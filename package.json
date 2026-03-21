@@ -1,0 +1,50 @@
+{
+  "name": "gestaoeclesial",
+  "version": "1.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "node ./scripts/run-eslint.cjs",
+    "seed:flows": "node ./scripts/seed-flow-templates.cjs"
+  },
+  "dependencies": {
+    "@googlemaps/js-api-loader": "^2.0.2",
+    "@react-google-maps/api": "^2.20.8",
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.89.0",
+    "@tailwindcss/postcss": "^4.1.17",
+    "@types/qrcode": "^1.5.6",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.2.3",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.1.0",
+    "jspdf-autotable": "^5.0.2",
+    "lucide-react": "^0.562.0",
+    "next": "^16.1.6",
+    "qrcode": "^1.5.4",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "recharts": "^3.6.0",
+    "resend": "^6.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.6",
+    "@types/qrcode.react": "^1.0.5",
+    "@types/react": "^19.0.5",
+    "@types/react-dom": "^19.0.2",
+    "autoprefixer": "^10.4.20",
+    "baseline-browser-mapping": "^2.9.19",
+    "eslint": "^9.16.0",
+    "eslint-config-next": "^16.0.5",
+    "pg": "^8.16.3",
+    "postcss": "^8.4.49",
+    "supabase": "^2.75.5",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2"
+  }
+}

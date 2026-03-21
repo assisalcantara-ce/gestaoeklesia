@@ -1,0 +1,3 @@
+-- Seed file (optional)
+-- Mantido intencionalmente simples.
+-- Use migrations em supabase/migrations para definir o schema.
