@@ -40,7 +40,7 @@ export default function UsuariosPage() {
   const [users, setUsers] = useState<User[]>([
     {
       id: '1',
-      email: 'admin@gestaoeclesial.local',
+      email: 'admin@gestaoservus.local',
       role: 'admin',
       createdAt: '2025-01-01',
     },

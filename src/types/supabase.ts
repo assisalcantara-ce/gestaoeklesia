@@ -14,9 +14,20 @@ export type Ministry = {
   email_admin: string
   cnpj_cpf: string | null
   phone: string | null
+  whatsapp?: string | null
   website: string | null
+  asaas_customer_id?: string | null
   logo_url: string | null
   description: string | null
+  responsible_name?: string | null
+  address_street?: string | null
+  address_number?: string | null
+  address_complement?: string | null
+  address_city?: string | null
+  address_state?: string | null
+  address_zip?: string | null
+  quantity_temples?: number | null
+  quantity_members?: number | null
   plan: 'starter' | 'growth' | 'enterprise'
   subscription_status: 'active' | 'trial' | 'suspended' | 'expired'
   subscription_start_date: string
@@ -49,15 +60,20 @@ export type Member = {
   email: string | null
   phone: string | null
   cpf: string | null
+  data_consagracao?: string | null
+  data_emissao?: string | null
+  data_validade_credencial?: string | null
   birth_date: string | null
   gender: string | null
   marital_status: string | null
+  orgao_emissor?: string | null
   occupation: string | null
   address: string | null
   complement: string | null
   city: string | null
   state: string | null
   zipcode: string | null
+  congregacao_id?: string | null
   latitude?: number | null
   longitude?: number | null
   member_since: string
@@ -163,15 +179,20 @@ export type CreateMemberRequest = {
   email?: string | null
   phone?: string | null
   cpf?: string | null
+  data_consagracao?: string | null
+  data_emissao?: string | null
+  data_validade_credencial?: string | null
   birth_date?: string | null
   gender?: string | null
   marital_status?: string | null
+  orgao_emissor?: string | null
   occupation?: string | null
   address?: string | null
   complement?: string | null
   city?: string | null
   state?: string | null
   zipcode?: string | null
+  congregacao_id?: string | null
   latitude?: number | null
   longitude?: number | null
   member_since?: string | Date

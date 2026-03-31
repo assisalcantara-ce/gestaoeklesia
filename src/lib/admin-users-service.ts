@@ -34,12 +34,11 @@ export interface AdminUserForm extends Omit<AdminUser, 'id' | 'criado_em' | 'atu
   password?: string
 }
 
-const supabase = createServerClient()
-
 /**
  * Lista todos os usuários administrativos
  */
 export async function getAllAdminUsers(): Promise<AdminUser[]> {
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from('admin_users')
     .select('*')
@@ -58,6 +57,7 @@ export async function getAllAdminUsers(): Promise<AdminUser[]> {
  * Obtém um usuário administrativo por ID
  */
 export async function getAdminUserById(id: string): Promise<AdminUser | null> {
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from('admin_users')
     .select('*')
@@ -76,6 +76,7 @@ export async function getAdminUserById(id: string): Promise<AdminUser | null> {
  * Obtém um usuário administrativo por email
  */
 export async function getAdminUserByEmail(email: string): Promise<AdminUser | null> {
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from('admin_users')
     .select('*')
@@ -108,6 +109,8 @@ export async function createAdminUser(userData: AdminUserForm): Promise<AdminUse
   if (existing) {
     throw new Error('Este email já está cadastrado')
   }
+
+  const supabase = createServerClient()
 
   // Cria usuário na tabela admin_users
   // Em produção, você precisará fazer hash da senha
@@ -155,6 +158,7 @@ export async function createAdminUser(userData: AdminUserForm): Promise<AdminUse
  * Atualiza um usuário administrativo
  */
 export async function updateAdminUser(id: string, userData: Partial<AdminUserForm>): Promise<AdminUser> {
+  const supabase = createServerClient()
   const { password, ...updateData } = userData
 
   const { data, error } = await supabase
@@ -176,6 +180,7 @@ export async function updateAdminUser(id: string, userData: Partial<AdminUserFor
  * Deleta um usuário administrativo
  */
 export async function deleteAdminUser(id: string): Promise<void> {
+  const supabase = createServerClient()
   // Verifica se é o último admin
   const { count, error: countError } = await supabase
     .from('admin_users')

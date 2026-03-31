@@ -331,7 +331,7 @@
                                "fontSize":  10,
                                "cor":  "#000",
                                "fonte":  "Arial",
-                               "texto":  "\u003cfont color=\"#ef4444\"\u003e{filiacao}\u003c/font\u003e",
+                               "texto":  "\u003cfont color=\"#ef4444\"\u003ePai: {nomePai} / Mãe: {nomeMae}\u003c/font\u003e",
                                "alinhamento":  "left",
                                "negrito":  true,
                                "italico":  false,

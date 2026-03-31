@@ -199,8 +199,9 @@ export function RichTextEditor({
                                 <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Cores Básicas</div>
                                 <div className="grid grid-cols-5 gap-2">
                                     {['#000000', '#444444', '#888888', '#cccccc', '#ffffff',
-                                        '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6',
-                                        '#3b82f6', '#6366f1', '#a855f7', '#ec4899', '#f43f5e'].map(color => (
+                                        '#ef4444', '#f97316', '#eab308', '#facc15', '#fde047',
+                                        '#fef9c3', '#FFFF00', '#22c55e', '#14b8a6', '#3b82f6',
+                                        '#6366f1', '#a855f7', '#ec4899', '#f43f5e'].map(color => (
                                             <button
                                                 key={color}
                                                 onClick={() => {

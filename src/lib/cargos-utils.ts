@@ -6,7 +6,7 @@ export interface CargoMinisterial {
     ativo: boolean;
 }
 
-const STORAGE_KEY = 'gestaoeclesial_cargos_ministeriais';
+const STORAGE_KEY = 'gestaoservus_cargos_ministeriais';
 
 // Lista padrão de cargos ministeriais
 const CARGOS_PADRAO: CargoMinisterial[] = [

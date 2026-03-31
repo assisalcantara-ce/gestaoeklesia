@@ -26,7 +26,7 @@ export default function DashboardPage() {
         const { data } = await supabase.auth.getUser();
 
         if (!data.user) {
-          router.push('/');
+          router.push('/login');
           return;
         }
 
@@ -105,8 +105,6 @@ export default function DashboardPage() {
   if (authLoading) return <div className="p-8">Carregando...</div>;
 
   const statsCards = [
-    { title: 'Tesouraria', value: 'R$ 0,00', subtitle: 'Saldo total', icon: '💰', color: 'bg-orange-100' },
-    { title: 'Achados e Perdidos', value: '0', subtitle: 'itens registrados', icon: '🔍', color: 'bg-green-100' },
     { title: 'Financeiro', value: 'R$ 0,00', subtitle: 'Receitas', icon: '💳', color: 'bg-cyan-100' },
     { title: 'Comissão', value: '0', subtitle: 'membros ativos', icon: '👥', color: 'bg-yellow-100' },
   ];
@@ -119,13 +117,13 @@ export default function DashboardPage() {
       <div className="flex-1 overflow-auto">
         <div className="p-6">
           {/* HEADER */}
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-[#123b63]">Bem-vindo ao Dashboard</h1>
-              <p className="text-gray-600 mt-1">{dataAtual}</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-[#123b63]">Bem-vindo ao Dashboard</h1>
+              <p className="text-gray-600 text-sm md:text-base mt-1">{dataAtual}</p>
             </div>
             {usuarioLogado && (
-              <div className="flex items-center gap-6 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+              <div className="flex items-center gap-6 bg-white rounded-lg p-4 shadow-sm border border-gray-200 md:flex-shrink-0">
                 <div className="text-right">
                   <p className="text-sm font-semibold text-[#123b63]">{usuarioLogado.nome}</p>
                   <p className="text-xs text-gray-600 mt-1">{usuarioLogado.email}</p>
@@ -147,7 +145,7 @@ export default function DashboardPage() {
 
           {/* STATS CARDS */}
           <div className="mb-12">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
               {statsCards.map((card, index) => (
                 <div
                   key={index}
@@ -250,18 +248,7 @@ export default function DashboardPage() {
 
           {/* THIRD ROW - FINAL OPTIONS */}
           <div className="mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* EBD */}
-            <div className="bg-white rounded-2xl p-8 shadow-md hover:shadow-lg transition">
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h3 className="text-lg font-bold text-[#123b63]">EBD</h3>
-                  <p className="text-gray-600 text-xs mt-2">Escola Bíblica</p>
-                </div>
-                <span className="text-3xl">📚</span>
-              </div>
-              <p className="text-3xl font-bold text-[#123b63] mt-4">0</p>
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
             {/* FUNCIONÁRIOS */}
             <div className="bg-white rounded-2xl p-8 shadow-md hover:shadow-lg transition">
@@ -289,21 +276,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* KIDS */}
-          <div className="mb-6">
-            <div className="grid grid-cols-1 gap-4">
-              <div className="bg-white rounded-2xl p-8 shadow-md hover:shadow-lg transition">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h3 className="text-lg font-bold text-[#123b63]">KIDs</h3>
-                    <p className="text-gray-600 text-xs mt-2">Ministério Infantil</p>
-                  </div>
-                  <span className="text-3xl">👶</span>
-                </div>
-                <p className="text-3xl font-bold text-[#123b63] mt-4">0</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

@@ -60,3 +60,19 @@ Notas rápidas (geolocalização):
 - Loop/login/admin: `docs/SESSION_03_JANEIRO_2026.md`
 - RLS recursion em `admin_users`: `docs/ACAO_IMEDIATA_FIX_RLS.md`
 - Deploy: `docs/GUIA_DEPLOY_PRODUCAO.md`
+
+---
+
+## 6) Planejamento Asaas (31/03/2026)
+
+- Gerar 12 cobrancas para contrato anual no Asaas.
+- Persistir parcelas na tabela `payments` (asaas_payment_id, status, due_date).
+- Admin/Pagamentos: listar parcelas e permitir baixa manual (recebimento em maos).
+- Webhook Asaas: atualizar automaticamente status de pagamento.
+
+Checklist detalhado para iniciar:
+- Definir modelo: 12 cobrancas avulsas x assinatura nativa Asaas.
+- Criar cliente server-side do Asaas (lib/asaas.ts).
+- Endpoint: criar cobrancas (admin/contrato anual).
+- Webhook: validar assinatura e mapear eventos (PAYMENT_CONFIRMED, PAYMENT_RECEIVED, PAYMENT_OVERDUE).
+- UI admin/pagamentos: filtros + acao "Baixa manual".

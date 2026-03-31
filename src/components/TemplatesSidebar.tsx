@@ -54,8 +54,6 @@ export function TemplatesSidebar({
     ].filter(Boolean);
 
     const TIPOS_CARTAO = [
-        { valor: 'membro', label: 'Cartão de Membro', cor: '#1e40af' },
-        { valor: 'congregado', label: 'Cartão de Congregado', cor: '#0891b2' },
         { valor: 'ministro', label: 'Credencial de Ministro', cor: '#d97706' },
         { valor: 'funcionario', label: 'Cartão de Funcionário', cor: '#6b21a8' }
     ];

@@ -57,6 +57,14 @@ interface FichaMembroProps {
 
 export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembroProps) {
   const fichaRef = useRef<HTMLDivElement>(null);
+  const sectionTitleStyle: React.CSSProperties = {
+    background: 'transparent',
+    color: '#003d7a',
+    padding: '6px 10px',
+    fontWeight: 'bold',
+    fontSize: '12px',
+    border: '1px solid #003d7a',
+  };
 
   const imprimirFicha = () => {
     if (fichaRef.current) {
@@ -68,7 +76,7 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
           <html>
             <head>
               <meta charset="UTF-8">
-              <title>Ficha do Membro - ${membro.nome}</title>
+              <title>Ficha do Ministro - ${membro.nome}</title>
               <style>
                 * { margin: 0; padding: 0; }
                 body { 
@@ -243,25 +251,26 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
           }}>
             {/* Matrícula e Nome em Caixa Horizontal */}
             <div style={{
-              background: 'linear-gradient(135deg, #1e40af 0%, #003d7a 100%)',
+              background: '#ffffff',
+              border: '1px solid #003d7a',
               borderRadius: '8px',
               padding: '12px 16px',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                 <div>
-                  <p style={{ margin: '0', fontSize: '10px', color: '#fff', opacity: 0.9, fontWeight: '600' }}>
+                  <p style={{ margin: '0', fontSize: '10px', color: '#003d7a', fontWeight: '700' }}>
                     MATRÍCULA
                   </p>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '18px', color: '#fff', fontWeight: 'bold' }}>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '18px', color: '#1f2937', fontWeight: 'bold' }}>
                     {membro.matricula}
                   </p>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <p style={{ margin: '0', fontSize: '10px', color: '#fff', opacity: 0.9, fontWeight: '600' }}>
-                    NOME DO MEMBRO
+                  <p style={{ margin: '0', fontSize: '10px', color: '#003d7a', fontWeight: '700' }}>
+                    NOME DO MINISTRO
                   </p>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '16px', color: '#fff', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '16px', color: '#1f2937', fontWeight: 'bold', letterSpacing: '0.5px' }}>
                     {membro.nome}
                   </p>
                 </div>
@@ -314,13 +323,7 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
           <tbody>
             {/* DADOS PESSOAIS */}
             <tr>
-              <td colSpan={4} style={{
-                background: '#003d7a',
-                color: '#fff',
-                padding: '6px 10px',
-                fontWeight: 'bold',
-                fontSize: '12px'
-              }}>
+              <td colSpan={4} style={sectionTitleStyle}>
                 DADOS PESSOAIS
               </td>
             </tr>
@@ -351,13 +354,10 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
             {(membro.nomePai || membro.nomeMae || membro.nomeConjuge) && (
               <>
                 <tr>
-                  <td colSpan={4} style={{
-                    background: '#003d7a',
-                    color: '#fff',
-                    padding: '6px 10px',
-                    fontWeight: 'bold',
-                    fontSize: '12px'
-                  }}>
+                  <td colSpan={4} style={{ border: 'none', height: '8px', padding: 0 }}></td>
+                </tr>
+                <tr>
+                  <td colSpan={4} style={sectionTitleStyle}>
                     DADOS FAMILIARES
                   </td>
                 </tr>
@@ -388,13 +388,10 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
             {(membro.tipoCadastro === 'ministro' || membro.cargo) && (
               <>
                 <tr>
-                  <td colSpan={4} style={{
-                    background: '#003d7a',
-                    color: '#fff',
-                    padding: '6px 10px',
-                    fontWeight: 'bold',
-                    fontSize: '12px'
-                  }}>
+                  <td colSpan={4} style={{ border: 'none', height: '8px', padding: 0 }}></td>
+                </tr>
+                <tr>
+                  <td colSpan={4} style={sectionTitleStyle}>
                     DADOS MINISTERIAIS
                   </td>
                 </tr>
@@ -421,13 +418,10 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
 
             {/* ENDEREÇO */}
             <tr>
-              <td colSpan={4} style={{
-                background: '#003d7a',
-                color: '#fff',
-                padding: '6px 10px',
-                fontWeight: 'bold',
-                fontSize: '12px'
-              }}>
+              <td colSpan={4} style={{ border: 'none', height: '8px', padding: 0 }}></td>
+            </tr>
+            <tr>
+              <td colSpan={4} style={sectionTitleStyle}>
                 ENDEREÇO
               </td>
             </tr>
@@ -456,13 +450,10 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
 
             {/* CONTATO */}
             <tr>
-              <td colSpan={4} style={{
-                background: '#003d7a',
-                color: '#fff',
-                padding: '6px 10px',
-                fontWeight: 'bold',
-                fontSize: '12px'
-              }}>
+              <td colSpan={4} style={{ border: 'none', height: '8px', padding: 0 }}></td>
+            </tr>
+            <tr>
+              <td colSpan={4} style={sectionTitleStyle}>
                 CONTATO
               </td>
             </tr>
@@ -497,7 +488,7 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
             <p style={{ margin: '4px 0 0 0' }}>{new Date().toLocaleDateString('pt-BR')}</p>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ margin: '0', color: '#666', fontWeight: 'bold' }}>Gestão Eclesial</p>
+            <p style={{ margin: '0', color: '#666', fontWeight: 'bold' }}>GESTAOSERVUS</p>
           </div>
           <div style={{ textAlign: 'right' }}>
             <p style={{ margin: '0', fontWeight: 'bold', color: '#003d7a' }}>Assinatura:</p>

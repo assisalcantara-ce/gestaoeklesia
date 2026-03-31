@@ -58,7 +58,7 @@ Este documento detalha a implementação completa do sistema de impressão de ca
   - Função
   - CPF
   - RG, Nacionalidade, Naturalidade
-  - Data de Nascimento, Data de Batismo
+  - Data de Nascimento, Data de Consagração
   - Estado Civil, Tipo Sanguíneo
   - QR Code
   - E todos os outros placeholders do sistema

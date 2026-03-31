@@ -98,24 +98,14 @@ export default function AdminDashboardPage() {
     )
   }
 
-  // Dados de exemplo para gráficos
-  const ticketsData = [
-    { month: 'Jan', value: 12 },
-    { month: 'Fev', value: 19 },
-    { month: 'Mar', value: 15 },
-    { month: 'Abr', value: 22 },
-    { month: 'Mai', value: 18 },
-    { month: 'Jun', value: 25 },
-  ]
-
-  const deploymentsData = [
-    { month: 'Jan', implantacoes: 8, cancelamentos: 2 },
-    { month: 'Fev', implantacoes: 12, cancelamentos: 1 },
-    { month: 'Mar', implantacoes: 10, cancelamentos: 3 },
-    { month: 'Abr', implantacoes: 15, cancelamentos: 2 },
-    { month: 'Mai', implantacoes: 11, cancelamentos: 4 },
-    { month: 'Jun', implantacoes: 18, cancelamentos: 1 },
-  ]
+  const ticketsData = metrics?.tickets_by_month || []
+  const deploymentsData = metrics?.deployments_by_month || []
+  const ticketStats = metrics?.ticket_stats || {
+    received: 0,
+    resolved: 0,
+    waiting: 0,
+    high_priority: 0,
+  }
 
   const StatCard = ({
     icon: Icon,
@@ -171,25 +161,21 @@ export default function AdminDashboardPage() {
               icon={Building2}
               title="Total de Ministérios"
               value={metrics?.total_ministries || 0}
-              trend="+12% vs mês anterior"
             />
             <StatCard
               icon={Users}
               title="Ministérios Ativos"
               value={metrics?.active_ministries || 0}
-              trend="+8% vs mês anterior"
             />
             <StatCard
               icon={CreditCard}
               title="Receita Total"
               value={`R$ ${((metrics?.total_revenue_month || 0) / 1000).toFixed(1)}k`}
-              trend="+23% vs mês anterior"
             />
             <StatCard
               icon={TrendingUp}
               title="Taxa de Crescimento"
-              value="12.5%"
-              trend="Em alta"
+              value={`${metrics?.user_growth_percent || 0}%`}
             />
           </div>
 
@@ -201,8 +187,8 @@ export default function AdminDashboardPage() {
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={ticketsData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis stroke="#9ca3af" />
-                  <YAxis stroke="#9ca3af" />
+                  <XAxis stroke="#9ca3af" dataKey="month" />
+                  <YAxis stroke="#9ca3af" allowDecimals={false} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#1f2937',
@@ -214,6 +200,7 @@ export default function AdminDashboardPage() {
                   <Line
                     type="monotone"
                     dataKey="value"
+                    name="Chamados"
                     stroke="#3b82f6"
                     strokeWidth={2}
                     dot={{ fill: '#3b82f6', r: 5 }}
@@ -230,23 +217,19 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
                   <p className="text-gray-400 text-sm mb-2">Chamados Recebidos</p>
-                  <p className="text-white text-3xl font-bold">24</p>
-                  <p className="text-green-400 text-xs mt-2">↑ 12% vs semana anterior</p>
+                  <p className="text-white text-3xl font-bold">{ticketStats.received}</p>
                 </div>
                 <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
                   <p className="text-gray-400 text-sm mb-2">Chamados Atendidos</p>
-                  <p className="text-white text-3xl font-bold">18</p>
-                  <p className="text-green-400 text-xs mt-2">75% de taxa de conclusão</p>
+                  <p className="text-white text-3xl font-bold">{ticketStats.resolved}</p>
                 </div>
                 <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
                   <p className="text-gray-400 text-sm mb-2">Chamados em Espera</p>
-                  <p className="text-white text-3xl font-bold">6</p>
-                  <p className="text-yellow-400 text-xs mt-2">Tempo médio: 45min</p>
+                  <p className="text-white text-3xl font-bold">{ticketStats.waiting}</p>
                 </div>
                 <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
                   <p className="text-gray-400 text-sm mb-2">Prioridade Alta</p>
-                  <p className="text-white text-3xl font-bold">3</p>
-                  <p className="text-red-400 text-xs mt-2">Requerem atenção</p>
+                  <p className="text-white text-3xl font-bold">{ticketStats.high_priority}</p>
                 </div>
               </div>
             </div>
@@ -258,8 +241,8 @@ export default function AdminDashboardPage() {
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={deploymentsData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis stroke="#9ca3af" />
-                <YAxis stroke="#9ca3af" />
+                <XAxis stroke="#9ca3af" dataKey="month" />
+                <YAxis stroke="#9ca3af" allowDecimals={false} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#1f2937',
@@ -268,11 +251,12 @@ export default function AdminDashboardPage() {
                   }}
                 />
                 <Legend />
-                <Bar dataKey="implantacoes" fill="#10b981" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="cancelamentos" fill="#ef4444" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="implantacoes" name="Implantações" fill="#10b981" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="cancelamentos" name="Cancelamentos" fill="#ef4444" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
+
         </div>
       </main>
     </div>

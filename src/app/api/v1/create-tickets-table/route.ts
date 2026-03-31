@@ -113,7 +113,11 @@ GRANT SELECT, INSERT, UPDATE ON public.tickets_suporte TO authenticated;
       console.warn('[MIGRATION] Erro ao verificar tabela:', checkError)
       
       // Se ainda der erro, retornar instruções
-      if (checkError.code === 'PGRST116' || checkError.message?.includes('not found')) {
+      if (
+        checkError.code === 'PGRST116' ||
+        checkError.code === 'PGRST205' ||
+        /not found|schema cache|does not exist/i.test(checkError.message || '')
+      ) {
         return NextResponse.json(
           {
             sucesso: false,

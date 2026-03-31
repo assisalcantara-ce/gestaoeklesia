@@ -95,6 +95,16 @@ export async function POST(request: NextRequest) {
     const website: string | undefined = body?.website
     const logoUrl: string | undefined = body?.logo_url
     const description: string | undefined = body?.description
+    const whatsapp: string | undefined = body?.whatsapp
+    const responsibleName: string | undefined = body?.responsible_name
+    const addressStreet: string | undefined = body?.address_street
+    const addressNumber: string | undefined = body?.address_number
+    const addressComplement: string | undefined = body?.address_complement
+    const addressCity: string | undefined = body?.address_city
+    const addressState: string | undefined = body?.address_state
+    const addressZip: string | undefined = body?.address_zip
+    const quantityTemples = body?.quantity_temples
+    const quantityMembers = body?.quantity_members
 
     if (!name || !emailAdmin) {
       return NextResponse.json(
@@ -134,9 +144,19 @@ export async function POST(request: NextRequest) {
           email_admin: emailAdmin,
           cnpj_cpf: onlyDigits(cnpjCpf),
           phone: onlyDigits(phone),
+          whatsapp: onlyDigits(whatsapp),
           website: website || null,
           logo_url: logoUrl || null,
           description: description || null,
+          responsible_name: responsibleName || null,
+          address_street: addressStreet || null,
+          address_number: addressNumber || null,
+          address_complement: addressComplement || null,
+          address_city: addressCity || null,
+          address_state: addressState || null,
+          address_zip: onlyDigits(addressZip),
+          quantity_temples: typeof quantityTemples === 'number' ? quantityTemples : 1,
+          quantity_members: typeof quantityMembers === 'number' ? quantityMembers : 0,
           plan,
           subscription_status: 'active',
           auto_renew: body?.auto_renew !== false,
@@ -193,6 +213,109 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     )
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const result = await requireAdmin(request, { requiredCapability: 'can_manage_ministries' })
+    if (!result.ok) return result.response
+    const { supabaseAdmin: supabase, adminUser } = result.ctx
+    const body = await request.json()
+
+    const id: string | undefined = body?.id
+    if (!id) {
+      return NextResponse.json({ error: 'ID do ministério é obrigatório' }, { status: 400 })
+    }
+
+    const name: string | undefined = body?.name
+    const emailAdmin: string | undefined = body?.email_admin || body?.contact_email
+    const phone: string | undefined = body?.phone || body?.contact_phone
+    const cnpjCpf: string | undefined = body?.cnpj_cpf || body?.cnpj
+    const website: string | undefined = body?.website
+    const logoUrl: string | undefined = body?.logo_url
+    const description: string | undefined = body?.description
+    const whatsapp: string | undefined = body?.whatsapp
+    const responsibleName: string | undefined = body?.responsible_name
+    const addressStreet: string | undefined = body?.address_street
+    const addressNumber: string | undefined = body?.address_number
+    const addressComplement: string | undefined = body?.address_complement
+    const addressCity: string | undefined = body?.address_city
+    const addressState: string | undefined = body?.address_state
+    const addressZip: string | undefined = body?.address_zip
+    const plan = body?.plan ? String(body.plan) : mapPlan(body?.subscription_plan_id)
+
+    const payload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (name !== undefined) payload.name = name
+    if (emailAdmin !== undefined) payload.email_admin = emailAdmin
+    if (phone !== undefined) payload.phone = onlyDigits(phone)
+    if (whatsapp !== undefined) payload.whatsapp = onlyDigits(whatsapp)
+    if (cnpjCpf !== undefined) payload.cnpj_cpf = onlyDigits(cnpjCpf)
+    if (website !== undefined) payload.website = website || null
+    if (logoUrl !== undefined) payload.logo_url = logoUrl || null
+    if (description !== undefined) payload.description = description || null
+    if (responsibleName !== undefined) payload.responsible_name = responsibleName || null
+    if (addressStreet !== undefined) payload.address_street = addressStreet || null
+    if (addressNumber !== undefined) payload.address_number = addressNumber || null
+    if (addressComplement !== undefined) payload.address_complement = addressComplement || null
+    if (addressCity !== undefined) payload.address_city = addressCity || null
+    if (addressState !== undefined) payload.address_state = addressState || null
+    if (addressZip !== undefined) payload.address_zip = onlyDigits(addressZip)
+    if (body?.quantity_temples !== undefined) payload.quantity_temples = Number(body.quantity_temples) || 0
+    if (body?.quantity_members !== undefined) payload.quantity_members = Number(body.quantity_members) || 0
+    if (plan) payload.plan = plan
+    if (body?.is_active !== undefined) payload.is_active = Boolean(body.is_active)
+
+    const { data, error } = await supabase
+      .from('ministries')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    await logAuditAction(supabase, adminUser.id, 'UPDATE_MINISTRY', 'ministries', id, payload)
+
+    return NextResponse.json({ data })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const result = await requireAdmin(request, { requiredCapability: 'can_manage_ministries' })
+    if (!result.ok) return result.response
+    const { supabaseAdmin: supabase, adminUser } = result.ctx
+    const body = await request.json()
+
+    const id: string | undefined = body?.id
+    if (!id) {
+      return NextResponse.json({ error: 'ID do ministério é obrigatório' }, { status: 400 })
+    }
+
+    const { data, error } = await supabase
+      .from('ministries')
+      .delete()
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    await logAuditAction(supabase, adminUser.id, 'DELETE_MINISTRY', 'ministries', id, {})
+
+    return NextResponse.json({ data })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

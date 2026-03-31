@@ -28,6 +28,10 @@ export function useAuditLog() {
           data: { user },
         } = await supabase.auth.getUser()
 
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
         if (!user) {
           console.warn('Usuário não autenticado, não pode registrar auditoria')
           return
@@ -55,6 +59,9 @@ export function useAuditLog() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...(session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : {}),
           },
           body: JSON.stringify(dados),
         })

@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClientFromRequest } from '@/lib/supabase-server'
+import { createServerClient, createServerClientFromRequest } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerClientFromRequest(request)
+    const authClient = createServerClientFromRequest(request)
+    const adminClient = createServerClient()
 
     // Obter usuário
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await authClient.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
@@ -26,23 +27,13 @@ export async function POST(request: NextRequest) {
     // Obter User Agent
     const userAgent = request.headers.get('user-agent') || 'desconhecido'
 
-    // Obter empresa_id do usuário
-    const { data: usuarioEmpresa } = await supabase
-      .from('usuario_empresas')
-      .select('empresa_id')
-      .eq('usuario_id', user.id)
-      .single()
-
-    if (!usuarioEmpresa) {
-      return NextResponse.json(
-        { error: 'Usuário não associado a empresa' },
-        { status: 400 },
-      )
+    const tryInsert = async (payload: Record<string, any>) => {
+      const { error } = await adminClient.from('audit_logs').insert(payload)
+      return error || null
     }
 
-    // Inserir log
-    const { error } = await supabase.from('audit_logs').insert({
-      empresa_id: usuarioEmpresa.empresa_id,
+    // Inserir log (schema simplificado)
+    let error = await tryInsert({
       usuario_id: user.id,
       usuario_email: body.usuario_email || user.email,
       acao: body.acao,
@@ -59,24 +50,134 @@ export async function POST(request: NextRequest) {
       mensagem_erro: body.mensagem_erro,
     })
 
-    if (error) {
-      // Se tabela não existe, tenta criar
-      if (error.code === 'PGRST116' || error.message?.includes('not found')) {
-        // Tabela será criada automaticamente pelo endpoint de migração
-        return NextResponse.json(
-          { message: 'Tabela ainda não existe, será criada na próxima requisição' },
-          { status: 202 },
-        )
-      }
-      throw error
+    if (!error) {
+      return NextResponse.json({ success: true, message: 'Log registrado' })
     }
 
-    return NextResponse.json({ success: true, message: 'Log registrado' })
+    // Se tabela não existe, tenta criar
+    if (error.code === 'PGRST116' || error.message?.includes('not found')) {
+      return NextResponse.json(
+        { message: 'Tabela ainda não existe, será criada na próxima requisição' },
+        { status: 202 },
+      )
+    }
+
+    // Fallback para schema antigo (ministry-based)
+    const actionMap: Record<string, string> = {
+      criar: 'CREATE',
+      editar: 'UPDATE',
+      deletar: 'DELETE',
+      visualizar: 'READ',
+      exportar: 'EXPORT',
+      importar: 'EXPORT',
+      responder: 'UPDATE',
+      login: 'LOGIN',
+      logout: 'LOGOUT',
+      download: 'DOWNLOAD',
+      upload: 'UPDATE',
+      outro: 'READ',
+    }
+
+    const resolveMinistryId = async () => {
+      const { data: mu, error: muErr } = await adminClient
+        .from('ministry_users')
+        .select('ministry_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!muErr && mu?.ministry_id) return mu.ministry_id as string
+
+      const { data: m, error: mErr } = await adminClient
+        .from('ministries')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!mErr && m?.id) return m.id as string
+
+      return null
+    }
+
+    const ministryId = await resolveMinistryId()
+
+    if (!ministryId) {
+      return NextResponse.json(
+        { message: 'Audit log ignorado: ministry não encontrado' },
+        { status: 202 },
+      )
+    }
+
+    const status = body.status || 'sucesso'
+    const statusCode = status === 'erro' ? 500 : status === 'aviso' ? 400 : 200
+    const mappedAction = actionMap[body.acao] || 'READ'
+
+    error = await tryInsert({
+      ministry_id: ministryId,
+      user_id: user.id,
+      action: mappedAction,
+      resource_type: body.modulo || body.tabela_afetada || 'geral',
+      resource_id: body.registro_id || null,
+      old_data: body.dados_anteriores || null,
+      new_data: body.dados_novos || null,
+      changes: null,
+      ip_address: ip,
+      user_agent: userAgent,
+      status_code: statusCode,
+      error_message: body.mensagem_erro || null,
+    })
+
+    if (!error) {
+      return NextResponse.json({ success: true, message: 'Log registrado (fallback)' })
+    }
+
+    // Fallback para schema empresa-based
+    const resolveEmpresaId = async () => {
+      const { data: ue, error: ueErr } = await adminClient
+        .from('usuario_empresas')
+        .select('empresa_id')
+        .eq('usuario_id', user.id)
+        .maybeSingle()
+
+      if (!ueErr && ue?.empresa_id) return ue.empresa_id as string
+      return null
+    }
+
+    const empresaId = await resolveEmpresaId()
+
+    if (empresaId) {
+      error = await tryInsert({
+        empresa_id: empresaId,
+        usuario_id: user.id,
+        usuario_email: body.usuario_email || user.email,
+        acao: body.acao,
+        modulo: body.modulo,
+        area: body.area,
+        tabela_afetada: body.tabela_afetada,
+        registro_id: body.registro_id,
+        descricao: body.descricao,
+        dados_anteriores: body.dados_anteriores,
+        dados_novos: body.dados_novos,
+        ip_address: ip,
+        user_agent: userAgent,
+        status: body.status || 'sucesso',
+        mensagem_erro: body.mensagem_erro,
+      })
+
+      if (!error) {
+        return NextResponse.json({ success: true, message: 'Log registrado (empresa)' })
+      }
+    }
+
+    console.error('Falha ao registrar auditoria:', error)
+    return NextResponse.json(
+      { success: false, message: 'Falha ao registrar auditoria' },
+      { status: 200 },
+    )
   } catch (error) {
     console.error('Erro ao registrar auditoria:', error)
     return NextResponse.json(
-      { error: 'Erro ao registrar auditoria' },
-      { status: 500 },
+      { success: false, message: 'Falha ao registrar auditoria' },
+      { status: 200 },
     )
   }
 }
@@ -103,25 +204,11 @@ export async function GET(request: NextRequest) {
     const dataInicio = searchParams.get('dataInicio')
     const dataFim = searchParams.get('dataFim')
 
-    // Obter empresa_id do usuário
-    const { data: usuarioEmpresa } = await supabase
-      .from('usuario_empresas')
-      .select('empresa_id, eh_administrador')
-      .eq('usuario_id', user.id)
-      .single()
-
-    if (!usuarioEmpresa) {
-      return NextResponse.json(
-        { error: 'Usuário não associado a empresa' },
-        { status: 400 },
-      )
-    }
-
     // Montar query
     let query = supabase
       .from('audit_logs')
       .select('*')
-      .eq('empresa_id', usuarioEmpresa.empresa_id)
+      .eq('usuario_id', user.id)
 
     // Aplicar filtros
     if (acao) query = query.eq('acao', acao)

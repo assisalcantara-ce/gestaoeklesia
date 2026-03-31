@@ -1,4 +1,4 @@
-# 🎨 Gestão Eklesia - Sistema de Administração Ministerial
+# 🎨 Gestão Servus - Sistema de Gestão para Instituições
 
 ## ✅ Status: 95% Pronto para Desenvolvimento
 

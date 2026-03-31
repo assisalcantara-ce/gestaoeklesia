@@ -201,7 +201,7 @@ export default function TrialSignupsWidget() {
   const getStatusBadge = (status: string, expiryDate: string) => {
     if (status === 'converted') {
       return (
-        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-900 text-green-200">
           <CheckCircle className="w-3 h-3" /> Convertido
         </span>
       )
@@ -211,7 +211,7 @@ export default function TrialSignupsWidget() {
 
     if (daysLeft < 0) {
       return (
-        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-red-900 text-red-200">
           <AlertCircle className="w-3 h-3" /> Expirado
         </span>
       )
@@ -219,7 +219,7 @@ export default function TrialSignupsWidget() {
 
     if (status === 'active') {
       return (
-        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-900 text-green-200">
           <CheckCircle className="w-3 h-3" /> Aprovado
         </span>
       )
@@ -227,14 +227,14 @@ export default function TrialSignupsWidget() {
 
     if (daysLeft <= 2) {
       return (
-        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-yellow-900 text-yellow-200">
           <Clock className="w-3 h-3" /> Vence em {daysLeft} dias
         </span>
       )
     }
 
     return (
-      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-orange-900 text-orange-200">
         <Clock className="w-3 h-3" /> Pendente
       </span>
     )
@@ -242,16 +242,16 @@ export default function TrialSignupsWidget() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <p className="text-gray-600">Carregando...</p>
+      <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6">
+        <p className="text-gray-400">Carregando...</p>
       </div>
     )
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">
+        <h3 className="text-lg font-semibold text-white">
           📝 Pré-Cadastros (Trial)
         </h3>
         <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold leading-none text-white transform bg-blue-600 rounded-full">
@@ -260,50 +260,50 @@ export default function TrialSignupsWidget() {
       </div>
 
       {signups.length === 0 ? (
-        <p className="text-gray-600 text-sm">Nenhum pré-cadastro registrado</p>
+        <p className="text-gray-400 text-sm">Nenhum pré-cadastro registrado</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50">
+            <thead className="border-b border-gray-700 bg-gray-900">
               <tr>
-                <th className="text-left px-4 py-2 font-semibold text-gray-700">
+                <th className="text-left px-4 py-2 font-semibold text-gray-300">
                   Ministério
                 </th>
-                <th className="text-left px-4 py-2 font-semibold text-gray-700">
+                <th className="text-left px-4 py-2 font-semibold text-gray-300">
                   Pastor
                 </th>
-                <th className="text-left px-4 py-2 font-semibold text-gray-700">
+                <th className="text-left px-4 py-2 font-semibold text-gray-300">
                   Email
                 </th>
-                <th className="text-left px-4 py-2 font-semibold text-gray-700">
+                <th className="text-left px-4 py-2 font-semibold text-gray-300">
                   Status
                 </th>
-                <th className="text-left px-4 py-2 font-semibold text-gray-700">
+                <th className="text-left px-4 py-2 font-semibold text-gray-300">
                   Cadastrado
                 </th>
-                <th className="text-center px-4 py-2 font-semibold text-gray-700">
+                <th className="text-center px-4 py-2 font-semibold text-gray-300">
                   Ações
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-700">
               {signups.map((signup) => (
-                <tr key={signup.id} className="hover:bg-gray-50 transition">
+                <tr key={signup.id} className="hover:bg-gray-700/40 transition">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-gray-100">
                       {signup.ministry_name}
                     </p>
                   </td>
-                  <td className="px-4 py-3 text-gray-700">
+                  <td className="px-4 py-3 text-gray-300">
                     {signup.pastor_name}
                   </td>
-                  <td className="px-4 py-3 text-gray-700 text-xs">
+                  <td className="px-4 py-3 text-gray-300 text-xs">
                     {signup.email}
                   </td>
                   <td className="px-4 py-3">
                     {getStatusBadge(signup.status, signup.trial_expires_at)}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 text-xs">
+                  <td className="px-4 py-3 text-gray-400 text-xs">
                     {new Date(signup.created_at).toLocaleDateString('pt-BR')}
                   </td>
                   <td className="px-4 py-3">
@@ -373,7 +373,7 @@ export default function TrialSignupsWidget() {
         </div>
       )}
 
-      <div className="mt-4 pt-4 border-t border-gray-200">
+      <div className="mt-4 pt-4 border-t border-gray-700">
         <p className="text-xs text-gray-500">
           Dica: Clique em "Aprovar" para liberar o acesso de teste ao usuário. Use "Detalhes" para gerar credenciais e contratos.
         </p>
@@ -381,37 +381,37 @@ export default function TrialSignupsWidget() {
 
       {/* Modal de Detalhes */}
       {showDetailModal && selectedSignup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto text-gray-100">
+            <h2 className="text-2xl font-bold text-white mb-4">
               📋 {selectedSignup.ministry_name}
             </h2>
 
             <div className="space-y-3 mb-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500 font-semibold uppercase">Pastor</p>
-                  <p className="text-sm text-gray-900">{selectedSignup.pastor_name}</p>
+                  <p className="text-xs text-gray-400 font-semibold uppercase">Pastor</p>
+                  <p className="text-sm text-gray-100">{selectedSignup.pastor_name}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 font-semibold uppercase">Status</p>
-                  <p className="text-sm text-gray-900">{selectedSignup.status}</p>
+                  <p className="text-xs text-gray-400 font-semibold uppercase">Status</p>
+                  <p className="text-sm text-gray-100">{selectedSignup.status}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 font-semibold uppercase">Email</p>
-                  <p className="text-sm text-gray-900">{selectedSignup.email}</p>
+                  <p className="text-xs text-gray-400 font-semibold uppercase">Email</p>
+                  <p className="text-sm text-gray-100">{selectedSignup.email}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 font-semibold uppercase">WhatsApp</p>
-                  <p className="text-sm text-gray-900">{selectedSignup.whatsapp}</p>
+                  <p className="text-xs text-gray-400 font-semibold uppercase">WhatsApp</p>
+                  <p className="text-sm text-gray-100">{selectedSignup.whatsapp}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 font-semibold uppercase">Templos</p>
-                  <p className="text-sm text-gray-900">{selectedSignup.quantity_temples}</p>
+                  <p className="text-xs text-gray-400 font-semibold uppercase">Templos</p>
+                  <p className="text-sm text-gray-100">{selectedSignup.quantity_temples}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 font-semibold uppercase">Membros</p>
-                  <p className="text-sm text-gray-900">{selectedSignup.quantity_members}</p>
+                  <p className="text-xs text-gray-400 font-semibold uppercase">Membros</p>
+                  <p className="text-sm text-gray-100">{selectedSignup.quantity_members}</p>
                 </div>
               </div>
             </div>
@@ -440,7 +440,7 @@ export default function TrialSignupsWidget() {
 
             <button
               onClick={() => setShowDetailModal(false)}
-              className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+              className="w-full px-4 py-2 border border-gray-600 text-gray-200 rounded-lg hover:bg-gray-800 transition font-medium"
             >
               Fechar
             </button>
@@ -450,25 +450,25 @@ export default function TrialSignupsWidget() {
 
       {/* Modal de Credenciais */}
       {showCredsModal && selectedSignup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl max-w-md w-full p-6 text-gray-100">
+            <h2 className="text-2xl font-bold text-white mb-4">
               🔑 Gerar Credenciais de Teste
             </h2>
 
             {!generatedCreds ? (
               <>
-                <p className="text-gray-600 mb-6">
+                <p className="text-gray-300 mb-6">
                   Gerar credenciais de teste para {selectedSignup.ministry_name}?
                 </p>
-                <p className="text-sm text-gray-500 mb-6 bg-blue-50 p-3 rounded border border-blue-200">
+                <p className="text-sm text-blue-200 mb-6 bg-blue-900/40 p-3 rounded border border-blue-800">
                   ℹ️ As credenciais serão válidas por 7 dias e terão acesso completo ao sistema.
                 </p>
 
                 <div className="flex gap-3">
                   <button
                     onClick={() => setShowCredsModal(false)}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                    className="flex-1 px-4 py-2 border border-gray-600 text-gray-200 rounded-lg hover:bg-gray-800 transition font-medium"
                   >
                     Cancelar
                   </button>
@@ -484,26 +484,26 @@ export default function TrialSignupsWidget() {
               </>
             ) : (
               <>
-                <div className="bg-green-50 border border-green-200 rounded p-4 mb-4">
-                  <p className="text-sm text-green-800">✅ Credenciais geradas com sucesso!</p>
+                <div className="bg-green-900 border border-green-700 rounded p-4 mb-4">
+                  <p className="text-sm text-green-200">✅ Credenciais geradas com sucesso!</p>
                 </div>
 
                 <div className="space-y-3 mb-6">
                   <div>
-                    <p className="text-xs text-gray-500 font-semibold uppercase mb-1">Usuário</p>
+                    <p className="text-xs text-gray-400 font-semibold uppercase mb-1">Usuário</p>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={generatedCreds.username}
                         readOnly
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded bg-gray-50 text-sm font-mono"
+                        className="flex-1 px-3 py-2 border border-gray-700 rounded bg-gray-800 text-sm font-mono text-gray-100"
                       />
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(generatedCreds.username)
                           setNotification({ isOpen: true, type: 'success', title: 'Copiado!', message: 'Usuário copiado para a área de transferência' })
                         }}
-                        className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 transition"
+                        className="px-3 py-2 bg-gray-700 rounded hover:bg-gray-600 transition"
                       >
                         📋
                       </button>
@@ -511,20 +511,20 @@ export default function TrialSignupsWidget() {
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-500 font-semibold uppercase mb-1">Senha</p>
+                    <p className="text-xs text-gray-400 font-semibold uppercase mb-1">Senha</p>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={generatedCreds.password}
                         readOnly
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded bg-gray-50 text-sm font-mono"
+                        className="flex-1 px-3 py-2 border border-gray-700 rounded bg-gray-800 text-sm font-mono text-gray-100"
                       />
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(generatedCreds.password)
                           setNotification({ isOpen: true, type: 'success', title: 'Copiado!', message: 'Senha copiada para a área de transferência' })
                         }}
-                        className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 transition"
+                        className="px-3 py-2 bg-gray-700 rounded hover:bg-gray-600 transition"
                       >
                         📋
                       </button>
@@ -532,20 +532,20 @@ export default function TrialSignupsWidget() {
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-500 font-semibold uppercase mb-1">URL de Acesso</p>
+                    <p className="text-xs text-gray-400 font-semibold uppercase mb-1">URL de Acesso</p>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={generatedCreds.access_url}
                         readOnly
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded bg-gray-50 text-sm font-mono"
+                        className="flex-1 px-3 py-2 border border-gray-700 rounded bg-gray-800 text-sm font-mono text-gray-100"
                       />
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(generatedCreds.access_url)
                           setNotification({ isOpen: true, type: 'success', title: 'Copiado!', message: 'URL de acesso copiada para a área de transferência' })
                         }}
-                        className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 transition"
+                        className="px-3 py-2 bg-gray-700 rounded hover:bg-gray-600 transition"
                       >
                         📋
                       </button>
@@ -553,8 +553,8 @@ export default function TrialSignupsWidget() {
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-500 font-semibold uppercase mb-1">Válido até</p>
-                    <p className="text-sm text-gray-900">
+                    <p className="text-xs text-gray-400 font-semibold uppercase mb-1">Válido até</p>
+                    <p className="text-sm text-gray-100">
                       {new Date(generatedCreds.expires_at).toLocaleDateString('pt-BR')}
                     </p>
                   </div>

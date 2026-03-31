@@ -1,19 +1,10 @@
 export const CERTIFICADO_PLACEHOLDERS = [
-  { campo: 'crianca_nome', placeholder: '{crianca_nome}', label: 'Nome da Crianca' },
-  { campo: 'pai_nome', placeholder: '{pai_nome}', label: 'Nome do Pai' },
-  { campo: 'mae_nome', placeholder: '{mae_nome}', label: 'Nome da Mae' },
-  { campo: 'responsavel_nome', placeholder: '{responsavel_nome}', label: 'Responsavel' },
-  { campo: 'responsavel_telefone', placeholder: '{responsavel_telefone}', label: 'Telefone do Responsavel' },
-  { campo: 'data_apresentacao', placeholder: '{data_apresentacao}', label: 'Data da Apresentacao' },
-  { campo: 'local_apresentacao', placeholder: '{local_apresentacao}', label: 'Local da Apresentacao' },
-  { campo: 'batizando_nome', placeholder: '{batizando_nome}', label: 'Nome do Batizando' },
-  { campo: 'data_batismo', placeholder: '{data_batismo}', label: 'Data do Batismo' },
-  { campo: 'local_batismo', placeholder: '{local_batismo}', label: 'Local do Batismo' },
-  { campo: 'noivo_nome', placeholder: '{noivo_nome}', label: 'Nome do Noivo' },
-  { campo: 'noiva_nome', placeholder: '{noiva_nome}', label: 'Nome da Noiva' },
-  { campo: 'data_casamento', placeholder: '{data_casamento}', label: 'Data do Casamento' },
-  { campo: 'local_casamento', placeholder: '{local_casamento}', label: 'Local do Casamento' },
-  { campo: 'celebrante_nome', placeholder: '{celebrante_nome}', label: 'Celebrante' },
+  { campo: 'ministro_nome', placeholder: '{ministro_nome}', label: 'Nome do Ministro' },
+  { campo: 'matricula', placeholder: '{matricula}', label: 'Matrícula' },
+  { campo: 'cargo_ministerial', placeholder: '{cargo_ministerial}', label: 'Cargo Ministerial' },
+  { campo: 'congregacao', placeholder: '{congregacao}', label: 'Congregação' },
+  { campo: 'data_consagracao', placeholder: '{data_consagracao}', label: 'Data de Consagração' },
+  { campo: 'presidente_nome', placeholder: '{presidente_nome}', label: 'Presidente' },
   { campo: 'data_emissao', placeholder: '{data_emissao}', label: 'Data de Emissao' },
   { campo: 'nome_igreja', placeholder: '{nome_igreja}', label: 'Nome da Igreja' }
 ];
@@ -38,9 +29,7 @@ export function substituirPlaceholdersCertificado(texto: string, dados: Record<s
   const base: Record<string, any> = {
     ...dados,
     data_emissao: dataEmissao,
-    data_apresentacao: formatDate(dados.data_apresentacao || dados.data_evento || ''),
-    data_batismo: formatDate(dados.data_batismo || ''),
-    data_casamento: formatDate(dados.data_casamento || '')
+    data_consagracao: formatDate(dados.data_consagracao || dados.data_processo || dados.data_evento || '')
   };
 
   CERTIFICADO_PLACEHOLDERS.forEach((ph) => {

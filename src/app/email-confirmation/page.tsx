@@ -102,7 +102,7 @@ function EmailConfirmationContent() {
 
         <div className="mt-8 pt-6 border-t border-gray-200">
           <p className="text-xs text-gray-500">
-            © 2026 Gestão Eclesial - Todos os direitos reservados
+            © 2026 GESTAOSERVUS - Todos os direitos reservados
           </p>
         </div>
       </div>

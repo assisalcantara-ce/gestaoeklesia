@@ -6,6 +6,7 @@
  */
 
 import { createServerClientFromRequest } from '@/lib/supabase-server'
+import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer'
 import { NextRequest, NextResponse } from 'next/server'
 
 async function resolveMinistryId(supabase: any, userId: string): Promise<string | null> {
@@ -91,6 +92,20 @@ export async function PUT(
   const { id } = await params
   try {
     const body = await request.json()
+    const normalizedBody = normalizePayloadToUppercase(body, {
+      preserveKeys: [
+        'member_since',
+        'birth_date',
+        'data_consagracao',
+        'data_emissao',
+        'data_validade_credencial',
+        'latitude',
+        'longitude',
+        'cargoMinisterial',
+        'cargo_ministerial',
+        'procedencia',
+      ],
+    })
     const supabase = createServerClientFromRequest(request)
 
     const {
@@ -124,16 +139,64 @@ export async function PUT(
       )
     }
 
+    const payload = {
+      name: normalizedBody.name,
+      email: typeof normalizedBody.email === 'string' ? normalizedBody.email.toLowerCase() : normalizedBody.email ?? null,
+      phone: normalizedBody.phone ?? null,
+      cpf: normalizedBody.cpf ?? null,
+      data_consagracao: normalizedBody.data_consagracao ?? null,
+      data_emissao: normalizedBody.data_emissao ?? null,
+      data_validade_credencial: normalizedBody.data_validade_credencial ?? null,
+      birth_date: normalizedBody.birth_date ?? null,
+      gender: normalizedBody.gender ?? null,
+      marital_status: normalizedBody.marital_status ?? null,
+      orgao_emissor: normalizedBody.orgao_emissor ?? null,
+      occupation: normalizedBody.occupation ?? null,
+      address: normalizedBody.address ?? null,
+      complement: normalizedBody.complement ?? null,
+      city: normalizedBody.city ?? null,
+      state: normalizedBody.state ?? null,
+      zipcode: normalizedBody.zipcode ?? null,
+      congregacao_id: normalizedBody.congregacao_id ?? null,
+      latitude: typeof normalizedBody.latitude === 'number' ? normalizedBody.latitude : null,
+      longitude: typeof normalizedBody.longitude === 'number' ? normalizedBody.longitude : null,
+      member_since: normalizedBody.member_since ?? undefined,
+      role: normalizedBody.role ?? null,
+      status: normalizedBody.status ?? undefined,
+      custom_fields: normalizedBody.custom_fields ?? {},
+      notes: normalizedBody.notes ?? null,
+      updated_at: new Date().toISOString(),
+    }
+
     // Atualizar
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('members')
-      .update({
-        ...body,
-        updated_at: new Date().toISOString(),
-      })
+      .update(payload)
       .eq('id', id)
       .eq('ministry_id', ministryId)
       .select()
+
+    // Compatibilidade: bases que ainda não têm colunas novas
+    if (error && /column\s+"?(latitude|longitude|congregacao_id|orgao_emissor|data_consagracao|data_emissao|data_validade_credencial)"?\s+of\s+relation\s+"?members"?\s+does\s+not\s+exist/i.test(error.message)) {
+      const fallbackPayload: any = { ...payload }
+      delete fallbackPayload.latitude
+      delete fallbackPayload.longitude
+      delete fallbackPayload.congregacao_id
+      delete fallbackPayload.orgao_emissor
+      delete fallbackPayload.data_consagracao
+      delete fallbackPayload.data_emissao
+      delete fallbackPayload.data_validade_credencial
+
+      const retry = await supabase
+        .from('members')
+        .update(fallbackPayload)
+        .eq('id', id)
+        .eq('ministry_id', ministryId)
+        .select()
+
+      data = retry.data
+      error = retry.error
+    }
 
     if (error) {
       return NextResponse.json(

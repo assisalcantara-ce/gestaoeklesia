@@ -1,4 +1,4 @@
-// Serviço de Email para Gestão Eclesial
+// Serviço de Email para GESTAOSERVUS
 
 export interface EmailValidacao {
   ministryId: string;
@@ -8,20 +8,45 @@ export interface EmailValidacao {
   criadoEm: string;
 }
 
-// Simular armazenamento de tokens de validação (em produção seria banco de dados)
-let tokensValidacao: EmailValidacao[] = [];
+// Chave de armazenamento no localStorage (por browser, persiste entre reloads e deploys)
+const LS_KEY = 'ge_email_tokens';
+
+type TokenEntry = Omit<EmailValidacao, 'token'>;
+type StoredTokens = Record<string, TokenEntry>;
+
+function readTokens(): StoredTokens {
+  if (typeof window === 'undefined') return {};
+  try {
+    return JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function writeTokens(tokens: StoredTokens): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(tokens));
+  } catch {
+    // quota ou modo privado — falha silenciosa
+  }
+}
 
 /**
- * Gera um token único para validação de email
+ * Gera um token único e criptograficamente seguro para validação de email
  */
 export function gerarTokenValidacao(): string {
-  return Math.random().toString(36).substring(2, 15) + 
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID().replace(/-/g, '') + Date.now().toString(36);
+  }
+  // Fallback para ambientes sem Web Crypto API
+  return Math.random().toString(36).substring(2, 15) +
          Math.random().toString(36).substring(2, 15) +
          Date.now().toString(36);
 }
 
 /**
- * Armazena token de validação
+ * Armazena token de validação no localStorage do browser
  */
 export function armazenarTokenValidacao(
   ministryId: string,
@@ -37,30 +62,29 @@ export function armazenarTokenValidacao(
     email,
     token,
     expiresAt: dataExpiracao.toISOString(),
-    criadoEm: dataAtual.toISOString()
+    criadoEm: dataAtual.toISOString(),
   };
 
-  tokensValidacao.push(validacao);
+  const tokens = readTokens();
+  tokens[token] = { ministryId, email, expiresAt: validacao.expiresAt, criadoEm: validacao.criadoEm };
+  writeTokens(tokens);
 
   return validacao;
 }
 
 /**
- * Valida um token
+ * Valida um token lido do localStorage
  */
 export function validarToken(ministryId: string, token: string): boolean {
-  const validacao = tokensValidacao.find(
-    v => v.ministryId === ministryId && v.token === token
-  );
+  const tokens = readTokens();
+  const entry = tokens[token];
 
-  if (!validacao) return false;
+  if (!entry || entry.ministryId !== ministryId) return false;
 
-  const agora = new Date();
-  const dataExpiracao = new Date(validacao.expiresAt);
-
-  if (agora > dataExpiracao) {
-    // Token expirado - remover
-    tokensValidacao = tokensValidacao.filter(v => v.token !== token);
+  if (new Date() > new Date(entry.expiresAt)) {
+    // Token expirado — limpar
+    delete tokens[token];
+    writeTokens(tokens);
     return false;
   }
 
@@ -68,10 +92,12 @@ export function validarToken(ministryId: string, token: string): boolean {
 }
 
 /**
- * Remove token após validação
+ * Remove token do localStorage após uso
  */
 export function removerTokenValidacao(token: string): void {
-  tokensValidacao = tokensValidacao.filter(v => v.token !== token);
+  const tokens = readTokens();
+  delete tokens[token];
+  writeTokens(tokens);
 }
 
 /**
@@ -89,7 +115,7 @@ export function gerarEmailHTML(
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Bem-vindo ao Gestão Eclesial</title>
+      <title>Bem-vindo ao GESTAOSERVUS</title>
       <style>
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -224,7 +250,7 @@ export function gerarEmailHTML(
       <div class="container">
         <div class="header">
           <div class="logo">⛪</div>
-          <h1>Gestão Eclesial</h1>
+          <h1>GESTAOSERVUS</h1>
           <p style="margin: 10px 0 0 0; font-size: 14px;">Sistema de Gestão para Igrejas e Ministérios</p>
         </div>
 
@@ -304,12 +330,12 @@ export function gerarEmailHTML(
 
           <p style="color: #666; line-height: 1.6; margin-top: 20px;">
             Se você não solicitou este cadastro ou tem dúvidas, entre em contato conosco no email 
-            <strong>suporte@gestaoeclesial.com.br</strong>
+            <strong>suporte@gestaoservus.com.br</strong>
           </p>
         </div>
 
         <div class="footer">
-          <p><strong>Gestão Eclesial™</strong> - Sistema de Gestão para Igrejas e Ministérios</p>
+          <p><strong>GESTAOSERVUS™</strong> - Sistema de Gestão para Igrejas e Ministérios</p>
           <p>© ${new Date().getFullYear()} Todos os direitos reservados.</p>
           <p>Este é um email automático. Favor não responder diretamente.</p>
         </div>
@@ -345,7 +371,7 @@ export async function enviarEmailBoasVindas(
     // Em produção, seria enviado via API
     console.log('📧 Email de boas-vindas preparado:', {
       para: emailAdmin,
-      assunto: `Bem-vindo ao Gestão Eclesial - ${nomeMinisterio}`,
+      assunto: `Bem-vindo ao GESTAOSERVUS - ${nomeMinisterio}`,
       html: htmlEmail,
       token
     });

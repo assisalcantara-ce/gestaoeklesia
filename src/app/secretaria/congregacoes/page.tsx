@@ -421,7 +421,7 @@ export default function CongregacoesPage() {
           data: { user },
         } = await supabase.auth.getUser();
         if (!user) {
-          router.push('/');
+          router.push('/login');
           return;
         }
 
@@ -993,6 +993,11 @@ export default function CongregacoesPage() {
   }, [formD3.dirigente, showFormD3, ministryId, dirigenteSelected?.name]);
 
   const handleSaveD2 = async () => {
+    if (!ministryId) {
+      await dialog.alert({ title: 'Aguarde', message: 'Ainda estamos carregando o ministério do usuário.', type: 'info' });
+      return;
+    }
+
     if (!formD2.nome.trim()) {
       await dialog.alert({ title: 'Atenção', type: 'warning', message: 'Por favor, preencha o nome.' });
       return;
@@ -1057,13 +1062,23 @@ export default function CongregacoesPage() {
         campoId = (data as any)?.id || null;
       }
 
+      const isMissingCongregacoesTableError = (err: any) => {
+        const text = String(err?.message || err?.details || err?.hint || err || '');
+        return /public\.congregacoes/i.test(text) && /could not find the table|schema cache|PGRST205/i.test(text);
+      };
+
       // Associações D1 -> D2 (best-effort)
       if (campoId) {
         const nowIso = new Date().toISOString();
         const existing = divisoes3
           .filter(cg => cg.campo_id === campoId)
           .map(cg => cg.id);
-        const selected = selectedD1IdsForD2;
+        const availableIds = new Set(
+          divisoes3
+            .filter(cg => !cg.campo_id || cg.campo_id === campoId)
+            .map(cg => cg.id)
+        );
+        const selected = selectedD1IdsForD2.filter(id => availableIds.has(id));
         const toAdd = selected.filter(id => !existing.includes(id));
         const toRemove = existing.filter(id => !selected.includes(id));
 
@@ -1073,7 +1088,13 @@ export default function CongregacoesPage() {
             .update({ campo_id: campoId, updated_at: nowIso })
             .eq('ministry_id', ministryId)
             .in('id', toAdd);
-          if (addErr) throw addErr;
+          if (addErr) {
+            if (isMissingCongregacoesTableError(addErr)) {
+              console.warn('Tabela public.congregacoes ausente; associação D1 -> D2 ignorada neste ambiente.');
+            } else {
+              throw addErr;
+            }
+          }
         }
 
         if (toRemove.length) {
@@ -1083,7 +1104,13 @@ export default function CongregacoesPage() {
             .eq('ministry_id', ministryId)
             .eq('campo_id', campoId)
             .in('id', toRemove);
-          if (removeErr) throw removeErr;
+          if (removeErr) {
+            if (isMissingCongregacoesTableError(removeErr)) {
+              console.warn('Tabela public.congregacoes ausente; desassociação D1 -> D2 ignorada neste ambiente.');
+            } else {
+              throw removeErr;
+            }
+          }
         }
       }
 
@@ -1111,11 +1138,22 @@ export default function CongregacoesPage() {
       setShowFormD2(false);
     } catch (error) {
       const err: any = error as any;
+      const fallbackRaw = (() => {
+        try {
+          if (typeof error === 'string') return error;
+          if (error instanceof Error) return error.message || error.name;
+          if (error && typeof error === 'object') return JSON.stringify(error);
+          return String(error || '');
+        } catch {
+          return '';
+        }
+      })();
       const parts = [
         err?.code ? `(${String(err.code)})` : '',
         err?.message ? String(err.message) : '',
         err?.details ? String(err.details) : '',
-        err?.hint ? String(err.hint) : ''
+        err?.hint ? String(err.hint) : '',
+        fallbackRaw
       ].filter(Boolean);
       const debugMsg = parts.join(' ');
 
@@ -1128,10 +1166,16 @@ export default function CongregacoesPage() {
         rawKeys: err ? Object.getOwnPropertyNames(err) : null,
       });
 
+      const missingTableMatch = debugMsg.match(/table\s+'([^']+)'/i);
+      const missingTableName = missingTableMatch?.[1] || '';
+      const tableMissing = /could not find the table|schema cache|PGRST205/i.test(debugMsg) && !!missingTableName;
+
       await dialog.alert({
         title: 'Erro',
         type: 'error',
-        message: debugMsg ? `Erro ao salvar: ${debugMsg}` : 'Erro ao salvar. Tente novamente.',
+        message: tableMissing
+          ? `Erro ao salvar: a tabela ${missingTableName} não existe neste banco. Aplique as migrações pendentes da Estrutura Hierárquica e tente novamente.`
+          : (debugMsg ? `Erro ao salvar: ${debugMsg}` : 'Erro ao salvar. Tente novamente.'),
       });
     }
   };
@@ -1466,7 +1510,15 @@ export default function CongregacoesPage() {
     } catch (error) {
       console.error('Erro ao salvar divisão 03 (raw):', error);
       console.error('Erro ao salvar divisão 03 (debug):', toDebugObject(error));
-      await dialog.alert({ title: 'Erro', type: 'error', message: `Erro ao salvar. ${formatDbError(error)}` });
+      const errText = formatDbError(error);
+      const tableMissing = /public\.congregacoes/i.test(errText) && /could not find the table|schema cache|PGRST205/i.test(errText);
+      await dialog.alert({
+        title: 'Erro',
+        type: 'error',
+        message: tableMissing
+          ? 'Erro ao salvar: a tabela public.congregacoes não existe neste banco. Aplique as migrações pendentes da Estrutura Hierárquica e tente novamente.'
+          : `Erro ao salvar. ${errText}`,
+      });
     }
   };
 
@@ -1545,6 +1597,8 @@ export default function CongregacoesPage() {
     const codigoToSave = editingD1?.codigo && Number.isFinite(editingD1.codigo) ? editingD1.codigo : (codigoParsed ?? codigoAuto);
 
     try {
+      let createdSupervisaoId: string | null = null;
+
       if (editingD1) {
         // Atualizar
         const { error } = await supabase
@@ -1562,7 +1616,7 @@ export default function CongregacoesPage() {
         if (error) throw error;
       } else {
         // Criar
-        const { error } = await supabase
+        const { data: createdRow, error } = await supabase
           .from('supervisoes')
           .insert([{
             ministry_id: ministryId,
@@ -1571,7 +1625,11 @@ export default function CongregacoesPage() {
             uf,
             ...supervisorPayload,
             is_active: true
-          }]);
+          }])
+          .select('id')
+          .single();
+
+        createdSupervisaoId = (createdRow as any)?.id || null;
         
         if (error) {
           // Em caso de corrida (código duplicado), recalcular e tentar 1 vez.
@@ -1579,7 +1637,7 @@ export default function CongregacoesPage() {
           if (String(msg).includes('idx_supervisoes_ministry_codigo_unique') || String(msg).includes('duplicate key')) {
             await loadDivisoes1(ministryId);
             const retryCodigo = getNextCodigo();
-            const { error: retryErr } = await supabase
+            const { data: retryRow, error: retryErr } = await supabase
               .from('supervisoes')
               .insert([{
                 ministry_id: ministryId,
@@ -1588,8 +1646,11 @@ export default function CongregacoesPage() {
                 uf,
                 ...supervisorPayload,
                 is_active: true
-              }]);
+              }])
+              .select('id')
+              .single();
             if (retryErr) throw retryErr;
+            createdSupervisaoId = (retryRow as any)?.id || null;
           } else {
             throw error;
           }
@@ -1598,7 +1659,7 @@ export default function CongregacoesPage() {
 
       // Associações D2 -> D3 (best-effort): campos.supervisao_id
       {
-        const supervisaoId = editingD1?.id || null;
+        const supervisaoId = editingD1?.id || createdSupervisaoId || null;
         // Se criou novo, precisamos descobrir o ID. Como esta tela usa o fluxo
         // de código auto-incremental + unique, a forma mais segura aqui é recarregar
         // e encontrar pelo (ministry_id, codigo).
@@ -1617,7 +1678,12 @@ export default function CongregacoesPage() {
           const existing = divisoes2
             .filter(c => c.supervisao_id === resolvedId)
             .map(c => c.id);
-          const selected = selectedD2IdsForD3;
+          const availableIds = new Set(
+            divisoes2
+              .filter(c => !c.supervisao_id || c.supervisao_id === resolvedId)
+              .map(c => c.id)
+          );
+          const selected = selectedD2IdsForD3.filter(id => availableIds.has(id));
           const toAdd = selected.filter(id => !existing.includes(id));
           const toRemove = existing.filter(id => !selected.includes(id));
 
@@ -1708,6 +1774,9 @@ export default function CongregacoesPage() {
     d3Enabled ? { id: 'divisao3', label: `${nomeD3}s (3ª)`, icon: '3️⃣' } : null
   ].filter(Boolean) as { id: string; label: string; icon: string }[];
 
+  const availableDivisoes3ForCurrentD2 = divisoes3.filter(cg => !cg.campo_id || cg.campo_id === editingD2?.id);
+  const availableDivisoes2ForCurrentD1 = divisoes2.filter(c => !c.supervisao_id || c.supervisao_id === editingD1?.id);
+
   return (
     <PageLayout
       title={`Estrutura Hierárquica - ${hierarchyLabel}`}
@@ -1718,6 +1787,7 @@ export default function CongregacoesPage() {
       }
       activeMenu="estrutura-hierarquica"
     >
+      <div className="w-full max-w-7xl mx-auto px-1 sm:px-2 lg:px-4">
       {/* Abas */}
       <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab}>
         {tabs.length === 0 && (
@@ -1740,7 +1810,7 @@ export default function CongregacoesPage() {
             </div>
 
             {showFormD3 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                 <h3 className="text-lg font-bold text-gray-800 mb-4">
                   {editingD3 ? `Editar ${nomeD1}` : `Nova ${nomeD1}`}
                 </h3>
@@ -1757,7 +1827,7 @@ export default function CongregacoesPage() {
                       value={formD3.nome}
                       onChange={(e) => setFormD3(prev => ({ ...prev, nome: e.target.value }))}
                       placeholder={`Ex: ${nomeD1} Central`}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
@@ -1782,7 +1852,7 @@ export default function CongregacoesPage() {
                         setDirigenteMsg('');
                       }}
                       placeholder="Ex: Pr. João Silva"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <p className="text-xs text-gray-600 mt-2">
                       {dirigenteStatus === 'loading'
@@ -1834,7 +1904,7 @@ export default function CongregacoesPage() {
                           value={formD3.dirigente_cpf}
                           onChange={(e) => setFormD3(prev => ({ ...prev, dirigente_cpf: formatCpf(e.target.value) }))}
                           placeholder="Ex: 00000000000"
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                       <div>
@@ -1844,7 +1914,7 @@ export default function CongregacoesPage() {
                           value={formD3.dirigente_cargo}
                           onChange={(e) => setFormD3(prev => ({ ...prev, dirigente_cargo: e.target.value }))}
                           placeholder="Ex: Pastor"
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                       <div>
@@ -1854,7 +1924,7 @@ export default function CongregacoesPage() {
                           value={formD3.dirigente_matricula}
                           onChange={(e) => setFormD3(prev => ({ ...prev, dirigente_matricula: e.target.value }))}
                           placeholder="Ex: 12345"
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                     </div>
@@ -1867,7 +1937,7 @@ export default function CongregacoesPage() {
                       value={formD3.endereco}
                       onChange={(e) => setFormD3(prev => ({ ...prev, endereco: e.target.value }))}
                       placeholder="Ex: Rua X, 123"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
@@ -1879,7 +1949,7 @@ export default function CongregacoesPage() {
                         value={formD3.cep}
                         onChange={(e) => setFormD3(prev => ({ ...prev, cep: e.target.value }))}
                         placeholder="Somente números"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                     <div>
@@ -1889,7 +1959,7 @@ export default function CongregacoesPage() {
                         value={formD3.municipio}
                         onChange={(e) => setFormD3(prev => ({ ...prev, municipio: e.target.value }))}
                         placeholder="Ex: Santos"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                     <div>
@@ -1900,7 +1970,7 @@ export default function CongregacoesPage() {
                         onChange={(e) => setFormD3(prev => ({ ...prev, uf: e.target.value.toUpperCase().slice(0, 2) }))}
                         placeholder="Ex: SP"
                         maxLength={2}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
@@ -1912,7 +1982,7 @@ export default function CongregacoesPage() {
                     <select
                       value={formD3.status_imovel}
                       onChange={(e) => setFormD3(prev => ({ ...prev, status_imovel: e.target.value as any }))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Selecione</option>
                       <option value="PROPRIO">Próprio</option>
@@ -1934,7 +2004,7 @@ export default function CongregacoesPage() {
                       }
                       disabled
                       placeholder="Gerado automaticamente ao salvar"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700"
+                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-700"
                     />
                     <p className="text-xs text-gray-600 mt-1">
                       Este campo é preenchido automaticamente com base no endereço e não pode ser editado aqui.
@@ -1989,7 +2059,7 @@ export default function CongregacoesPage() {
                               value={fotoIgrejaUrlInput}
                               onChange={(e) => setFotoIgrejaUrlInput(e.target.value)}
                               placeholder="(opcional) URL da foto"
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                             <button
                               type="button"
@@ -2113,31 +2183,28 @@ export default function CongregacoesPage() {
                   setFotoIgrejaChange({ kind: 'none' });
                   setFotoIgrejaUrlInput('');
                 }}
-                className="mb-6 w-full px-6 py-3 bg-[#123b63] text-white rounded-lg hover:bg-[#0f2a45] transition font-semibold"
+                className="mb-6 w-full px-6 py-3 bg-teal-500 text-white font-bold rounded-lg hover:bg-teal-600 transition shadow-md"
               >
                 + Adicionar {nomeD1}
               </button>
             )}
 
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-100 border-b border-gray-200">
-                  <tr>
-                    {d2Enabled ? (
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">{nomeD2}</th>
-                    ) : (d3Enabled ? (
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">{nomeD3}</th>
-                    ) : null)}
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nome</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Dirigente</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Data Criação</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Ações</th>
-                  </tr>
-                </thead>
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-200 text-gray-800">
+                      <th className="px-4 py-3 text-left font-semibold">SETOR</th>
+                      <th className="px-4 py-3 text-left font-semibold">NOME</th>
+                      <th className="px-4 py-3 text-left font-semibold">DIRIGENTE</th>
+                      <th className="px-4 py-3 text-left font-semibold">CONDIÇÃO</th>
+                      <th className="px-4 py-3 text-center font-semibold">AÇÕES</th>
+                    </tr>
+                  </thead>
                 <tbody>
                   {divisoes3.length === 0 ? (
                     <tr>
-                      <td colSpan={(d2Enabled || d3Enabled) ? 6 : 5} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
                         Nenhuma {nomeD1} cadastrada
                       </td>
                     </tr>
@@ -2151,19 +2218,22 @@ export default function CongregacoesPage() {
                         : null;
 
                       return (
-                        <tr key={cg.id} className="border-b border-gray-200 hover:bg-gray-50 transition">
-                          {d2Enabled ? (
-                            <td className="px-6 py-3 text-sm text-gray-700">{campo ? formatCampoLabel(campo) : '-'}</td>
-                          ) : (d3Enabled ? (
-                            <td className="px-6 py-3 text-sm text-gray-700">{sup ? formatSupervisaoLabel(sup) : '-'}</td>
-                          ) : null)}
-                          <td className="px-6 py-3 text-sm text-gray-700 font-semibold">{cg.nome}</td>
-                          <td className="px-6 py-3 text-sm text-gray-700">{String((cg as any).dirigente || '').trim() || '-'}</td>
-                          <td className="px-6 py-3 text-sm text-gray-700">{`${cg.cidade || '-'} / ${cg.uf || '-'}`}</td>
-                          <td className="px-6 py-3 text-sm text-gray-600">
-                            {new Date(cg.created_at).toLocaleDateString('pt-BR')}
+                        <tr key={cg.id} className="border-b border-gray-200 hover:bg-gray-50">
+                          <td className="px-4 py-3 text-gray-700">
+                            {campo ? formatCampoLabel(campo) : (sup ? formatSupervisaoLabel(sup) : '-')}
                           </td>
-                          <td className="px-6 py-3 text-right space-x-2">
+                          <td className="px-4 py-3 font-semibold text-gray-800">{cg.nome}</td>
+                          <td className="px-4 py-3 text-gray-700">{String((cg as any).dirigente || '').trim() || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {cg.status_imovel === 'PROPRIO'
+                              ? 'Própria'
+                              : cg.status_imovel === 'ALUGADO'
+                                ? 'Alugada'
+                                : cg.status_imovel === 'CEDIDO'
+                                  ? 'Cedida'
+                                  : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-center">
                             <button
                               onClick={() => {
                                 setEditingD3(cg);
@@ -2195,15 +2265,15 @@ export default function CongregacoesPage() {
                                 setFotoIgrejaChange({ kind: 'none' });
                                 setFotoIgrejaUrlInput('');
                               }}
-                              className="text-blue-600 hover:text-blue-800 transition text-sm font-semibold"
+                              className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold"
                             >
-                              ✏️ Editar
+                              Editar
                             </button>
                             <button
                               onClick={() => handleDeleteD3(cg.id)}
-                              className="text-red-600 hover:text-red-800 transition text-sm font-semibold"
+                              className="ml-2 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs font-semibold"
                             >
-                              🗑️ Deletar
+                              Deletar
                             </button>
                           </td>
                         </tr>
@@ -2211,7 +2281,8 @@ export default function CongregacoesPage() {
                     })
                   )}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           </Section>
         )}
@@ -2228,7 +2299,7 @@ export default function CongregacoesPage() {
 
             <>
               {showFormD2 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+                  <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                     <h3 className="text-lg font-bold text-gray-800 mb-4">
                       {editingD2 ? `Editar ${nomeD2}` : `Novo ${nomeD2}`}
                     </h3>
@@ -2243,7 +2314,7 @@ export default function CongregacoesPage() {
                           value={formD2.nome}
                           onChange={(e) => setFormD2(prev => ({ ...prev, nome: e.target.value }))}
                           placeholder={`Ex: ${nomeD2} Baixada Santista`}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
 
@@ -2296,7 +2367,7 @@ export default function CongregacoesPage() {
                                   setPastorMsg('');
                                 }}
                                 placeholder="Digite para buscar..."
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                               <p className="text-xs text-gray-600 mt-2">
                                 {pastorStatus === 'loading'
@@ -2337,7 +2408,7 @@ export default function CongregacoesPage() {
                                 type="date"
                                 value={formD2.pastor_data_posse}
                                 onChange={(e) => setFormD2(prev => ({ ...prev, pastor_data_posse: e.target.value }))}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                             </div>
                           </div>
@@ -2349,11 +2420,11 @@ export default function CongregacoesPage() {
                         <p className="text-xs text-gray-600 mb-3">
                           Selecionados: {selectedD1IdsForD2.length}
                         </p>
-                        {divisoes3.length === 0 ? (
-                          <p className="text-sm text-gray-600">Nenhuma {nomeD1} cadastrada ainda.</p>
+                        {availableDivisoes3ForCurrentD2.length === 0 ? (
+                          <p className="text-sm text-gray-600">Nenhuma {nomeD1} disponível para este {nomeD2}.</p>
                         ) : (
                           <div className="max-h-48 overflow-auto border border-gray-200 rounded-lg bg-white">
-                            {divisoes3.map(cg => {
+                            {availableDivisoes3ForCurrentD2.map(cg => {
                               const checked = selectedD1IdsForD2.includes(cg.id);
                               return (
                                 <label key={cg.id} className="flex items-center gap-3 px-4 py-2 border-b border-gray-100 text-sm">
@@ -2439,34 +2510,30 @@ export default function CongregacoesPage() {
                       setPastorMsg('');
                       setSelectedD1IdsForD2([]);
                     }}
-                    className="mb-6 w-full px-6 py-3 bg-[#123b63] text-white rounded-lg hover:bg-[#0f2a45] transition font-semibold"
+                    className="mb-6 w-full px-6 py-3 bg-teal-500 text-white font-bold rounded-lg hover:bg-teal-600 transition shadow-md"
                   >
                     + Adicionar {nomeD2}
                   </button>
                 )}
             </>
 
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-100 border-b border-gray-200">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
                   <tr>
-                    {d3Enabled && (
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">{nomeD3}</th>
-                    )}
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nome</th>
-                    {d3Enabled && (
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Sede</th>
-                    )}
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Pastor</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Município/UF</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Data Criação</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Ações</th>
+                    <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">REGIONAL</th>
+                    <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">NOME</th>
+                    <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">PASTOR/SUPERVISOR</th>
+                    <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">MUNICÍPIO</th>
+                    <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">QTD. {`${nomeD1.toUpperCase()}S`}</th>
+                    <th className="px-4 py-3 text-center font-semibold bg-gray-200 text-gray-800">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {divisoes2.length === 0 ? (
                     <tr>
-                      <td colSpan={d3Enabled ? 6 : 5} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
                         Nenhum {nomeD2} cadastrado
                       </td>
                     </tr>
@@ -2475,33 +2542,17 @@ export default function CongregacoesPage() {
                       const sup = d3Enabled && c.supervisao_id
                         ? divisoes1.find(s => s.id === c.supervisao_id) || null
                         : null;
+                      const qtdCongregacoes = divisoes3.filter(cg => cg.campo_id === c.id).length;
                       return (
-                        <tr key={c.id} className="border-b border-gray-200 hover:bg-gray-50 transition">
-                          {d3Enabled && (
-                            <td className="px-6 py-3 text-sm text-gray-700">
-                              {sup ? formatSupervisaoLabel(sup) : '-'}
-                            </td>
-                          )}
-                          <td className="px-6 py-3 text-sm text-gray-700 font-semibold">{c.nome}</td>
-                          {d3Enabled && (
-                            <td className="px-6 py-3">
-                              {c.is_sede ? (
-                                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">✓ Sede</span>
-                              ) : (
-                                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">○ Não</span>
-                              )}
-                            </td>
-                          )}
-                          <td className="px-6 py-3 text-sm text-gray-700">
+                        <tr key={c.id} className="border-b border-gray-200 hover:bg-gray-50">
+                          <td className="px-4 py-3 text-gray-700">{sup ? formatSupervisaoLabel(sup) : '-'}</td>
+                          <td className="px-4 py-3 text-gray-700 font-semibold">{c.nome}</td>
+                          <td className="px-4 py-3 text-gray-700">
                             {c.pastor_nome || '-'}
-                            {c.pastor_data_posse ? (
-                              <span className="text-xs text-gray-500"> ({new Date(c.pastor_data_posse).toLocaleDateString('pt-BR')})</span>
-                            ) : null}
                           </td>
-                          <td className="px-6 py-3 text-sm text-gray-600">
-                            {new Date(c.created_at).toLocaleDateString('pt-BR')}
-                          </td>
-                          <td className="px-6 py-3 text-right space-x-2">
+                          <td className="px-4 py-3 text-gray-700">{c.municipio || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700 font-semibold">{qtdCongregacoes}</td>
+                          <td className="px-4 py-3 text-center">
                             <button
                               onClick={() => {
                                 setEditingD2(c);
@@ -2524,15 +2575,15 @@ export default function CongregacoesPage() {
                                 setPastorStatus(c.pastor_member_id ? 'selected' : 'idle');
                                 setPastorMsg(c.pastor_member_id ? 'Pastor selecionado.' : '');
                               }}
-                              className="text-blue-600 hover:text-blue-800 transition text-sm font-semibold"
+                              className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold"
                             >
-                              ✏️ Editar
+                              Editar
                             </button>
                             <button
                               onClick={() => handleDeleteD2(c.id)}
-                              className="text-red-600 hover:text-red-800 transition text-sm font-semibold"
+                              className="ml-2 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs font-semibold"
                             >
-                              🗑️ Deletar
+                              Deletar
                             </button>
                           </td>
                         </tr>
@@ -2541,6 +2592,7 @@ export default function CongregacoesPage() {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           </Section>
         )}
@@ -2555,7 +2607,7 @@ export default function CongregacoesPage() {
               </div>
             </div>
             {showFormD1 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                 <h3 className="text-lg font-bold text-gray-800 mb-4">
                   {editingD1 ? `Editar ${nomeD3}` : `Nova ${nomeD3}`}
                 </h3>
@@ -2567,7 +2619,7 @@ export default function CongregacoesPage() {
                       value={formD1.nome}
                       onChange={(e) => setFormD1({ ...formD1, nome: e.target.value })}
                       placeholder={`Ex: ${nomeD3} Norte`}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
@@ -2610,7 +2662,7 @@ export default function CongregacoesPage() {
                         value={formD1.supervisor_nome}
                         onChange={(e) => setFormD1(prev => ({ ...prev, supervisor_nome: e.target.value }))}
                         placeholder="Ex: Pr. João Silva"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   )}
@@ -2618,11 +2670,11 @@ export default function CongregacoesPage() {
                   <div className="bg-white rounded-lg border border-gray-200 p-4">
                     <p className="text-sm font-semibold text-gray-800 mb-2">Adicionar {nomeD2}s (opcional)</p>
                     <p className="text-xs text-gray-600 mb-3">Selecionados: {selectedD2IdsForD3.length}</p>
-                    {divisoes2.length === 0 ? (
-                      <p className="text-sm text-gray-600">Nenhum {nomeD2} cadastrado ainda.</p>
+                    {availableDivisoes2ForCurrentD1.length === 0 ? (
+                      <p className="text-sm text-gray-600">Nenhum {nomeD2} disponível para esta {nomeD3}.</p>
                     ) : (
                       <div className="max-h-48 overflow-auto border border-gray-200 rounded-lg bg-white">
-                        {divisoes2.map(c => {
+                        {availableDivisoes2ForCurrentD1.map(c => {
                           const checked = selectedD2IdsForD3.includes(c.id);
                           return (
                             <label key={c.id} className="flex items-center gap-3 px-4 py-2 border-b border-gray-100 text-sm">
@@ -2682,84 +2734,81 @@ export default function CongregacoesPage() {
             )}
 
             {!showFormD1 && (
-              <button onClick={openNewD1} className="mb-6 w-full px-6 py-3 bg-[#123b63] text-white rounded-lg hover:bg-[#0f2a45] transition font-semibold">
+              <button onClick={openNewD1} className="mb-6 w-full px-6 py-3 bg-teal-500 text-white font-bold rounded-lg hover:bg-teal-600 transition shadow-md">
                 + Adicionar {nomeD3}
               </button>
             )}
 
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-100 border-b border-gray-200">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
                   <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nome</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Data Criação</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Ações</th>
+                    <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">NOME</th>
+                    <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">PASTOR/SUPERVISOR</th>
+                    <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">QTD DE SETOR</th>
+                    <th className="px-4 py-3 text-center font-semibold bg-gray-200 text-gray-800">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {divisoes1.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
                         Nenhuma {nomeD3} cadastrada
                       </td>
                     </tr>
                   ) : (
-                    divisoes1.map(d => (
-                      <tr key={d.id} className="border-b border-gray-200 hover:bg-gray-50 transition">
-                        <td className="px-6 py-3 text-sm text-gray-700 font-semibold">{d.nome}</td>
-                        <td className="px-6 py-3">
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            d.is_active
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {d.is_active ? '✓ Ativo' : '○ Inativo'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-3 text-sm text-gray-600">
-                          {new Date(d.created_at).toLocaleDateString('pt-BR')}
-                        </td>
-                        <td className="px-6 py-3 text-right space-x-2">
-                          <button
-                            onClick={() => {
-                              setEditingD1(d);
-                              setFormD1({
-                                codigo: d.codigo ? String(d.codigo) : '',
-                                nome: d.nome || '',
-                                uf: '',
-                                informar_supervisor: !!(d.supervisor_nome || d.supervisor_member_id),
-                                supervisor_cpf_input: '',
-                                supervisor_member_id: '',
-                                supervisor_matricula: '',
-                                supervisor_nome: d.supervisor_nome || '',
-                                supervisor_cpf: '',
-                                supervisor_data_nascimento: '',
-                                supervisor_cargo: '',
-                                supervisor_celular: ''
-                              });
-                              setSelectedD2IdsForD3(divisoes2.filter(c => c.supervisao_id === d.id).map(c => c.id));
-                              setSupervisorStatus('idle');
-                              setSupervisorMsg('');
-                              setShowFormD1(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-800 transition text-sm font-semibold"
-                          >
-                            ✏️ Editar
-                          </button>
-                          <button onClick={() => handleDeleteD1(d.id)} className="text-red-600 hover:text-red-800 transition text-sm font-semibold">
-                            🗑️ Deletar
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    divisoes1.map(d => {
+                      const qtdSetor = divisoes2.filter(c => c.supervisao_id === d.id).length;
+
+                      return (
+                        <tr key={d.id} className="border-b border-gray-200 hover:bg-gray-50">
+                          <td className="px-4 py-3 text-gray-700 font-semibold">{d.nome}</td>
+                          <td className="px-4 py-3 text-gray-700">{d.supervisor_nome || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700 font-semibold">{qtdSetor}</td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => {
+                                setEditingD1(d);
+                                setFormD1({
+                                  codigo: d.codigo ? String(d.codigo) : '',
+                                  nome: d.nome || '',
+                                  uf: '',
+                                  informar_supervisor: !!(d.supervisor_nome || d.supervisor_member_id),
+                                  supervisor_cpf_input: '',
+                                  supervisor_member_id: '',
+                                  supervisor_matricula: '',
+                                  supervisor_nome: d.supervisor_nome || '',
+                                  supervisor_cpf: '',
+                                  supervisor_data_nascimento: '',
+                                  supervisor_cargo: '',
+                                  supervisor_celular: ''
+                                });
+                                setSelectedD2IdsForD3(divisoes2.filter(c => c.supervisao_id === d.id).map(c => c.id));
+                                setSupervisorStatus('idle');
+                                setSupervisorMsg('');
+                                setShowFormD1(true);
+                              }}
+                              className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold"
+                            >
+                              Editar
+                            </button>
+                            <button onClick={() => handleDeleteD1(d.id)} className="ml-2 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs font-semibold">
+                              Deletar
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           </Section>
         )}
       </Tabs>
+      </div>
     </PageLayout>
   );
 }

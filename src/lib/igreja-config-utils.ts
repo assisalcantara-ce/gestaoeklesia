@@ -9,7 +9,9 @@ export interface ConfiguracaoIgreja {
     telefone: string;
     email: string;
     website?: string;
+    descricao?: string;
     responsavel?: string;
+    dataCadastro?: string;
     logo: string; // Base64 da imagem
 }
 
@@ -21,6 +23,7 @@ const CONFIGURACAO_PADRAO: ConfiguracaoIgreja = {
     telefone: '',
     email: '',
     website: '',
+    descricao: '',
     responsavel: '',
     logo: ''
 };
@@ -57,7 +60,7 @@ export async function fetchConfiguracaoIgrejaFromSupabase(
 
     const { data, error } = await supabase
         .from('ministries')
-        .select('name, email_admin, cnpj_cpf, phone, website, logo_url')
+        .select('name, email_admin, cnpj_cpf, phone, website, description, logo_url, created_at')
         .eq('id', ministryId)
         .maybeSingle();
 
@@ -78,7 +81,9 @@ export async function fetchConfiguracaoIgrejaFromSupabase(
         telefone: data.phone || '',
         email: data.email_admin || '',
         website: data.website || '',
+        descricao: data.description || '',
         responsavel: churchProfile.responsavel || CONFIGURACAO_PADRAO.responsavel || '',
+        dataCadastro: data.created_at ? new Date(data.created_at).toISOString().split('T')[0] : '',
         logo: data.logo_url || ''
     };
 }
@@ -96,6 +101,7 @@ export async function updateConfiguracaoIgrejaInSupabase(
     if (typeof config.cnpj === 'string') updateMinistry.cnpj_cpf = config.cnpj;
     if (typeof config.telefone === 'string') updateMinistry.phone = config.telefone;
     if (typeof config.website === 'string') updateMinistry.website = config.website;
+    if (typeof config.descricao === 'string') updateMinistry.description = config.descricao;
     if (typeof config.logo === 'string') updateMinistry.logo_url = config.logo;
 
     if (Object.keys(updateMinistry).length > 0) {
@@ -118,7 +124,7 @@ export async function updateConfiguracaoIgrejaInSupabase(
         ...(typeof config.responsavel === 'string' ? { responsavel: config.responsavel } : {})
     };
 
-    await supabase
+    const { error: upsertErr } = await supabase
         .from('configurations')
         .upsert(
             {
@@ -128,4 +134,6 @@ export async function updateConfiguracaoIgrejaInSupabase(
             } as any,
             { onConflict: 'ministry_id' }
         );
+
+    if (upsertErr) throw upsertErr;
 }

@@ -5,9 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-guard'
-
-const ASAAS_API_KEY = process.env.ASAAS_API_KEY
-const ASAAS_API_URL = 'https://api.asaas.com/v3'
+import { buildMonthlyInstallments, createAsaasPayment, ensureAsaasCustomer } from '@/lib/asaas'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +17,11 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const status = searchParams.get('status')
+    const statusIn = searchParams.get('status_in')
     const ministry_id = searchParams.get('ministry_id')
+    const dueFrom = searchParams.get('due_from')
+    const dueTo = searchParams.get('due_to')
+    const origin = searchParams.get('origin')
 
     const offset = (page - 1) * limit
     let query = supabaseAdmin
@@ -34,8 +36,31 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', status)
     }
 
+    if (statusIn) {
+      const statuses = statusIn.split(',').map((item) => item.trim()).filter(Boolean)
+      if (statuses.length > 0) {
+        query = query.in('status', statuses)
+      }
+    }
+
     if (ministry_id) {
       query = query.eq('ministry_id', ministry_id)
+    }
+
+    if (dueFrom) {
+      query = query.gte('due_date', dueFrom)
+    }
+
+    if (dueTo) {
+      query = query.lte('due_date', dueTo)
+    }
+
+    if (origin === 'manual') {
+      query = query.is('asaas_payment_id', null)
+    }
+
+    if (origin === 'asaas') {
+      query = query.not('asaas_payment_id', 'is', null)
     }
 
     const { data, error, count } = await query
@@ -87,92 +112,146 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ministério não encontrado' }, { status: 404 })
     }
 
-    // Criar pagamento no Supabase
-    const { data: payment, error: paymentError } = await supabase
-      .from('payments')
-      .insert([{
-        ministry_id: body.ministry_id,
-        subscription_plan_id: body.subscription_plan_id,
-        amount: body.amount,
-        description: body.description || `Assinatura - ${ministry.name}`,
-        due_date: body.due_date,
-        status: 'pending',
-        payment_method: body.payment_method,
-        period_start: body.period_start,
-        period_end: body.period_end,
-      }])
-      .select()
-      .single()
-
-    if (paymentError) {
-      return NextResponse.json({ error: paymentError.message }, { status: 400 })
+    const installments = Math.max(1, parseInt(body.installments || '1'))
+    const amount = Number(body.amount)
+    if (Number.isNaN(amount)) {
+      return NextResponse.json({ error: 'Valor inválido' }, { status: 400 })
     }
 
-    // Se houver integração ASAAS configurada, criar cobro lá também
-    if (ASAAS_API_KEY && body.create_asaas !== false) {
-      const asaasPayment = await createAsaasPayment(ministry, payment)
-      
-      if (asaasPayment.success) {
-        // Atualizar com ID do ASAAS
-        await supabase
-          .from('payments')
-          .update({
-            asaas_payment_id: asaasPayment.id,
-            asaas_response: asaasPayment.response,
+    const descriptionBase = body.description || `Assinatura - ${ministry.name}`
+
+    if (installments === 1) {
+      const cutoff = new Date(Date.now() - 10 * 1000).toISOString()
+      const { data: existing } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('ministry_id', body.ministry_id)
+        .eq('amount', amount)
+        .eq('due_date', body.due_date)
+        .eq('payment_method', body.payment_method)
+        .eq('description', descriptionBase)
+        .eq('status', 'pending')
+        .gte('created_at', cutoff)
+        .limit(1)
+        .maybeSingle()
+
+      if (existing) {
+        return NextResponse.json({ data: [existing], duplicated: true }, { status: 200 })
+      }
+    }
+
+    const dueDates = buildMonthlyInstallments(body.due_date, installments)
+
+    const rowsToInsert = dueDates.map((dueDate: string, index: number) => ({
+      ministry_id: body.ministry_id,
+      subscription_plan_id: body.subscription_plan_id,
+      amount,
+      description: installments > 1 ? `${descriptionBase} (${index + 1}/${installments})` : descriptionBase,
+      due_date: dueDate,
+      status: 'pending',
+      payment_method: body.payment_method,
+      period_start: body.period_start,
+      period_end: body.period_end,
+    }))
+
+    const { data: payments, error: paymentError } = await supabase
+      .from('payments')
+      .insert(rowsToInsert)
+      .select()
+
+    if (paymentError || !payments) {
+      return NextResponse.json({ error: paymentError?.message || 'Erro ao criar pagamentos' }, { status: 400 })
+    }
+
+    // Se houver integração ASAAS configurada, criar cobranças lá também
+    if (body.create_asaas !== false) {
+      const customerId = await ensureAsaasCustomer(supabase, ministry)
+
+      for (const payment of payments) {
+        try {
+          const asaasPayment = await createAsaasPayment({
+            customer: customerId,
+            value: payment.amount,
+            dueDate: payment.due_date,
+            description: payment.description,
+            billingType: (payment.payment_method || 'PIX').toUpperCase(),
+            externalReference: payment.id,
           })
-          .eq('id', payment.id)
+
+          await supabase
+            .from('payments')
+            .update({
+              asaas_payment_id: asaasPayment.id,
+              asaas_response: asaasPayment,
+            })
+            .eq('id', payment.id)
+        } catch (err) {
+          // Mantem pagamento local mesmo se ASAAS falhar
+          await supabase
+            .from('payments')
+            .update({
+              asaas_response: { error: (err as Error).message },
+            })
+            .eq('id', payment.id)
+        }
       }
     }
 
     // Log auditoria
-    await logAuditAction(supabase, adminUser.id, 'CREATE_PAYMENT', 'payments', payment.id, {})
+    await logAuditAction(supabase, adminUser.id, 'CREATE_PAYMENT', 'payments', payments[0].id, {})
 
-    return NextResponse.json(payment, { status: 201 })
+    return NextResponse.json({ data: payments }, { status: 201 })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
 
-/**
- * Criar cobro no ASAAS
- */
-async function createAsaasPayment(ministry: any, payment: any) {
+export async function PATCH(request: NextRequest) {
   try {
-    if (!ASAAS_API_KEY) {
-      return { success: false, error: 'ASAAS não configurado' }
+    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    if (!result.ok) return result.response
+    const { supabaseAdmin: supabase, adminUser } = result.ctx
+
+    const body = await request.json()
+    const paymentId = body?.payment_id
+
+    if (!paymentId) {
+      return NextResponse.json({ error: 'payment_id é obrigatório' }, { status: 400 })
     }
 
-    const response = await fetch(`${ASAAS_API_URL}/payments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'access_token': ASAAS_API_KEY,
-      },
-      body: JSON.stringify({
-        customer: ministry.email_admin, // ou customer_id se já tiver
-        value: payment.amount,
-        dueDate: payment.due_date,
-        description: payment.description,
-        billingType: payment.payment_method || 'PIX', // PIX, BOLETO, CREDIT_CARD, DEBIT_CARD
-        remoteId: payment.id, // ID do pagamento nosso
-      }),
+    const manualNote = String(body?.manual_note || 'Baixa manual')
+    const now = new Date().toISOString()
+
+    const { data: updated, error } = await supabase
+      .from('payments')
+      .update({
+        status: 'paid',
+        payment_date: now,
+        asaas_response: {
+          manual_settlement: true,
+          note: manualNote,
+          settled_at: now,
+        },
+        updated_at: now,
+      })
+      .eq('id', paymentId)
+      .select()
+      .single()
+
+    if (error || !updated) {
+      return NextResponse.json(
+        { error: error?.message || 'Falha ao dar baixa manual' },
+        { status: 400 }
+      )
+    }
+
+    await logAuditAction(supabase, adminUser.id, 'MANUAL_PAYMENT_SETTLEMENT', 'payments', updated.id, {
+      note: manualNote,
     })
 
-    const data = await response.json()
-
-    if (!response.ok) {
-      console.error('Erro ASAAS:', data)
-      return { success: false, error: data.errors?.[0]?.detail }
-    }
-
-    return {
-      success: true,
-      id: data.id,
-      response: data,
-    }
+    return NextResponse.json({ data: updated }, { status: 200 })
   } catch (err: any) {
-    console.error('Erro ao criar pagamento ASAAS:', err)
-    return { success: false, error: err.message }
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
 

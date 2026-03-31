@@ -70,6 +70,8 @@ export interface SupportTicket {
   resolved_at?: string;
   sla_minutes?: number;
   response_at?: string;
+  last_message_user_id?: string | null;
+  last_message_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -165,6 +167,14 @@ export interface DashboardMetrics {
   tickets_overdue_sla: number;
   storage_usage_percent: number;
   user_growth_percent: number;
+  tickets_by_month: Array<{ month: string; value: number }>;
+  deployments_by_month: Array<{ month: string; implantacoes: number; cancelamentos: number }>;
+  ticket_stats: {
+    received: number;
+    resolved: number;
+    waiting: number;
+    high_priority: number;
+  };
 }
 
 // ============================================

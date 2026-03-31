@@ -9,7 +9,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth'
 import PageLayout from '@/components/PageLayout'
 import { useAppDialog } from '@/providers/AppDialogProvider'
 
-type TicketStatus = 'aberto' | 'em_progresso' | 'resolvido' | 'fechado'
+type TicketStatus = 'aberto' | 'em_progresso' | 'resolvido' | 'fechado' | 'aguardando_cliente'
 type TicketPriority = 'baixa' | 'media' | 'alta' | 'critica'
 
 interface Ticket {
@@ -23,6 +23,8 @@ interface Ticket {
   data_atualizacao: string
   respondido_em?: string
   usuario_id: string
+  ministry_id: string
+  ticket_number?: string
 }
 
 interface NovoTicket {
@@ -43,6 +45,16 @@ export default function SuportePage() {
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [filtroStatus, setFiltroStatus] = useState<TicketStatus | 'todos'>('todos')
   const [selecionado, setSelecionado] = useState<Ticket | null>(null)
+  const [ministryId, setMinistryId] = useState<string | null>(null)
+  const [mensagens, setMensagens] = useState<Array<{ id: string; user_id: string; message: string; created_at: string }>>([])
+  const [carregandoMensagens, setCarregandoMensagens] = useState(false)
+  const [resposta, setResposta] = useState('')
+  const [enviandoResposta, setEnviandoResposta] = useState(false)
+  const [mostrarResposta, setMostrarResposta] = useState(false)
+  const [suporteRespondeu, setSuporteRespondeu] = useState(false)
+  const [podeEditarDescricao, setPodeEditarDescricao] = useState(false)
+  const [descricaoEditada, setDescricaoEditada] = useState('')
+  const [salvandoDescricao, setSalvandoDescricao] = useState(false)
   const [novoTicket, setNovoTicket] = useState<NovoTicket>({
     titulo: '',
     descricao: '',
@@ -63,69 +75,193 @@ export default function SuportePage() {
     'Outro',
   ]
 
+  const resolveMinistryId = async () => {
+    try {
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser()
+
+      if (!currentUser) return null
+
+      const { data: mu, error: muErr } = await supabase
+        .from('ministry_users')
+        .select('ministry_id')
+        .eq('user_id', currentUser.id)
+        .maybeSingle()
+
+      if (!muErr && mu?.ministry_id) return mu.ministry_id as string
+
+      const { data: m, error: mErr } = await supabase
+        .from('ministries')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .maybeSingle()
+
+      if (!mErr && m?.id) return m.id as string
+    } catch {
+      return null
+    }
+    return null
+  }
+
   // Carregar tickets
   useEffect(() => {
     if (authLoading) return
     if (!user) return
-    carregarTickets()
+    resolveMinistryId().then((resolved) => {
+      setMinistryId(resolved)
+    })
   }, [authLoading, user?.id])
 
-  const criarTabelaAutomaticamente = async () => {
-    try {
-      const response = await fetch('/api/v1/create-tickets-table', {
-        method: 'POST',
-      })
-      if (response.ok) {
-        // Esperar um pouco para a tabela ser criada
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        return true
-      }
-      return false
-    } catch (err) {
-      console.error('Erro ao criar tabela:', err)
-      return false
+  useEffect(() => {
+    if (!user || !ministryId) return
+    carregarTickets()
+  }, [user?.id, ministryId])
+
+  useEffect(() => {
+    if (!user || !ministryId) return
+    const intervalId = setInterval(() => {
+      carregarTickets()
+    }, 20000)
+
+    return () => clearInterval(intervalId)
+  }, [user?.id, ministryId])
+
+  useEffect(() => {
+    if (!selecionado) return
+    carregarMensagens(selecionado.id)
+    setMostrarResposta(selecionado.status !== 'aguardando_cliente')
+    setDescricaoEditada(selecionado.descricao)
+  }, [selecionado?.id])
+
+  useEffect(() => {
+    if (!selecionado || !user || !ministryId) return
+    const intervalId = setInterval(() => {
+      carregarMensagens(selecionado.id)
+      carregarTickets()
+    }, 10000)
+
+    return () => clearInterval(intervalId)
+  }, [selecionado?.id, user?.id, ministryId])
+
+  const mapStatusFromDb = (status: string | null): TicketStatus => {
+    switch (status) {
+      case 'open':
+        return 'aberto'
+      case 'in_progress':
+        return 'em_progresso'
+      case 'resolved':
+        return 'fechado'
+      case 'closed':
+        return 'fechado'
+      case 'waiting_customer':
+        return 'aguardando_cliente'
+      default:
+        return 'aberto'
     }
   }
 
-  const carregarTickets = async (tentarCriarTabela = true) => {
+  const mapPriorityFromDb = (priority: string | null): TicketPriority => {
+    switch (priority) {
+      case 'low':
+        return 'baixa'
+      case 'high':
+        return 'alta'
+      case 'urgent':
+        return 'critica'
+      default:
+        return 'media'
+    }
+  }
+
+  const mapStatusToDb = (status: TicketStatus) => {
+    switch (status) {
+      case 'aberto':
+        return 'open'
+      case 'em_progresso':
+        return 'in_progress'
+      case 'resolvido':
+        return 'resolved'
+      case 'fechado':
+        return 'closed'
+      case 'aguardando_cliente':
+        return 'waiting_customer'
+      default:
+        return 'open'
+    }
+  }
+
+  const mapPriorityToDb = (priority: TicketPriority) => {
+    switch (priority) {
+      case 'baixa':
+        return 'low'
+      case 'alta':
+        return 'high'
+      case 'critica':
+        return 'urgent'
+      default:
+        return 'medium'
+    }
+  }
+
+  const carregarTickets = async () => {
     try {
       setLoading(true)
-      if (!user) return
+      if (!user || !ministryId) return
 
       // Buscar tickets do usuário
       const { data, error } = await supabase
-        .from('tickets_suporte')
+        .from('support_tickets')
         .select('*')
-        .eq('usuario_id', user.id)
-        .order('data_criacao', { ascending: false })
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
 
       if (error) {
-        // Verificar se é erro de tabela não encontrada
-        if ((error.code === 'PGRST116' || error.message?.includes('not found')) && tentarCriarTabela) {
-          console.log('[SUPORTE] Tabela não encontrada. Criando automaticamente...')
-          const tabelaCriada = await criarTabelaAutomaticamente()
-          if (tabelaCriada) {
-            // Tentar carregar novamente após criar a tabela
-            await carregarTickets(false)
-            return
-          } else {
-            setError('❌ Erro ao criar tabela de suporte. Tente novamente.')
-            return
-          }
-        } else {
-          console.error('[SUPORTE] Erro ao carregar tickets:', {
-            codigo: error.code,
-            mensagem: error.message,
-            detalhes: JSON.stringify(error),
-          })
-          setError('Erro ao carregar tickets: ' + (error.message || 'Erro desconhecido'))
-          return
-        }
+        console.error('[SUPORTE] Erro ao carregar tickets:', {
+          codigo: error.code,
+          mensagem: error.message,
+          detalhes: JSON.stringify(error),
+        })
+        setError('Erro ao carregar tickets: ' + (error.message || 'Erro desconhecido'))
+        return
       }
 
       // Sucesso! Limpar erro se houver
       setError('')
-      setTickets(data || [])
+      const mapped = (data || []).map((row: any) => ({
+        id: row.id,
+        titulo: row.subject,
+        descricao: row.description,
+        status: mapStatusFromDb(row.status),
+        prioridade: mapPriorityFromDb(row.priority),
+        categoria: row.category,
+        data_criacao: row.created_at,
+        data_atualizacao: row.updated_at,
+        respondido_em: row.response_at || row.resolved_at,
+        usuario_id: row.user_id,
+        ministry_id: row.ministry_id,
+        ticket_number: row.ticket_number,
+      }))
+      const statusOrder: Record<TicketStatus, number> = {
+        aberto: 0,
+        em_progresso: 1,
+        aguardando_cliente: 2,
+        resolvido: 3,
+        fechado: 4,
+      }
+      const sorted = [...mapped].sort((a, b) => {
+        const orderDiff = statusOrder[a.status] - statusOrder[b.status]
+        if (orderDiff !== 0) return orderDiff
+        return new Date(b.data_criacao).getTime() - new Date(a.data_criacao).getTime()
+      })
+      setTickets(sorted)
+
+      if (selecionado) {
+        const updatedSelected = mapped.find((ticket) => ticket.id === selecionado.id)
+        if (updatedSelected) {
+          setSelecionado(updatedSelected)
+        }
+      }
       
       // Registrar ação de visualização de tickets
       if (data && data.length > 0) {
@@ -133,7 +269,7 @@ export default function SuportePage() {
           acao: 'visualizar',
           modulo: 'suporte',
           area: 'tickets',
-          tabela_afetada: 'tickets_suporte',
+          tabela_afetada: 'support_tickets',
           descricao: `Visualizou ${data.length} ticket(s)`,
           status: 'sucesso'
         })
@@ -143,6 +279,129 @@ export default function SuportePage() {
       setError('Erro ao carregar tickets. Tente recarregar a página.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const carregarMensagens = async (ticketId: string) => {
+    try {
+      setCarregandoMensagens(true)
+      const { data, error } = await supabase
+        .from('support_ticket_messages')
+        .select('*')
+        .eq('ticket_id', ticketId)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('[SUPORTE] Erro ao carregar mensagens:', error)
+        return
+      }
+
+      const visible = (data || [])
+        .filter((msg: any) => msg.is_internal !== true)
+        .map((msg: any) => ({
+          id: msg.id,
+          user_id: msg.user_id,
+          message: msg.message,
+          created_at: msg.created_at,
+        }))
+      setMensagens(visible)
+      const suporteRespondeuLocal = visible.some((msg) => msg.user_id !== user?.id)
+      setSuporteRespondeu(suporteRespondeuLocal)
+      const podeEditar = selecionado?.status === 'aberto' && !selecionado?.respondido_em && !suporteRespondeuLocal
+      setPodeEditarDescricao(Boolean(podeEditar))
+    } finally {
+      setCarregandoMensagens(false)
+    }
+  }
+
+  const salvarDescricao = async () => {
+    if (!selecionado || !user) return
+    if (!descricaoEditada.trim()) {
+      await dialog.alert({ title: 'Atenção', type: 'warning', message: 'A descrição não pode ficar vazia.' })
+      return
+    }
+
+    try {
+      setSalvandoDescricao(true)
+      const { error: updateError } = await supabase
+        .from('support_tickets')
+        .update({ description: descricaoEditada.trim(), updated_at: new Date().toISOString() })
+        .eq('id', selecionado.id)
+
+      if (updateError) {
+        await dialog.alert({ title: 'Erro', type: 'error', message: updateError.message })
+        return
+      }
+
+      setSelecionado({ ...selecionado, descricao: descricaoEditada.trim(), data_atualizacao: new Date().toISOString() })
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.id === selecionado.id
+            ? { ...ticket, descricao: descricaoEditada.trim(), data_atualizacao: new Date().toISOString() }
+            : ticket,
+        ),
+      )
+    } finally {
+      setSalvandoDescricao(false)
+    }
+  }
+
+  const enviarResposta = async () => {
+    if (!user || !selecionado || !resposta.trim()) return
+
+    try {
+      setEnviandoResposta(true)
+      const { error: insertError } = await supabase
+        .from('support_ticket_messages')
+        .insert({
+          ticket_id: selecionado.id,
+          user_id: user.id,
+          message: resposta,
+          is_internal: false,
+        })
+
+      if (insertError) {
+        await dialog.alert({ title: 'Erro', type: 'error', message: insertError.message })
+        return
+      }
+
+      const { error: updateError } = await supabase
+        .from('support_tickets')
+        .update({ status: mapStatusToDb('em_progresso'), updated_at: new Date().toISOString() })
+        .eq('id', selecionado.id)
+
+      if (updateError) {
+        await dialog.alert({ title: 'Erro', type: 'error', message: updateError.message })
+        return
+      }
+
+      setResposta('')
+      await carregarMensagens(selecionado.id)
+      await carregarTickets()
+    } finally {
+      setEnviandoResposta(false)
+    }
+  }
+
+  const reabrirTicket = async () => {
+    if (!user || !selecionado) return
+
+    try {
+      setEnviandoResposta(true)
+      const { error: updateError } = await supabase
+        .from('support_tickets')
+        .update({ status: mapStatusToDb('aberto'), updated_at: new Date().toISOString() })
+        .eq('id', selecionado.id)
+
+      if (updateError) {
+        await dialog.alert({ title: 'Erro', type: 'error', message: updateError.message })
+        return
+      }
+
+      setSelecionado({ ...selecionado, status: 'aberto', data_atualizacao: new Date().toISOString() })
+      await carregarTickets()
+    } finally {
+      setEnviandoResposta(false)
     }
   }
 
@@ -163,19 +422,23 @@ export default function SuportePage() {
         return
       }
 
+      if (!ministryId) {
+        await dialog.alert({ title: 'Erro', type: 'error', message: 'Ministério não encontrado para este usuário.' })
+        return
+      }
+
       // Criar novo ticket
       const { error } = await supabase
-        .from('tickets_suporte')
+        .from('support_tickets')
         .insert([
           {
-            usuario_id: user.id,
-            titulo: novoTicket.titulo,
-            descricao: novoTicket.descricao,
-            categoria: novoTicket.categoria,
-            prioridade: novoTicket.prioridade,
-            status: 'aberto',
-            data_criacao: new Date().toISOString(),
-            data_atualizacao: new Date().toISOString(),
+            ministry_id: ministryId,
+            user_id: user.id,
+            subject: novoTicket.titulo,
+            description: novoTicket.descricao,
+            category: novoTicket.categoria,
+            priority: mapPriorityToDb(novoTicket.prioridade),
+            status: mapStatusToDb('aberto'),
           },
         ])
         .select()
@@ -186,7 +449,7 @@ export default function SuportePage() {
           acao: 'criar',
           modulo: 'suporte',
           area: 'tickets',
-          tabela_afetada: 'tickets_suporte',
+          tabela_afetada: 'support_tickets',
           descricao: `Tentativa de abrir novo ticket falhou`,
           status: 'erro',
           mensagem_erro: error.message
@@ -200,7 +463,7 @@ export default function SuportePage() {
         acao: 'criar',
         modulo: 'suporte',
         area: 'tickets',
-        tabela_afetada: 'tickets_suporte',
+        tabela_afetada: 'support_tickets',
         descricao: `Novo ticket aberto: "${novoTicket.titulo}"`,
         dados_novos: {
           titulo: novoTicket.titulo,
@@ -236,9 +499,45 @@ export default function SuportePage() {
       case 'resolvido':
         return 'bg-green-100 text-green-800'
       case 'fechado':
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-red-50 text-red-700'
+      case 'aguardando_cliente':
+        return 'bg-purple-100 text-purple-800'
       default:
         return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getCardBorderColor = (status: TicketStatus) => {
+    switch (status) {
+      case 'aberto':
+        return 'border-blue-400'
+      case 'em_progresso':
+        return 'border-yellow-400'
+      case 'aguardando_cliente':
+        return 'border-purple-400'
+      case 'resolvido':
+        return 'border-green-400'
+      case 'fechado':
+        return 'border-red-300'
+      default:
+        return 'border-gray-300'
+    }
+  }
+
+  const getStatusLabel = (status: TicketStatus) => {
+    switch (status) {
+      case 'aberto':
+        return 'Aberto'
+      case 'em_progresso':
+        return 'Em progresso'
+      case 'resolvido':
+        return 'Resolvido'
+      case 'fechado':
+        return 'Fechado'
+      case 'aguardando_cliente':
+        return 'Aguardando cliente'
+      default:
+        return 'Aberto'
     }
   }
 
@@ -270,7 +569,7 @@ export default function SuportePage() {
       activeMenu="suporte"
     >
       <div className="bg-white rounded-lg shadow-lg p-6">
-        {/* ERRO - TABELA NÃO CRIADA (agora será criada automaticamente) */}
+        {/* ERRO */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 rounded-lg">
             <p className="text-red-800 font-semibold">{error}</p>
@@ -391,8 +690,8 @@ export default function SuportePage() {
         )}
 
         {/* FILTROS */}
-        <div className="mb-6 flex gap-2 flex-wrap">
-          {['todos', 'aberto', 'em_progresso', 'resolvido', 'fechado'].map((status) => (
+        <div className="mb-6 flex gap-2 flex-wrap items-center">
+          {['todos', 'aberto', 'em_progresso', 'aguardando_cliente', 'fechado'].map((status) => (
             <button
               key={status}
               onClick={() => setFiltroStatus(status as TicketStatus | 'todos')}
@@ -402,9 +701,15 @@ export default function SuportePage() {
                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
               }`}
             >
-              {status === 'todos' ? 'Todos' : status.replace('_', ' ').toUpperCase()}
+              {status === 'todos' ? 'Todos' : getStatusLabel(status as TicketStatus)}
             </button>
           ))}
+          <button
+            onClick={carregarTickets}
+            className="px-4 py-2 rounded-lg font-semibold bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+          >
+            Atualizar
+          </button>
         </div>
 
         {/* LISTA DE TICKETS */}
@@ -442,18 +747,69 @@ export default function SuportePage() {
             {ticketsFiltrados.map((ticket) => (
               <div
                 key={ticket.id}
-                onClick={() => setSelecionado(ticket)}
-                className="bg-white rounded-lg shadow hover:shadow-lg transition cursor-pointer border-l-4 border-[#0284c7]"
+                className={`bg-white rounded-lg shadow hover:shadow-lg transition border-l-4 ${getCardBorderColor(ticket.status)}`}
               >
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold text-[#123b63] mb-1">#{ticket.id.slice(0, 8).toUpperCase()}</h3>
+                      <h3 className={`text-xl font-bold mb-1 ${getStatusColor(ticket.status)}`}>
+                        #{ticket.ticket_number || ticket.id.slice(0, 8).toUpperCase()}
+                      </h3>
                       <p className="text-lg font-semibold text-gray-800">{ticket.titulo}</p>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(ticket.status)}`}>
-                      {ticket.status.replace('_', ' ').toUpperCase()}
-                    </span>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(ticket.status)}`}>
+                        {getStatusLabel(ticket.status)}
+                      </span>
+                      {ticket.status === 'aguardando_cliente' && (
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setSelecionado(ticket)
+                            setMostrarResposta(true)
+                          }}
+                          className="px-3 py-1 text-xs font-semibold rounded-full bg-[#123b63] text-white hover:bg-[#0f2f4d] transition"
+                        >
+                          Responder ticket
+                        </button>
+                      )}
+                      {ticket.status === 'aberto' && !ticket.respondido_em && (
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setSelecionado(ticket)
+                            setMostrarResposta(false)
+                          }}
+                          className="px-3 py-1 text-xs font-semibold rounded-full bg-white text-[#123b63] border border-[#123b63]/20 hover:bg-[#123b63] hover:text-white transition"
+                        >
+                          Visualizar
+                        </button>
+                      )}
+                      {ticket.status === 'em_progresso' && (
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setSelecionado(ticket)
+                            setMostrarResposta(true)
+                          }}
+                          className="px-3 py-1 text-xs font-semibold rounded-full bg-white text-[#123b63] border border-[#123b63]/20 hover:bg-[#123b63] hover:text-white transition"
+                        >
+                          Visualizar
+                        </button>
+                      )}
+                      {ticket.status === 'fechado' && (
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setSelecionado(ticket)
+                            setMostrarResposta(true)
+                          }}
+                          className="px-3 py-1 text-xs font-semibold rounded-full bg-gray-700 text-white hover:bg-gray-800 transition"
+                        >
+                          Reabrir e enviar
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <p className="text-gray-600 mb-3 line-clamp-2">{ticket.descricao}</p>
@@ -475,6 +831,14 @@ export default function SuportePage() {
                         {new Date(ticket.data_criacao).toLocaleDateString('pt-BR')}
                       </span>
                     </div>
+                    {ticket.respondido_em && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500">Respondido em:</span>
+                        <span className="font-semibold text-gray-800">
+                          {new Date(ticket.respondido_em).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -485,48 +849,149 @@ export default function SuportePage() {
         {/* DETALHES DO TICKET SELECIONADO */}
         {selecionado && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-96 overflow-y-auto">
-              <div className="bg-[#0284c7] text-white p-6 border-b">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden">
+              <div className="relative bg-gradient-to-r from-[#0f2f4d] via-[#123b63] to-[#1b6aa5] text-white px-8 py-7">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm text-white/70">#{selecionado.id.slice(0, 8).toUpperCase()}</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-white/70">Ticket</p>
                     <h2 className="text-2xl font-bold">{selecionado.titulo}</h2>
+                    <p className="text-sm text-white/80 mt-1">#{selecionado.ticket_number || selecionado.id.slice(0, 8).toUpperCase()}</p>
                   </div>
                   <button
                     onClick={() => setSelecionado(null)}
-                    className="text-white hover:bg-white/20 rounded p-2 transition"
+                    className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-2 transition"
                   >
                     ✕
                   </button>
                 </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selecionado.status)}`}>
+                    {getStatusLabel(selecionado.status)}
+                  </span>
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white">
+                    Prioridade {selecionado.prioridade.toUpperCase()}
+                  </span>
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white">
+                    Categoria {selecionado.categoria}
+                  </span>
+                </div>
               </div>
 
-              <div className="p-6 space-y-4">
-                <div>
-                  <h3 className="font-bold text-gray-700 mb-2">Descrição</h3>
-                  <p className="text-gray-600 bg-gray-50 p-4 rounded">{selecionado.descricao}</p>
+              <div className="px-6 lg:px-8 pb-8">
+                <div className="mx-auto grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-0">
+                  <div className="p-6 border-b lg:border-b-0 lg:border-r border-gray-100 space-y-6">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Resumo</h3>
+                      {podeEditarDescricao && (
+                        <span className="text-xs text-gray-400">Editável antes da resposta do suporte</span>
+                      )}
+                    </div>
+                    {podeEditarDescricao ? (
+                      <div className="space-y-3">
+                        <textarea
+                          value={descricaoEditada}
+                          onChange={(e) => setDescricaoEditada(e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-[#0284c7] focus:ring-2 focus:ring-[#0284c7]/20 h-28 resize-none leading-relaxed"
+                          placeholder="Descreva seu problema"
+                        />
+                        <div className="flex justify-end">
+                          <button
+                            onClick={salvarDescricao}
+                            disabled={salvandoDescricao}
+                            className="px-4 py-2 bg-[#123b63] text-white rounded-lg font-semibold hover:bg-[#0f2f4d] transition disabled:opacity-50"
+                          >
+                            {salvandoDescricao ? 'Salvando...' : 'Salvar alterações'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-gray-700 bg-gray-50 border border-gray-100 rounded-xl p-4 leading-relaxed">
+                        {selecionado.descricao}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Conversas</h3>
+                      <span className="text-xs text-gray-400">Atualiza automaticamente</span>
+                    </div>
+                    {carregandoMensagens ? (
+                      <p className="text-gray-500 text-sm">Carregando mensagens...</p>
+                    ) : mensagens.length === 0 ? (
+                      <p className="text-gray-500 text-sm">Nenhuma mensagem ainda.</p>
+                    ) : (
+                      <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                        {mensagens.map((msg) => (
+                          <div
+                            key={msg.id}
+                            className={`rounded-xl p-3 border ${msg.user_id === user?.id ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}
+                          >
+                            <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
+                              <span className="inline-flex items-center gap-2 font-semibold">
+                                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${msg.user_id === user?.id ? 'bg-yellow-200 text-yellow-800' : 'bg-green-200 text-green-800'}`}>
+                                  {msg.user_id === user?.id ? 'VC' : 'SP'}
+                                </span>
+                                {msg.user_id === user?.id ? 'Você' : 'Suporte'}
+                              </span>
+                              <span>{new Date(msg.created_at).toLocaleString('pt-BR')}</span>
+                            </div>
+                            <p className="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">{msg.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="font-bold text-gray-700 mb-1">Status</h3>
-                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(selecionado.status)}`}>
-                      {selecionado.status.replace('_', ' ').toUpperCase()}
-                    </span>
+                  <div className="p-6 space-y-6">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="rounded-xl border border-gray-100 p-3">
+                      <p className="text-xs text-gray-400 uppercase tracking-widest">Criado em</p>
+                      <p className="font-semibold text-gray-700 mt-1">
+                        {new Date(selecionado.data_criacao).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-gray-100 p-3">
+                      <p className="text-xs text-gray-400 uppercase tracking-widest">Atualizado</p>
+                      <p className="font-semibold text-gray-700 mt-1">
+                        {new Date(selecionado.data_atualizacao).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-gray-700 mb-1">Prioridade</h3>
-                    <span className={`font-bold ${getPriorityColor(selecionado.prioridade)}`}>
-                      {selecionado.prioridade.toUpperCase()}
-                    </span>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Responder</h3>
+                      <span className="text-xs text-gray-400">Envie sua mensagem</span>
+                    </div>
+                    {(selecionado.status === 'em_progresso' || suporteRespondeu) && (selecionado.status === 'aguardando_cliente' || selecionado.status === 'fechado' || selecionado.status === 'em_progresso' || mostrarResposta) ? (
+                      <>
+                        <textarea
+                          value={resposta}
+                          onChange={(e) => setResposta(e.target.value)}
+                          className="w-full px-5 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:border-[#0284c7] focus:ring-2 focus:ring-[#0284c7]/20 h-44 resize-none leading-relaxed"
+                          placeholder="Digite sua resposta"
+                        />
+                        <div className="flex justify-end">
+                          <button
+                            onClick={enviarResposta}
+                            disabled={enviandoResposta}
+                            className="px-5 py-2 bg-[#0284c7] text-white rounded-lg font-semibold hover:bg-[#0270b0] transition disabled:opacity-50"
+                          >
+                            {enviandoResposta
+                              ? 'Enviando...'
+                              : selecionado.status === 'fechado'
+                                ? 'Reabrir e enviar mensagem'
+                                : 'Enviar'}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-500">Aguardando resposta do suporte.</p>
+                    )}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-gray-700 mb-1">Categoria</h3>
-                    <p className="text-gray-600">{selecionado.categoria}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-700 mb-1">Criado em</h3>
-                    <p className="text-gray-600">{new Date(selecionado.data_criacao).toLocaleDateString('pt-BR')}</p>
                   </div>
                 </div>
               </div>

@@ -331,7 +331,7 @@
       "fontSize": 10,
       "cor": "#000",
       "fonte": "Arial",
-      "texto": "<font color=\"#ef4444\">{filiacao}</font>",
+      "texto": "<font color=\"#ef4444\">Pai: {nomePai} / Mãe: {nomeMae}</font>",
       "alinhamento": "left",
       "negrito": true,
       "italico": false,

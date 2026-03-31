@@ -9,7 +9,12 @@ export const PLACEHOLDERS_CONFIG = [
   { campo: 'rg', placeholder: '{rg}', label: 'RG' },
   { campo: 'cargo', placeholder: '{cargo}', label: 'Cargo' },
   { campo: 'filiacao', placeholder: '{filiacao}', label: 'Filiação' },
+  { campo: 'nomePai', placeholder: '{nomePai}', label: 'Pai' },
+  { campo: 'nomeMae', placeholder: '{nomeMae}', label: 'Mãe' },
   { campo: 'dataBatismo', placeholder: '{dataBatismo}', label: 'Data de Batismo' },
+  { campo: 'dataConsagracao', placeholder: '{dataConsagracao}', label: 'Data de Consagração' },
+  { campo: 'dataEmissao', placeholder: '{dataEmissao}', label: 'Data de Emissão' },
+  { campo: 'validadeCredencial', placeholder: '{validadeCredencial}', label: 'Validade (Credencial)' },
   { campo: 'dataBatismoAguas', placeholder: '{dataBatismoAguas}', label: 'Batismo nas Águas' },
   { campo: 'dataBatismoEspiritoSanto', placeholder: '{dataBatismoEspiritoSanto}', label: 'Batismo no Espírito Santo' },
   { campo: 'validade', placeholder: '{validade}', label: 'Validade' },
@@ -27,6 +32,22 @@ export const PLACEHOLDERS_CONFIG = [
   // Nota: Placeholders de divisões ({divisao1}, {divisao1_valor}, etc.) são tratados separadamente
   // com lógica dinâmica baseada em nomenclaturas
 ];
+
+function parseDateFromInput(valor?: string): Date | null {
+  if (!valor) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+    const [ano, mes, dia] = valor.split('-').map(Number);
+    const parsed = new Date(ano, mes - 1, dia);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(valor)) {
+    const [dia, mes, ano] = valor.split('/').map(Number);
+    const parsed = new Date(ano, mes - 1, dia);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  const parsed = new Date(valor);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 function normalizeNomenclaturasForCartoes(raw: any): any {
   if (!raw) return null;
@@ -112,6 +133,21 @@ export function substituirPlaceholders(texto: string, membro: any, nomenclaturas
         .join(' e ');
     }
 
+    if (ph.campo === 'dataConsagracao') {
+      valor = membro.dataConsagracao || membro.dataConsagracaoRecebimento || '';
+    }
+
+    if (ph.campo === 'dataEmissao') {
+      valor = membro.dataEmissao || membro.data_emissao || '';
+      if (!valor) {
+        const hoje = new Date();
+        const dia = String(hoje.getDate()).padStart(2, '0');
+        const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+        const ano = hoje.getFullYear();
+        valor = `${dia}/${mes}/${ano}`;
+      }
+    }
+
     if (ph.campo === 'dataBatismo' && !valor) {
       valor = membro.dataBatismoAguas || '';
     }
@@ -127,6 +163,20 @@ export function substituirPlaceholders(texto: string, membro: any, nomenclaturas
       const mes = String(dataBase.getMonth() + 1).padStart(2, '0');
       const ano = dataBase.getFullYear();
       valor = `${dia}/${mes}/${ano}`;
+    }
+
+    if (ph.campo === 'validadeCredencial') {
+      valor = membro.dataValidadeCredencial || '';
+      if (!valor) {
+        const anos = membro.validadeAnos || 1;
+        const dataEmissaoRaw = membro.dataEmissao || membro.data_emissao;
+        const dataBase = parseDateFromInput(dataEmissaoRaw) || new Date();
+        dataBase.setFullYear(dataBase.getFullYear() + anos);
+        const dia = String(dataBase.getDate()).padStart(2, '0');
+        const mes = String(dataBase.getMonth() + 1).padStart(2, '0');
+        const ano = dataBase.getFullYear();
+        valor = `${dia}/${mes}/${ano}`;
+      }
     }
 
     // Formatação de data (se for do tipo YYYY-MM-DD)

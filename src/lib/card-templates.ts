@@ -210,7 +210,6 @@ export const TEMPLATE_MINISTRO_BRANCO: CardTemplate = {
         orientacao: 'horizontal'
     }
 };
-
 // Modelo 2: Ministro Executivo (Vertical)
 export const TEMPLATE_MINISTRO_EXECUTIVO: CardTemplate = {
     id: 'ministro-executivo',
@@ -460,7 +459,7 @@ export function converterParaTemplateEditavel(template: CardTemplate): any {
                 {"id": "1766780318914sb40je7js", "tipo": "chapa", "x": 152, "y": 216, "largura": 160, "altura": 35, "fontSize": 10, "cor": "#ffffff", "fonte": "Arial", "transparencia": 1, "borderRadius": 6, "texto": "CHAPA", "alinhamento": "left", "negrito": false, "italico": false, "sublinhado": false, "visivel": true},
                 {"id": "1766701435750", "tipo": "qrcode", "x": 35, "y": 17, "largura": 90, "altura": 90, "fontSize": 10, "cor": "#000", "fonte": "Arial", "alinhamento": "left", "negrito": false, "italico": false, "sublinhado": false, "visivel": true},
                 {"id": "1766701497174", "tipo": "texto", "x": 10, "y": 252, "largura": 442, "altura": 30, "fontSize": 10, "cor": "#ffffff", "fonte": "Arial", "backgroundColor": "#000000", "texto": "Ide por todo o mundo e pregai o evangelho a toda a criatura. MC 16:15<div><font color=\"#ef4444\">Válido somente enquanto o portador se manter fiel a Deus e a Doutrina desta Igreja.</font></div>", "alinhamento": "center", "negrito": true, "italico": false, "sublinhado": false, "visivel": true},
-                {"id": "1766779482593a8nkcpczi", "tipo": "texto", "x": 26, "y": 134, "largura": 282, "altura": 24, "fontSize": 10, "cor": "#000", "fonte": "Arial", "texto": "<font color=\"#ef4444\">{filiacao}</font>", "alinhamento": "left", "negrito": true, "italico": false, "sublinhado": false, "visivel": true},
+                {"id": "1766779482593a8nkcpczi", "tipo": "texto", "x": 26, "y": 134, "largura": 282, "altura": 24, "fontSize": 10, "cor": "#000", "fonte": "Arial", "texto": "<font color=\"#ef4444\">Pai: {nomePai} / Mãe: {nomeMae}</font>", "alinhamento": "left", "negrito": true, "italico": false, "sublinhado": false, "visivel": true},
                 {"id": "17667794825933nfyrfhmg", "tipo": "texto", "x": 26, "y": 124, "largura": 90, "altura": 18, "fontSize": 10, "cor": "#000", "fonte": "Arial", "texto": "Filiação", "alinhamento": "left", "negrito": true, "italico": false, "sublinhado": false, "visivel": true},
                 {"id": "17667794825931t3s1esri", "tipo": "texto", "x": 158, "y": 84, "largura": 250, "altura": 20, "fontSize": 12, "cor": "#000", "fonte": "Arial", "texto": "Data de Validade:&nbsp;<font color=\"#ef4444\">{validade}</font>", "alinhamento": "center", "negrito": true, "italico": false, "sublinhado": false, "visivel": true},
                 {"id": "1766779482593u1foluglk", "tipo": "texto", "x": 26, "y": 168, "largura": 90, "altura": 18, "fontSize": 10, "cor": "#000", "fonte": "Arial", "texto": "RG", "alinhamento": "left", "negrito": true, "italico": false, "sublinhado": false, "visivel": true},
@@ -863,7 +862,7 @@ export function converterParaTemplateEditavel(template: CardTemplate): any {
                     "fontSize": 10,
                     "cor": "#000",
                     "fonte": "Arial",
-                    "texto": "<font color=\"#ef4444\">{filiacao}</font>",
+                    "texto": "<font color=\"#ef4444\">Pai: {nomePai} / Mãe: {nomeMae}</font>",
                     "alinhamento": "left",
                     "negrito": true,
                     "italico": false,

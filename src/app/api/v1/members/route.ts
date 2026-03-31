@@ -9,6 +9,7 @@
  */
 
 import { createServerClientFromRequest } from '@/lib/supabase-server'
+import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer'
 import { NextRequest, NextResponse } from 'next/server'
 
 async function resolveMinistryId(supabase: any, userId: string): Promise<string | null> {
@@ -152,6 +153,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+    const normalizedBody = normalizePayloadToUppercase(body, {
+      preserveKeys: [
+        'member_since',
+        'birth_date',
+        'data_consagracao',
+        'data_emissao',
+        'data_validade_credencial',
+        'latitude',
+        'longitude',
+        'cargoMinisterial',
+        'cargo_ministerial',
+        'procedencia',
+      ],
+    })
 
     const ministryId = await resolveMinistryId(supabase, user.id)
     if (!ministryId) {
@@ -162,7 +177,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar campos obrigatórios
-    if (!body.name) {
+    if (!normalizedBody.name) {
       return NextResponse.json(
         { error: 'Nome é obrigatório' },
         { status: 400 }
@@ -175,55 +190,61 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           ministry_id: ministryId,
-          name: body.name,
-          email: body.email || null,
-          phone: body.phone || null,
-          cpf: body.cpf || null,
-          birth_date: body.birth_date || null,
-          gender: body.gender || null,
-          marital_status: body.marital_status || null,
-          occupation: body.occupation || null,
-          address: body.address || null,
-          complement: body.complement || null,
-          city: body.city || null,
-          state: body.state || null,
-          zipcode: body.zipcode || null,
-          latitude: typeof body.latitude === 'number' ? body.latitude : null,
-          longitude: typeof body.longitude === 'number' ? body.longitude : null,
-          member_since: body.member_since || new Date(),
-          role: body.role || null,
-          status: body.status || 'active',
-          custom_fields: body.custom_fields || {},
-          notes: body.notes || null,
+          name: normalizedBody.name,
+          email: typeof normalizedBody.email === 'string' ? normalizedBody.email.toLowerCase() : normalizedBody.email || null,
+          phone: normalizedBody.phone || null,
+          cpf: normalizedBody.cpf || null,
+          data_consagracao: normalizedBody.data_consagracao || null,
+          data_emissao: normalizedBody.data_emissao || null,
+          data_validade_credencial: normalizedBody.data_validade_credencial || null,
+          birth_date: normalizedBody.birth_date || null,
+          gender: normalizedBody.gender || null,
+          marital_status: normalizedBody.marital_status || null,
+          orgao_emissor: normalizedBody.orgao_emissor || null,
+          occupation: normalizedBody.occupation || null,
+          address: normalizedBody.address || null,
+          complement: normalizedBody.complement || null,
+          city: normalizedBody.city || null,
+          state: normalizedBody.state || null,
+          zipcode: normalizedBody.zipcode || null,
+          congregacao_id: normalizedBody.congregacao_id || null,
+          latitude: typeof normalizedBody.latitude === 'number' ? normalizedBody.latitude : null,
+          longitude: typeof normalizedBody.longitude === 'number' ? normalizedBody.longitude : null,
+          member_since: normalizedBody.member_since || new Date(),
+          role: normalizedBody.role || null,
+          status: normalizedBody.status || 'active',
+          custom_fields: normalizedBody.custom_fields || {},
+          notes: normalizedBody.notes || null,
         },
       ])
       .select()
 
     // Compatibilidade: bases que ainda não têm colunas latitude/longitude
-    if (error && /column\s+"?(latitude|longitude)"?\s+of\s+relation\s+"?members"?\s+does\s+not\s+exist/i.test(error.message)) {
+    if (error && /column\s+"?(latitude|longitude|orgao_emissor|data_consagracao|data_emissao|data_validade_credencial)"?\s+of\s+relation\s+"?members"?\s+does\s+not\s+exist/i.test(error.message)) {
       const { data: data2, error: error2 } = await supabase
         .from('members')
         .insert([
           {
             ministry_id: ministryId,
-            name: body.name,
-            email: body.email || null,
-            phone: body.phone || null,
-            cpf: body.cpf || null,
-            birth_date: body.birth_date || null,
-            gender: body.gender || null,
-            marital_status: body.marital_status || null,
-            occupation: body.occupation || null,
-            address: body.address || null,
-            complement: body.complement || null,
-            city: body.city || null,
-            state: body.state || null,
-            zipcode: body.zipcode || null,
-            member_since: body.member_since || new Date(),
-            role: body.role || null,
-            status: body.status || 'active',
-            custom_fields: body.custom_fields || {},
-            notes: body.notes || null,
+            name: normalizedBody.name,
+            email: typeof normalizedBody.email === 'string' ? normalizedBody.email.toLowerCase() : normalizedBody.email || null,
+            phone: normalizedBody.phone || null,
+            cpf: normalizedBody.cpf || null,
+            birth_date: normalizedBody.birth_date || null,
+            gender: normalizedBody.gender || null,
+            marital_status: normalizedBody.marital_status || null,
+            occupation: normalizedBody.occupation || null,
+            address: normalizedBody.address || null,
+            complement: normalizedBody.complement || null,
+            city: normalizedBody.city || null,
+            state: normalizedBody.state || null,
+            zipcode: normalizedBody.zipcode || null,
+            congregacao_id: normalizedBody.congregacao_id || null,
+            member_since: normalizedBody.member_since || new Date(),
+            role: normalizedBody.role || null,
+            status: normalizedBody.status || 'active',
+            custom_fields: normalizedBody.custom_fields || {},
+            notes: normalizedBody.notes || null,
           },
         ])
         .select()

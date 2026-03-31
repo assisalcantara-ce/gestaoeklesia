@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AppDialogProvider } from '@/providers/AppDialogProvider';
+import { AuthProvider } from '@/providers/AuthProvider';
+import { UsuarioProvider } from '@/providers/UsuarioContext';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Gestão Eclesial - Login',
-  description: 'Sistema de Administração Ministerial',
+  title: 'GESTAOSERVUS - Login',
+  description: 'Sistema de Gestão para Instituições',
 };
 
 export default function RootLayout({
@@ -19,9 +21,13 @@ export default function RootLayout({
       <head>
       </head>
       <body className="antialiased bg-white">
-        <AppDialogProvider>
-          {children}
-        </AppDialogProvider>
+        <AuthProvider>
+          <UsuarioProvider>
+            <AppDialogProvider>
+              {children}
+            </AppDialogProvider>
+          </UsuarioProvider>
+        </AuthProvider>
       </body>
     </html>
   );

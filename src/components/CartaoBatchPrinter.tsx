@@ -20,6 +20,8 @@ interface Membro {
   tipoCadastro: 'membro' | 'congregado' | 'ministro' | 'crianca';
   cargo?: string;
   filiacao?: string;
+  nomePai?: string;
+  nomeMae?: string;
   dataBatismo?: string;
   naturalidade?: string;
   nacionalidade?: string;
@@ -139,7 +141,11 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
       cartaoHTML.appendChild(container);
 
       // Injetar validadeAnos do template no membro para o substituidor usar
-      const membroComConfig = { ...membro, validadeAnos: template.validadeAnos || 1 };
+      const membroComConfig = {
+        ...membro,
+        validadeAnos: template.validadeAnos || 1,
+        dataEmissao: template.dataEmissao || membro.dataEmissao
+      };
 
       container.innerHTML = elementos.filter((el: any) => el.visivel).map((el: any) => {
         if (el.tipo === 'qrcode') {

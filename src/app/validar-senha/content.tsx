@@ -109,7 +109,7 @@ export default function ValidarSenhaContent() {
 
       // Redirecionar para login após 3 segundos
       setTimeout(() => {
-        router.push('/');
+        router.push('/login');
       }, 3000);
     } catch (erro) {
       setMensagemErro('Erro ao salvar senha. Tente novamente.');
@@ -228,12 +228,12 @@ export default function ValidarSenhaContent() {
             </div>
 
             <button
-              onClick={() => router.push('/')}
+              onClick={() => router.push('/login')}
               className="w-full py-3 bg-gradient-to-r from-[#123b63] to-[#0284c7] text-white rounded-lg hover:opacity-90 transition font-bold"
             >
               🔑 Ir para Login
-            </button>
-          </div>
+            <button
+              onClick={() => router.push('/login')}
         )}
 
         {/* ETAPA: ERRO */}
@@ -258,7 +258,7 @@ export default function ValidarSenhaContent() {
             </button>
 
             <p className="text-xs text-gray-600 mt-4">
-              Dúvidas? Entre em contato: <strong>suporte@gestaoeclesial.com.br</strong>
+              Dúvidas? Entre em contato: <strong>suporte@gestaoservus.com.br</strong>
             </p>
           </div>
         )}

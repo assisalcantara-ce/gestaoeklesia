@@ -133,22 +133,32 @@ export default function NomenclaturaPage() {
   };
 
   const upsertOrgNomenclaturas = async (ministryId: string, state: NomenclaturasState) => {
-    const { data: existingRow } = await supabase
+    const { data: existingRow, error: existingErr } = await supabase
       .from('configurations')
       .select('nomenclaturas')
       .eq('ministry_id', ministryId)
       .maybeSingle();
 
+    if (existingErr) {
+      console.error('❌ Erro ao carregar configurações atuais:', existingErr);
+      throw new Error(existingErr.message || 'Erro ao carregar configurações atuais');
+    }
+
     const existingNomenclaturas = (existingRow as any)?.nomenclaturas || {};
     const payload = buildOrgNomenclaturasPayload(state);
 
-    await supabase
+    const { error: upsertErr } = await supabase
       .from('configurations')
       .upsert({
         ministry_id: ministryId,
         nomenclaturas: { ...existingNomenclaturas, [ORG_NOMENCLATURAS_KEY]: payload },
         updated_at: new Date().toISOString(),
       } as any, { onConflict: 'ministry_id' });
+
+    if (upsertErr) {
+      console.error('❌ Erro ao salvar nomenclaturas:', upsertErr);
+      throw new Error(upsertErr.message || 'Erro ao salvar nomenclaturas');
+    }
   };
 
   const loadFromSupabaseOrMigrate = async () => {
@@ -303,21 +313,32 @@ export default function NomenclaturaPage() {
   const handleSave = async () => {
     console.log('💾 handleSave chamado');
     console.log('📋 Dados a salvar:', temp);
-    setNomenclatura(temp);
-    const ministryId = await resolveMinistryId();
-    if (ministryId) {
-      await upsertOrgNomenclaturas(ministryId, temp);
-    }
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('nomenclaturas', JSON.stringify(temp));
-        localStorage.setItem(NOMENCLATURAS_SCHEMA_VERSION_KEY, NOMENCLATURAS_SCHEMA_VERSION);
-      } catch {
-        // ignore
+
+    try {
+      const ministryId = await resolveMinistryId();
+      if (!ministryId) {
+        alert('Não foi possível identificar sua instituição para salvar as nomenclaturas.');
+        return;
       }
+
+      await upsertOrgNomenclaturas(ministryId, temp);
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('nomenclaturas', JSON.stringify(temp));
+          localStorage.setItem(NOMENCLATURAS_SCHEMA_VERSION_KEY, NOMENCLATURAS_SCHEMA_VERSION);
+        } catch {
+          // ignore
+        }
+      }
+
+      setNomenclatura(temp);
+      setIsEditing(false);
+      alert('Nomenclaturas atualizadas com sucesso!');
+    } catch (error: any) {
+      console.error('❌ Falha ao salvar nomenclaturas:', error);
+      alert(`Erro ao salvar nomenclaturas: ${error?.message || 'tente novamente.'}`);
     }
-    setIsEditing(false);
-    alert('Nomenclaturas atualizadas com sucesso!');
   };
 
   const handleCancel = () => {
@@ -335,7 +356,7 @@ export default function NomenclaturaPage() {
         <div className="p-6">
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold text-gray-800">📝 Nomenclaturas da Organização</h1>
+            <h1 className="text-3xl font-bold text-gray-800">📝 Nomenclaturas da Instituição</h1>
             <button
               onClick={() => {
                 if (isEditing) {
@@ -359,7 +380,7 @@ export default function NomenclaturaPage() {
           {/* Explicação */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <p className="text-blue-900 text-sm">
-              <strong>ℹ️ Informação:</strong> Customize os nomes das divisões internas do seu ministério. 
+              <strong>ℹ️ Informação:</strong> Customize os nomes das divisões internas da sua instituição. 
               Essas nomenclaturas serão utilizadas em toda a plataforma e nos documentos gerados.
             </p>
           </div>

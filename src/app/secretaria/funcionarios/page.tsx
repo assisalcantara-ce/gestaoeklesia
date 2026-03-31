@@ -50,7 +50,7 @@ interface Funcionario {
   member_cpf?: string;
 }
 
-const GRUPOS_FUNCAO = [
+const GRUPOS_FUNCAO_BASE = [
   { valor: '', label: 'Escolha um Grupo' },
   { valor: 'administrativo', label: 'Administrativo' },
   { valor: 'financeiro', label: 'Financeiro' },
@@ -61,7 +61,7 @@ const GRUPOS_FUNCAO = [
   { valor: 'eventos', label: 'Eventos' }
 ];
 
-const FUNCOES = [
+const FUNCOES_BASE = [
   { valor: '', label: 'Escolha uma Função' },
   { valor: 'gerente', label: 'Gerente' },
   { valor: 'assistente', label: 'Assistente' },
@@ -83,6 +83,18 @@ const BANCOS = [
 
 const UFDADOS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 
+const FUNCIONARIOS_GRUPOS_KEY = 'funcionarios_grupos_custom';
+const FUNCIONARIOS_FUNCOES_KEY = 'funcionarios_funcoes_custom';
+
+const normalizeOptionValue = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
 export default function GerenciarFuncionarios() {
   const supabase = createClient();
   const { loading: authLoading } = useRequireSupabaseAuth();
@@ -97,6 +109,10 @@ export default function GerenciarFuncionarios() {
   const [modalSucesso, setModalSucesso] = useState<{ isOpen: boolean; title: string; message: string; type: 'success' | 'error' | 'warning' | 'info' }>({ isOpen: false, title: '', message: '', type: 'success' });
   const [abaAtiva, setAbaAtiva] = useState<'cadastro' | 'lista'>('cadastro');
   const [activeMenu, setActiveMenu] = useState<string>('funcionarios');
+  const [gruposFuncao, setGruposFuncao] = useState(GRUPOS_FUNCAO_BASE);
+  const [funcoes, setFuncoes] = useState(FUNCOES_BASE);
+  const [novoGrupo, setNovoGrupo] = useState('');
+  const [novaFuncao, setNovaFuncao] = useState('');
 
   const [formData, setFormData] = useState({
     grupo: '',
@@ -183,6 +199,118 @@ export default function GerenciarFuncionarios() {
     carregarMembros();
     carregarFuncionarios();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const gruposRaw = localStorage.getItem(FUNCIONARIOS_GRUPOS_KEY);
+      const funcoesRaw = localStorage.getItem(FUNCIONARIOS_FUNCOES_KEY);
+
+      if (gruposRaw) {
+        const parsed = JSON.parse(gruposRaw);
+        if (Array.isArray(parsed)) {
+          const extras = parsed
+            .filter((x: any) => x && typeof x.valor === 'string' && typeof x.label === 'string')
+            .map((x: any) => ({ valor: String(x.valor), label: String(x.label) }));
+          setGruposFuncao([...GRUPOS_FUNCAO_BASE, ...extras]);
+        }
+      }
+
+      if (funcoesRaw) {
+        const parsed = JSON.parse(funcoesRaw);
+        if (Array.isArray(parsed)) {
+          const extras = parsed
+            .filter((x: any) => x && typeof x.valor === 'string' && typeof x.label === 'string')
+            .map((x: any) => ({ valor: String(x.valor), label: String(x.label) }));
+          setFuncoes([...FUNCOES_BASE, ...extras]);
+        }
+      }
+    } catch {
+      // ignore local parse errors
+    }
+  }, []);
+
+  const persistCustomOptions = (key: string, options: Array<{ valor: string; label: string }>, baseOptions: Array<{ valor: string; label: string }>) => {
+    if (typeof window === 'undefined') return;
+    const baseValues = new Set(baseOptions.map(o => o.valor));
+    const onlyCustom = options.filter(o => o.valor && !baseValues.has(o.valor));
+    localStorage.setItem(key, JSON.stringify(onlyCustom));
+  };
+
+  const handleAdicionarGrupo = () => {
+    const label = novoGrupo.trim();
+    if (!label) return;
+
+    const valor = normalizeOptionValue(label);
+    if (!valor) return;
+
+    const existe = gruposFuncao.some(g => g.valor === valor || g.label.toLowerCase() === label.toLowerCase());
+    if (existe) {
+      setModalSucesso({
+        isOpen: true,
+        title: 'Aviso',
+        message: 'Este grupo já existe na lista.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const next = [...gruposFuncao, { valor, label }];
+    setGruposFuncao(next);
+    setFormData(prev => ({ ...prev, grupo: valor }));
+    setNovoGrupo('');
+    persistCustomOptions(FUNCIONARIOS_GRUPOS_KEY, next, GRUPOS_FUNCAO_BASE);
+  };
+
+  const handleAdicionarFuncao = () => {
+    const label = novaFuncao.trim();
+    if (!label) return;
+
+    const valor = normalizeOptionValue(label);
+    if (!valor) return;
+
+    const existe = funcoes.some(f => f.valor === valor || f.label.toLowerCase() === label.toLowerCase());
+    if (existe) {
+      setModalSucesso({
+        isOpen: true,
+        title: 'Aviso',
+        message: 'Esta função já existe na lista.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const next = [...funcoes, { valor, label }];
+    setFuncoes(next);
+    setFormData(prev => ({ ...prev, funcao: valor }));
+    setNovaFuncao('');
+    persistCustomOptions(FUNCIONARIOS_FUNCOES_KEY, next, FUNCOES_BASE);
+  };
+
+  const handleRemoverGrupoCustom = (valor: string) => {
+    const baseValues = new Set(GRUPOS_FUNCAO_BASE.map(g => g.valor));
+    if (baseValues.has(valor)) return;
+
+    const next = gruposFuncao.filter(g => g.valor !== valor);
+    setGruposFuncao(next);
+    if (formData.grupo === valor) {
+      setFormData(prev => ({ ...prev, grupo: '' }));
+    }
+    persistCustomOptions(FUNCIONARIOS_GRUPOS_KEY, next, GRUPOS_FUNCAO_BASE);
+  };
+
+  const handleRemoverFuncaoCustom = (valor: string) => {
+    const baseValues = new Set(FUNCOES_BASE.map(f => f.valor));
+    if (baseValues.has(valor)) return;
+
+    const next = funcoes.filter(f => f.valor !== valor);
+    setFuncoes(next);
+    if (formData.funcao === valor) {
+      setFormData(prev => ({ ...prev, funcao: '' }));
+    }
+    persistCustomOptions(FUNCIONARIOS_FUNCOES_KEY, next, FUNCOES_BASE);
+  };
 
   // Buscar membros
   const handleSearchMembro = (valor: string) => {
@@ -378,6 +506,9 @@ export default function GerenciarFuncionarios() {
     if (f.status !== filtroStatus) return false;
     return true;
   });
+
+  const gruposCustom = gruposFuncao.filter(g => !GRUPOS_FUNCAO_BASE.some(base => base.valor === g.valor));
+  const funcoesCustom = funcoes.filter(f => !FUNCOES_BASE.some(base => base.valor === f.valor));
 
   if (authLoading) return <div className="p-8">Carregando...</div>;
 
@@ -586,10 +717,55 @@ export default function GerenciarFuncionarios() {
                         onChange={handleInputChange}
                         className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        {GRUPOS_FUNCAO.map(g => (
+                        {gruposFuncao.map(g => (
                           <option key={g.valor} value={g.valor}>{g.label}</option>
                         ))}
                       </select>
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          value={novoGrupo}
+                          onChange={(e) => setNovoGrupo(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAdicionarGrupo();
+                            }
+                          }}
+                          placeholder="Adicionar novo grupo"
+                          className="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAdicionarGrupo}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+                        >
+                          + Adicionar
+                        </button>
+                      </div>
+                      {gruposCustom.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-xs font-semibold text-gray-600 mb-2">Grupos criados</p>
+                          <div className="flex flex-wrap gap-2">
+                            {gruposCustom.map(grupo => (
+                              <div
+                                key={grupo.valor}
+                                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs"
+                              >
+                                <span>{grupo.label}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoverGrupoCustom(grupo.valor)}
+                                  className="text-red-600 hover:text-red-700 font-bold"
+                                  title="Remover grupo"
+                                >
+                                  x
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -602,10 +778,55 @@ export default function GerenciarFuncionarios() {
                         onChange={handleInputChange}
                         className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        {FUNCOES.map(f => (
+                        {funcoes.map(f => (
                           <option key={f.valor} value={f.valor}>{f.label}</option>
                         ))}
                       </select>
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          value={novaFuncao}
+                          onChange={(e) => setNovaFuncao(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAdicionarFuncao();
+                            }
+                          }}
+                          placeholder="Adicionar nova função"
+                          className="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAdicionarFuncao}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+                        >
+                          + Adicionar
+                        </button>
+                      </div>
+                      {funcoesCustom.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-xs font-semibold text-gray-600 mb-2">Funções criadas</p>
+                          <div className="flex flex-wrap gap-2">
+                            {funcoesCustom.map(funcao => (
+                              <div
+                                key={funcao.valor}
+                                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs"
+                              >
+                                <span>{funcao.label}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoverFuncaoCustom(funcao.valor)}
+                                  className="text-red-600 hover:text-red-700 font-bold"
+                                  title="Remover função"
+                                >
+                                  x
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -825,7 +1046,7 @@ export default function GerenciarFuncionarios() {
                     className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Todos os Grupos</option>
-                    {GRUPOS_FUNCAO.filter(g => g.valor).map(g => (
+                    {gruposFuncao.filter(g => g.valor).map(g => (
                       <option key={g.valor} value={g.valor}>{g.label}</option>
                     ))}
                   </select>

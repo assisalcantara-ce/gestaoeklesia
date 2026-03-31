@@ -12,7 +12,88 @@
  */
 
 import { createServerClientFromRequest } from '@/lib/supabase-server'
+import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer'
 import { NextRequest, NextResponse } from 'next/server'
+
+function getSupabaseErrorText(error: any): string {
+  if (!error) return ''
+  const parts = [
+    error?.code ? `(${String(error.code)})` : '',
+    error?.message ? String(error.message) : '',
+    error?.details ? String(error.details) : '',
+    error?.hint ? String(error.hint) : '',
+  ].filter(Boolean)
+  if (parts.length > 0) return parts.join(' ')
+  try {
+    const s = JSON.stringify(error)
+    return s && s !== '{}' ? s : String(error)
+  } catch {
+    return String(error)
+  }
+}
+
+function isMissingEmployeesViewError(error: any): boolean {
+  const text = getSupabaseErrorText(error).toLowerCase()
+  return (
+    text.includes('employees_with_member_info') &&
+    (text.includes('pgrst205') || text.includes('schema cache') || text.includes('could not find the table') || text.includes('does not exist'))
+  )
+}
+
+async function listEmployeesFallback(
+  supabase: any,
+  ministryId: string,
+  page: number,
+  limit: number,
+  status: string | null,
+  grupo: string | null,
+) {
+  const offset = (page - 1) * limit
+
+  let employeesQuery = supabase
+    .from('employees')
+    .select('*', { count: 'exact' })
+    .eq('ministry_id', ministryId)
+
+  if (status) employeesQuery = employeesQuery.eq('status', status)
+  if (grupo) employeesQuery = employeesQuery.eq('grupo', grupo)
+
+  employeesQuery = employeesQuery
+    .range(offset, offset + limit - 1)
+    .order('created_at', { ascending: false })
+
+  const { data: employeesRows, error: employeesErr, count } = await employeesQuery
+  if (employeesErr) throw employeesErr
+
+  const rows = (employeesRows as any[]) || []
+  const memberIds = Array.from(new Set(rows.map((r: any) => r.member_id).filter(Boolean)))
+
+  let membersMap = new Map<string, any>()
+  if (memberIds.length > 0) {
+    const { data: membersRows, error: membersErr } = await supabase
+      .from('members')
+      .select('id,name,cpf,phone,birth_date')
+      .eq('ministry_id', ministryId)
+      .in('id', memberIds)
+
+    if (!membersErr) {
+      membersMap = new Map(((membersRows as any[]) || []).map((m: any) => [String(m.id), m]))
+    }
+  }
+
+  const enriched = rows.map((r: any) => {
+    const m = membersMap.get(String(r.member_id))
+    return {
+      ...r,
+      member_name: m?.name || null,
+      member_cpf: m?.cpf || null,
+      member_phone: m?.phone || null,
+      member_birth_date: m?.birth_date || null,
+    }
+  })
+
+  return { data: enriched, count: count || 0 }
+}
 
 async function resolveMinistryId(supabase: any, userId: string): Promise<string | null> {
   const { data: mu, error: muErr } = await supabase
@@ -89,8 +170,25 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query
 
     if (error) {
+      if (isMissingEmployeesViewError(error)) {
+        try {
+          const fallback = await listEmployeesFallback(supabase, ministryId, page, limit, status, grupo)
+          return NextResponse.json({
+            data: fallback.data,
+            count: fallback.count,
+            page,
+            limit,
+            total_pages: Math.ceil((fallback.count || 0) / limit),
+          })
+        } catch (fallbackErr: any) {
+          return NextResponse.json(
+            { error: getSupabaseErrorText(fallbackErr) || 'Estrutura de funcionários indisponível no Supabase' },
+            { status: 400 }
+          )
+        }
+      }
       return NextResponse.json(
-        { error: error.message },
+        { error: getSupabaseErrorText(error) || error.message },
         { status: 400 }
       )
     }
@@ -131,6 +229,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+    const normalizedBody = normalizePayloadToUppercase(body, {
+      preserveKeys: ['data_admissao'],
+    })
     
     const {
       member_id,
@@ -152,7 +253,7 @@ export async function POST(request: NextRequest) {
       pix,
       obs,
       status = 'ATIVO'
-    } = body
+    } = normalizedBody
 
     // Validar campos obrigatórios
     if (!member_id || !grupo || !funcao || !data_admissao) {
@@ -172,7 +273,7 @@ export async function POST(request: NextRequest) {
           grupo,
           funcao,
           data_admissao,
-          email,
+          email: typeof email === 'string' ? email.toLowerCase() : email,
           telefone,
           whatsapp,
           rg,

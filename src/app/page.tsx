@@ -1,40 +1,149 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase-client';
 import NotificationModal from '@/components/NotificationModal';
 import { formatCpfOrCnpj, formatPhone } from '@/lib/mascaras';
 
-export default function LoginPage() {
+const benefits = [
+  {
+    title: 'Gestão multi-institucional',
+    text: 'Gerencie uma ou várias instituições com usuários isolados e acesso controlado.'
+  },
+  {
+    title: 'Estrutura hierárquica completa',
+    text: 'Supervisões, congregações e departamentos com fluxo de autoridade definido.'
+  },
+  {
+    title: 'Relatórios e métricas',
+    text: 'Acompanhe indicadores, frequência, crescimento e dados escancaradamente útil.'
+  },
+  {
+    title: '100% na nuvem',
+    text: 'Acesse de qualquer lugar, qualquer dispositivo, dados sempre sincronizados.'
+  },
+  {
+    title: 'Conformidade LGPD',
+    text: 'Dados protegidos com criptografia, controle de acesso e boas práticas legais.'
+  },
+  {
+    title: 'Implementação rápida',
+    text: 'Setup em horas, não semanas. Equipe de onboarding inclusa em todos os planos.'
+  }
+];
+
+const features = [
+  {
+    title: 'Gestão de membros',
+    text: 'Cadastro completo com fotos, CPF/RG, histórico ministerial e documentos.',
+    bullets: ['Dados pessoais completos', 'Cargo e setor', 'Histórico de atividades']
+  },
+  {
+    title: 'Credenciais e cartões',
+    text: 'Gere cartões personalizados com logo, dados e QR Code para impressão em lote.',
+    bullets: ['4 tipos de cartão', 'Templates customizáveis', 'Impressão em massa']
+  },
+  {
+    title: 'Estrutura hierárquica',
+    text: 'Supervisões, congregações e departamentos com fluxo de autoridade definido.',
+    bullets: ['Múltiplos níveis', 'Acesso por departamento', 'Relatórios por área']
+  },
+  {
+    title: 'Financeiro integrado',
+    text: 'Controle de receitas, despesas, tesouraria com relatórios detalhados.',
+    bullets: ['Fluxo de caixa', 'Categorias customizáveis', 'Relatórios por período']
+  },
+  {
+    title: 'Geolocalização',
+    text: 'Mapa com localização dos membros e propriedades da instituição.',
+    bullets: ['Mapa interativo', 'Filtros por área', 'Endereço dos membros']
+  },
+  {
+    title: 'Eventos e reuniões',
+    text: 'Agende eventos, cultos, reuniões com controle de frequência automático.',
+    bullets: ['Eventos recorrentes', 'Listas de presença', 'Notificações']
+  }
+];
+
+const pricing = [
+  {
+    name: 'Starter',
+    priceMonthly: 'R$ 149,99',
+    priceYearly: 'R$ 1.499,99/ano',
+    description: 'Ideal para Instituições pequenas iniciando na plataforma',
+    highlights: ['Até 5 Campos', 'Até 50 Igrejas', 'Até 500 Membros', 'Até 3 Usuários Administrativos']
+  },
+  {
+    name: 'Intermediário',
+    priceMonthly: 'R$ 299,99',
+    priceYearly: 'R$ 2.999,99/ano',
+    description: 'Solução completa para Instituições de grande porte e em crescimento',
+    highlights: ['Até 20 Campos', 'Até 250 Igrejas', 'Até 3.000 Membros', 'Até 10 Usuários Administrativos'],
+    featured: true
+  },
+  {
+    name: 'Profissional',
+    priceMonthly: 'R$ 499,99',
+    priceYearly: 'R$ 4.999,99/ano',
+    description: 'Solução completa para Instituições de grande porte e em crescimento',
+    highlights: ['Até 50 Campos', 'Até 600 Igrejas', 'Até 7.000 Membros', 'Até 25 Usuários Administrativos']
+  },
+  {
+    name: 'Expert',
+    priceMonthly: 'R$ 999,00',
+    priceYearly: 'R$ 9.999,99/ano',
+    description: 'Personalizado para grandes Instituições com alto fluxo de atividades.',
+    highlights: ['Até 999 Campos', 'Até 999 Igrejas', 'Até 99.999 Membros', 'Até 999 Usuários Administrativos']
+  }
+];
+
+const faqs = [
+  {
+    question: 'Quantas instituições posso gerenciar?',
+    answer: 'Ilimitado. Cada instituição tem seu próprio dashboard e dados isolados. Perfeito para redes e supervisões.'
+  },
+  {
+    question: 'Quanto tempo leva para implementar?',
+    answer: 'Setup inicial em 1-2 horas. A equipe de onboarding acompanha toda a implantação no seu plano.'
+  },
+  {
+    question: 'Os cartões podem ser customizados?',
+    answer: 'Sim! Configure cores, logos, campos e templates. Imprima um ou centenas de cartões em lote.'
+  },
+  {
+    question: 'Como funciona a geolocalização?',
+    answer: 'Mapa interativo com posições dos membros, igrejas e propriedades. Filtros por departamento e área.'
+  },
+  {
+    question: 'Preciso contratar suporte extra?',
+    answer: 'Não. Suporte está incluído em todos os planos. Professional já tem chat + email.'
+  },
+  {
+    question: 'Os dados estão seguros?',
+    answer: 'Sim. Uso Supabase (PostgreSQL enterprise), criptografia SSL/TLS, backup diário e conformidade LGPD.'
+  }
+];
+
+const gallery = [
+  { src: '/img/img1.png', alt: 'Tela do dashboard do sistema' },
+  { src: '/img/img2.png', alt: 'Tela de gestao de membros' },
+  { src: '/img/img3.png', alt: 'Tela de cartoes e credenciais' },
+  { src: '/img/img4.png', alt: 'Tela de relatorios e indicadores' }
+];
+
+export default function LandingPage() {
   const router = useRouter();
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showSignup, setShowSignup] = useState(false);
-  const [successModal, setSuccessModal] = useState<{
-    isOpen: boolean;
-    email: string;
-    expiry: string;
-  }>({
-    isOpen: false,
-    email: '',
-    expiry: ''
-  });
-  const [errorModal, setErrorModal] = useState<{
-    isOpen: boolean;
-    email: string;
-  }>({
+  const [successModal, setSuccessModal] = useState({
     isOpen: false,
     email: ''
   });
-  const [loginErrorModal, setLoginErrorModal] = useState<{
-    isOpen: boolean;
-  }>({
-    isOpen: false
+  const [errorModal, setErrorModal] = useState({
+    isOpen: false,
+    email: ''
   });
+  const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string } | null>(null);
   const [contactData, setContactData] = useState({
     ministerio: '',
     pastor: '',
@@ -43,75 +152,12 @@ export default function LoginPage() {
     email: ''
   });
 
-  // Limpar erro após 3 segundos
   useEffect(() => {
     if (error) {
-      const timer = setTimeout(() => {
-        setError('');
-      }, 3000);
+      const timer = setTimeout(() => setError(''), 3000);
       return () => clearTimeout(timer);
     }
   }, [error]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    try {
-      if (!email || !password) {
-        setError('Por favor, preencha todos os campos');
-        setLoading(false);
-        return;
-      }
-
-      // Inicializar Supabase se não estiver feito
-      if (!supabaseRef.current) {
-        supabaseRef.current = createClient();
-      }
-
-      // Validar que Supabase está configurado
-      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        console.error('[LOGIN] ❌ Variáveis de ambiente do Supabase não configuradas');
-        setError('⚠️ Aplicação não está configurada corretamente. Contate o administrador.');
-        setLoading(false);
-        return;
-      }
-
-      console.log('[LOGIN] Tentando login com:', email);
-
-      // Login no Supabase Auth
-      const { data: authData, error: authError } = await supabaseRef.current.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      console.log('[LOGIN] Resposta Supabase:', { 
-        sucesso: !authError, 
-        usuarioId: authData?.user?.id,
-        mensagem: authError?.message || 'Sem erros'
-      });
-
-      if (!authError && authData?.user) {
-        // Login bem-sucedido no Supabase Auth
-        console.log('[LOGIN] ✅ Usuário autenticado via Supabase:', email);
-        router.push('/dashboard');
-        return;
-      }
-
-      // Se chegou aqui, credenciais inválidas
-      setLoginErrorModal({ isOpen: true });
-      setLoading(false);
-      return;
-    } catch (err) {
-      console.error('[LOGIN] 🔴 Erro geral:', {
-        erro: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined
-      });
-      setError('🔴 Erro ao fazer login. Verifique a conexão e tente novamente.');
-      setLoading(false);
-    }
-  };
 
   const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -132,52 +178,41 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // Validação de campos obrigatórios
       if (!contactData.ministerio.trim()) {
-        setError('Nome do Ministério é obrigatório');
+        setError('Nome do Ministerio e obrigatorio');
         setLoading(false);
         return;
       }
 
       if (!contactData.pastor.trim()) {
-        setError('Nome do Pastor é obrigatório');
+        setError('Nome do Pastor e obrigatorio');
         setLoading(false);
         return;
       }
 
       if (!contactData.cpf.trim()) {
-        setError('CPF é obrigatório');
+        setError('CPF/CNPJ e obrigatorio');
         setLoading(false);
         return;
       }
 
       if (!contactData.whatsapp.trim()) {
-        setError('WhatsApp é obrigatório');
+        setError('WhatsApp e obrigatorio');
         setLoading(false);
         return;
       }
 
       if (!contactData.email.trim()) {
-        setError('Email é obrigatório');
+        setError('Email e obrigatorio');
         setLoading(false);
         return;
       }
 
-      // Validar email
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactData.email)) {
-        setError('Email inválido');
+        setError('Email invalido');
         setLoading(false);
         return;
       }
-
-      // Enviar para API
-      console.log('[CONTACT] Enviando dados de contato:', {
-        ministerio: contactData.ministerio,
-        pastor: contactData.pastor,
-        cpf: contactData.cpf,
-        whatsapp: contactData.whatsapp,
-        email: contactData.email,
-      })
 
       const response = await fetch('/api/v1/contact', {
         method: 'POST',
@@ -189,300 +224,387 @@ export default function LoginPage() {
           whatsapp: contactData.whatsapp,
           email: contactData.email,
         }),
-      })
+      });
 
-      const result = await response.json()
-      
-      console.log('[CONTACT] Resposta do servidor:', { status: response.status, result })
+      const result = await response.json();
 
       if (!response.ok) {
-        // Se o erro for email já existe, mostrar modal específico (não é um erro crítico)
-        if (result.error?.includes('já foi registrado') || result.error?.includes('already been registered') || result.error?.includes('já existe')) {
-          console.log('[CONTACT] Email já registrado:', contactData.email)
-          setErrorModal({
-            isOpen: true,
-            email: contactData.email
-          });
+        if (result.error?.includes('ja foi registrado') || result.error?.includes('already been registered') || result.error?.includes('ja existe')) {
+          setErrorModal({ isOpen: true, email: contactData.email });
           setLoading(false);
           return;
         }
-        
-        // Para outros erros, mostrar no console
-        console.error('[CONTACT] Erro detalhado:', result.error)
         setError(result.error || 'Erro ao registrar contato');
         setLoading(false);
         return;
       }
 
-      // Sucesso
       setError('');
-      
-      // Mostrar modal de sucesso
-      setSuccessModal({
-        isOpen: true,
-        email: contactData.email,
-        expiry: ''
-      });
-
-      // Limpar formulário
-      setShowSignup(false);
+      setSuccessModal({ isOpen: true, email: contactData.email });
       setContactData({ ministerio: '', pastor: '', cpf: '', whatsapp: '', email: '' });
-
       setLoading(false);
     } catch (err) {
       console.error('Erro ao registrar contato:', err);
       setError('Erro ao registrar contato. Tente novamente.');
-      setLoading(false)
+      setLoading(false);
     }
   };
 
   return (
-    <div className="login-hero flex flex-col items-center justify-center min-h-screen px-4">
-      {/* MODAL DE SUCESSO - SOLICITAÇÃO DE CONTATO RECEBIDA */}
+    <div className="min-h-screen bg-white text-slate-900">
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&family=DM+Serif+Display&display=swap');
+        :root {
+          --landing-bg: #ffffff;
+          --landing-card: #f8fafb;
+          --landing-accent: #0ea5e9;
+          --landing-gold: #f59e0b;
+          --landing-text: #1e293b;
+        }
+        body {
+          font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+          background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+        }
+        .landing-title {
+          font-family: 'DM Serif Display', 'Georgia', serif;
+          color: #0f172a;
+        }
+      `}</style>
+
       <NotificationModal
         isOpen={successModal.isOpen}
         type="success"
-        title="✅ Solicitação Recebida com Sucesso!"
-        message={`Obrigado por se interessar no Gestão Eclesial!\n\nNossa equipe de suporte entrará em contato com você em breve para apresentar o sistema e liberar seu período de teste gratuito.\n\n📧 Email: ${successModal.email}\n📱 Acompanhe pelo WhatsApp\n⏰ Tempo de resposta: até 24h\n\nVocê será redirecionado em instantes...`}
-        onClose={() => {
-          setSuccessModal({ isOpen: false, email: '', expiry: '' });
-          router.push('/');
-        }}
+        title="Solicitacao recebida!"
+        message={`Obrigado pelo interesse. Entraremos em contato em breve.\n\nEmail: ${successModal.email}`}
+        onClose={() => setSuccessModal({ isOpen: false, email: '' })}
         autoClose={5000}
       />
 
-      {/* MODAL DE ERRO - EMAIL JÁ EXISTE */}
       <NotificationModal
         isOpen={errorModal.isOpen}
         type="error"
-        title="⚠️ Email já Registrado"
-        message={`O email ${errorModal.email} já foi registrado em nosso sistema.\n\nVocê pode:\n\n• Usar outro email para um novo contato\n• Entrar em contato direto com nosso suporte pelo WhatsApp`}
+        title="Email ja registrado"
+        message={`O email ${errorModal.email} ja foi registrado.`}
         onClose={() => setErrorModal({ isOpen: false, email: '' })}
         showButton={true}
         autoClose={4000}
       />
 
-      {/* MODAL DE ERRO - LOGIN */}
-      <NotificationModal
-        isOpen={loginErrorModal.isOpen}
-        type="error"
-        title="❌ Credenciais incorretas"
-        message="Email ou senha incorretos. Verifique os dados e tente novamente."
-        onClose={() => setLoginErrorModal({ isOpen: false })}
-        showButton={true}
-        autoClose={3500}
-      />
-
-      {/* LOGO - MOBILE */}
-      <div className="md:hidden flex justify-center items-center mb-6">
-        <img
-          src="/img/logo-eklesia.png"
-          alt="Gestão Eclesial"
-          className="w-[200px] drop-shadow-xl logo-animate"
-        />
-      </div>
-
-      <div className="flex w-full max-w-6xl items-center justify-center gap-8">
-
-        {/* COLUNA ESQUERDA - LOGO */}
-        <div className="hidden md:flex md:w-1/2 justify-center items-center">
-          <img
-            src="/img/logo-eklesia.png"
-            alt="Gestão Eclesial"
-            className="w-[350px] drop-shadow-xl logo-animate"
+      {selectedImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+          <div
+            className="absolute inset-0"
+            onClick={() => setSelectedImage(null)}
           />
-        </div>
-
-        {/* COLUNA DIREITA - CARD DE LOGIN */}
-        <div className="w-full md:w-1/2 flex flex-col items-center justify-center">
-          {/* CARD LOGIN */}
-          {!showSignup && (
-            <div className="rounded-2xl shadow-2xl w-full max-w-sm backdrop-blur-sm p-6 mx-4" style={{ backgroundColor: '#4A6FA5E6', color: 'white' }}>
-
-              <h2 className="text-center text-xl font-bold mb-6 text-white">ACESSO AO SISTEMA</h2>
-
-              <form onSubmit={handleSubmit}>
-                {error && (
-                  <div className="mb-6 p-4 bg-red-500/90 border-2 border-red-300 rounded-xl shadow-lg flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <span className="text-white text-xl font-bold flex-shrink-0 mt-0.5">⚠️</span>
-                    <div>
-                      <p className="text-white font-bold text-sm">Erro de Acesso</p>
-                      <p className="text-white/90 text-sm mt-1">{error}</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-2 mb-4">
-                  <label htmlFor="email" className="block text-sm font-semibold text-white">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="seu@email.com"
-                    className="w-full px-4 py-3 rounded-lg bg-white/25 border border-white/40 text-white placeholder:text-white/50 focus:border-[#f9b233] focus:outline-none focus:ring-2 focus:ring-[#f9b233]/60 transition text-base font-medium"
-                  />
-                </div>
-
-                <div className="space-y-2 mb-6">
-                  <label htmlFor="password" className="block text-sm font-semibold text-white">
-                    Senha
-                  </label>
-                  <input
-                    type="password"
-                    id="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-4 py-3 rounded-lg bg-white/25 border border-white/40 text-white placeholder:text-white/50 focus:border-[#f9b233] focus:outline-none focus:ring-2 focus:ring-[#f9b233]/60 transition text-base font-medium"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full mt-6 px-4 py-3 bg-[#f9b233] text-[#123b63] rounded-lg font-bold text-base hover:bg-[#f5a800] transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
-                >
-                  {loading ? 'Entrando...' : 'Entrar'}
-                </button>
-
-                <div className="mt-4 text-center">
-                  <p className="text-xs text-white/70">
-                    Novo por aqui?<br />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowSignup(true);
-                        setError('');
-                      }}
-                      className="text-[#ffc547] hover:text-[#ffd966] transition font-semibold"
-                    >
-                      Solicite um contato conosco.
-                    </button>
-                  </p>
-                </div>
-              </form>
-
-              <div className="mt-4 pt-4 border-t border-white/20 text-center">
-                <button
-                  type="button"
-                  className="px-6 py-2 bg-[#0284c7] text-white rounded-lg font-semibold text-sm hover:bg-[#0369a1] transition shadow-lg hover:shadow-xl"
-                >
-                  Esqueceu sua senha?
-                </button>
-              </div>
-
-            </div>
-          )}
-
-          {/* CARD CONTATO */}
-          {showSignup && (
-            <div className="bg-[#4A6FA5] text-white rounded-2xl shadow-2xl w-full max-w-sm backdrop-blur-sm p-8 mx-4">
-              <h2 className="text-center text-2xl font-bold mb-2 text-white">SOLICITAR CONTATO</h2>
-              <p className="text-center text-[#ffc547] text-sm font-semibold mb-6">Apresentação + Teste Gratuito</p>
-
-              <form onSubmit={handleContactSubmit}>
-                {error && (
-                  <div className="p-4 bg-red-50/20 border border-red-300/40 rounded-lg text-sm text-white font-medium mb-5">
-                    {error}
-                  </div>
-                )}
-
-                <div className="space-y-3 mb-4">
-                  <input
-                    type="text"
-                    name="ministerio"
-                    value={contactData.ministerio}
-                    onChange={handleContactChange}
-                    placeholder="Nome do Ministério / Igreja"
-                    className="w-full px-4 py-3 rounded-lg bg-white text-[#123b63] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#f9b233] transition text-sm font-medium"
-                  />
-                </div>
-
-                <div className="space-y-3 mb-4">
-                  <input
-                    type="text"
-                    name="pastor"
-                    value={contactData.pastor}
-                    onChange={handleContactChange}
-                    placeholder="Seu Nome Completo"
-                    className="w-full px-4 py-3 rounded-lg bg-white text-[#123b63] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#f9b233] transition text-sm font-medium"
-                  />
-                </div>
-
-                <div className="space-y-3 mb-4">
-                  <input
-                    type="text"
-                    name="cpf"
-                    value={contactData.cpf}
-                    onChange={handleContactChange}
-                    placeholder="CPF / CNPJ"
-                    className="w-full px-4 py-3 rounded-lg bg-white text-[#123b63] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#f9b233] transition text-sm font-medium"
-                  />
-                </div>
-
-                <div className="space-y-3 mb-4">
-                  <input
-                    type="text"
-                    name="whatsapp"
-                    value={contactData.whatsapp}
-                    onChange={handleContactChange}
-                    placeholder="WhatsApp (com DDD)"
-                    className="w-full px-4 py-3 rounded-lg bg-white text-[#123b63] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#f9b233] transition text-sm font-medium"
-                  />
-                </div>
-
-                <div className="space-y-3 mb-5">
-                  <input
-                    type="email"
-                    name="email"
-                    value={contactData.email}
-                    onChange={handleContactChange}
-                    placeholder="Email para contato"
-                    className="w-full px-4 py-3 rounded-lg bg-white text-[#123b63] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#f9b233] transition text-sm font-medium"
-                  />
-                </div>
-
-                <div className="flex gap-3 mt-2">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 px-4 py-3 bg-[#f9b233] text-[#123b63] rounded-lg font-bold text-sm hover:bg-[#f5a800] transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-                  >
-                    {loading ? 'Enviando...' : 'SOLICITAR CONTATO'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowSignup(false);
-                      setContactData({ ministerio: '', pastor: '', cpf: '', whatsapp: '', email: '' });
-                      setError('');
-                    }}
-                    className="flex-1 px-4 py-3 bg-[#0284c7] text-white rounded-lg font-bold text-sm hover:bg-[#0369a1] transition shadow-lg"
-                  >
-                    VOLTAR
-                  </button>
-                </div>
-
-                <div className="mt-5 text-center">
-                  <p className="text-sm text-white/70">
-                    💬 <a href="https://wa.me/5591981755021?text=Olá%2C%20gostaria%20de%20informações%20sobre%20o%20Gestão%20Eclesial" target="_blank" rel="noopener noreferrer" className="text-[#ffc547] hover:text-[#ffd966] transition font-semibold">Fale com o Suporte</a>
-                  </p>
-                </div>
-              </form>
-
-            </div>
-          )}
-
-          <div className="text-center text-black text-xs w-full footer-text">
-            <p className="font-semibold">GESTÃO ECLESIAL - Administração Ministerial V. 1.0</p>
-            <p className="text-black/70">Desenvolvido por: MOOVE Sistemas LTDA</p>
+          <div className="relative max-w-5xl w-full">
+            <button
+              className="absolute -top-12 right-0 text-white text-sm font-semibold"
+              onClick={() => setSelectedImage(null)}
+              aria-label="Fechar"
+            >
+              Fechar
+            </button>
+            <img
+              src={selectedImage.src}
+              alt={selectedImage.alt}
+              className="w-full max-h-[80vh] object-contain rounded-2xl border border-white/20 shadow-2xl"
+            />
           </div>
         </div>
+      )}
 
-      </div>
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/img/logo333-v2.png" alt="Gestao Servus" className="h-10" />
+          </div>
+          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
+            <a href="#beneficios" className="hover:text-slate-900 transition">Benefícios</a>
+            <a href="#telas" className="hover:text-slate-900 transition">Telas</a>
+            <a href="#funcionalidades" className="hover:text-slate-900 transition">Funcionalidades</a>
+            <a href="#planos" className="hover:text-slate-900 transition">Planos</a>
+            <a href="#faq" className="hover:text-slate-900 transition">FAQ</a>
+            <a href="#contato" className="hover:text-slate-900 transition">Contato</a>
+          </nav>
+          <button
+            onClick={() => router.push('/login')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+          >
+            Login
+          </button>
+        </div>
+      </header>
+
+      <section className="relative overflow-hidden">
+        <div className="absolute -top-24 -right-32 w-[420px] h-[420px] bg-blue-100/40 blur-3xl rounded-full" />
+        <div className="absolute -bottom-32 -left-16 w-[320px] h-[320px] bg-amber-100/40 blur-3xl rounded-full" />
+        <div className="max-w-6xl mx-auto px-6 py-20 grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-center">
+          <div className="space-y-6">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-xs font-semibold uppercase tracking-[0.3em] text-blue-600">
+              Gestao inteligente
+            </span>
+            <h1 className="landing-title text-4xl md:text-5xl">
+              Gestão inteligente para instituições modernas.
+            </h1>
+            <p className="text-lg text-slate-600">
+              Administre sua instituição com ferramentas para membros, financeiro, estrutura hierárquica, cartões e relatórios.
+            </p>
+            <div className="flex flex-wrap gap-4">
+              <a
+                href="#planos"
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition"
+              >
+                Começar agora - 7 dias grátis
+              </a>
+              <a
+                href="#contato"
+                className="px-6 py-3 border-2 border-slate-300 text-slate-900 rounded-lg font-semibold hover:border-slate-400 hover:bg-slate-50 transition"
+              >
+                Agendar demonstração
+              </a>
+            </div>
+            <div className="flex flex-wrap gap-3 text-sm text-slate-600">
+              <span className="px-3 py-1 bg-slate-100 rounded-full">7 dias gratis</span>
+              <span className="px-3 py-1 bg-slate-100 rounded-full">Suporte especializado</span>
+              <span className="px-3 py-1 bg-slate-100 rounded-full">Cancele quando quiser</span>
+            </div>
+          </div>
+          <div className="bg-gradient-to-br from-white to-blue-50 border border-slate-200 rounded-2xl p-8 shadow-lg">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Resumo</p>
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Tempo de implantação</span>
+                <span className="text-slate-900 font-semibold">~1 dia</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Modulo mais usado</span>
+                <span className="text-slate-900 font-semibold">Secretaria</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Suporte</span>
+                <span className="text-slate-900 font-semibold">24h úteis</span>
+              </div>
+              <div className="mt-6 bg-blue-500/10 border border-blue-200 rounded-xl p-4">
+                <p className="text-xs font-semibold uppercase text-blue-600">Impacto</p>
+                <p className="text-2xl font-bold text-slate-900">+45% produtividade</p>
+                <p className="text-xs text-slate-600">Em gestão, relatórios e controle operacional.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="telas" className="max-w-6xl mx-auto px-6 py-16">
+        <div className="text-center max-w-2xl mx-auto mb-10">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Veja na pratica</p>
+          <h2 className="landing-title text-3xl">Telas do sistema</h2>
+          <p className="text-slate-600 mt-3">Um panorama real do que sua equipe vai usar no dia a dia.</p>
+        </div>
+        <div className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory md:justify-center touch-manipulation">
+          {gallery.map((item) => (
+            <div
+              key={item.src}
+              className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm hover:shadow-lg transition shrink-0 min-w-[150px] sm:min-w-[190px] lg:min-w-[230px] max-w-[230px] snap-start select-none touch-manipulation cursor-pointer"
+              onClick={() => setSelectedImage(item)}
+            >
+              <img
+                src={item.src}
+                alt={item.alt}
+                className="w-full h-32 sm:h-36 lg:h-40 object-cover rounded-xl border border-slate-200"
+                loading="lazy"
+                draggable={false}
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="beneficios" className="max-w-6xl mx-auto px-6 py-16">
+        <div className="text-center max-w-2xl mx-auto mb-10">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Por que escolher</p>
+          <h2 className="landing-title text-3xl">Gestão Servus</h2>
+          <p className="text-slate-600 mt-3">Tudo que você precisa para gerir sua instituição de forma eficiente e segura.</p>
+        </div>
+        <div className="grid gap-6 md:grid-cols-3">
+          {benefits.map((card) => (
+            <div key={card.title} className="bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg transition duration-300">
+              <h3 className="text-lg font-bold text-slate-900">{card.title}</h3>
+              <p className="text-sm text-slate-600 mt-2">{card.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="funcionalidades" className="max-w-6xl mx-auto px-6 py-16">
+        <div className="text-center max-w-2xl mx-auto mb-10">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Tudo que você precisa</p>
+          <h2 className="landing-title text-3xl">Ferramentas completas</h2>
+          <p className="text-slate-600 mt-3">Módulos integrados para administrar sua instituição de forma centralizada.</p>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {features.map((feature) => (
+            <div key={feature.title} className="bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg transition duration-300">
+              <h3 className="text-lg font-bold text-slate-900">{feature.title}</h3>
+              <p className="text-sm text-slate-600 mt-2">{feature.text}</p>
+              <ul className="mt-4 space-y-2 text-sm text-slate-600">
+                {feature.bullets.map((bullet) => (
+                  <li key={bullet} className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-blue-500" />
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="planos" className="max-w-6xl mx-auto px-6 py-16">
+        <div className="text-center max-w-2xl mx-auto mb-10">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Planos que crescem com você</p>
+          <h2 className="landing-title text-3xl">Escolha o plano ideal</h2>
+          <p className="text-slate-600 mt-3">Todos incluem suporte, onboarding e 7 dias de teste gratuito.</p>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {pricing.map((plan) => (
+            <div
+              key={plan.name}
+              className={`rounded-2xl p-6 border transition duration-300 ${plan.featured
+                ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white border-blue-600 shadow-xl scale-105'
+                : 'bg-white text-slate-900 border-slate-200 hover:shadow-lg'
+              }`}
+            >
+              {plan.featured && (
+                <span className="inline-flex text-xs font-semibold bg-yellow-400 text-slate-900 px-2 py-1 rounded-full">
+                  Mais popular
+                </span>
+              )}
+              <h3 className="text-xl font-bold mt-4">{plan.name}</h3>
+              <p className={`text-sm mt-2 ${plan.featured ? 'text-blue-100' : 'text-slate-600'}`}>{plan.description}</p>
+              <div className="mt-4">
+                <p className="text-3xl font-bold">{plan.priceMonthly}</p>
+                <p className={`text-xs mt-1 ${plan.featured ? 'text-blue-100' : 'text-slate-500'}`}>{plan.priceYearly}</p>
+              </div>
+              <ul className={`mt-6 space-y-2 text-sm ${plan.featured ? '' : ''}`}>
+                {plan.highlights.map((item) => (
+                  <li key={item} className="flex items-center gap-2">
+                    <span className={`h-2 w-2 rounded-full ${plan.featured ? 'bg-yellow-300' : 'bg-blue-500'}`} />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href="#contato"
+                className={`mt-6 inline-flex w-full justify-center px-4 py-2 rounded-lg font-semibold transition ${plan.featured
+                  ? 'bg-yellow-400 text-slate-900 hover:bg-yellow-300'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                Assinar agora
+              </a>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="faq" className="max-w-6xl mx-auto px-6 py-16">
+        <div className="text-center max-w-2xl mx-auto mb-10">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Perguntas frequentes</p>
+          <h2 className="landing-title text-3xl">Tire suas duvidas</h2>
+        </div>
+        <div className="grid gap-4">
+          {faqs.map((faq) => (
+            <details key={faq.question} className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition cursor-pointer group">
+              <summary className="font-semibold text-slate-900 cursor-pointer flex justify-between items-center">
+                {faq.question}
+                <span className="ml-2 group-open:rotate-180 transition duration-300">▾</span>
+              </summary>
+              <p className="text-sm text-slate-600 mt-2">{faq.answer}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      <section id="contato" className="max-w-6xl mx-auto px-6 py-16">
+        <div className="grid gap-10 lg:grid-cols-[1fr_1fr] items-start">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Ainda tem duvidas?</p>
+            <h2 className="landing-title text-3xl">Vamos conversar</h2>
+            <p className="text-slate-600 mt-3">
+              Nossa equipe responde em até 24h úteis. Agendamos uma demonstração, liberamos acesso ao trial e guiamos sua implementação.
+            </p>
+            <div className="mt-8 space-y-3 text-sm text-slate-600">
+              <p>Atendimento: Segunda a sexta, 9h as 18h (horário Brasília)</p>
+              <p>Demonstracao via video call - 30 minutos</p>
+              <p>Consultoria de implementação incluída</p>
+              <p>Onboarding com sua equipe</p>
+            </div>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-lg">
+            <form onSubmit={handleContactSubmit} className="space-y-4">
+              {error && (
+                <div className="bg-red-100 border border-red-300 text-sm text-red-900 p-3 rounded-lg">
+                  {error}
+                </div>
+              )}
+              <input
+                type="text"
+                name="ministerio"
+                value={contactData.ministerio}
+                onChange={handleContactChange}
+                placeholder="Nome da Instituição"
+                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="text"
+                name="pastor"
+                value={contactData.pastor}
+                onChange={handleContactChange}
+                placeholder="Seu Nome Completo"
+                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="text"
+                name="cpf"
+                value={contactData.cpf}
+                onChange={handleContactChange}
+                placeholder="CPF / CNPJ"
+                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="text"
+                name="whatsapp"
+                value={contactData.whatsapp}
+                onChange={handleContactChange}
+                placeholder="WhatsApp (com DDD)"
+                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="email"
+                name="email"
+                value={contactData.email}
+                onChange={handleContactChange}
+                placeholder="Email para contato"
+                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Enviando...' : 'Enviar mensagem'}
+              </button>
+              <p className="text-xs text-slate-500">
+                Ao enviar, você concorda com nossa política de privacidade.
+              </p>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-slate-200 py-10 text-center text-xs text-slate-500">
+        Gestão Servus - Tecnologia para instituições. Desenvolvido por Moove Sistemas.
+      </footer>
     </div>
   );
 }

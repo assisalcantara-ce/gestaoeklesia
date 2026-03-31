@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import NotificationModal from '@/components/NotificationModal';
-import { getCargosMinisteriais, type CargoMinisterial } from '@/lib/cargos-utils';
+import { getCargosMinisteriais, saveCargosMinisteriais, type CargoMinisterial } from '@/lib/cargos-utils';
 import { useAppDialog } from '@/providers/AppDialogProvider'
 import { createClient } from '@/lib/supabase-client'
 import { formatCnpj, formatPhone } from '@/lib/mascaras';
@@ -35,7 +35,7 @@ export default function ConfiguracoesPage() {
       <div className="flex-1 overflow-auto">
         <div className="p-6">
           {/* Header */}
-          <h1 className="text-3xl font-bold text-gray-800 mb-6">⚙️ Configurações do Ministério</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-6">⚙️ Configurações da Instituição</h1>
 
           {/* Abas */}
           <div className="flex border-b border-gray-300 bg-white rounded-t-lg overflow-x-auto mb-6">
@@ -46,7 +46,7 @@ export default function ConfiguracoesPage() {
                 : 'text-gray-600 border-transparent hover:text-teal-600'
                 }`}
             >
-              🏛️ Perfil do Ministério
+              🏛️ Perfil da Instituição
             </button>
             <button
               onClick={() => setActiveTab('identidade')}
@@ -134,6 +134,7 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
     telefone: '',
     website: '',
     endereco: '',
+    descricao: '',
     responsavel: '',
     dataCadastro: ''
   });
@@ -142,14 +143,15 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
     fetchConfiguracaoIgrejaFromSupabase(supabase)
       .then((config: any) => {
         setFormData({
-          nomeMinisterio: config.nome || 'Ministério',
+          nomeMinisterio: config.nome || 'Instituição',
           cnpj: config.cnpj || '',
           email: config.email || '',
           telefone: config.telefone || '',
           website: config.website || '',
           endereco: config.endereco || '',
+          descricao: config.descricao || '',
           responsavel: config.responsavel || '',
-          dataCadastro: ''
+          dataCadastro: config.dataCadastro || ''
         });
       })
       .catch(() => null);
@@ -170,24 +172,29 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
   };
 
   const handleSave = async () => {
-    await updateConfiguracaoIgrejaInSupabase(supabase, {
-      nome: formData.nomeMinisterio,
-      cnpj: formData.cnpj,
-      email: formData.email,
-      telefone: formData.telefone,
-      endereco: formData.endereco,
-      website: formData.website,
-      responsavel: formData.responsavel
-    });
-
-    onNotification('Sucesso', 'Dados do ministério atualizados com sucesso!', 'success');
-    setIsEditing(false);
+    try {
+      await updateConfiguracaoIgrejaInSupabase(supabase, {
+        nome: formData.nomeMinisterio,
+        cnpj: formData.cnpj,
+        email: formData.email,
+        telefone: formData.telefone,
+        endereco: formData.endereco,
+        descricao: formData.descricao,
+        website: formData.website,
+        responsavel: formData.responsavel
+      });
+      onNotification('Sucesso', 'Dados da instituição atualizados com sucesso!', 'success');
+      setIsEditing(false);
+    } catch (error: any) {
+      console.error('❌ Erro ao salvar perfil:', error);
+      onNotification('Erro', error?.message || 'Erro ao salvar. Tente novamente.', 'error');
+    }
   };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Perfil do Ministério</h2>
+        <h2 className="text-2xl font-bold text-gray-800">Perfil da Instituição</h2>
         <button
           onClick={() => setIsEditing(!isEditing)}
           className={`px-6 py-2 rounded-lg transition font-semibold ${isEditing
@@ -202,7 +209,7 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Nome do Ministério</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Nome da Instituição</label>
             <input
               type="text"
               name="nomeMinisterio"
@@ -262,7 +269,7 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Responsável</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Presidente</label>
             <input
               type="text"
               name="responsavel"
@@ -281,19 +288,33 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
             value={formData.endereco}
             onChange={handleChange}
             disabled={!isEditing}
-            rows={3}
+            rows={2}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Data de Cadastro</label>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Descrição</label>
+          <textarea
+            name="descricao"
+            value={formData.descricao}
+            onChange={handleChange}
+            disabled={!isEditing}
+            rows={3}
+            placeholder="Informações sobre sua instituição"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-teal-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Data de Fundação</label>
           <input
             type="date"
             name="dataCadastro"
             value={formData.dataCadastro}
-            disabled
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+            onChange={handleChange}
+            disabled={!isEditing}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
 
@@ -414,7 +435,7 @@ function BrandingContent({ onNotification }: { onNotification: (title: string, m
 
       <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-gray-700">
-          💡 <strong>Dica:</strong> As informações da igreja (nome, endereço, CNPJ, telefone, email) são configuradas na aba <strong>"Perfil do Ministério"</strong> e serão exibidas automaticamente no cabeçalho dos relatórios em PDF.
+          💡 <strong>Dica:</strong> As informações da chiesa (nome, endereço, CNPJ, telefone, email) são configuradas na aba <strong>"Perfil da Instituição"</strong> e serão exibidas automaticamente no cabeçalho dos relatórios em PDF.
         </p>
       </div>
     </div>
@@ -662,6 +683,7 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
   const supabase = createClient();
 
   const ORG_NOMENCLATURAS_KEY = 'divisoes_organizacionais';
+  const CARGOS_MINISTERIAIS_KEY = 'cargos_ministeriais';
   const ORG_NOMENCLATURAS_SCHEMA_VERSION = 3;
 
   type DivisionKey = 'divisaoPrincipal' | 'divisaoSecundaria' | 'divisaoTerciaria';
@@ -779,23 +801,43 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
     };
   };
 
-  const upsertOrgNomenclaturas = async (ministryId: string, state: NomenclaturasState) => {
-    const { data: existingRow } = await supabase
-      .from('configurations')
-      .select('nomenclaturas')
-      .eq('ministry_id', ministryId)
-      .maybeSingle();
+  const upsertOrgNomenclaturas = async (
+    ministryId: string,
+    state: NomenclaturasState,
+    cargos: CargoMinisterial[]
+  ) => {
+    try {
+      const { data: existingRow } = await supabase
+        .from('configurations')
+        .select('nomenclaturas')
+        .eq('ministry_id', ministryId)
+        .maybeSingle();
 
-    const existingNomenclaturas = (existingRow as any)?.nomenclaturas || {};
-    const payload = buildOrgNomenclaturasPayload(state);
+      const existingNomenclaturas = (existingRow as any)?.nomenclaturas || {};
+      const payload = buildOrgNomenclaturasPayload(state);
 
-    await supabase
-      .from('configurations')
-      .upsert({
-        ministry_id: ministryId,
-        nomenclaturas: { ...existingNomenclaturas, [ORG_NOMENCLATURAS_KEY]: payload },
-        updated_at: new Date().toISOString(),
-      } as any, { onConflict: 'ministry_id' });
+      const { error: upsertErr } = await supabase
+        .from('configurations')
+        .upsert({
+          ministry_id: ministryId,
+          nomenclaturas: {
+            ...existingNomenclaturas,
+            [ORG_NOMENCLATURAS_KEY]: payload,
+            [CARGOS_MINISTERIAIS_KEY]: cargos,
+          },
+          updated_at: new Date().toISOString(),
+        } as any, { onConflict: 'ministry_id' });
+
+      if (upsertErr) {
+        console.error('❌ Erro ao salvar nomenclaturas:', upsertErr);
+        throw new Error(upsertErr.message || 'Erro ao salvar nomenclaturas');
+      }
+
+      console.log('✅ Nomenclaturas salvas com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro em upsertOrgNomenclaturas:', error);
+      throw error;
+    }
   };
 
   const loadFromSupabaseOrMigrate = async () => {
@@ -811,6 +853,11 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
     if (!configErr) {
       const rawNomenclaturas = (configRow as any)?.nomenclaturas || {};
       const org = rawNomenclaturas?.[ORG_NOMENCLATURAS_KEY];
+      const cargos = rawNomenclaturas?.[CARGOS_MINISTERIAIS_KEY];
+      if (Array.isArray(cargos)) {
+        setCargosMinisteriais(cargos as CargoMinisterial[]);
+        saveCargosMinisteriais(cargos as CargoMinisterial[]);
+      }
       if (org) {
         const schemaVersion = Number(org?.schemaVersion || 0);
         const normalized = normalizeNomenclaturas({
@@ -826,7 +873,7 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
     }
 
     let nextState = getDefaultNomenclaturas();
-    await upsertOrgNomenclaturas(ministryId, nextState);
+    await upsertOrgNomenclaturas(ministryId, nextState, cargosMinisteriais);
     setNomenclaturasState(nextState);
     setTemp(nextState);
   };
@@ -896,22 +943,30 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
     console.log('📋 Dados a salvar:', temp);
     setNomenclaturasState(temp);
 
-    const ministryId = await resolveMinistryId();
-    if (ministryId) {
-      await upsertOrgNomenclaturas(ministryId, temp);
-    }
-
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('nomenclaturas', JSON.stringify(temp));
-        localStorage.setItem(NOMENCLATURAS_SCHEMA_VERSION_KEY, NOMENCLATURAS_SCHEMA_VERSION);
-      } catch {
-        // ignore
+    try {
+      const ministryId = await resolveMinistryId();
+      if (!ministryId) {
+        onNotification('Erro', 'Não foi possível identificar sua instituição.', 'error');
+        return;
       }
-    }
 
-    setIsEditing(false);
-    onNotification('Sucesso', 'Nomenclaturas atualizadas com sucesso!', 'success');
+      await upsertOrgNomenclaturas(ministryId, temp, cargosMinisteriais);
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('nomenclaturas', JSON.stringify(temp));
+          localStorage.setItem(NOMENCLATURAS_SCHEMA_VERSION_KEY, NOMENCLATURAS_SCHEMA_VERSION);
+        } catch {
+          // ignore
+        }
+      }
+
+      setIsEditing(false);
+      onNotification('Sucesso', 'Nomenclaturas atualizadas com sucesso!', 'success');
+    } catch (error: any) {
+      console.error('❌ Erro ao salvar nomenclaturas:', error);
+      onNotification('Erro', `Erro ao salvar: ${error?.message || 'Tente novamente'}`, 'error');
+    }
   };
 
   const handleCancel = () => {
@@ -921,9 +976,11 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
   };
 
   const toggleCargo = (id: number) => {
-    setCargosMinisteriais(cargosMinisteriais.map(cargo =>
+    const nextCargos = cargosMinisteriais.map(cargo =>
       cargo.id === id ? { ...cargo, ativo: !cargo.ativo } : cargo
-    ));
+    );
+    setCargosMinisteriais(nextCargos);
+    saveCargosMinisteriais(nextCargos);
   };
 
   const adicionarCargo = () => {
@@ -953,7 +1010,9 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
       ativo: true
     };
 
-    setCargosMinisteriais([...cargosMinisteriais, novoCargoObj]);
+    const nextCargos = [...cargosMinisteriais, novoCargoObj];
+    setCargosMinisteriais(nextCargos);
+    saveCargosMinisteriais(nextCargos);
     setNovoCargo('');
     onNotification('Sucesso', `Cargo "${nomeNormalizado}" adicionado com sucesso!`, 'success');
   };
@@ -971,7 +1030,9 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
     })
 
     if (ok) {
-      setCargosMinisteriais(cargosMinisteriais.filter(c => c.id !== id));
+      const nextCargos = cargosMinisteriais.filter(c => c.id !== id);
+      setCargosMinisteriais(nextCargos);
+      saveCargosMinisteriais(nextCargos);
       onNotification('Sucesso', `Cargo "${cargo.nome}" removido com sucesso!`, 'success');
     }
   };

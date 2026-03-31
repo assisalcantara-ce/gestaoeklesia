@@ -29,7 +29,11 @@ export async function GET(request: NextRequest) {
       `, { count: 'exact' })
 
     if (status) {
-      query = query.eq('status', status)
+      if (status === 'active') {
+        query = query.in('status', ['open', 'in_progress', 'waiting_customer'])
+      } else {
+        query = query.eq('status', status)
+      }
     }
 
     if (priority) {
@@ -53,8 +57,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+    const ticketIds = (data || []).map((row: any) => row.id)
+    let lastMessageByTicket: Record<string, { user_id: string; created_at: string }> = {}
+
+    if (ticketIds.length > 0) {
+      const { data: lastMessages } = await supabaseAdmin
+        .from('support_ticket_messages')
+        .select('ticket_id,user_id,created_at')
+        .in('ticket_id', ticketIds)
+        .eq('is_internal', false)
+        .order('created_at', { ascending: false })
+
+      lastMessageByTicket = (lastMessages || []).reduce((acc: any, msg: any) => {
+        if (!acc[msg.ticket_id]) {
+          acc[msg.ticket_id] = { user_id: msg.user_id, created_at: msg.created_at }
+        }
+        return acc
+      }, {})
+    }
+
+    const enriched = (data || []).map((ticket: any) => {
+      const lastMessage = lastMessageByTicket[ticket.id]
+      return {
+        ...ticket,
+        last_message_user_id: lastMessage?.user_id || null,
+        last_message_at: lastMessage?.created_at || null,
+      }
+    })
+
     return NextResponse.json({
-      data,
+      data: enriched,
       count,
       page,
       limit,

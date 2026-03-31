@@ -48,7 +48,7 @@ export default function MembrosOverview({
   // Calcular estatísticas com base nos membros filtrados
   const totalMembros = membrosFiltrados.length;
   const ativos = membrosFiltrados.filter(m => m.status === 'ativo').length;
-  const dizimistas = membrosFiltrados.filter(m => m.dizimista === true).length;
+  const inativos = membrosFiltrados.filter(m => m.status === 'inativo').length;
   
   const tiposContagem = {
     membro: membrosFiltrados.filter(m => m.tipoCadastro === 'membro').length,
@@ -58,8 +58,8 @@ export default function MembrosOverview({
   };
 
   const percentualAtivo = totalMembros > 0 ? ((ativos / totalMembros) * 100).toFixed(1) : 0;
-  const percentualDizimista = totalMembros > 0 ? ((dizimistas / totalMembros) * 100).toFixed(1) : 0;
-  const percentualCongregado = totalMembros > 0 ? ((tiposContagem.congregado / totalMembros) * 100).toFixed(1) : 0;
+  const percentualInativo = totalMembros > 0 ? ((inativos / totalMembros) * 100).toFixed(1) : 0;
+  const percentualMinistro = totalMembros > 0 ? ((tiposContagem.ministro / totalMembros) * 100).toFixed(1) : 0;
 
   // Gerar dados de cadastro por mês (últimos 12 meses)
   const gerarDadosCadastrosPorMes = () => {
@@ -105,22 +105,22 @@ export default function MembrosOverview({
     <div className="space-y-6">
       {/* Cards de Estatísticas - Visão Geral */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total de Membros */}
+        {/* Total de Ministros */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow-lg hover:shadow-xl transition">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm opacity-90 font-medium">Total de Membros</p>
+              <p className="text-sm opacity-90 font-medium">Total de Ministros</p>
               <p className="text-3xl font-bold mt-2">{totalMembros}</p>
             </div>
             <span className="text-4xl opacity-70">👥</span>
           </div>
         </div>
 
-        {/* Membros Ativos */}
+        {/* Ministros Ativos */}
         <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-lg shadow-lg hover:shadow-xl transition">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm opacity-90 font-medium">Membros Ativos</p>
+              <p className="text-sm opacity-90 font-medium">Ministros Ativos</p>
               <p className="text-3xl font-bold mt-2">{ativos}</p>
               <p className="text-xs opacity-75 mt-1">{percentualAtivo}%</p>
             </div>
@@ -128,42 +128,42 @@ export default function MembrosOverview({
           </div>
         </div>
 
-        {/* Dizimistas */}
+        {/* Ministros Inativos */}
         <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-6 rounded-lg shadow-lg hover:shadow-xl transition">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm opacity-90 font-medium">Dizimistas</p>
-              <p className="text-3xl font-bold mt-2">{dizimistas}</p>
-              <p className="text-xs opacity-75 mt-1">{percentualDizimista}%</p>
+              <p className="text-sm opacity-90 font-medium">Ministros Inativos</p>
+              <p className="text-3xl font-bold mt-2">{inativos}</p>
+              <p className="text-xs opacity-75 mt-1">{percentualInativo}%</p>
             </div>
-            <span className="text-4xl opacity-70">💰</span>
+            <span className="text-4xl opacity-70">⏸️</span>
           </div>
         </div>
 
-        {/* Congregados */}
+        {/* Perfil Ministro */}
         <div className="bg-gradient-to-br from-teal-500 to-teal-600 text-white p-6 rounded-lg shadow-lg hover:shadow-xl transition">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm opacity-90 font-medium">Congregados</p>
-              <p className="text-3xl font-bold mt-2">{tiposContagem.congregado}</p>
-              <p className="text-xs opacity-75 mt-1">{percentualCongregado}%</p>
+              <p className="text-sm opacity-90 font-medium">Perfil Ministro</p>
+              <p className="text-3xl font-bold mt-2">{tiposContagem.ministro}</p>
+              <p className="text-xs opacity-75 mt-1">{percentualMinistro}%</p>
             </div>
-            <span className="text-4xl opacity-70">🤝</span>
+            <span className="text-4xl opacity-70">🎓</span>
           </div>
         </div>
       </div>
 
-      {/* Gráfico de Distribuição por Tipo de Cadastro */}
+      {/* Gráfico de Distribuição por Perfil de Cadastro */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-          <span>📊</span> Distribuição por Tipo de Cadastro
+          <span>📊</span> Distribuição por Perfil de Cadastro
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Membros */}
+          {/* Perfil Membro (Legado) */}
           <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex items-center justify-between mb-3">
-              <span className="font-semibold text-gray-700">Membros</span>
+              <span className="font-semibold text-gray-700">Perfil Membro (Legado)</span>
               <span className="text-2xl">⛪</span>
             </div>
             <div className="text-3xl font-bold text-blue-600">{tiposContagem.membro}</div>
@@ -178,10 +178,10 @@ export default function MembrosOverview({
             </p>
           </div>
 
-          {/* Congregados */}
+          {/* Perfil Congregado (Legado) */}
           <div className="p-4 bg-green-50 rounded-lg border border-green-200">
             <div className="flex items-center justify-between mb-3">
-              <span className="font-semibold text-gray-700">Congregados</span>
+              <span className="font-semibold text-gray-700">Perfil Congregado (Legado)</span>
               <span className="text-2xl">🤝</span>
             </div>
             <div className="text-3xl font-bold text-green-600">{tiposContagem.congregado}</div>
@@ -214,10 +214,10 @@ export default function MembrosOverview({
             </p>
           </div>
 
-          {/* Crianças */}
+          {/* Perfil Criança (Legado) */}
           <div className="p-4 bg-pink-50 rounded-lg border border-pink-200">
             <div className="flex items-center justify-between mb-3">
-              <span className="font-semibold text-gray-700">Crianças</span>
+              <span className="font-semibold text-gray-700">Perfil Criança (Legado)</span>
               <span className="text-2xl">👶</span>
             </div>
             <div className="text-3xl font-bold text-pink-600">{tiposContagem.crianca}</div>

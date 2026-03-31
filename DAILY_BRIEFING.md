@@ -1,13 +1,13 @@
 # 📋 DAILY BRIEFING - GestãoEklesia
 
-**Data de Última Atualização:** 15 de fevereiro de 2026  
-**Última Sessão:** Fluxos (Operacao) com formularios amigaveis + template "Apresentacao de Criancas" com form.fields + Estrutura Hierarquica sem geolocalizacao na Divisao 2
+**Data de Última Atualização:** 31 de março de 2026  
+**Última Sessão:** Ajustes de UI/admin, planos e landing page + planejamento Asaas (cobrancas anuais, webhook, baixa manual)
 
 ---
 
 ## 🎯 PROJETO EM UMA LINHA
 
-**GestãoEklesia** é um **SaaS multi-tenant** para gerenciar igrejas/ministérios com painel admin, geolocalização, cartões de membros e relatórios.
+**GestãoServus** é um **SaaS multi-tenant** para gerenciar instituições/ministérios com painel admin, geolocalização, cartões de membros e relatórios.
 
 ---
 
@@ -45,6 +45,8 @@ NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
+
+Nota: este ambiente permite acesso direto ao Supabase via CLI/SDK usando `SUPABASE_SERVICE_ROLE_KEY`.
 
 ### Admin de Teste
 Para ambiente local/staging, mantenha usuário admin de teste, mas **não registre senha em .md**.
@@ -195,6 +197,33 @@ git merge feature/nova-feature
     - Criar instancia de "Apresentacao de Criancas" com dados preenchidos.
     - Abrir detalhe e confirmar exibicao dos dados.
     - Executar "Enviar para analise" e verificar historico.
+
+---
+
+## ✨ ÚLTIMAS IMPLEMENTAÇÕES (31 de março de 2026)
+
+### ✅ Concluído
+- [x] Landing page atualizada com planos reais (Starter, Intermediário, Profissional, Expert) e limites.
+- [x] Descrições dos planos alinhadas ao Supabase.
+- [x] Carrossel de telas na landing com lightbox (clique para ampliar).
+- [x] Sidebar principal e AdminSidebar com logo atualizada (logo333-v3.png).
+- [x] Admin planos: formulário ajustado (Campos/Igrejas/Membros/Usuários Administrativos), slug automático, edição por clique no card.
+- [x] Admin planos: cards exibem descrição real do plano e ordem definida (Starter, Intermediário, Profissional, Expert).
+- [x] Admin ministérios: select "Plano de Inscrição" dinâmico a partir de subscription_plans.
+- [x] Admin ministérios: website deixou de ser obrigatório (campo livre).
+- [x] API: rota PATCH /api/v1/admin/plans/:id criada.
+
+### 🧭 Planejamento Asaas (cobrancas anuais)
+- Criar 12 parcelas do contrato de 1 ano no Asaas (gerar 12 cobranças).
+- Persistir cada cobrança na tabela payments (asaas_payment_id, status, due_date).
+- Admin/Pagamentos deve listar as parcelas e permitir baixa manual (recebimento em mãos).
+- Webhook Asaas deve atualizar status automaticamente (paid/overdue/cancelled).
+
+### ▶️ Próximo passo (amanhã)
+- Iniciar integração Asaas:
+    - Definir modelo (12 cobranças avulsas ou assinatura nativa Asaas).
+    - Implementar cliente Asaas (server-side) e endpoint webhook.
+    - Atualizar admin/pagamentos para listar e permitir baixa manual.
 
 ### 📅 07 de Fevereiro de 2026 — Geolocalização (0 coordenadas) + persistência lat/lng
 

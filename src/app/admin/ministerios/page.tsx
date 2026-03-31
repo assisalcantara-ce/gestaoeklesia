@@ -5,17 +5,21 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { authenticatedFetch } from '@/lib/api-client'
-import Link from 'next/link'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import TrialSignupsWidget from '@/components/TrialSignupsWidget'
+import AdminSidebar from '@/components/AdminSidebar'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
+import type { SubscriptionPlan } from '@/types/admin'
 import { onlyDigits, formatCnpj, formatPhone } from '@/lib/mascaras'
 
 export default function MinisteriosPage() {
-  const { isLoading, isAuthenticated, logout } = useAdminAuth()
+  const { isLoading, isAuthenticated } = useAdminAuth()
   const [ministerios, setMinisterios] = useState<SupabaseMinistry[]>([])
+  const [planos, setPlanos] = useState<SubscriptionPlan[]>([])
+  const [planosLoading, setPlanosLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [logoFile, setLogoFile] = useState<File | null>(null)
@@ -52,6 +56,34 @@ export default function MinisteriosPage() {
     quantity_members: 0,
   })
 
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      cnpj: '',
+      contact_email: '',
+      contact_phone: '',
+      whatsapp: '',
+      responsible_name: '',
+      website: '',
+      logo_url: '',
+      description: '',
+      address_street: '',
+      address_number: '',
+      address_complement: '',
+      address_city: '',
+      address_state: '',
+      address_zip: '',
+      subscription_plan_id: '',
+      is_active: true,
+      quantity_temples: 1,
+      quantity_members: 0,
+    })
+    if (logoPreviewObjectUrl) URL.revokeObjectURL(logoPreviewObjectUrl)
+    setLogoPreviewObjectUrl('')
+    setLogoPreviewSrc('')
+    setLogoFile(null)
+  }
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/admin/login')
@@ -61,8 +93,26 @@ export default function MinisteriosPage() {
   useEffect(() => {
     if (isAuthenticated) {
       fetchMinisterios()
+      fetchPlanos()
     }
   }, [isAuthenticated])
+
+  const fetchPlanos = async () => {
+    try {
+      setPlanosLoading(true)
+      const response = await authenticatedFetch('/api/v1/admin/plans')
+      if (!response.ok) {
+        throw new Error('Erro ao carregar planos')
+      }
+
+      const data = await response.json()
+      setPlanos(data.data || [])
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setPlanosLoading(false)
+    }
+  }
 
   const formatCep = (value: string) => {
     const digits = onlyDigits(value).slice(0, 8)
@@ -210,9 +260,9 @@ export default function MinisteriosPage() {
       }
 
       const response = await authenticatedFetch('/api/v1/admin/ministries', {
-        method: 'POST',
+        method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadToSend),
+        body: JSON.stringify(editingId ? { ...payloadToSend, id: editingId } : payloadToSend),
       })
 
       if (!response.ok) {
@@ -223,35 +273,14 @@ export default function MinisteriosPage() {
       const payload = await response.json()
       const creds = payload?.credentials
       setSuccess(
-        creds?.email && creds?.password
-          ? `Ministério criado com sucesso! Credenciais geradas: ${creds.email} / ${creds.password}`
-          : 'Ministério criado com sucesso!'
+        editingId
+          ? 'Ministério atualizado com sucesso!'
+          : creds?.email && creds?.password
+            ? `Ministério criado com sucesso! Credenciais geradas: ${creds.email} / ${creds.password}`
+            : 'Ministério criado com sucesso!'
       )
-      setFormData({
-        name: '',
-        cnpj: '',
-        contact_email: '',
-        contact_phone: '',
-        whatsapp: '',
-        responsible_name: '',
-        website: '',
-        logo_url: '',
-        description: '',
-        address_street: '',
-        address_number: '',
-        address_complement: '',
-        address_city: '',
-        address_state: '',
-        address_zip: '',
-        subscription_plan_id: '',
-        is_active: true,
-        quantity_temples: 1,
-        quantity_members: 0,
-      })
-      if (logoPreviewObjectUrl) URL.revokeObjectURL(logoPreviewObjectUrl)
-      setLogoPreviewObjectUrl('')
-      setLogoPreviewSrc('')
-      setLogoFile(null)
+      resetForm()
+      setEditingId(null)
       setShowForm(false)
       fetchMinisterios()
     } catch (err: any) {
@@ -259,88 +288,145 @@ export default function MinisteriosPage() {
     }
   }
 
+  const handleEdit = (ministerio: SupabaseMinistry) => {
+    setEditingId(ministerio.id)
+    setShowForm(true)
+    setFormData({
+      name: ministerio.name || '',
+      cnpj: ministerio.cnpj_cpf || '',
+      contact_email: ministerio.email_admin || '',
+      contact_phone: ministerio.phone || '',
+      whatsapp: ministerio.whatsapp || '',
+      responsible_name: ministerio.responsible_name || '',
+      website: ministerio.website || '',
+      logo_url: ministerio.logo_url || '',
+      description: ministerio.description || '',
+      address_street: ministerio.address_street || '',
+      address_number: ministerio.address_number || '',
+      address_complement: ministerio.address_complement || '',
+      address_city: ministerio.address_city || '',
+      address_state: ministerio.address_state || '',
+      address_zip: ministerio.address_zip || '',
+      subscription_plan_id: ministerio.plan || '',
+      is_active: ministerio.is_active !== false,
+      quantity_temples: ministerio.quantity_temples || 1,
+      quantity_members: ministerio.quantity_members || 0,
+    })
+    if (logoPreviewObjectUrl) URL.revokeObjectURL(logoPreviewObjectUrl)
+    setLogoPreviewObjectUrl('')
+    setLogoFile(null)
+    setLogoPreviewSrc(ministerio.logo_url || '')
+  }
+
+  const handleDelete = async (ministerio: SupabaseMinistry) => {
+    const ok = window.confirm(`Remover o ministério "${ministerio.name}"?`)
+    if (!ok) return
+
+    try {
+      const response = await authenticatedFetch('/api/v1/admin/ministries', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ministerio.id }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload.error || 'Erro ao remover ministério')
+      }
+
+      fetchMinisterios()
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <Link href="/admin/dashboard" className="text-2xl font-bold text-gray-800 hover:text-gray-600">
-            ← Voltar ao Dashboard
-          </Link>
-          <button
-            onClick={async () => {
-              await logout()
-              router.push('/admin/login')
-            }}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            Sair
-          </button>
-        </div>
-      </nav>
+    <div className="flex h-screen bg-gray-900">
+      <AdminSidebar />
 
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-800 mb-2">Gerenciar Ministérios</h2>
-          <p className="text-gray-600">Gerencie todos os ministérios/clientes do sistema</p>
+      <main className="flex-1 overflow-auto">
+        <div className="sticky top-0 bg-gray-950 border-b border-gray-800 px-6 py-4 z-10">
+          <h2 className="text-2xl font-bold text-white">PAINEL ADMINISTRATIVO: MINISTÉRIOS</h2>
+          <p className="text-gray-400 text-sm mt-1">Gerencie todos os ministérios/clientes</p>
         </div>
 
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 p-4 rounded mb-6">
-            {error}
-          </div>
-        )}
+        <div className="p-6 space-y-6">
+          <div className="max-w-7xl mx-auto">
+            {error && (
+              <div className="bg-red-900 border border-red-700 text-red-200 p-4 rounded mb-6">
+                {error}
+              </div>
+            )}
 
-        {success && (
-          <div className="bg-green-100 border border-green-400 text-green-700 p-4 rounded mb-6">
-            {success}
-          </div>
-        )}
+            {success && (
+              <div className="bg-green-900 border border-green-700 text-green-200 p-4 rounded mb-6">
+                {success}
+              </div>
+            )}
 
-        {/* Abas */}
-        <div className="mb-6 border-b border-gray-200">
-          <div className="flex gap-4">
-            <button
-              onClick={() => setActiveTab('ativos')}
-              className={`px-4 py-3 font-medium text-sm transition ${
-                activeTab === 'ativos'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              📋 Ministérios Ativos
-            </button>
-            <button
-              onClick={() => setActiveTab('precadastros')}
-              className={`px-4 py-3 font-medium text-sm transition ${
-                activeTab === 'precadastros'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              ⏳ Pré-Cadastros (Trial)
-            </button>
-          </div>
-        </div>
+            {/* Abas */}
+            <div className="mb-6 border-b border-gray-800">
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setActiveTab('ativos')}
+                  className={`px-4 py-3 font-medium text-sm transition ${
+                    activeTab === 'ativos'
+                      ? 'text-blue-400 border-b-2 border-blue-400'
+                      : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  📋 Ministérios Ativos
+                </button>
+                <button
+                  onClick={() => setActiveTab('precadastros')}
+                  className={`px-4 py-3 font-medium text-sm transition ${
+                    activeTab === 'precadastros'
+                      ? 'text-blue-400 border-b-2 border-blue-400'
+                      : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  ⏳ Pré-Cadastros (Trial)
+                </button>
+              </div>
+            </div>
 
         {/* TAB: Ministérios Ativos */}
         {activeTab === 'ativos' && (
           <>
             {/* Botão para novo ministério */}
-            <div className="mb-6">
-              <button
-                onClick={() => setShowForm(!showForm)}
-                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                {showForm ? 'Cancelar' : '+ Novo Ministério'}
-              </button>
-            </div>
+              <div className="mb-6 flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    if (showForm) {
+                      setShowForm(false)
+                      setEditingId(null)
+                      resetForm()
+                    } else {
+                      setShowForm(true)
+                    }
+                  }}
+                  className={`px-6 py-2 text-white rounded transition ${
+                    showForm
+                      ? editingId
+                        ? 'bg-red-600 hover:bg-red-700'
+                        : 'bg-gray-700 hover:bg-gray-600'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  {showForm ? (editingId ? 'Cancelar edição' : 'Cancelar') : '+ Novo Ministério'}
+                </button>
+              </div>
 
             {/* Formulário */}
-            {showForm && (
-              <div className="bg-white rounded-lg shadow p-6 mb-8">
-                <h3 className="text-xl font-bold mb-4">Novo Ministério</h3>
-                <form onSubmit={handleSubmit}>
+              {showForm && (
+                <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6 mb-8 text-gray-100">
+                  <h3 className="text-xl font-bold mb-4">
+                    {editingId ? 'Editar Instituição' : 'Novo Ministério'}
+                  </h3>
+                <form
+                  onSubmit={handleSubmit}
+                  className="space-y-6 text-gray-100 [&_h3]:text-white [&_h4]:text-gray-200 [&_label]:text-gray-300 [&_input]:bg-gray-900 [&_input]:border-gray-700 [&_input]:text-gray-100 [&_input]:placeholder:text-gray-500 [&_select]:bg-gray-900 [&_select]:border-gray-700 [&_select]:text-gray-100 [&_textarea]:bg-gray-900 [&_textarea]:border-gray-700 [&_textarea]:text-gray-100 [&_textarea]:placeholder:text-gray-500"
+                >
                   {/* Seção 1: Informações Básicas */}
                   <div className="mb-6">
                     <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">Informações Básicas</h4>
@@ -496,7 +582,7 @@ export default function MinisteriosPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Website</label>
                     <input
-                      type="url"
+                      type="text"
                       value={formData.website}
                       onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
@@ -679,9 +765,14 @@ export default function MinisteriosPage() {
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                     >
                       <option value="">Selecione um plano...</option>
-                      <option value="plan-basic">Plano Básico</option>
-                      <option value="plan-standard">Plano Padrão</option>
-                      <option value="plan-premium">Plano Premium</option>
+                      {planosLoading && (
+                        <option value="" disabled>Carregando planos...</option>
+                      )}
+                      {!planosLoading && planos.map((plano) => (
+                        <option key={plano.id} value={plano.id}>
+                          {plano.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -702,64 +793,76 @@ export default function MinisteriosPage() {
                 type="submit"
                 className="mt-6 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium"
               >
-                Criar Ministério
+                {editingId ? 'Atualizar Instituição' : 'Criar Ministério'}
               </button>
             </form>
           </div>
         )}
 
         {/* Lista de ministérios */}
-        {loading ? (
-          <div className="text-center text-gray-600 py-12">Carregando...</div>
-        ) : ministerios.length === 0 ? (
-          <div className="text-center text-gray-600 py-12">
-            Nenhum ministério cadastrado
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nome</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Telefone</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {ministerios.map((ministerio) => (
-                  <tr key={ministerio.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-800">{ministerio.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{ministerio.email_admin}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{formatPhoneDisplay(ministerio.phone)}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className={`px-3 py-1 rounded text-sm font-medium ${
-                        ministerio.is_active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {ministerio.is_active ? 'Ativo' : 'Inativo'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <button className="text-blue-600 hover:text-blue-800 mr-2">Editar</button>
-                      <button className="text-red-600 hover:text-red-800">Remover</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-          </>
-        )}
+            {loading ? (
+              <div className="text-center text-gray-400 py-12">Carregando...</div>
+            ) : ministerios.length === 0 ? (
+              <div className="text-center text-gray-400 py-12">
+                Nenhum ministério cadastrado
+              </div>
+            ) : (
+              <div className="bg-gray-800 border border-gray-700 rounded-lg shadow overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-900">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Nome</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Email</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Telefone</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Status</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700">
+                    {ministerios.map((ministerio) => (
+                      <tr key={ministerio.id} className="hover:bg-gray-700/40">
+                        <td className="px-6 py-4 text-sm text-gray-100">{ministerio.name}</td>
+                        <td className="px-6 py-4 text-sm text-gray-300">{ministerio.email_admin}</td>
+                        <td className="px-6 py-4 text-sm text-gray-300">{formatPhoneDisplay(ministerio.phone)}</td>
+                        <td className="px-6 py-4 text-sm">
+                          <span className={`px-3 py-1 rounded text-xs font-semibold ${
+                            ministerio.is_active
+                              ? 'bg-green-900 text-green-200'
+                              : 'bg-gray-700 text-gray-300'
+                          }`}>
+                            {ministerio.is_active ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          <button
+                            onClick={() => handleEdit(ministerio)}
+                            className="text-blue-400 hover:text-blue-300 mr-2"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleDelete(ministerio)}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            Remover
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+              </>
+            )}
 
         {/* TAB: Pré-Cadastros */}
-        {activeTab === 'precadastros' && (
-          <TrialSignupsWidget />
-        )}
-      </div>
+            {activeTab === 'precadastros' && (
+              <TrialSignupsWidget />
+            )}
+          </div>
+        </div>
+      </main>
     </div>
   )
 }

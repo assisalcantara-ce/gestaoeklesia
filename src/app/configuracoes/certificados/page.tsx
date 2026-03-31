@@ -57,7 +57,7 @@ interface CertificadoTemplate {
   elementos: CertificadoElemento[];
   orientacao?: 'landscape' | 'portrait';
   variacao?: 'branco';
-  categoria?: 'apresentacao-criancas' | 'batismo' | 'casamento';
+  categoria?: 'ministerial';
   ativo?: boolean;
   criado_pelo_usuario?: boolean;
 }
@@ -70,9 +70,7 @@ export default function ConfiguracoesCertificadosPage() {
   const imagemInputRef = useRef<HTMLInputElement>(null);
 
   const CERTIFICADO_TIPOS = [
-    { id: 'apresentacao-criancas', label: 'Apresentação de Crianças', descricao: 'Secretaria' },
-    { id: 'batismo', label: 'Batismo', descricao: 'Secretaria' },
-    { id: 'casamento', label: 'Casamento', descricao: 'Secretaria' }
+    { id: 'ministerial', label: 'Ministerial', descricao: 'Secretaria' }
   ] as const;
 
   const CERTIFICADO_VARIACOES = [
@@ -91,7 +89,7 @@ export default function ConfiguracoesCertificadosPage() {
   const [statusMensagem, setStatusMensagem] = useState('');
   const [tipoCertificadoAtivo, setTipoCertificadoAtivo] = useState<
     (typeof CERTIFICADO_TIPOS)[number]['id']
-  >('apresentacao-criancas');
+  >('ministerial');
 
 
   const generateId = () => {
@@ -121,13 +119,13 @@ export default function ConfiguracoesCertificadosPage() {
       ...templatesLoaded.filter((t: any) => !CERTIFICADOS_TEMPLATES_BASE.some((base) => base.id === t.id))
     ].map((t: any) => ({
       ...t,
-      categoria: t.categoria || 'apresentacao-criancas'
+      categoria: 'ministerial'
     }));
 
     setTemplatesCertificados(mergedTemplates as any);
     const ativo =
       mergedTemplates.find((t: any) => t.ativo) ||
-      mergedTemplates.find((t: any) => (t.categoria || 'apresentacao-criancas') === 'apresentacao-criancas' && !t.variacao) ||
+      mergedTemplates.find((t: any) => (t.categoria || 'ministerial') === 'ministerial' && !t.variacao) ||
       mergedTemplates.find((t: any) => !t.variacao) ||
       mergedTemplates[0] ||
       null;
@@ -164,9 +162,9 @@ export default function ConfiguracoesCertificadosPage() {
     setElementoSelecionado(null);
     setElementosSelecionados([]);
     if (!next) return;
-    const categoria = next.categoria || 'apresentacao-criancas';
+    const categoria = next.categoria || 'ministerial';
     const nextTemplates = templatesCertificados.map((t) => {
-      if ((t.categoria || 'apresentacao-criancas') !== categoria) return t;
+      if ((t.categoria || 'ministerial') !== categoria) return t;
       return { ...t, ativo: t.id === next.id };
     });
     setTemplatesCertificados(nextTemplates);
@@ -285,7 +283,7 @@ export default function ConfiguracoesCertificadosPage() {
     variacao?: 'branco'
   ) => {
     const candidatos = templatesCertificados.filter((template) => {
-      const categoria = template.categoria || 'apresentacao-criancas';
+      const categoria = template.categoria || 'ministerial';
       if (categoria !== tipo) return false;
       if (variacao === 'branco') return template.variacao === 'branco';
       return !template.variacao;

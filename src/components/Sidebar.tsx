@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase-client';
 
 interface SidebarProps {
   activeMenu: string;
@@ -10,7 +11,9 @@ interface SidebarProps {
 
 export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
   const router = useRouter();
+  const supabase = createClient();
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
@@ -21,33 +24,20 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
       path: '/secretaria',
       submenu: [
         { id: 'estrutura-hierarquica', label: 'Estrutura Hierárquica', icon: '🏛️', path: '/secretaria/estrutura-hierarquica' },
-        { id: 'membros', label: 'Membros/Congregados', icon: '👥', path: '/secretaria/membros' },
+        { id: 'membros', label: 'Ministros', icon: '👥', path: '/secretaria/membros' },
         { id: 'funcionarios', label: 'Funcionários', icon: '👔', path: '/secretaria/funcionarios' },
-        { id: 'fluxos-operacao', label: 'Fluxos (Operacao)', icon: '📌', path: '/secretaria/fluxos' },
-        { id: 'criancas', label: 'Apresentação de Crianças', icon: '👶', path: '/secretaria/criancas' },
-        { id: 'batismo', label: 'Batismo', icon: '💧', path: '/secretaria/batismo' },
-        { id: 'casamentos', label: 'Casamentos', icon: '💍', path: '/secretaria/casamentos' },
         { id: 'consagracao', label: 'Consagração (obreiros)', icon: '🙏', path: '/secretaria/consagracao' },
         { id: 'cartas', label: 'Cartas ministeriais', icon: '📜', path: '/secretaria/cartas' },
-        { id: 'desligamento', label: 'Solicitação de desligamento', icon: '📋', path: '/secretaria/desligamento' },
-        { id: 'gabinete', label: 'Gabinete (agenda)', icon: '📅', path: '/secretaria/gabinete' },
-        { id: 'cadastros', label: 'Cadastros', icon: '📑', path: '/secretaria/cadastros' },
-        { id: 'pre-cadastro', label: 'Pré-cadastro', icon: '📝', path: '/secretaria/pre-cadastro' },
-        { id: 'relatorios', label: 'Relatórios', icon: '📊', path: '/secretaria/relatorios' }
+        { id: 'certificados', label: 'Certificados', icon: '🎓', path: '/configuracoes/certificados' }
       ]
     },
-    { id: 'tesouraria', label: 'Tesouraria', icon: '💰', path: '/tesouraria' },
     { id: 'financeiro', label: 'Financeiro', icon: '💳', path: '/financeiro' },
-    { id: 'geolocalizacao', label: 'Geolocalização', icon: '📍', path: '/geolocalizacao' },
     { id: 'eventos', label: 'Eventos', icon: '📅', path: '/eventos' },
     { id: 'presidencia', label: 'Presidência', icon: '👑', path: '/presidencia' },
     { id: 'reunioes', label: 'Reuniões', icon: '🤝', path: '/reunioes' },
     { id: 'comissao', label: 'Comissão', icon: '👥', path: '/comissao' },
     { id: 'patrimonio', label: 'Patrimônio', icon: '🏢', path: '/patrimonio' },
-    { id: 'ebd', label: 'EBD', icon: '📚', path: '/ebd' },
-    { id: 'kids', label: 'KIDs', icon: '👶', path: '/kids' },
     { id: 'missoes', label: 'Missões', icon: '✈️', path: '/missoes' },
-    { id: 'achados', label: 'Achados e Perdidos', icon: '🔍', path: '/achados' },
     { id: 'auditoria', label: 'Auditoria', icon: '✅', path: '/auditoria' },
     { id: 'usuarios', label: 'Usuários', icon: '👤', path: '/usuarios' },
     { id: 'suporte', label: 'Suporte', icon: '🎫', path: '/suporte' },
@@ -65,13 +55,19 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
     },
   ];
 
-  return (
-    <div className="w-64 bg-[#123b63] text-white shadow-lg flex flex-col">
+  const handleNavigate = (id: string, path: string) => {
+    setActiveMenu(id);
+    router.push(path);
+    setIsMobileMenuOpen(false);
+  };
+
+  const sidebarContent = (
+    <div className="w-64 bg-[#123b63] text-white shadow-lg flex flex-col h-full">
       {/* LOGO */}
       <div className="p-6 border-b border-white/20 flex items-center justify-center">
         <img
-          src="/img/logo_menu.png"
-          alt="Gestão Eclesial"
+          src="/img/logo333-v3.png"
+          alt="GESTAOSERVUS"
           className="h-16 object-contain"
         />
       </div>
@@ -86,8 +82,7 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
                   if ((item as any).submenu) {
                     setExpandedMenu(expandedMenu === item.id ? null : item.id);
                   } else {
-                    setActiveMenu(item.id);
-                    router.push(item.path);
+                    handleNavigate(item.id, item.path);
                   }
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 transition ${activeMenu === item.id
@@ -110,10 +105,7 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
                   {(item as any).submenu.map((submenu: any, index: number) => (
                     <button
                       key={submenu.id}
-                      onClick={() => {
-                        setActiveMenu(submenu.id);
-                        router.push(submenu.path);
-                      }}
+                      onClick={() => handleNavigate(submenu.id, submenu.path)}
                       className={`w-full flex items-center gap-3 px-4 py-3 transition text-sm text-left ${activeMenu === submenu.id
                           ? 'bg-white/20 text-white font-semibold'
                           : 'text-white/60 hover:bg-white/15 hover:text-white'
@@ -131,9 +123,48 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
       </nav>
 
       {/* FOOTER */}
-      <div className="p-4 border-t border-white/20 text-center text-xs text-white/60">
-        <p>Gestão Eclesial v1.0</p>
+      <div className="p-4 border-t border-white/20 space-y-3">
+        <button
+          onClick={() => {
+            supabase.auth.signOut().finally(() => router.push('/'));
+          }}
+          className="w-full px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
+        >
+          Sair
+        </button>
+        <p className="text-center text-xs text-white/60">GESTAOSERVUS v1.0</p>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      <button
+        onClick={() => setIsMobileMenuOpen((open) => !open)}
+        className="md:hidden fixed left-4 top-4 z-50 p-2 bg-white rounded-lg shadow-md text-[#123b63] hover:bg-gray-100 transition"
+        aria-label="Menu"
+        aria-expanded={isMobileMenuOpen}
+      >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      {isMobileMenuOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          <div className="fixed left-0 top-0 h-full z-50 md:hidden">
+            {sidebarContent}
+          </div>
+        </>
+      )}
+
+      <div className="hidden md:flex h-screen">
+        {sidebarContent}
+      </div>
+    </>
   );
 }

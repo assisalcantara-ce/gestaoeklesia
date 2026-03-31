@@ -1,7 +1,7 @@
 # 🗺️ IA - Mapa do Projeto (Essencial)
 
 ## Visão em 1 linha
-SaaS multi-tenant para gestão de igrejas/ministérios, com Supabase (Auth + Postgres + RLS) e Next.js.
+SaaS multi-tenant para gestão de instituições/ministérios, com Supabase (Auth + Postgres + RLS) e Next.js.
 
 ---
 

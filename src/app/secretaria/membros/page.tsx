@@ -40,6 +40,7 @@ interface Membro {
   nomePai?: string;
   nomeMae?: string;
   rg?: string;
+  orgaoEmissor?: string;
   nacionalidade?: string;
   naturalidade?: string;
   uf?: string;
@@ -70,6 +71,9 @@ interface Membro {
   procedencia?: string;
   procedenciaLocal?: string;
   cargoMinisterial?: string;
+  dataConsagracao?: string;
+  dataEmissao?: string;
+  dataValidadeCredencial?: string;
   dadosCargos?: {
     [key: string]: {
       dataConsagracaoRecebimento: string;
@@ -78,12 +82,13 @@ interface Membro {
     }
   };
   observacoesMinisteriais?: string;
-  // Dizimista
-  dizimista?: boolean;
-  historicoDizimos?: Array<{
-    data: string;
-    valor: number;
-  }>;
+}
+
+interface DivisaoOption {
+  id: string;
+  nome: string;
+  supervisao_id?: string | null;
+  campo_id?: string | null;
 }
 
 export default function MembrosPage() {
@@ -135,7 +140,7 @@ export default function MembrosPage() {
   const normalizeTipoCadastro = (value: any): Membro['tipoCadastro'] => {
     const v = String(value || '').toLowerCase();
     if (v === 'membro' || v === 'congregado' || v === 'ministro' || v === 'crianca') return v as any;
-    return 'membro';
+    return 'ministro';
   };
 
   const dbStatusToUi = (status: Member['status'] | null | undefined): Membro['status'] =>
@@ -146,6 +151,12 @@ export default function MembrosPage() {
 
   const memberToMembro = (member: Member): Membro => {
     const cf = (member.custom_fields && typeof member.custom_fields === 'object') ? member.custom_fields : {};
+    const cargoMinisterial = String(
+      (cf as any).cargoMinisterial ||
+      (cf as any).cargo_ministerial ||
+      member.occupation ||
+      ''
+    );
     const stableUniqueId =
       typeof (cf as any).uniqueId === 'string' && String((cf as any).uniqueId).length >= 8
         ? String((cf as any).uniqueId)
@@ -154,15 +165,35 @@ export default function MembrosPage() {
     return {
       id: member.id,
       uniqueId: stableUniqueId,
+      ...(cf as any),
       matricula: String((cf as any).matricula || ''),
       nome: String(member.name || (cf as any).nome || ''),
       cpf: formatCpf(String(member.cpf || (cf as any).cpf || '')),
-      tipoCadastro: normalizeTipoCadastro((cf as any).tipoCadastro || member.role),
+      tipoCadastro: normalizeTipoCadastro(member.role || (cf as any).tipoCadastro),
       supervisao: String((cf as any).supervisao || ''),
       campo: String((cf as any).campo || ''),
       congregacao: String((cf as any).congregacao || ''),
       status: dbStatusToUi(member.status),
-      ...(cf as any),
+      dataNascimento: String(member.birth_date || (cf as any).dataNascimento || ''),
+      sexo: String(member.gender || (cf as any).sexo || ''),
+      estadoCivil: String(member.marital_status || (cf as any).estadoCivil || ''),
+      orgaoEmissor: String((member as any).orgao_emissor || (cf as any).orgaoEmissor || (cf as any).orgao_emissor || ''),
+      qualFuncao: String(member.occupation || (cf as any).qualFuncao || ''),
+      email: String(member.email || (cf as any).email || ''),
+      celular: String(member.phone || (cf as any).celular || ''),
+      cidade: String(member.city || (cf as any).cidade || ''),
+      complemento: String(member.complement || (cf as any).complemento || ''),
+      orgaoEmissor: String((cf as any).orgaoEmissor || (cf as any).orgao_emissor || ''),
+      uf: String(member.state || (cf as any).uf || ''),
+      cep: String(member.zipcode || (cf as any).cep || ''),
+      procedencia: String((cf as any).procedencia || '').toLocaleLowerCase('pt-BR'),
+      procedenciaLocal: String((cf as any).procedenciaLocal || ''),
+      latitude: String((member.latitude ?? (cf as any).latitude ?? '') || ''),
+      longitude: String((member.longitude ?? (cf as any).longitude ?? '') || ''),
+      cargoMinisterial,
+      dataConsagracao: String((member as any).data_consagracao || (cf as any).dataConsagracao || ''),
+      dataEmissao: String((member as any).data_emissao || (cf as any).dataEmissao || ''),
+      dataValidadeCredencial: String((member as any).data_validade_credencial || (cf as any).dataValidadeCredencial || ''),
       fotoUrl: (cf as any).fotoUrl || undefined,
     };
   };
@@ -250,7 +281,7 @@ export default function MembrosPage() {
   const [dadosPessoais, setDadosPessoais] = useState({
     matricula: '',
     cpf: '',
-    tipoCadastro: '', // Membro, Congregado, Ministro, Criança
+    tipoCadastro: 'ministro', // Convenção do projeto
     nome: '',
     dataNascimento: '',
     sexo: 'MASCULINO',
@@ -263,6 +294,7 @@ export default function MembrosPage() {
     nomePai: '',
     nomeMae: '',
     rg: '',
+    orgaoEmissor: '',
     nacionalidade: 'BRASILEIRA',
     naturalidade: '',
     uf: '',
@@ -315,13 +347,10 @@ export default function MembrosPage() {
     pastorAuxiliar: false,
     procedencia: '',
     procedenciaLocal: '',
+    dataConsagracao: '',
+    dataEmissao: '',
+    dataValidadeCredencial: '',
     observacoesMinisteriais: ''
-  });
-
-  // Estado para dados de dizimista
-  const [dadosDizimista, setDadosDizimista] = useState({
-    dizimista: false,
-    historicoDizimos: [] as Array<{ data: string; valor: number }>
   });
 
   // Estado para rastrear cargo selecionado
@@ -343,15 +372,32 @@ export default function MembrosPage() {
   // Cargos ministeriais (sincronizados com configurações via localStorage)
   const [cargosMinisteriais] = useState<CargoMinisterial[]>(() => getCargosMinisteriais());
 
+  const resolveCargoValue = (rawValue?: string) => {
+    const value = String(rawValue || '').trim();
+    if (!value) return '';
+
+    const match = cargosMinisteriais.find(
+      (cargo) => String(cargo.nome || '').trim().toLocaleUpperCase('pt-BR') === value.toLocaleUpperCase('pt-BR')
+    );
+
+    return match?.nome || value;
+  };
+
   // Nomenclaturas dinâmicas para as divisões
   const [nomenclaturas, setNomenclaturasState] = useState({
     divisao1: 'IGREJA',
     divisao2: 'CAMPO',
     divisao3: 'NENHUMA'
   });
+  const [orgNomenclaturasRaw, setOrgNomenclaturasRaw] = useState<any>(null);
+
+  const [supervisoes, setSupervisoes] = useState<DivisaoOption[]>([]);
+  const [campos, setCampos] = useState<DivisaoOption[]>([]);
+  const [congregacoes, setCongregacoes] = useState<DivisaoOption[]>([]);
 
   const refreshNomenclaturas = async () => {
     const org = await loadOrgNomenclaturasFromSupabaseOrMigrate(supabase);
+    setOrgNomenclaturasRaw(org);
     setNomenclaturasState({
       divisao1: org?.divisaoPrincipal?.opcao1 || 'IGREJA',
       divisao2: org?.divisaoSecundaria?.opcao1 || 'CAMPO',
@@ -385,6 +431,99 @@ export default function MembrosPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const resolveMinistryId = async (): Promise<string | null> => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const mu = await supabase
+        .from('ministry_users')
+        .select('ministry_id')
+        .eq('user_id', user.id)
+        .limit(1);
+      const ministryIdFromMu = (mu.data as any)?.[0]?.ministry_id as string | undefined;
+      if (ministryIdFromMu) return ministryIdFromMu;
+
+      const m = await supabase
+        .from('ministries')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1);
+      const ministryIdFromOwner = (m.data as any)?.[0]?.id as string | undefined;
+      return ministryIdFromOwner || null;
+    } catch {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const loadEstruturaOptions = async () => {
+      const ministryId = await resolveMinistryId();
+      if (!ministryId) return;
+
+      const [s, c, g] = await Promise.all([
+        supabase.from('supervisoes').select('id,nome,is_active').eq('ministry_id', ministryId).eq('is_active', true).order('nome'),
+        supabase.from('campos').select('id,nome,supervisao_id,is_active').eq('ministry_id', ministryId).eq('is_active', true).order('nome'),
+        supabase.from('congregacoes').select('id,nome,supervisao_id,campo_id,is_active').eq('ministry_id', ministryId).eq('is_active', true).order('nome'),
+      ]);
+
+      if (s.error) console.warn('Falha ao carregar 1a divisao:', s.error);
+      if (c.error) console.warn('Falha ao carregar 2a divisao:', c.error);
+      if (g.error) console.warn('Falha ao carregar 3a divisao:', g.error);
+
+      setSupervisoes(((s.data as any[]) || []).map((row: any) => ({ id: row.id, nome: row.nome })));
+      setCampos(((c.data as any[]) || []).map((row: any) => ({ id: row.id, nome: row.nome, supervisao_id: row.supervisao_id })));
+      setCongregacoes(((g.data as any[]) || []).map((row: any) => ({ id: row.id, nome: row.nome, supervisao_id: row.supervisao_id, campo_id: row.campo_id })));
+    };
+
+    loadEstruturaOptions().catch(() => null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sanitizeNome = (value: unknown) => String(value || '').trim();
+
+  const dedupByNome = (items: DivisaoOption[]): DivisaoOption[] => {
+    const seen = new Set<string>();
+    const out: DivisaoOption[] = [];
+    items.forEach((item) => {
+      const nome = sanitizeNome(item.nome);
+      if (!nome) return;
+      const key = nome.toUpperCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({ ...item, nome });
+    });
+    return out;
+  };
+
+  const supervisoesFromNomenclaturas = ((orgNomenclaturasRaw?.divisaoPrincipal?.custom || []) as string[])
+    .map((nome, idx) => ({ id: `cfg-s-${idx}-${nome}`, nome: sanitizeNome(nome) }))
+    .filter((opt) => !!opt.nome);
+  const camposFromNomenclaturas = ((orgNomenclaturasRaw?.divisaoSecundaria?.custom || []) as string[])
+    .map((nome, idx) => ({ id: `cfg-c-${idx}-${nome}`, nome: sanitizeNome(nome) }))
+    .filter((opt) => !!opt.nome);
+  const congregacoesFromNomenclaturas = ((orgNomenclaturasRaw?.divisaoTerciaria?.custom || []) as string[])
+    .map((nome, idx) => ({ id: `cfg-g-${idx}-${nome}`, nome: sanitizeNome(nome) }))
+    .filter((opt) => !!opt.nome);
+
+  const supervisoesFromMembers = dedupByNome(
+    (membersApi || [])
+      .map((m: any, idx: number) => ({ id: `legacy-s-${idx}`, nome: sanitizeNome((m?.custom_fields as any)?.supervisao) }))
+      .filter((opt: any) => !!opt.nome)
+  );
+  const camposFromMembers = dedupByNome(
+    (membersApi || [])
+      .map((m: any, idx: number) => ({ id: `legacy-c-${idx}`, nome: sanitizeNome((m?.custom_fields as any)?.campo) }))
+      .filter((opt: any) => !!opt.nome)
+  );
+  const congregacoesFromMembers = dedupByNome(
+    (membersApi || [])
+      .map((m: any, idx: number) => ({ id: `legacy-g-${idx}`, nome: sanitizeNome((m?.custom_fields as any)?.congregacao) }))
+      .filter((opt: any) => !!opt.nome)
+  );
 
   // Funções de Imagem
   const handleFotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -606,7 +745,7 @@ export default function MembrosPage() {
     setDadosPessoais({
       matricula: novaMatricula,
       cpf: '',
-      tipoCadastro: '',
+      tipoCadastro: 'ministro',
       nome: '',
       dataNascimento: '',
       sexo: 'MASCULINO',
@@ -619,6 +758,7 @@ export default function MembrosPage() {
       nomePai: '',
       nomeMae: '',
       rg: '',
+      orgaoEmissor: '',
       nacionalidade: 'BRASILEIRA',
       naturalidade: '',
       uf: '',
@@ -650,11 +790,10 @@ export default function MembrosPage() {
       pastorAuxiliar: false,
       procedencia: '',
       procedenciaLocal: '',
+      dataConsagracao: '',
+      dataEmissao: new Date().toISOString().slice(0, 10),
+      dataValidadeCredencial: '',
       observacoesMinisteriais: ''
-    });
-    setDadosDizimista({
-      dizimista: false,
-      historicoDizimos: []
     });
     setFotoMembro(null);
     setFotoOriginal(null);
@@ -777,7 +916,7 @@ export default function MembrosPage() {
     yPos += 8;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('Listagem de Membros', pageWidth / 2, yPos, { align: 'center' });
+    doc.text('Listagem de Ministros', pageWidth / 2, yPos, { align: 'center' });
 
     // Informações do relatório
     doc.setFontSize(9);
@@ -849,7 +988,7 @@ export default function MembrosPage() {
 
     // Salvar PDF
     const dataHora = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-    doc.save(`listagem_membros_${dataHora}.pdf`);
+    doc.save(`listagem_ministros_${dataHora}.pdf`);
 
     setNotification({
       isOpen: true,
@@ -865,7 +1004,7 @@ export default function MembrosPage() {
     setDadosPessoais({
       matricula: membro.matricula || '',
       cpf: membro.cpf || '',
-      tipoCadastro: membro.tipoCadastro || 'membro',
+      tipoCadastro: 'ministro',
       nome: membro.nome || '',
       dataNascimento: membro.dataNascimento || '',
       sexo: membro.sexo || 'MASCULINO',
@@ -878,6 +1017,7 @@ export default function MembrosPage() {
       nomePai: membro.nomePai || '',
       nomeMae: membro.nomeMae || '',
       rg: membro.rg || '',
+      orgaoEmissor: membro.orgaoEmissor || '',
       nacionalidade: membro.nacionalidade || 'BRASILEIRA',
       naturalidade: membro.naturalidade || '',
       uf: membro.uf || '',
@@ -912,13 +1052,12 @@ export default function MembrosPage() {
       pastorAuxiliar: membro.pastorAuxiliar || false,
       procedencia: membro.procedencia || '',
       procedenciaLocal: membro.procedenciaLocal || '',
+      dataConsagracao: membro.dataConsagracao || '',
+      dataEmissao: membro.dataEmissao || '',
+      dataValidadeCredencial: membro.dataValidadeCredencial || '',
       observacoesMinisteriais: membro.observacoesMinisteriais || ''
     });
-    setDadosDizimista({
-      dizimista: membro.dizimista || false,
-      historicoDizimos: membro.historicoDizimos || []
-    });
-    setCargoSelecionado(membro.cargoMinisterial || '');
+    setCargoSelecionado(resolveCargoValue(membro.cargoMinisterial));
     setDadosCargos(membro.dadosCargos || {});
     setIsEditando(false);
     setIsAdminMode(true); // Modo admin ativado para edição
@@ -932,12 +1071,12 @@ export default function MembrosPage() {
     console.log('Dados Pessoais:', dadosPessoais);
 
     // Validar campos obrigatórios
-    if (!dadosPessoais.cpf || !dadosPessoais.nome || !dadosPessoais.tipoCadastro || !dadosPessoais.dataNascimento) {
+    if (!dadosPessoais.cpf || !dadosPessoais.nome || !dadosPessoais.dataNascimento) {
       console.warn('⚠️ Erro: Campos obrigatórios ausentes');
       setNotification({
         isOpen: true,
         title: 'Erro de Validação',
-        message: 'Preencha todos os campos obrigatórios: CPF, Nome, Tipo de Cadastro e Data de Nascimento',
+        message: 'Preencha todos os campos obrigatórios: CPF, Nome e Data de Nascimento',
         type: 'error'
       });
       return;
@@ -958,7 +1097,7 @@ export default function MembrosPage() {
       const baseForCustom: Partial<Membro> = {
         uniqueId: membroEditando?.uniqueId || gerarUniqueId(),
         matricula: dadosPessoais.matricula,
-        tipoCadastro: normalizeTipoCadastro(dadosPessoais.tipoCadastro),
+        tipoCadastro: 'ministro',
         supervisao: dadosPessoais.supervisao,
         campo: dadosPessoais.campo,
         congregacao: dadosPessoais.congregacao,
@@ -974,6 +1113,7 @@ export default function MembrosPage() {
         nomePai: dadosPessoais.nomePai,
         nomeMae: dadosPessoais.nomeMae,
         rg: dadosPessoais.rg,
+        orgaoEmissor: dadosPessoais.orgaoEmissor,
         nacionalidade: dadosPessoais.nacionalidade,
         naturalidade: dadosPessoais.naturalidade,
         uf: dadosPessoais.uf,
@@ -985,11 +1125,15 @@ export default function MembrosPage() {
         cargoMinisterial: cargoSelecionado,
         dadosCargos,
         temFuncaoIgreja: dadosMinisteriais.temFuncaoIgreja,
-        ...dadosDizimista,
         fotoUrl: fotoMembro || undefined,
       };
 
-      const custom_fields = buildCustomFieldsFromForm(baseForCustom);
+      const custom_fields = {
+        ...buildCustomFieldsFromForm(baseForCustom),
+        // Compatibilidade entre telas/fluxos que usam nomes diferentes para o mesmo dado
+        cargoMinisterial: cargoSelecionado || null,
+        cargo_ministerial: cargoSelecionado || null,
+      };
 
       const latitudeNumber = enderecoData.latitude ? Number(String(enderecoData.latitude).replace(',', '.')) : null
       const longitudeNumber = enderecoData.longitude ? Number(String(enderecoData.longitude).replace(',', '.')) : null
@@ -1009,13 +1153,25 @@ export default function MembrosPage() {
         cpf: onlyDigits(dadosPessoais.cpf) || null,
         email: dadosPessoais.email || null,
         phone: dadosPessoais.celular || null,
+        data_consagracao: dadosMinisteriais.dataConsagracao || null,
+        data_emissao: dadosMinisteriais.dataEmissao || null,
+        data_validade_credencial: dadosMinisteriais.dataValidadeCredencial || null,
+        birth_date: dadosPessoais.dataNascimento || null,
+        gender: dadosPessoais.sexo || null,
+        marital_status: dadosPessoais.estadoCivil || null,
+        orgao_emissor: dadosPessoais.orgaoEmissor || null,
+        occupation: dadosMinisteriais.qualFuncao || cargoSelecionado || null,
         status: uiStatusToDb('ativo'),
         address: addressText,
+        complement: enderecoData.complemento || null,
         city: enderecoData.cidade || null,
         state: dadosPessoais.uf || null,
         zipcode: onlyDigits(enderecoData.cep) || null,
+        congregacao_id: congregacoes.find((cg) => cg.nome === dadosPessoais.supervisao)?.id || null,
         latitude: Number.isFinite(latitudeNumber) ? latitudeNumber : null,
         longitude: Number.isFinite(longitudeNumber) ? longitudeNumber : null,
+        role: 'ministro',
+        notes: dadosMinisteriais.observacoesMinisteriais || null,
         custom_fields,
       };
 
@@ -1026,7 +1182,7 @@ export default function MembrosPage() {
         setNotification({
           isOpen: true,
           title: 'Sucesso',
-          message: 'Membro atualizado com sucesso!',
+          message: 'Ministro atualizado com sucesso!',
           type: 'success'
         });
       } else {
@@ -1037,7 +1193,7 @@ export default function MembrosPage() {
         setNotification({
           isOpen: true,
           title: 'Sucesso',
-          message: 'Novo membro cadastrado com sucesso!',
+          message: 'Novo ministro cadastrado com sucesso!',
           type: 'success'
         });
       }
@@ -1061,7 +1217,7 @@ export default function MembrosPage() {
     setDadosPessoais({
       matricula: '',
       cpf: '',
-      tipoCadastro: '',
+      tipoCadastro: 'ministro',
       nome: '',
       dataNascimento: '',
       sexo: 'MASCULINO',
@@ -1074,6 +1230,7 @@ export default function MembrosPage() {
       nomePai: '',
       nomeMae: '',
       rg: '',
+      orgaoEmissor: '',
       nacionalidade: 'BRASILEIRA',
       naturalidade: '',
       uf: '',
@@ -1105,11 +1262,10 @@ export default function MembrosPage() {
       pastorAuxiliar: false,
       procedencia: '',
       procedenciaLocal: '',
+      dataConsagracao: '',
+      dataEmissao: '',
+      dataValidadeCredencial: '',
       observacoesMinisteriais: ''
-    });
-    setDadosDizimista({
-      dizimista: false,
-      historicoDizimos: []
     });
     setFotoMembro(null);
     setFotoOriginal(null);
@@ -1141,7 +1297,7 @@ export default function MembrosPage() {
       setNotification({
         isOpen: true,
         title: 'Sucesso',
-        message: `Membro "${membroDeletando.nome}" foi deletado com sucesso!`,
+        message: `Ministro "${membroDeletando.nome}" foi deletado com sucesso!`,
         type: 'success'
       });
       setMembroDeletando(null);
@@ -1317,6 +1473,53 @@ export default function MembrosPage() {
   const endIndex = startIndex + itemsPerPage;
   const membrosPaginados = membrosFiltrados.slice(startIndex, endIndex);
 
+  const supervisoesOptions = supervisoes.length
+    ? dedupByNome([...supervisoes])
+    : dedupByNome([
+        ...supervisoes,
+        ...supervisoesFromMembers,
+        ...supervisoesFromNomenclaturas,
+      ]);
+  const camposOptions = campos.length
+    ? dedupByNome([...campos])
+    : dedupByNome([
+        ...campos,
+        ...camposFromMembers,
+        ...camposFromNomenclaturas,
+      ]);
+  const congregacoesOptions = congregacoes.length
+    ? dedupByNome([...congregacoes])
+    : dedupByNome([
+        ...congregacoes,
+        ...congregacoesFromMembers,
+        ...congregacoesFromNomenclaturas,
+      ]);
+
+  const isDbOption = (id?: string | null) => !!id && !id.startsWith('legacy-') && !id.startsWith('cfg-');
+
+  // Mapeamento da tela atual:
+  // 1ª Divisão = Congregação, 2ª Divisão = Setor, 3ª Divisão = Regional.
+  const divisao1Options = congregacoesOptions;
+  const divisao2Options = camposOptions;
+  const divisao3Options = supervisoesOptions;
+
+  const divisao1Selecionada = divisao1Options.find((o) => o.nome === dadosPessoais.supervisao) || null;
+  const divisao2Selecionada = divisao2Options.find((o) => o.nome === dadosPessoais.campo) || null;
+
+  const divisao2Filtradas = (divisao1Selecionada?.campo_id && isDbOption(divisao1Selecionada.id))
+    ? divisao2Options.filter((o) => o.id === divisao1Selecionada.campo_id)
+    : divisao2Options;
+
+  const divisao3Filtradas = divisao3Options.filter((o) => {
+    if (divisao2Selecionada?.supervisao_id && isDbOption(divisao2Selecionada.id)) {
+      return o.id === divisao2Selecionada.supervisao_id;
+    }
+    if (divisao1Selecionada?.supervisao_id && isDbOption(divisao1Selecionada.id)) {
+      return o.id === divisao1Selecionada.supervisao_id;
+    }
+    return true;
+  });
+
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
@@ -1344,7 +1547,7 @@ export default function MembrosPage() {
             {/* Conteúdo */}
             <div className="px-6 py-6 space-y-4">
               <p className="text-gray-700 font-semibold">
-                Tem certeza que deseja deletar este membro?
+                Tem certeza que deseja deletar este ministro?
               </p>
               <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
                 <p className="text-sm text-gray-700">
@@ -1402,17 +1605,13 @@ export default function MembrosPage() {
 
             {/* Conteúdo */}
             <div className="p-6 space-y-4">
-              {/* Instruções de uso */}
-              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 text-sm">
-                <p className="text-amber-900"><strong>📱 Como usar:</strong> Gire o scroll para zoom | Arraste com mouse para mover | Use sliders como alternativa</p>
-              </div>
 
               {/* Área de Preview com proporcao 3x4 */}
               <div className="bg-gray-100 rounded-lg p-4 flex justify-center">
                 <div 
                   ref={previewAreaRef}
                   className="relative bg-black rounded-lg overflow-hidden cursor-grab active:cursor-grabbing select-none aspect-[3/4]" 
-                  style={{ width: '300px', height: '400px' }}
+                  style={{ width: '220px', height: '293px' }}
                   onWheel={handleCropWheel}
                   onMouseDown={handleCropMouseDown}
                   onMouseMove={handleCropMouseMove}
@@ -1421,8 +1620,8 @@ export default function MembrosPage() {
                 >
                   <canvas
                     ref={canvasRefCrop}
-                    width={300}
-                    height={400}
+                    width={220}
+                    height={293}
                     className="hidden"
                   />
                   <div className="w-full h-full absolute inset-0 flex items-center justify-center bg-gray-900">
@@ -1520,12 +1719,6 @@ export default function MembrosPage() {
                 </div>
               </div>
 
-              {/* Info */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-xs text-blue-800">
-                  💡 <strong>Mouse:</strong> Scroll para zoom | Arraste para mover | <strong>Sliders:</strong> Ajustes finos
-                </p>
-              </div>
             </div>
 
             {/* Botões */}
@@ -1547,14 +1740,14 @@ export default function MembrosPage() {
         </div>
       )}
 
-      {/* Modal de Impressão - Ficha do Membro */}
+      {/* Modal de Impressão - Ficha do Ministro */}
       {membroImprimindo && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full my-8 flex flex-col max-h-[90vh]">
             {/* Header */}
             <div className="flex justify-between items-center px-6 py-4 border-b-2 border-teal-500 bg-gradient-to-r from-teal-600 to-teal-700 flex-shrink-0">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <span>🖨️</span> Ficha do Membro
+                <span>🖨️</span> Ficha do Ministro
               </h2>
               <button
                 onClick={() => setMembroImprimindo(null)}
@@ -1609,7 +1802,7 @@ export default function MembrosPage() {
                     logoUrl: configIgreja.logo || undefined
                   };
                 })()}
-                fotoUrl={undefined}
+                fotoUrl={membroImprimindo.fotoUrl || undefined}
               />
             </div>
 
@@ -1709,8 +1902,8 @@ export default function MembrosPage() {
       )}
 
       <div className="flex-1 overflow-auto">
-        <div className="p-6">
-          {/* Navegação de Abas - Dashboard vs Dados de Membros */}
+        <div className="p-6 max-w-[96rem] mx-auto w-full">
+          {/* Navegação de Abas - Dashboard vs Dados de Ministros */}
           <div className="bg-white rounded-lg shadow-md mb-6 border-b-4 border-teal-500">
             <div className="flex items-center gap-4 p-4">
               <button
@@ -1731,7 +1924,7 @@ export default function MembrosPage() {
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                👥 Dados de Membros
+                👥 Dados de Ministros
               </button>
             </div>
           </div>
@@ -1757,7 +1950,7 @@ export default function MembrosPage() {
             </div>
           )}
 
-          {/* Vista - Dados de Membros (Listagem completa) */}
+          {/* Vista - Dados de Ministros (Listagem completa) */}
           {dashboardView === 'list' && (
             <div>
           {/* Filtro de Busca */}
@@ -1809,10 +2002,10 @@ export default function MembrosPage() {
             <div className="flex items-center justify-between p-4 border-b-2 border-teal-500">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">☰</span>
-                <h2 className="text-lg font-bold text-teal-700">Listagem de Membros</h2>
+                <h2 className="text-lg font-bold text-teal-700">Listagem de Ministros</h2>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-600">Quantidade de Membros</span>
+                <span className="text-sm text-gray-600">Quantidade de Ministros</span>
                 <div className="flex gap-2">
                   <button
                     onClick={abrirNovoCadastro}
@@ -1827,7 +2020,7 @@ export default function MembrosPage() {
                         setDadosPessoais({
                           matricula: novaMatricula,
                           cpf: '',
-                          tipoCadastro: ultimoCadastro.tipoCadastro,
+                          tipoCadastro: 'ministro',
                           nome: '',
                           dataNascimento: ultimoCadastro.dataNascimento || '',
                           sexo: ultimoCadastro.sexo || 'MASCULINO',
@@ -1840,6 +2033,7 @@ export default function MembrosPage() {
                           nomePai: ultimoCadastro.nomePai || '',
                           nomeMae: ultimoCadastro.nomeMae || '',
                           rg: '',
+                          orgaoEmissor: ultimoCadastro.orgaoEmissor || '',
                           nacionalidade: ultimoCadastro.nacionalidade || 'BRASILEIRA',
                           naturalidade: ultimoCadastro.naturalidade || '',
                           uf: ultimoCadastro.uf || '',
@@ -1871,13 +2065,12 @@ export default function MembrosPage() {
                           pastorAuxiliar: ultimoCadastro.pastorAuxiliar || false,
                           procedencia: ultimoCadastro.procedencia || '',
                           procedenciaLocal: ultimoCadastro.procedenciaLocal || '',
+                          dataConsagracao: ultimoCadastro.dataConsagracao || '',
+                          dataEmissao: ultimoCadastro.dataEmissao || '',
+                          dataValidadeCredencial: ultimoCadastro.dataValidadeCredencial || '',
                           observacoesMinisteriais: ultimoCadastro.observacoesMinisteriais || ''
                         });
-                        setDadosDizimista({
-                          dizimista: ultimoCadastro.dizimista || false,
-                          historicoDizimos: ultimoCadastro.historicoDizimos || []
-                        });
-                        setCargoSelecionado(ultimoCadastro.cargoMinisterial || '');
+                        setCargoSelecionado(resolveCargoValue(ultimoCadastro.cargoMinisterial));
                         setDadosCargos(ultimoCadastro.dadosCargos || {});
                         setIsEditando(false);
                         setShowForm(true);
@@ -1944,8 +2137,9 @@ export default function MembrosPage() {
             </div>
 
             {/* Tabela */}
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
+            <div className="px-4 pt-3 pb-2">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
                 <thead>
                   <tr className="bg-gray-100">
                     <th className="border-2 border-gray-300 px-4 py-3 text-center font-semibold text-gray-700 w-12">
@@ -1970,7 +2164,7 @@ export default function MembrosPage() {
                     <th className="border-2 border-gray-300 px-4 py-3 text-center font-semibold text-gray-700 w-12">Foto</th>
                     <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Nome</th>
                     <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">CPF</th>
-                    <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Tipo de Cadastro</th>
+                    <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Cargo</th>
                     <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Supervisão</th>
                     <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Campo</th>
                     <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Status</th>
@@ -2008,7 +2202,7 @@ export default function MembrosPage() {
                       </td>
                       <td className="border border-gray-300 px-4 py-3 text-gray-700">{membro.nome}</td>
                       <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.cpf}</td>
-                      <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.tipoCadastro.charAt(0).toUpperCase() + membro.tipoCadastro.slice(1)}</td>
+                      <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.cargoMinisterial || '-'}</td>
                       <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.supervisao || '-'}</td>
                       <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.campo || '-'}</td>
                       <td className="border border-gray-300 px-4 py-3">
@@ -2074,7 +2268,8 @@ export default function MembrosPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           </div>
 
@@ -2104,12 +2299,12 @@ export default function MembrosPage() {
           {/* Formulário Modal com Abas */}
           {showForm && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col" style={{ height: '90vh' }}>
+              <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col" style={{ height: '90vh' }}>
                 {/* Header */}
-                <div className="flex justify-between items-center px-6 py-4 border-b-2 border-teal-500 bg-gradient-to-r from-teal-600 to-teal-700 flex-shrink-0">
+                <div className="flex justify-between items-center px-4 py-4 border-b-2 border-teal-500 bg-gradient-to-r from-teal-600 to-teal-700 flex-shrink-0">
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <span>{membroEditando ? '✏️' : '➕'}</span>
-                    {membroEditando ? `Editar Membro - ${membroEditando.nome}` : 'Inserir Novo Membro'}
+                    {membroEditando ? `Editar Ministro - ${membroEditando.nome}` : 'Inserir Novo Ministro'}
                   </h2>
                   <button
                     onClick={() => setShowForm(false)}
@@ -2123,7 +2318,7 @@ export default function MembrosPage() {
                 <div className="flex border-b border-gray-300 bg-white overflow-x-auto h-16 items-center flex-shrink-0">
                   <button
                     onClick={() => setActiveTab('dados')}
-                    className={`px-5 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'dados'
+                    className={`px-4 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'dados'
                       ? 'text-teal-700 border-teal-600'
                       : 'text-gray-600 border-transparent hover:text-teal-600'
                       }`}
@@ -2132,37 +2327,25 @@ export default function MembrosPage() {
                   </button>
                   <button
                     onClick={() => setActiveTab('endereco')}
-                    className={`px-5 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'endereco'
+                    className={`px-4 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'endereco'
                       ? 'text-teal-700 border-teal-600'
                       : 'text-gray-600 border-transparent hover:text-teal-600'
                       }`}
                   >
                     🌍 Endereço + Contato
                   </button>
-                  {/* Aba Ministerial: Mostrada apenas quando tipo de cadastro for Ministro */}
-                  {dadosPessoais.tipoCadastro === 'ministro' && (
-                    <button
-                      onClick={() => setActiveTab('ministerial')}
-                      className={`px-5 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'ministerial'
-                        ? 'text-teal-700 border-teal-600'
-                        : 'text-gray-600 border-transparent hover:text-teal-600'
-                        }`}
-                    >
-                      ⛪ Ministerial
-                    </button>
-                  )}
                   <button
-                    onClick={() => setActiveTab('dizimista')}
-                    className={`px-5 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'dizimista'
+                    onClick={() => setActiveTab('ministerial')}
+                    className={`px-4 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'ministerial'
                       ? 'text-teal-700 border-teal-600'
                       : 'text-gray-600 border-transparent hover:text-teal-600'
                       }`}
                   >
-                    💰 Dizimista
+                    ⛪ Ministerial
                   </button>
                   <button
                     onClick={() => setActiveTab('foto')}
-                    className={`px-5 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'foto'
+                    className={`px-4 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'foto'
                       ? 'text-teal-700 border-teal-600'
                       : 'text-gray-600 border-transparent hover:text-teal-600'
                       }`}
@@ -2172,7 +2355,7 @@ export default function MembrosPage() {
                 </div>
 
                 {/* Conteúdo das Abas - Scrollável com margens laterais e altura fixa */}
-                <div className="flex-1 overflow-y-auto px-6 py-3 min-h-0">
+                <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0">
                   {/* ABA: DADOS CADASTRAIS */}
                   {activeTab === 'dados' && (
                     <div className="space-y-3">
@@ -2234,30 +2417,13 @@ export default function MembrosPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">
-                            Tipo de Cadastro *
-                            {membroEditando && <span className="ml-2 text-xs text-gray-500">(Bloqueado)</span>}
-                          </label>
-                          {membroEditando ? (
-                            <input
-                              type="text"
-                              value={dadosPessoais.tipoCadastro.charAt(0).toUpperCase() + dadosPessoais.tipoCadastro.slice(1)}
-                              disabled
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-600 cursor-not-allowed focus:outline-none"
-                            />
-                          ) : (
-                            <select
-                              value={dadosPessoais.tipoCadastro}
-                              onChange={(e) => setDadosPessoais({ ...dadosPessoais, tipoCadastro: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            >
-                              <option value="">Selecionar</option>
-                              <option value="membro">Membro</option>
-                              <option value="congregado">Congregado</option>
-                              <option value="ministro">Ministro</option>
-                              <option value="crianca">Criança</option>
-                            </select>
-                          )}
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">Tipo de Cadastro *</label>
+                          <input
+                            type="text"
+                            value="Ministro"
+                            disabled
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-600 cursor-not-allowed focus:outline-none"
+                          />
                         </div>
                       </div>
 
@@ -2415,13 +2581,22 @@ export default function MembrosPage() {
 
 
                       {/* Documentação */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
                           <label className="block text-xs font-semibold text-gray-700 mb-1">RG</label>
                           <input
                             type="text"
                             value={dadosPessoais.rg}
                             onChange={(e) => setDadosPessoais({ ...dadosPessoais, rg: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">Órgão Emissor</label>
+                          <input
+                            type="text"
+                            value={dadosPessoais.orgaoEmissor}
+                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, orgaoEmissor: e.target.value })}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                           />
                         </div>
@@ -2546,30 +2721,72 @@ export default function MembrosPage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div>
                             <label className="block text-xs font-semibold text-gray-700 mb-1">{nomenclaturas.divisao1} (1ª Divisão)</label>
-                            <input
-                              type="text"
+                            <select
                               value={dadosPessoais.supervisao}
-                              onChange={(e) => setDadosPessoais({ ...dadosPessoais, supervisao: e.target.value })}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                const congregacaoSelecionada = divisao1Options.find((opt) => opt.nome === value) || null;
+                                const setorRelacionado = congregacaoSelecionada?.campo_id
+                                  ? divisao2Options.find((opt) => opt.id === congregacaoSelecionada.campo_id) || null
+                                  : null;
+                                const regionalRelacionado = setorRelacionado?.supervisao_id
+                                  ? divisao3Options.find((opt) => opt.id === setorRelacionado.supervisao_id) || null
+                                  : (congregacaoSelecionada?.supervisao_id
+                                      ? divisao3Options.find((opt) => opt.id === congregacaoSelecionada.supervisao_id) || null
+                                      : null);
+
+                                setDadosPessoais({
+                                  ...dadosPessoais,
+                                  supervisao: value,
+                                  campo: setorRelacionado?.nome || '',
+                                  congregacao: regionalRelacionado?.nome || '',
+                                });
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            />
+                            >
+                              <option value="">Selecione</option>
+                              {divisao1Options.map((opt) => (
+                                <option key={opt.id} value={opt.nome}>{opt.nome}</option>
+                              ))}
+                            </select>
                           </div>
                           <div>
                             <label className="block text-xs font-semibold text-gray-700 mb-1">{nomenclaturas.divisao2} (2ª Divisão)</label>
-                            <input
-                              type="text"
+                            <select
                               value={dadosPessoais.campo}
-                              onChange={(e) => setDadosPessoais({ ...dadosPessoais, campo: e.target.value })}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                const setorSelecionado = divisao2Options.find((opt) => opt.nome === value) || null;
+                                const regionalRelacionado = setorSelecionado?.supervisao_id
+                                  ? divisao3Options.find((opt) => opt.id === setorSelecionado.supervisao_id) || null
+                                  : null;
+
+                                setDadosPessoais({
+                                  ...dadosPessoais,
+                                  campo: value,
+                                  congregacao: regionalRelacionado?.nome || '',
+                                });
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            />
+                            >
+                              <option value="">Selecione</option>
+                              {divisao2Filtradas.map((opt) => (
+                                <option key={opt.id} value={opt.nome}>{opt.nome}</option>
+                              ))}
+                            </select>
                           </div>
                           <div>
                             <label className="block text-xs font-semibold text-gray-700 mb-1">{nomenclaturas.divisao3} (3ª Divisão)</label>
-                            <input
-                              type="text"
+                            <select
                               value={dadosPessoais.congregacao}
                               onChange={(e) => setDadosPessoais({ ...dadosPessoais, congregacao: e.target.value })}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            />
+                            >
+                              <option value="">Selecione</option>
+                              {divisao3Filtradas.map((opt) => (
+                                <option key={opt.id} value={opt.nome}>{opt.nome}</option>
+                              ))}
+                            </select>
                           </div>
                         </div>
                       </div>
@@ -2578,20 +2795,6 @@ export default function MembrosPage() {
                         <label className="block text-xs font-semibold text-gray-700 mb-1">Observações</label>
                         <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
                       </div>
-
-                      {/* Checkbox Dizimista */}
-                      <div className="flex items-center gap-3 p-3 border border-gray-300 rounded-lg bg-gray-50 mt-4">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={dadosDizimista.dizimista}
-                            onChange={(e) => setDadosDizimista({ ...dadosDizimista, dizimista: e.target.checked })}
-                            className="w-5 h-5 cursor-pointer"
-                          />
-                          <label className="text-sm font-semibold text-gray-700">Dizimista?</label>
-                        </div>
-                      </div>
-
 
                     </div>
                   )}
@@ -2722,8 +2925,8 @@ export default function MembrosPage() {
                     </div>
                   )}
 
-                  {/* ABA: MINISTERIAL - Aparece apenas quando for Ministro */}
-                  {activeTab === 'ministerial' && dadosPessoais.tipoCadastro === 'ministro' && (
+                  {/* ABA: MINISTERIAL */}
+                  {activeTab === 'ministerial' && (
                     <div className="space-y-3">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
@@ -2819,6 +3022,27 @@ export default function MembrosPage() {
                             type="date"
                             value={dadosMinisteriais.dataBatismoAguas}
                             onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, dataBatismoAguas: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">Data de Consagração</label>
+                          <input
+                            type="date"
+                            value={dadosMinisteriais.dataConsagracao}
+                            onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, dataConsagracao: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">Data de Validade (Credencial)</label>
+                          <input
+                            type="date"
+                            value={dadosMinisteriais.dataValidadeCredencial}
+                            onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, dataValidadeCredencial: e.target.value })}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                           />
                         </div>
@@ -2935,78 +3159,6 @@ export default function MembrosPage() {
                     </div>
                   )}
 
-                  {/* ABA: DIZIMISTA */}
-                  {activeTab === 'dizimista' && (
-                    <div className="space-y-4">
-                      {/* Status Dizimista */}
-                      <div className="flex items-center gap-3 p-3 border border-gray-300 rounded-lg bg-gray-50">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">💰</span>
-                          <label className="text-sm font-semibold text-gray-700">
-                            Status: <span className={dadosDizimista.dizimista ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
-                              {dadosDizimista.dizimista ? 'DIZIMISTA' : 'NÃO DIZIMISTA'}
-                            </span>
-                          </label>
-                        </div>
-                      </div>
-                      {/* Relatório de Dízimos */}
-                      {dadosDizimista.dizimista && (
-                        <div className="p-4 border border-teal-200 rounded-lg bg-teal-50">
-                          <h3 className="text-sm font-bold text-teal-900 mb-4">📋 Relatório de Dízimos</h3>
-
-                          {/* Tabela de Dízimos */}
-                          <div className="overflow-x-auto mb-4">
-                            <table className="w-full border-collapse text-sm">
-                              <thead>
-                                <tr className="bg-teal-200">
-                                  <th className="border border-teal-300 px-3 py-2 text-left font-semibold">Data</th>
-                                  <th className="border border-teal-300 px-3 py-2 text-right font-semibold">Valor</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {dadosDizimista.historicoDizimos && dadosDizimista.historicoDizimos.length > 0 ? (
-                                  dadosDizimista.historicoDizimos.map((dizimo, index) => (
-                                    <tr key={index} className="hover:bg-teal-100">
-                                      <td className="border border-teal-300 px-3 py-2">{new Date(dizimo.data).toLocaleDateString('pt-BR')}</td>
-                                      <td className="border border-teal-300 px-3 py-2 text-right font-semibold">R$ {dizimo.valor.toFixed(2).replace('.', ',')}</td>
-                                    </tr>
-                                  ))
-                                ) : (
-                                  <tr>
-                                    <td colSpan={2} className="border border-teal-300 px-3 py-4 text-center text-gray-500">
-                                      Nenhum registro de dízimo
-                                    </td>
-                                  </tr>
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-
-                          {/* Total */}
-                          {dadosDizimista.historicoDizimos && dadosDizimista.historicoDizimos.length > 0 && (
-                            <div className="p-3 bg-teal-100 rounded-md border border-teal-300 flex justify-between items-center">
-                              <span className="font-semibold text-teal-900">Total de Dízimos:</span>
-                              <span className="font-bold text-lg text-teal-900">
-                                R$ {(dadosDizimista.historicoDizimos.reduce((sum, d) => sum + d.valor, 0)).toFixed(2).replace('.', ',')}
-                              </span>
-                            </div>
-                          )}
-
-                          <div className="mt-3 p-3 bg-blue-100 border border-blue-300 rounded-md text-xs text-blue-800">
-                            <p className="font-semibold mb-1">ℹ️ Informação</p>
-                            <p>Os registros de dízimos são gerenciados através do módulo Financeiro.</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {!dadosDizimista.dizimista && (
-                        <div className="p-4 bg-gray-100 rounded-lg border border-gray-300 text-center text-gray-600">
-                          <p className="text-sm">Este membro não está cadastrado como dizimista.</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* ABA: FOTO */}
                   {activeTab === 'foto' && (
                     <div className="space-y-4">
@@ -3015,7 +3167,7 @@ export default function MembrosPage() {
                           <div className="relative group">
                             <img
                               src={fotoMembro}
-                              alt="Foto do Membro"
+                              alt="Foto do Ministro"
                               className="max-h-64 rounded-md shadow-md border-2 border-teal-500 transition-opacity group-hover:opacity-50"
                             />
                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -3031,7 +3183,7 @@ export default function MembrosPage() {
                         ) : (
                           <>
                             <div className="text-4xl mb-3">📸</div>
-                            <h3 className="text-base font-semibold text-gray-800 mb-1">Foto do Membro</h3>
+                            <h3 className="text-base font-semibold text-gray-800 mb-1">Foto do Ministro</h3>
                             <p className="text-xs text-gray-600 mb-3">Clique para fazer upload</p>
                             <button
                               onClick={() => fileInputRef.current?.click()}
@@ -3073,7 +3225,7 @@ export default function MembrosPage() {
                 </div>
 
                 {/* Rodapé com Botões de Ação */}
-                <div className="flex gap-4 px-6 py-3 border-t border-gray-300 bg-gradient-to-r from-teal-50 to-cyan-50 flex-shrink-0">
+                <div className="flex gap-4 px-4 py-3 border-t border-gray-300 bg-gradient-to-r from-teal-50 to-cyan-50 flex-shrink-0">
                   <button
                     onClick={salvarMembro}
                     className="flex-1 px-4 py-2 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg hover:from-teal-700 hover:to-teal-800 transition font-bold text-sm"

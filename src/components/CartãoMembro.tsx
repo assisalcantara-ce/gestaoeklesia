@@ -24,6 +24,8 @@ interface Membro {
   dataNascimento?: string;
   dataBatismo?: string;
   filiacao?: string;
+  nomePai?: string;
+  nomeMae?: string;
   naturalidade?: string;
   nacionalidade?: string;
   estadoCivil?: string;
@@ -223,7 +225,8 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
         const membroComConfig = {
           ...membro,
           validadeAnos: template.validadeAnos || 1,
-          nomeIgreja: configIgreja?.nome || 'Igreja'
+          nomeIgreja: configIgreja?.nome || 'Igreja',
+          dataEmissao: template.dataEmissao || membro.dataEmissao
         };
         const textoSubstituido = substituirPlaceholders(elemento.texto || '', membroComConfig, orgNomenclaturas);
 

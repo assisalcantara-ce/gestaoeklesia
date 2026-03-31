@@ -57,31 +57,87 @@ export async function POST(request: NextRequest) {
       }, { status: 200 })
     }
 
-    // APROVEÇAR: Criar usuário em administração_usuarios
-    const { data: adminUser, error: createError } = await supabaseAdmin
-      .from('administração_usuarios')
-      .insert({
-        user_id: preReg.user_id,
-        email: preReg.email,
-        nome: preReg.pastor_name,
-        ministerio: preReg.ministry_name,
-        cpf_cnpj: preReg.cpf_cnpj,
-        whatsapp: preReg.whatsapp,
-        status: 'active',
-        trial_expires_at: preReg.trial_expires_at,
-        trial_days: 7,
-        data_aprovacao: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-
-    if (createError) {
-      console.error('[APPROVE_TRIAL] Erro ao criar usuário admin:', createError)
+    if (!preReg.user_id) {
       return NextResponse.json(
-        { error: 'Erro ao liberar acesso: ' + createError.message },
+        { error: 'Pré-cadastro sem usuário associado. Gere credenciais antes de aprovar.' },
         { status: 400 }
       )
+    }
+
+    const slug = String(preReg.ministry_name || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 80) || `ministerio-${Date.now()}`
+
+    const { data: existingMinistry } = await supabaseAdmin
+      .from('ministries')
+      .select('id')
+      .eq('user_id', preReg.user_id)
+      .maybeSingle()
+
+    let ministryId = existingMinistry?.id || null
+
+    if (!ministryId) {
+      const { data: ministry, error: ministryError } = await supabaseAdmin
+        .from('ministries')
+        .insert({
+          user_id: preReg.user_id,
+          name: preReg.ministry_name,
+          slug,
+          email_admin: preReg.email,
+          cnpj_cpf: preReg.cpf_cnpj,
+          phone: preReg.phone || null,
+          website: preReg.website || null,
+          description: preReg.description || null,
+          plan: preReg.plan || 'starter',
+          subscription_status: 'active',
+          subscription_start_date: new Date().toISOString(),
+          subscription_end_date: preReg.trial_expires_at || null,
+          is_active: true,
+        })
+        .select('id')
+        .single()
+
+      if (ministryError || !ministry) {
+        console.error('[APPROVE_TRIAL] Erro ao criar ministerio:', ministryError)
+        return NextResponse.json(
+          { error: 'Erro ao liberar acesso: ' + (ministryError?.message || 'ministerio') },
+          { status: 400 }
+        )
+      }
+
+      ministryId = ministry.id
+    }
+
+    if (ministryId) {
+      const { data: existingLink } = await supabaseAdmin
+        .from('ministry_users')
+        .select('id')
+        .eq('ministry_id', ministryId)
+        .eq('user_id', preReg.user_id)
+        .maybeSingle()
+
+      if (!existingLink) {
+        const { error: linkError } = await supabaseAdmin
+          .from('ministry_users')
+          .insert({
+            ministry_id: ministryId,
+            user_id: preReg.user_id,
+            role: 'admin',
+            is_active: true,
+          })
+
+        if (linkError) {
+          console.error('[APPROVE_TRIAL] Erro ao vincular usuario ao ministerio:', linkError)
+          return NextResponse.json(
+            { error: 'Erro ao vincular usuario ao ministerio: ' + linkError.message },
+            { status: 400 }
+          )
+        }
+      }
     }
 
     // Atualizar status em pre_registrations
@@ -115,7 +171,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Acesso liberado com sucesso! Usuário pode fazer login.',
-      data: adminUser,
+      data: { ministry_id: ministryId },
       action: 'approved'
     }, { status: 201 })
 

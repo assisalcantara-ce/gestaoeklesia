@@ -48,11 +48,6 @@ export async function requireFlowAuth(request: NextRequest): Promise<FlowAuthCon
 
   let userId: string | null = null;
   try {
-    try {
-      await supabase.auth.setSession({ access_token: token, refresh_token: token });
-    } catch {
-      // Ignore session set errors; we'll fall back to token decoding.
-    }
     const { data, error } = await supabase.auth.getUser(token);
     if (!error && data?.user?.id) userId = data.user.id;
   } catch {

@@ -9,6 +9,7 @@ import InteractiveCanvas from '@/components/InteractiveCanvas';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { createClient } from '@/lib/supabase-client';
 import { loadOrgNomenclaturasFromSupabaseOrMigrate } from '@/lib/org-nomenclaturas';
+import { obterPreviewTexto } from '@/lib/cartoes-utils';
 import {
   persistTemplatesSnapshotToSupabase,
   loadTemplatesForCurrentUser,
@@ -55,6 +56,7 @@ interface TemplateCartao {
   atualizadoEm: Date;
   ativo?: boolean;
   validadeAnos?: number;
+  dataEmissao?: string;
   tipoImpressao?: 'pvc' | 'a4';
   orientacao?: 'landscape' | 'portrait';
   previewImage?: string;
@@ -99,8 +101,12 @@ const PLACEHOLDERS_DISPONIVEIS = [
   { campo: 'campo', label: 'Campo', placeholder: '{campo}' },
   { campo: 'dataNascimento', label: 'Data de Nascimento', placeholder: '{dataNascimento}' },
   { campo: 'dataBatismo', label: 'Data de Batismo', placeholder: '{dataBatismo}' },
+  { campo: 'dataConsagracao', label: 'Data de Consagração', placeholder: '{dataConsagracao}' },
+  { campo: 'dataEmissao', label: 'Data de Emissão', placeholder: '{dataEmissao}' },
   { campo: 'validade', label: 'Validade', placeholder: '{validade}' },
-  { campo: 'filiacao', label: 'Filiação (Pai/Mãe)', placeholder: '{filiacao}' },
+  { campo: 'validadeCredencial', label: 'Validade (Credencial)', placeholder: '{validadeCredencial}' },
+  { campo: 'nomePai', label: 'Pai', placeholder: '{nomePai}' },
+  { campo: 'nomeMae', label: 'Mãe', placeholder: '{nomeMae}' },
   { campo: 'estadoCivil', label: 'Estado Civil', placeholder: '{estadoCivil}' },
   { campo: 'tipoSanguineo', label: 'Tipo Sanguíneo', placeholder: '{tipoSanguineo}' },
   { campo: 'naturalidade', label: 'Naturalidade', placeholder: '{naturalidade}' },
@@ -123,7 +129,7 @@ export default function ConfiguracaoCartoesPage() {
   const supabase = createClient();
 
   const [activeMenu, setActiveMenu] = useState('cartoes');
-  const [tipoCadastroAtivo, setTipoCadastroAtivo] = useState<'membro' | 'congregado' | 'ministro' | 'funcionario'>('membro');
+  const [tipoCadastroAtivo, setTipoCadastroAtivo] = useState<'ministro' | 'funcionario'>('ministro');
   const [_nomenclaturas, setNomenclaturasState] = useState<any>(null);
   const [placeholdersDisponiveis, setPlaceholdersDisponiveis] = useState(PLACEHOLDERS_DISPONIVEIS);
 
@@ -142,6 +148,64 @@ export default function ConfiguracaoCartoesPage() {
 
   const fileInputRefFrente = useRef<HTMLInputElement>(null);
   const fileInputRefVerso = useRef<HTMLInputElement>(null);
+
+  const formatDateForInput = (valor?: string) => {
+    if (!valor) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) return valor;
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(valor)) {
+      const [dia, mes, ano] = valor.split('/');
+      return `${ano}-${mes}-${dia}`;
+    }
+    const parsed = new Date(valor);
+    if (Number.isNaN(parsed.getTime())) return '';
+    const ano = parsed.getFullYear();
+    const mes = String(parsed.getMonth() + 1).padStart(2, '0');
+    const dia = String(parsed.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  };
+
+  const getPreviewTextForCanvas = (texto: string) => {
+    const previewBase = obterPreviewTexto(texto, _nomenclaturas);
+    const anos = templateEmEdicao?.validadeAnos ?? 1;
+
+    const parseDataEmissao = (valor?: string) => {
+      if (!valor) return null;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+        const [ano, mes, dia] = valor.split('-').map(Number);
+        const parsed = new Date(ano, mes - 1, dia);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      }
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(valor)) {
+        const [dia, mes, ano] = valor.split('/').map(Number);
+        const parsed = new Date(ano, mes - 1, dia);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      }
+      const parsed = new Date(valor);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    const dataEmissaoBase = parseDataEmissao(templateEmEdicao?.dataEmissao) || new Date();
+    const dataValidade = new Date(dataEmissaoBase);
+    dataValidade.setFullYear(dataValidade.getFullYear() + anos);
+
+    const formatar = (data: Date) => {
+      const dia = String(data.getDate()).padStart(2, '0');
+      const mes = String(data.getMonth() + 1).padStart(2, '0');
+      const ano = data.getFullYear();
+      return `${dia}/${mes}/${ano}`;
+    };
+
+    const validadeTexto = formatar(dataValidade);
+    const emissaoTexto = formatar(dataEmissaoBase);
+
+    return previewBase
+      .replace(/\{validade\}/g, validadeTexto)
+      .replace(/\{validadeCredencial\}/g, validadeTexto)
+      .replace(/\{dataEmissao\}/g, emissaoTexto)
+      .replace(/\[Validade\]/g, validadeTexto)
+      .replace(/\[Validade \(Credencial\)\]/g, validadeTexto)
+      .replace(/\[Data de Emissão\]/g, emissaoTexto);
+  };
 
   const generateId = () => {
     try {
@@ -167,12 +231,12 @@ export default function ConfiguracaoCartoesPage() {
       setMinistryId(resolvedMinistryId);
       setTemplates(loadedTemplates as any);
 
-      const ativo = (loadedTemplates as any[]).find((t: any) => t.ativo && t.tipoCadastro === 'membro');
+      const ativo = (loadedTemplates as any[]).find((t: any) => t.ativo && t.tipoCadastro === 'ministro');
       if (ativo) {
         setTemplateEmEdicao(ativo);
       } else {
         const { getTemplatesPorTipo, converterParaTemplateEditavel } = require('@/lib/card-templates');
-        const padroes = getTemplatesPorTipo('membro');
+        const padroes = getTemplatesPorTipo('ministro');
         const fallback = padroes.length > 0 ? padroes[0] : null;
         if (fallback) setTemplateEmEdicao(converterParaTemplateEditavel(fallback));
       }
@@ -587,7 +651,7 @@ export default function ConfiguracaoCartoesPage() {
 
     setTemplates(novasTemplates);
     if (ministryId) {
-      persistTemplatesSnapshotToSupabase(supabase, ministryId, (templateEmEdicao.tipoCadastro as TipoCartao) || 'membro', novasTemplates)
+      persistTemplatesSnapshotToSupabase(supabase, ministryId, (templateEmEdicao.tipoCadastro as TipoCartao) || 'ministro', novasTemplates)
         .catch(() => null);
     }
     
@@ -658,7 +722,7 @@ export default function ConfiguracaoCartoesPage() {
     const indexExistente = novasTemplates.findIndex(t => t.id === templateCorrigido.id);
 
     // Se for um ID de template oficial/editável (podem ser salvos como branco), remover qualquer versão antiga antes de adicionar a nova
-    const TEMPLATES_EDITABLE = ['membro-01', 'membro-02', 'membro-classico', 'congregado-01', 'congregado-02', 'congregado-branco', 'congregado-moderno', 'ministro-classico', 'ministro-02'];
+    const TEMPLATES_EDITABLE = ['ministro-classico', 'ministro-02', 'ministro-branco', 'funcionario-customizado', 'funcionario-branco'];
     if (TEMPLATES_EDITABLE.includes(templateCorrigido.id)) {
       if (indexExistente >= 0) {
         console.log('🧹 Removendo versão antiga do template para garantir integridade...');
@@ -701,7 +765,7 @@ export default function ConfiguracaoCartoesPage() {
       persistTemplatesSnapshotToSupabase(
         supabase,
         ministryId,
-        (templateCorrigido.tipoCadastro as TipoCartao) || 'membro',
+        (templateCorrigido.tipoCadastro as TipoCartao) || 'ministro',
         novasTemplates
       ).catch(() => null);
     }
@@ -754,7 +818,7 @@ export default function ConfiguracaoCartoesPage() {
     const next = [...templates, novoTemplate];
     setTemplates(next);
     if (ministryId) {
-      persistTemplatesSnapshotToSupabase(supabase, ministryId, (novoTemplate.tipoCadastro as TipoCartao) || 'membro', next)
+      persistTemplatesSnapshotToSupabase(supabase, ministryId, (novoTemplate.tipoCadastro as TipoCartao) || 'ministro', next)
         .catch(() => null);
     }
     setTemplateEmEdicao(novoTemplate);
@@ -767,9 +831,8 @@ export default function ConfiguracaoCartoesPage() {
 
     // Lista de IDs de templates nativos que NÃO podem ser deletados
     const TEMPLATES_NATIVOS = [
-      'membro-01', 'membro-branco', 'membro-classico', 'membro-02',
-      'congregado-01', 'congregado-branco', 'congregado-02', 'congregado-moderno',
-      'ministro-branco', 'ministro-classico', 'ministro-02'
+      'ministro-branco', 'ministro-classico', 'ministro-02',
+      'funcionario-customizado', 'funcionario-branco'
     ];
 
     // Impedir deleção de templates nativos
@@ -784,7 +847,7 @@ export default function ConfiguracaoCartoesPage() {
     const novasTemplates = templates.filter(t => t.id !== templateId);
     setTemplates(novasTemplates);
     if (ministryId) {
-      persistTemplatesSnapshotToSupabase(supabase, ministryId, (templateADeletar.tipoCadastro as TipoCartao) || 'membro', novasTemplates)
+      persistTemplatesSnapshotToSupabase(supabase, ministryId, (templateADeletar.tipoCadastro as TipoCartao) || 'ministro', novasTemplates)
         .catch(() => null);
     }
 
@@ -817,8 +880,8 @@ export default function ConfiguracaoCartoesPage() {
       console.log('🔄 [ativarTemplate] Buscando em templates nativos...');
       const { getTemplatesPorTipo } = require('@/lib/card-templates');
       
-      // Procurar em TODOS os tipos (incluindo funcionario)
-      const tipos = ['membro', 'congregado', 'ministro', 'funcionario'];
+      // Procurar apenas nos tipos suportados do projeto
+      const tipos = ['ministro', 'funcionario'];
       for (const tipo of tipos) {
         const nativosDoTipo = getTemplatesPorTipo(tipo);
         targetTemplate = nativosDoTipo.find((t: any) => t.id === templateId);
@@ -874,7 +937,7 @@ export default function ConfiguracaoCartoesPage() {
     console.log('🔄 [ativarTemplate] Salvando novas templates:', novasTemplates.map(t => ({ id: t.id, ativo: t.ativo })));
     setTemplates(novasTemplates);
     if (ministryId) {
-      persistTemplatesSnapshotToSupabase(supabase, ministryId, (tipoAlvo as TipoCartao) || 'membro', novasTemplates)
+      persistTemplatesSnapshotToSupabase(supabase, ministryId, (tipoAlvo as TipoCartao) || 'ministro', novasTemplates)
         .catch(() => null);
     }
 
@@ -897,7 +960,7 @@ export default function ConfiguracaoCartoesPage() {
     setTemplates(novasTemplates);
     if (ministryId) {
       const t = templates.find(tt => tt.id === templateId);
-      const tipo = (t?.tipoCadastro as TipoCartao) || (t?.tipo as TipoCartao) || 'membro';
+      const tipo = (t?.tipoCadastro as TipoCartao) || (t?.tipo as TipoCartao) || 'ministro';
       persistTemplatesSnapshotToSupabase(supabase, ministryId, tipo, novasTemplates).catch(() => null);
     }
 
@@ -905,9 +968,9 @@ export default function ConfiguracaoCartoesPage() {
       // Se o template sendo desativado é o que está no canvas, volta para um modelo em branco limpo
       // PRIORIZAR template customizado se existir
       const { TEMPLATES_CUSTOMIZADOS } = require('@/lib/custom-card-templates');
-      const { TEMPLATE_MEMBRO_01, converterParaTemplateEditavel } = require('@/lib/card-templates');
-      const customizado = TEMPLATES_CUSTOMIZADOS.find((t: any) => t.id === 'membro-01');
-      const templateParaUsar = customizado || TEMPLATE_MEMBRO_01;
+      const { TEMPLATE_MINISTRO_CLASSICO, converterParaTemplateEditavel } = require('@/lib/card-templates');
+      const customizado = TEMPLATES_CUSTOMIZADOS.find((t: any) => t.id === 'ministro-classico');
+      const templateParaUsar = customizado || TEMPLATE_MINISTRO_CLASSICO;
       setTemplateEmEdicao(converterParaTemplateEditavel(templateParaUsar));
     }
   };
@@ -982,6 +1045,21 @@ export default function ConfiguracaoCartoesPage() {
                   </div>
 
                   <div className="grid grid-cols-4 gap-4 items-end">
+                    <div className="col-span-1">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        Data de Emissão
+                      </label>
+                      <input
+                        type="date"
+                        value={formatDateForInput(templateEmEdicao.dataEmissao)}
+                        onChange={(e) => setTemplateEmEdicao({
+                          ...templateEmEdicao,
+                          dataEmissao: e.target.value
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
                     <div className="col-span-1">
                       <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Validade do Cartão
@@ -1134,6 +1212,7 @@ export default function ConfiguracaoCartoesPage() {
                       elementoSelecionado={elementoSelecionado}
                       elementosSelecionados={elementosSelecionados || []}
                       nomenclaturas={_nomenclaturas}
+                      getPreviewText={getPreviewTextForCanvas}
                       backgroundUrl={editandoVerso ? templateEmEdicao.backgroundUrlVerso : templateEmEdicao.backgroundUrl}
                       onElementoSelecionado={setElementoSelecionado}
                       onElementosSelecionados={setElementosSelecionados}
