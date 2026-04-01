@@ -232,8 +232,7 @@ export default function ValidarSenhaContent() {
               className="w-full py-3 bg-gradient-to-r from-[#123b63] to-[#0284c7] text-white rounded-lg hover:opacity-90 transition font-bold"
             >
               🔑 Ir para Login
-            <button
-              onClick={() => router.push('/login')}
+            </button>
         )}
 
         {/* ETAPA: ERRO */}
