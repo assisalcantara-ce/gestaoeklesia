@@ -217,7 +217,7 @@ export default function ValidarSenhaContent() {
             <div className="text-6xl mb-4 animate-bounce">✅</div>
             <h2 className="text-3xl font-bold text-[#123b63] mb-2">Sucesso!</h2>
             <p className="text-gray-600 mb-4">Sua senha foi validada com sucesso!</p>
-            
+
             <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 mb-6">
               <p className="text-sm text-gray-700 mb-2">
                 <strong>🎉 Seu ministério está pronto para usar!</strong>
@@ -241,7 +241,7 @@ export default function ValidarSenhaContent() {
           <div className="bg-white rounded-2xl shadow-2xl p-8 text-center">
             <div className="text-6xl mb-4">❌</div>
             <h2 className="text-3xl font-bold text-red-600 mb-2">Link Inválido</h2>
-            
+
             <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-6">
               <p className="text-sm text-gray-700">{mensagem_erro}</p>
             </div>
