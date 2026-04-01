@@ -10,7 +10,6 @@ import { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase
 export default function BrandingPage() {
   const [activeMenu, setActiveMenu] = useState('branding');
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -33,7 +32,6 @@ export default function BrandingPage() {
             return;
           }
           setLogoPreview(event.target?.result as string);
-          setLogoFile(file);
         };
         img.src = event.target?.result as string;
       };

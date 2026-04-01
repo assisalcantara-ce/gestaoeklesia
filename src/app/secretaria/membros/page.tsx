@@ -183,7 +183,6 @@ export default function MembrosPage() {
       celular: String(member.phone || (cf as any).celular || ''),
       cidade: String(member.city || (cf as any).cidade || ''),
       complemento: String(member.complement || (cf as any).complemento || ''),
-      orgaoEmissor: String((cf as any).orgaoEmissor || (cf as any).orgao_emissor || ''),
       uf: String(member.state || (cf as any).uf || ''),
       cep: String(member.zipcode || (cf as any).cep || ''),
       procedencia: String((cf as any).procedencia || '').toLocaleLowerCase('pt-BR'),

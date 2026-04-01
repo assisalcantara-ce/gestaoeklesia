@@ -3,7 +3,6 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
-import { MapPin, Phone, Mail, MapMarked } from 'lucide-react';
 import type { Marcador } from '@/lib/geolocation-utils';
 
 const DEFAULT_CENTER = {
@@ -33,7 +32,7 @@ export default function MapaGeolizacao({ marcadores, selectedMarker, onMarkerCli
   useEffect(() => {
     const initMap = async () => {
       try {
-        await loader.load();
+        await (loader as any).load();
 
         if (!mapRef.current) return;
 

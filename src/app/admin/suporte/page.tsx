@@ -23,7 +23,7 @@ export default function SuportePage() {
   const [messages, setMessages] = useState<SupportTicketMessage[]>([])
   const [replyText, setReplyText] = useState('')
   const [replying, setReplying] = useState(false)
-  const [replyStatus, setReplyStatus] = useState('waiting_customer')
+  const [replyStatus, setReplyStatus] = useState<SupportTicket['status']>('waiting_customer')
   const router = useRouter()
 
   const [formData, setFormData] = useState({
@@ -594,7 +594,7 @@ export default function SuportePage() {
                         <div className="flex flex-wrap gap-3 items-center">
                           <select
                             value={replyStatus}
-                            onChange={(e) => setReplyStatus(e.target.value)}
+                            onChange={(e) => setReplyStatus(e.target.value as SupportTicket['status'])}
                             className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
                           >
                             <option value="waiting_customer">Aguardando Cliente</option>

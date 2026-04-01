@@ -960,7 +960,7 @@ export default function ConfiguracaoCartoesPage() {
     setTemplates(novasTemplates);
     if (ministryId) {
       const t = templates.find(tt => tt.id === templateId);
-      const tipo = (t?.tipoCadastro as TipoCartao) || (t?.tipo as TipoCartao) || 'ministro';
+      const tipo = (t?.tipoCadastro as TipoCartao) || 'ministro';
       persistTemplatesSnapshotToSupabase(supabase, ministryId, tipo, novasTemplates).catch(() => null);
     }
 

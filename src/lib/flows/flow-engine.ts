@@ -1,5 +1,6 @@
 export type FlowTransition = {
   action: string;
+  label?: string;
   from: string;
   to: string;
   roles: string[];

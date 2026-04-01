@@ -228,7 +228,7 @@ export default function SuportePage() {
 
       // Sucesso! Limpar erro se houver
       setError('')
-      const mapped = (data || []).map((row: any) => ({
+      const mapped: Ticket[] = (data || []).map((row: any) => ({
         id: row.id,
         titulo: row.subject,
         descricao: row.description,
@@ -296,7 +296,7 @@ export default function SuportePage() {
         return
       }
 
-      const visible = (data || [])
+      const visible: Array<{ id: string; user_id: string; message: string; created_at: string }> = (data || [])
         .filter((msg: any) => msg.is_internal !== true)
         .map((msg: any) => ({
           id: msg.id,
@@ -377,28 +377,6 @@ export default function SuportePage() {
 
       setResposta('')
       await carregarMensagens(selecionado.id)
-      await carregarTickets()
-    } finally {
-      setEnviandoResposta(false)
-    }
-  }
-
-  const reabrirTicket = async () => {
-    if (!user || !selecionado) return
-
-    try {
-      setEnviandoResposta(true)
-      const { error: updateError } = await supabase
-        .from('support_tickets')
-        .update({ status: mapStatusToDb('aberto'), updated_at: new Date().toISOString() })
-        .eq('id', selecionado.id)
-
-      if (updateError) {
-        await dialog.alert({ title: 'Erro', type: 'error', message: updateError.message })
-        return
-      }
-
-      setSelecionado({ ...selecionado, status: 'aberto', data_atualizacao: new Date().toISOString() })
       await carregarTickets()
     } finally {
       setEnviandoResposta(false)

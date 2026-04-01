@@ -395,5 +395,14 @@ export async function enviarEmailBoasVindas(
  * Recuperar informações do token
  */
 export function obterInfoToken(token: string): EmailValidacao | null {
-  return tokensValidacao.find(v => v.token === token) || null;
+  const tokens = readTokens();
+  const entry = tokens[token];
+  if (!entry) return null;
+  return {
+    token,
+    ministryId: entry.ministryId,
+    email: entry.email,
+    expiresAt: entry.expiresAt,
+    criadoEm: entry.criadoEm,
+  };
 }

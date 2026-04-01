@@ -98,15 +98,15 @@ export default function FluxosOperacaoPage() {
 
       const role = String(mu?.role || '').toLowerCase();
       const perms = Array.isArray(mu?.permissions) ? mu?.permissions : [];
-      const permSet = new Set(perms.map((p: any) => String(p || '').toUpperCase()));
+      const permSet = new Set<string>(perms.map((p: any) => String(p || '').toUpperCase()));
       const allowAll = ['admin', 'manager', 'supervisor', 'superintendent', 'superintendente'].includes(role)
         || permSet.has('ADMINISTRADOR')
         || permSet.has('SUPERVISOR')
         || permSet.has('SUPERINTENDENTE');
 
-      const mappedRoles = Array.from(new Set([
+      const mappedRoles = Array.from(new Set<string>([
         ...mapBaseRole(role),
-        ...permSet
+        ...Array.from(permSet)
       ]));
 
       setCanViewAll(allowAll);

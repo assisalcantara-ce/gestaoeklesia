@@ -7,6 +7,7 @@ import { getCargosMinisteriais, saveCargosMinisteriais, type CargoMinisterial } 
 import { useAppDialog } from '@/providers/AppDialogProvider'
 import { createClient } from '@/lib/supabase-client'
 import { formatCnpj, formatPhone } from '@/lib/mascaras';
+import { NOMENCLATURAS_SCHEMA_VERSION, NOMENCLATURAS_SCHEMA_VERSION_KEY } from '@/lib/org-nomenclaturas';
 
 export const dynamic = 'force-dynamic';
 

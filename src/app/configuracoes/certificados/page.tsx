@@ -29,7 +29,7 @@ const ELEMENTOS_CERTIFICADO = [
 
 interface CertificadoElemento {
   id: string;
-  tipo: 'texto' | 'logo' | 'imagem' | 'chapa';
+  tipo: 'texto' | 'logo' | 'imagem' | 'chapa' | 'qrcode' | 'foto-membro';
   x: number;
   y: number;
   largura: number;
@@ -74,7 +74,7 @@ export default function ConfiguracoesCertificadosPage() {
   ] as const;
 
   const CERTIFICADO_VARIACOES = [
-    { id: 'padrao', label: 'Modelo 01' },
+    { id: 'padrao', label: 'Modelo 01', variacao: 'padrao' as const },
     { id: 'branco', label: 'Modelo em branco', variacao: 'branco' as const }
   ] as const;
 
@@ -341,12 +341,14 @@ export default function ConfiguracoesCertificadosPage() {
 
                 <div className="space-y-3">
                   {CERTIFICADO_VARIACOES.map((variacao) => {
-                    const template = getTemplatePorTipo(tipoCertificadoAtivo, variacao.variacao);
+                    const variacaoId = variacao.variacao ?? 'padrao';
+                    const variacaoParam = variacaoId === 'padrao' ? undefined : variacaoId;
+                    const template = getTemplatePorTipo(tipoCertificadoAtivo, variacaoParam);
                     const isSelected = templateEmEdicao?.id === template?.id;
                     const isDisabled = !template;
                     const previewStyle: React.CSSProperties = template?.backgroundUrl
                       ? { backgroundImage: `url(${template.backgroundUrl})`, backgroundSize: 'cover' }
-                      : variacao.variacao === 'branco'
+                      : variacaoId === 'branco'
                         ? { background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)' }
                         : { background: 'linear-gradient(135deg, #dbeafe 0%, #eef2ff 100%)' };
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import PageLayout from '@/components/PageLayout';
 import Section from '@/components/Section';
 import { getAvailableActions } from '@/lib/flows/flow-engine';
@@ -31,7 +31,6 @@ function formatActionLabel(action: string): string {
 
 export default function FluxoInstancePage() {
   const params = useParams();
-  const router = useRouter();
   const instanceId = String(params?.id || '');
 
   const [loading, setLoading] = useState(true);

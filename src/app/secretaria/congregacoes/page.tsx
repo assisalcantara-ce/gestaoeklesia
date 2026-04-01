@@ -125,12 +125,12 @@ export default function CongregacoesPage() {
   const [editingD1, setEditingD1] = useState<Divisao1 | null>(null);
   const [showFormD1, setShowFormD1] = useState(false);
 
-  const [supervisorStatus, setSupervisorStatus] = useState<'idle' | 'loading' | 'found' | 'not_found' | 'error'>('idle');
-  const [supervisorMsg, setSupervisorMsg] = useState<string>('');
+  const [, setSupervisorStatus] = useState<'idle' | 'loading' | 'found' | 'not_found' | 'error'>('idle');
+  const [, setSupervisorMsg] = useState<string>('');
 
-  const [supervisorCpfResults, setSupervisorCpfResults] = useState<MemberLookup[]>([]);
-  const [supervisorCpfStatus, setSupervisorCpfStatus] = useState<'idle' | 'loading' | 'selected' | 'not_found' | 'error'>('idle');
-  const [supervisorCpfMsg, setSupervisorCpfMsg] = useState<string>('');
+  const [, setSupervisorCpfResults] = useState<MemberLookup[]>([]);
+  const [, setSupervisorCpfStatus] = useState<'idle' | 'loading' | 'selected' | 'not_found' | 'error'>('idle');
+  const [, setSupervisorCpfMsg] = useState<string>('');
 
   // Divisão 02 (Campo) - Form states
   const [formD2, setFormD2] = useState({
@@ -187,7 +187,6 @@ export default function CongregacoesPage() {
 
   const [geoPreview, setGeoPreview] = useState<{ latitude: number; longitude: number; address: string } | null>(null);
   const [lastCepAutofill, setLastCepAutofill] = useState<string>('');
-  const [lastCepAutofillD2, setLastCepAutofillD2] = useState<string>('');
 
   const buildGeocodeQuery = (opts: { endereco: string; municipio: string; uf: string; cepDigits: string }) => {
     return [opts.endereco, opts.municipio, opts.uf, opts.cepDigits, 'Brasil']
