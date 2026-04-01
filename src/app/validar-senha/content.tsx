@@ -233,6 +233,7 @@ export default function ValidarSenhaContent() {
             >
               🔑 Ir para Login
             </button>
+          </div>
         )}
 
         {/* ETAPA: ERRO */}
