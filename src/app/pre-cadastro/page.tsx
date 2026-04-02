@@ -9,7 +9,7 @@ const PLAN_OPTIONS = [
   { value: 'intermediario', label: 'Intermediário' },
   { value: 'profissional', label: 'Profissional' },
   { value: 'expert', label: 'Expert' }
-];
+] as const;
 
 const PLAN_DETAILS = {
   starter: {
@@ -38,9 +38,13 @@ const PLAN_DETAILS = {
   }
 } as const;
 
-const resolvePlan = (value: string | null) => {
+type PlanKey = keyof typeof PLAN_DETAILS;
+
+const resolvePlan = (value: string | null): PlanKey => {
   const normalized = (value || '').toLowerCase();
-  return PLAN_OPTIONS.some((plan) => plan.value === normalized) ? normalized : 'starter';
+  return PLAN_OPTIONS.some((plan) => plan.value === normalized)
+    ? (normalized as PlanKey)
+    : 'starter';
 };
 
 const formatCep = (value: string) => {
@@ -54,7 +58,26 @@ export default function PreCadastroPage() {
   const searchParams = useSearchParams();
   const initialPlan = useMemo(() => resolvePlan(searchParams.get('plan')), [searchParams]);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    ministry_name: string;
+    responsible_name: string;
+    cpf_cnpj: string;
+    email: string;
+    password: string;
+    whatsapp: string;
+    phone: string;
+    website: string;
+    quantity_temples: string;
+    quantity_members: string;
+    address_zip: string;
+    address_street: string;
+    address_number: string;
+    address_complement: string;
+    address_city: string;
+    address_state: string;
+    description: string;
+    plan: PlanKey;
+  }>({
     ministry_name: '',
     responsible_name: '',
     cpf_cnpj: '',
@@ -258,10 +281,10 @@ export default function PreCadastroPage() {
               </p>
               <div className="space-y-3">
                 <p className="text-sm text-blue-100">
-                  {PLAN_DETAILS[formData.plan as keyof typeof PLAN_DETAILS].description}
+                  {PLAN_DETAILS[formData.plan].description}
                 </p>
                 <ul className="space-y-2 text-xs text-blue-100">
-                  {PLAN_DETAILS[formData.plan as keyof typeof PLAN_DETAILS].highlights.map((item) => (
+                  {PLAN_DETAILS[formData.plan].highlights.map((item) => (
                     <li key={item} className="flex items-center gap-2">
                       <span className="h-1.5 w-1.5 rounded-full bg-yellow-300" />
                       {item}

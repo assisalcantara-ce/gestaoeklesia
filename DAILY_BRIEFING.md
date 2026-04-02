@@ -1,7 +1,7 @@
 # 📋 DAILY BRIEFING - GestãoEklesia
 
-**Data de Última Atualização:** 31 de março de 2026  
-**Última Sessão:** Ajustes de UI/admin, planos e landing page + planejamento Asaas (cobrancas anuais, webhook, baixa manual)
+**Data de Última Atualização:** 2 de abril de 2026  
+**Última Sessão:** Trial automático com expiração, UI de pré-cadastros e migrações de status
 
 ---
 
@@ -178,6 +178,19 @@ git merge feature/nova-feature
 ---
 
 ## ✨ ÚLTIMAS IMPLEMENTAÇÕES
+
+### 📅 2 de Abril de 2026 — Pré-cadastro (Trial) e Expiração
+
+#### ✅ Concluído
+- [x] Status de pré-cadastro padronizado para apenas `trial` e `encerrado`.
+- [x] Migração aplicada para ajuste de status e constraint.
+- [x] Bloqueio de acesso quando trial expira, retornando erro "Expirado".
+- [x] Atualização automática do status para `encerrado` quando vence (função + job opcional).
+- [x] UI de pré-cadastros: aba "Expirado", textos revisados e data de vencimento em vermelho/negrito.
+
+#### ▶️ Próximo passo (amanhã)
+- Revisar mensagens de erro no front para exibir "Expirado" de forma amigável.
+- Validar fluxo completo: signup -> login -> expiração -> bloqueio.
 
 ### 📅 15 de Fevereiro de 2026 — Fluxos (Operacao) + Estrutura Hierarquica
 

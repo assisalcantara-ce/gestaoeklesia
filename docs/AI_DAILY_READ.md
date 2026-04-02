@@ -76,3 +76,12 @@ Checklist detalhado para iniciar:
 - Endpoint: criar cobrancas (admin/contrato anual).
 - Webhook: validar assinatura e mapear eventos (PAYMENT_CONFIRMED, PAYMENT_RECEIVED, PAYMENT_OVERDUE).
 - UI admin/pagamentos: filtros + acao "Baixa manual".
+
+---
+
+## 7) Atualizacoes recentes (02/04/2026)
+
+- Status de pre-cadastro: apenas `trial` e `encerrado`.
+- Bloqueio de acesso quando trial expira (erro "Expirado").
+- Job/função SQL para expirar trials automaticamente.
+- UI de pre-cadastros: aba "Expirado" e vencimento destacado.
