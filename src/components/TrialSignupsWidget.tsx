@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { AlertCircle, CheckCircle, Eye } from 'lucide-react'
-import NotificationModal from './NotificationModal'
+import { Eye } from 'lucide-react'
 import { authenticatedFetch } from '@/lib/api-client'
 
 interface PreRegistration {
@@ -25,7 +24,6 @@ export default function TrialSignupsWidget() {
   const [activeTab, setActiveTab] = useState<'trial' | 'encerrado'>('trial')
   const [selectedSignup, setSelectedSignup] = useState<PreRegistration | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
-  const [notification, setNotification] = useState<{ isOpen: boolean; type: 'success' | 'error' | 'warning' | 'info'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
   const fetchTrialSignups = async () => {
     try {
       setLoading(true)
@@ -269,17 +267,6 @@ export default function TrialSignupsWidget() {
           </div>
         </div>
       )}
-
-
-      {/* Notificação Modal */}
-      <NotificationModal
-        isOpen={notification.isOpen}
-        type={notification.type}
-        title={notification.title}
-        message={notification.message}
-        onClose={() => setNotification({ ...notification, isOpen: false })}
-        autoClose={notification.type === 'success' ? 3000 : undefined}
-      />
     </div>
   )
 }
