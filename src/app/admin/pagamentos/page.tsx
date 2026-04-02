@@ -160,6 +160,7 @@ export default function PagamentosPage() {
       origin: 'all',
       status: 'all',
     })
+    setMinistrySearch('')
     setPage(1)
   }
 
@@ -376,6 +377,14 @@ export default function PagamentosPage() {
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 {showForm ? 'Fechar formulário' : '+ Novo Pagamento'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fetchPagamentos()}
+                className="ml-auto px-4 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-400"
+              >
+                Atualizar
               </button>
             </div>
 

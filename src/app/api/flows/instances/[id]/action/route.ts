@@ -104,6 +104,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erro interno do servidor';
     const status = message === 'UNAUTHORIZED' ? 401 : 500;
+    if (message === 'TRIAL_EXPIRED') {
+      return NextResponse.json({ error: 'Expirado' }, { status: 403 });
+    }
     if (message === 'ACTION_NOT_ALLOWED') {
       return NextResponse.json({ error: 'Acao nao permitida' }, { status: 403 });
     }

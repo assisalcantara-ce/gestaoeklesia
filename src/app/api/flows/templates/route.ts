@@ -44,6 +44,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: payload });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erro interno do servidor';
+    if (message === 'TRIAL_EXPIRED') {
+      return NextResponse.json({ error: 'Expirado' }, { status: 403 });
+    }
     if (message === 'NO_MINISTRY') {
       return NextResponse.json({ error: 'Usuario sem vinculo com ministerio' }, { status: 403 });
     }
@@ -103,6 +106,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ data: template });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erro interno do servidor';
+    if (message === 'TRIAL_EXPIRED') {
+      return NextResponse.json({ error: 'Expirado' }, { status: 403 });
+    }
     if (message === 'NO_MINISTRY') {
       return NextResponse.json({ error: 'Usuario sem vinculo com ministerio' }, { status: 403 });
     }

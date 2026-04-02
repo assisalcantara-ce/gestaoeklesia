@@ -40,6 +40,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ success: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erro interno do servidor';
+    if (message === 'TRIAL_EXPIRED') {
+      return NextResponse.json({ error: 'Expirado' }, { status: 403 });
+    }
     if (message === 'NO_MINISTRY') {
       return NextResponse.json({ error: 'Usuario sem vinculo com ministerio' }, { status: 403 });
     }

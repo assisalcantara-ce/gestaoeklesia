@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
     // Atualizar status em pre_registrations
     const { error: updateError } = await supabaseAdmin
       .from('pre_registrations')
-      .update({ status: 'active' })
+      .update({ status: 'trial' })
       .eq('id', pre_registration_id)
 
     if (updateError) {

@@ -35,7 +35,26 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { ministerio, pastor, cpf, whatsapp, email } = body
+    const {
+      ministerio,
+      pastor,
+      cpf,
+      whatsapp,
+      email,
+      phone,
+      website,
+      responsible_name,
+      quantity_temples,
+      quantity_members,
+      address_street,
+      address_number,
+      address_complement,
+      address_city,
+      address_state,
+      address_zip,
+      description,
+      plan,
+    } = body
 
     console.log('[CONTACT] Recebido:', { ministerio, pastor, cpf, whatsapp, email })
 
@@ -125,6 +144,18 @@ export async function POST(request: NextRequest) {
       // ignore
     }
 
+    const allowedPlans = new Set(['starter', 'intermediario', 'profissional', 'expert'])
+    const planValue = typeof plan === 'string' && allowedPlans.has(plan.toLowerCase())
+      ? plan.toLowerCase()
+      : 'starter'
+
+    const templesValue = Number.isFinite(Number(quantity_temples))
+      ? Number(quantity_temples)
+      : 1
+    const membersValue = Number.isFinite(Number(quantity_members))
+      ? Number(quantity_members)
+      : 0
+
     // Salvar solicitação de contato em pre_registrations
     const { data: contact, error: contactError } = await supabaseClient
       .from('pre_registrations')
@@ -135,9 +166,22 @@ export async function POST(request: NextRequest) {
         cpf_cnpj: cpf,
         whatsapp,
         email,
+        phone: phone || null,
+        website: website || null,
+        responsible_name: responsible_name || pastor || null,
+        quantity_temples: templesValue,
+        quantity_members: membersValue,
+        address_street: address_street || null,
+        address_number: address_number || null,
+        address_complement: address_complement || null,
+        address_city: address_city || null,
+        address_state: address_state || null,
+        address_zip: address_zip || null,
+        description: description || null,
+        plan: planValue,
         trial_expires_at: new Date().toISOString(), // Data de hoje para pendente; será atualizada quando aprovado
         trial_days: 0,
-        status: 'pending',
+        status: 'trial',
         created_at: new Date().toISOString(),
       })
       .select()
@@ -179,7 +223,7 @@ export async function POST(request: NextRequest) {
         admin_id: null, // Notificação para todos os admins
         type: 'new_contact_request',
         title: `📝 Nova Solicitação de Contato: ${ministerio}`,
-        message: `Pastor: ${pastor} | Email: ${email} | WhatsApp: ${whatsapp}`,
+        message: `Pastor: ${pastor} | Email: ${email} | WhatsApp: ${whatsapp} | Plano: ${planValue}`,
         data: {
           contact_id: contact.id,
           ministry_name: ministerio,
@@ -187,6 +231,7 @@ export async function POST(request: NextRequest) {
           cpf_cnpj: cpf,
           email,
           whatsapp,
+          plan: planValue,
         },
         is_read: false,
         created_at: new Date().toISOString(),

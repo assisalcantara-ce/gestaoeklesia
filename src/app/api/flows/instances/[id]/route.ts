@@ -33,6 +33,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ data: { instance, definition: version?.definition_json || null, history: history || [], roles } });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erro interno do servidor';
+    if (message === 'TRIAL_EXPIRED') {
+      return NextResponse.json({ error: 'Expirado' }, { status: 403 });
+    }
     if (message === 'NO_MINISTRY') {
       return NextResponse.json({ error: 'Usuario sem vinculo com ministerio' }, { status: 403 });
     }
@@ -88,6 +91,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ data: updated });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erro interno do servidor';
+    if (message === 'TRIAL_EXPIRED') {
+      return NextResponse.json({ error: 'Expirado' }, { status: 403 });
+    }
     if (message === 'NO_MINISTRY') {
       return NextResponse.json({ error: 'Usuario sem vinculo com ministerio' }, { status: 403 });
     }

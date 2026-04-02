@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.pre_registrations (
   email VARCHAR(255) NOT NULL UNIQUE,
   trial_expires_at TIMESTAMP NOT NULL,
   trial_days INTEGER DEFAULT 7,
-  status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'expired', 'converted')),
+  status VARCHAR(50) DEFAULT 'trial' CHECK (status IN ('trial', 'encerrado')),
   notes TEXT,
   created_at TIMESTAMP DEFAULT now(),
   updated_at TIMESTAMP DEFAULT now()
@@ -54,8 +54,8 @@ CREATE OR REPLACE FUNCTION check_trial_expiration()
 RETURNS VOID AS $$
 BEGIN
   UPDATE public.pre_registrations
-  SET status = 'expired'
-  WHERE trial_expires_at <= NOW() AND status IN ('pending', 'active');
+  SET status = 'encerrado'
+  WHERE trial_expires_at <= NOW() AND status IN ('trial');
   
   -- Opcional: deletar usuários cujo trial expirou
   -- DELETE FROM auth.users

@@ -16,7 +16,7 @@ const benefits = [
   },
   {
     title: 'Relatórios e métricas',
-    text: 'Acompanhe indicadores, frequência, crescimento e dados escancaradamente útil.'
+    text: 'Acompanhe indicadores, frequência, crescimento e dados escancaradamente úteis.'
   },
   {
     title: '100% na nuvem',
@@ -68,6 +68,7 @@ const features = [
 const pricing = [
   {
     name: 'Starter',
+    slug: 'starter',
     priceMonthly: 'R$ 149,99',
     priceYearly: 'R$ 1.499,99/ano',
     description: 'Ideal para Instituições pequenas iniciando na plataforma',
@@ -75,6 +76,7 @@ const pricing = [
   },
   {
     name: 'Intermediário',
+    slug: 'intermediario',
     priceMonthly: 'R$ 299,99',
     priceYearly: 'R$ 2.999,99/ano',
     description: 'Solução completa para Instituições de grande porte e em crescimento',
@@ -83,6 +85,7 @@ const pricing = [
   },
   {
     name: 'Profissional',
+    slug: 'profissional',
     priceMonthly: 'R$ 499,99',
     priceYearly: 'R$ 4.999,99/ano',
     description: 'Solução completa para Instituições de grande porte e em crescimento',
@@ -90,6 +93,7 @@ const pricing = [
   },
   {
     name: 'Expert',
+    slug: 'expert',
     priceMonthly: 'R$ 999,00',
     priceYearly: 'R$ 9.999,99/ano',
     description: 'Personalizado para grandes Instituições com alto fluxo de atividades.',
@@ -179,37 +183,37 @@ export default function LandingPage() {
 
     try {
       if (!contactData.ministerio.trim()) {
-        setError('Nome do Ministerio e obrigatorio');
+        setError('Nome do Ministério é obrigatório');
         setLoading(false);
         return;
       }
 
       if (!contactData.pastor.trim()) {
-        setError('Nome do Pastor e obrigatorio');
+        setError('Nome do Pastor é obrigatório');
         setLoading(false);
         return;
       }
 
       if (!contactData.cpf.trim()) {
-        setError('CPF/CNPJ e obrigatorio');
+        setError('CPF/CNPJ é obrigatório');
         setLoading(false);
         return;
       }
 
       if (!contactData.whatsapp.trim()) {
-        setError('WhatsApp e obrigatorio');
+        setError('WhatsApp é obrigatório');
         setLoading(false);
         return;
       }
 
       if (!contactData.email.trim()) {
-        setError('Email e obrigatorio');
+        setError('Email é obrigatório');
         setLoading(false);
         return;
       }
 
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactData.email)) {
-        setError('Email invalido');
+        setError('Email inválido');
         setLoading(false);
         return;
       }
@@ -274,7 +278,7 @@ export default function LandingPage() {
       <NotificationModal
         isOpen={successModal.isOpen}
         type="success"
-        title="Solicitacao recebida!"
+        title="Solicitação recebida!"
         message={`Obrigado pelo interesse. Entraremos em contato em breve.\n\nEmail: ${successModal.email}`}
         onClose={() => setSuccessModal({ isOpen: false, email: '' })}
         autoClose={5000}
@@ -283,8 +287,8 @@ export default function LandingPage() {
       <NotificationModal
         isOpen={errorModal.isOpen}
         type="error"
-        title="Email ja registrado"
-        message={`O email ${errorModal.email} ja foi registrado.`}
+        title="Email já registrado"
+        message={`O email ${errorModal.email} já foi registrado.`}
         onClose={() => setErrorModal({ isOpen: false, email: '' })}
         showButton={true}
         autoClose={4000}
@@ -316,7 +320,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/img/logo333-v2.png" alt="Gestao Servus" className="h-10" />
+            <img src="/img/logo333-v2.png" alt="Gestão Servus" className="h-10" />
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
             <a href="#beneficios" className="hover:text-slate-900 transition">Benefícios</a>
@@ -341,7 +345,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 py-20 grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-center">
           <div className="space-y-6">
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-xs font-semibold uppercase tracking-[0.3em] text-blue-600">
-              Gestao inteligente
+              Gestão inteligente
             </span>
             <h1 className="landing-title text-4xl md:text-5xl">
               Gestão inteligente para instituições modernas.
@@ -364,7 +368,7 @@ export default function LandingPage() {
               </a>
             </div>
             <div className="flex flex-wrap gap-3 text-sm text-slate-600">
-              <span className="px-3 py-1 bg-slate-100 rounded-full">7 dias gratis</span>
+              <span className="px-3 py-1 bg-slate-100 rounded-full">7 dias grátis</span>
               <span className="px-3 py-1 bg-slate-100 rounded-full">Suporte especializado</span>
               <span className="px-3 py-1 bg-slate-100 rounded-full">Cancele quando quiser</span>
             </div>
@@ -377,7 +381,7 @@ export default function LandingPage() {
                 <span className="text-slate-900 font-semibold">~1 dia</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-600">Modulo mais usado</span>
+                <span className="text-slate-600">Módulo mais usado</span>
                 <span className="text-slate-900 font-semibold">Secretaria</span>
               </div>
               <div className="flex items-center justify-between">
@@ -396,7 +400,7 @@ export default function LandingPage() {
 
       <section id="telas" className="max-w-6xl mx-auto px-6 py-16">
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Veja na pratica</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Veja na prática</p>
           <h2 className="landing-title text-3xl">Telas do sistema</h2>
           <p className="text-slate-600 mt-3">Um panorama real do que sua equipe vai usar no dia a dia.</p>
         </div>
@@ -494,7 +498,7 @@ export default function LandingPage() {
                 ))}
               </ul>
               <a
-                href="#contato"
+                href={`/pre-cadastro?plan=${plan.slug || 'starter'}`}
                 className={`mt-6 inline-flex w-full justify-center px-4 py-2 rounded-lg font-semibold transition ${plan.featured
                   ? 'bg-yellow-400 text-slate-900 hover:bg-yellow-300'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
@@ -510,7 +514,7 @@ export default function LandingPage() {
       <section id="faq" className="max-w-6xl mx-auto px-6 py-16">
         <div className="text-center max-w-2xl mx-auto mb-10">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Perguntas frequentes</p>
-          <h2 className="landing-title text-3xl">Tire suas duvidas</h2>
+          <h2 className="landing-title text-3xl">Tire suas dúvidas</h2>
         </div>
         <div className="grid gap-4">
           {faqs.map((faq) => (
@@ -528,14 +532,14 @@ export default function LandingPage() {
       <section id="contato" className="max-w-6xl mx-auto px-6 py-16">
         <div className="grid gap-10 lg:grid-cols-[1fr_1fr] items-start">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Ainda tem duvidas?</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Ainda tem dúvidas?</p>
             <h2 className="landing-title text-3xl">Vamos conversar</h2>
             <p className="text-slate-600 mt-3">
               Nossa equipe responde em até 24h úteis. Agendamos uma demonstração, liberamos acesso ao trial e guiamos sua implementação.
             </p>
             <div className="mt-8 space-y-3 text-sm text-slate-600">
-              <p>Atendimento: Segunda a sexta, 9h as 18h (horário Brasília)</p>
-              <p>Demonstracao via video call - 30 minutos</p>
+              <p>Atendimento: Segunda a sexta, 9h às 18h (horário Brasília)</p>
+              <p>Demonstração via vídeo call - 30 minutos</p>
               <p>Consultoria de implementação incluída</p>
               <p>Onboarding com sua equipe</p>
             </div>

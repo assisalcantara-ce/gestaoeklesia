@@ -62,6 +62,8 @@ export async function requireFlowAuth(request: NextRequest): Promise<FlowAuthCon
     throw new Error('UNAUTHORIZED');
   }
 
+  await ensureTrialAccess(userId);
+
   const resolvedMuFromRequest = await resolveMinistryUserFromRequest(supabase, userId, token);
   const resolvedMu = resolvedMuFromRequest || await resolveMinistryUser(userId);
   if (resolvedMu?.ministry_id) {
@@ -100,6 +102,31 @@ export async function requireFlowAuth(request: NextRequest): Promise<FlowAuthCon
     roles: ['ADMINISTRADOR'],
     congregacaoId: null,
   };
+}
+
+async function ensureTrialAccess(userId: string) {
+  const admin = createServerClient();
+  const { data, error } = await admin
+    .from('pre_registrations')
+    .select('id, trial_expires_at, status')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error || !data) return;
+
+  const expiresAt = data.trial_expires_at ? new Date(data.trial_expires_at) : null;
+  const isExpired = data.status === 'encerrado' || (expiresAt && expiresAt.getTime() <= Date.now());
+
+  if (isExpired) {
+    if (data.status !== 'encerrado') {
+      await admin
+        .from('pre_registrations')
+        .update({ status: 'encerrado' })
+        .eq('id', data.id);
+    }
+
+    throw new Error('TRIAL_EXPIRED');
+  }
 }
 
 async function resolveMinistryUser(userId: string) {

@@ -103,3 +103,43 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
+
+export async function GET(request: NextRequest) {
+  try {
+    const guard = await requireAdmin(request, { requiredRole: 'admin' });
+    if (!guard.ok) return guard.response;
+
+    const { supabaseAdmin } = guard.ctx;
+    const searchParams = request.nextUrl.searchParams;
+    const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit') || '50')));
+    const status = searchParams.get('status');
+
+    let query = supabaseAdmin
+      .from('pre_registrations')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (status && status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    console.error('API error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Erro ao listar pré-registros' },
+      { status: 500 }
+    );
+  }
+}
