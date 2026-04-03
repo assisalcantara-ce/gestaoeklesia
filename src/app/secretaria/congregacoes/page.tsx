@@ -76,9 +76,10 @@ interface MemberLookup {
   id: string;
   name: string;
   cpf: string | null;
-  birth_date: string | null;
+  data_nascimento: string | null;
   role: string | null;
   occupation: string | null;
+  profissao?: string | null;
   phone: string | null;
   custom_fields: Record<string, any> | null;
 }
@@ -669,7 +670,7 @@ export default function CongregacoesPage() {
       setSupervisorCpfStatus('loading');
       setSupervisorCpfMsg('Buscando sugestões...');
 
-      const selectFields = 'id, name, cpf, birth_date, role, occupation, phone, custom_fields';
+      const selectFields = 'id, name, cpf, data_nascimento, role, profissao, phone, custom_fields';
       const { data, error } = await supabase
         .from('members')
         .select(selectFields)
@@ -725,7 +726,7 @@ export default function CongregacoesPage() {
       setSupervisorStatus('loading');
       setSupervisorMsg('Aguardando dados...');
 
-      const selectFields = 'id, name, cpf, birth_date, role, occupation, phone, custom_fields';
+      const selectFields = 'id, name, cpf, data_nascimento, role, profissao, phone, custom_fields';
       const { data: dataDigits, error: errDigits } = await supabase
         .from('members')
         .select(selectFields)
@@ -789,7 +790,7 @@ export default function CongregacoesPage() {
 
       const cargo =
         member.role ||
-        member.occupation ||
+        member.profissao ||
         (member.custom_fields && (member.custom_fields.cargo || member.custom_fields.função || member.custom_fields.funcao)) ||
         '';
 
@@ -804,7 +805,7 @@ export default function CongregacoesPage() {
         supervisor_matricula: String(matricula || ''),
         supervisor_nome: member.name || '',
         supervisor_cpf: member.cpf || cpfDigits,
-        supervisor_data_nascimento: member.birth_date || '',
+        supervisor_data_nascimento: member.data_nascimento || '',
         supervisor_cargo: String(cargo || ''),
         supervisor_celular: String(celular || '')
       }));
@@ -936,7 +937,7 @@ export default function CongregacoesPage() {
 
       const { data, error } = await supabase
         .from('members')
-        .select('id, name, cpf, birth_date, role, occupation, phone, custom_fields')
+        .select('id, name, cpf, data_nascimento, role, profissao, phone, custom_fields')
         .eq('ministry_id', ministryId)
         .ilike('name', `%${q}%`)
         .limit(7);
@@ -993,7 +994,7 @@ export default function CongregacoesPage() {
 
       const { data, error } = await supabase
         .from('members')
-        .select('id, name, cpf, birth_date, role, occupation, phone, custom_fields')
+        .select('id, name, cpf, data_nascimento, role, profissao, phone, custom_fields')
         .eq('ministry_id', ministryId)
         .ilike('name', `%${q}%`)
         .limit(8);

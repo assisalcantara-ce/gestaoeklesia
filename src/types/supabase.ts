@@ -61,27 +61,70 @@ export type Member = {
   email: string | null
   phone: string | null
   cpf: string | null
+  // Datas ministeriais
   data_consagracao?: string | null
   data_emissao?: string | null
   data_validade_credencial?: string | null
-  birth_date: string | null
-  gender: string | null
-  marital_status: string | null
+  // Aba Dados
+  matricula?: string | null
+  unique_id?: string | null
+  tipo_cadastro?: string | null
+  data_nascimento: string | null
+  sexo: string | null
+  tipo_sanguineo?: string | null
+  escolaridade?: string | null
+  estado_civil: string | null
+  nome_conjuge?: string | null
+  cpf_conjuge?: string | null
+  data_nascimento_conjuge?: string | null
+  nome_pai?: string | null
+  nome_mae?: string | null
+  rg?: string | null
   orgao_emissor?: string | null
-  occupation: string | null
-  address: string | null
-  complement: string | null
-  city: string | null
-  state: string | null
-  zipcode: string | null
+  nacionalidade?: string | null
+  naturalidade?: string | null
+  uf_naturalidade?: string | null
+  titulo_eleitoral?: string | null
+  zona_eleitoral?: string | null
+  secao_eleitoral?: string | null
+  data_batismo_aguas?: string | null
+  data_batismo_espirito_santo?: string | null
+  // Aba Endereço
+  cep?: string | null
+  logradouro: string | null
+  numero?: string | null
+  bairro?: string | null
+  complemento: string | null
+  cidade: string | null
+  estado: string | null
+  // Aba Contato
+  celular?: string | null
+  whatsapp?: string | null
+  // Geolocalização
   congregacao_id?: string | null
   latitude?: number | null
   longitude?: number | null
+  // Aba Ministerial
+  profissao: string | null
+  curso_teologico?: string | null
+  instituicao_teologica?: string | null
+  pastor_auxiliar?: boolean | null
+  procedencia?: string | null
+  procedencia_local?: string | null
+  cargo_ministerial?: string | null
+  dados_cargos?: Record<string, any> | null
+  tem_funcao_igreja?: boolean | null
+  qual_funcao?: string | null
+  setor_departamento?: string | null
+  observacoes_ministeriais?: string | null
+  // Aba Foto
+  foto_url?: string | null
+  // Campos do sistema
   member_since: string
   role: string | null
   status: 'active' | 'inactive' | 'deceased' | 'transferred'
   custom_fields: Record<string, any>
-  notes: string | null
+  observacoes: string | null
   created_at: string
   updated_at: string
 }
@@ -183,24 +226,66 @@ export type CreateMemberRequest = {
   data_consagracao?: string | null
   data_emissao?: string | null
   data_validade_credencial?: string | null
-  birth_date?: string | null
-  gender?: string | null
-  marital_status?: string | null
+  // Aba Dados
+  matricula?: string | null
+  unique_id?: string | null
+  tipo_cadastro?: string | null
+  data_nascimento?: string | null
+  sexo?: string | null
+  tipo_sanguineo?: string | null
+  escolaridade?: string | null
+  estado_civil?: string | null
+  nome_conjuge?: string | null
+  cpf_conjuge?: string | null
+  data_nascimento_conjuge?: string | null
+  nome_pai?: string | null
+  nome_mae?: string | null
+  rg?: string | null
   orgao_emissor?: string | null
-  occupation?: string | null
-  address?: string | null
-  complement?: string | null
-  city?: string | null
-  state?: string | null
-  zipcode?: string | null
+  nacionalidade?: string | null
+  naturalidade?: string | null
+  uf_naturalidade?: string | null
+  titulo_eleitoral?: string | null
+  zona_eleitoral?: string | null
+  secao_eleitoral?: string | null
+  data_batismo_aguas?: string | null
+  data_batismo_espirito_santo?: string | null
+  // Aba Endereço
+  cep?: string | null
+  logradouro?: string | null
+  numero?: string | null
+  bairro?: string | null
+  complemento?: string | null
+  cidade?: string | null
+  estado?: string | null
+  // Aba Contato
+  celular?: string | null
+  whatsapp?: string | null
+  // Geolocalização
   congregacao_id?: string | null
   latitude?: number | null
   longitude?: number | null
+  // Aba Ministerial
+  profissao?: string | null
+  curso_teologico?: string | null
+  instituicao_teologica?: string | null
+  pastor_auxiliar?: boolean | null
+  procedencia?: string | null
+  procedencia_local?: string | null
+  cargo_ministerial?: string | null
+  dados_cargos?: Record<string, any> | null
+  tem_funcao_igreja?: boolean | null
+  qual_funcao?: string | null
+  setor_departamento?: string | null
+  observacoes_ministeriais?: string | null
+  // Aba Foto
+  foto_url?: string | null
+  // Sistema
   member_since?: string | Date
   role?: string | null
   status?: Member['status']
   custom_fields?: Record<string, any>
-  notes?: string | null
+  observacoes?: string | null
 }
 
 export type UpdateMemberRequest = Partial<CreateMemberRequest>
