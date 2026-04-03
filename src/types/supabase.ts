@@ -29,6 +29,7 @@ export type Ministry = {
   quantity_temples?: number | null
   quantity_members?: number | null
   plan: 'starter' | 'intermediario' | 'profissional' | 'expert'
+  subscription_plan_id?: string | null
   subscription_status: 'active' | 'trial' | 'suspended' | 'expired'
   subscription_start_date: string
   subscription_end_date: string | null
