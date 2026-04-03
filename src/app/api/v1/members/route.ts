@@ -282,37 +282,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-            complement: normalizedBody.complement || null,
-            city: normalizedBody.city || null,
-            state: normalizedBody.state || null,
-            zipcode: normalizedBody.zipcode || null,
-            congregacao_id: normalizedBody.congregacao_id || null,
-            member_since: normalizedBody.member_since || new Date(),
-            role: normalizedBody.role || null,
-            status: normalizedBody.status || 'active',
-            custom_fields: normalizedBody.custom_fields || {},
-            notes: normalizedBody.notes || null,
-          },
-        ])
-        .select()
-
-      if (error2) {
-        return NextResponse.json({ error: error2.message }, { status: 400 })
-      }
-
-      return NextResponse.json(data2[0], { status: 201 })
-    }
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
-
-    return NextResponse.json(data[0], { status: 201 })
-  } catch (error) {
-    console.error('POST /api/v1/members:', error)
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    )
-  }
-}
