@@ -3,62 +3,65 @@ import { Plan } from '@/types/ministry';
 export const PLANOS_DISPONIBLES: { [key: string]: Plan } = {
   starter: {
     id: 'starter',
-    nome: 'Plano Starter',
-    preco_mensal: 99.90,
-    preco_anual: 999.00,
-    descricao: 'Ideal para ministérios pequenos',
-    usuarios_max: 10,
-    armazenamento_gb: 5,
+    nome: 'Starter',
+    preco_mensal: 149.99,
+    preco_anual: 1499.99,
+    descricao: 'Ideal para instituicoes pequenas iniciando na plataforma',
+    usuarios_max: 3,
+    armazenamento_gb: 0,
     recursos: [
-      'Até 10 usuários',
-      '5 GB de armazenamento',
-      'Dashboard básico',
-      'Suporte por email',
-      'Relatórios simples',
-      'Backup semanal'
+      'Ate 5 Campos',
+      'Ate 50 Igrejas',
+      'Ate 500 Membros',
+      'Ate 3 Usuarios Administrativos'
     ],
     cor: 'bg-blue-50 border-blue-200'
   },
-  professional: {
-    id: 'professional',
-    nome: 'Plano Professional',
-    preco_mensal: 199.90,
-    preco_anual: 1999.00,
-    descricao: 'Ideal para ministérios em crescimento',
-    usuarios_max: 50,
-    armazenamento_gb: 50,
+  intermediario: {
+    id: 'intermediario',
+    nome: 'Intermediario',
+    preco_mensal: 299.99,
+    preco_anual: 2999.99,
+    descricao: 'Solucao completa para instituicoes de grande porte e em crescimento.',
+    usuarios_max: 10,
+    armazenamento_gb: 0,
     recursos: [
-      'Até 50 usuários',
-      '50 GB de armazenamento',
-      'Dashboard avançado',
-      'Suporte por email e chat',
-      'Relatórios detalhados',
-      'Backup diário',
-      'Integração com sistemas externos',
-      'API própria'
+      'Ate 20 Campos',
+      'Ate 250 Igrejas',
+      'Ate 3.000 Membros',
+      'Ate 10 Usuarios Administrativos'
     ],
-    cor: 'bg-green-50 border-green-200'
+    cor: 'bg-sky-50 border-sky-200'
   },
-  enterprise: {
-    id: 'enterprise',
-    nome: 'Plano Enterprise',
-    preco_mensal: 499.90,
-    preco_anual: 4999.00,
-    descricao: 'Ideal para grandes redes de ministérios',
-    usuarios_max: 500,
-    armazenamento_gb: 500,
+  profissional: {
+    id: 'profissional',
+    nome: 'Profissional',
+    preco_mensal: 499.99,
+    preco_anual: 4999.99,
+    descricao: 'Solucao completa para instituicoes em fase de expansao acelerada',
+    usuarios_max: 25,
+    armazenamento_gb: 0,
     recursos: [
-      'Até 500 usuários',
-      '500 GB de armazenamento',
-      'Dashboard customizável',
-      'Suporte 24/7 (phone + email + chat)',
-      'Relatórios em tempo real',
-      'Backup em tempo real',
-      'API ilimitada',
-      'Consultoria incluída',
-      'Custom branding',
-      'SSO (Single Sign-On)',
-      'Gestor de conta dedicado'
+      'Ate 50 Campos',
+      'Ate 600 Igrejas',
+      'Ate 7.000 Membros',
+      'Ate 25 Usuarios Administrativos'
+    ],
+    cor: 'bg-indigo-50 border-indigo-200'
+  },
+  expert: {
+    id: 'expert',
+    nome: 'Expert',
+    preco_mensal: 999.0,
+    preco_anual: 9999.99,
+    descricao: 'Personalizado para grandes instituicoes com alto fluxo de atividades.',
+    usuarios_max: 999,
+    armazenamento_gb: 0,
+    recursos: [
+      'Ate 999 Campos',
+      'Ate 999 Igrejas',
+      'Ate 99.999 Membros',
+      'Ate 999 Usuarios Administrativos'
     ],
     cor: 'bg-purple-50 border-purple-200'
   }

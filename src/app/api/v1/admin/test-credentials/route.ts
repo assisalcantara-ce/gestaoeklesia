@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
         name: `${ministryPrefix}${preReg.ministry_name}`,
         slug: slug,
         email_admin: email,
-        plan: isPermanent ? 'professional' : 'trial',
+        plan: isPermanent ? 'profissional' : 'trial',
         subscription_status: 'active',
         subscription_start_date: startDate.toISOString(),
         subscription_end_date: endDate?.toISOString() || null,

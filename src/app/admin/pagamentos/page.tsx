@@ -9,7 +9,7 @@ import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import AdminSidebar from '@/components/AdminSidebar'
 import type { Payment, SubscriptionPlan } from '@/types/admin'
 import type { Ministry } from '@/types/supabase'
-import { CheckCircle2, FileText, Info } from 'lucide-react'
+import { CheckCircle2, FileText, Info, Trash2 } from 'lucide-react'
 
 export default function PagamentosPage() {
   const { isLoading, isAuthenticated } = useAdminAuth()
@@ -31,6 +31,9 @@ export default function PagamentosPage() {
   const [detailsModal, setDetailsModal] = useState<{ isOpen: boolean; payment: Payment | null }>(
     { isOpen: false, payment: null }
   )
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; payment: Payment | null; deleting: boolean }>(
+    { isOpen: false, payment: null, deleting: false }
+  )
   const [filter, setFilter] = useState<string>('all')
   const [filters, setFilters] = useState({
     ministry_id: '',
@@ -43,6 +46,8 @@ export default function PagamentosPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const router = useRouter()
 
   const [formData, setFormData] = useState({
@@ -126,7 +131,7 @@ export default function PagamentosPage() {
       setLoading(true)
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '20',
+        limit: '15',
       })
       if (filters.ministry_id) params.append('ministry_id', filters.ministry_id)
       if (filters.due_from) params.append('due_from', filters.due_from)
@@ -145,6 +150,8 @@ export default function PagamentosPage() {
 
       const data = await response.json()
       setPagamentos(data.data)
+      setTotalPages(data.total_pages || 1)
+      setTotalCount(data.count || 0)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -286,6 +293,30 @@ export default function PagamentosPage() {
     }
   }
 
+  const handleDeletePayment = async () => {
+    if (!deleteModal.payment) return
+    setDeleteModal(prev => ({ ...prev, deleting: true }))
+    try {
+      const response = await authenticatedFetch('/api/v1/admin/payments', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentId: deleteModal.payment.id }),
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Erro ao excluir cobrança')
+      }
+
+      setSuccess('Cobrança excluída com sucesso!')
+      setDeleteModal({ isOpen: false, payment: null, deleting: false })
+      fetchPagamentos()
+    } catch (err: any) {
+      setError(err.message)
+      setDeleteModal(prev => ({ ...prev, deleting: false }))
+    }
+  }
+
   const handlePrintReceipt = (payment: Payment) => {
     const ministryName = (payment as any).ministries?.name || payment.ministry_id
     const planName = (payment as any).subscription_plans?.name || '-'
@@ -388,6 +419,7 @@ export default function PagamentosPage() {
               </button>
             </div>
 
+            {!showForm && (
             <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6 mb-6 text-gray-100">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Busca / Filtro</h3>
@@ -501,6 +533,7 @@ export default function PagamentosPage() {
                 </div>
               </div>
             </div>
+            )}
 
             {showForm && (
               <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6 mb-6 text-gray-100">
@@ -781,6 +814,10 @@ export default function PagamentosPage() {
             )}
 
             <div className="bg-gray-900 border border-gray-800 rounded-lg shadow overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+                <h2 className="text-base font-semibold text-white">Cobranças</h2>
+                {!loading && <span className="text-xs text-gray-400">{totalCount} registro{totalCount !== 1 ? 's' : ''}</span>}
+              </div>
               {loading ? (
                 <div className="p-6 text-center text-gray-400">Carregando...</div>
               ) : pagamentos.length === 0 ? (
@@ -848,6 +885,13 @@ export default function PagamentosPage() {
                                 <CheckCircle2 size={18} />
                               </button>
                             )}
+                            <button
+                              onClick={() => setDeleteModal({ isOpen: true, payment: p, deleting: false })}
+                              title="Excluir cobrança"
+                              className="p-3 rounded-lg border border-red-600 text-red-400 hover:text-white hover:bg-red-600"
+                            >
+                              <Trash2 size={18} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -855,6 +899,45 @@ export default function PagamentosPage() {
                   </tbody>
                 </table>
               )}
+
+              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700">
+                  <p className="text-sm text-gray-400">
+                    {totalCount} registro{totalCount !== 1 ? 's' : ''} &bull; Página {page} de {totalPages}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPage(1)}
+                      disabled={page === 1}
+                      className="px-3 py-1.5 text-xs rounded-lg border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      «
+                    </button>
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-3 py-1.5 text-xs rounded-lg border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Anterior
+                    </button>
+                    <span className="px-3 py-1.5 text-xs rounded-lg bg-gray-700 text-white font-medium">
+                      {page}
+                    </span>
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="px-3 py-1.5 text-xs rounded-lg border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Próxima
+                    </button>
+                    <button
+                      onClick={() => setPage(totalPages)}
+                      disabled={page === totalPages}
+                      className="px-3 py-1.5 text-xs rounded-lg border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      »
+                    </button>
+                  </div>
+                </div>
             </div>
           </div>
         </div>
@@ -953,6 +1036,45 @@ export default function PagamentosPage() {
                 <p className="text-gray-400">ASAAS ID</p>
                 <p className="text-gray-100 font-semibold">{detailsModal.payment.asaas_payment_id || '-'}</p>
               </div>
+              {!(detailsModal.payment as any).asaas_payment_id && (detailsModal.payment as any).asaas_response?.error && (
+                <div className="bg-red-900/40 border border-red-700 rounded-lg p-3 md:col-span-2">
+                  <p className="text-red-400 text-xs font-semibold mb-1">Erro ASAAS</p>
+                  <p className="text-red-200 text-xs break-all">{(detailsModal.payment as any).asaas_response.error}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteModal.isOpen && deleteModal.payment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-gray-700 bg-gray-900 p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-white">Excluir Cobrança</h3>
+            <p className="text-sm text-gray-400 mt-2">
+              {deleteModal.payment.asaas_payment_id
+                ? 'Esta cobrança será removida do sistema e também cancelada no ASAAS.'
+                : 'Esta cobrança será removida do sistema.'}
+            </p>
+            <div className="mt-3 bg-gray-800 rounded-lg p-3 text-sm">
+              <p className="text-gray-400">Descrição: <span className="text-gray-100">{deleteModal.payment.description || '-'}</span></p>
+              <p className="text-gray-400 mt-1">Valor: <span className="text-gray-100">R$ {deleteModal.payment.amount?.toFixed(2)}</span></p>
+            </div>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setDeleteModal({ isOpen: false, payment: null, deleting: false })}
+                disabled={deleteModal.deleting}
+                className="px-4 py-2 rounded-lg border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeletePayment}
+                disabled={deleteModal.deleting}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleteModal.deleting ? 'Excluindo...' : 'Confirmar exclusão'}
+              </button>
             </div>
           </div>
         </div>

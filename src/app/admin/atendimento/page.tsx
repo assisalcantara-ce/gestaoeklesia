@@ -865,8 +865,9 @@ export default function AttendancePanelPage() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                     >
                       <option value="starter">Starter</option>
-                      <option value="professional">Professional</option>
-                      <option value="enterprise">Enterprise</option>
+                      <option value="intermediario">Intermediario</option>
+                      <option value="profissional">Profissional</option>
+                      <option value="expert">Expert</option>
                     </select>
                   </div>
                 </div>

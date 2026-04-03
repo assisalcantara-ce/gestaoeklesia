@@ -232,7 +232,7 @@ export default function LoginPage() {
 
       <div className="md:hidden flex justify-center items-center mb-6">
         <img
-          src="/img/logo3.png"
+          src="/img/logo44.png"
           alt="Gestao Servus"
           className="w-[200px] drop-shadow-xl logo-animate"
         />
@@ -241,22 +241,13 @@ export default function LoginPage() {
       <div className="flex w-full max-w-6xl items-center justify-center gap-8">
         <div className="hidden md:flex md:w-1/2 justify-center items-center">
           <img
-            src="/img/logo3.png"
+            src="/img/logo44.png"
             alt="Gestao Servus"
             className="w-[350px] drop-shadow-xl logo-animate"
           />
         </div>
 
         <div className="w-full md:w-1/2 flex flex-col items-center justify-center">
-          <div className="w-full max-w-sm mx-4 mb-4">
-            <button
-              type="button"
-              onClick={() => router.push('/admin/login')}
-              className="w-full px-4 py-3 bg-[#123b63] text-white rounded-xl border border-white/10 hover:bg-[#0f2a45] transition font-semibold"
-            >
-              Acessar Area Admin
-            </button>
-          </div>
           {!showSignup && (
             <div className="rounded-2xl shadow-2xl w-full max-w-sm backdrop-blur-sm p-6 mx-4" style={{ backgroundColor: '#4A6FA5E6', color: 'white' }}>
               <h2 className="text-center text-xl font-bold mb-6 text-white">ACESSO AO SISTEMA</h2>
@@ -415,6 +406,16 @@ export default function LoginPage() {
               </form>
             </div>
           )}
+
+          <div className="w-full max-w-sm mx-4 mt-6">
+            <button
+              type="button"
+              onClick={() => router.push('/admin/login')}
+              className="w-full px-4 py-3 bg-[#123b63] text-white rounded-xl border border-white/10 hover:bg-[#0f2a45] transition font-semibold"
+            >
+              Acessar Area Admin
+            </button>
+          </div>
         </div>
       </div>
     </div>

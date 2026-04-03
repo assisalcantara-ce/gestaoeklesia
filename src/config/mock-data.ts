@@ -20,12 +20,12 @@ export const ministeriiosSimulados: Ministry[] = [
     subscription: {
       id: 'sub001',
       ministry_id: 'min001',
-      plan_id: 'professional',
+      plan_id: 'profissional',
       status: 'ativo',
       data_inicio: '2025-01-15',
       data_vencimento: '2026-01-15',
       tipo_pagamento: 'anual',
-      valor_pago: 1999.00,
+      valor_pago: 4999.99,
       renovacao_automatica: true
     },
     usuarios_count: 28,
@@ -76,12 +76,12 @@ export const ministeriiosSimulados: Ministry[] = [
     subscription: {
       id: 'sub003',
       ministry_id: 'min003',
-      plan_id: 'enterprise',
+      plan_id: 'expert',
       status: 'ativo',
       data_inicio: '2024-06-10',
       data_vencimento: '2026-06-10',
       tipo_pagamento: 'anual',
-      valor_pago: 4999.00,
+      valor_pago: 9999.99,
       renovacao_automatica: true
     },
     usuarios_count: 145,
@@ -103,12 +103,12 @@ export const ministeriiosSimulados: Ministry[] = [
     subscription: {
       id: 'sub004',
       ministry_id: 'min004',
-      plan_id: 'professional',
+      plan_id: 'profissional',
       status: 'pendente',
       data_inicio: '2025-09-05',
       data_vencimento: '2026-09-05',
       tipo_pagamento: 'anual',
-      valor_pago: 1999.00,
+      valor_pago: 4999.99,
       renovacao_automatica: false
     },
     usuarios_count: 35,

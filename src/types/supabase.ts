@@ -28,7 +28,7 @@ export type Ministry = {
   address_zip?: string | null
   quantity_temples?: number | null
   quantity_members?: number | null
-  plan: 'starter' | 'growth' | 'enterprise'
+  plan: 'starter' | 'intermediario' | 'profissional' | 'expert'
   subscription_status: 'active' | 'trial' | 'suspended' | 'expired'
   subscription_start_date: string
   subscription_end_date: string | null

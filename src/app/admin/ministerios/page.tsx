@@ -10,7 +10,7 @@ import TrialSignupsWidget from '@/components/TrialSignupsWidget'
 import AdminSidebar from '@/components/AdminSidebar'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 import type { SubscriptionPlan } from '@/types/admin'
-import { onlyDigits, formatCnpj, formatPhone } from '@/lib/mascaras'
+import { onlyDigits, formatCnpj, formatPhone, validarCnpj } from '@/lib/mascaras'
 
 export default function MinisteriosPage() {
   const { isLoading, isAuthenticated } = useAdminAuth()
@@ -44,6 +44,8 @@ export default function MinisteriosPage() {
     website: '',
     logo_url: '',
     description: '',
+    access_email: '',
+    access_password: '',
     address_street: '',
     address_number: '',
     address_complement: '',
@@ -67,6 +69,8 @@ export default function MinisteriosPage() {
       website: '',
       logo_url: '',
       description: '',
+      access_email: '',
+      access_password: '',
       address_street: '',
       address_number: '',
       address_complement: '',
@@ -247,16 +251,33 @@ export default function MinisteriosPage() {
     setError('')
     setSuccess('')
 
+    // Validar CNPJ se preenchido
+    const cnpjDigits = onlyDigits(formData.cnpj)
+    if (cnpjDigits && !validarCnpj(cnpjDigits)) {
+      setError('CNPJ inválido. Verifique os dígitos e tente novamente.')
+      return
+    }
+
     try {
       const uploadedLogoUrl = await uploadLogoIfNeeded()
 
-      const payloadToSend = {
+      let payloadToSend: any = {
         ...formData,
         // Garantir que o backend recebe apenas dígitos
         cnpj: onlyDigits(formData.cnpj),
         contact_phone: onlyDigits(formData.contact_phone),
         whatsapp: onlyDigits(formData.whatsapp),
         logo_url: uploadedLogoUrl || formData.logo_url,
+      }
+
+      if (!editingId) {
+        // Remove credential fields when creating new ministry
+        const { access_email, access_password, ...rest } = payloadToSend
+        payloadToSend = rest
+      } else {
+        // Remove empty credential fields when editing
+        if (!payloadToSend.access_email?.trim()) delete payloadToSend.access_email
+        if (!payloadToSend.access_password?.trim()) delete payloadToSend.access_password
       }
 
       const response = await authenticatedFetch('/api/v1/admin/ministries', {
@@ -301,6 +322,8 @@ export default function MinisteriosPage() {
       website: ministerio.website || '',
       logo_url: ministerio.logo_url || '',
       description: ministerio.description || '',
+      access_email: '',
+      access_password: '',
       address_street: ministerio.address_street || '',
       address_number: ministerio.address_number || '',
       address_complement: ministerio.address_complement || '',
@@ -451,10 +474,22 @@ export default function MinisteriosPage() {
                             const digits = onlyDigits(e.target.value).slice(0, 14)
                             setFormData({ ...formData, cnpj: digits })
                           }}
-                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                          className={`w-full px-4 py-2 border rounded focus:outline-none focus:border-blue-500 ${
+                            formData.cnpj.length === 14 && !validarCnpj(formData.cnpj)
+                              ? 'border-red-500 bg-red-50'
+                              : formData.cnpj.length === 14
+                              ? 'border-green-500'
+                              : 'border-gray-300'
+                          }`}
                           placeholder="00.000.000/0000-00"
                           maxLength={18}
                         />
+                        {formData.cnpj.length === 14 && !validarCnpj(formData.cnpj) && (
+                          <p className="mt-1 text-xs text-red-600">CNPJ inválido — verifique os dígitos verificadores</p>
+                        )}
+                        {formData.cnpj.length === 14 && validarCnpj(formData.cnpj) && (
+                          <p className="mt-1 text-xs text-green-600">CNPJ válido ✓</p>
+                        )}
                       </div>
                       <div className="md:col-span-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -608,6 +643,38 @@ export default function MinisteriosPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Seção 3.1: Credenciais de Acesso */}
+              {editingId && (
+                <div className="mb-6">
+                  <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">Credenciais de Acesso</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Novo Email de Acesso</label>
+                      <input
+                        type="email"
+                        value={formData.access_email}
+                        onChange={(e) => setFormData({ ...formData, access_email: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        placeholder="(opcional) novo email"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Nova Senha de Acesso</label>
+                      <input
+                        type="password"
+                        value={formData.access_password}
+                        onChange={(e) => setFormData({ ...formData, access_password: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        placeholder="(opcional) min. 6 caracteres"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Se preencher, o email/senha de acesso do tenant sera atualizado.
+                  </p>
+                </div>
+              )}
 
               {/* Seção 4: Endereço */}
               <div className="mb-6">

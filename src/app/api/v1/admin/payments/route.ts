@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-guard'
-import { buildMonthlyInstallments, createAsaasPayment, ensureAsaasCustomer } from '@/lib/asaas'
+import { buildMonthlyInstallments, createAsaasPayment, deleteAsaasPayment, ensureAsaasCustomer } from '@/lib/asaas'
 
 export async function GET(request: NextRequest) {
   try {
@@ -165,44 +165,82 @@ export async function POST(request: NextRequest) {
 
     // Se houver integração ASAAS configurada, criar cobranças lá também
     if (body.create_asaas !== false) {
-      const customerId = await ensureAsaasCustomer(supabase, ministry)
-
-      for (const payment of payments) {
-        try {
-          const asaasPayment = await createAsaasPayment({
-            customer: customerId,
-            value: payment.amount,
-            dueDate: payment.due_date,
-            description: payment.description,
-            billingType: (payment.payment_method || 'PIX').toUpperCase(),
-            externalReference: payment.id,
-          })
-
-          await supabase
-            .from('payments')
-            .update({
-              asaas_payment_id: asaasPayment.id,
-              asaas_response: asaasPayment,
-            })
-            .eq('id', payment.id)
-        } catch (err) {
-          // Mantem pagamento local mesmo se ASAAS falhar
-          await supabase
-            .from('payments')
-            .update({
-              asaas_response: { error: (err as Error).message },
-            })
-            .eq('id', payment.id)
+      try {
+        const customerId = await ensureAsaasCustomer(supabase, ministry)
+        
+        if (!customerId) {
+          console.warn('[PAYMENTS API] Aviso: customerId não obtido do ASAAS para ministry', body.ministry_id)
         }
+
+        for (const payment of payments) {
+          try {
+            const asaasPayment = await createAsaasPayment({
+              customer: customerId,
+              value: payment.amount,
+              dueDate: payment.due_date,
+              description: payment.description,
+              billingType: (() => {
+                const m = (payment.payment_method || 'pix').toLowerCase()
+                if (m === 'credit_card') return 'CREDIT_CARD'
+                if (m === 'bank_transfer') return 'PIX' // ASAAS não tem bank_transfer, usa PIX
+                return m.toUpperCase() // pix → PIX, boleto → BOLETO
+              })(),
+              externalReference: payment.id,
+            })
+
+            await supabase
+              .from('payments')
+              .update({
+                asaas_payment_id: asaasPayment.id,
+                asaas_response: asaasPayment,
+              })
+              .eq('id', payment.id)
+          } catch (err) {
+            console.warn('[PAYMENTS API] Erro ao criar cobrança ASAAS para payment', payment.id, err)
+            // Mantem pagamento local mesmo se ASAAS falhar
+            await supabase
+              .from('payments')
+              .update({
+                asaas_response: { error: (err as Error).message },
+              })
+              .eq('id', payment.id)
+          }
+        }
+      } catch (err: any) {
+        const errMsg = err?.message || 'Erro desconhecido ao integrar ASAAS'
+        console.error('[PAYMENTS API] Erro na integração ASAAS (ensureCustomer ou billingType):', errMsg)
+        // Salva o erro em todos os pagamentos criados para diagnóstico
+        await Promise.allSettled(
+          payments.map((payment: any) =>
+            supabase
+              .from('payments')
+              .update({ asaas_response: { error: errMsg, stage: 'customer_or_billing' } })
+              .eq('id', payment.id)
+              .then(() => {})
+          )
+        )
       }
     }
 
     // Log auditoria
-    await logAuditAction(supabase, adminUser.id, 'CREATE_PAYMENT', 'payments', payments[0].id, {})
+    try {
+      await logAuditAction(supabase, adminUser.id, 'CREATE_PAYMENT', 'payments', payments[0].id, {})
+    } catch (auditErr) {
+      console.error('Erro ao registrar auditoria:', auditErr)
+      // Não falha a criação de pagamento se auditoria falhar
+    }
 
     return NextResponse.json({ data: payments }, { status: 201 })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('[PAYMENTS API] Erro ao criar pagamentos:', {
+      message: err.message,
+      stack: err.stack,
+      cause: err.cause
+    })
+    return NextResponse.json({ 
+      error: err.message || 'Erro ao processar pagamentos',
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    }, { status: 500 })
   }
 }
 
@@ -255,6 +293,60 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
+export async function DELETE(request: NextRequest) {
+  try {
+    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    if (!result.ok) return result.response
+    const { supabaseAdmin, adminUser } = result.ctx
+
+    const body = await request.json()
+    const { paymentId } = body
+
+    if (!paymentId) {
+      return NextResponse.json({ error: 'paymentId é obrigatório' }, { status: 400 })
+    }
+
+    // Buscar pagamento para verificar se tem asaas_payment_id
+    const { data: payment, error: fetchError } = await supabaseAdmin
+      .from('payments')
+      .select('id, asaas_payment_id')
+      .eq('id', paymentId)
+      .single()
+
+    if (fetchError || !payment) {
+      return NextResponse.json({ error: 'Pagamento não encontrado' }, { status: 404 })
+    }
+
+    // Se tiver ID ASAAS, deletar lá primeiro
+    if (payment.asaas_payment_id) {
+      try {
+        await deleteAsaasPayment(payment.asaas_payment_id)
+        console.log('[DELETE PAYMENT] Removido do ASAAS:', payment.asaas_payment_id)
+      } catch (asaasErr: any) {
+        console.error('[DELETE PAYMENT] Erro ao remover do ASAAS (continuando exclusão local):', asaasErr.message)
+      }
+    }
+
+    // Deletar localmente
+    const { error: deleteError } = await supabaseAdmin
+      .from('payments')
+      .delete()
+      .eq('id', paymentId)
+
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 400 })
+    }
+
+    await logAuditAction(supabaseAdmin, adminUser.id, 'DELETE_PAYMENT', 'payments', paymentId, {
+      asaas_payment_id: payment.asaas_payment_id || null,
+    })
+
+    return NextResponse.json({ success: true }, { status: 200 })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
 async function logAuditAction(
   supabase: any,
   adminUserId: string,
@@ -264,7 +356,7 @@ async function logAuditAction(
   changes: any
 ) {
   try {
-    await supabase
+    const result = await supabase
       .from('admin_audit_logs')
       .insert([{
         admin_user_id: adminUserId,
@@ -273,8 +365,13 @@ async function logAuditAction(
         entity_id: entityId,
         changes,
         status: 'success',
+        created_at: new Date().toISOString(),
       }])
+    
+    if (result.error) {
+      console.warn('[AUDIT LOG] Erro ao registrar auditoria:', result.error)
+    }
   } catch (err) {
-    console.error('Erro ao fazer log de auditoria:', err)
+    console.warn('[AUDIT LOG] Erro ao fazer log de auditoria:', err)
   }
 }

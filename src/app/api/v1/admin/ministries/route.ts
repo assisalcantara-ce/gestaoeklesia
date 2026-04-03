@@ -19,8 +19,9 @@ function slugify(input: string) {
 
 function mapPlan(subscriptionPlanId?: string) {
   const v = (subscriptionPlanId || '').toLowerCase()
-  if (v.includes('premium') || v.includes('enterprise')) return 'enterprise'
-  if (v.includes('standard') || v.includes('growth')) return 'growth'
+  if (v.includes('expert') || v.includes('enterprise') || v.includes('empresarial')) return 'expert'
+  if (v.includes('profissional') || v.includes('professional')) return 'profissional'
+  if (v.includes('intermediario') || v.includes('intermediate')) return 'intermediario'
   return 'starter'
 }
 
@@ -246,6 +247,8 @@ export async function PATCH(request: NextRequest) {
     const addressState: string | undefined = body?.address_state
     const addressZip: string | undefined = body?.address_zip
     const plan = body?.plan ? String(body.plan) : mapPlan(body?.subscription_plan_id)
+    const accessEmail: string | undefined = body?.access_email
+    const accessPassword: string | undefined = body?.access_password
 
     const payload: Record<string, any> = {
       updated_at: new Date().toISOString(),
@@ -270,6 +273,37 @@ export async function PATCH(request: NextRequest) {
     if (body?.quantity_members !== undefined) payload.quantity_members = Number(body.quantity_members) || 0
     if (plan) payload.plan = plan
     if (body?.is_active !== undefined) payload.is_active = Boolean(body.is_active)
+
+    if (accessPassword && accessPassword.length < 6) {
+      return NextResponse.json({ error: 'Senha deve ter no minimo 6 caracteres' }, { status: 400 })
+    }
+
+    if (accessEmail || accessPassword) {
+      const { data: ministryRow, error: ministryError } = await supabase
+        .from('ministries')
+        .select('user_id')
+        .eq('id', id)
+        .single()
+
+      if (ministryError || !ministryRow?.user_id) {
+        return NextResponse.json({ error: 'Nao foi possivel localizar o usuario do tenant' }, { status: 400 })
+      }
+
+      const updatePayload: Record<string, any> = {}
+      if (accessEmail) updatePayload.email = accessEmail
+      if (accessPassword) updatePayload.password = accessPassword
+
+      const { error: authError } = await supabase.auth.admin.updateUserById(
+        ministryRow.user_id,
+        updatePayload
+      )
+
+      if (authError) {
+        return NextResponse.json({ error: authError.message }, { status: 400 })
+      }
+
+      if (accessEmail) payload.email_admin = accessEmail
+    }
 
     const { data, error } = await supabase
       .from('ministries')

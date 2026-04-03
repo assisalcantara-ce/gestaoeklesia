@@ -1,6 +1,6 @@
 // Tipos para Ministérios/Empresas Clientes
 
-export type PlanType = 'starter' | 'professional' | 'enterprise';
+export type PlanType = 'starter' | 'intermediario' | 'profissional' | 'expert';
 export type SubscriptionStatus = 'ativo' | 'pendente' | 'cancelado' | 'expirado';
 
 export interface Plan {
