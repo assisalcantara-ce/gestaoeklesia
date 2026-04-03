@@ -751,7 +751,7 @@ export default function MembrosPage() {
     }
   };
 
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
 
   // Função para gerar próxima matrícula automática
   const gerarProximaMatricula = () => {
@@ -2332,19 +2332,57 @@ export default function MembrosPage() {
               <div className="text-sm text-gray-600">
                 Mostrando {startIndex + 1} até {Math.min(endIndex, membrosFiltrados.length)} de {membrosFiltrados.length} registros
               </div>
-              <div className="flex gap-2">
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <button
-                    key={i + 1}
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={`px-3 py-1 rounded ${currentPage === i + 1
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
+              <div className="flex items-center gap-1">
+                {/* Anterior */}
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ‹
+                </button>
+
+                {/* Páginas com ellipsis */}
+                {(() => {
+                  const pages: (number | string)[] = [];
+                  if (totalPages <= 7) {
+                    for (let i = 1; i <= totalPages; i++) pages.push(i);
+                  } else {
+                    pages.push(1);
+                    if (currentPage > 4) pages.push('...');
+                    const start = Math.max(2, currentPage - 2);
+                    const end = Math.min(totalPages - 1, currentPage + 2);
+                    for (let i = start; i <= end; i++) pages.push(i);
+                    if (currentPage < totalPages - 3) pages.push('...');
+                    pages.push(totalPages);
+                  }
+                  return pages.map((p, idx) =>
+                    p === '...' ? (
+                      <span key={`ellipsis-${idx}`} className="px-2 py-1 text-gray-400 select-none">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setCurrentPage(p as number)}
+                        className={`px-3 py-1 rounded ${
+                          currentPage === p
+                            ? 'bg-teal-600 text-white font-bold'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  );
+                })()}
+
+                {/* Próximo */}
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ›
+                </button>
               </div>
             </div>
           </div>
