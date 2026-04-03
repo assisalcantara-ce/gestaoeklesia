@@ -1161,16 +1161,6 @@ export default function MembrosPage() {
       const latitudeNumber = enderecoData.latitude ? Number(String(enderecoData.latitude).replace(',', '.')) : null
       const longitudeNumber = enderecoData.longitude ? Number(String(enderecoData.longitude).replace(',', '.')) : null
 
-      const addressText = [
-        enderecoData.logradouro,
-        enderecoData.numero,
-        enderecoData.bairro,
-        enderecoData.complemento,
-      ]
-        .map((p) => String(p || '').trim())
-        .filter(Boolean)
-        .join(', ') || null
-
       const payloadBase: CreateMemberRequest = {
         name: dadosPessoais.nome,
         cpf: onlyDigits(dadosPessoais.cpf) || null,
