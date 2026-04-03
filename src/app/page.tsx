@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import NotificationModal from '@/components/NotificationModal';
 import { formatCpfOrCnpj, formatPhone } from '@/lib/mascaras';
+import { createClient } from '@/lib/supabase-client';
+import { formatarPreco } from '@/config/plans';
 
 const benefits = [
   {
@@ -65,41 +67,7 @@ const features = [
   }
 ];
 
-const pricing = [
-  {
-    name: 'Starter',
-    slug: 'starter',
-    priceMonthly: 'R$ 149,99',
-    priceYearly: 'R$ 1.499,99/ano',
-    description: 'Ideal para Instituições pequenas iniciando na plataforma',
-    highlights: ['Até 5 Campos', 'Até 50 Igrejas', 'Até 500 Membros', 'Até 3 Usuários Administrativos']
-  },
-  {
-    name: 'Intermediário',
-    slug: 'intermediario',
-    priceMonthly: 'R$ 299,99',
-    priceYearly: 'R$ 2.999,99/ano',
-    description: 'Solução completa para Instituições de grande porte e em crescimento',
-    highlights: ['Até 20 Campos', 'Até 250 Igrejas', 'Até 3.000 Membros', 'Até 10 Usuários Administrativos'],
-    featured: true
-  },
-  {
-    name: 'Profissional',
-    slug: 'profissional',
-    priceMonthly: 'R$ 499,99',
-    priceYearly: 'R$ 4.999,99/ano',
-    description: 'Solução completa para Instituições de grande porte e em crescimento',
-    highlights: ['Até 50 Campos', 'Até 600 Igrejas', 'Até 7.000 Membros', 'Até 25 Usuários Administrativos']
-  },
-  {
-    name: 'Expert',
-    slug: 'expert',
-    priceMonthly: 'R$ 999,00',
-    priceYearly: 'R$ 9.999,99/ano',
-    description: 'Personalizado para grandes Instituições com alto fluxo de atividades.',
-    highlights: ['Até 999 Campos', 'Até 999 Igrejas', 'Até 99.999 Membros', 'Até 999 Usuários Administrativos']
-  }
-];
+
 
 const faqs = [
   {
@@ -135,10 +103,49 @@ const gallery = [
   { src: '/img/img4.png', alt: 'Tela de relatorios e indicadores' }
 ];
 
+type PlanoDB = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  price_monthly: number;
+  price_annually: number | null;
+  max_users: number;
+  max_members: number;
+  max_ministerios: number;
+  max_divisao1: number;
+  max_divisao2: number;
+  max_divisao3: number;
+  is_active: boolean;
+  display_order: number;
+  has_api_access: boolean;
+  has_advanced_reports: boolean;
+  has_priority_support: boolean;
+  has_custom_domain: boolean;
+  has_white_label: boolean;
+  has_automation: boolean;
+};
+
+function buildHighlights(plan: PlanoDB): string[] {
+  const h: string[] = [];
+  if (plan.max_users > 0) h.push(`Até ${plan.max_users} Usuários Administrativos`);
+  if (plan.max_members > 0) h.push(`Até ${plan.max_members.toLocaleString('pt-BR')} Membros`);
+  if (plan.max_ministerios > 0) h.push(`Até ${plan.max_ministerios} Igrejas`);
+  if (plan.has_advanced_reports) h.push('Relatórios Avançados');
+  if (plan.has_api_access) h.push('Acesso à API');
+  if (plan.has_priority_support) h.push('Suporte Prioritário');
+  if (plan.has_custom_domain) h.push('Domínio Personalizado');
+  if (plan.has_white_label) h.push('White Label');
+  if (plan.has_automation) h.push('Automação');
+  return h;
+}
+
 export default function LandingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [planosLanding, setPlanosLanding] = useState<PlanoDB[]>([]);
+  const [showAllPlanos, setShowAllPlanos] = useState(false);
   const [successModal, setSuccessModal] = useState({
     isOpen: false,
     email: ''
@@ -162,6 +169,17 @@ export default function LandingPage() {
       return () => clearTimeout(timer);
     }
   }, [error]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from('subscription_plans')
+      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,max_divisao1,max_divisao2,max_divisao3,is_active,display_order,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+      .order('price_monthly', { ascending: true })
+      .then(({ data }) => { if (data) setPlanosLanding(data as PlanoDB[]); });
+  }, []);
 
   const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -334,15 +352,15 @@ export default function LandingPage() {
             onClick={() => router.push('/login')}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
           >
-            Login
+            Acesso ao Sistema
           </button>
         </div>
       </header>
 
       <section className="relative overflow-hidden">
-        <div className="absolute -top-24 -right-32 w-[420px] h-[420px] bg-blue-100/40 blur-3xl rounded-full" />
-        <div className="absolute -bottom-32 -left-16 w-[320px] h-[320px] bg-amber-100/40 blur-3xl rounded-full" />
-        <div className="max-w-6xl mx-auto px-6 py-20 grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-center">
+        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/img/bgslider.jpg')" }} />
+        <div className="absolute inset-0 bg-white/60" />
+        <div className="relative max-w-6xl mx-auto px-6 py-20 grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-center">
           <div className="space-y-6">
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-xs font-semibold uppercase tracking-[0.3em] text-blue-600">
               Gestão inteligente
@@ -431,7 +449,7 @@ export default function LandingPage() {
         </div>
         <div className="grid gap-6 md:grid-cols-3">
           {benefits.map((card) => (
-            <div key={card.title} className="bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg transition duration-300">
+            <div key={card.title} className="bg-gradient-to-br from-slate-50 to-blue-50 border border-blue-100 rounded-2xl p-6 hover:shadow-lg hover:border-blue-200 transition duration-300">
               <h3 className="text-lg font-bold text-slate-900">{card.title}</h3>
               <p className="text-sm text-slate-600 mt-2">{card.text}</p>
             </div>
@@ -447,7 +465,7 @@ export default function LandingPage() {
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {features.map((feature) => (
-            <div key={feature.title} className="bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg transition duration-300">
+            <div key={feature.title} className="bg-gradient-to-br from-slate-50 to-blue-50 border border-blue-100 rounded-2xl p-6 hover:shadow-lg hover:border-blue-200 transition duration-300">
               <h3 className="text-lg font-bold text-slate-900">{feature.title}</h3>
               <p className="text-sm text-slate-600 mt-2">{feature.text}</p>
               <ul className="mt-4 space-y-2 text-sm text-slate-600">
@@ -469,46 +487,72 @@ export default function LandingPage() {
           <h2 className="landing-title text-3xl">Escolha o plano ideal</h2>
           <p className="text-slate-600 mt-3">Todos incluem suporte, onboarding e 7 dias de teste gratuito.</p>
         </div>
+        {planosLanding.length === 0 && (
+          <p className="text-center text-slate-400 text-sm py-8">Carregando planos...</p>
+        )}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {pricing.map((plan) => (
-            <div
-              key={plan.name}
-              className={`rounded-2xl p-6 border transition duration-300 ${plan.featured
-                ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white border-blue-600 shadow-xl scale-105'
-                : 'bg-white text-slate-900 border-slate-200 hover:shadow-lg'
-              }`}
-            >
-              {plan.featured && (
-                <span className="inline-flex text-xs font-semibold bg-yellow-400 text-slate-900 px-2 py-1 rounded-full">
-                  Mais popular
-                </span>
-              )}
-              <h3 className="text-xl font-bold mt-4">{plan.name}</h3>
-              <p className={`text-sm mt-2 ${plan.featured ? 'text-blue-100' : 'text-slate-600'}`}>{plan.description}</p>
-              <div className="mt-4">
-                <p className="text-3xl font-bold">{plan.priceMonthly}</p>
-                <p className={`text-xs mt-1 ${plan.featured ? 'text-blue-100' : 'text-slate-500'}`}>{plan.priceYearly}</p>
-              </div>
-              <ul className={`mt-6 space-y-2 text-sm ${plan.featured ? '' : ''}`}>
-                {plan.highlights.map((item) => (
-                  <li key={item} className="flex items-center gap-2">
-                    <span className={`h-2 w-2 rounded-full ${plan.featured ? 'bg-yellow-300' : 'bg-blue-500'}`} />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <a
-                href={`/pre-cadastro?plan=${plan.slug || 'starter'}`}
-                className={`mt-6 inline-flex w-full justify-center px-4 py-2 rounded-lg font-semibold transition ${plan.featured
-                  ? 'bg-yellow-400 text-slate-900 hover:bg-yellow-300'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
+          {(showAllPlanos ? planosLanding : planosLanding.slice(0, 4)).map((plan, idx) => {
+            const featured = idx === 1;
+            const highlights = buildHighlights(plan);
+            return (
+              <div
+                key={plan.id}
+                className={`rounded-2xl p-6 border transition duration-300 ${
+                  featured
+                    ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white border-blue-600 shadow-xl scale-105'
+                    : 'bg-white text-slate-900 border-slate-200 hover:shadow-lg'
                 }`}
               >
-                Assinar agora
-              </a>
-            </div>
-          ))}
+                {featured && (
+                  <span className="inline-flex text-xs font-semibold bg-yellow-400 text-slate-900 px-2 py-1 rounded-full">
+                    Mais popular
+                  </span>
+                )}
+                <h3 className="text-xl font-bold mt-4">{plan.name}</h3>
+                <p className={`text-sm mt-2 ${featured ? 'text-blue-100' : 'text-slate-600'}`}>
+                  {plan.description || ''}
+                </p>
+                <div className="mt-4">
+                  <p className="text-3xl font-bold">{formatarPreco(plan.price_monthly)}</p>
+                  {plan.price_annually && (
+                    <p className={`text-xs mt-1 ${featured ? 'text-blue-100' : 'text-slate-500'}`}>
+                      {formatarPreco(plan.price_annually)}/ano
+                    </p>
+                  )}
+                </div>
+                <ul className="mt-6 space-y-2 text-sm">
+                  {highlights.map((item) => (
+                    <li key={item} className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${featured ? 'bg-yellow-300' : 'bg-blue-500'}`} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href={`/pre-cadastro?plan=${plan.slug}`}
+                  className={`mt-6 inline-flex w-full justify-center px-4 py-2 rounded-lg font-semibold transition ${
+                    featured
+                      ? 'bg-yellow-400 text-slate-900 hover:bg-yellow-300'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  Assinar agora
+                </a>
+              </div>
+            );
+          })}
         </div>
+        {planosLanding.length > 4 && (
+          <div className="text-center mt-10">
+            <button
+              onClick={() => setShowAllPlanos(v => !v)}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full border-2 border-blue-600 text-blue-600 font-semibold hover:bg-blue-600 hover:text-white transition"
+            >
+              {showAllPlanos ? 'Mostrar menos' : 'Ver todos os Planos'}
+              <span className={`transition-transform ${showAllPlanos ? 'rotate-180' : ''}`}>▾</span>
+            </button>
+          </div>
+        )}
       </section>
 
       <section id="faq" className="max-w-6xl mx-auto px-6 py-16">

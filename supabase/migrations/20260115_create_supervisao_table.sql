@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS public.supervisoes (
   UNIQUE(ministry_id, nome)
 );
 
-CREATE INDEX idx_supervisoes_ministry_id ON public.supervisoes(ministry_id);
-CREATE INDEX idx_supervisoes_is_active ON public.supervisoes(is_active);
+CREATE INDEX IF NOT EXISTS idx_supervisoes_ministry_id ON public.supervisoes(ministry_id);
+CREATE INDEX IF NOT EXISTS idx_supervisoes_is_active ON public.supervisoes(is_active);
 
 ALTER TABLE public.supervisoes ENABLE ROW LEVEL SECURITY;
 
@@ -177,13 +177,13 @@ CREATE POLICY "congregacoes_filtered_by_role"
 
 -- RLS para membros respeitarem hierarquia
 -- Compatibilidade: algumas bases usam public.membros; outras usam public.members.
-DO $$
+DO $do$
 BEGIN
   IF to_regclass('public.membros') IS NOT NULL THEN
     EXECUTE 'ALTER TABLE public.membros ADD COLUMN IF NOT EXISTS congregacao_id UUID REFERENCES public.congregacoes(id) ON DELETE SET NULL';
     EXECUTE 'CREATE INDEX IF NOT EXISTS idx_membros_congregacao_id ON public.membros(congregacao_id)';
     EXECUTE 'DROP POLICY IF EXISTS "membros_filtered_by_role" ON public.membros';
-    EXECUTE $$
+    EXECUTE $policy$
       CREATE POLICY "membros_filtered_by_role"
         ON public.membros FOR SELECT
         USING (
@@ -208,12 +208,12 @@ BEGIN
             AND mu.congregacao_id = membros.congregacao_id
           )
         )
-    $$;
+    $policy$;
   ELSIF to_regclass('public.members') IS NOT NULL THEN
     EXECUTE 'ALTER TABLE public.members ADD COLUMN IF NOT EXISTS congregacao_id UUID REFERENCES public.congregacoes(id) ON DELETE SET NULL';
     EXECUTE 'CREATE INDEX IF NOT EXISTS idx_members_congregacao_id ON public.members(congregacao_id)';
     EXECUTE 'DROP POLICY IF EXISTS "members_filtered_by_role" ON public.members';
-    EXECUTE $$
+    EXECUTE $policy$
       CREATE POLICY "members_filtered_by_role"
         ON public.members FOR SELECT
         USING (
@@ -238,7 +238,7 @@ BEGIN
             AND mu.congregacao_id = members.congregacao_id
           )
         )
-    $$;
+    $policy$;
   END IF;
 END
-$$;
+$do$;

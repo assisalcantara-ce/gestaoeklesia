@@ -101,6 +101,15 @@ export default function CongregacoesPage() {
   const [divisoes3, setDivisoes3] = useState<Divisao3[]>([]);
   const [ministryId, setMinistryId] = useState<string>('');
 
+  // Limites do plano para divisões hierárquicas
+  // -1 = ilimitado, 0 = bloqueado, N = máximo N registros
+  const [planLimits, setPlanLimits] = useState({
+    max_divisao1: 999, // Supervisão
+    max_divisao2: 999, // Campo
+    max_divisao3: -1,  // Igreja/Congregação
+    planName: '',
+  });
+
   // Associações (seleção múltipla)
   // - D2 (campos) pode receber várias D1 (congregações) via congregacoes.campo_id
   // - D3 (supervisões) pode receber várias D2 (campos) via campos.supervisao_id
@@ -457,6 +466,49 @@ export default function CongregacoesPage() {
 
           if (resolvedMinistryId) {
             setMinistryId(resolvedMinistryId);
+
+            // Carregar limites do plano
+            const FALLBACK_LIMITS: Record<string, { max_divisao1: number; max_divisao2: number; max_divisao3: number }> = {
+              basic:         { max_divisao1: 5,   max_divisao2: 0,  max_divisao3: 0  },
+              starter:       { max_divisao1: 10,  max_divisao2: 1,  max_divisao3: -1 },
+              intermediario: { max_divisao1: 25,  max_divisao2: 3,  max_divisao3: -1 },
+              profissional:  { max_divisao1: 50,  max_divisao2: 10, max_divisao3: -1 },
+              expert:        { max_divisao1: 100, max_divisao2: 20, max_divisao3: -1 },
+            };
+
+            try {
+              const { data: ministryRow } = await supabase
+                .from('ministries')
+                .select('subscription_plan_id, plan_id')
+                .eq('id', resolvedMinistryId)
+                .maybeSingle();
+
+              let limits = { max_divisao1: 999, max_divisao2: 999, max_divisao3: -1 };
+              let planName = '';
+
+              if ((ministryRow as any)?.subscription_plan_id) {
+                const { data: planRow } = await supabase
+                  .from('subscription_plans')
+                  .select('max_divisao1, max_divisao2, max_divisao3, name')
+                  .eq('id', (ministryRow as any).subscription_plan_id)
+                  .maybeSingle();
+                if (planRow) {
+                  limits = {
+                    max_divisao1: (planRow as any).max_divisao1 ?? 999,
+                    max_divisao2: (planRow as any).max_divisao2 ?? 999,
+                    max_divisao3: (planRow as any).max_divisao3 ?? -1,
+                  };
+                  planName = (planRow as any).name || '';
+                }
+              } else if ((ministryRow as any)?.plan_id) {
+                const slug = String((ministryRow as any).plan_id).toLowerCase();
+                const fb = FALLBACK_LIMITS[slug];
+                if (fb) { limits = fb; planName = (ministryRow as any).plan_id; }
+              }
+
+              setPlanLimits({ ...limits, planName });
+            } catch { /* sem limites adicionais */ }
+
             // Carregar dados do Supabase
             await Promise.all([
               loadDivisoes1(resolvedMinistryId),
@@ -1002,6 +1054,18 @@ export default function CongregacoesPage() {
       return;
     }
 
+    // Verificar limite do plano para 2ª divisão
+    if (!editingD2) {
+      if (planLimits.max_divisao2 === 0) {
+        await dialog.alert({ title: 'Limite do Plano', type: 'error', message: `O plano atual não permite criação de ${nomeD2}. Faça upgrade para habilitar esta divisão.` });
+        return;
+      }
+      if (planLimits.max_divisao2 > 0 && divisoes2.length >= planLimits.max_divisao2) {
+        await dialog.alert({ title: 'Limite do Plano', type: 'error', message: `Limite atingido: o plano permite até ${planLimits.max_divisao2} ${nomeD2}(s). Faça upgrade para adicionar mais.` });
+        return;
+      }
+    }
+
 
     // Regra nova: D2 não depende de existir D1.
     // Se houver divisão 3 (Supervisão) habilitada, o vínculo é opcional.
@@ -1205,6 +1269,18 @@ export default function CongregacoesPage() {
     if (!formD3.nome.trim()) {
       await dialog.alert({ title: 'Atenção', message: 'Por favor, preencha o nome.', type: 'warning' });
       return;
+    }
+
+    // Verificar limite do plano para 3ª divisão (Igreja/Congregação)
+    if (!editingD3) {
+      if (planLimits.max_divisao3 === 0) {
+        await dialog.alert({ title: 'Limite do Plano', type: 'error', message: `O plano atual não permite criação de ${nomeD1}. Faça upgrade para habilitar esta divisão.` });
+        return;
+      }
+      if (planLimits.max_divisao3 > 0 && divisoes3.length >= planLimits.max_divisao3) {
+        await dialog.alert({ title: 'Limite do Plano', type: 'error', message: `Limite atingido: o plano permite até ${planLimits.max_divisao3} ${nomeD1}(s). Faça upgrade para adicionar mais.` });
+        return;
+      }
     }
 
     if (!formD3.status_imovel) {
@@ -1565,6 +1641,18 @@ export default function CongregacoesPage() {
     if (!formD1.nome.trim()) {
       await dialog.alert({ title: 'Atenção', type: 'warning', message: 'Por favor, preencha o nome' });
       return;
+    }
+
+    // Verificar limite do plano para 1ª divisão (Supervisão/Regional)
+    if (!editingD1) {
+      if (planLimits.max_divisao1 === 0) {
+        await dialog.alert({ title: 'Limite do Plano', type: 'error', message: `O plano atual não permite criação de ${nomeD3}. Faça upgrade para habilitar esta divisão.` });
+        return;
+      }
+      if (planLimits.max_divisao1 > 0 && divisoes1.length >= planLimits.max_divisao1) {
+        await dialog.alert({ title: 'Limite do Plano', type: 'error', message: `Limite atingido: o plano permite até ${planLimits.max_divisao1} ${nomeD3}(s). Faça upgrade para adicionar mais.` });
+        return;
+      }
     }
 
     const uf: string | null = null;
@@ -2154,6 +2242,8 @@ export default function CongregacoesPage() {
             {!showFormD3 && (
               <button
                 onClick={() => {
+                  if (planLimits.max_divisao3 === 0) return;
+                  if (planLimits.max_divisao3 > 0 && divisoes3.length >= planLimits.max_divisao3) return;
                   setShowFormD3(true);
                   setEditingD3(null);
                   setGeoPreview(null);
@@ -2182,9 +2272,25 @@ export default function CongregacoesPage() {
                   setFotoIgrejaChange({ kind: 'none' });
                   setFotoIgrejaUrlInput('');
                 }}
-                className="mb-6 w-full px-6 py-3 bg-teal-500 text-white font-bold rounded-lg hover:bg-teal-600 transition shadow-md"
+                disabled={planLimits.max_divisao3 === 0 || (planLimits.max_divisao3 > 0 && divisoes3.length >= planLimits.max_divisao3)}
+                title={
+                  planLimits.max_divisao3 === 0
+                    ? `Plano atual não permite ${nomeD1}`
+                    : planLimits.max_divisao3 > 0 && divisoes3.length >= planLimits.max_divisao3
+                      ? `Limite do plano atingido (${planLimits.max_divisao3})`
+                      : undefined
+                }
+                className={`mb-6 w-full px-6 py-3 font-bold rounded-lg transition shadow-md flex items-center justify-center gap-2 ${
+                  planLimits.max_divisao3 === 0 || (planLimits.max_divisao3 > 0 && divisoes3.length >= planLimits.max_divisao3)
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-teal-500 text-white hover:bg-teal-600'
+                }`}
               >
                 + Adicionar {nomeD1}
+                {planLimits.max_divisao3 > 0 && (
+                  <span className="text-xs opacity-80">({divisoes3.length}/{planLimits.max_divisao3})</span>
+                )}
+                {planLimits.max_divisao3 === 0 && <span className="text-xs opacity-80">(bloqueado no plano)</span>}
               </button>
             )}
 
@@ -2489,6 +2595,8 @@ export default function CongregacoesPage() {
                 {!showFormD2 && (
                   <button
                     onClick={() => {
+                      if (planLimits.max_divisao2 === 0) return;
+                      if (planLimits.max_divisao2 > 0 && divisoes2.length >= planLimits.max_divisao2) return;
                       setShowFormD2(true);
                       setEditingD2(null);
                       setFormD2({
@@ -2509,9 +2617,25 @@ export default function CongregacoesPage() {
                       setPastorMsg('');
                       setSelectedD1IdsForD2([]);
                     }}
-                    className="mb-6 w-full px-6 py-3 bg-teal-500 text-white font-bold rounded-lg hover:bg-teal-600 transition shadow-md"
+                    disabled={planLimits.max_divisao2 === 0 || (planLimits.max_divisao2 > 0 && divisoes2.length >= planLimits.max_divisao2)}
+                    title={
+                      planLimits.max_divisao2 === 0
+                        ? `Plano atual não permite ${nomeD2}`
+                        : planLimits.max_divisao2 > 0 && divisoes2.length >= planLimits.max_divisao2
+                          ? `Limite do plano atingido (${planLimits.max_divisao2})`
+                          : undefined
+                    }
+                    className={`mb-6 w-full px-6 py-3 font-bold rounded-lg transition shadow-md flex items-center justify-center gap-2 ${
+                      planLimits.max_divisao2 === 0 || (planLimits.max_divisao2 > 0 && divisoes2.length >= planLimits.max_divisao2)
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-teal-500 text-white hover:bg-teal-600'
+                    }`}
                   >
                     + Adicionar {nomeD2}
+                    {planLimits.max_divisao2 > 0 && (
+                      <span className="text-xs opacity-80">({divisoes2.length}/{planLimits.max_divisao2})</span>
+                    )}
+                    {planLimits.max_divisao2 === 0 && <span className="text-xs opacity-80">(bloqueado no plano)</span>}
                   </button>
                 )}
             </>
@@ -2733,8 +2857,31 @@ export default function CongregacoesPage() {
             )}
 
             {!showFormD1 && (
-              <button onClick={openNewD1} className="mb-6 w-full px-6 py-3 bg-teal-500 text-white font-bold rounded-lg hover:bg-teal-600 transition shadow-md">
+              <button
+                onClick={() => {
+                  if (planLimits.max_divisao1 === 0) return;
+                  if (planLimits.max_divisao1 > 0 && divisoes1.length >= planLimits.max_divisao1) return;
+                  openNewD1();
+                }}
+                disabled={planLimits.max_divisao1 === 0 || (planLimits.max_divisao1 > 0 && divisoes1.length >= planLimits.max_divisao1)}
+                title={
+                  planLimits.max_divisao1 === 0
+                    ? `Plano atual não permite ${nomeD3}`
+                    : planLimits.max_divisao1 > 0 && divisoes1.length >= planLimits.max_divisao1
+                      ? `Limite do plano atingido (${planLimits.max_divisao1})`
+                      : undefined
+                }
+                className={`mb-6 w-full px-6 py-3 font-bold rounded-lg transition shadow-md flex items-center justify-center gap-2 ${
+                  planLimits.max_divisao1 === 0 || (planLimits.max_divisao1 > 0 && divisoes1.length >= planLimits.max_divisao1)
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-teal-500 text-white hover:bg-teal-600'
+                }`}
+              >
                 + Adicionar {nomeD3}
+                {planLimits.max_divisao1 > 0 && planLimits.max_divisao1 < 999 && (
+                  <span className="text-xs opacity-80">({divisoes1.length}/{planLimits.max_divisao1})</span>
+                )}
+                {planLimits.max_divisao1 === 0 && <span className="text-xs opacity-80">(bloqueado no plano)</span>}
               </button>
             )}
 

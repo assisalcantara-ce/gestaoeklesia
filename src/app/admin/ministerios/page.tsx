@@ -330,7 +330,7 @@ export default function MinisteriosPage() {
       address_city: ministerio.address_city || '',
       address_state: ministerio.address_state || '',
       address_zip: ministerio.address_zip || '',
-      subscription_plan_id: ministerio.plan || '',
+      subscription_plan_id: ministerio.subscription_plan_id || '',
       is_active: ministerio.is_active !== false,
       quantity_temples: ministerio.quantity_temples || 1,
       quantity_members: ministerio.quantity_members || 0,

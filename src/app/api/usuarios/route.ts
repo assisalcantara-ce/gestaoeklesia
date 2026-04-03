@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { requireFlowAuth, hasRole } from '@/lib/flows/flow-auth';
+import { PLANOS_DISPONIBLES } from '@/config/plans';
 
 type UsuarioResponse = {
   id: string;
   nome: string;
   email: string;
   email_confirmed: boolean;
-  nivel: 'administrador' | 'financeiro' | 'operador' | 'supervisor' | 'superintendente' | 'coordenador';
+  nivel: 'administrador' | 'financeiro' | 'operador' | 'supervisor';
   congregacao?: string;
   congregacao_id?: string | null;
   status: 'ativo' | 'inativo';
@@ -19,6 +20,13 @@ type UsuarioCreateBody = {
   senha: string;
   nivel: UsuarioResponse['nivel'];
   congregacao_id?: string | null;
+};
+
+const LIMITE_POR_PLANO: Record<string, number> = {
+  starter: 3,
+  intermediario: 10,
+  profissional: 25,
+  expert: 999,
 };
 
 type UsuarioUpdateBody = {
@@ -38,9 +46,7 @@ function mapNivel(role: string | null | undefined, permissions: any): UsuarioRes
 
   if (permSet.has('ADMINISTRADOR') || ['admin'].includes(base)) return 'administrador';
   if (permSet.has('FINANCEIRO') || ['financeiro', 'financial'].includes(base)) return 'financeiro';
-  if (permSet.has('SUPERINTENDENTE') || ['superintendente', 'superintendent'].includes(base)) return 'superintendente';
   if (permSet.has('SUPERVISOR') || ['supervisor', 'manager'].includes(base)) return 'supervisor';
-  if (permSet.has('COORDENADOR') || ['coordenador', 'coordinator'].includes(base)) return 'coordenador';
   if (permSet.has('OPERADOR') || ['operador', 'operator'].includes(base)) return 'operador';
 
   return 'operador';
@@ -145,10 +151,6 @@ function mapRoleAndPermissions(nivel: UsuarioResponse['nivel']) {
       return { role: 'financeiro', permissions: ['FINANCEIRO'] };
     case 'supervisor':
       return { role: 'supervisor', permissions: ['SUPERVISOR'] };
-    case 'superintendente':
-      return { role: 'superintendente', permissions: ['SUPERINTENDENTE'] };
-    case 'coordenador':
-      return { role: 'coordenador', permissions: ['COORDENADOR'] };
     default:
       return { role: 'operator', permissions: ['OPERADOR'] };
   }
@@ -176,11 +178,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Senha muito curta' }, { status: 400 });
     }
 
-    if ((nivel === 'operador' || nivel === 'coordenador') && !congregacaoId) {
+    if (nivel === 'operador' && !congregacaoId) {
       return NextResponse.json({ error: 'Congregacao obrigatoria para este nivel' }, { status: 400 });
     }
 
     const admin = createServerClient();
+
+    // Verificar limite de usuários do plano
+    const { data: ministryData } = await admin
+      .from('ministries')
+      .select('plan_id')
+      .eq('id', ministryId)
+      .maybeSingle();
+
+    const planId = (ministryData as any)?.plan_id || 'starter';
+    const limite = LIMITE_POR_PLANO[planId] ?? PLANOS_DISPONIBLES[planId]?.usuarios_max ?? 3;
+
+    const { count: totalUsuarios } = await admin
+      .from('ministry_users')
+      .select('*', { count: 'exact', head: true })
+      .eq('ministry_id', ministryId);
+
+    if ((totalUsuarios ?? 0) >= limite) {
+      const planoNome = PLANOS_DISPONIBLES[planId]?.nome || planId;
+      return NextResponse.json(
+        { error: `Limite de usuários atingido para o plano ${planoNome} (máximo: ${limite}). Faça upgrade para adicionar mais usuários.` },
+        { status: 403 }
+      );
+    }
+
     const roleConfig = mapRoleAndPermissions(nivel);
 
     const { data: authUser, error: authError } = await admin.auth.admin.createUser({
@@ -255,7 +281,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Senha muito curta' }, { status: 400 });
     }
 
-    if ((nivel === 'operador' || nivel === 'coordenador') && !congregacaoId) {
+    if (nivel === 'operador' && !congregacaoId) {
       return NextResponse.json({ error: 'Congregacao obrigatoria para este nivel' }, { status: 400 });
     }
 

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       .from('payments')
       .select(`
         *,
-        ministries:ministry_id(name, email_admin),
+        ministries:ministry_id(name, email_admin, phone, cnpj_cpf, logo_url, address_street, address_number, address_city, address_state, address_zip),
         subscription_plans:subscription_plan_id(name, slug)
       `, { count: 'exact' })
 

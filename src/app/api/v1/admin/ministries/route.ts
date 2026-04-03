@@ -246,7 +246,31 @@ export async function PATCH(request: NextRequest) {
     const addressCity: string | undefined = body?.address_city
     const addressState: string | undefined = body?.address_state
     const addressZip: string | undefined = body?.address_zip
-    const plan = body?.plan ? String(body.plan) : mapPlan(body?.subscription_plan_id)
+    const rawSubPlanId: string | undefined = body?.subscription_plan_id
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    let plan: string
+    let resolvedPlanUUID: string | null = null
+
+    if (rawSubPlanId && uuidRegex.test(rawSubPlanId)) {
+      // UUID enviado pelo form: buscar slug correspondente
+      resolvedPlanUUID = rawSubPlanId
+      const { data: planRow } = await supabase
+        .from('subscription_plans')
+        .select('slug')
+        .eq('id', rawSubPlanId)
+        .maybeSingle()
+      plan = body?.plan ? String(body.plan) : (planRow?.slug || mapPlan(rawSubPlanId))
+    } else {
+      // Slug ou vazio: mapear e buscar UUID
+      plan = body?.plan ? String(body.plan) : mapPlan(rawSubPlanId)
+      const { data: planRow } = await supabase
+        .from('subscription_plans')
+        .select('id')
+        .eq('slug', plan)
+        .maybeSingle()
+      resolvedPlanUUID = planRow?.id || null
+    }
+
     const accessEmail: string | undefined = body?.access_email
     const accessPassword: string | undefined = body?.access_password
 
@@ -272,6 +296,7 @@ export async function PATCH(request: NextRequest) {
     if (body?.quantity_temples !== undefined) payload.quantity_temples = Number(body.quantity_temples) || 0
     if (body?.quantity_members !== undefined) payload.quantity_members = Number(body.quantity_members) || 0
     if (plan) payload.plan = plan
+    if (resolvedPlanUUID) payload.subscription_plan_id = resolvedPlanUUID
     if (body?.is_active !== undefined) payload.is_active = Boolean(body.is_active)
 
     if (accessPassword && accessPassword.length < 6) {

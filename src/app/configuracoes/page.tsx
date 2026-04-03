@@ -8,8 +8,8 @@ import { useAppDialog } from '@/providers/AppDialogProvider'
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { createClient } from '@/lib/supabase-client'
 import { formatCnpj, formatPhone } from '@/lib/mascaras';
-import { PLANOS_DISPONIBLES, formatarPreco } from '@/config/plans';
-import type { PlanType } from '@/types/ministry';
+import { formatarPreco } from '@/config/plans';
+import type { SubscriptionPlan } from '@/types/admin';
 import { NOMENCLATURAS_SCHEMA_VERSION, NOMENCLATURAS_SCHEMA_VERSION_KEY } from '@/lib/org-nomenclaturas';
 
 export const dynamic = 'force-dynamic';
@@ -451,6 +451,7 @@ function FaturasContent() {
   const [filterStatus, setFilterStatus] = useState('TODAS');
   const [faturas, setFaturas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [baixandoId, setBaixandoId] = useState<string | null>(null);
 
   useEffect(() => {
     const carregarFaturas = async () => {
@@ -484,11 +485,14 @@ function FaturasContent() {
         // Mapear dados
         const faturasFormatadas = (payments || []).map((payment: any, index: number) => ({
           id: payment.id,
+          asaas_payment_id: payment.asaas_payment_id ?? null,
+          payment_method: payment.payment_method ?? null,
           numero: `FAT-${new Date(payment.created_at).getFullYear()}-${String(index + 1).padStart(3, '0')}`,
           data: payment.created_at,
           vencimento: payment.due_date,
           valor: parseFloat(payment.amount),
           status: mapearStatusPagamento(payment.status),
+          description: payment.description ?? '',
         }));
 
         setFaturas(faturasFormatadas);
@@ -520,6 +524,74 @@ function FaturasContent() {
   };
 
   const faturasFiltered = filterStatus === 'TODAS' ? faturas : faturas.filter(f => f.status === filterStatus.toLowerCase());
+
+  const handleBaixar = async (fatura: any) => {
+    setBaixandoId(fatura.id);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        alert('Sessão expirada. Faça login novamente.');
+        return;
+      }
+
+      const response = await fetch(`/api/v1/admin/payments-boleto?id=${fatura.id}`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+
+      if (!response.ok) {
+        console.error('Erro ao buscar boleto:', await response.text());
+        alert('Não foi possível obter o link do boleto. Tente novamente.');
+        return;
+      }
+
+      const data = await response.json();
+
+      // Abrir link ASAAS se disponível
+      if (data.bankSlipUrl) {
+        window.open(data.bankSlipUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      if (data.invoiceUrl) {
+        window.open(data.invoiceUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      if (data.pixQrCodeUrl) {
+        window.open(data.pixQrCodeUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      // Fallback: comprovante local imprimível
+      const win = window.open('', '_blank');
+      if (win) {
+        win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Fatura ${fatura.numero}</title>
+        <style>body{font-family:sans-serif;padding:32px;max-width:600px;margin:0 auto}
+        h2{color:#0d9488}table{width:100%;border-collapse:collapse;margin-top:16px}
+        td{padding:8px 0;border-bottom:1px solid #eee}td:first-child{color:#666;width:140px}
+        .valor{font-size:1.5rem;font-weight:700;color:#0d9488;margin:16px 0}
+        .rodape{margin-top:32px;font-size:0.75rem;color:#999;border-top:1px solid #eee;padding-top:12px}
+        </style></head><body>
+        <h2>Fatura ${fatura.numero}</h2>
+        <table>
+          <tr><td>Descrição</td><td>${fatura.description || 'Assinatura'}</td></tr>
+          <tr><td>Emissão</td><td>${new Date(fatura.data).toLocaleDateString('pt-BR')}</td></tr>
+          <tr><td>Vencimento</td><td>${new Date(fatura.vencimento).toLocaleDateString('pt-BR')}</td></tr>
+          <tr><td>Forma</td><td>${fatura.payment_method || '-'}</td></tr>
+        </table>
+        <div class="valor">R$ ${fatura.valor.toFixed(2).replace('.', ',')}</div>
+        <div class="rodape">Gerado em ${new Date().toLocaleString('pt-BR')}</div>
+        <script>window.print();</script>
+        </body></html>`);
+        win.document.close();
+      }
+    } catch (err) {
+      console.error('Erro ao baixar fatura:', err);
+      alert('Erro ao baixar fatura. Tente novamente.');
+    } finally {
+      setBaixandoId(null);
+    }
+  };
 
   const totalPago = faturas.filter(f => f.status === 'paga').reduce((sum, f) => sum + f.valor, 0);
   const totalVencida = faturas.filter(f => f.status === 'vencida').reduce((sum, f) => sum + f.valor, 0);
@@ -613,7 +685,13 @@ function FaturasContent() {
                   </span>
                 </td>
                 <td className="px-6 py-3 text-sm">
-                  <button className="text-teal-600 hover:text-teal-800 font-semibold">📥 Baixar</button>
+                  <button
+                    onClick={() => handleBaixar(fatura)}
+                    disabled={baixandoId === fatura.id}
+                    className="text-teal-600 hover:text-teal-800 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {baixandoId === fatura.id ? '⏳ Aguarde...' : '📥 Baixar'}
+                  </button>
                 </td>
               </tr>
             ))}
@@ -629,98 +707,97 @@ function FaturasContent() {
 // Componente Plano
 function PlanoContent({ onNotification }: { onNotification: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [planoSelecionado, setPlanoSelecionado] = useState<PlanType | null>(null);
+  const [planoSelecionado, setPlanoSelecionado] = useState<SubscriptionPlan | null>(null);
   const [criandoTicket, setCriandoTicket] = useState(false);
   const dialog = useAppDialog();
   const { registrarAcao } = useAuditLog();
 
-  const [planoAtualId, setPlanoAtualId] = useState<PlanType>('starter');
+  const [planosDB, setPlanosDB] = useState<SubscriptionPlan[]>([]);
+  const [planoAtual, setPlanoAtual] = useState<SubscriptionPlan | null>(null);
   const [planoInicio, setPlanoInicio] = useState<string>('');
   const [planoRenovacao, setPlanoRenovacao] = useState<string>('');
   const [planoStatus, setPlanoStatus] = useState<string>('ativo');
   const [loading, setLoading] = useState(true);
+  const [ministryId, setMinistryId] = useState<string>('');
 
-  const planosDisponiveis = Object.values(PLANOS_DISPONIBLES);
-  const planoAtual = PLANOS_DISPONIBLES[planoAtualId] || PLANOS_DISPONIBLES.starter;
-
-  const getPlanLabel = (planId: PlanType) => {
-    switch (planId) {
-      case 'intermediario':
-        return 'Intermediário';
-      case 'profissional':
-        return 'Profissional';
-      case 'expert':
-        return 'Expert';
-      default:
-        return 'Starter';
-    }
+  const buildRecursos = (plan: SubscriptionPlan & { max_divisao1?: number; max_divisao2?: number; max_divisao3?: number }): string[] => {
+    const r: string[] = [];
+    if (plan.max_users > 0) r.push(`Até ${plan.max_users} Usuários Administrativos`);
+    if (plan.max_members > 0) r.push(`Até ${plan.max_members.toLocaleString('pt-BR')} Membros`);
+    if (plan.max_ministerios > 0) r.push(`Até ${plan.max_ministerios} Igrejas`);
+    if (plan.has_advanced_reports) r.push('Relatórios Avançados');
+    if (plan.has_api_access) r.push('Acesso à API');
+    if (plan.has_priority_support) r.push('Suporte Prioritário');
+    if (plan.has_custom_domain) r.push('Domínio Personalizado');
+    if (plan.has_white_label) r.push('White Label');
+    if (plan.has_automation) r.push('Automação');
+    return r;
   };
 
   useEffect(() => {
     const supabase = createClient();
 
-    const resolveMinistryId = async () => {
+    const load = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) return null;
+        // 1) Carregar planos ativos diretamente do banco
+        const { data: plansData } = await supabase
+          .from('subscription_plans')
+          .select('*')
+          .eq('is_active', true)
+          .order('display_order', { ascending: true });
 
-        const mu = await supabase
-          .from('ministry_users')
-          .select('ministry_id')
-          .eq('user_id', user.id)
-          .limit(1);
+        const plans = (plansData || []) as SubscriptionPlan[];
+        setPlanosDB(plans);
 
-        const ministryIdFromMu = (mu.data as any)?.[0]?.ministry_id as string | undefined;
-        if (ministryIdFromMu) return ministryIdFromMu;
+        // 2) Resolver ministryId
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-        const m = await supabase.from('ministries').select('id').eq('user_id', user.id).limit(1);
-        const ministryIdFromOwner = (m.data as any)?.[0]?.id as string | undefined;
-        return ministryIdFromOwner || null;
-      } catch {
-        return null;
-      }
-    };
+        const muResult = await supabase.from('ministry_users').select('ministry_id').eq('user_id', user.id).maybeSingle();
+        let mId = (muResult.data as any)?.ministry_id as string | undefined;
+        if (!mId) {
+          const mResult = await supabase.from('ministries').select('id').eq('user_id', user.id).maybeSingle();
+          mId = (mResult.data as any)?.id as string | undefined;
+        }
+        if (!mId) return;
+        setMinistryId(mId);
 
-    const normalizePlanId = (value: string | null | undefined): PlanType => {
-      const normalized = String(value || '').toLowerCase();
-      if (normalized in PLANOS_DISPONIBLES) return normalized as PlanType;
-      if (normalized.includes('profissional') || normalized.includes('professional')) return 'profissional';
-      if (normalized.includes('intermediario') || normalized.includes('intermediate')) return 'intermediario';
-      if (normalized.includes('expert') || normalized.includes('enterprise') || normalized.includes('empresarial')) return 'expert';
-      return 'starter';
-    };
-
-    const loadPlanoAtual = async () => {
-      try {
-        const ministryId = await resolveMinistryId();
-        if (!ministryId) return;
-
-        const { data } = await supabase
+        // 3) Buscar dados do ministério com JOIN no plano (coluna subscription_plan_id existe após migration 20260403200000)
+        const { data: mData } = await supabase
           .from('ministries')
-          .select('plan, subscription_status, subscription_start_date, subscription_end_date, created_at')
-          .eq('id', ministryId)
+          .select('plan, subscription_plan_id, subscription_status, subscription_start_date, subscription_end_date, created_at, subscription_plans:subscription_plan_id(id, slug, name, price_monthly, price_annually, description, max_users, max_members, max_ministerios, has_api_access, has_custom_domain, has_advanced_reports, has_priority_support, has_white_label, has_automation, is_active, display_order)')
+          .eq('id', mId)
           .maybeSingle();
 
-        const planId = normalizePlanId(data?.plan);
-        setPlanoAtualId(planId);
-        setPlanoStatus(String(data?.subscription_status || 'ativo'));
+        setPlanoStatus(String((mData as any)?.subscription_status || 'ativo'));
+        setPlanoInicio((mData as any)?.subscription_start_date || (mData as any)?.created_at || '');
+        setPlanoRenovacao((mData as any)?.subscription_end_date || '');
 
-        const inicio = data?.subscription_start_date || data?.created_at || '';
-        const renovacao = data?.subscription_end_date || '';
-        setPlanoInicio(inicio);
-        setPlanoRenovacao(renovacao);
+        // 4) Plano atual: UUID via JOIN > slug exato no campo plan
+        let found: SubscriptionPlan | null = null;
+        const joinedPlan = (mData as any)?.subscription_plans;
+        if (joinedPlan?.id) {
+          found = plans.find(p => p.id === joinedPlan.id) || (joinedPlan as SubscriptionPlan);
+        }
+        if (!found) {
+          const slug = String((mData as any)?.plan || '').toLowerCase().trim();
+          if (slug) {
+            found = plans.find(p => p.slug.toLowerCase() === slug)
+              || plans.find(p => p.name.toLowerCase() === slug)
+              || null;
+          }
+        }
+        setPlanoAtual(found);
       } finally {
         setLoading(false);
       }
     };
 
-    loadPlanoAtual();
+    load();
   }, []);
 
-  const handleUpgradeClick = (targetPlano: PlanType) => {
-    setPlanoSelecionado(targetPlano);
+  const handleUpgradeClick = (plano: SubscriptionPlan) => {
+    setPlanoSelecionado(plano);
     setShowUpgradeModal(true);
   };
 
@@ -731,97 +808,41 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        await dialog.alert({
-          title: 'Erro',
-          type: 'error',
-          message: 'Você precisa estar logado para solicitar upgrade'
-        });
+        await dialog.alert({ title: 'Erro', type: 'error', message: 'Você precisa estar logado para solicitar upgrade' });
         return;
       }
 
-      // Obter informações do ministry
-      const muResult = await supabase
-        .from('ministry_users')
-        .select('ministry_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      const ministryIdFromMu = (muResult.data as any)?.ministry_id as string | undefined;
-      let ministryId = ministryIdFromMu;
-
-      if (!ministryId) {
-        const mResult = await supabase
-          .from('ministries')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        ministryId = (mResult.data as any)?.id as string | undefined;
+      let mId = ministryId;
+      if (!mId) {
+        const muResult = await supabase.from('ministry_users').select('ministry_id').eq('user_id', user.id).maybeSingle();
+        mId = (muResult.data as any)?.ministry_id as string;
+        if (!mId) {
+          const mResult = await supabase.from('ministries').select('id').eq('user_id', user.id).maybeSingle();
+          mId = (mResult.data as any)?.id as string;
+        }
       }
 
-      if (!ministryId) {
-        await dialog.alert({
-          title: 'Erro',
-          type: 'error',
-          message: 'Ministério não encontrado'
-        });
+      if (!mId) {
+        await dialog.alert({ title: 'Erro', type: 'error', message: 'Ministério não encontrado' });
         return;
       }
 
-      // Montar dados do novo ticket
-      const novoPlano = planoSelecionado ? PLANOS_DISPONIBLES[planoSelecionado] : null;
-      const planoAtualObj = PLANOS_DISPONIBLES[planoAtualId];
+      const titulo = `Solicitação de Upgrade de Plano: ${planoSelecionado?.name || 'Desconhecido'}`;
+      const descricao = `Solicitação de upgrade do plano "${planoAtual?.name || 'Atual'}" para "${planoSelecionado?.name || 'Desconhecido'}".\n\nNovo plano: ${formatarPreco(planoSelecionado?.price_monthly || 0)}/mês\n\nFavor processar esta solicitação comercial.`;
 
-      const titulo = `Solicitação de Upgrade de Plano: ${novoPlano?.nome || 'Desconhecido'}`;
-      const descricao = `Solicitação de upgrade do plano "${planoAtualObj?.nome || 'Atual'}" para "${novoPlano?.nome || 'Desconhecido'}".\n\nNovo plano: ${formatarPreco(novoPlano?.preco_mensal || 0)}/mês\n\nFavor processar esta solicitação comercial.`;
-
-      // Criar ticket na tabela support_tickets
       const { error: ticketError } = await supabase
         .from('support_tickets')
-        .insert([{
-          ministry_id: ministryId,
-          user_id: user.id,
-          subject: titulo,
-          description: descricao,
-          category: 'Upgrade de Plano',
-          priority: 'high',
-          status: 'open',
-        }])
+        .insert([{ ministry_id: mId, user_id: user.id, subject: titulo, description: descricao, category: 'Upgrade de Plano', priority: 'high', status: 'open' }])
         .select();
 
       if (ticketError) {
-        await registrarAcao({
-          acao: 'criar',
-          modulo: 'configuracoes',
-          area: 'plano',
-          tabela_afetada: 'support_tickets',
-          descricao: `Tentativa de criar ticket de upgrade falhou`,
-          status: 'erro',
-          mensagem_erro: ticketError.message
-        });
-        await dialog.alert({
-          title: 'Erro',
-          type: 'error',
-          message: 'Erro ao criar ticket: ' + ticketError.message
-        });
+        await registrarAcao({ acao: 'criar', modulo: 'configuracoes', area: 'plano', tabela_afetada: 'support_tickets', descricao: 'Tentativa de criar ticket de upgrade falhou', status: 'erro', mensagem_erro: ticketError.message });
+        await dialog.alert({ title: 'Erro', type: 'error', message: 'Erro ao criar ticket: ' + ticketError.message });
         return;
       }
 
-      // Registrar ação
-      await registrarAcao({
-        acao: 'criar',
-        modulo: 'configuracoes',
-        area: 'plano',
-        tabela_afetada: 'support_tickets',
-        descricao: `Ticket de upgrade criado: ${titulo}`,
-        dados_novos: {
-          plano_atual: planoAtualId,
-          plano_solicitado: planoSelecionado,
-          titulo
-        },
-        status: 'sucesso'
-      });
+      await registrarAcao({ acao: 'criar', modulo: 'configuracoes', area: 'plano', tabela_afetada: 'support_tickets', descricao: `Ticket de upgrade criado: ${titulo}`, dados_novos: { plano_atual: planoAtual?.slug, plano_solicitado: planoSelecionado?.slug, titulo }, status: 'sucesso' });
 
-      // Sucesso!
       setShowUpgradeModal(false);
       setPlanoSelecionado(null);
       onNotification('Sucesso!', 'Ticket comercial enviado com sucesso! Um membro da nossa equipe entrará em contato em breve para processar seu upgrade.', 'success');
@@ -833,113 +854,142 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
     }
   };
 
+  // Plano recomendado = próximo nível acima do atual
+  const recommendedPlanId = (() => {
+    if (planosDB.length === 0) return null;
+    if (!planoAtual) return planosDB[Math.floor(planosDB.length / 2)]?.id || null;
+    const idx = planosDB.findIndex(p => p.id === planoAtual.id);
+    return idx >= 0 && idx < planosDB.length - 1 ? planosDB[idx + 1].id : null;
+  })();
+
+  const recursosPlanAtual = planoAtual ? buildRecursos(planoAtual as any) : [];
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Plano de Assinatura</h2>
 
-      {loading && (
-        <p className="text-sm text-gray-500 mb-4">Carregando dados do plano...</p>
+      {loading && <p className="text-sm text-gray-500 mb-4">Carregando dados do plano...</p>}
+
+      {/* Plano não identificado */}
+      {!loading && !planoAtual && (
+        <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-6 text-yellow-800 text-sm">
+          Plano atual não identificado. Entre em contato com o suporte para regularizar sua assinatura.
+        </div>
       )}
 
-      <div className="bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg shadow-lg p-8 mb-8">
-        <h3 className="text-2xl font-bold mb-2">Seu Plano Atual</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div>
-            <p className="text-teal-100 text-sm mb-1">Plano</p>
-            <p className="text-2xl font-bold">{getPlanLabel(planoAtual.id)}</p>
-            <p className="text-teal-100 text-xs">Status: {planoStatus}</p>
-          </div>
-          <div>
-            <p className="text-teal-100 text-sm mb-1">Valor</p>
-            <p className="text-2xl font-bold">{formatarPreco(planoAtual.preco_mensal)}</p>
-          </div>
-          <div>
-            <p className="text-teal-100 text-sm mb-1">Ativo desde</p>
-            <p className="text-lg font-semibold">
-              {planoInicio ? new Date(planoInicio).toLocaleDateString('pt-BR') : '—'}
-            </p>
-          </div>
-          <div>
-            <p className="text-teal-100 text-sm mb-1">Próxima renovação</p>
-            <p className="text-lg font-semibold">
-              {planoRenovacao ? new Date(planoRenovacao).toLocaleDateString('pt-BR') : '—'}
-            </p>
-          </div>
-        </div>
-        <div className="mt-6">
-          <h4 className="text-lg font-bold mb-3">Seu Plano Inclui:</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {planoAtual.recursos.map((feature, index) => (
-              <p key={index} className="text-teal-100">✓ {feature}</p>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <h3 className="text-xl font-bold text-gray-800 mb-4">Planos Disponíveis</h3>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {planosDisponiveis.map((plano) => (
-          <div key={plano.id} className={`rounded-lg shadow-lg overflow-hidden transition transform hover:scale-105 ${plano.id === 'intermediario' ? 'ring-2 ring-teal-500' : ''}`}>
-            {plano.id === 'intermediario' && (
-              <div className="bg-teal-500 text-white px-4 py-2 text-center text-sm font-bold">⭐ RECOMENDADO</div>
-            )}
-            <div className="p-4">
-              <h4 className="text-lg font-bold text-gray-800 mb-2">{getPlanLabel(plano.id)}</h4>
-              <p className="text-2xl font-bold text-teal-600 mb-1">{formatarPreco(plano.preco_mensal)}</p>
-              <p className="text-gray-600 text-sm">por mensal</p>
-              <p className="text-gray-500 text-xs mb-6">{formatarPreco(plano.preco_anual)}/ano</p>
-              <div className="space-y-2 mb-6">
-                {plano.recursos.map((feature, index) => (
-                  <p key={index} className="text-sm text-gray-700">✓ {feature}</p>
-                ))}
-              </div>
-              <button
-                onClick={() => {
-                  if (plano.id !== planoAtual.id) {
-                    handleUpgradeClick(plano.id);
-                  }
-                }}
-                disabled={plano.id === planoAtual.id}
-                className={`w-full py-2 rounded-lg font-semibold transition ${plano.id === planoAtual.id
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-teal-600 text-white hover:bg-teal-700'
-                  }`}
-              >
-                {plano.id === planoAtual.id ? '✓ Plano Atual' : 'Fazer Upgrade'}
-              </button>
+      {/* Card plano atual */}
+      {planoAtual && (
+        <div className="bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg shadow-lg p-8 mb-8">
+          <h3 className="text-2xl font-bold mb-2">Seu Plano Atual</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div>
+              <p className="text-teal-100 text-sm mb-1">Plano</p>
+              <p className="text-2xl font-bold">{planoAtual.name}</p>
+              <p className="text-teal-100 text-xs">Status: {planoStatus}</p>
+            </div>
+            <div>
+              <p className="text-teal-100 text-sm mb-1">Valor</p>
+              <p className="text-2xl font-bold">{formatarPreco(planoAtual.price_monthly)}</p>
+              {planoAtual.price_annually && (
+                <p className="text-teal-100 text-xs">{formatarPreco(planoAtual.price_annually)}/ano</p>
+              )}
+            </div>
+            <div>
+              <p className="text-teal-100 text-sm mb-1">Ativo desde</p>
+              <p className="text-lg font-semibold">{planoInicio ? new Date(planoInicio).toLocaleDateString('pt-BR') : '—'}</p>
+            </div>
+            <div>
+              <p className="text-teal-100 text-sm mb-1">Próxima renovação</p>
+              <p className="text-lg font-semibold">{planoRenovacao ? new Date(planoRenovacao).toLocaleDateString('pt-BR') : '—'}</p>
             </div>
           </div>
-        ))}
-      </div>
+          {recursosPlanAtual.length > 0 && (
+            <div className="mt-6">
+              <h4 className="text-lg font-bold mb-3">Seu Plano Inclui:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {recursosPlanAtual.map((feature, index) => (
+                  <p key={index} className="text-teal-100">✓ {feature}</p>
+                ))}
+              </div>
+              {planoAtual.description && (
+                <p className="text-teal-200 text-sm mt-3 italic">{planoAtual.description}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
+      {/* Lista de planos disponíveis */}
+      {!loading && planosDB.length > 0 && (
+        <>
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Planos Disponíveis</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {planosDB.map((plano) => {
+              const isAtual = plano.id === planoAtual?.id;
+              const isRecomendado = plano.id === recommendedPlanId && !isAtual;
+              const recursos = buildRecursos(plano as any);
+              return (
+                <div key={plano.id} className={`rounded-lg shadow-lg overflow-hidden transition transform hover:scale-105 ${isRecomendado ? 'ring-2 ring-teal-500' : ''}`}>
+                  {isRecomendado && (
+                    <div className="bg-teal-500 text-white px-4 py-2 text-center text-sm font-bold">⭐ RECOMENDADO</div>
+                  )}
+                  {isAtual && (
+                    <div className="bg-blue-600 text-white px-4 py-2 text-center text-sm font-bold">✓ PLANO ATUAL</div>
+                  )}
+                  <div className="p-4">
+                    <h4 className="text-lg font-bold text-gray-800 mb-2">{plano.name}</h4>
+                    {plano.description && <p className="text-gray-500 text-xs mb-2">{plano.description}</p>}
+                    <p className="text-2xl font-bold text-teal-600 mb-1">{formatarPreco(plano.price_monthly)}</p>
+                    <p className="text-gray-600 text-sm">por mês</p>
+                    {plano.price_annually && (
+                      <p className="text-gray-500 text-xs mb-4">{formatarPreco(plano.price_annually)}/ano</p>
+                    )}
+                    <div className="space-y-1 mb-6 mt-3">
+                      {recursos.map((feature, idx) => (
+                        <p key={idx} className="text-sm text-gray-700">✓ {feature}</p>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => { if (!isAtual) handleUpgradeClick(plano); }}
+                      disabled={isAtual}
+                      className={`w-full py-2 rounded-lg font-semibold transition ${
+                        isAtual ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-teal-600 text-white hover:bg-teal-700'
+                      }`}
+                    >
+                      {isAtual ? '✓ Plano Atual' : 'Solicitar Upgrade'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Modal upgrade */}
       {showUpgradeModal && planoSelecionado && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6">
             <h3 className="text-2xl font-bold text-gray-800 mb-4">Solicitar Upgrade</h3>
             <p className="text-gray-600 mb-4">
-              Um ticket comercial será criado e nossa equipe de suporte entrará em contato para processar seu upgrade para o plano <strong>{PLANOS_DISPONIBLES[planoSelecionado]?.nome}</strong>.
+              Um ticket comercial será criado e nossa equipe de suporte entrará em contato para processar seu upgrade para o plano <strong>{planoSelecionado.name}</strong>.
             </p>
-            <p className="text-sm text-gray-500 mb-6">
-              Você receberá uma resposta por email em breve com os próximos passos.
-            </p>
+            <div className="bg-gray-50 rounded-lg p-4 mb-4 text-sm text-gray-700">
+              <p>📦 <strong>{planoAtual?.name}</strong> → <strong>{planoSelecionado.name}</strong></p>
+              <p className="mt-1">💰 {formatarPreco(planoSelecionado.price_monthly)}/mês</p>
+            </div>
+            <p className="text-sm text-gray-500 mb-6">Você receberá uma resposta por email em breve com os próximos passos.</p>
             <div className="flex gap-4">
-              <button 
-                onClick={() => {
-                  setShowUpgradeModal(false);
-                  setPlanoSelecionado(null);
-                }}
+              <button
+                onClick={() => { setShowUpgradeModal(false); setPlanoSelecionado(null); }}
                 disabled={criandoTicket}
-                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Cancelar
-              </button>
-              <button 
+                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold disabled:opacity-50"
+              >Cancelar</button>
+              <button
                 onClick={handleConfirmUpgrade}
                 disabled={criandoTicket}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {criandoTicket ? 'Processando...' : 'Abrir Ticket'}
-              </button>
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold disabled:opacity-50"
+              >{criandoTicket ? 'Processando...' : 'Abrir Ticket'}</button>
             </div>
           </div>
         </div>
@@ -947,6 +997,8 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
     </div>
   );
 }
+
+
 
 // Componente Nomenclaturas
 function NomenclaturaContent({ onNotification }: { onNotification: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {

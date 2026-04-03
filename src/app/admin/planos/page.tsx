@@ -41,6 +41,9 @@ export default function PlanosPage() {
     max_storage_bytes: '',
     max_members: '',
     max_ministerios: '',
+    max_divisao1: '',
+    max_divisao2: '',
+    max_divisao3: '',
     setup_fee: '',
     has_api_access: false,
     has_custom_domain: false,
@@ -105,6 +108,9 @@ export default function PlanosPage() {
           max_storage_bytes: parseInt(formData.max_storage_bytes),
           max_members: parseInt(formData.max_members),
           max_ministerios: parseInt(formData.max_ministerios || '0'),
+          max_divisao1: parseInt(formData.max_divisao1 || '5'),
+          max_divisao2: parseInt(formData.max_divisao2 || '0'),
+          max_divisao3: parseInt(formData.max_divisao3 || '-1'),
           setup_fee: parseFloat(formData.setup_fee || '0'),
         }),
       })
@@ -133,6 +139,9 @@ export default function PlanosPage() {
       max_storage_bytes: '',
       max_members: '',
       max_ministerios: '',
+      max_divisao1: '',
+      max_divisao2: '',
+      max_divisao3: '',
       setup_fee: '',
       has_api_access: false,
       has_custom_domain: false,
@@ -157,6 +166,9 @@ export default function PlanosPage() {
       max_storage_bytes: plan.max_storage_bytes.toString(),
       max_members: plan.max_members.toString(),
       max_ministerios: plan.max_ministerios?.toString() || '',
+      max_divisao1: plan.max_divisao1?.toString() || '5',
+      max_divisao2: plan.max_divisao2?.toString() || '0',
+      max_divisao3: plan.max_divisao3?.toString() || '-1',
       setup_fee: plan.setup_fee ? plan.setup_fee.toString() : '',
       has_api_access: plan.has_api_access,
       has_custom_domain: plan.has_custom_domain,
@@ -295,6 +307,36 @@ export default function PlanosPage() {
                     placeholder="Máximo de Igrejas"
                     value={formData.max_ministerios}
                     onChange={(e) => setFormData({ ...formData, max_ministerios: e.target.value })}
+                    required
+                    className="px-4 py-2 border rounded-lg"
+                  />
+
+                  <input
+                    type="number"
+                    placeholder="Limite 1ª Divisão (ex: Supervisão)"
+                    value={formData.max_divisao1}
+                    onChange={(e) => setFormData({ ...formData, max_divisao1: e.target.value })}
+                    title="Máximo de registros da 1ª divisão hierárquica"
+                    required
+                    className="px-4 py-2 border rounded-lg"
+                  />
+
+                  <input
+                    type="number"
+                    placeholder="Limite 2ª Divisão (0 = nenhuma)"
+                    value={formData.max_divisao2}
+                    onChange={(e) => setFormData({ ...formData, max_divisao2: e.target.value })}
+                    title="Máximo de registros da 2ª divisão. 0 = não permitido"
+                    required
+                    className="px-4 py-2 border rounded-lg"
+                  />
+
+                  <input
+                    type="number"
+                    placeholder="Limite 3ª Divisão (-1 = ilimitado, 0 = nenhuma)"
+                    value={formData.max_divisao3}
+                    onChange={(e) => setFormData({ ...formData, max_divisao3: e.target.value })}
+                    title="-1 = ilimitado, 0 = não permitido, N = máximo N"
                     required
                     className="px-4 py-2 border rounded-lg"
                   />

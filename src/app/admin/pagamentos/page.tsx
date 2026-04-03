@@ -318,12 +318,26 @@ export default function PagamentosPage() {
   }
 
   const handlePrintReceipt = (payment: Payment) => {
-    const ministryName = (payment as any).ministries?.name || payment.ministry_id
+    const ministry = (payment as any).ministries || {}
+    const ministryName = ministry.name || payment.ministry_id
     const planName = (payment as any).subscription_plans?.name || '-'
     const dueDate = new Date(payment.due_date).toLocaleDateString('pt-BR')
     const paidDate = payment.payment_date
       ? new Date(payment.payment_date).toLocaleDateString('pt-BR')
       : '-'
+
+    const addressParts = [
+      ministry.address_street,
+      ministry.address_number,
+      ministry.address_city,
+      ministry.address_state,
+      ministry.address_zip,
+    ].filter(Boolean)
+    const address = addressParts.join(', ')
+
+    const logoHtml = ministry.logo_url
+      ? `<img src="${ministry.logo_url}" alt="Logo" style="width:80px;height:80px;object-fit:contain;" />`
+      : ''
 
     const html = `
       <!doctype html>
@@ -333,24 +347,41 @@ export default function PagamentosPage() {
           <title>Recibo de Pagamento</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
-            h1 { font-size: 18px; margin-bottom: 12px; }
+            .header { display: flex; align-items: flex-start; gap: 18px; border-bottom: 2px solid #003d7a; padding-bottom: 14px; margin-bottom: 20px; }
+            .header-logo { flex-shrink: 0; }
+            .header-info { flex: 1; }
+            .header-info .nome { font-size: 14px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; }
+            .header-info .detalhe { font-size: 11px; color: #444; line-height: 1.6; }
+            h1 { font-size: 16px; margin-bottom: 12px; font-weight: bold; }
             .box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
             .row { display: flex; justify-content: space-between; margin: 6px 0; }
             .label { color: #64748b; }
             .value { font-weight: 600; }
+            .footer { margin-top: 24px; font-size: 10px; color: #999; text-align: center; }
           </style>
         </head>
         <body>
+          <div class="header">
+            <div class="header-logo">${logoHtml}</div>
+            <div class="header-info">
+              <div class="nome">${ministryName}</div>
+              ${address ? `<div class="detalhe">${address}</div>` : ''}
+              ${ministry.email_admin ? `<div class="detalhe">Email: ${ministry.email_admin}</div>` : ''}
+              ${ministry.cnpj_cpf ? `<div class="detalhe">CNPJ: ${ministry.cnpj_cpf}</div>` : ''}
+              ${ministry.phone ? `<div class="detalhe">Tel: ${ministry.phone}</div>` : ''}
+            </div>
+          </div>
           <h1>Recibo de Pagamento</h1>
           <div class="box">
-            <div class="row"><span class="label">Ministerio</span><span class="value">${ministryName}</span></div>
+            <div class="row"><span class="label">Ministério</span><span class="value">${ministryName}</span></div>
             <div class="row"><span class="label">Plano</span><span class="value">${planName}</span></div>
             <div class="row"><span class="label">Valor</span><span class="value">R$ ${payment.amount.toFixed(2)}</span></div>
             <div class="row"><span class="label">Vencimento</span><span class="value">${dueDate}</span></div>
             <div class="row"><span class="label">Pagamento</span><span class="value">${paidDate}</span></div>
             <div class="row"><span class="label">Status</span><span class="value">${payment.status}</span></div>
-            <div class="row"><span class="label">Metodo</span><span class="value">${payment.payment_method || '-'}</span></div>
+            <div class="row"><span class="label">Método</span><span class="value">${payment.payment_method || '-'}</span></div>
           </div>
+          <div class="footer">Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</div>
         </body>
       </html>
     `

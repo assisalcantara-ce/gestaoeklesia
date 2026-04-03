@@ -18,6 +18,9 @@ export interface SubscriptionPlan {
   max_storage_bytes: number;
   max_members: number;
   max_ministerios: number;
+  max_divisao1: number;
+  max_divisao2: number;
+  max_divisao3: number;
   has_api_access: boolean;
   has_custom_domain: boolean;
   has_advanced_reports: boolean;

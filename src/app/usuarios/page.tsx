@@ -6,13 +6,14 @@ import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { createClient } from '@/lib/supabase-client';
+import { PLANOS_DISPONIBLES } from '@/config/plans';
 
 interface Usuario {
   id: string;
   nome: string;
   email: string;
   email_confirmed?: boolean;
-  nivel: 'administrador' | 'financeiro' | 'operador' | 'supervisor' | 'superintendente' | 'coordenador';
+  nivel: 'administrador' | 'financeiro' | 'operador' | 'supervisor';
   congregacao?: string;
   congregacao_id?: string | null;
   supervisao?: string;
@@ -74,11 +75,17 @@ export default function UsuariosPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
+  const LIMITE_POR_PLANO: Record<string, number> = { starter: 3, intermediario: 10, profissional: 25, expert: 999 };
+  const [planoId, setPlanoId] = useState<string>('starter');
+  const limiteUsuarios = LIMITE_POR_PLANO[planoId] ?? 3;
+  const totalUsuarios = usuarios.length;
+  const limiteAtingido = totalUsuarios >= limiteUsuarios;
+
   const nivelAcessoInfo: NivelAcesso[] = [
     {
       id: 'administrador',
       nome: 'Administrador',
-      descricao: 'Pastor Presidente / Sede do Ministério - Acesso total ao sistema',
+      descricao: 'Secretaria Geral - Acesso total ao sistema',
       icon: '👑',
       cor: 'bg-purple-100 border-purple-300',
     },
@@ -92,30 +99,16 @@ export default function UsuariosPage() {
     {
       id: 'supervisor',
       nome: 'Supervisor',
-      descricao: 'Responsável por um grupo de congregações/regional',
+      descricao: 'Responsável por um grupo de Supervisão/regional',
       icon: '🗺️',
       cor: 'bg-indigo-100 border-indigo-300',
     },
     {
       id: 'operador',
       nome: 'Operador',
-      descricao: 'Pastores de Congregação - Gerenciamento local',
+      descricao: 'Cadastros e consultas - Secretaria local',
       icon: '🏢',
       cor: 'bg-green-100 border-green-300',
-    },
-    {
-      id: 'superintendente',
-      nome: 'Superintendente',
-      descricao: 'Líder Geral de EBD do Ministério - Acesso apenas a EBD',
-      icon: '📚',
-      cor: 'bg-orange-100 border-orange-300',
-    },
-    {
-      id: 'coordenador',
-      nome: 'Coordenador',
-      descricao: 'Líder Local de EBD da Congregação - Acesso apenas a EBD local',
-      icon: '👥',
-      cor: 'bg-yellow-100 border-yellow-300',
     },
   ];
 
@@ -204,6 +197,21 @@ export default function UsuariosPage() {
     loadCongregacoes();
   }, [authLoading, supabase]);
 
+  useEffect(() => {
+    const loadPlano = async () => {
+      if (authLoading) return;
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) return;
+      const { data: row } = await supabase
+        .from('ministries')
+        .select('plan_id')
+        .eq('user_id', data.session.user.id)
+        .maybeSingle();
+      if ((row as any)?.plan_id) setPlanoId((row as any).plan_id);
+    };
+    loadPlano();
+  }, [authLoading, supabase]);
+
   const openEditModal = (usuario: Usuario & { congregacao_id?: string | null }) => {
     setEditError('');
     setEditStatus('');
@@ -245,7 +253,7 @@ export default function UsuariosPage() {
       return;
     }
 
-    if ((editData.nivel === 'operador' || editData.nivel === 'coordenador') && !editData.congregacao_id) {
+    if (editData.nivel === 'operador' && !editData.congregacao_id) {
       setEditError('Congregacao obrigatoria para este nivel.');
       return;
     }
@@ -320,7 +328,7 @@ export default function UsuariosPage() {
       return;
     }
 
-    if ((formData.nivel === 'operador' || formData.nivel === 'coordenador') && !formData.congregacao_id) {
+    if (formData.nivel === 'operador' && !formData.congregacao_id) {
       setFormError('Congregacao obrigatoria para este nivel.');
       return;
     }
@@ -402,10 +410,21 @@ export default function UsuariosPage() {
             <div>
               <h1 className="text-4xl font-bold text-[#123b63]">Usuários</h1>
               <p className="text-gray-600 mt-2">Gerencie usuários e seus níveis de acesso</p>
+              <p className="text-sm mt-1">
+                <span className={limiteAtingido ? 'text-red-600 font-semibold' : 'text-gray-500'}>
+                  {totalUsuarios}/{limiteUsuarios} usuários
+                </span>
+                <span className="text-gray-400 ml-1">· Plano {PLANOS_DISPONIBLES[planoId]?.nome || planoId}</span>
+              </p>
             </div>
             <button
-              onClick={() => setShowForm(!showForm)}
-              className="bg-[#0284c7] text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold"
+              onClick={() => {
+                if (limiteAtingido) return;
+                setShowForm(!showForm);
+              }}
+              disabled={limiteAtingido}
+              title={limiteAtingido ? `Limite do plano atingido (${limiteUsuarios} usuários)` : ''}
+              className={`px-6 py-3 rounded-lg font-semibold transition ${limiteAtingido ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#0284c7] text-white hover:bg-blue-700'}`}
             >
               + Novo Usuário
             </button>
@@ -434,7 +453,12 @@ export default function UsuariosPage() {
           {/* Form de novo usuário */}
           {showForm && (
             <div className="bg-white rounded-lg p-6 shadow-md mb-6 border-2 border-[#123b63]">
-              <h2 className="text-2xl font-bold text-[#123b63] mb-4">Adicionar Novo Usuário</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-[#123b63]">Adicionar Novo Usuário</h2>
+                <span className={`text-sm font-semibold px-3 py-1 rounded-full ${limiteAtingido ? 'bg-red-100 text-red-700' : totalUsuarios >= limiteUsuarios - 1 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                  {totalUsuarios}/{limiteUsuarios} usuários · {PLANOS_DISPONIBLES[planoId]?.nome || planoId}
+                </span>
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <input
@@ -473,7 +497,7 @@ export default function UsuariosPage() {
                     ))}
                   </select>
                 </div>
-                {selectedLevel && (selectedLevel === 'operador' || selectedLevel === 'coordenador') && (
+                {selectedLevel && selectedLevel === 'operador' && (
                   <select
                     value={formData.congregacao_id}
                     onChange={(e) => handleFormChange('congregacao_id', e.target.value)}
@@ -728,7 +752,7 @@ export default function UsuariosPage() {
                   </div>
                 </div>
 
-                {(editData.nivel === 'operador' || editData.nivel === 'coordenador') && (
+                {editData.nivel === 'operador' && (
                   <div>
                     <label className="block text-sm font-semibold text-[#123b63] mb-2">Congregação</label>
                     <select
