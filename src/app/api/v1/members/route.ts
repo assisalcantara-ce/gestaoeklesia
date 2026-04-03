@@ -261,10 +261,6 @@ export async function POST(request: NextRequest) {
           status: normalizedBody.status || 'active',
           custom_fields: normalizedBody.custom_fields || {},
           observacoes: normalizedBody.observacoes || null,
-          // Campos ministeriais de data
-          data_consagracao: normalizedBody.data_consagracao || null,
-          data_emissao: normalizedBody.data_emissao || null,
-          data_validade_credencial: normalizedBody.data_validade_credencial || null,
         },
       ])
       .select()
