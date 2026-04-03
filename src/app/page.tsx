@@ -178,7 +178,7 @@ export default function LandingPage() {
       .eq('is_active', true)
       .order('display_order', { ascending: true })
       .order('price_monthly', { ascending: true })
-      .then(({ data }) => { if (data) setPlanosLanding(data as PlanoDB[]); });
+      .then(({ data }: { data: PlanoDB[] | null }) => { if (data) setPlanosLanding(data); });
   }, []);
 
   const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
