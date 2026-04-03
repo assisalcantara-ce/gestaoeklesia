@@ -95,13 +95,16 @@ export async function PUT(
     const normalizedBody = normalizePayloadToUppercase(body, {
       preserveKeys: [
         'member_since',
-        'birth_date',
+        'data_nascimento',
+        'data_nascimento_conjuge',
+        'data_batismo_aguas',
+        'data_batismo_espirito_santo',
         'data_consagracao',
         'data_emissao',
         'data_validade_credencial',
+        'dados_cargos',
         'latitude',
         'longitude',
-        'cargoMinisterial',
         'cargo_ministerial',
         'procedencia',
       ],
@@ -144,27 +147,69 @@ export async function PUT(
       email: typeof normalizedBody.email === 'string' ? normalizedBody.email.toLowerCase() : normalizedBody.email ?? null,
       phone: normalizedBody.phone ?? null,
       cpf: normalizedBody.cpf ?? null,
-      data_consagracao: normalizedBody.data_consagracao ?? null,
-      data_emissao: normalizedBody.data_emissao ?? null,
-      data_validade_credencial: normalizedBody.data_validade_credencial ?? null,
-      birth_date: normalizedBody.birth_date ?? null,
-      gender: normalizedBody.gender ?? null,
-      marital_status: normalizedBody.marital_status ?? null,
+      // Aba Dados
+      matricula: normalizedBody.matricula ?? null,
+      unique_id: normalizedBody.unique_id ?? null,
+      tipo_cadastro: normalizedBody.tipo_cadastro ?? null,
+      data_nascimento: normalizedBody.data_nascimento ?? null,
+      sexo: normalizedBody.sexo ?? null,
+      tipo_sanguineo: normalizedBody.tipo_sanguineo ?? null,
+      escolaridade: normalizedBody.escolaridade ?? null,
+      estado_civil: normalizedBody.estado_civil ?? null,
+      nome_conjuge: normalizedBody.nome_conjuge ?? null,
+      cpf_conjuge: normalizedBody.cpf_conjuge ?? null,
+      data_nascimento_conjuge: normalizedBody.data_nascimento_conjuge ?? null,
+      nome_pai: normalizedBody.nome_pai ?? null,
+      nome_mae: normalizedBody.nome_mae ?? null,
+      rg: normalizedBody.rg ?? null,
       orgao_emissor: normalizedBody.orgao_emissor ?? null,
-      occupation: normalizedBody.occupation ?? null,
-      address: normalizedBody.address ?? null,
-      complement: normalizedBody.complement ?? null,
-      city: normalizedBody.city ?? null,
-      state: normalizedBody.state ?? null,
-      zipcode: normalizedBody.zipcode ?? null,
+      nacionalidade: normalizedBody.nacionalidade ?? null,
+      naturalidade: normalizedBody.naturalidade ?? null,
+      uf_naturalidade: normalizedBody.uf_naturalidade ?? null,
+      titulo_eleitoral: normalizedBody.titulo_eleitoral ?? null,
+      zona_eleitoral: normalizedBody.zona_eleitoral ?? null,
+      secao_eleitoral: normalizedBody.secao_eleitoral ?? null,
+      data_batismo_aguas: normalizedBody.data_batismo_aguas ?? null,
+      data_batismo_espirito_santo: normalizedBody.data_batismo_espirito_santo ?? null,
+      // Aba Endereço
+      cep: normalizedBody.cep ?? null,
+      logradouro: normalizedBody.logradouro ?? null,
+      numero: normalizedBody.numero ?? null,
+      bairro: normalizedBody.bairro ?? null,
+      complemento: normalizedBody.complemento ?? null,
+      cidade: normalizedBody.cidade ?? null,
+      estado: normalizedBody.estado ?? null,
+      // Aba Contato
+      celular: normalizedBody.celular ?? null,
+      whatsapp: normalizedBody.whatsapp ?? null,
+      // Geolocalização
       congregacao_id: normalizedBody.congregacao_id ?? null,
       latitude: typeof normalizedBody.latitude === 'number' ? normalizedBody.latitude : null,
       longitude: typeof normalizedBody.longitude === 'number' ? normalizedBody.longitude : null,
+      // Aba Ministerial
+      profissao: normalizedBody.profissao ?? null,
+      curso_teologico: normalizedBody.curso_teologico ?? null,
+      instituicao_teologica: normalizedBody.instituicao_teologica ?? null,
+      pastor_auxiliar: normalizedBody.pastor_auxiliar ?? false,
+      procedencia: normalizedBody.procedencia ?? null,
+      procedencia_local: normalizedBody.procedencia_local ?? null,
+      cargo_ministerial: normalizedBody.cargo_ministerial ?? null,
+      dados_cargos: normalizedBody.dados_cargos ?? {},
+      tem_funcao_igreja: normalizedBody.tem_funcao_igreja ?? false,
+      qual_funcao: normalizedBody.qual_funcao ?? null,
+      setor_departamento: normalizedBody.setor_departamento ?? null,
+      observacoes_ministeriais: normalizedBody.observacoes_ministeriais ?? null,
+      data_consagracao: normalizedBody.data_consagracao ?? null,
+      data_emissao: normalizedBody.data_emissao ?? null,
+      data_validade_credencial: normalizedBody.data_validade_credencial ?? null,
+      // Aba Foto
+      foto_url: normalizedBody.foto_url ?? null,
+      // Sistema
       member_since: normalizedBody.member_since ?? undefined,
       role: normalizedBody.role ?? null,
       status: normalizedBody.status ?? undefined,
       custom_fields: normalizedBody.custom_fields ?? {},
-      notes: normalizedBody.notes ?? null,
+      observacoes: normalizedBody.observacoes ?? null,
       updated_at: new Date().toISOString(),
     }
 
@@ -176,27 +221,7 @@ export async function PUT(
       .eq('ministry_id', ministryId)
       .select()
 
-    // Compatibilidade: bases que ainda não têm colunas novas
-    if (error && /column\s+"?(latitude|longitude|congregacao_id|orgao_emissor|data_consagracao|data_emissao|data_validade_credencial)"?\s+of\s+relation\s+"?members"?\s+does\s+not\s+exist/i.test(error.message)) {
-      const fallbackPayload: any = { ...payload }
-      delete fallbackPayload.latitude
-      delete fallbackPayload.longitude
-      delete fallbackPayload.congregacao_id
-      delete fallbackPayload.orgao_emissor
-      delete fallbackPayload.data_consagracao
-      delete fallbackPayload.data_emissao
-      delete fallbackPayload.data_validade_credencial
 
-      const retry = await supabase
-        .from('members')
-        .update(fallbackPayload)
-        .eq('id', id)
-        .eq('ministry_id', ministryId)
-        .select()
-
-      data = retry.data
-      error = retry.error
-    }
 
     if (error) {
       return NextResponse.json(
