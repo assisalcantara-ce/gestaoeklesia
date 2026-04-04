@@ -2218,8 +2218,7 @@ export default function MembrosPage() {
                     <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Nome</th>
                     <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">CPF</th>
                     <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Cargo</th>
-                    <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Supervisão</th>
-                    <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Campo</th>
+                    <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Data Consagração</th>
                     <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Status</th>
                     <th className="border-2 border-gray-300 px-4 py-3 text-center font-semibold text-gray-700">Controles</th>
                   </tr>
@@ -2256,8 +2255,11 @@ export default function MembrosPage() {
                       <td className="border border-gray-300 px-4 py-3 text-gray-700">{membro.nome}</td>
                       <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.cpf}</td>
                       <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.cargoMinisterial || '-'}</td>
-                      <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.supervisao || '-'}</td>
-                      <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.campo || '-'}</td>
+                      <td className="border border-gray-300 px-4 py-3 text-gray-600">
+                        {membro.dataConsagracao
+                          ? new Date(membro.dataConsagracao + 'T00:00:00').toLocaleDateString('pt-BR')
+                          : '-'}
+                      </td>
                       <td className="border border-gray-300 px-4 py-3">
                         <span className={`px-3 py-1 rounded text-sm font-semibold ${membro.status === 'ativo'
                           ? 'bg-green-100 text-green-800'
