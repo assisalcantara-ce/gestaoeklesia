@@ -2499,14 +2499,13 @@ export default function MembrosPage() {
                             type="text"
                             placeholder="Somente Números"
                             value={dadosPessoais.cpf}
-                            onChange={(e) => !membroEditando && setDadosPessoais({ ...dadosPessoais, cpf: formatCpf(e.target.value) })}
-                            disabled={membroEditando ? true : false}
-                            className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:border-transparent ${membroEditando
-                              ? 'bg-gray-100 border-gray-300 text-gray-600 cursor-not-allowed'
-                              : dadosPessoais.cpf && !validarCPF(dadosPessoais.cpf)
+                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, cpf: formatCpf(e.target.value) })}
+                            disabled={false}
+                            className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:border-transparent ${
+                              dadosPessoais.cpf && !validarCPF(dadosPessoais.cpf)
                                 ? 'border-red-500 focus:ring-red-500'
                                 : 'border-gray-300 focus:ring-teal-500'
-                              }`}
+                            }`}
                           />
                         </div>
                         <div>
