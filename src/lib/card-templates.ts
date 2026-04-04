@@ -1095,7 +1095,7 @@ export function converterParaTemplateEditavel(template: CardTemplate): any {
         ];
 
         if (template.layout.mostrarCargo) {
-            elementos.push({ id: '9', tipo: 'texto', x: 15, y: 219, largura: 300, altura: 30, fontSize: 13, cor: '#8B0000', backgroundColor: '#ffffff', borderRadius: 6, fonte: 'Arial', visivel: true, alinhamento: 'left', negrito: true, texto: '<font color="#000000"> CARGO:</font> {cargo}' });
+            elementos.push({ id: '9', tipo: 'texto', x: 15, y: 219, largura: 300, altura: 30, fontSize: 13, cor: '#8B0000', backgroundColor: '#ffffff', borderRadius: 6, fonte: 'Arial', visivel: true, alinhamento: 'left', negrito: true, texto: '<font color="#000000"> CARGO:</font> {cargo_ministerial}' });
         }
 
         return {

@@ -8,7 +8,7 @@ interface SubstituicaoRequest {
     matricula?: string;
     nome?: string;
     cpf?: string;
-    cargo?: string;
+    cargoMinisterial?: string;
     dataNascimento?: string;
     email?: string;
     celular?: string;
@@ -25,7 +25,7 @@ const PLACEHOLDERS = [
   { campo: 'nome', placeholder: '{nome}' },
   { campo: 'matricula', placeholder: '{matricula}' },
   { campo: 'cpf', placeholder: '{cpf}' },
-  { campo: 'cargo', placeholder: '{cargo}' },
+  { campo: 'cargoMinisterial', placeholder: '{cargo_ministerial}' },
   { campo: 'congregacao', placeholder: '{divisao3_valor}' },
   { campo: 'dataNascimento', placeholder: '{dataNascimento}' },
   { campo: 'email', placeholder: '{email}' },

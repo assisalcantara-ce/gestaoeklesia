@@ -96,7 +96,7 @@ const PLACEHOLDERS_DISPONIVEIS = [
   { campo: 'matricula', label: 'Matrícula', placeholder: '{matricula}' },
   { campo: 'cpf', label: 'CPF', placeholder: '{cpf}' },
   { campo: 'rg', label: 'RG', placeholder: '{rg}' },
-  { campo: 'cargo', label: 'Cargo', placeholder: '{cargo}' },
+  { campo: 'cargoMinisterial', label: 'Cargo Ministerial', placeholder: '{cargo_ministerial}' },
   { campo: 'supervisao', label: 'Supervisão', placeholder: '{supervisao}' },
   { campo: 'campo', label: 'Campo', placeholder: '{campo}' },
   { campo: 'dataNascimento', label: 'Data de Nascimento', placeholder: '{dataNascimento}' },

@@ -7,7 +7,7 @@ export const PLACEHOLDERS_CONFIG = [
   { campo: 'matricula', placeholder: '{matricula}', label: 'Matrícula' },
   { campo: 'cpf', placeholder: '{cpf}', label: 'CPF' },
   { campo: 'rg', placeholder: '{rg}', label: 'RG' },
-  { campo: 'cargo', placeholder: '{cargo}', label: 'Cargo' },
+  { campo: 'cargoMinisterial', placeholder: '{cargo_ministerial}', label: 'Cargo Ministerial' },
   { campo: 'filiacao', placeholder: '{filiacao}', label: 'Filiação' },
   { campo: 'nomePai', placeholder: '{nomePai}', label: 'Pai' },
   { campo: 'nomeMae', placeholder: '{nomeMae}', label: 'Mãe' },
