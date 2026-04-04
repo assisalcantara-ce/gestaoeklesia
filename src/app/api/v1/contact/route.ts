@@ -6,6 +6,7 @@ import { consumeRateLimit } from '@/lib/rate-limit-db'
 
 export async function POST(request: NextRequest) {
   try {
+    const buildTicketNumber = () => `LND-${Date.now().toString(36).toUpperCase()}`
     const ip = getClientIp(request)
     const limit = Number(process.env.PUBLIC_RATE_LIMIT_CONTACT_PER_10MIN || 10)
     const windowMs = 10 * 60 * 1000
@@ -215,6 +216,31 @@ export async function POST(request: NextRequest) {
         contact_id: contact.id,
       },
     })
+
+    const landingTicketNumber = buildTicketNumber()
+    const landingDescription = description?.trim()
+      ? description.trim()
+      : 'Solicitação de contato recebida pela landing page.'
+
+    const { error: landingTicketError } = await supabaseAdmin
+      .from('support_tickets_landing')
+      .insert({
+        ticket_number: landingTicketNumber,
+        institution_name: ministerio,
+        contact_name: responsible_name || pastor,
+        email,
+        whatsapp,
+        description: landingDescription,
+        status: 'open',
+        priority: 'medium',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+
+    if (landingTicketError) {
+      console.warn('[CONTACT] Aviso ao criar ticket landing:', landingTicketError)
+      // Não falha o request por causa disso
+    }
 
     // Criar notificação para o admin
     const { error: notificationError } = await supabaseClient

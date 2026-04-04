@@ -56,9 +56,9 @@ const features = [
     bullets: ['Fluxo de caixa', 'Categorias customizáveis', 'Relatórios por período']
   },
   {
-    title: 'Geolocalização',
-    text: 'Mapa com localização dos membros e propriedades da instituição.',
-    bullets: ['Mapa interativo', 'Filtros por área', 'Endereço dos membros']
+    title: 'Suporte via tickets',
+    text: 'Atendimento estruturado com equipe especializada para resolver demandas com rapidez.',
+    bullets: ['Fila inteligente', 'Acompanhamento por status', 'Histórico completo']
   },
   {
     title: 'Eventos e reuniões',
@@ -71,20 +71,12 @@ const features = [
 
 const faqs = [
   {
-    question: 'Quantas instituições posso gerenciar?',
-    answer: 'Ilimitado. Cada instituição tem seu próprio dashboard e dados isolados. Perfeito para redes e supervisões.'
-  },
-  {
     question: 'Quanto tempo leva para implementar?',
     answer: 'Setup inicial em 1-2 horas. A equipe de onboarding acompanha toda a implantação no seu plano.'
   },
   {
     question: 'Os cartões podem ser customizados?',
     answer: 'Sim! Configure cores, logos, campos e templates. Imprima um ou centenas de cartões em lote.'
-  },
-  {
-    question: 'Como funciona a geolocalização?',
-    answer: 'Mapa interativo com posições dos membros, igrejas e propriedades. Filtros por departamento e área.'
   },
   {
     question: 'Preciso contratar suporte extra?',
@@ -124,13 +116,15 @@ type PlanoDB = {
   has_custom_domain: boolean;
   has_white_label: boolean;
   has_automation: boolean;
+  has_modulo_financeiro: boolean;
+  has_modulo_eventos: boolean;
+  has_modulo_reunioes: boolean;
 };
 
 function buildHighlights(plan: PlanoDB): string[] {
   const h: string[] = [];
   if (plan.max_users > 0) h.push(`Até ${plan.max_users} Usuários Administrativos`);
   if (plan.max_members > 0) h.push(`Até ${plan.max_members.toLocaleString('pt-BR')} Membros`);
-  if (plan.max_ministerios > 0) h.push(`Até ${plan.max_ministerios} Igrejas`);
   if (plan.has_advanced_reports) h.push('Relatórios Avançados');
   if (plan.has_api_access) h.push('Acesso à API');
   if (plan.has_priority_support) h.push('Suporte Prioritário');
@@ -138,6 +132,14 @@ function buildHighlights(plan: PlanoDB): string[] {
   if (plan.has_white_label) h.push('White Label');
   if (plan.has_automation) h.push('Automação');
   return h;
+}
+
+function buildModuleHighlights(plan: PlanoDB): string[] {
+  const modules: string[] = [];
+  if (plan.has_modulo_financeiro) modules.push('Financeiro');
+  if (plan.has_modulo_eventos) modules.push('Eventos');
+  if (plan.has_modulo_reunioes) modules.push('Reuniões');
+  return modules;
 }
 
 export default function LandingPage() {
@@ -174,12 +176,34 @@ export default function LandingPage() {
     const supabase = createClient();
     supabase
       .from('subscription_plans')
-      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,max_divisao1,max_divisao2,max_divisao3,is_active,display_order,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation')
+      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,max_divisao1,max_divisao2,max_divisao3,is_active,display_order,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes')
       .eq('is_active', true)
       .order('display_order', { ascending: true })
       .order('price_monthly', { ascending: true })
       .then(({ data }: { data: PlanoDB[] | null }) => { if (data) setPlanosLanding(data); });
   }, []);
+
+  const normalizePlanKey = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .trim();
+
+  const planosDestaque = ['basic', 'basico', 'starter', 'intermediario', 'profissional']
+    .reduce((acc, key) => {
+      const plan = planosLanding.find((item) =>
+        normalizePlanKey(item.slug || item.name) === key || normalizePlanKey(item.name) === key
+      );
+      if (plan && !acc.some((existing) => existing.id === plan.id)) {
+        acc.push(plan);
+      }
+      return acc;
+    }, [] as PlanoDB[]);
+
+  const planosVisiveis = showAllPlanos
+    ? planosLanding
+    : (planosDestaque.length > 0 ? planosDestaque : planosLanding.slice(0, 4));
 
   const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -491,9 +515,10 @@ export default function LandingPage() {
           <p className="text-center text-slate-400 text-sm py-8">Carregando planos...</p>
         )}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {(showAllPlanos ? planosLanding : planosLanding.slice(0, 4)).map((plan, idx) => {
+          {planosVisiveis.map((plan, idx) => {
             const featured = idx === 1;
             const highlights = buildHighlights(plan);
+            const modules = buildModuleHighlights(plan);
             return (
               <div
                 key={plan.id}
@@ -528,6 +553,21 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
+                {modules.length > 0 && (
+                  <div className="mt-6">
+                    <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${featured ? 'text-blue-100' : 'text-slate-500'}`}>
+                      Módulos
+                    </p>
+                    <ul className="mt-3 space-y-2 text-sm">
+                      {modules.map((item) => (
+                        <li key={item} className="flex items-center gap-2">
+                          <span className={`h-2 w-2 rounded-full ${featured ? 'bg-yellow-300' : 'bg-blue-500'}`} />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <a
                   href={`/pre-cadastro?plan=${plan.slug}`}
                   className={`mt-6 inline-flex w-full justify-center px-4 py-2 rounded-lg font-semibold transition ${
@@ -542,13 +582,13 @@ export default function LandingPage() {
             );
           })}
         </div>
-        {planosLanding.length > 4 && (
+        {planosLanding.length > 0 && (
           <div className="text-center mt-10">
             <button
               onClick={() => setShowAllPlanos(v => !v)}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full border-2 border-blue-600 text-blue-600 font-semibold hover:bg-blue-600 hover:text-white transition"
             >
-              {showAllPlanos ? 'Mostrar menos' : 'Ver todos os Planos'}
+              {showAllPlanos ? 'Mostrar menos' : 'Exibir todos os planos'}
               <span className={`transition-transform ${showAllPlanos ? 'rotate-180' : ''}`}>▾</span>
             </button>
           </div>

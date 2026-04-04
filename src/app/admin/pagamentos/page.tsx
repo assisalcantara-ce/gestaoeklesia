@@ -93,7 +93,7 @@ export default function PagamentosPage() {
           router.push('/admin/login')
           return
         }
-        throw new Error('Erro ao carregar ministérios')
+        throw new Error('Erro ao carregar instituições')
       }
 
       const data = await response.json()
@@ -464,7 +464,7 @@ export default function PagamentosPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="relative">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Ministério</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Instituição</label>
                   <input
                     type="text"
                     value={ministrySearch}
@@ -599,16 +599,16 @@ export default function PagamentosPage() {
                   className="grid grid-cols-1 md:grid-cols-2 gap-4 [&_input]:bg-gray-900 [&_input]:border-gray-700 [&_input]:text-gray-100 [&_input]:placeholder:text-gray-500 [&_select]:bg-gray-900 [&_select]:border-gray-700 [&_select]:text-gray-100"
                 >
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Ministério</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Instituição</label>
                     <select
                       value={formData.ministry_id}
                       onChange={(e) => setFormData({ ...formData, ministry_id: e.target.value })}
                       required
                       className="w-full px-4 py-2 border rounded-lg"
                     >
-                      <option value="">Selecione o ministério...</option>
+                      <option value="">Selecione a instituição...</option>
                       {ministeriosLoading && (
-                        <option value="" disabled>Carregando ministérios...</option>
+                        <option value="" disabled>Carregando instituições...</option>
                       )}
                       {!ministeriosLoading && ministerios.map((m) => (
                         <option key={m.id} value={m.id}>
@@ -736,16 +736,16 @@ export default function PagamentosPage() {
                   className="grid grid-cols-1 md:grid-cols-2 gap-4 [&_input]:bg-gray-900 [&_input]:border-gray-700 [&_input]:text-gray-100 [&_input]:placeholder:text-gray-500 [&_select]:bg-gray-900 [&_select]:border-gray-700 [&_select]:text-gray-100"
                 >
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Ministério</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Instituição</label>
                     <select
                       value={avulsoForm.ministry_id}
                       onChange={(e) => setAvulsoForm({ ...avulsoForm, ministry_id: e.target.value })}
                       required
                       className="w-full px-4 py-2 border rounded-lg"
                     >
-                      <option value="">Selecione o ministério...</option>
+                      <option value="">Selecione a instituição...</option>
                       {ministeriosLoading && (
-                        <option value="" disabled>Carregando ministérios...</option>
+                        <option value="" disabled>Carregando instituições...</option>
                       )}
                       {!ministeriosLoading && ministerios.map((m) => (
                         <option key={m.id} value={m.id}>

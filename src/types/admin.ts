@@ -27,6 +27,9 @@ export interface SubscriptionPlan {
   has_priority_support: boolean;
   has_white_label: boolean;
   has_automation: boolean;
+  has_modulo_financeiro: boolean;
+  has_modulo_eventos: boolean;
+  has_modulo_reunioes: boolean;
   is_active: boolean;
   display_order: number;
   created_at: string;
@@ -86,6 +89,35 @@ export interface SupportTicketMessage {
   message: string;
   is_internal: boolean;
   attachments?: any[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LandingTicketNote {
+  text: string;
+  created_at: string;
+}
+
+export interface SupportTicketLanding {
+  id: string;
+  ticket_number: string;
+  institution_name: string;
+  contact_name: string;
+  email: string;
+  whatsapp: string;
+  description: string;
+  status:
+    | 'open'
+    | 'in_progress'
+    | 'waiting_customer'
+    | 'resolved'
+    | 'closed'
+    | 'em_atendimento'
+    | 'cancelado'
+    | 'aguardando_contrato'
+    | 'contrato_finalizado';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  notes: LandingTicketNote[];
   created_at: string;
   updated_at: string;
 }

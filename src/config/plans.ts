@@ -11,7 +11,6 @@ export const PLANOS_DISPONIBLES: { [key: string]: Plan } = {
     armazenamento_gb: 0,
     recursos: [
       'Ate 5 Campos',
-      'Ate 50 Igrejas',
       'Ate 500 Membros',
       'Ate 3 Usuarios Administrativos'
     ],
@@ -27,7 +26,6 @@ export const PLANOS_DISPONIBLES: { [key: string]: Plan } = {
     armazenamento_gb: 0,
     recursos: [
       'Ate 20 Campos',
-      'Ate 250 Igrejas',
       'Ate 3.000 Membros',
       'Ate 10 Usuarios Administrativos'
     ],
@@ -43,7 +41,6 @@ export const PLANOS_DISPONIBLES: { [key: string]: Plan } = {
     armazenamento_gb: 0,
     recursos: [
       'Ate 50 Campos',
-      'Ate 600 Igrejas',
       'Ate 7.000 Membros',
       'Ate 25 Usuarios Administrativos'
     ],
@@ -59,7 +56,6 @@ export const PLANOS_DISPONIBLES: { [key: string]: Plan } = {
     armazenamento_gb: 0,
     recursos: [
       'Ate 999 Campos',
-      'Ate 999 Igrejas',
       'Ate 99.999 Membros',
       'Ate 999 Usuarios Administrativos'
     ],

@@ -2602,8 +2602,8 @@ export default function MembrosPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                           >
                             <option value="">- Escolha -</option>
-                            <option value="solteiro">Solteiro</option>
-                            <option value="casado">Casado</option>
+                            <option value="solteiro">{dadosPessoais.sexo === 'FEMININO' ? 'Solteira' : 'Solteiro'}</option>
+                            <option value="casado">{dadosPessoais.sexo === 'FEMININO' ? 'Casada' : 'Casado'}</option>
                           </select>
                         </div>
                       </div>

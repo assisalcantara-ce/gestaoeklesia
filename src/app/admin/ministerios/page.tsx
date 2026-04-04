@@ -54,8 +54,6 @@ export default function MinisteriosPage() {
     address_zip: '',
     subscription_plan_id: '',
     is_active: true,
-    quantity_temples: 1,
-    quantity_members: 0,
   })
 
   const resetForm = () => {
@@ -79,8 +77,6 @@ export default function MinisteriosPage() {
       address_zip: '',
       subscription_plan_id: '',
       is_active: true,
-      quantity_temples: 1,
-      quantity_members: 0,
     })
     if (logoPreviewObjectUrl) URL.revokeObjectURL(logoPreviewObjectUrl)
     setLogoPreviewObjectUrl('')
@@ -332,8 +328,7 @@ export default function MinisteriosPage() {
       address_zip: ministerio.address_zip || '',
       subscription_plan_id: ministerio.subscription_plan_id || '',
       is_active: ministerio.is_active !== false,
-      quantity_temples: ministerio.quantity_temples || 1,
-      quantity_members: ministerio.quantity_members || 0,
+
     })
     if (logoPreviewObjectUrl) URL.revokeObjectURL(logoPreviewObjectUrl)
     setLogoPreviewObjectUrl('')
@@ -700,35 +695,6 @@ export default function MinisteriosPage() {
                   </div>
                 </div>
 
-                {/* Informações de Estrutura */}
-                <div className="mt-6 pt-6 border-t border-gray-300">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">📊 Informações de Estrutura</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Quantidade de Igrejas/Templos</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={formData.quantity_temples}
-                        onChange={(e) => setFormData({ ...formData, quantity_temples: parseInt(e.target.value) || 1 })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                        placeholder="1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Quantidade de Membros</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={formData.quantity_members}
-                        onChange={(e) => setFormData({ ...formData, quantity_members: parseInt(e.target.value) || 0 })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Rua</label>
@@ -866,7 +832,7 @@ export default function MinisteriosPage() {
           </div>
         )}
 
-        {/* Lista de instituições */}}
+        {/* Lista de instituições */}
             {loading ? (
               <div className="text-center text-gray-400 py-12">Carregando...</div>
             ) : ministerios.length === 0 ? (

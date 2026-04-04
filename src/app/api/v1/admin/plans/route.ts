@@ -63,9 +63,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // Validar campos
-    if (!body.name || !body.slug || !body.price_monthly || !body.max_users) {
+    if (!body.name || !body.slug || !body.price_monthly || !body.max_users || !body.max_members) {
       return NextResponse.json(
-        { error: 'Campos obrigatórios: name, slug, price_monthly, max_users, max_members, max_storage_bytes' },
+        { error: 'Campos obrigatórios: name, slug, price_monthly, max_users, max_members' },
         { status: 400 }
       )
     }
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
         price_annually: body.price_annually,
         setup_fee: body.setup_fee || 0,
         max_users: body.max_users,
-        max_storage_bytes: body.max_storage_bytes,
+        max_storage_bytes: body.max_storage_bytes ?? 0,
         max_members: body.max_members,
         max_ministerios: body.max_ministerios || 1,
         max_divisao1: body.max_divisao1 ?? 5,
@@ -91,6 +91,9 @@ export async function POST(request: NextRequest) {
         has_custom_domain: body.has_custom_domain || false,
         has_advanced_reports: body.has_advanced_reports || false,
         has_priority_support: body.has_priority_support || false,
+        has_modulo_financeiro: body.has_modulo_financeiro || false,
+        has_modulo_eventos: body.has_modulo_eventos || false,
+        has_modulo_reunioes: body.has_modulo_reunioes || false,
         has_white_label: body.has_white_label || false,
         has_automation: body.has_automation || false,
         is_active: true,
