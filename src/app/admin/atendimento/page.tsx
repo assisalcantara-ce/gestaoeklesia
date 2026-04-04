@@ -416,7 +416,7 @@ export default function AttendancePanelPage() {
                 <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Buscar por ministério, pastor, email ou WhatsApp..."
+                  placeholder="Buscar por instituição, pastor, email ou WhatsApp..."
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -473,7 +473,7 @@ export default function AttendancePanelPage() {
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Ministério</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Instituição</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Pastor/Responsável</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Email</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Telefone</th>
@@ -616,7 +616,7 @@ export default function AttendancePanelPage() {
               Atualizar Atendimento
             </h2>
             <p className="text-gray-600 mb-6">
-              Ministério: <strong>{selectedAttendance.pre_registration?.ministry_name || 'N/A'}</strong>
+              Instituição: <strong>{selectedAttendance.pre_registration?.ministry_name || 'N/A'}</strong>
             </p>
 
             <form className="space-y-8">
@@ -625,7 +625,7 @@ export default function AttendancePanelPage() {
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b-2 border-blue-500">ℹ️ Informações Básicas</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nome do Ministério *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nome da Instituição *</label>
                     <input
                       type="text"
                       value={editingData.ministry_name || ''}
@@ -848,12 +848,12 @@ export default function AttendancePanelPage() {
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b-2 border-blue-500">📝 Informações Adicionais</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Descrição do Ministério</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Descrição da Instituição</label>
                     <textarea
                       value={editingData.description || ''}
                       onChange={(e) => setEditingData({ ...editingData, description: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
-                      placeholder="Descreva brevemente o ministério..."
+                      placeholder="Descreva brevemente a instituição..."
                       rows={4}
                     />
                   </div>

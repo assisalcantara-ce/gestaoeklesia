@@ -288,17 +288,17 @@ export default function MinisteriosPage() {
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Erro ao criar ministério')
+        throw new Error(error.error || 'Erro ao criar instituição')
       }
 
       const payload = await response.json()
       const creds = payload?.credentials
       setSuccess(
         editingId
-          ? 'Ministério atualizado com sucesso!'
+          ? 'Instituição atualizada com sucesso!'
           : creds?.email && creds?.password
-            ? `Ministério criado com sucesso! Credenciais geradas: ${creds.email} / ${creds.password}`
-            : 'Ministério criado com sucesso!'
+            ? `Instituição criada com sucesso! Credenciais geradas: ${creds.email} / ${creds.password}`
+            : 'Instituição criada com sucesso!'
       )
       resetForm()
       setEditingId(null)
@@ -354,7 +354,7 @@ export default function MinisteriosPage() {
 
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}))
-        throw new Error(payload.error || 'Erro ao remover ministério')
+        throw new Error(payload.error || 'Erro ao remover instituição')
       }
 
       fetchMinisterios()
@@ -369,8 +369,8 @@ export default function MinisteriosPage() {
 
       <main className="flex-1 overflow-auto">
         <div className="sticky top-0 bg-gray-950 border-b border-gray-800 px-6 py-4 z-10">
-          <h2 className="text-2xl font-bold text-white">PAINEL ADMINISTRATIVO: MINISTÉRIOS</h2>
-          <p className="text-gray-400 text-sm mt-1">Gerencie todos os ministérios/clientes</p>
+          <h2 className="text-2xl font-bold text-white">PAINEL ADMINISTRATIVO: INSTITUIÇÕES</h2>
+          <p className="text-gray-400 text-sm mt-1">Gerencie todas as instituições/clientes</p>
         </div>
 
         <div className="p-6 space-y-6">
@@ -398,7 +398,7 @@ export default function MinisteriosPage() {
                       : 'text-gray-400 hover:text-gray-200'
                   }`}
                 >
-                  📋 Ministérios Ativos
+                  📋 Instituições Ativas
                 </button>
                 <button
                   onClick={() => setActiveTab('precadastros')}
@@ -413,10 +413,10 @@ export default function MinisteriosPage() {
               </div>
             </div>
 
-        {/* TAB: Ministérios Ativos */}
+        {/* TAB: Instituições Ativas */}
         {activeTab === 'ativos' && (
           <>
-            {/* Botão para novo ministério */}
+            {/* Botão para novo instituição */}
               <div className="mb-6 flex items-center gap-3">
                 <button
                   onClick={() => {
@@ -436,7 +436,7 @@ export default function MinisteriosPage() {
                       : 'bg-blue-600 hover:bg-blue-700'
                   }`}
                 >
-                  {showForm ? (editingId ? 'Cancelar edição' : 'Cancelar') : '+ Novo Ministério'}
+                  {showForm ? (editingId ? 'Cancelar edição' : 'Cancelar') : '+ Nova Instituição'}
                 </button>
               </div>
 
@@ -444,7 +444,7 @@ export default function MinisteriosPage() {
               {showForm && (
                 <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6 mb-8 text-gray-100">
                   <h3 className="text-xl font-bold mb-4">
-                    {editingId ? 'Editar Instituição' : 'Novo Ministério'}
+                    {editingId ? 'Editar Instituição' : 'Nova Instituição'}
                   </h3>
                 <form
                   onSubmit={handleSubmit}
@@ -455,7 +455,7 @@ export default function MinisteriosPage() {
                     <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">Informações Básicas</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Nome do Ministério *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Nome da Instituição *</label>
                         <input
                           type="text"
                           value={formData.name}
@@ -860,18 +860,18 @@ export default function MinisteriosPage() {
                 type="submit"
                 className="mt-6 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium"
               >
-                {editingId ? 'Atualizar Instituição' : 'Criar Ministério'}
+                {editingId ? 'Atualizar Instituição' : 'Criar Instituição'}
               </button>
             </form>
           </div>
         )}
 
-        {/* Lista de ministérios */}
+        {/* Lista de instituições */}}
             {loading ? (
               <div className="text-center text-gray-400 py-12">Carregando...</div>
             ) : ministerios.length === 0 ? (
               <div className="text-center text-gray-400 py-12">
-                Nenhum ministério cadastrado
+                Nenhuma instituição cadastrada
               </div>
             ) : (
               <div className="bg-gray-800 border border-gray-700 rounded-lg shadow overflow-hidden">

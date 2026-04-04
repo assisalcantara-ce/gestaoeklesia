@@ -373,7 +373,7 @@ export default function PagamentosPage() {
           </div>
           <h1>Recibo de Pagamento</h1>
           <div class="box">
-            <div class="row"><span class="label">Ministério</span><span class="value">${ministryName}</span></div>
+            <div class="row"><span class="label">Instituição</span><span class="value">${ministryName}</span></div>
             <div class="row"><span class="label">Plano</span><span class="value">${planName}</span></div>
             <div class="row"><span class="label">Valor</span><span class="value">R$ ${payment.amount.toFixed(2)}</span></div>
             <div class="row"><span class="label">Vencimento</span><span class="value">${dueDate}</span></div>
@@ -480,7 +480,7 @@ export default function PagamentosPage() {
                   {ministrySearch.length >= 3 && (
                     <div className="absolute z-20 mt-2 w-full rounded-lg border border-gray-700 bg-gray-900 shadow-lg max-h-56 overflow-auto">
                       {ministeriosLoading && (
-                        <div className="px-4 py-2 text-sm text-gray-400">Carregando ministérios...</div>
+                        <div className="px-4 py-2 text-sm text-gray-400">Carregando instituições...</div>
                       )}
                       {!ministeriosLoading && ministerios
                         .filter((m) => m.name.toLowerCase().includes(ministrySearch.toLowerCase()))
@@ -857,7 +857,7 @@ export default function PagamentosPage() {
                 <table className="w-full">
                   <thead className="bg-gray-800 border-b border-gray-700">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300">Ministério</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300">Instituição</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300">Valor</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300">Vencimento</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300">Status</th>
@@ -1030,7 +1030,7 @@ export default function PagamentosPage() {
             </div>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div className="bg-gray-800 rounded-lg p-3">
-                <p className="text-gray-400">Ministério</p>
+                <p className="text-gray-400">Instituição</p>
                 <p className="text-gray-100 font-semibold">
                   {(detailsModal.payment as any).ministries?.name || detailsModal.payment.ministry_id}
                 </p>

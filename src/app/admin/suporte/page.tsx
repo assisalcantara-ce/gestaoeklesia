@@ -354,7 +354,7 @@ export default function SuportePage() {
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
               <input
                 type="text"
-                placeholder="ID do Ministério"
+                placeholder="ID da Instituição"
                 value={formData.ministry_id}
                 onChange={(e) => setFormData({ ...formData, ministry_id: e.target.value })}
                 required
