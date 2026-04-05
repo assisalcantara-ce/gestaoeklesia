@@ -381,6 +381,29 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
 
   const temVerso = template.temVerso && template.elementosVerso && template.elementosVerso.length > 0;
 
+  // Compõe background em alta resolução (carregado diretamente como Image) com os elementos
+  const compositeWithBackground = (
+    foreground: HTMLCanvasElement,
+    bgUrl: string | undefined
+  ): Promise<HTMLCanvasElement> => {
+    if (!bgUrl) return Promise.resolve(foreground);
+    return new Promise((resolve) => {
+      const out = document.createElement('canvas');
+      out.width = foreground.width;
+      out.height = foreground.height;
+      const ctx = out.getContext('2d')!;
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, out.width, out.height);
+        ctx.drawImage(foreground, 0, 0);
+        resolve(out);
+      };
+      img.onerror = () => resolve(foreground);
+      img.src = bgUrl;
+    });
+  };
+
   const gerarPDF = async () => {
     if (!printRef.current || gerandoPDF) return;
 
@@ -390,13 +413,18 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
       const frenteEl = printRef.current.querySelector('#print-frente') as HTMLElement;
       if (!frenteEl) throw new Error('Elemento da frente não encontrado');
 
-      // Capture Front
-      const canvasFrente = await html2canvas(frenteEl, {
-        scale: 4, // High Resolution for printing
+      // Capturar elementos sem backgroundImage CSS (evita desfoque do html2canvas)
+      const bgFrente = frenteEl.style.backgroundImage;
+      frenteEl.style.backgroundImage = 'none';
+      const captFrente = await html2canvas(frenteEl, {
+        scale: 4,
         useCORS: true,
-        backgroundColor: '#ffffff',
+        backgroundColor: null,
         logging: false
       });
+      frenteEl.style.backgroundImage = bgFrente;
+      // Compor background em alta resolução por cima dos elementos
+      const canvasFrente = await compositeWithBackground(captFrente, template.backgroundUrl);
 
       // Determinar tipo de impressão
       const tipoImpressao = template.tipoImpressao || 'pvc';
@@ -426,12 +454,16 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
         if (temVerso) {
           const versoEl = printRef.current.querySelector('#print-verso') as HTMLElement;
           if (versoEl) {
-            const canvasVerso = await html2canvas(versoEl, {
+            const bgVerso = versoEl.style.backgroundImage;
+            versoEl.style.backgroundImage = 'none';
+            const captVerso = await html2canvas(versoEl, {
               scale: 4,
               useCORS: true,
-              backgroundColor: '#ffffff',
+              backgroundColor: null,
               logging: false
             });
+            versoEl.style.backgroundImage = bgVerso;
+            const canvasVerso = await compositeWithBackground(captVerso, template.backgroundUrlVerso);
 
             // Página 2: Verso (ESPELHADO -> Posição Direita/Coluna 1)
             pdf.addPage();
@@ -456,12 +488,16 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
         if (temVerso) {
           const versoEl = printRef.current.querySelector('#print-verso') as HTMLElement;
           if (versoEl) {
-            const canvasVerso = await html2canvas(versoEl, {
+            const bgVerso = versoEl.style.backgroundImage;
+            versoEl.style.backgroundImage = 'none';
+            const captVerso = await html2canvas(versoEl, {
               scale: 4,
               useCORS: true,
-              backgroundColor: '#ffffff',
+              backgroundColor: null,
               logging: false
             });
+            versoEl.style.backgroundImage = bgVerso;
+            const canvasVerso = await compositeWithBackground(captVerso, template.backgroundUrlVerso);
             pdf.addPage();
             pdf.addImage(canvasVerso.toDataURL('image/png'), 'PNG', 0, 0, largCartaoMM, altCartaoMM);
           }

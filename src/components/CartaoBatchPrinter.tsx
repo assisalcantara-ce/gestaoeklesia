@@ -119,6 +119,29 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
       pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [largCartaoMM, altCartaoMM] });
     }
 
+    // Compõe background em alta resolução com os elementos capturados pelo html2canvas
+    const compositeWithBackground = (
+      foreground: HTMLCanvasElement,
+      bgUrl: string | undefined
+    ): Promise<HTMLCanvasElement> => {
+      if (!bgUrl) return Promise.resolve(foreground);
+      return new Promise((resolve) => {
+        const out = document.createElement('canvas');
+        out.width = foreground.width;
+        out.height = foreground.height;
+        const ctx = out.getContext('2d')!;
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, out.width, out.height);
+          ctx.drawImage(foreground, 0, 0);
+          resolve(out);
+        };
+        img.onerror = () => resolve(foreground);
+        img.src = bgUrl;
+      });
+    };
+
     const renderizarLado = async (membro: Membro, template: any, elementos: any[], bgUrl?: string, isVerso = false) => {
       const cartaoHTML = document.createElement('div');
       cartaoHTML.style.position = 'absolute';
@@ -133,11 +156,7 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
       container.style.position = 'relative';
       container.style.overflow = 'hidden';
       container.style.backgroundColor = '#ffffff';
-      if (bgUrl) {
-        container.style.backgroundImage = `url(${bgUrl})`;
-        container.style.backgroundSize = 'cover';
-        container.style.backgroundPosition = 'center';
-      }
+      // backgroundImage não aplicado via CSS — será composto em alta resolução após html2canvas
       cartaoHTML.appendChild(container);
 
       // Injetar validadeAnos do template no membro para o substituidor usar
@@ -214,15 +233,17 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
         }
       }
 
-      const canvas = await html2canvas(cartaoHTML, {
+      const captCanvas = await html2canvas(cartaoHTML, {
         scale: 4,
-        backgroundColor: '#ffffff',
+        backgroundColor: null,
         logging: false,
         useCORS: true
       });
 
       document.body.removeChild(cartaoHTML);
-      return canvas.toDataURL('image/png', 1.0);
+      // Compor background em alta resolução sobre os elementos capturados
+      const finalCanvas = await compositeWithBackground(captCanvas, bgUrl);
+      return finalCanvas.toDataURL('image/png', 1.0);
     };
 
     if (tipoImpressao === 'a4') {

@@ -202,8 +202,8 @@ export async function PUT(
       data_consagracao: normalizedBody.data_consagracao ?? null,
       data_emissao: normalizedBody.data_emissao ?? null,
       data_validade_credencial: normalizedBody.data_validade_credencial ?? null,
-      // Aba Foto
-      foto_url: normalizedBody.foto_url ?? null,
+      // Aba Foto — só atualiza se o campo foi enviado explicitamente; caso contrário preserva o valor atual
+      ...('foto_url' in normalizedBody ? { foto_url: normalizedBody.foto_url ?? null } : {}),
       // Sistema
       member_since: normalizedBody.member_since ?? undefined,
       role: normalizedBody.role ?? null,
