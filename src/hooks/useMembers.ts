@@ -15,7 +15,15 @@ import { createClient } from '@/lib/supabase-client'
 async function getAccessTokenOrThrow() {
   const supabase = createClient()
   const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
+  let token = data.session?.access_token
+
+  // getSession pode retornar null durante a hidratação inicial (SSR/storage ainda não lido).
+  // Tentativa extra com refreshSession para garantir que o token seja recuperado.
+  if (!token) {
+    const { data: refreshed } = await supabase.auth.refreshSession()
+    token = refreshed.session?.access_token
+  }
+
   if (!token) throw new Error('Não autenticado')
   return token
 }

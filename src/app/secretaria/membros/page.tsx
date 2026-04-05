@@ -239,6 +239,7 @@ export default function MembrosPage() {
     fetchMembers(1, 500).catch((e) => {
       // Erros já são expostos via membersError; aqui evitamos poluir o console.
       if (e instanceof Error && e.message === 'Usuário sem ministério associado') return;
+      if (e instanceof Error && e.message === 'Não autenticado') return; // race condition na hidratação
       console.error('Erro ao carregar membros (API):', e);
     });
   }, [fetchMembers]);
