@@ -89,8 +89,8 @@ export async function GET(request: NextRequest) {
     // Aplicar paginação
     query = query.range(offset, offset + limit - 1)
 
-    // Ordenar por data de criação
-    query = query.order('created_at', { ascending: false })
+    // Ordenar por data de criação (ordenação numérica de matrícula feita no cliente)
+    query = query.order('created_at', { ascending: true })
 
     const { data, error, count } = await query
 

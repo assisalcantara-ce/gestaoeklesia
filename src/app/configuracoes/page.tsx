@@ -724,7 +724,6 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
     const r: string[] = [];
     if (plan.max_users > 0) r.push(`Até ${plan.max_users} Usuários Administrativos`);
     if (plan.max_members > 0) r.push(`Até ${plan.max_members.toLocaleString('pt-BR')} Membros`);
-    if (plan.max_ministerios > 0) r.push(`Até ${plan.max_ministerios} Igrejas`);
     if (plan.has_advanced_reports) r.push('Relatórios Avançados');
     if (plan.has_api_access) r.push('Acesso à API');
     if (plan.has_priority_support) r.push('Suporte Prioritário');
@@ -732,6 +731,14 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
     if (plan.has_white_label) r.push('White Label');
     if (plan.has_automation) r.push('Automação');
     return r;
+  };
+
+  const buildModulos = (plan: SubscriptionPlan): string[] => {
+    const m: string[] = [];
+    if ((plan as any).has_modulo_financeiro) m.push('Financeiro');
+    if ((plan as any).has_modulo_eventos) m.push('Eventos');
+    if ((plan as any).has_modulo_reunioes) m.push('Reuniões');
+    return m;
   };
 
   useEffect(() => {
@@ -742,9 +749,9 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
         // 1) Carregar planos ativos diretamente do banco
         const { data: plansData } = await supabase
           .from('subscription_plans')
-          .select('*')
+          .select('*, has_modulo_financeiro, has_modulo_eventos, has_modulo_reunioes')
           .eq('is_active', true)
-          .order('display_order', { ascending: true });
+          .order('price_monthly', { ascending: true });
 
         const plans = (plansData || []) as SubscriptionPlan[];
         setPlanosDB(plans);
@@ -765,7 +772,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
         // 3) Buscar dados do ministério com JOIN no plano (coluna subscription_plan_id existe após migration 20260403200000)
         const { data: mData } = await supabase
           .from('ministries')
-          .select('plan, subscription_plan_id, subscription_status, subscription_start_date, subscription_end_date, created_at, subscription_plans:subscription_plan_id(id, slug, name, price_monthly, price_annually, description, max_users, max_members, max_ministerios, has_api_access, has_custom_domain, has_advanced_reports, has_priority_support, has_white_label, has_automation, is_active, display_order)')
+          .select('plan, subscription_plan_id, subscription_status, subscription_start_date, subscription_end_date, created_at, subscription_plans:subscription_plan_id(id, slug, name, price_monthly, price_annually, description, max_users, max_members, max_ministerios, has_api_access, has_custom_domain, has_advanced_reports, has_priority_support, has_white_label, has_automation, has_modulo_financeiro, has_modulo_eventos, has_modulo_reunioes, is_active, display_order)')
           .eq('id', mId)
           .maybeSingle();
 
@@ -863,6 +870,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
   })();
 
   const recursosPlanAtual = planoAtual ? buildRecursos(planoAtual as any) : [];
+  const modulosPlanAtual = planoAtual ? buildModulos(planoAtual) : [];
 
   return (
     <div>
@@ -903,7 +911,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
               <p className="text-lg font-semibold">{planoRenovacao ? new Date(planoRenovacao).toLocaleDateString('pt-BR') : '—'}</p>
             </div>
           </div>
-          {recursosPlanAtual.length > 0 && (
+          {(recursosPlanAtual.length > 0 || modulosPlanAtual.length > 0) && (
             <div className="mt-6">
               <h4 className="text-lg font-bold mb-3">Seu Plano Inclui:</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -911,6 +919,16 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
                   <p key={index} className="text-teal-100">✓ {feature}</p>
                 ))}
               </div>
+              {modulosPlanAtual.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-teal-200 text-xs font-semibold uppercase tracking-widest mb-2">Módulos Incluídos</p>
+                  <div className="flex flex-wrap gap-2">
+                    {modulosPlanAtual.map((m, i) => (
+                      <span key={i} className="px-3 py-1 bg-white/20 text-white text-xs font-semibold rounded-full">✓ {m}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
               {planoAtual.description && (
                 <p className="text-teal-200 text-sm mt-3 italic">{planoAtual.description}</p>
               )}
@@ -928,8 +946,9 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
               const isAtual = plano.id === planoAtual?.id;
               const isRecomendado = plano.id === recommendedPlanId && !isAtual;
               const recursos = buildRecursos(plano as any);
+              const modulos = buildModulos(plano);
               return (
-                <div key={plano.id} className={`rounded-lg shadow-lg overflow-hidden transition transform hover:scale-105 ${isRecomendado ? 'ring-2 ring-teal-500' : ''}`}>
+                <div key={plano.id} className={`rounded-lg shadow-lg overflow-hidden transition transform hover:scale-105 bg-white ${isRecomendado ? 'ring-2 ring-teal-500' : ''} ${isAtual ? 'ring-2 ring-blue-500' : ''}`}>
                   {isRecomendado && (
                     <div className="bg-teal-500 text-white px-4 py-2 text-center text-sm font-bold">⭐ RECOMENDADO</div>
                   )}
@@ -937,18 +956,33 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
                     <div className="bg-blue-600 text-white px-4 py-2 text-center text-sm font-bold">✓ PLANO ATUAL</div>
                   )}
                   <div className="p-4">
-                    <h4 className="text-lg font-bold text-gray-800 mb-2">{plano.name}</h4>
-                    {plano.description && <p className="text-gray-500 text-xs mb-2">{plano.description}</p>}
+                    <h4 className="text-lg font-bold text-gray-800 mb-1">{plano.name}</h4>
+                    {plano.description && <p className="text-gray-500 text-xs mb-3">{plano.description}</p>}
                     <p className="text-2xl font-bold text-teal-600 mb-1">{formatarPreco(plano.price_monthly)}</p>
                     <p className="text-gray-600 text-sm">por mês</p>
                     {plano.price_annually && (
-                      <p className="text-gray-500 text-xs mb-4">{formatarPreco(plano.price_annually)}/ano</p>
+                      <p className="text-gray-500 text-xs mb-3">{formatarPreco(plano.price_annually)}/ano</p>
                     )}
-                    <div className="space-y-1 mb-6 mt-3">
-                      {recursos.map((feature, idx) => (
-                        <p key={idx} className="text-sm text-gray-700">✓ {feature}</p>
-                      ))}
-                    </div>
+
+                    {recursos.length > 0 && (
+                      <div className="space-y-1 mb-3 mt-2">
+                        {recursos.map((feature, idx) => (
+                          <p key={idx} className="text-xs text-gray-700">✓ {feature}</p>
+                        ))}
+                      </div>
+                    )}
+
+                    {modulos.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Módulos</p>
+                        <div className="flex flex-wrap gap-1">
+                          {modulos.map((m, i) => (
+                            <span key={i} className="px-2 py-0.5 bg-teal-50 border border-teal-200 text-teal-700 text-xs font-semibold rounded-full">{m}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <button
                       onClick={() => { if (!isAtual) handleUpgradeClick(plano); }}
                       disabled={isAtual}

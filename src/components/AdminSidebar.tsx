@@ -34,7 +34,7 @@ export default function AdminSidebar() {
 
   const menuItems = [
     { label: 'Dashboard', href: '/admin/dashboard', icon: Home },
-    { label: 'Ministérios', href: '/admin/ministerios', icon: Building2 },
+    { label: 'Instituições', href: '/admin/ministerios', icon: Building2 },
     { label: 'Pagamentos', href: '/admin/pagamentos', icon: CreditCard },
     { label: 'Planos', href: '/admin/planos', icon: BarChart3 },
     { label: 'Suporte', href: '/admin/suporte', icon: HeadphonesIcon },

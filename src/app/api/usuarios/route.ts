@@ -367,3 +367,75 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: message }, { status });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { ministryId, roles, userId: currentUserId } = await requireFlowAuth(request);
+    if (!hasRole(roles, ['ADMINISTRADOR'])) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const userId = String(request.nextUrl.searchParams.get('user_id') || '').trim();
+    if (!userId) {
+      return NextResponse.json({ error: 'user_id é obrigatório' }, { status: 400 });
+    }
+
+    if (userId === currentUserId) {
+      return NextResponse.json({ error: 'Você não pode remover sua própria conta.' }, { status: 403 });
+    }
+
+    const admin = createServerClient();
+
+    // Impede deletar o dono do tenant (ministry.user_id) — causaria cascade e apagaria tudo
+    const { data: ministry } = await admin
+      .from('ministries')
+      .select('user_id')
+      .eq('id', ministryId)
+      .single();
+
+    if (ministry?.user_id === userId) {
+      return NextResponse.json(
+        { error: 'Não é possível remover o proprietário do tenant. Transfira a titularidade antes.' },
+        { status: 403 }
+      );
+    }
+
+    const { data: existing, error: checkError } = await admin
+      .from('ministry_users')
+      .select('user_id')
+      .eq('ministry_id', ministryId)
+      .eq('user_id', userId)
+      .single();
+
+    if (checkError || !existing) {
+      return NextResponse.json({ error: 'Usuário não encontrado neste ministério' }, { status: 404 });
+    }
+
+    const { error: deleteRelError } = await admin
+      .from('ministry_users')
+      .delete()
+      .eq('ministry_id', ministryId)
+      .eq('user_id', userId);
+
+    if (deleteRelError) {
+      return NextResponse.json({ error: deleteRelError.message }, { status: 400 });
+    }
+
+    const { error: deleteAuthError } = await admin.auth.admin.deleteUser(userId);
+    if (deleteAuthError) {
+      return NextResponse.json({ error: deleteAuthError.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Erro interno do servidor';
+    if (message === 'TRIAL_EXPIRED') {
+      return NextResponse.json({ error: 'Expirado' }, { status: 403 });
+    }
+    if (message === 'NO_MINISTRY') {
+      return NextResponse.json({ error: 'Usuario sem vinculo com ministerio' }, { status: 403 });
+    }
+    const status = message === 'UNAUTHORIZED' ? 401 : 500;
+    return NextResponse.json({ error: message }, { status });
+  }
+}

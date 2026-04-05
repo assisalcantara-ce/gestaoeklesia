@@ -57,6 +57,9 @@ export default function UsuariosPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
   const [editStatus, setEditStatus] = useState('');
+  const [usuarioParaRemover, setUsuarioParaRemover] = useState<Usuario | null>(null);
+  const [removendoUsuario, setRemovendoUsuario] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [editEmailConfirmed, setEditEmailConfirmed] = useState(true);
   const [editOriginalStatus, setEditOriginalStatus] = useState<'ativo' | 'inativo'>('ativo');
   const [editData, setEditData] = useState({
@@ -162,6 +165,7 @@ export default function UsuariosPage() {
 
       const payload = await res.json();
       setUsuarios(payload?.data || []);
+      setCurrentUserId(data.session?.user?.id ?? null);
       setUsuariosLoading(false);
     };
 
@@ -308,6 +312,47 @@ export default function UsuariosPage() {
         setUsuarios(payload?.data || []);
       }
     }
+  };
+
+  const handleRemoverUsuario = (usuario: Usuario) => {
+    setUsuarioParaRemover(usuario);
+  };
+
+  const confirmarRemocao = async () => {
+    if (!usuarioParaRemover) return;
+    setRemovendoUsuario(true);
+
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    const currentUserId = data.session?.user?.id;
+
+    if (!token) {
+      setRemovendoUsuario(false);
+      return;
+    }
+
+    if (usuarioParaRemover.id === currentUserId) {
+      alert('Você não pode remover sua própria conta.');
+      setUsuarioParaRemover(null);
+      setRemovendoUsuario(false);
+      return;
+    }
+
+    const res = await fetch(`/api/usuarios?user_id=${encodeURIComponent(usuarioParaRemover.id)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err?.error || 'Falha ao remover usuário.');
+      setRemovendoUsuario(false);
+      return;
+    }
+
+    setUsuarios(prev => prev.filter(u => u.id !== usuarioParaRemover.id));
+    setUsuarioParaRemover(null);
+    setRemovendoUsuario(false);
   };
 
   const handleFormChange = (field: keyof typeof formData, value: string) => {
@@ -634,7 +679,10 @@ export default function UsuariosPage() {
                             Editar
                           </button>
                           <span className="text-gray-300">|</span>
-                          <button className="text-red-600 hover:text-red-800 font-semibold text-sm">Remover</button>
+                          <button
+                            onClick={() => handleRemoverUsuario(usuario)}
+                            className="text-red-600 hover:text-red-800 font-semibold text-sm"
+                          >Remover</button>
                         </div>
                       </td>
                     </tr>
@@ -816,6 +864,70 @@ export default function UsuariosPage() {
                 >
                   {editSaving ? 'Salvando...' : 'Salvar'}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {usuarioParaRemover && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+              <div className="bg-red-50 px-6 py-5 flex items-center gap-4 border-b border-red-100">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Remover Usuário</h3>
+                  <p className="text-sm text-gray-500">Esta ação não pode ser desfeita</p>
+                </div>
+              </div>
+
+              <div className="px-6 py-5">
+                <p className="text-gray-700">
+                  Você está prestes a remover permanentemente o usuário:
+                </p>
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="font-semibold text-gray-900">{usuarioParaRemover.nome}</p>
+                  <p className="text-sm text-gray-500">{usuarioParaRemover.email}</p>
+                </div>
+                {usuarioParaRemover.id === currentUserId ? (
+                  <p className="mt-3 text-sm text-amber-600 font-medium bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    ⚠️ Você não pode remover sua própria conta.
+                  </p>
+                ) : (
+                  <p className="mt-3 text-sm text-red-600 font-medium">
+                    O acesso ao sistema será revogado imediatamente.
+                  </p>
+                )}
+              </div>
+
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+                <button
+                  onClick={() => setUsuarioParaRemover(null)}
+                  disabled={removendoUsuario}
+                  className="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                {usuarioParaRemover.id !== currentUserId && (
+                  <button
+                    onClick={confirmarRemocao}
+                    disabled={removendoUsuario}
+                    className="px-5 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 disabled:opacity-60 transition-colors flex items-center gap-2"
+                  >
+                    {removendoUsuario ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                        </svg>
+                        Removendo...
+                      </>
+                    ) : 'Remover Usuário'}
+                  </button>
+                )}
               </div>
             </div>
           </div>

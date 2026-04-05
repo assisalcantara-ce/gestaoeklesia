@@ -217,6 +217,7 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
       textAlign: (elemento.alinhamento || 'left') as any,
       whiteSpace: 'pre-wrap',
       wordBreak: 'break-word',
+      textTransform: 'uppercase',
     };
 
     switch (elemento.tipo) {

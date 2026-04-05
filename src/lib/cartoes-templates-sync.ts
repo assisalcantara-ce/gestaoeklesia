@@ -40,7 +40,10 @@ function isCartoesTemplatesUnavailableError(error: any): boolean {
     text.includes('pgrst205') ||
     text.includes('permission denied') ||
     text.includes('not authorized') ||
-    text.includes('violates row-level security')
+    text.includes('violates row-level security') ||
+    text.includes('failed to fetch') ||
+    text.includes('networkerror') ||
+    text.includes('network request failed')
   );
 }
 
@@ -128,6 +131,10 @@ export async function fetchCartoesTemplatesFromSupabase(
 
   if (error) {
     const msg = getSupabaseErrorText(error);
+    if (isCartoesTemplatesUnavailableError(error)) {
+      console.warn('⚠️ Tabela/rede de cartoes_templates indisponível; usando templates locais.');
+      return [];
+    }
     console.error('❌ Erro ao buscar templates no Supabase:', msg || error);
     return [];
   }

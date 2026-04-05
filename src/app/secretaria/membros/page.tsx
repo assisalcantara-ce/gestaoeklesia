@@ -245,7 +245,11 @@ export default function MembrosPage() {
 
   // Projetar o formato do banco (Member) para o formato usado pela UI (Membro)
   useEffect(() => {
-    setMembros(membersApi.map(memberToMembro));
+    setMembros(
+      membersApi
+        .map(memberToMembro)
+        .sort((a, b) => (parseInt(a.matricula) || 0) - (parseInt(b.matricula) || 0))
+    );
   }, [membersApi]);
 
   useEffect(() => {
@@ -273,6 +277,7 @@ export default function MembrosPage() {
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ATIVO');
+  const [cargoFilter, setCargoFilter] = useState('TODOS');
   const [currentPage, setCurrentPage] = useState(1);
   const [membroEditando, setMembroEditando] = useState<Membro | null>(null);
   const [membroDeletando, setMembroDeletando] = useState<Membro | null>(null);
@@ -946,23 +951,27 @@ export default function MembrosPage() {
     doc.setFont('helvetica', 'normal');
     yPos += 7;
 
-    doc.text(`Total de registros: ${membros.length}`, 14, yPos);
+    doc.text(`Total de registros: ${membrosFiltrados.length}`, 14, yPos);
     doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth - 14, yPos, { align: 'right' });
 
     // Preparar dados da tabela
-    const tableData = membros.map(membro => [
+    const tableData = membrosFiltrados.map(membro => [
       membro.matricula,
       membro.nome,
       membro.cpf,
-      membro.supervisao || '-',
-      membro.campo || '-',
+      membro.cargoMinisterial || '-',
+      (membro as any).dadosCargos?.dataConsagracao
+        ? new Date((membro as any).dadosCargos.dataConsagracao).toLocaleDateString('pt-BR')
+        : (membro as any).dataConsagracao
+          ? new Date((membro as any).dataConsagracao).toLocaleDateString('pt-BR')
+          : '-',
       membro.status === 'ativo' ? 'Ativo' : 'Inativo'
     ]);
 
     // Gerar tabela
     autoTable(doc, {
       startY: yPos + 5,
-      head: [['Matrícula', 'Nome', 'CPF', 'Supervisão', 'Campo', 'Status']],
+      head: [['Matrícula', 'Nome', 'CPF', 'Cargo', 'Dt. Consagração', 'Status']],
       body: tableData,
       theme: 'grid',
       headStyles: {
@@ -978,11 +987,10 @@ export default function MembrosPage() {
       columnStyles: {
         0: { halign: 'center', cellWidth: 20 },
         1: { halign: 'left', cellWidth: 'auto' },
-        2: { halign: 'center', cellWidth: 30 },
-        3: { halign: 'left', cellWidth: 30 },
-        4: { halign: 'left', cellWidth: 30 },
-        5: { halign: 'left', cellWidth: 30 },
-        6: { halign: 'center', cellWidth: 20 }
+        2: { halign: 'center', cellWidth: 35 },
+        3: { halign: 'left', cellWidth: 35 },
+        4: { halign: 'center', cellWidth: 30 },
+        5: { halign: 'center', cellWidth: 20 }
       },
       alternateRowStyles: {
         fillColor: [245, 245, 245]
@@ -1518,7 +1526,8 @@ export default function MembrosPage() {
       m.cpf.includes(searchTerm) ||
       m.matricula.includes(searchTerm);
     const matchStatus = statusFilter === 'TODOS' || m.status.toUpperCase() === statusFilter;
-    return matchSearch && matchStatus;
+    const matchCargo = cargoFilter === 'TODOS' || (m.cargoMinisterial || '').toUpperCase() === cargoFilter.toUpperCase();
+    return matchSearch && matchStatus && matchCargo;
   });
 
   const totalPages = Math.ceil(membrosFiltrados.length / itemsPerPage);
@@ -2023,7 +2032,23 @@ export default function MembrosPage() {
                 />
               </div>
               <div className="w-48">
-                <label className="block text-sm font-semibold text-teal-700 mb-2">SITUAÇÃO</label>
+                <label className="block text-sm font-semibold text-teal-700 mb-2">CARGO</label>
+                <select
+                  value={cargoFilter}
+                  onChange={(e) => {
+                    setCargoFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full px-4 py-2 border-2 border-teal-300 rounded-lg bg-teal-50 focus:outline-none focus:border-teal-500"
+                >
+                  <option value="TODOS">TODOS</option>
+                  {getCargosMinisteriais().filter(c => c.ativo).map(c => (
+                    <option key={c.id} value={c.nome}>{c.nome.toUpperCase()}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-48">
+                <label className="block text-sm font-semibold text-teal-700 mb-2">STATUS</label>
                 <select
                   value={statusFilter}
                   onChange={(e) => {
@@ -2038,15 +2063,16 @@ export default function MembrosPage() {
                 </select>
               </div>
               <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setStatusFilter('ATIVO');
-                  setCurrentPage(1);
-                }}
-                className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition font-semibold text-sm"
-              >
-                LIMPAR
-              </button>
+                  onClick={() => {
+                    setSearchTerm('');
+                    setStatusFilter('ATIVO');
+                    setCargoFilter('TODOS');
+                    setCurrentPage(1);
+                  }}
+                  className="mt-[26px] px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition font-semibold text-sm h-[42px]"
+                >
+                  LIMPAR
+                </button>
             </div>
           </div>
 
@@ -2058,7 +2084,15 @@ export default function MembrosPage() {
                 <h2 className="text-lg font-bold text-teal-700">Listagem de Ministros</h2>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-600">Quantidade de Ministros</span>
+                <span className="text-sm text-gray-600">
+                  Quantidade de Ministros:
+                  <span className="ml-2 px-2 py-0.5 bg-teal-100 text-teal-700 font-bold rounded-full text-sm">
+                    {membrosFiltrados.length}
+                  </span>
+                  {membrosFiltrados.length !== membros.length && (
+                    <span className="ml-1 text-xs text-gray-400">de {membros.length}</span>
+                  )}
+                </span>
                 <div className="flex gap-2">
                   <button
                     onClick={abrirNovoCadastro}

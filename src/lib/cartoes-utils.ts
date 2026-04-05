@@ -179,6 +179,25 @@ export function substituirPlaceholders(texto: string, membro: any, nomenclaturas
       }
     }
 
+    // Tratamento de Estado Civil conforme sexo
+    if (ph.campo === 'estadoCivil') {
+      const sexo = String(membro.sexo || '').toUpperCase();
+      const isFeminino = sexo === 'FEMININO' || sexo === 'F';
+      const raw = String(membro.estadoCivil || '').toLowerCase().trim();
+      // Normaliza variantes femininas/masculinas para a raiz neutra
+      const normalizado = raw
+        .replace(/^casada$/, 'casado')
+        .replace(/^solteira$/, 'solteiro')
+        .replace(/^viúva$/, 'viuvo')
+        .replace(/^viuva$/, 'viuvo')
+        .replace(/^divorciada$/, 'divorciado');
+      if (normalizado === 'casado') valor = isFeminino ? 'Casada' : 'Casado';
+      else if (normalizado === 'solteiro') valor = isFeminino ? 'Solteira' : 'Solteiro';
+      else if (normalizado === 'viuvo') valor = isFeminino ? 'Viúva' : 'Viúvo';
+      else if (normalizado === 'divorciado') valor = isFeminino ? 'Divorciada' : 'Divorciado';
+      else valor = membro.estadoCivil || '';
+    }
+
     // Formatação de data (se for do tipo YYYY-MM-DD)
     if (typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(valor)) {
       const [ano, mes, dia] = valor.split('-');
