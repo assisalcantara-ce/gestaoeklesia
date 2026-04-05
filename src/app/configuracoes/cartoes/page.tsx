@@ -805,14 +805,24 @@ export default function ConfiguracaoCartoesPage() {
     // Salvar snapshot do template no banco para preservar a configuração atual
     if (ministryId) {
       try {
-        // Garante que o templateEmEdicao atual está no snapshot antes de persistir
+        // Usa backgroundUrl como previewImage para exibir miniatura no sidebar
+        const templateComPreview: TemplateCartao = {
+          ...templateEmEdicao,
+          previewImage: templateEmEdicao.backgroundUrl || templateEmEdicao.previewImage,
+        };
+
+        // Garante que o template atual (com preview atualizado) está no snapshot
         const snapshotAtualizado = templates.map(t =>
-          t.id === templateEmEdicao.id ? templateEmEdicao : t
+          t.id === templateEmEdicao.id ? templateComPreview : t
         );
-        // Se o template ainda não existe em templates (novo), adiciona ao snapshot
         if (!templates.find(t => t.id === templateEmEdicao.id)) {
-          snapshotAtualizado.push(templateEmEdicao);
+          snapshotAtualizado.push(templateComPreview);
         }
+
+        // Atualiza estado local para refletir imediatamente no sidebar
+        setTemplates(snapshotAtualizado);
+        setTemplateEmEdicao(templateComPreview);
+
         await persistTemplatesSnapshotToSupabase(
           supabase,
           ministryId,
