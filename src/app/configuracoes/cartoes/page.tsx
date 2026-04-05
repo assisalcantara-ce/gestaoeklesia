@@ -784,7 +784,7 @@ export default function ConfiguracaoCartoesPage() {
     setTimeout(() => setMensagemSucesso(''), 3000);
   };
 
-  const copiarJSON = () => {
+  const copiarJSON = async () => {
     if (!templateEmEdicao) return;
 
     // Preparar JSON limpo (sem arquivos ou objetos circulares)
@@ -793,13 +793,42 @@ export default function ConfiguracaoCartoesPage() {
       return value;
     }, 2);
 
-    navigator.clipboard.writeText(jsonStr).then(() => {
-      setMensagemSucesso('JSON copiado para a área de transferência!');
-      setTimeout(() => setMensagemSucesso(''), 3000);
-    }).catch(err => {
+    // Copiar para clipboard
+    try {
+      await navigator.clipboard.writeText(jsonStr);
+    } catch (err) {
       console.error('Erro ao copiar JSON:', err);
       alert('Erro ao copiar para a área de transferência');
-    });
+      return;
+    }
+
+    // Salvar snapshot do template no banco para preservar a configuração atual
+    if (ministryId) {
+      try {
+        // Garante que o templateEmEdicao atual está no snapshot antes de persistir
+        const snapshotAtualizado = templates.map(t =>
+          t.id === templateEmEdicao.id ? templateEmEdicao : t
+        );
+        // Se o template ainda não existe em templates (novo), adiciona ao snapshot
+        if (!templates.find(t => t.id === templateEmEdicao.id)) {
+          snapshotAtualizado.push(templateEmEdicao);
+        }
+        await persistTemplatesSnapshotToSupabase(
+          supabase,
+          ministryId,
+          (templateEmEdicao.tipoCadastro as TipoCartao) || 'ministro',
+          snapshotAtualizado
+        );
+        setMensagemSucesso('JSON copiado e salvo no banco com sucesso!');
+      } catch (err) {
+        console.error('Erro ao salvar JSON no banco:', err);
+        setMensagemSucesso('JSON copiado (falha ao salvar no banco)');
+      }
+    } else {
+      setMensagemSucesso('JSON copiado para a área de transferência!');
+    }
+
+    setTimeout(() => setMensagemSucesso(''), 4000);
   };
 
   const duplicarTemplate = (templateId: string) => {
