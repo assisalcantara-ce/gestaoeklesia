@@ -188,11 +188,11 @@ export default function UsuariosPage() {
   const { adminUser } = useAdminAuth()
 
   // Função utilitária para saber se é o próprio usuário logado
-  const isSelf = (user: AdminUser) => {
+  const isSelf = (user: AdminUser): boolean => {
     if (!adminUser) return false
     return (
       user.email === adminUser.email ||
-      (adminUser.id && user.id === adminUser.id)
+      !!(adminUser.id && user.id === adminUser.id)
     )
   }
 
