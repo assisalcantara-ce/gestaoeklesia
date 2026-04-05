@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 import { requireAdmin } from '@/lib/admin-guard';
 import { consumeRateLimit } from '@/lib/rate-limit-db';
 
@@ -163,7 +164,7 @@ export async function POST(request: NextRequest) {
         .insert({
           pre_registration_id,
           username,
-          password: Buffer.from(password).toString('base64'),
+          password: await bcrypt.hash(password, 10),
           temp_ministry_id: ministry.id,
           is_active: true,
           expires_at: endDate?.toISOString() || null,

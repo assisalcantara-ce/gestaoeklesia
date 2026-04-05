@@ -14,11 +14,13 @@ const resolveToken = (request: NextRequest) => {
 
 export async function POST(request: NextRequest) {
   try {
-    if (ASAAS_WEBHOOK_TOKEN) {
-      const token = resolveToken(request);
-      if (!token || token !== ASAAS_WEBHOOK_TOKEN) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+    if (!ASAAS_WEBHOOK_TOKEN) {
+      console.error('[ASAAS WEBHOOK] ASAAS_WEBHOOK_TOKEN não configurado — request rejeitado');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const token = resolveToken(request);
+    if (!token || token !== ASAAS_WEBHOOK_TOKEN) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const payload = await request.json();

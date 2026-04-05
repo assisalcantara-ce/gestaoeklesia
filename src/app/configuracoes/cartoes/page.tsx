@@ -697,6 +697,12 @@ export default function ConfiguracaoCartoesPage() {
     console.log('✅ [SALVAR] templateCorrigido.tipoCadastro:', templateCorrigido.tipoCadastro);
     console.log('✅ [SALVAR] templateCorrigido.id:', templateCorrigido.id);
 
+    // --- MINIATURA DO SIDEBAR ---
+    // Para qualquer template que tenha backgroundUrl, usa como previewImage
+    if (templateCorrigido.backgroundUrl) {
+      templateCorrigido.previewImage = templateCorrigido.backgroundUrl;
+    }
+
     // --- PROTEÇÃO DE PREVIEW ---
     // Se for um template nativo e perdeu o previewImage, restaurar da fábrica
     if ((templateCorrigido.id === 'congregado-01' || templateCorrigido.id === 'congregado-02' || templateCorrigido.id === 'membro-02' || templateCorrigido.id === 'membro-classico') && !templateCorrigido.previewImage) {
@@ -805,24 +811,13 @@ export default function ConfiguracaoCartoesPage() {
     // Salvar snapshot do template no banco para preservar a configuração atual
     if (ministryId) {
       try {
-        // Usa backgroundUrl como previewImage para exibir miniatura no sidebar
-        const templateComPreview: TemplateCartao = {
-          ...templateEmEdicao,
-          previewImage: templateEmEdicao.backgroundUrl || templateEmEdicao.previewImage,
-        };
-
-        // Garante que o template atual (com preview atualizado) está no snapshot
+        // Garante que o template atual está no snapshot antes de persistir
         const snapshotAtualizado = templates.map(t =>
-          t.id === templateEmEdicao.id ? templateComPreview : t
+          t.id === templateEmEdicao.id ? templateEmEdicao : t
         );
         if (!templates.find(t => t.id === templateEmEdicao.id)) {
-          snapshotAtualizado.push(templateComPreview);
+          snapshotAtualizado.push(templateEmEdicao);
         }
-
-        // Atualiza estado local para refletir imediatamente no sidebar
-        setTemplates(snapshotAtualizado);
-        setTemplateEmEdicao(templateComPreview);
-
         await persistTemplatesSnapshotToSupabase(
           supabase,
           ministryId,

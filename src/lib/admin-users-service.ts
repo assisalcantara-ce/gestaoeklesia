@@ -1,5 +1,6 @@
 import 'server-only'
 
+import bcrypt from 'bcrypt'
 import { createServerClient } from '@/lib/supabase-server'
 
 export interface AdminUser {
@@ -119,7 +120,7 @@ export async function createAdminUser(userData: AdminUserForm): Promise<AdminUse
     .insert([
       {
         email: userData.email,
-        password_hash: userData.password, // TODO: Fazer hash da senha com bcrypt
+        password_hash: await bcrypt.hash(userData.password, 10),
         role: userData.role,
         nome: userData.nome,
         cpf: userData.cpf,

@@ -10,42 +10,38 @@ import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import {
   loadCertificadosTemplatesForCurrentUser,
-  persistCertificadosTemplatesSnapshotToSupabase
+  persistCertificadosTemplatesSnapshotToSupabase,
 } from '@/lib/certificados-templates-sync';
-import { CERTIFICADOS_TEMPLATES_BASE } from '@/lib/certificados-templates';
 import {
   CERTIFICADO_PLACEHOLDERS,
-  obterPreviewTextoCertificado
+  obterPreviewTextoCertificado,
 } from '@/lib/certificados-utils';
 
 const CERTIFICADO_CANVAS = { largura: 840, altura: 595 };
 
-const ELEMENTOS_CERTIFICADO = [
-  { tipo: 'texto', label: 'Texto', icone: '📝' },
-  { tipo: 'logo', label: 'Logo', icone: '🏛️' },
-  { tipo: 'imagem', label: 'Imagem', icone: '🖼️' },
-  { tipo: 'chapa', label: 'Chapa', icone: '🔴' }
+const ELEMENTOS_TIPOS = [
+  { tipo: 'texto',  label: 'Texto',  icone: 'T'   },
+  { tipo: 'logo',   label: 'Logo',   icone: 'L'   },
+  { tipo: 'imagem', label: 'Imagem', icone: 'IMG' },
+  { tipo: 'chapa',  label: 'Chapa',  icone: 'CH'  },
 ];
 
 interface CertificadoElemento {
   id: string;
-  tipo: 'texto' | 'logo' | 'imagem' | 'chapa' | 'qrcode' | 'foto-membro';
+  tipo: 'texto' | 'logo' | 'imagem' | 'chapa';
   x: number;
   y: number;
   largura: number;
   altura: number;
   fontSize?: number;
   cor?: string;
-  backgroundColor?: string;
   fonte?: string;
   transparencia?: number;
-  borderRadius?: number;
   texto?: string;
   alinhamento?: 'left' | 'center' | 'right';
   negrito?: boolean;
   italico?: boolean;
   sublinhado?: boolean;
-  sombreado?: boolean;
   imagemUrl?: string;
   visivel: boolean;
 }
@@ -56,11 +52,23 @@ interface CertificadoTemplate {
   backgroundUrl?: string;
   elementos: CertificadoElemento[];
   orientacao?: 'landscape' | 'portrait';
-  variacao?: 'branco';
-  categoria?: 'ministerial';
   ativo?: boolean;
   criado_pelo_usuario?: boolean;
 }
+
+const gId = () =>
+  typeof crypto !== 'undefined' && (crypto as any).randomUUID
+    ? (crypto as any).randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const novoTemplateEmBranco = (nome: string): CertificadoTemplate => ({
+  id: gId(),
+  nome,
+  orientacao: 'landscape',
+  ativo: false,
+  criado_pelo_usuario: true,
+  elementos: [],
+});
 
 export default function ConfiguracoesCertificadosPage() {
   const { loading } = useRequireSupabaseAuth();
@@ -69,228 +77,168 @@ export default function ConfiguracoesCertificadosPage() {
   const backgroundInputRef = useRef<HTMLInputElement>(null);
   const imagemInputRef = useRef<HTMLInputElement>(null);
 
-  const CERTIFICADO_TIPOS = [
-    { id: 'ministerial', label: 'Ministerial', descricao: 'Secretaria' }
-  ] as const;
+  const [activeMenu, setActiveMenu]       = useState('config-certificados');
+  const [loadingData, setLoadingData]     = useState(true);
+  const [ministryId, setMinistryId]       = useState<string | null>(null);
 
-  const CERTIFICADO_VARIACOES = [
-    { id: 'padrao', label: 'Modelo 01', variacao: 'padrao' as const },
-    { id: 'branco', label: 'Modelo em branco', variacao: 'branco' as const }
-  ] as const;
-
-  const [activeMenu, setActiveMenu] = useState('config-certificados');
-  const [loadingData, setLoadingData] = useState(true);
-  const [ministryId, setMinistryId] = useState<string | null>(null);
-
-  const [templatesCertificados, setTemplatesCertificados] = useState<CertificadoTemplate[]>([]);
-  const [templateEmEdicao, setTemplateEmEdicao] = useState<CertificadoTemplate | null>(null);
-  const [elementoSelecionado, setElementoSelecionado] = useState<CertificadoElemento | null>(null);
+  const [templates, setTemplates]                         = useState<CertificadoTemplate[]>([]);
+  const [templateEmEdicao, setTemplateEmEdicao]           = useState<CertificadoTemplate | null>(null);
+  const [elementoSelecionado, setElementoSelecionado]     = useState<CertificadoElemento | null>(null);
   const [elementosSelecionados, setElementosSelecionados] = useState<CertificadoElemento[]>([]);
-  const [statusMensagem, setStatusMensagem] = useState('');
-  const [tipoCertificadoAtivo, setTipoCertificadoAtivo] = useState<
-    (typeof CERTIFICADO_TIPOS)[number]['id']
-  >('ministerial');
+  const [statusMensagem, setStatusMensagem]               = useState('');
+  const [novoNome, setNovoNome]                           = useState('');
+  const [renomearId, setRenomearId]                       = useState<string | null>(null);
+  const [renomearNome, setRenomearNome]                   = useState('');
+  const [confirmDeleteId, setConfirmDeleteId]             = useState<string | null>(null);
 
-
-  const generateId = () => {
-    try {
-      if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') {
-        return (crypto as any).randomUUID() as string;
-      }
-    } catch {
-      // ignore
-    }
-    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const mostrarStatus = (msg: string) => {
+    setStatusMensagem(msg);
+    setTimeout(() => setStatusMensagem(''), 3000);
   };
 
-  const loadInitialData = async () => {
+  useEffect(() => {
+    if (loading) return;
     setLoadingData(true);
-    const resolvedMinistryId = await resolveMinistryId(supabase);
-    setMinistryId(resolvedMinistryId);
+    (async () => {
+      const mid = await resolveMinistryId(supabase);
+      setMinistryId(mid);
+      const res = await loadCertificadosTemplatesForCurrentUser(supabase);
+      setTemplates(res.templates as CertificadoTemplate[]);
+      setTemplateEmEdicao(res.templates[0] as CertificadoTemplate ?? null);
+      setLoadingData(false);
+    })();
+  }, [loading, supabase]);
 
-    const templatesRes = await loadCertificadosTemplatesForCurrentUser(supabase);
-    const templatesLoaded = templatesRes.templates.length > 0 ? templatesRes.templates : [];
-    const templatesById = new Map(templatesLoaded.map((t: any) => [t.id, t]));
-    const mergedTemplates = [
-      ...CERTIFICADOS_TEMPLATES_BASE.map((base) => ({
-        ...base,
-        ...(templatesById.get(base.id) || {})
-      })),
-      ...templatesLoaded.filter((t: any) => !CERTIFICADOS_TEMPLATES_BASE.some((base) => base.id === t.id))
-    ].map((t: any) => ({
-      ...t,
-      categoria: 'ministerial'
-    }));
+  /* ---------- mutacoes de template ---------- */
 
-    setTemplatesCertificados(mergedTemplates as any);
-    const ativo =
-      mergedTemplates.find((t: any) => t.ativo) ||
-      mergedTemplates.find((t: any) => (t.categoria || 'ministerial') === 'ministerial' && !t.variacao) ||
-      mergedTemplates.find((t: any) => !t.variacao) ||
-      mergedTemplates[0] ||
-      null;
-    setTemplateEmEdicao(ativo as any);
-    if (ativo?.categoria) {
-      setTipoCertificadoAtivo(ativo.categoria);
+  const salvarTodos = async (prox: CertificadoTemplate[]) => {
+    setTemplates(prox);
+    if (ministryId) {
+      await persistCertificadosTemplatesSnapshotToSupabase(supabase, ministryId, prox as any[]);
     }
-
-    setLoadingData(false);
   };
 
-  useEffect(() => {
-    if (!loading) {
-      loadInitialData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  const handleCriarNovo = async () => {
+    const nome = novoNome.trim() || `Modelo ${templates.length + 1}`;
+    const tmpl = novoTemplateEmBranco(nome);
+    const prox = [...templates, tmpl];
+    await salvarTodos(prox);
+    setTemplateEmEdicao(tmpl);
+    setNovoNome('');
+    mostrarStatus(`Modelo "${nome}" criado.`);
+  };
 
-  useEffect(() => {
-    if (templatesCertificados.length === 0) return;
-    const next = getTemplatePorTipo(tipoCertificadoAtivo);
-    if (!next) return;
-    if (templateEmEdicao?.id === next.id) return;
-    setTemplateEmEdicao(next);
+  const handleSalvar = async () => {
+    if (!templateEmEdicao || !ministryId) return;
+    const prox = templates.map((t) => (t.id === templateEmEdicao.id ? templateEmEdicao : t));
+    await salvarTodos(prox);
+    mostrarStatus('Modelo salvo com sucesso.');
+  };
+
+  const handleRenomear = async (id: string) => {
+    const nome = renomearNome.trim();
+    if (!nome) return;
+    const prox = templates.map((t) => (t.id === id ? { ...t, nome } : t));
+    await salvarTodos(prox);
+    if (templateEmEdicao?.id === id) setTemplateEmEdicao((prev) => prev ? { ...prev, nome } : prev);
+    setRenomearId(null);
+    mostrarStatus('Modelo renomeado.');
+  };
+
+  const handleDeletar = async (id: string) => {
+    const prox = templates.filter((t) => t.id !== id);
+    await salvarTodos(prox);
+    if (templateEmEdicao?.id === id) {
+      setTemplateEmEdicao(prox[0] ?? null);
+    }
+    setConfirmDeleteId(null);
+    mostrarStatus('Modelo excluido.');
+  };
+
+  const handleSelect = (t: CertificadoTemplate) => {
+    setTemplateEmEdicao(t);
     setElementoSelecionado(null);
     setElementosSelecionados([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tipoCertificadoAtivo, templatesCertificados]);
-
-  const handleSelectTemplate = (templateId: string) => {
-    const next = templatesCertificados.find((t) => t.id === templateId) || null;
-    const nextComAtivo = next ? { ...next, ativo: true } : null;
-    setTemplateEmEdicao(nextComAtivo);
-    setElementoSelecionado(null);
-    setElementosSelecionados([]);
-    if (!next) return;
-    const categoria = next.categoria || 'ministerial';
-    const nextTemplates = templatesCertificados.map((t) => {
-      if ((t.categoria || 'ministerial') !== categoria) return t;
-      return { ...t, ativo: t.id === next.id };
-    });
-    setTemplatesCertificados(nextTemplates);
-    setTipoCertificadoAtivo(categoria);
   };
 
-  const handleTemplateUpdate = (nextTemplate: CertificadoTemplate) => {
-    setTemplateEmEdicao(nextTemplate);
-  };
+  /* ---------- canvas helpers ---------- */
 
-  const updateElemento = (id: string, props: Partial<CertificadoElemento>) => {
+  const updateEl = (id: string, props: Partial<CertificadoElemento>) => {
     if (!templateEmEdicao) return;
-    const elementosAtualizados = templateEmEdicao.elementos.map((el) =>
-      el.id === id ? { ...el, ...props } : el
-    );
-    handleTemplateUpdate({ ...templateEmEdicao, elementos: elementosAtualizados });
+    setTemplateEmEdicao({
+      ...templateEmEdicao,
+      elementos: templateEmEdicao.elementos.map((el) =>
+        el.id === id ? { ...el, ...props } : el
+      ),
+    });
   };
 
-  const updateMultiplos = (items: Array<{ id: string; propriedades: Partial<CertificadoElemento> }>) => {
+  const updateMultiplos = (
+    items: Array<{ id: string; propriedades: Partial<CertificadoElemento> }>
+  ) => {
     if (!templateEmEdicao) return;
     const mapa = new Map(items.map((i) => [i.id, i.propriedades]));
-    const elementosAtualizados = templateEmEdicao.elementos.map((el) =>
-      mapa.has(el.id) ? { ...el, ...mapa.get(el.id) } : el
-    );
-    handleTemplateUpdate({ ...templateEmEdicao, elementos: elementosAtualizados });
+    setTemplateEmEdicao({
+      ...templateEmEdicao,
+      elementos: templateEmEdicao.elementos.map((el) =>
+        mapa.has(el.id) ? { ...el, ...mapa.get(el.id) } : el
+      ),
+    });
   };
 
-  const handleAddElemento = (tipo: CertificadoElemento['tipo']) => {
+  const handleAddEl = (tipo: CertificadoElemento['tipo']) => {
     if (!templateEmEdicao) return;
-
     const base: CertificadoElemento = {
-      id: generateId(),
+      id: gId(),
       tipo,
       x: 40,
       y: 40,
       largura: tipo === 'logo' ? 90 : tipo === 'imagem' ? 160 : tipo === 'chapa' ? 200 : 320,
-      altura: tipo === 'logo' ? 90 : tipo === 'imagem' ? 120 : tipo === 'chapa' ? 40 : 40,
+      altura:  tipo === 'logo' ? 90 : tipo === 'imagem' ? 120 : tipo === 'chapa' ? 40  : 40,
       fontSize: 16,
       cor: '#111827',
       fonte: 'Arial',
       alinhamento: 'left',
-      negrito: false,
-      italico: false,
-      sublinhado: false,
       visivel: true,
-      texto: tipo === 'texto' ? 'Texto do certificado' : tipo === 'chapa' ? 'CHAPA' : undefined
+      texto: tipo === 'texto' ? 'Texto do certificado' : undefined,
     };
-
-    const elementosAtualizados = [...templateEmEdicao.elementos, base];
-    handleTemplateUpdate({ ...templateEmEdicao, elementos: elementosAtualizados });
+    setTemplateEmEdicao({
+      ...templateEmEdicao,
+      elementos: [...templateEmEdicao.elementos, base],
+    });
     setElementoSelecionado(base);
     setElementosSelecionados([base]);
   };
 
-  const handleRemoveElemento = (elementoId: string) => {
+  const handleRemoveEl = (elId: string) => {
     if (!templateEmEdicao) return;
-    const elementosAtualizados = templateEmEdicao.elementos.filter((el) => el.id !== elementoId);
-    handleTemplateUpdate({ ...templateEmEdicao, elementos: elementosAtualizados });
-    if (elementoSelecionado?.id === elementoId) setElementoSelecionado(null);
+    setTemplateEmEdicao({
+      ...templateEmEdicao,
+      elementos: templateEmEdicao.elementos.filter((el) => el.id !== elId),
+    });
+    if (elementoSelecionado?.id === elId) setElementoSelecionado(null);
   };
 
-  const handleSaveTemplate = async () => {
-    if (!templateEmEdicao || !ministryId) return;
-    const nextTemplates = templatesCertificados.map((t) =>
-      t.id === templateEmEdicao.id ? templateEmEdicao : t
-    );
-    setTemplatesCertificados(nextTemplates);
-    await persistCertificadosTemplatesSnapshotToSupabase(supabase, ministryId, nextTemplates as any[]);
-    setStatusMensagem('Template de certificado salvo.');
-  };
-
-  const handleResetTemplate = async () => {
-    if (!templateEmEdicao || !ministryId) return;
-    const baseTemplate = CERTIFICADOS_TEMPLATES_BASE.find((t) => t.id === templateEmEdicao.id);
-    if (!baseTemplate) {
-      setStatusMensagem('Nao ha modelo base para restaurar este template.');
-      return;
-    }
-
-    const resetTemplate = JSON.parse(JSON.stringify(baseTemplate)) as CertificadoTemplate;
-    const nextTemplates = templatesCertificados.map((t) =>
-      t.id === templateEmEdicao.id ? resetTemplate : t
-    );
-    setTemplatesCertificados(nextTemplates);
-    setTemplateEmEdicao(resetTemplate);
-    await persistCertificadosTemplatesSnapshotToSupabase(supabase, ministryId, nextTemplates as any[]);
-    setStatusMensagem('Template restaurado para o modelo base.');
-  };
-
-  const handleBackgroundUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !templateEmEdicao) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      handleTemplateUpdate({ ...templateEmEdicao, backgroundUrl: dataUrl });
+    reader.onload = (ev) => {
+      setTemplateEmEdicao({ ...templateEmEdicao, backgroundUrl: ev.target?.result as string });
     };
     reader.readAsDataURL(file);
     e.target.value = '';
   };
 
-  const handleImagemUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !templateEmEdicao || !elementoSelecionado) return;
+    if (!file || !elementoSelecionado) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      updateElemento(elementoSelecionado.id, { imagemUrl: dataUrl });
+    reader.onload = (ev) => {
+      updateEl(elementoSelecionado.id, { imagemUrl: ev.target?.result as string });
     };
     reader.readAsDataURL(file);
     e.target.value = '';
-  };
-
-  const getTemplatePorTipo = (
-    tipo: (typeof CERTIFICADO_TIPOS)[number]['id'],
-    variacao?: 'branco'
-  ) => {
-    const candidatos = templatesCertificados.filter((template) => {
-      const categoria = template.categoria || 'ministerial';
-      if (categoria !== tipo) return false;
-      if (variacao === 'branco') return template.variacao === 'branco';
-      return !template.variacao;
-    });
-
-    if (variacao === 'branco') return candidatos[0];
-    return candidatos.find((t) => t.ativo) || candidatos[0];
   };
 
   if (loading || loadingData) return <div className="p-8">Carregando...</div>;
@@ -300,368 +248,342 @@ export default function ConfiguracoesCertificadosPage() {
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-white border-b border-gray-200 p-6">
-          <h1 className="text-3xl font-bold text-gray-800">⚙️ Certificados</h1>
-          <p className="text-gray-600 mt-1">Gerencie templates de certificados</p>
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Modelos de Certificado</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Crie e edite modelos que ficam disponiveis em Secretaria / Certificados
+            </p>
+          </div>
+          {statusMensagem && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded text-sm">
+              {statusMensagem}
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 overflow-hidden">
-          <div className="flex h-full">
-            <div className="w-72 bg-white border-r border-gray-200 p-4 overflow-y-auto">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">Templates</h2>
+        <div className="flex-1 overflow-hidden flex">
 
-              <div className="mb-4">
-                <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
-                  Tipo de Certificado
-                </label>
-                <div className="space-y-2">
-                  {CERTIFICADO_TIPOS.map((tipo) => (
-                    <button
-                      key={tipo.id}
-                      onClick={() => setTipoCertificadoAtivo(tipo.id)}
-                      className={`w-full text-left px-4 py-2.5 rounded-lg transition font-semibold text-sm ${
-                        tipoCertificadoAtivo === tipo.id
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {tipo.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <hr className="my-4 border-gray-300" />
-
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-lg">✨</span>
-                  <h3 className="text-sm font-bold text-gray-800">Modelos Disponiveis</h3>
-                </div>
-
-                <div className="space-y-3">
-                  {CERTIFICADO_VARIACOES.map((variacao) => {
-                    const variacaoId = variacao.variacao ?? 'padrao';
-                    const variacaoParam = variacaoId === 'padrao' ? undefined : variacaoId;
-                    const template = getTemplatePorTipo(tipoCertificadoAtivo, variacaoParam);
-                    const isSelected = templateEmEdicao?.id === template?.id;
-                    const isDisabled = !template;
-                    const previewStyle: React.CSSProperties = template?.backgroundUrl
-                      ? { backgroundImage: `url(${template.backgroundUrl})`, backgroundSize: 'cover' }
-                      : variacaoId === 'branco'
-                        ? { background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)' }
-                        : { background: 'linear-gradient(135deg, #dbeafe 0%, #eef2ff 100%)' };
-
-                    return (
-                      <div
-                        key={variacao.id}
-                        className={`bg-white rounded-lg p-3 border-2 transition cursor-pointer hover:shadow-md ${
-                          isSelected
-                            ? 'border-green-500 shadow-lg ring-1 ring-green-500/20'
-                            : 'border-gray-200 hover:border-gray-300'
-                        } ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                        onClick={() => template && handleSelectTemplate(template.id)}
-                      >
-                        <div
-                          className="w-full h-20 rounded mb-2 flex items-center justify-center text-white font-bold text-xs shadow-sm overflow-hidden"
-                          style={previewStyle}
-                        >
-                          {!template ? (
-                            <div className="text-center">
-                              <div className="text-3xl mb-1 text-gray-400">⏳</div>
-                              <div className="text-xs text-gray-500">Em breve</div>
-                            </div>
-                          ) : (
-                            <div className="w-full h-full p-1.5 flex flex-col justify-between">
-                              <div className="flex items-start gap-0.5">
-                                <div className="w-3 h-3 bg-white/30 rounded-sm"></div>
-                                <div className="flex-1 h-2 bg-white/30 rounded"></div>
-                                <div className="w-3 h-3 bg-white/30 rounded-sm"></div>
-                              </div>
-                              <div className="flex gap-0.5">
-                                <div className="w-6 h-8 bg-white/40 rounded"></div>
-                                <div className="flex-1 space-y-0.5">
-                                  <div className="h-2 bg-white/50 rounded"></div>
-                                  <div className="h-1.5 bg-white/30 rounded w-3/4"></div>
-                                  <div className="h-1.5 bg-white/30 rounded w-2/3"></div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <h4 className="font-semibold text-xs text-gray-800 mb-1">
-                          {variacao.label}
-                          <span className="block text-[10px] text-gray-500 font-normal">
-                            {template ? template.nome : 'Em breve'}
-                          </span>
-                        </h4>
-
-                        <div className="text-[10px] text-gray-500">
-                          {isSelected ? 'Ativo (Clique para editar)' : 'Clique para editar'}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+          {/* Painel esquerdo: lista de modelos */}
+          <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+            <div className="p-4 border-b border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Novo Modelo</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Nome do modelo"
+                  className="flex-1 border rounded px-2 py-1.5 text-sm"
+                  value={novoNome}
+                  onChange={(e) => setNovoNome(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCriarNovo()}
+                />
+                <button
+                  onClick={handleCriarNovo}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm font-semibold hover:bg-blue-700 transition"
+                >
+                  +
+                </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="space-y-6">
-                {statusMensagem && (
-                  <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded">
-                    {statusMensagem}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {templates.length === 0 && (
+                <p className="text-xs text-gray-400 text-center mt-6">
+                  Nenhum modelo ainda.<br />Crie o primeiro acima.
+                </p>
+              )}
+              {templates.map((t) => (
+                <div
+                  key={t.id}
+                  className={`rounded-lg border p-3 cursor-pointer transition group ${
+                    templateEmEdicao?.id === t.id
+                      ? 'border-blue-500 bg-blue-50 shadow-sm'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                  onClick={() => handleSelect(t)}
+                >
+                  {/* miniatura */}
+                  <div
+                    className="w-full h-14 rounded mb-2 overflow-hidden"
+                    style={
+                      t.backgroundUrl
+                        ? { backgroundImage: `url(${t.backgroundUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                        : { background: 'linear-gradient(135deg,#dbeafe,#eef2ff)' }
+                    }
+                  >
+                    <div className="w-full h-full flex items-center justify-center text-white text-xs opacity-60">
+                      {t.elementos.length === 0 ? 'Em branco' : `${t.elementos.length} elem.`}
+                    </div>
                   </div>
-                )}
 
-                <div className="bg-white rounded-lg shadow border border-gray-200 p-6 space-y-4">
+                  {renomearId === t.id ? (
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        autoFocus
+                        className="flex-1 border rounded px-1 py-0.5 text-xs"
+                        value={renomearNome}
+                        onChange={(e) => setRenomearNome(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleRenomear(t.id);
+                          if (e.key === 'Escape') setRenomearId(null);
+                        }}
+                      />
+                      <button className="text-xs text-blue-600 font-semibold" onClick={() => handleRenomear(t.id)}>OK</button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="text-xs font-semibold text-gray-800 truncate flex-1">{t.nome}</p>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          title="Renomear"
+                          className="text-gray-400 hover:text-blue-500 text-xs px-1"
+                          onClick={() => { setRenomearId(t.id); setRenomearNome(t.nome); }}
+                        >&#9998;</button>
+                        {confirmDeleteId === t.id ? (
+                          <>
+                            <button className="text-xs text-red-600 font-semibold" onClick={() => handleDeletar(t.id)}>Sim</button>
+                            <button className="text-xs text-gray-500" onClick={() => setConfirmDeleteId(null)}>Nao</button>
+                          </>
+                        ) : (
+                          <button
+                            title="Excluir"
+                            className="text-gray-400 hover:text-red-500 text-xs px-1"
+                            onClick={() => setConfirmDeleteId(t.id)}
+                          >&#10005;</button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Area central: canvas */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {!templateEmEdicao ? (
+              <div className="flex flex-col items-center justify-center h-64 text-gray-400 text-sm">
+                <p className="text-4xl mb-3">+</p>
+                <p>Crie um modelo no painel esquerdo para comecar.</p>
+              </div>
+            ) : (
+              <>
+                <div className="bg-white rounded-lg shadow border border-gray-200 p-5 space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Editar Template</h3>
-                      <p className="text-sm text-gray-500">
-                        {templateEmEdicao ? templateEmEdicao.nome : 'Selecione um modelo'}
-                      </p>
+                      <h3 className="text-base font-semibold text-gray-900">{templateEmEdicao.nome}</h3>
+                      <p className="text-xs text-gray-400">{templateEmEdicao.elementos.length} elemento(s) no canvas</p>
                     </div>
-                    <button
-                      className="px-3 py-2 border-2 border-blue-500 text-blue-700 rounded-lg hover:bg-blue-50"
-                      onClick={() => backgroundInputRef.current?.click()}
-                      disabled={!templateEmEdicao}
-                    >
-                      Alterar Imagem
-                    </button>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
-                      Imagem de Fundo (Frente)
-                    </label>
-                    <div
-                      className={`border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition ${
-                        templateEmEdicao ? 'bg-gray-50 cursor-pointer hover:bg-gray-100' : 'bg-gray-100 cursor-not-allowed'
-                      }`}
-                      onClick={() => templateEmEdicao && backgroundInputRef.current?.click()}
-                    >
-                      <div className="text-4xl mb-2">📤</div>
-                      <div className="text-sm font-semibold text-gray-700">Alterar Imagem</div>
-                      <p className="text-xs text-gray-500 mt-1">Formato landscape A4 recomendado</p>
-                    </div>
-                    {templateEmEdicao?.backgroundUrl && (
+                    <div className="flex gap-2">
                       <button
-                        className="mt-2 text-xs text-red-600 hover:underline"
-                        onClick={() => handleTemplateUpdate({ ...templateEmEdicao, backgroundUrl: undefined })}
+                        className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 text-sm"
+                        onClick={() => backgroundInputRef.current?.click()}
                       >
-                        Remover Imagem
+                        Imagem de Fundo
                       </button>
-                    )}
-                  </div>
-
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-800 mb-2">
-                      Canvas de Edicao (Landscape)
-                    </h4>
-                    <div className="bg-white border rounded-lg p-3">
-                      {templateEmEdicao ? (
-                        <InteractiveCanvas
-                          elementos={templateEmEdicao.elementos}
-                          elementoSelecionado={elementoSelecionado}
-                          elementosSelecionados={elementosSelecionados}
-                          onElementoSelecionado={setElementoSelecionado}
-                          onElementosSelecionados={setElementosSelecionados}
-                          onElementoAtualizado={updateElemento}
-                          onMultiplosElementosAtualizados={updateMultiplos}
-                          onElementoRemovido={handleRemoveElemento}
-                          getPreviewText={obterPreviewTextoCertificado}
-                          backgroundUrl={templateEmEdicao.backgroundUrl}
-                          larguraCanvas={CERTIFICADO_CANVAS.largura}
-                          alturaCanvas={CERTIFICADO_CANVAS.altura}
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-[320px] text-sm text-gray-500">
-                          Selecione um modelo para editar.
-                        </div>
+                      {templateEmEdicao.backgroundUrl && (
+                        <button
+                          className="px-3 py-1.5 border border-red-200 text-red-600 rounded hover:bg-red-50 text-sm"
+                          onClick={() => setTemplateEmEdicao({ ...templateEmEdicao, backgroundUrl: undefined })}
+                        >
+                          Remover Fundo
+                        </button>
                       )}
+                      <button
+                        className="px-4 py-1.5 bg-[#123b63] text-white rounded hover:bg-[#0f2a45] text-sm font-semibold shadow"
+                        onClick={handleSalvar}
+                      >
+                        Salvar Modelo
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      className="px-4 py-2 bg-[#123b63] text-white rounded-lg hover:bg-[#0f2a45] transition shadow-md"
-                      onClick={handleSaveTemplate}
-                      disabled={!templateEmEdicao}
-                    >
-                      Salvar Template
-                    </button>
-                    <button
-                      className="px-4 py-2 border-2 border-blue-500 text-blue-700 rounded-lg hover:bg-blue-50"
-                      onClick={handleResetTemplate}
-                      disabled={!templateEmEdicao}
-                    >
-                      Resetar para Nativo
-                    </button>
+                  <div className="bg-white border rounded-lg p-2">
+                    <InteractiveCanvas
+                      elementos={templateEmEdicao.elementos}
+                      elementoSelecionado={elementoSelecionado}
+                      elementosSelecionados={elementosSelecionados}
+                      onElementoSelecionado={setElementoSelecionado}
+                      onElementosSelecionados={setElementosSelecionados}
+                      onElementoAtualizado={updateEl}
+                      onMultiplosElementosAtualizados={updateMultiplos}
+                      onElementoRemovido={handleRemoveEl}
+                      getPreviewText={obterPreviewTextoCertificado}
+                      backgroundUrl={templateEmEdicao.backgroundUrl}
+                      larguraCanvas={CERTIFICADO_CANVAS.largura}
+                      alturaCanvas={CERTIFICADO_CANVAS.altura}
+                    />
                   </div>
-
-                  <input
-                    ref={backgroundInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleBackgroundUpload}
-                  />
-                  <input
-                    ref={imagemInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleImagemUpload}
-                  />
                 </div>
-              </div>
-            </div>
+              </>
+            )}
+          </div>
 
-            <div className="w-80 bg-white border-l border-gray-200 p-4 overflow-y-auto">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">Adicionar Elementos</h3>
+          {/* Painel direito: ferramentas */}
+          <div className="w-72 bg-white border-l border-gray-200 p-4 overflow-y-auto space-y-4">
+            <div>
+              <h3 className="text-sm font-bold text-gray-800 mb-2">Adicionar Elemento</h3>
               <div className="grid grid-cols-2 gap-2">
-                {ELEMENTOS_CERTIFICADO.map((el) => (
+                {ELEMENTOS_TIPOS.map((el) => (
                   <button
                     key={el.tipo}
-                    onClick={() => handleAddElemento(el.tipo as CertificadoElemento['tipo'])}
-                    className="flex flex-col items-center gap-2 p-3 border border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
+                    onClick={() => handleAddEl(el.tipo as CertificadoElemento['tipo'])}
                     disabled={!templateEmEdicao}
+                    className="flex flex-col items-center gap-1 p-3 border rounded-lg hover:border-blue-400 hover:bg-blue-50 transition disabled:opacity-40 text-gray-700"
                   >
-                    <span className="text-2xl">{el.icone}</span>
-                    <span className="text-xs font-semibold text-gray-700 text-center">{el.label}</span>
+                    <span className="text-base font-bold">{el.icone}</span>
+                    <span className="text-xs">{el.label}</span>
                   </button>
                 ))}
               </div>
+            </div>
 
-              <hr className="my-4" />
+            <hr />
 
-              <h4 className="font-semibold text-gray-800 mb-3">Dicas de Uso</h4>
-              <ul className="text-xs text-gray-600 space-y-2">
-                <li>• Clique nos elementos para seleciona-los</li>
-                <li>• Arraste elementos para reposiciona-los</li>
-                <li>• Use os campos do elemento selecionado para ajustes</li>
-                <li>• Use placeholders nos textos do certificado</li>
-              </ul>
+            {/* Elemento selecionado */}
+            <div>
+              <h4 className="text-sm font-bold text-gray-800 mb-2">Elemento Selecionado</h4>
+              {!elementoSelecionado && (
+                <p className="text-xs text-gray-400">Clique em um elemento no canvas.</p>
+              )}
+              {elementoSelecionado && (
+                <div className="space-y-3">
+                  {elementoSelecionado.tipo === 'texto' && (
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600">Texto</label>
+                      <textarea
+                        className="mt-1 w-full border rounded px-2 py-1 text-xs"
+                        rows={3}
+                        value={elementoSelecionado.texto || ''}
+                        onChange={(e) => updateEl(elementoSelecionado.id, { texto: e.target.value })}
+                      />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600">Fonte</label>
+                      <input
+                        className="mt-1 w-full border rounded px-2 py-1 text-xs"
+                        value={elementoSelecionado.fonte || 'Arial'}
+                        onChange={(e) => updateEl(elementoSelecionado.id, { fonte: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600">Tamanho</label>
+                      <input
+                        type="number"
+                        className="mt-1 w-full border rounded px-2 py-1 text-xs"
+                        value={elementoSelecionado.fontSize || 16}
+                        onChange={(e) => updateEl(elementoSelecionado.id, { fontSize: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600">Cor</label>
+                      <input
+                        type="color"
+                        className="mt-1 w-full border rounded h-8"
+                        value={elementoSelecionado.cor || '#111827'}
+                        onChange={(e) => updateEl(elementoSelecionado.id, { cor: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600">Alinham.</label>
+                      <select
+                        className="mt-1 w-full border rounded px-2 py-1 text-xs"
+                        value={elementoSelecionado.alinhamento || 'left'}
+                        onChange={(e) => updateEl(elementoSelecionado.id, { alinhamento: e.target.value as any })}
+                      >
+                        <option value="left">Esq</option>
+                        <option value="center">Centro</option>
+                        <option value="right">Dir</option>
+                      </select>
+                    </div>
+                  </div>
 
-              <div className="mt-4 bg-white border rounded-lg p-4">
-                <h4 className="font-semibold text-sm text-gray-800 mb-2">Elemento Selecionado</h4>
-                {!elementoSelecionado && (
-                  <p className="text-xs text-gray-500">Selecione um elemento para editar.</p>
-                )}
-                {elementoSelecionado && (
-                  <div className="space-y-3">
-                    {elementoSelecionado.tipo === 'texto' && (
-                      <div>
-                        <label className="text-xs font-semibold text-gray-700">Texto</label>
-                        <textarea
-                          className="mt-1 w-full border rounded px-3 py-2 text-xs"
-                          rows={3}
-                          value={elementoSelecionado.texto || ''}
-                          onChange={(e) => updateElemento(elementoSelecionado.id, { texto: e.target.value })}
-                        />
-                      </div>
-                    )}
+                  {(elementoSelecionado.tipo === 'imagem' || elementoSelecionado.tipo === 'logo') && (
+                    <button
+                      className="w-full px-3 py-1.5 border rounded text-xs text-gray-700 hover:bg-gray-50"
+                      onClick={() => imagemInputRef.current?.click()}
+                    >
+                      Enviar Imagem
+                    </button>
+                  )}
 
+                  {elementoSelecionado.tipo === 'chapa' && (
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-xs font-semibold text-gray-700">Fonte</label>
-                        <input
-                          className="mt-1 w-full border rounded px-2 py-1 text-xs"
-                          value={elementoSelecionado.fonte || 'Arial'}
-                          onChange={(e) => updateElemento(elementoSelecionado.id, { fonte: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-gray-700">Tamanho</label>
-                        <input
-                          type="number"
-                          className="mt-1 w-full border rounded px-2 py-1 text-xs"
-                          value={elementoSelecionado.fontSize || 12}
-                          onChange={(e) => updateElemento(elementoSelecionado.id, { fontSize: Number(e.target.value) })}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-gray-700">Cor</label>
+                        <label className="text-xs font-semibold text-gray-600">Cor</label>
                         <input
                           type="color"
                           className="mt-1 w-full border rounded h-8"
-                          value={elementoSelecionado.cor || '#111827'}
-                          onChange={(e) => updateElemento(elementoSelecionado.id, { cor: e.target.value })}
+                          value={elementoSelecionado.cor || '#ef4444'}
+                          onChange={(e) => updateEl(elementoSelecionado.id, { cor: e.target.value })}
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-semibold text-gray-700">Alinhamento</label>
-                        <select
+                        <label className="text-xs font-semibold text-gray-600">Opacidade</label>
+                        <input
+                          type="number"
+                          min="0" max="1" step="0.05"
                           className="mt-1 w-full border rounded px-2 py-1 text-xs"
-                          value={elementoSelecionado.alinhamento || 'left'}
-                          onChange={(e) => updateElemento(elementoSelecionado.id, { alinhamento: e.target.value as any })}
-                        >
-                          <option value="left">Esquerda</option>
-                          <option value="center">Centro</option>
-                          <option value="right">Direita</option>
-                        </select>
+                          value={elementoSelecionado.transparencia ?? 1}
+                          onChange={(e) => updateEl(elementoSelecionado.id, { transparencia: Number(e.target.value) })}
+                        />
                       </div>
                     </div>
+                  )}
 
-                    {(elementoSelecionado.tipo === 'imagem' || elementoSelecionado.tipo === 'logo') && (
-                      <button
-                        className="px-3 py-2 border rounded text-xs"
-                        onClick={() => imagemInputRef.current?.click()}
-                      >
-                        Enviar Imagem
-                      </button>
-                    )}
-
-                    {elementoSelecionado.tipo === 'chapa' && (
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-xs font-semibold text-gray-700">Cor</label>
-                          <input
-                            type="color"
-                            className="mt-1 w-full border rounded h-8"
-                            value={elementoSelecionado.cor || '#ef4444'}
-                            onChange={(e) => updateElemento(elementoSelecionado.id, { cor: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-gray-700">Opacidade</label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="1"
-                            step="0.1"
-                            className="mt-1 w-full border rounded px-2 py-1 text-xs"
-                            value={elementoSelecionado.transparencia ?? 1}
-                            onChange={(e) => updateElemento(elementoSelecionado.id, { transparencia: Number(e.target.value) })}
-                          />
-                        </div>
-                      </div>
-                    )}
-
+                  <div className="flex gap-2">
                     <button
-                      className="text-red-600 text-xs"
-                      onClick={() => handleRemoveElemento(elementoSelecionado.id)}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                      onClick={() => updateEl(elementoSelecionado.id, { negrito: !elementoSelecionado.negrito })}
                     >
-                      Remover elemento
+                      <strong>B</strong>
+                    </button>
+                    <button
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                      onClick={() => updateEl(elementoSelecionado.id, { italico: !elementoSelecionado.italico })}
+                    >
+                      <em>I</em>
+                    </button>
+                    <button
+                      className="text-xs text-gray-500 hover:text-gray-700 underline"
+                      onClick={() => updateEl(elementoSelecionado.id, { sublinhado: !elementoSelecionado.sublinhado })}
+                    >
+                      U
+                    </button>
+                    <button
+                      className="ml-auto text-xs text-red-500 hover:text-red-700"
+                      onClick={() => handleRemoveEl(elementoSelecionado.id)}
+                    >
+                      Remover
                     </button>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+            </div>
 
-              <div className="mt-4 bg-white border rounded-lg p-4">
-                <h4 className="font-semibold text-sm text-gray-800 mb-2">Placeholders</h4>
-                <ul className="text-xs text-gray-600 space-y-1">
-                  {CERTIFICADO_PLACEHOLDERS.map((ph) => (
-                    <li key={ph.placeholder}>{ph.placeholder} - {ph.label}</li>
-                  ))}
-                </ul>
-              </div>
+            <hr />
+
+            {/* Placeholders */}
+            <div>
+              <h4 className="text-sm font-bold text-gray-800 mb-2">Variaveis Disponiveis</h4>
+              <ul className="text-xs text-gray-500 space-y-1">
+                {CERTIFICADO_PLACEHOLDERS.map((ph) => (
+                  <li key={ph.placeholder} className="flex items-center gap-1">
+                    <code className="bg-gray-100 px-1 rounded">{ph.placeholder}</code>
+                    <span>{ph.label}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
       </div>
+
+      <input ref={backgroundInputRef} type="file" accept="image/*" className="hidden" onChange={handleBgUpload} />
+      <input ref={imagemInputRef} type="file" accept="image/*" className="hidden" onChange={handleImgUpload} />
     </div>
   );
 }

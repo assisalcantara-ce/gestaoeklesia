@@ -157,3 +157,62 @@ export const buildMonthlyInstallments = (startDate: string, count: number) => {
 
   return installments;
 };
+
+const fmtDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/**
+ * Gera as datas e valores das 12 parcelas mensais com vencimento todo dia 10.
+ *
+ * Regras da 1ª parcela:
+ *  - Dia 1–5:  vence no dia 10 do MESMO mês, valor proporcional
+ *              (dias restantes até o dia 10 / dias do mês × mensalidade)
+ *  - Dia 6+:   vence no dia 10 do MÊS SEGUINTE, valor cheio
+ *              (os poucos dias até o dia 10 não são cobrados)
+ *
+ * Parcelas 2–12: sempre dia 10 dos meses subsequentes, valor cheio.
+ *
+ * Exemplos (mensalidade R$ 149):
+ *   Ativado dia 03/04 → 1ª: 10/04, R$ (7/30×149) ≈ R$ 34,77 (proporcional)
+ *   Ativado dia 06/04 → 1ª: 10/05, R$ 149,00 (cheio, próximo mês)
+ *   Ativado dia 10/04 → 1ª: 10/05, R$ 149,00 (cheio, próximo mês)
+ *   Ativado dia 30/04 → 1ª: 10/05, R$ 149,00 (cheio, próximo mês)
+ */
+export function buildBillingInstallments(
+  activationDate: Date,
+  monthlyPrice: number,
+  count = 12
+): Array<{ dueDate: string; amount: number; isProrated: boolean }> {
+  const day = activationDate.getDate();
+  const year = activationDate.getFullYear();
+  const month = activationDate.getMonth();
+
+  let firstDueDate: Date;
+  let firstAmount: number;
+  let isProrated: boolean;
+
+  if (day <= 5) {
+    // Cobra proporcional até o dia 10 do mesmo mês
+    firstDueDate = new Date(year, month, 10);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysUntilDue = 10 - day; // ex.: dia 3 → 7 dias
+    firstAmount = Math.round((daysUntilDue / daysInMonth) * monthlyPrice * 100) / 100;
+    isProrated = true;
+  } else {
+    // Cobra valor cheio no dia 10 do próximo mês (dias até lá não são cobrados)
+    firstDueDate = new Date(year, month + 1, 10);
+    firstAmount = monthlyPrice;
+    isProrated = false;
+  }
+
+  const installments: Array<{ dueDate: string; amount: number; isProrated: boolean }> = [
+    { dueDate: fmtDate(firstDueDate), amount: firstAmount, isProrated },
+  ];
+
+  for (let i = 1; i < count; i++) {
+    const d = new Date(firstDueDate.getFullYear(), firstDueDate.getMonth() + i, 10);
+    installments.push({ dueDate: fmtDate(d), amount: monthlyPrice, isProrated: false });
+  }
+
+  return installments;
+}

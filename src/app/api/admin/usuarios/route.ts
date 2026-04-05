@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import bcrypt from 'bcrypt'
 import { requireAdmin } from '@/lib/admin-guard'
 
 function sanitizeAdminUser(row: any) {
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           email: body.email,
-          password_hash: body.password, // TODO: Fazer hash com bcrypt
+          password_hash: await bcrypt.hash(body.password, 10),
           role: body.role || 'suporte',
           nome: body.nome,
           cpf: body.cpf,
@@ -143,6 +144,11 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
     const { password, ...updateData } = body
 
+    // Se senha fornecida, inclui no update
+    if (password && String(password).trim().length >= 6) {
+      updateData.password_hash = await bcrypt.hash(String(password).trim(), 10)
+    }
+
     const { data, error } = await supabase
       .from('admin_users')
       .update(updateData)
@@ -176,6 +182,47 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'ID é obrigatório' }, { status: 400 })
     }
 
+    // Busca o registro alvo para comparações
+    const { data: targetUser } = await supabase
+      .from('admin_users')
+      .select('id, email, role, user_id')
+      .eq('id', id)
+      .single()
+
+    if (!targetUser) {
+      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
+    }
+
+    // LOG para debug da trava de auto-exclusão
+    console.error('[DELETE ADMIN_USER] Comparação de trava:', {
+      targetUser: {
+        id: targetUser.id,
+        email: targetUser.email,
+        user_id: targetUser.user_id,
+      },
+      logged: {
+        email: result.ctx.adminUser?.email || result.ctx.user?.email,
+        user_id: result.ctx.user?.id,
+        adminUser: result.ctx.adminUser?.id,
+        authUser: result.ctx.user?.id,
+      },
+    })
+
+    // Impede que o usuário logado delete a própria conta
+    // Compara por email (mais confiável que id) e por user_id do Supabase Auth
+    const loggedEmail = result.ctx.adminUser?.email || result.ctx.user?.email
+    const loggedAuthId = result.ctx.user?.id
+
+    if (
+      targetUser.email === loggedEmail ||
+      (loggedAuthId && targetUser.user_id === loggedAuthId)
+    ) {
+      return NextResponse.json(
+        { error: 'Você não pode remover a sua própria conta enquanto estiver logado.' },
+        { status: 403 }
+      )
+    }
+
     // Verifica se é o último admin
     const { count } = await supabase
       .from('admin_users')
@@ -183,19 +230,11 @@ export async function DELETE(request: NextRequest) {
       .eq('role', 'admin')
       .eq('status', 'ATIVO')
 
-    if (count === 1) {
-      const { data: user } = await supabase
-        .from('admin_users')
-        .select('role')
-        .eq('id', id)
-        .single()
-
-      if (user?.role === 'admin') {
-        return NextResponse.json(
-          { error: 'Não é possível deletar o último usuário administrador' },
-          { status: 400 }
-        )
-      }
+    if (count === 1 && targetUser.role === 'admin') {
+      return NextResponse.json(
+        { error: 'Não é possível deletar o último usuário administrador' },
+        { status: 400 }
+      )
     }
 
     // Soft delete

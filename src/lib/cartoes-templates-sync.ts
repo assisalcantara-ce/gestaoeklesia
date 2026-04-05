@@ -227,17 +227,24 @@ export async function persistTemplatesSnapshotToSupabase(
     return;
   }
 
-  const rows = templatesDoTipo.map(t => ({
-    ministry_id: ministryId,
-    template_key: String(t.id),
-    tipo_cadastro: tipo,
-    name: String(t.nome || t.name || t.id),
-    description: null,
-    template_data: t,
-    preview_url: (t.previewImage || null) as any,
-    is_default: (t.ativo === true) as any,
-    is_active: (t.ativo === true) as any,
-  }));
+  const rows = templatesDoTipo.map(t => {
+    // preview_url é VARCHAR(500) no banco — data URLs base64 excedem esse limite
+    const rawPreview: string | undefined = t.previewImage;
+    const previewUrl = rawPreview && !rawPreview.startsWith('data:') && rawPreview.length <= 500
+      ? rawPreview
+      : null;
+    return {
+      ministry_id: ministryId,
+      template_key: String(t.id),
+      tipo_cadastro: tipo,
+      name: String(t.nome || t.name || t.id),
+      description: null,
+      template_data: t,
+      preview_url: previewUrl as any,
+      is_default: (t.ativo === true) as any,
+      is_active: (t.ativo === true) as any,
+    };
+  });
 
   const up = await supabase
     .from('cartoes_templates')

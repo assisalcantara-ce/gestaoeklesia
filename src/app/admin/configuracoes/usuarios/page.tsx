@@ -2,16 +2,19 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import AdminSidebar from '@/components/AdminSidebar'
+import { authenticatedFetch } from '@/lib/api-client'
 import { useAppDialog } from '@/providers/AppDialogProvider'
 import { Plus, Trash2, Edit2, Shield, CreditCard, Headphones } from 'lucide-react'
+import { useAdminAuth } from '@/providers/AdminAuthProvider'
 
-interface User {
+interface AdminUser {
   id: string
   email: string
+  nome: string
   role: 'admin' | 'financeiro' | 'suporte'
-  createdAt: string
+  criado_em: string
 }
 
 const ROLE_CONFIG = {
@@ -37,14 +40,12 @@ const ROLE_CONFIG = {
 
 export default function UsuariosPage() {
   const dialog = useAppDialog()
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: '1',
-      email: 'admin@gestaoservus.local',
-      role: 'admin',
-      createdAt: '2025-01-01',
-    },
-  ])
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(true)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
+  const [editFormData, setEditFormData] = useState({ email: '', password: '', role: 'suporte' as AdminUser['role'] })
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<AdminUser | null>(null)
 
   const [formData, setFormData] = useState({
     nome: '',
@@ -53,8 +54,6 @@ export default function UsuariosPage() {
     role: 'suporte' as 'admin' | 'financeiro' | 'suporte',
     cpf: '',
     rg: '',
-    data_nascimento: '',
-    data_admissao: '',
     funcao: '',
     telefone: '',
     whatsapp: '',
@@ -72,6 +71,29 @@ export default function UsuariosPage() {
 
   const [showForm, setShowForm] = useState(false)
 
+  const fetchUsers = async () => {
+    try {
+      setLoadingUsers(true)
+      const res = await authenticatedFetch('/api/admin/usuarios')
+      if (res.ok) {
+        const data = await res.json()
+        setUsers(
+          (data || []).map((u: any) => ({
+            id: u.id,
+            email: u.email,
+            nome: u.nome || '',
+            role: u.role || 'suporte',
+            criado_em: u.criado_em || u.data_admissao || '',
+          }))
+        )
+      }
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  useEffect(() => { fetchUsers() }, [])
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({
@@ -82,34 +104,96 @@ export default function UsuariosPage() {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.email || !formData.password) {
-      await dialog.alert({ title: 'Atenção', type: 'warning', message: 'Preencha todos os campos' })
+    if (!formData.email || !formData.password || !formData.nome) {
+      await dialog.alert({ title: 'Atenção', type: 'warning', message: 'Nome, email e senha são obrigatórios' })
       return
     }
-
-    const newUser: User = {
-      id: String(users.length + 1),
-      email: formData.email,
-      role: formData.role,
-      createdAt: new Date().toLocaleDateString('pt-BR'),
+    setActionLoading(true)
+    try {
+      const res = await authenticatedFetch('/api/admin/usuarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        await dialog.alert({ title: 'Erro', type: 'error', message: data.error || 'Erro ao criar usuário' })
+        return
+      }
+      setFormData({
+        nome: '', email: '', password: '', role: 'suporte',
+        cpf: '', rg: '', funcao: '',
+        telefone: '', whatsapp: '', cep: '', endereco: '', cidade: '', bairro: '', uf: '',
+        banco: '', agencia: '', conta_corrente: '', pix: '', obs: ''
+      })
+      setShowForm(false)
+      await fetchUsers()
+    } finally {
+      setActionLoading(false)
     }
-
-    setUsers([...users, newUser])
-    setFormData({ 
-      nome: '', email: '', password: '', role: 'suporte', 
-      cpf: '', rg: '', data_nascimento: '', data_admissao: '', funcao: '',
-      telefone: '', whatsapp: '', cep: '', endereco: '', cidade: '', bairro: '', uf: '',
-      banco: '', agencia: '', conta_corrente: '', pix: '', obs: ''
-    })
-    setShowForm(false)
   }
 
-  const handleDeleteUser = async (id: string) => {
-    if (users.find((u) => u.id === id)?.role === 'admin' && users.filter((u) => u.role === 'admin').length === 1) {
-      await dialog.alert({ title: 'Atenção', type: 'warning', message: 'Não é possível deletar o último usuário admin' })
+  const handleEditOpen = (user: AdminUser) => {
+    setEditingUser(user)
+    setEditFormData({ email: user.email, password: '', role: user.role })
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingUser) return
+    if (!editFormData.email) {
+      await dialog.alert({ title: 'Atenção', type: 'warning', message: 'Email é obrigatório' })
       return
     }
-    setUsers(users.filter((u) => u.id !== id))
+    setActionLoading(true)
+    try {
+      const payload: any = { email: editFormData.email, role: editFormData.role }
+      if (editFormData.password.trim()) payload.password = editFormData.password.trim()
+      const res = await authenticatedFetch(`/api/admin/usuarios?id=${editingUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        await dialog.alert({ title: 'Erro', type: 'error', message: data.error || 'Erro ao atualizar usuário' })
+        return
+      }
+      setEditingUser(null)
+      await fetchUsers()
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const doDeleteUser = async () => {
+    if (!confirmDeleteUser) return
+    setActionLoading(true)
+    try {
+      const res = await authenticatedFetch(`/api/admin/usuarios?id=${confirmDeleteUser.id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        await dialog.alert({ title: 'Erro', type: 'error', message: data.error || 'Erro ao remover usuário' })
+        return
+      }
+      setConfirmDeleteUser(null)
+      await fetchUsers()
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const { adminUser } = useAdminAuth()
+
+  // Função utilitária para saber se é o próprio usuário logado
+  const isSelf = (user: AdminUser) => {
+    if (!adminUser) return false
+    return (
+      user.email === adminUser.email ||
+      (adminUser.id && user.id === adminUser.id)
+    )
   }
 
   return (
@@ -205,20 +289,6 @@ export default function UsuariosPage() {
                       name="rg"
                       placeholder="RG"
                       value={formData.rg}
-                      onChange={handleInputChange}
-                      className="bg-gray-900 text-white border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
-                    />
-                    <input
-                      type="date"
-                      name="data_nascimento"
-                      value={formData.data_nascimento}
-                      onChange={handleInputChange}
-                      className="bg-gray-900 text-white border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
-                    />
-                    <input
-                      type="date"
-                      name="data_admissao"
-                      value={formData.data_admissao}
                       onChange={handleInputChange}
                       className="bg-gray-900 text-white border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
                     />
@@ -391,7 +461,10 @@ export default function UsuariosPage() {
 
                     return (
                       <tr key={user.id} className="hover:bg-gray-700 transition">
-                        <td className="px-6 py-3 text-white">{user.email}</td>
+                        <td className="px-6 py-3">
+                          <p className="text-white">{user.email}</p>
+                          {user.nome && <p className="text-gray-400 text-xs">{user.nome}</p>}
+                        </td>
                         <td className="px-6 py-3">
                           <div className="flex items-center gap-2">
                             <div className={`${roleConfig.color} p-1 rounded`}>
@@ -403,15 +476,24 @@ export default function UsuariosPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-3 text-gray-400 text-sm">{user.createdAt}</td>
+                        <td className="px-6 py-3 text-gray-400 text-sm">
+                          {user.criado_em ? new Date(user.criado_em).toLocaleDateString('pt-BR') : '-'}
+                        </td>
                         <td className="px-6 py-3">
                           <div className="flex gap-2">
-                            <button className="p-2 hover:bg-gray-600 rounded transition text-blue-400">
+                            <button
+                              onClick={() => !isSelf(user) && handleEditOpen(user)}
+                              className={`p-2 hover:bg-gray-600 rounded transition text-blue-400 ${isSelf(user) ? 'opacity-40 cursor-not-allowed' : ''}`}
+                              title={isSelf(user) ? 'Você não pode editar sua própria conta' : 'Editar'}
+                              disabled={isSelf(user)}
+                            >
                               <Edit2 size={16} />
                             </button>
                             <button
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="p-2 hover:bg-gray-600 rounded transition text-red-400"
+                              onClick={() => !isSelf(user) && setConfirmDeleteUser(user)}
+                              className={`p-2 hover:bg-gray-600 rounded transition text-red-400 ${isSelf(user) ? 'opacity-40 cursor-not-allowed' : ''}`}
+                              title={isSelf(user) ? 'Você não pode remover sua própria conta' : 'Remover'}
+                              disabled={isSelf(user)}
                             >
                               <Trash2 size={16} />
                             </button>
@@ -424,9 +506,14 @@ export default function UsuariosPage() {
               </table>
             </div>
 
-            {users.length === 0 && (
+            {users.length === 0 && !loadingUsers && (
               <div className="px-6 py-12 text-center">
                 <p className="text-gray-400">Nenhum usuário cadastrado ainda</p>
+              </div>
+            )}
+            {loadingUsers && (
+              <div className="px-6 py-12 text-center">
+                <p className="text-gray-400">Carregando...</p>
               </div>
             )}
           </div>
@@ -450,6 +537,103 @@ export default function UsuariosPage() {
           </div>
         </div>
       </main>
+
+      {/* Modal: Editar usuário */}
+      {editingUser && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl max-w-md w-full p-6 text-gray-100">
+            <h2 className="text-lg font-bold text-white mb-5">Editar usuário</h2>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="block text-gray-400 text-sm mb-1">Email</label>
+                <input
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(e) => setEditFormData((p) => ({ ...p, email: e.target.value }))}
+                  className="w-full bg-gray-800 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-400 text-sm mb-1">Nova senha <span className="text-gray-500">(deixe em branco para não alterar)</span></label>
+                <input
+                  type="password"
+                  value={editFormData.password}
+                  onChange={(e) => setEditFormData((p) => ({ ...p, password: e.target.value }))}
+                  placeholder="Mínimo 6 caracteres"
+                  className="w-full bg-gray-800 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-400 text-sm mb-1">Permissão</label>
+                <select
+                  value={editFormData.role}
+                  onChange={(e) => setEditFormData((p) => ({ ...p, role: e.target.value as AdminUser['role'] }))}
+                  className="w-full bg-gray-800 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="suporte">Suporte</option>
+                  <option value="financeiro">Financeiro</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  disabled={actionLoading}
+                  className="flex-1 px-4 py-2 bg-gray-700 text-gray-100 rounded-lg hover:bg-gray-600 transition text-sm font-medium disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold disabled:opacity-50"
+                >
+                  {actionLoading ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmar exclusão */}
+      {confirmDeleteUser && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-red-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-gray-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-900/60 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </div>
+              <h2 className="text-lg font-bold text-white">Remover usuário?</h2>
+            </div>
+            <p className="text-sm text-gray-300 mb-2">Você está prestes a remover:</p>
+            <div className="bg-gray-800 rounded-lg px-4 py-3 mb-4">
+              <p className="font-semibold text-white text-sm">{confirmDeleteUser.nome || confirmDeleteUser.email}</p>
+              <p className="text-xs text-gray-400">{confirmDeleteUser.email} · {ROLE_CONFIG[confirmDeleteUser.role]?.label}</p>
+            </div>
+            <div className="bg-red-950/40 border border-red-800/50 rounded-lg px-4 py-3 mb-5">
+              <p className="text-xs text-red-400 font-medium">⚠️ O acesso será revogado imediatamente.</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDeleteUser(null)}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-gray-700 text-gray-100 rounded-lg hover:bg-gray-600 transition text-sm font-medium disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={doDeleteUser}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-semibold disabled:opacity-50"
+              >
+                {actionLoading ? 'Removendo...' : 'Sim, remover'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

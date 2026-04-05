@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { createClient } from '@/lib/supabase-client';
-import { PLANOS_DISPONIBLES } from '@/config/plans';
+
 
 interface Usuario {
   id: string;
@@ -78,9 +78,8 @@ export default function UsuariosPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const LIMITE_POR_PLANO: Record<string, number> = { starter: 3, intermediario: 10, profissional: 25, expert: 999 };
-  const [planoId, setPlanoId] = useState<string>('starter');
-  const limiteUsuarios = LIMITE_POR_PLANO[planoId] ?? 3;
+  const [maxUsuarios, setMaxUsuarios] = useState<number>(1);
+  const limiteUsuarios = maxUsuarios;
   const totalUsuarios = usuarios.length;
   const limiteAtingido = totalUsuarios >= limiteUsuarios;
 
@@ -206,12 +205,31 @@ export default function UsuariosPage() {
       if (authLoading) return;
       const { data } = await supabase.auth.getSession();
       if (!data.session) return;
-      const { data: row } = await supabase
-        .from('ministries')
-        .select('plan_id')
+
+      // Tenta via ministry_users (usuário secundário)
+      const { data: mu } = await supabase
+        .from('ministry_users')
+        .select('ministry_id')
         .eq('user_id', data.session.user.id)
+        .limit(1)
         .maybeSingle();
-      if ((row as any)?.plan_id) setPlanoId((row as any).plan_id);
+      const ministryId = mu?.ministry_id;
+
+      const query = ministryId
+        ? supabase
+            .from('ministries')
+            .select('subscription_plan_id, subscription_plans(max_users)')
+            .eq('id', ministryId)
+            .maybeSingle()
+        : supabase
+            .from('ministries')
+            .select('subscription_plan_id, subscription_plans(max_users)')
+            .eq('user_id', data.session.user.id)
+            .maybeSingle();
+
+      const { data: row } = await query;
+      const maxUsers = (row as any)?.subscription_plans?.max_users;
+      if (typeof maxUsers === 'number') setMaxUsuarios(maxUsers);
     };
     loadPlano();
   }, [authLoading, supabase]);
@@ -459,7 +477,7 @@ export default function UsuariosPage() {
                 <span className={limiteAtingido ? 'text-red-600 font-semibold' : 'text-gray-500'}>
                   {totalUsuarios}/{limiteUsuarios} usuários
                 </span>
-                <span className="text-gray-400 ml-1">· Plano {PLANOS_DISPONIBLES[planoId]?.nome || planoId}</span>
+
               </p>
             </div>
             <button
@@ -501,7 +519,7 @@ export default function UsuariosPage() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold text-[#123b63]">Adicionar Novo Usuário</h2>
                 <span className={`text-sm font-semibold px-3 py-1 rounded-full ${limiteAtingido ? 'bg-red-100 text-red-700' : totalUsuarios >= limiteUsuarios - 1 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
-                  {totalUsuarios}/{limiteUsuarios} usuários · {PLANOS_DISPONIBLES[planoId]?.nome || planoId}
+                  {totalUsuarios}/{limiteUsuarios} usuários
                 </span>
               </div>
               

@@ -2,50 +2,43 @@
 
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { createClient } from '@/lib/supabase-client';
 import { formatCpfOrCnpj, formatPhone, onlyDigits } from '@/lib/mascaras';
+import { formatarPreco } from '@/config/plans';
 
-const PLAN_OPTIONS = [
-  { value: 'starter', label: 'Starter' },
-  { value: 'intermediario', label: 'Intermediário' },
-  { value: 'profissional', label: 'Profissional' },
-  { value: 'expert', label: 'Expert' }
-] as const;
-
-const PLAN_DETAILS = {
-  starter: {
-    priceMonthly: 'R$ 149,99',
-    priceYearly: 'R$ 1.499,99/ano',
-    description: 'Ideal para instituições pequenas iniciando na plataforma',
-    highlights: ['Até 5 Campos', 'Até 50 Igrejas', 'Até 500 Membros', 'Até 3 Usuários Administrativos']
-  },
-  intermediario: {
-    priceMonthly: 'R$ 299,99',
-    priceYearly: 'R$ 2.999,99/ano',
-    description: 'Solução completa para instituições de grande porte e em crescimento.',
-    highlights: ['Até 20 Campos', 'Até 250 Igrejas', 'Até 3.000 Membros', 'Até 10 Usuários Administrativos']
-  },
-  profissional: {
-    priceMonthly: 'R$ 499,99',
-    priceYearly: 'R$ 4.999,99/ano',
-    description: 'Solução completa para instituições em fase de expansão acelerada',
-    highlights: ['Até 50 Campos', 'Até 600 Igrejas', 'Até 7.000 Membros', 'Até 25 Usuários Administrativos']
-  },
-  expert: {
-    priceMonthly: 'R$ 999,00',
-    priceYearly: 'R$ 9.999,99/ano',
-    description: 'Personalizado para grandes instituições com alto fluxo de atividades.',
-    highlights: ['Até 999 Campos', 'Até 999 Igrejas', 'Até 99.999 Membros', 'Até 999 Usuários Administrativos']
-  }
-} as const;
-
-type PlanKey = keyof typeof PLAN_DETAILS;
-
-const resolvePlan = (value: string | null): PlanKey => {
-  const normalized = (value || '').toLowerCase();
-  return PLAN_OPTIONS.some((plan) => plan.value === normalized)
-    ? (normalized as PlanKey)
-    : 'starter';
+type PlanoDB = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  price_monthly: number;
+  price_annually: number | null;
+  max_users: number;
+  max_members: number;
+  max_divisao1: number;
+  has_advanced_reports: boolean;
+  has_api_access: boolean;
+  has_priority_support: boolean;
+  has_custom_domain: boolean;
+  has_white_label: boolean;
+  has_automation: boolean;
+  has_modulo_financeiro: boolean;
+  has_modulo_eventos: boolean;
+  has_modulo_reunioes: boolean;
 };
+
+function buildHighlights(plan: PlanoDB): string[] {
+  const h: string[] = [];
+  if (plan.max_users > 0) h.push(`Até ${plan.max_users} Usuários Administrativos`);
+  if (plan.max_members > 0) h.push(`Até ${plan.max_members.toLocaleString('pt-BR')} Ministros`);
+  if (plan.max_divisao1 > 0) h.push(`Até ${plan.max_divisao1} Campos`);
+  if (plan.has_modulo_financeiro) h.push('Módulo Financeiro');
+  if (plan.has_modulo_eventos) h.push('Módulo Eventos');
+  if (plan.has_modulo_reunioes) h.push('Módulo Reuniões');
+  if (plan.has_advanced_reports) h.push('Relatórios Avançados');
+  if (plan.has_priority_support) h.push('Suporte Prioritário');
+  return h;
+}
 
 const formatCep = (value: string) => {
   const digits = onlyDigits(value).slice(0, 8);
@@ -56,7 +49,11 @@ const formatCep = (value: string) => {
 
 export default function PreCadastroPage() {
   const searchParams = useSearchParams();
-  const initialPlan = useMemo(() => resolvePlan(searchParams.get('plan')), [searchParams]);
+  const planParam = useMemo(() => (searchParams.get('plan') || '').toLowerCase().trim(), [searchParams]);
+  const supabase = useMemo(() => createClient(), []);
+
+  const [planos, setPlanos] = useState<PlanoDB[]>([]);
+  const [planoAtivo, setPlanoAtivo] = useState<PlanoDB | null>(null);
 
   const [formData, setFormData] = useState<{
     ministry_name: string;
@@ -67,8 +64,6 @@ export default function PreCadastroPage() {
     whatsapp: string;
     phone: string;
     website: string;
-    quantity_temples: string;
-    quantity_members: string;
     address_zip: string;
     address_street: string;
     address_number: string;
@@ -76,7 +71,7 @@ export default function PreCadastroPage() {
     address_city: string;
     address_state: string;
     description: string;
-    plan: PlanKey;
+    plan: string;
   }>({
     ministry_name: '',
     responsible_name: '',
@@ -86,8 +81,6 @@ export default function PreCadastroPage() {
     whatsapp: '',
     phone: '',
     website: '',
-    quantity_temples: '1',
-    quantity_members: '0',
     address_zip: '',
     address_street: '',
     address_number: '',
@@ -95,7 +88,7 @@ export default function PreCadastroPage() {
     address_city: '',
     address_state: '',
     description: '',
-    plan: initialPlan
+    plan: planParam || 'basic'
   });
 
   const [loading, setLoading] = useState(false);
@@ -103,12 +96,32 @@ export default function PreCadastroPage() {
   const [success, setSuccess] = useState(false);
   const successMessageRef = useRef<HTMLDivElement>(null);
 
+  // Busca planos ativos do banco
   useEffect(() => {
-    setFormData((prev) => ({
-      ...prev,
-      plan: initialPlan
-    }));
-  }, [initialPlan]);
+    supabase
+      .from('subscription_plans')
+      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_divisao1,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+      .order('price_monthly', { ascending: true })
+      .then(({ data }: { data: PlanoDB[] | null }) => {
+        if (!data?.length) return;
+        setPlanos(data);
+        const matched =
+          data.find((p) => p.slug?.toLowerCase() === planParam) ||
+          data.find((p) => p.name?.toLowerCase() === planParam) ||
+          data[0];
+        setPlanoAtivo(matched);
+        setFormData((prev) => ({ ...prev, plan: matched?.slug || matched?.name || prev.plan }));
+      });
+  }, [supabase, planParam]);
+
+  // Sincroniza planoAtivo ao mudar select
+  useEffect(() => {
+    if (!planos.length) return;
+    const matched = planos.find((p) => p.slug === formData.plan || p.name?.toLowerCase() === formData.plan);
+    setPlanoAtivo(matched ?? null);
+  }, [formData.plan, planos]);
 
   useEffect(() => {
     if (success && successMessageRef.current) {
@@ -195,8 +208,6 @@ export default function PreCadastroPage() {
           phone: formData.phone,
           website: formData.website,
           responsible_name: formData.responsible_name,
-          quantity_temples: formData.quantity_temples,
-          quantity_members: formData.quantity_members,
           address_zip: formData.address_zip,
           address_street: formData.address_street,
           address_number: formData.address_number,
@@ -226,8 +237,6 @@ export default function PreCadastroPage() {
         whatsapp: '',
         phone: '',
         website: '',
-        quantity_temples: '1',
-        quantity_members: '0',
         address_zip: '',
         address_street: '',
         address_number: '',
@@ -277,20 +286,22 @@ export default function PreCadastroPage() {
                 <span className="text-sm text-blue-50">07 dias grátis</span>
               </div>
               <p className="text-3xl font-bold">
-                {PLAN_OPTIONS.find((plan) => plan.value === formData.plan)?.label || 'Starter'}
+                {planoAtivo?.name || 'Carregando...'}
               </p>
               <div className="space-y-3">
                 <p className="text-sm text-blue-100">
-                  {PLAN_DETAILS[formData.plan].description}
+                  {planoAtivo?.description || ''}
                 </p>
-                <ul className="space-y-2 text-xs text-blue-100">
-                  {PLAN_DETAILS[formData.plan].highlights.map((item) => (
-                    <li key={item} className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-yellow-300" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
+                {planoAtivo && (
+                  <ul className="space-y-2 text-xs text-blue-100">
+                    {buildHighlights(planoAtivo).map((item) => (
+                      <li key={item} className="flex items-center gap-2">
+                        <span className="h-1.5 w-1.5 rounded-full bg-yellow-300" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
 
@@ -302,16 +313,21 @@ export default function PreCadastroPage() {
                 Após o período de testes, você poderá assinar um dos planos abaixo.
               </p>
               <div className="space-y-3">
-                {PLAN_OPTIONS.map((plan) => (
-                  <div key={plan.value} className="flex items-center justify-between text-blue-50 text-sm">
-                    <span className="font-semibold">{plan.label}</span>
-                    <span>{PLAN_DETAILS[plan.value].priceMonthly}</span>
+                {planos.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between text-blue-50 text-sm">
+                    <span className="font-semibold">{p.name}</span>
+                    <span>{formatarPreco(p.price_monthly)}/mês</span>
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-blue-100">
-                Valores anuais a partir de {PLAN_DETAILS.starter.priceYearly}.
-              </p>
+              {(() => {
+                const comAnual = planos.find((p) => p.price_annually && p.price_annually > 0);
+                return comAnual ? (
+                  <p className="text-xs text-blue-100">
+                    Valores anuais a partir de {formatarPreco(comAnual.price_annually!)}/ano.
+                  </p>
+                ) : null;
+              })()}
             </div>
 
             <a
@@ -358,7 +374,7 @@ export default function PreCadastroPage() {
                   value={formData.ministry_name}
                   onChange={handleChange}
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
-                  placeholder="Ex: Igreja Assembleia de Deus"
+                  placeholder="Ex: Convenção Estadual de Ministros"
                 />
               </div>
               <div>
@@ -379,9 +395,9 @@ export default function PreCadastroPage() {
                   onChange={handleChange}
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
                 >
-                  {PLAN_OPTIONS.map((plan) => (
-                    <option key={plan.value} value={plan.value}>
-                      {plan.label}
+                  {planos.map((p) => (
+                    <option key={p.id} value={p.slug || p.name.toLowerCase()}>
+                      {p.name} — {formatarPreco(p.price_monthly)}/mês
                     </option>
                   ))}
                 </select>
@@ -459,33 +475,6 @@ export default function PreCadastroPage() {
                   placeholder="https://"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Igrejas/Templos</label>
-                  <input
-                    name="quantity_temples"
-                    type="number"
-                    min="1"
-                    value={formData.quantity_temples}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Membros</label>
-                  <input
-                    name="quantity_members"
-                    type="number"
-                    min="0"
-                    value={formData.quantity_members}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">CEP</label>
                 <input
@@ -496,6 +485,9 @@ export default function PreCadastroPage() {
                   placeholder="00000-000"
                 />
               </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Cidade</label>
                 <input

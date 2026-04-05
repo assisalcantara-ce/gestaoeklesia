@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 
 interface SidebarProps {
   activeMenu: string;
@@ -14,8 +15,9 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
   const supabase = createClient();
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const planFeatures = usePlanFeatures();
 
-  const menuItems = [
+  const allMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
     {
       id: 'secretaria',
@@ -28,7 +30,7 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
         { id: 'funcionarios', label: 'Funcionários', icon: '👔', path: '/secretaria/funcionarios' },
         { id: 'consagracao', label: 'Consagração (obreiros)', icon: '🙏', path: '/secretaria/consagracao' },
         { id: 'cartas', label: 'Cartas ministeriais', icon: '📜', path: '/secretaria/cartas' },
-        { id: 'certificados', label: 'Certificados', icon: '🎓', path: '/configuracoes/certificados' }
+        { id: 'certificados', label: 'Certificados', icon: '🎓', path: '/secretaria/certificados' }
       ]
     },
     { id: 'financeiro', label: 'Financeiro', icon: '💳', path: '/financeiro' },
@@ -54,6 +56,16 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
       ]
     },
   ];
+
+  // Filtra menus restritos por plano (enquanto carrega, mantém oculto para não piscar)
+  const menuItems = planFeatures.loading
+    ? allMenuItems.filter(i => !['financeiro', 'eventos', 'reunioes'].includes(i.id))
+    : allMenuItems.filter(i => {
+        if (i.id === 'financeiro') return planFeatures.has_modulo_financeiro;
+        if (i.id === 'eventos') return planFeatures.has_modulo_eventos;
+        if (i.id === 'reunioes') return planFeatures.has_modulo_reunioes;
+        return true;
+      });
 
   const handleNavigate = (id: string, path: string) => {
     setActiveMenu(id);

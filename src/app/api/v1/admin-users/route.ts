@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import bcrypt from 'bcrypt'
 import { requireAdmin } from '@/lib/admin-guard'
 
 function sanitizeAdminUser(row: any) {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
       .insert([{
         nome: body.nome || body.name,
         email: body.email,
-        password_hash: body.password_hash || '',
+        password_hash: body.password_hash ? await bcrypt.hash(body.password_hash, 10) : '',
         role: body.role,
         status: body.status || 'ATIVO',
       }])

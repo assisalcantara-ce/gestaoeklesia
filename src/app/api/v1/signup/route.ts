@@ -191,17 +191,18 @@ export async function POST(request: NextRequest) {
     const trialExpiresAt = new Date()
     trialExpiresAt.setDate(trialExpiresAt.getDate() + 7)
 
-    const allowedPlans = new Set(['starter', 'intermediario', 'profissional', 'expert'])
-    const planValue = typeof plan === 'string' && allowedPlans.has(plan.toLowerCase())
-      ? plan.toLowerCase()
-      : 'starter'
-
-    const templesValue = Number.isFinite(Number(quantity_temples))
-      ? Number(quantity_temples)
-      : 1
-    const membersValue = Number.isFinite(Number(quantity_members))
-      ? Number(quantity_members)
-      : 0
+    // Busca slugs ativos no banco para validar o plano enviado
+    const { data: planosValidos } = await supabaseAdmin
+      .from('subscription_plans')
+      .select('slug')
+      .eq('is_active', true)
+    const slugsValidos = new Set(
+      (planosValidos || []).map((p: any) => (p.slug as string)?.toLowerCase()).filter(Boolean)
+    )
+    const planLower = typeof plan === 'string' ? plan.toLowerCase() : ''
+    const planValue = slugsValidos.has(planLower)
+      ? planLower
+      : (slugsValidos.size > 0 ? [...slugsValidos][0] : 'basic')
 
     // Salvar pré-cadastro na tabela pre_registrations
     const { data: prescadastro, error: prescadastroError } = await supabaseClient
@@ -216,8 +217,6 @@ export async function POST(request: NextRequest) {
         phone: phone || null,
         website: website || null,
         responsible_name: responsible_name || pastor || null,
-        quantity_temples: templesValue,
-        quantity_members: membersValue,
         address_zip: address_zip || null,
         address_street: address_street || null,
         address_number: address_number || null,
@@ -322,7 +321,7 @@ export async function POST(request: NextRequest) {
                           <div style="background:#ecfeff;border-radius:12px;padding:16px;margin-bottom:16px;">
                             <p style="margin:0 0 6px;font-size:14px;color:#0f172a;"><strong>Dados de acesso</strong></p>
                             <p style="margin:0;font-size:13px;color:#475569;">Email: ${email}</p>
-                            <p style="margin:0;font-size:13px;color:#475569;">Senha: ${senha}</p>
+                            <p style="margin:4px 0 0;font-size:13px;color:#475569;">Use o email e a senha que você cadastrou para acessar o sistema.</p>
                           </div>
                           <a href="${appUrl}/login" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:bold;">Acessar o sistema</a>
                           <p style="margin:16px 0 0;font-size:12px;color:#64748b;">Suporte WhatsApp: <a href="https://wa.me/5591981755021" style="color:#2563eb;">(91) 98175-5021</a>.</p>
@@ -348,9 +347,18 @@ export async function POST(request: NextRequest) {
           subject: 'Bem-vindo ao GestaoServus - acesso de teste',
           html,
         })
-      } catch (emailError) {
-        console.warn('[SIGNUP] Falha ao enviar email de boas-vindas:', emailError)
+        console.log('[SIGNUP] ✅ Email enviado para:', email)
+      } catch (emailError: any) {
+        console.warn('[SIGNUP] Falha ao enviar email de boas-vindas:', {
+          message: emailError?.message,
+          statusCode: emailError?.statusCode,
+          name: emailError?.name,
+          from: resendFrom,
+          to: email,
+        })
       }
+    } else {
+      console.warn('[SIGNUP] RESEND_API_KEY não configurado — email não enviado.')
     }
 
     console.log('[SIGNUP] ✅ Pré-cadastro criado com sucesso:', {

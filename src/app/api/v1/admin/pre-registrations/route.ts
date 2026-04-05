@@ -74,6 +74,7 @@ export async function PUT(request: NextRequest) {
     if (quantity_members !== undefined) updateData.quantity_members = quantity_members;
     if (description !== undefined) updateData.description = description;
     if (plan !== undefined) updateData.plan = plan;
+    if (body.status !== undefined) updateData.status = body.status;
 
     const { data, error } = await supabase
       .from('pre_registrations')
@@ -139,6 +140,43 @@ export async function GET(request: NextRequest) {
     console.error('API error:', error);
     return NextResponse.json(
       { success: false, error: 'Erro ao listar pré-registros' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const guard = await requireAdmin(request, { requiredRole: 'admin' });
+    if (!guard.ok) return guard.response;
+
+    const body = await request.json();
+    const { id } = body;
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'ID é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabase
+      .from('pre_registrations')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('API error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Erro ao deletar pré-registro' },
       { status: 500 }
     );
   }

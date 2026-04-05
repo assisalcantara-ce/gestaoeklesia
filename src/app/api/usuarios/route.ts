@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { requireFlowAuth, hasRole } from '@/lib/flows/flow-auth';
-import { PLANOS_DISPONIBLES } from '@/config/plans';
 
 type UsuarioResponse = {
   id: string;
@@ -22,12 +21,6 @@ type UsuarioCreateBody = {
   congregacao_id?: string | null;
 };
 
-const LIMITE_POR_PLANO: Record<string, number> = {
-  starter: 3,
-  intermediario: 10,
-  profissional: 25,
-  expert: 999,
-};
 
 type UsuarioUpdateBody = {
   user_id: string;
@@ -184,15 +177,16 @@ export async function POST(request: NextRequest) {
 
     const admin = createServerClient();
 
-    // Verificar limite de usuários do plano
+    // Verificar limite de usuários do plano via subscription_plans.max_users
     const { data: ministryData } = await admin
       .from('ministries')
-      .select('plan_id')
+      .select('name, subscription_plan_id, subscription_plans(name, max_users)')
       .eq('id', ministryId)
       .maybeSingle();
 
-    const planId = (ministryData as any)?.plan_id || 'starter';
-    const limite = LIMITE_POR_PLANO[planId] ?? PLANOS_DISPONIBLES[planId]?.usuarios_max ?? 3;
+    const planData = (ministryData as any)?.subscription_plans;
+    const limite: number = planData?.max_users ?? 3;
+    const planoNome: string = planData?.name || 'seu plano';
 
     const { count: totalUsuarios } = await admin
       .from('ministry_users')
@@ -200,7 +194,6 @@ export async function POST(request: NextRequest) {
       .eq('ministry_id', ministryId);
 
     if ((totalUsuarios ?? 0) >= limite) {
-      const planoNome = PLANOS_DISPONIBLES[planId]?.nome || planId;
       return NextResponse.json(
         { error: `Limite de usuários atingido para o plano ${planoNome} (máximo: ${limite}). Faça upgrade para adicionar mais usuários.` },
         { status: 403 }

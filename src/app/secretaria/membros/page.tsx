@@ -275,6 +275,9 @@ export default function MembrosPage() {
     });
   };
 
+  const [maxMembros, setMaxMembros] = useState<number>(0); // 0 = sem limite
+  const limiteMembrosAtingido = maxMembros > 0 && membros.length >= maxMembros;
+
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ATIVO');
@@ -493,11 +496,19 @@ export default function MembrosPage() {
       const ministryId = await resolveMinistryId();
       if (!ministryId) return;
 
-      const [s, c, g] = await Promise.all([
+      const [s, c, g, minRow] = await Promise.all([
         supabase.from('supervisoes').select('id,nome,is_active').eq('ministry_id', ministryId).eq('is_active', true).order('nome'),
         supabase.from('campos').select('id,nome,supervisao_id,is_active').eq('ministry_id', ministryId).eq('is_active', true).order('nome'),
         supabase.from('congregacoes').select('id,nome,supervisao_id,campo_id,is_active').eq('ministry_id', ministryId).eq('is_active', true).order('nome'),
+        supabase.from('ministries').select('subscription_plan_id, subscription_plans(max_members)').eq('id', ministryId).maybeSingle(),
       ]);
+
+      if (s.error) console.warn('Falha ao carregar 1a divisao:', s.error);
+      if (c.error) console.warn('Falha ao carregar 2a divisao:', c.error);
+      if (g.error) console.warn('Falha ao carregar 3a divisao:', g.error);
+
+      const maxM = (minRow.data as any)?.subscription_plans?.max_members;
+      if (typeof maxM === 'number' && maxM > 0) setMaxMembros(maxM);
 
       if (s.error) console.warn('Falha ao carregar 1a divisao:', s.error);
       if (c.error) console.warn('Falha ao carregar 2a divisao:', c.error);
@@ -2009,6 +2020,7 @@ export default function MembrosPage() {
               <MembrosOverview 
                 membros={membros}
                 nivelUsuario="administrador"
+                maxMembros={maxMembros}
               />
             </div>
           )}
@@ -2096,8 +2108,19 @@ export default function MembrosPage() {
                 </span>
                 <div className="flex gap-2">
                   <button
-                    onClick={abrirNovoCadastro}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold text-sm flex items-center gap-2"
+                    onClick={() => {
+                      if (limiteMembrosAtingido) {
+                        setNotification({ isOpen: true, title: 'Limite atingido', message: `Seu plano permite no máximo ${maxMembros} cadastros. Faça upgrade para adicionar mais.`, type: 'warning', showButton: true });
+                        return;
+                      }
+                      abrirNovoCadastro();
+                    }}
+                    className={`px-4 py-2 rounded-lg transition font-semibold text-sm flex items-center gap-2 ${
+                      limiteMembrosAtingido
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
+                    title={limiteMembrosAtingido ? `Limite de ${maxMembros} cadastros atingido` : 'Novo Cadastro'}
                   >
                     <span>➕</span> Novo Cadastro
                   </button>

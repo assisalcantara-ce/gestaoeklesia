@@ -180,6 +180,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Verificar limite de membros do plano via subscription_plans.max_members
+    const { data: ministryData } = await supabase
+      .from('ministries')
+      .select('subscription_plan_id, subscription_plans(name, max_members)')
+      .eq('id', ministryId)
+      .maybeSingle();
+
+    const planData = (ministryData as any)?.subscription_plans;
+    const maxMembers: number = planData?.max_members ?? 0;
+
+    if (maxMembers > 0) {
+      const { count: totalMembers } = await supabase
+        .from('members')
+        .select('*', { count: 'exact', head: true })
+        .eq('ministry_id', ministryId);
+
+      if ((totalMembers ?? 0) >= maxMembers) {
+        const planoNome: string = planData?.name || 'seu plano';
+        return NextResponse.json(
+          { error: `Limite de cadastros atingido para o plano ${planoNome} (máximo: ${maxMembers}). Faça upgrade para adicionar mais cadastros.` },
+          { status: 403 }
+        );
+      }
+    }
+
     // Validar campos obrigatórios
     if (!normalizedBody.name) {
       return NextResponse.json(
