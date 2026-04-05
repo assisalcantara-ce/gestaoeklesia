@@ -156,7 +156,7 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
       container.style.height = '100%';
       container.style.position = 'relative';
       container.style.overflow = 'hidden';
-      container.style.backgroundColor = '#ffffff';
+      container.style.backgroundColor = 'transparent';
       // backgroundImage não aplicado via CSS — será composto em alta resolução após html2canvas
       cartaoHTML.appendChild(container);
 

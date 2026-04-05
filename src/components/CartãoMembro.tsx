@@ -416,7 +416,9 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
 
       // Capturar elementos sem backgroundImage CSS (evita desfoque do html2canvas)
       const bgFrente = frenteEl.style.backgroundImage;
+      const bgColorFrente = frenteEl.style.backgroundColor;
       frenteEl.style.backgroundImage = 'none';
+      frenteEl.style.backgroundColor = 'transparent';
       const captFrente = await html2canvas(frenteEl, {
         scale: 4,
         useCORS: true,
@@ -424,6 +426,7 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
         logging: false
       });
       frenteEl.style.backgroundImage = bgFrente;
+      frenteEl.style.backgroundColor = bgColorFrente;
       // Compor background em alta resolução por cima dos elementos
       const canvasFrente = await compositeWithBackground(captFrente, template.backgroundUrl);
 
@@ -456,7 +459,9 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
           const versoEl = printRef.current.querySelector('#print-verso') as HTMLElement;
           if (versoEl) {
             const bgVerso = versoEl.style.backgroundImage;
+            const bgColorVerso = versoEl.style.backgroundColor;
             versoEl.style.backgroundImage = 'none';
+            versoEl.style.backgroundColor = 'transparent';
             const captVerso = await html2canvas(versoEl, {
               scale: 4,
               useCORS: true,
@@ -464,6 +469,7 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
               logging: false
             });
             versoEl.style.backgroundImage = bgVerso;
+            versoEl.style.backgroundColor = bgColorVerso;
             const canvasVerso = await compositeWithBackground(captVerso, template.backgroundUrlVerso);
 
             // Página 2: Verso (ESPELHADO -> Posição Direita/Coluna 1)
@@ -490,7 +496,9 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
           const versoEl = printRef.current.querySelector('#print-verso') as HTMLElement;
           if (versoEl) {
             const bgVerso = versoEl.style.backgroundImage;
+            const bgColorVerso = versoEl.style.backgroundColor;
             versoEl.style.backgroundImage = 'none';
+            versoEl.style.backgroundColor = 'transparent';
             const captVerso = await html2canvas(versoEl, {
               scale: 4,
               useCORS: true,
@@ -498,6 +506,7 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
               logging: false
             });
             versoEl.style.backgroundImage = bgVerso;
+            versoEl.style.backgroundColor = bgColorVerso;
             const canvasVerso = await compositeWithBackground(captVerso, template.backgroundUrlVerso);
             pdf.addPage();
             pdf.addImage(canvasVerso.toDataURL('image/png'), 'PNG', 0, 0, largCartaoMM, altCartaoMM);
