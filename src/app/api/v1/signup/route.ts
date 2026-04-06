@@ -46,8 +46,6 @@ export async function POST(request: NextRequest) {
       phone,
       website,
       responsible_name,
-      quantity_temples,
-      quantity_members,
       address_zip,
       address_street,
       address_number,

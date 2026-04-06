@@ -28,7 +28,7 @@ const ELEMENTOS_TIPOS = [
 
 interface CertificadoElemento {
   id: string;
-  tipo: 'texto' | 'logo' | 'imagem' | 'chapa';
+  tipo: 'texto' | 'logo' | 'imagem' | 'chapa' | 'foto-membro' | 'qrcode';
   x: number;
   y: number;
   largura: number;

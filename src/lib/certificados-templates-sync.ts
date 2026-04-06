@@ -31,24 +31,6 @@ function getSupabaseErrorText(error: any): string {
   }
 }
 
-function isCertificadosUnavailableError(error: any): boolean {
-  const text = getSupabaseErrorText(error).toLowerCase();
-  return (
-    text.includes('certificados_templates') ||
-    text.includes('relation') ||
-    text.includes('does not exist') ||
-    text.includes('could not find the table') ||
-    text.includes('schema cache') ||
-    text.includes('pgrst205') ||
-    text.includes('permission denied') ||
-    text.includes('not authorized') ||
-    text.includes('violates row-level security') ||
-    text.includes('failed to fetch') ||
-    text.includes('networkerror') ||
-    text.includes('network request failed') ||
-    (typeof error === 'object' && error !== null && Object.keys(error).length === 0)
-  );
-}
 
 export async function fetchCertificadosTemplatesFromSupabase(
   supabase: SupabaseClient,

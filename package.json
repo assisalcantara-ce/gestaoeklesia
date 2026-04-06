@@ -33,6 +33,7 @@
     "resend": "^6.6.0"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/node": "^20.17.6",
     "@types/qrcode.react": "^1.0.5",
     "@types/react": "^19.0.5",
