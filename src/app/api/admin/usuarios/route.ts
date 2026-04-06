@@ -82,11 +82,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Cria usuário
+    // Cria usuário no Supabase Auth (necessário para login)
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: body.email,
+      password: body.password,
+      email_confirm: true,
+    })
+
+    if (authError || !authData.user) {
+      return NextResponse.json(
+        { error: authError?.message || 'Erro ao criar usuário no sistema de autenticação' },
+        { status: 400 }
+      )
+    }
+
+    // Cria registro em admin_users vinculado ao auth user
     const { data, error } = await supabase
       .from('admin_users')
       .insert([
         {
+          user_id: authData.user.id,
           email: body.email,
           password_hash: await bcrypt.hash(body.password, 10),
           role: body.role || 'suporte',
@@ -116,6 +131,8 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
+      // Rollback: remove o auth user criado para não deixar órfão
+      await supabase.auth.admin.deleteUser(authData.user.id)
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
@@ -144,9 +161,22 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
     const { password, ...updateData } = body
 
-    // Se senha fornecida, inclui no update
+    // Se senha fornecida, atualiza no Auth e no admin_users
     if (password && String(password).trim().length >= 6) {
-      updateData.password_hash = await bcrypt.hash(String(password).trim(), 10)
+      const newPassword = String(password).trim()
+
+      // Busca user_id vinculado para atualizar no Supabase Auth
+      const { data: existing } = await supabase
+        .from('admin_users')
+        .select('user_id')
+        .eq('id', id)
+        .single()
+
+      if (existing?.user_id) {
+        await supabase.auth.admin.updateUserById(existing.user_id, { password: newPassword })
+      }
+
+      updateData.password_hash = await bcrypt.hash(newPassword, 10)
     }
 
     const { data, error } = await supabase

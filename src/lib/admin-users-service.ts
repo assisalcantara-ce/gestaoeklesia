@@ -113,12 +113,23 @@ export async function createAdminUser(userData: AdminUserForm): Promise<AdminUse
 
   const supabase = createServerClient()
 
-  // Cria usuário na tabela admin_users
-  // Em produção, você precisará fazer hash da senha
+  // Cria usuário no Supabase Auth (necessário para login)
+  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    email: userData.email,
+    password: userData.password,
+    email_confirm: true,
+  })
+
+  if (authError || !authData.user) {
+    throw new Error(authError?.message || 'Erro ao criar usuário no sistema de autenticação')
+  }
+
+  // Cria registro em admin_users vinculado ao auth user
   const { data, error } = await supabase
     .from('admin_users')
     .insert([
       {
+        user_id: authData.user.id,
         email: userData.email,
         password_hash: await bcrypt.hash(userData.password, 10),
         role: userData.role,
@@ -148,6 +159,8 @@ export async function createAdminUser(userData: AdminUserForm): Promise<AdminUse
     .single()
 
   if (error) {
+    // Rollback: remove o auth user criado para não deixar órfão
+    await supabase.auth.admin.deleteUser(authData.user.id)
     console.error('Erro ao criar usuário:', error)
     throw new Error(error.message)
   }
