@@ -41,7 +41,7 @@ function hasCapability(adminUser: any, requiredCapability?: string): boolean {
   // Compatibilidade: alguns ambientes usam um schema antigo de admin_users
   // sem colunas can_manage_*; nesse caso, admin tem acesso total.
   const role = adminUser?.role
-  if ((role === 'admin' || role === 'super_admin') && adminUser?.[requiredCapability] === undefined) {
+  if ((role === 'admin' || role === 'super_admin') && adminUser?.[requiredCapability] == null) {
     return true
   }
 
