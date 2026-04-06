@@ -267,10 +267,10 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Soft delete
+    // Soft delete — limpa campos com unique constraint para não bloquear novos cadastros
     const { error } = await supabase
       .from('admin_users')
-      .update({ status: 'INATIVO' })
+      .update({ status: 'INATIVO', cpf: null })
       .eq('id', id)
 
     if (error) {
