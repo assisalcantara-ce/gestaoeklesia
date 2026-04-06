@@ -281,6 +281,14 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+    // Remove o usuário do Supabase Auth para liberar o email e revogar sessões
+    if (targetUser.user_id) {
+      const { error: authDeleteError } = await supabase.auth.admin.deleteUser(targetUser.user_id)
+      if (authDeleteError) {
+        console.warn('[DELETE ADMIN_USER] Soft delete ok, mas falha ao remover do Auth:', authDeleteError.message)
+      }
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json(
