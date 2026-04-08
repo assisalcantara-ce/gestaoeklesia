@@ -232,8 +232,8 @@ export default function LoginPage() {
 
       <div className="md:hidden flex justify-center items-center mb-6">
         <img
-          src="/img/logo44.png"
-          alt="Gestao Servus"
+          src="/img/logo-eklesia.png"
+          alt="Gestão Eklesia"
           className="w-[200px] drop-shadow-xl logo-animate"
         />
       </div>
@@ -241,8 +241,8 @@ export default function LoginPage() {
       <div className="flex w-full max-w-6xl items-center justify-center gap-8">
         <div className="hidden md:flex md:w-1/2 justify-center items-center">
           <img
-            src="/img/logo44.png"
-            alt="Gestao Servus"
+            src="/img/logo-eklesia.png"
+            alt="Gestão Eklesia"
             className="w-[350px] drop-shadow-xl logo-animate"
           />
         </div>

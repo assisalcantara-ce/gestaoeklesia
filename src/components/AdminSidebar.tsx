@@ -58,8 +58,8 @@ export default function AdminSidebar() {
       >
         <div className="flex items-center justify-center p-4 border-b border-gray-800">
           <img
-            src="/img/logo333-v3.png"
-            alt="Logo"
+            src="/img/logo_menu.png"
+            alt="Gestão Eklesia"
             className="h-[56px] w-auto object-contain"
           />
         </div>

@@ -17,9 +17,9 @@ type Bucket = {
 }
 
 function getStore(): Map<string, Bucket> {
-  const g = globalThis as unknown as { __gestaoservusRateLimitStore?: Map<string, Bucket> }
-  if (!g.__gestaoservusRateLimitStore) g.__gestaoservusRateLimitStore = new Map()
-  return g.__gestaoservusRateLimitStore
+  const g = globalThis as unknown as { __gestaoeklesiaRateLimitStore?: Map<string, Bucket> }
+  if (!g.__gestaoeklesiaRateLimitStore) g.__gestaoeklesiaRateLimitStore = new Map()
+  return g.__gestaoeklesiaRateLimitStore
 }
 
 export function checkRateLimit(params: {

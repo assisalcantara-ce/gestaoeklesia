@@ -147,7 +147,7 @@ export const ministeriiosSimulados: Ministry[] = [
 export const adminsSimulados = [
   {
     id: 'admin001',
-    email: 'super@gestaoservus.com.br',
+    email: 'super@gestaoeklesia.com.br',
     senha_hash: 'hashed_super_admin_password',
     nome: 'Super Administrador',
     role: 'super_admin' as const,
@@ -157,9 +157,9 @@ export const adminsSimulados = [
   },
   {
     id: 'admin002',
-    email: 'suporte@gestaoservus.com.br',
+    email: 'suporte@gestaoeklesia.com.br',
     senha_hash: 'hashed_suporte_password',
-    nome: 'Suporte GESTAOSERVUS',
+    nome: 'Suporte GESTÃO EKLESIA',
     role: 'suporte' as const,
     data_cadastro: '2025-01-10',
     ultimo_acesso: '2025-11-29T17:30:00',

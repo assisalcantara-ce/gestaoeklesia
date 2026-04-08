@@ -362,7 +362,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/img/logo333-v2.png" alt="Gestão Servus" className="h-10" />
+            <img src="/img/logo-eklesia.png" alt="Gestão Eklesia" className="h-10" />
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
             <a href="#beneficios" className="hover:text-slate-900 transition">Benefícios</a>
@@ -468,7 +468,7 @@ export default function LandingPage() {
       <section id="beneficios" className="max-w-6xl mx-auto px-6 py-16">
         <div className="text-center max-w-2xl mx-auto mb-10">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Por que escolher</p>
-          <h2 className="landing-title text-3xl">Gestão Servus</h2>
+          <h2 className="landing-title text-3xl">Gestão Eklesia</h2>
           <p className="text-slate-600 mt-3">Tudo que você precisa para gerir sua instituição de forma eficiente e segura.</p>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
@@ -691,7 +691,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="border-t border-slate-200 py-10 text-center text-xs text-slate-500">
-        Gestão Servus - Tecnologia para instituições. Desenvolvido por Moove Sistemas.
+        Gestão Eklesia - Tecnologia para igrejas. Desenvolvido por Moove Sistemas.
       </footer>
     </div>
   );

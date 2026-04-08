@@ -7,8 +7,8 @@ import { UsuarioProvider } from '@/providers/UsuarioContext';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'GESTAOSERVUS - Login',
-  description: 'Sistema de Gestão para Instituições',
+  title: 'Gestão Eklesia - Login',
+  description: 'Sistema de Gestão para Igrejas',
 };
 
 export default function RootLayout({

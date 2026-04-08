@@ -34,9 +34,9 @@
     content: "";
     position: absolute;
     inset: 0;
-    background-image: url("/img/login-bg.png");
+    background-image: url("/img/login-bg.jpg");
     background-size: cover;
-    background-position: left -20px;
+    background-position: center 30%;
     opacity: 1;
     filter: contrast(1.1);
     z-index: -3;

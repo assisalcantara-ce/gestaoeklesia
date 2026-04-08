@@ -281,7 +281,7 @@ export async function POST(request: NextRequest) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const resendKey = process.env.RESEND_API_KEY
-    const resendFrom = process.env.RESEND_FROM || 'noreply@gestaoservus.com.br'
+    const resendFrom = process.env.RESEND_FROM || 'noreply@gestaoeklesia.com.br'
 
     if (resendKey) {
       try {
@@ -293,7 +293,7 @@ export async function POST(request: NextRequest) {
             <head>
               <meta charset="UTF-8" />
               <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <title>Bem-vindo ao Gestão Servus</title>
+              <title>Bem-vindo ao Gestão Eklesia</title>
             </head>
             <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:24px 0;">
@@ -302,7 +302,7 @@ export async function POST(request: NextRequest) {
                     <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(15,23,42,0.08);">
                       <tr>
                         <td style="background:#0f172a;color:#ffffff;padding:28px 32px;">
-                          <h1 style="margin:0;font-size:22px;">Bem-vindo ao GestaoServus</h1>
+                          <h1 style="margin:0;font-size:22px;">Bem-vindo ao Gestão Eklesia</h1>
                           <p style="margin:8px 0 0;font-size:14px;color:#cbd5f5;">Seu acesso de teste já está ativo.</p>
                         </td>
                       </tr>
@@ -328,7 +328,7 @@ export async function POST(request: NextRequest) {
                       </tr>
                       <tr>
                         <td style="background:#f8fafc;color:#94a3b8;padding:16px 32px;font-size:11px;">
-                          GestaoServus © ${new Date().getFullYear()} - suporte@gestaoservus.com.br
+                          Gestão Eklesia © ${new Date().getFullYear()} - suporte@gestaoeklesia.com.br
                         </td>
                       </tr>
                     </table>
@@ -342,7 +342,7 @@ export async function POST(request: NextRequest) {
         await resend.emails.send({
           from: resendFrom,
           to: email,
-          subject: 'Bem-vindo ao GestaoServus - acesso de teste',
+          subject: 'Bem-vindo ao Gestão Eklesia - acesso de teste',
           html,
         })
         console.log('[SIGNUP] ✅ Email enviado para:', email)

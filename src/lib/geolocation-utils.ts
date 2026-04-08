@@ -177,7 +177,7 @@ export function gerarKML(marcadores: Marcador[]): string {
   let kmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>GESTAOSERVUS - Geolocalizacão</name>
+    <name>GESTÃO EKLESIA - Geolocalização</name>
     <description>Exportação de Membros e Congregações</description>
     
     <!-- Estilos para Membros -->

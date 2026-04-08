@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
 
     // Enviar email de confirmação de efetivação ao cliente
     const resendKey = process.env.RESEND_API_KEY
-    const resendFrom = process.env.RESEND_FROM || 'noreply@gestaoservus.com.br'
+    const resendFrom = process.env.RESEND_FROM || 'noreply@gestaoeklesia.com.br'
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     if (resendKey) {
       try {
@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
             <head>
               <meta charset="UTF-8" />
               <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <title>Acesso Efetivado - GestaoServus</title>
+              <title>Acesso Efetivado - Gestão Eklesia</title>
             </head>
             <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:24px 0;">
@@ -287,7 +287,7 @@ export async function POST(request: NextRequest) {
                       <tr>
                         <td style="background:#0f172a;color:#ffffff;padding:28px 32px;">
                           <h1 style="margin:0;font-size:22px;">Acesso Efetivado!</h1>
-                          <p style="margin:8px 0 0;font-size:14px;color:#cbd5f5;">Sua assinatura esta ativa no GestaoServus.</p>
+                          <p style="margin:8px 0 0;font-size:14px;color:#cbd5f5;">Sua assinatura esta ativa no Gestão Eklesia.</p>
                         </td>
                       </tr>
                       <tr>
@@ -308,7 +308,7 @@ export async function POST(request: NextRequest) {
                       </tr>
                       <tr>
                         <td style="background:#f8fafc;color:#94a3b8;padding:16px 32px;font-size:11px;">
-                          GestaoServus &copy; ${new Date().getFullYear()} - suporte@gestaoservus.com.br
+                          Gestão Eklesia &copy; ${new Date().getFullYear()} - suporte@gestaoeklesia.com.br
                         </td>
 
                       </tr>
@@ -322,7 +322,7 @@ export async function POST(request: NextRequest) {
         await resend.emails.send({
           from: resendFrom,
           to: preReg.email,
-          subject: 'Acesso Efetivado - GestaoServus',
+          subject: 'Acesso Efetivado - Gestão Eklesia',
           html,
         })
         console.log('[APPROVE_TRIAL] ✅ Email de efetivacao enviado para:', preReg.email)

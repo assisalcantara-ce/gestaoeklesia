@@ -258,7 +258,7 @@ export default function ValidarSenhaContent() {
             </button>
 
             <p className="text-xs text-gray-600 mt-4">
-              Dúvidas? Entre em contato: <strong>suporte@gestaoservus.com.br</strong>
+              Dúvidas? Entre em contato: <strong>suporte@gestaoeklesia.com.br</strong>
             </p>
           </div>
         )}

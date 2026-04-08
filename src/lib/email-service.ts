@@ -1,4 +1,4 @@
-// Serviço de Email para GESTAOSERVUS
+// Serviço de Email para GESTÃO EKLESIA
 
 export interface EmailValidacao {
   ministryId: string;
@@ -115,7 +115,7 @@ export function gerarEmailHTML(
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Bem-vindo ao GESTAOSERVUS</title>
+      <title>Bem-vindo ao Gestão Eklesia</title>
       <style>
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -250,7 +250,7 @@ export function gerarEmailHTML(
       <div class="container">
         <div class="header">
           <div class="logo">⛪</div>
-          <h1>GESTAOSERVUS</h1>
+          <h1>GESTÃO EKLESIA</h1>
           <p style="margin: 10px 0 0 0; font-size: 14px;">Sistema de Gestão para Igrejas e Ministérios</p>
         </div>
 
@@ -330,12 +330,12 @@ export function gerarEmailHTML(
 
           <p style="color: #666; line-height: 1.6; margin-top: 20px;">
             Se você não solicitou este cadastro ou tem dúvidas, entre em contato conosco no email 
-            <strong>suporte@gestaoservus.com.br</strong>
+            <strong>suporte@gestaoeklesia.com.br</strong>
           </p>
         </div>
 
         <div class="footer">
-          <p><strong>GESTAOSERVUS™</strong> - Sistema de Gestão para Igrejas e Ministérios</p>
+          <p><strong>GESTÃO EKLESIA™</strong> - Sistema de Gestão para Igrejas</p>
           <p>© ${new Date().getFullYear()} Todos os direitos reservados.</p>
           <p>Este é um email automático. Favor não responder diretamente.</p>
         </div>
@@ -371,7 +371,7 @@ export async function enviarEmailBoasVindas(
     // Em produção, seria enviado via API
     console.log('📧 Email de boas-vindas preparado:', {
       para: emailAdmin,
-      assunto: `Bem-vindo ao GESTAOSERVUS - ${nomeMinisterio}`,
+      assunto: `Bem-vindo ao Gestão Eklesia - ${nomeMinisterio}`,
       html: htmlEmail,
       token
     });

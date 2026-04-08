@@ -488,7 +488,7 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
             <p style={{ margin: '4px 0 0 0' }}>{new Date().toLocaleDateString('pt-BR')}</p>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ margin: '0', color: '#666', fontWeight: 'bold' }}>GESTAOSERVUS</p>
+            <p style={{ margin: '0', color: '#666', fontWeight: 'bold' }}>GESTÃO EKLESIA</p>
           </div>
           <div style={{ textAlign: 'right' }}>
             <p style={{ margin: '0', fontWeight: 'bold', color: '#003d7a' }}>Assinatura:</p>
