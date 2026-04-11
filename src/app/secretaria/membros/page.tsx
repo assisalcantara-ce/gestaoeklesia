@@ -97,12 +97,47 @@ interface DivisaoOption {
   campo_id?: string | null;
 }
 
+interface DadosPessoaisState {
+  matricula: string;
+  cpf: string;
+  tipoCadastro: Membro['tipoCadastro'];
+  nome: string;
+  dataNascimento: string;
+  sexo: string;
+  tipoSanguineo: string;
+  escolaridade: string;
+  estadoCivil: string;
+  nomeConjuge: string;
+  cpfConjuge: string;
+  dataNascimentoConjuge: string;
+  nomePai: string;
+  nomeMae: string;
+  rg: string;
+  orgaoEmissor: string;
+  nacionalidade: string;
+  naturalidade: string;
+  uf: string;
+  supervisao: string;
+  campo: string;
+  congregacao: string;
+  email: string;
+  celular: string;
+  whatsapp: string;
+  profissao: string;
+  tituloEleitoral: string;
+  zonaEleitoral: string;
+  secaoEleitoral: string;
+  observacoes: string;
+}
+
+type MembrosFormTab = 'dados' | 'endereco' | 'ministerial' | 'foto';
+
 export default function MembrosPage() {
   const supabase = createClient();
 
   const [dashboardView, setDashboardView] = useState<'overview' | 'list'>('overview');
   const [activeMenu, setActiveMenu] = useState('membros');
-  const [activeTab, setActiveTab] = useState('dados');
+  const [activeTab, setActiveTab] = useState<MembrosFormTab>('dados');
   const [templatesSnapshot, setTemplatesSnapshot] = useState<any[]>([]);
   const [configIgreja, setConfigIgreja] = useState({
     nome: 'Igreja/Ministério',
@@ -321,7 +356,7 @@ export default function MembrosPage() {
   });
 
   // Estado para dados pessoais
-  const [dadosPessoais, setDadosPessoais] = useState({
+  const [dadosPessoais, setDadosPessoais] = useState<DadosPessoaisState>({
     matricula: '',
     cpf: '',
     tipoCadastro: 'membro', // Convenção do projeto
@@ -2194,7 +2229,12 @@ export default function MembrosPage() {
                           congregacao: ultimoCadastro.congregacao || '',
                           email: '',
                           celular: '',
-                          whatsapp: ''
+                          whatsapp: '',
+                          profissao: ultimoCadastro.profissao || '',
+                          tituloEleitoral: ultimoCadastro.tituloEleitoral || '',
+                          zonaEleitoral: ultimoCadastro.zonaEleitoral || '',
+                          secaoEleitoral: ultimoCadastro.secaoEleitoral || '',
+                          observacoes: ultimoCadastro.observacoes || ''
                         });
                         setEnderecoData({
                           cep: ultimoCadastro.cep || '',
@@ -2616,8 +2656,8 @@ export default function MembrosPage() {
                             onChange={(e) => {
                               const v = e.target.value as Membro['tipoCadastro'];
                               setDadosPessoais({ ...dadosPessoais, tipoCadastro: v });
-                              if (v !== 'ministro' && activeTab === 'ministerial') {
-                                setActiveTab('dados');
+                              if (v !== 'ministro') {
+                                setActiveTab((prev) => (prev === 'ministerial' ? 'dados' : prev));
                               }
                             }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
