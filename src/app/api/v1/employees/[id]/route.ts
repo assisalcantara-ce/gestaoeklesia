@@ -199,11 +199,11 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
     const normalizedBody = normalizePayloadToUppercase(body, {
-      preserveKeys: ['data_admissao'],
+      preserveKeys: ['data_admissao', 'email', 'member_id'],
     }) as Record<string, any>
 
     if (typeof normalizedBody.email === 'string') {
-      normalizedBody.email = normalizedBody.email.toLowerCase()
+      normalizedBody.email = normalizedBody.email.toLowerCase().trim() || undefined
     }
 
     const supabase = createServerClientFromRequest(request)

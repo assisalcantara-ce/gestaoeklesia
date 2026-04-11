@@ -8,6 +8,86 @@ function sanitizeAdminUser(row: any) {
   return rest
 }
 
+function getMissingColumnName(message: string): string | null {
+  const patterns = [
+    /'([a-zA-Z0-9_]+)' column/i,
+    /column\s+"?([a-zA-Z0-9_]+)"?\s+does not exist/i,
+  ]
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern)
+    if (match?.[1]) return match[1]
+  }
+
+  return null
+}
+
+async function insertAdminUserCompat(supabase: any, payload: Record<string, any>) {
+  const mutablePayload = { ...payload }
+
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const { data, error } = await supabase
+      .from('admin_users')
+      .insert([mutablePayload])
+      .select()
+      .single()
+
+    if (!error) return { data, error: null }
+
+    const missingColumn = getMissingColumnName(error.message || '')
+    if (!missingColumn || !(missingColumn in mutablePayload)) {
+      return { data: null, error }
+    }
+
+    delete mutablePayload[missingColumn]
+  }
+
+  return {
+    data: null,
+    error: { message: 'Não foi possível compatibilizar colunas de admin_users na inserção.' },
+  }
+}
+
+async function updateAdminUserCompat(supabase: any, id: string, payload: Record<string, any>) {
+  const mutablePayload = { ...payload }
+
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const { data, error } = await supabase
+      .from('admin_users')
+      .update(mutablePayload)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (!error) return { data, error: null }
+
+    const missingColumn = getMissingColumnName(error.message || '')
+    if (!missingColumn || !(missingColumn in mutablePayload)) {
+      return { data: null, error }
+    }
+
+    delete mutablePayload[missingColumn]
+  }
+
+  return {
+    data: null,
+    error: { message: 'Não foi possível compatibilizar colunas de admin_users na atualização.' },
+  }
+}
+
+function isActiveAdminUser(row: any) {
+  if (typeof row?.status === 'string') return row.status === 'ATIVO'
+  if (typeof row?.is_active === 'boolean') return row.is_active === true
+  if (typeof row?.ativo === 'boolean') return row.ativo === true
+  return true
+}
+
+function getAdminUserCreatedAt(row: any): number {
+  const raw = row?.criado_em || row?.created_at || row?.data_admissao || row?.updated_at
+  const ts = raw ? new Date(raw).getTime() : 0
+  return Number.isFinite(ts) ? ts : 0
+}
+
 export async function GET(request: NextRequest) {
   try {
     const result = await requireAdmin(request, { requiredRole: 'admin' })
@@ -36,14 +116,16 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from('admin_users')
       .select('*')
-      .eq('status', 'ATIVO')
-      .order('criado_em', { ascending: false })
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json((data || []).map(sanitizeAdminUser))
+    const activeUsers = (data || [])
+      .filter(isActiveAdminUser)
+      .sort((a: any, b: any) => getAdminUserCreatedAt(b) - getAdminUserCreatedAt(a))
+
+    return NextResponse.json(activeUsers.map(sanitizeAdminUser))
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Erro desconhecido' },
@@ -96,43 +178,49 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Cria registro em admin_users vinculado ao auth user
-    const { data, error } = await supabase
+    const payloadBase: Record<string, any> = {
+      user_id: authData.user.id,
+      email: body.email,
+      role: body.role || 'suporte',
+      can_manage_ministries: ['admin', 'super_admin'].includes(body.role) || false,
+      can_manage_payments: ['admin', 'super_admin', 'financeiro'].includes(body.role) || false,
+      can_manage_plans: ['admin', 'super_admin'].includes(body.role) || false,
+      can_manage_support: ['admin', 'super_admin', 'suporte'].includes(body.role) || false,
+      nome: body.nome,
+      name: body.nome,
+      cpf: body.cpf,
+      rg: body.rg,
+      data_nascimento: body.data_nascimento,
+      data_admissao: body.data_admissao || new Date().toISOString().split('T')[0],
+      status: body.status || 'ATIVO',
+      is_active: true,
+      telefone: body.telefone,
+      whatsapp: body.whatsapp,
+      cep: body.cep,
+      endereco: body.endereco,
+      cidade: body.cidade,
+      bairro: body.bairro,
+      uf: body.uf,
+      banco: body.banco,
+      agencia: body.agencia,
+      conta_corrente: body.conta_corrente,
+      pix: body.pix,
+      obs: body.obs,
+      funcao: body.funcao,
+      grupo: body.grupo,
+    }
+
+    const passwordHashProbe = await supabase
       .from('admin_users')
-      .insert([
-        {
-          user_id: authData.user.id,
-          email: body.email,
-          password_hash: await bcrypt.hash(body.password, 10),
-          role: body.role || 'suporte',
-          can_manage_ministries: ['admin', 'super_admin'].includes(body.role) || false,
-          can_manage_payments: ['admin', 'super_admin', 'financeiro'].includes(body.role) || false,
-          can_manage_plans: ['admin', 'super_admin'].includes(body.role) || false,
-          can_manage_support: ['admin', 'super_admin', 'suporte'].includes(body.role) || false,
-          nome: body.nome,
-          cpf: body.cpf,
-          rg: body.rg,
-          data_nascimento: body.data_nascimento,
-          data_admissao: body.data_admissao || new Date().toISOString().split('T')[0],
-          status: body.status || 'ATIVO',
-          telefone: body.telefone,
-          whatsapp: body.whatsapp,
-          cep: body.cep,
-          endereco: body.endereco,
-          cidade: body.cidade,
-          bairro: body.bairro,
-          uf: body.uf,
-          banco: body.banco,
-          agencia: body.agencia,
-          conta_corrente: body.conta_corrente,
-          pix: body.pix,
-          obs: body.obs,
-          funcao: body.funcao,
-          grupo: body.grupo,
-        },
-      ])
-      .select()
-      .single()
+      .select('id,password_hash')
+      .limit(1)
+
+    if (!passwordHashProbe.error) {
+      payloadBase.password_hash = await bcrypt.hash(body.password, 10)
+    }
+
+    // Cria registro em admin_users vinculado ao auth user
+    const { data, error } = await insertAdminUserCompat(supabase, payloadBase)
 
     if (error) {
       // Rollback: remove o auth user criado para não deixar órfão
@@ -180,15 +268,21 @@ export async function PUT(request: NextRequest) {
         await supabase.auth.admin.updateUserById(existing.user_id, { password: newPassword })
       }
 
-      updateData.password_hash = await bcrypt.hash(newPassword, 10)
+      const passwordHashProbe = await supabase
+        .from('admin_users')
+        .select('id,password_hash')
+        .limit(1)
+
+      if (!passwordHashProbe.error) {
+        updateData.password_hash = await bcrypt.hash(newPassword, 10)
+      }
     }
 
-    const { data, error } = await supabase
-      .from('admin_users')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single()
+    if (typeof updateData.nome === 'string') {
+      updateData.name = updateData.nome
+    }
+
+    const { data, error } = await updateAdminUserCompat(supabase, id, updateData)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
@@ -258,24 +352,31 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Verifica se é o último admin
-    const { count } = await supabase
+    const { data: adminRows, error: adminsError } = await supabase
       .from('admin_users')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'admin')
-      .eq('status', 'ATIVO')
+      .select('id, role, status, is_active, ativo')
 
-    if (count === 1 && targetUser.role === 'admin') {
+    if (adminsError) {
+      return NextResponse.json({ error: adminsError.message }, { status: 400 })
+    }
+
+    const activeAdminCount = (adminRows || []).filter((u: any) => u.role === 'admin' && isActiveAdminUser(u)).length
+
+    if (activeAdminCount === 1 && targetUser.role === 'admin') {
       return NextResponse.json(
         { error: 'Não é possível deletar o último usuário administrador' },
         { status: 400 }
       )
     }
 
+    const softDeletePayload = {
+      status: 'INATIVO',
+      is_active: false,
+      cpf: null,
+    }
+
     // Soft delete — limpa campos com unique constraint para não bloquear novos cadastros
-    const { error } = await supabase
-      .from('admin_users')
-      .update({ status: 'INATIVO', cpf: null })
-      .eq('id', id)
+    const { error } = await updateAdminUserCompat(supabase, id, softDeletePayload)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })

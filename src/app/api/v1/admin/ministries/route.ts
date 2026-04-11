@@ -31,6 +31,20 @@ function onlyDigits(value: unknown) {
   return digits.length ? digits : null
 }
 
+function upperText(value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  const normalized = String(value).trim()
+  if (!normalized) return null
+  return normalized.toUpperCase()
+}
+
+function lowerText(value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  const normalized = String(value).trim()
+  if (!normalized) return null
+  return normalized.toLowerCase()
+}
+
 export async function GET(request: NextRequest) {
   try {
     const result = await requireAdmin(request, { requiredCapability: 'can_manage_ministries' })
@@ -89,20 +103,23 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // Compatibilidade com o formulário atual do admin
-    const name: string | undefined = body?.name
-    const emailAdmin: string | undefined = body?.email_admin || body?.contact_email
+    const hasOwn = (key: string) => Object.prototype.hasOwnProperty.call(body, key)
+
+    const name = upperText(body?.name)
+    const emailAdmin = lowerText(body?.email_admin || body?.contact_email)
     const phone: string | undefined = body?.phone || body?.contact_phone
     const cnpjCpf: string | undefined = body?.cnpj_cpf || body?.cnpj
-    const website: string | undefined = body?.website
-    const logoUrl: string | undefined = body?.logo_url
-    const description: string | undefined = body?.description
+    const website = lowerText(body?.website)
+    const hasLogoUrl = hasOwn('logo_url')
+    const logoUrl = hasLogoUrl ? (String(body?.logo_url || '').trim() || null) : undefined
+    const description = upperText(body?.description)
     const whatsapp: string | undefined = body?.whatsapp
-    const responsibleName: string | undefined = body?.responsible_name
-    const addressStreet: string | undefined = body?.address_street
-    const addressNumber: string | undefined = body?.address_number
-    const addressComplement: string | undefined = body?.address_complement
-    const addressCity: string | undefined = body?.address_city
-    const addressState: string | undefined = body?.address_state
+    const responsibleName = upperText(body?.responsible_name)
+    const addressStreet = upperText(body?.address_street)
+    const addressNumber = upperText(body?.address_number)
+    const addressComplement = upperText(body?.address_complement)
+    const addressCity = upperText(body?.address_city)
+    const addressState = upperText(body?.address_state)
     const addressZip: string | undefined = body?.address_zip
     const quantityTemples = body?.quantity_temples
     const quantityMembers = body?.quantity_members
@@ -146,15 +163,15 @@ export async function POST(request: NextRequest) {
           cnpj_cpf: onlyDigits(cnpjCpf),
           phone: onlyDigits(phone),
           whatsapp: onlyDigits(whatsapp),
-          website: website || null,
-          logo_url: logoUrl || null,
-          description: description || null,
-          responsible_name: responsibleName || null,
-          address_street: addressStreet || null,
-          address_number: addressNumber || null,
-          address_complement: addressComplement || null,
-          address_city: addressCity || null,
-          address_state: addressState || null,
+          website,
+          logo_url: logoUrl,
+          description,
+          responsible_name: responsibleName,
+          address_street: addressStreet,
+          address_number: addressNumber,
+          address_complement: addressComplement,
+          address_city: addressCity,
+          address_state: addressState,
           address_zip: onlyDigits(addressZip),
           quantity_temples: typeof quantityTemples === 'number' ? quantityTemples : 1,
           quantity_members: typeof quantityMembers === 'number' ? quantityMembers : 0,
@@ -225,26 +242,31 @@ export async function PATCH(request: NextRequest) {
     if (!result.ok) return result.response
     const { supabaseAdmin: supabase, adminUser } = result.ctx
     const body = await request.json()
+    const hasOwn = (key: string) => Object.prototype.hasOwnProperty.call(body, key)
 
     const id: string | undefined = body?.id
     if (!id) {
       return NextResponse.json({ error: 'ID do ministério é obrigatório' }, { status: 400 })
     }
 
-    const name: string | undefined = body?.name
-    const emailAdmin: string | undefined = body?.email_admin || body?.contact_email
+    const name = upperText(body?.name)
+    const hasEmailAdmin = hasOwn('email_admin') || hasOwn('contact_email')
+    const emailAdmin = lowerText(body?.email_admin || body?.contact_email)
+    const hasPhone = hasOwn('phone') || hasOwn('contact_phone')
     const phone: string | undefined = body?.phone || body?.contact_phone
+    const hasCnpj = hasOwn('cnpj_cpf') || hasOwn('cnpj')
     const cnpjCpf: string | undefined = body?.cnpj_cpf || body?.cnpj
-    const website: string | undefined = body?.website
-    const logoUrl: string | undefined = body?.logo_url
-    const description: string | undefined = body?.description
+    const website = lowerText(body?.website)
+    const hasLogoUrl = hasOwn('logo_url')
+    const logoUrl = hasLogoUrl ? (String(body?.logo_url || '').trim() || null) : undefined
+    const description = upperText(body?.description)
     const whatsapp: string | undefined = body?.whatsapp
-    const responsibleName: string | undefined = body?.responsible_name
-    const addressStreet: string | undefined = body?.address_street
-    const addressNumber: string | undefined = body?.address_number
-    const addressComplement: string | undefined = body?.address_complement
-    const addressCity: string | undefined = body?.address_city
-    const addressState: string | undefined = body?.address_state
+    const responsibleName = upperText(body?.responsible_name)
+    const addressStreet = upperText(body?.address_street)
+    const addressNumber = upperText(body?.address_number)
+    const addressComplement = upperText(body?.address_complement)
+    const addressCity = upperText(body?.address_city)
+    const addressState = upperText(body?.address_state)
     const addressZip: string | undefined = body?.address_zip
     const rawSubPlanId: string | undefined = body?.subscription_plan_id
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -271,28 +293,28 @@ export async function PATCH(request: NextRequest) {
       resolvedPlanUUID = planRow?.id || null
     }
 
-    const accessEmail: string | undefined = body?.access_email
+    const accessEmail = lowerText(body?.access_email)
     const accessPassword: string | undefined = body?.access_password
 
     const payload: Record<string, any> = {
       updated_at: new Date().toISOString(),
     }
 
-    if (name !== undefined) payload.name = name
-    if (emailAdmin !== undefined) payload.email_admin = emailAdmin
-    if (phone !== undefined) payload.phone = onlyDigits(phone)
-    if (whatsapp !== undefined) payload.whatsapp = onlyDigits(whatsapp)
-    if (cnpjCpf !== undefined) payload.cnpj_cpf = onlyDigits(cnpjCpf)
-    if (website !== undefined) payload.website = website || null
-    if (logoUrl !== undefined) payload.logo_url = logoUrl || null
-    if (description !== undefined) payload.description = description || null
-    if (responsibleName !== undefined) payload.responsible_name = responsibleName || null
-    if (addressStreet !== undefined) payload.address_street = addressStreet || null
-    if (addressNumber !== undefined) payload.address_number = addressNumber || null
-    if (addressComplement !== undefined) payload.address_complement = addressComplement || null
-    if (addressCity !== undefined) payload.address_city = addressCity || null
-    if (addressState !== undefined) payload.address_state = addressState || null
-    if (addressZip !== undefined) payload.address_zip = onlyDigits(addressZip)
+    if (hasOwn('name')) payload.name = name
+    if (hasEmailAdmin) payload.email_admin = emailAdmin
+    if (hasPhone) payload.phone = onlyDigits(phone)
+    if (hasOwn('whatsapp')) payload.whatsapp = onlyDigits(whatsapp)
+    if (hasCnpj) payload.cnpj_cpf = onlyDigits(cnpjCpf)
+    if (hasOwn('website')) payload.website = website
+    if (hasLogoUrl) payload.logo_url = logoUrl
+    if (hasOwn('description')) payload.description = description
+    if (hasOwn('responsible_name')) payload.responsible_name = responsibleName
+    if (hasOwn('address_street')) payload.address_street = addressStreet
+    if (hasOwn('address_number')) payload.address_number = addressNumber
+    if (hasOwn('address_complement')) payload.address_complement = addressComplement
+    if (hasOwn('address_city')) payload.address_city = addressCity
+    if (hasOwn('address_state')) payload.address_state = addressState
+    if (hasOwn('address_zip')) payload.address_zip = onlyDigits(addressZip)
     if (body?.quantity_temples !== undefined) payload.quantity_temples = Number(body.quantity_temples) || 0
     if (body?.quantity_members !== undefined) payload.quantity_members = Number(body.quantity_members) || 0
     if (plan) payload.plan = plan

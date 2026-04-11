@@ -107,6 +107,11 @@ export async function PUT(
         'longitude',
         'cargo_ministerial',
         'procedencia',
+        // Campos com valores controlados (enums lowercase no banco)
+        'tipo_cadastro',
+        'role',
+        'status',
+        'email',
       ],
     })
     const supabase = createServerClientFromRequest(request)

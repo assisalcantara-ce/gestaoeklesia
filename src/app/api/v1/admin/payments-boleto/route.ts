@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-
-const ASAAS_API_URL = 'https://api.asaas.com/v3';
-
-const getAsaasApiKey = () => {
-  return process.env.ASAAS_API_KEY?.replace(/^\\/, '');
-};
+import { getAsaasPayment } from '@/lib/asaas';
 
 export async function GET(request: NextRequest) {
   try {
@@ -89,25 +84,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Buscar dados do pagamento no ASAAS
-    const apiKey = getAsaasApiKey();
-    if (!apiKey) {
-      return NextResponse.json({ error: 'ASAAS não configurado' }, { status: 500 });
-    }
-
-    const asaasResponse = await fetch(`${ASAAS_API_URL}/payments/${asaasPaymentId}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        access_token: apiKey,
-      },
-    });
-
-    if (!asaasResponse.ok) {
-      const errData = await asaasResponse.json().catch(() => ({}));
-      console.error('[payments-boleto] Erro ASAAS:', errData);
-      return NextResponse.json({ error: 'Erro ao buscar boleto no ASAAS' }, { status: 502 });
-    }
-
-    const asaasData = await asaasResponse.json();
+    const asaasData = await getAsaasPayment(asaasPaymentId);
 
     return NextResponse.json({
       invoiceUrl: asaasData.invoiceUrl ?? null,

@@ -17,7 +17,16 @@ export async function authenticatedFetch(
   })
 
   // Obter a sessão atual (com timeout para não travar a UI)
-  const { data: { session } } = await Promise.race([getSessionPromise, timeoutPromise])
+  let session: any = null
+  try {
+    const result = await Promise.race([getSessionPromise, timeoutPromise]) as { data: { session: any } }
+    session = result?.data?.session ?? null
+  } catch (error: any) {
+    // Mantem a chamada de API mesmo sem token para permitir respostas 401/403 controladas pelo backend.
+    if (error?.message !== 'SESSION_TIMEOUT') {
+      console.warn('[authenticatedFetch] Falha ao obter sessão:', error)
+    }
+  }
   
   const headers = new Headers(options.headers || {})
   
@@ -26,8 +35,25 @@ export async function authenticatedFetch(
     headers.set('Authorization', `Bearer ${session.access_token}`)
   }
 
-  return fetch(url, {
+  const requestInit: RequestInit = {
     ...options,
     headers,
-  })
+    credentials: options.credentials ?? 'same-origin',
+  }
+
+  try {
+    return await fetch(url, requestInit)
+  } catch (error) {
+    // Alguns navegadores podem falhar com URL relativa em cenários específicos (ex.: navegação/estado de sessão).
+    if (typeof window !== 'undefined' && url.startsWith('/')) {
+      const absoluteUrl = `${window.location.origin}${url}`
+      try {
+        return await fetch(absoluteUrl, requestInit)
+      } catch {
+        // Cai no erro amigável abaixo.
+      }
+    }
+
+    throw new Error('Falha de rede ao comunicar com o servidor. Verifique conexão, login e se o app está em execução.')
+  }
 }

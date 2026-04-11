@@ -57,6 +57,12 @@ interface Membro {
   email?: string;
   celular?: string;
   whatsapp?: string;
+  // Documentos e Observações Gerais
+  profissao?: string;
+  tituloEleitoral?: string;
+  zonaEleitoral?: string;
+  secaoEleitoral?: string;
+  observacoes?: string;
   // Foto
   fotoUrl?: string;
   // Ministeriais
@@ -191,7 +197,12 @@ export default function MembrosPage() {
       nacionalidade: String(member.nacionalidade || (cf as any).nacionalidade || ''),
       naturalidade: String(member.naturalidade || (cf as any).naturalidade || ''),
       uf: String(member.uf_naturalidade || member.estado || (cf as any).uf || ''),
-      qualFuncao: String(member.qual_funcao || member.profissao || (cf as any).qualFuncao || ''),
+      qualFuncao: String(member.qual_funcao || (cf as any).qualFuncao || ''),
+      profissao: String(member.profissao || (cf as any).profissao || ''),
+      tituloEleitoral: String(member.titulo_eleitoral || (cf as any).tituloEleitoral || ''),
+      zonaEleitoral: String(member.zona_eleitoral || (cf as any).zonaEleitoral || ''),
+      secaoEleitoral: String(member.secao_eleitoral || (cf as any).secaoEleitoral || ''),
+      observacoes: String(member.observacoes || (cf as any).observacoes || ''),
       email: String(member.email || (cf as any).email || ''),
       celular: String(member.celular || member.phone || (cf as any).celular || ''),
       whatsapp: String(member.whatsapp || (cf as any).whatsapp || ''),
@@ -313,7 +324,7 @@ export default function MembrosPage() {
   const [dadosPessoais, setDadosPessoais] = useState({
     matricula: '',
     cpf: '',
-    tipoCadastro: 'ministro', // Convenção do projeto
+    tipoCadastro: 'membro', // Convenção do projeto
     nome: '',
     dataNascimento: '',
     sexo: 'MASCULINO',
@@ -335,7 +346,12 @@ export default function MembrosPage() {
     congregacao: '',
     email: '',
     celular: '',
-    whatsapp: ''
+    whatsapp: '',
+    profissao: '',
+    tituloEleitoral: '',
+    zonaEleitoral: '',
+    secaoEleitoral: '',
+    observacoes: ''
   });
 
   // Estado para foto (Base64)
@@ -785,7 +801,7 @@ export default function MembrosPage() {
     setDadosPessoais({
       matricula: novaMatricula,
       cpf: '',
-      tipoCadastro: 'ministro',
+      tipoCadastro: 'membro',
       nome: '',
       dataNascimento: '',
       sexo: 'MASCULINO',
@@ -807,7 +823,12 @@ export default function MembrosPage() {
       congregacao: '',
       email: '',
       celular: '',
-      whatsapp: ''
+      whatsapp: '',
+      profissao: '',
+      tituloEleitoral: '',
+      zonaEleitoral: '',
+      secaoEleitoral: '',
+      observacoes: ''
     });
     setEnderecoData({
       cep: '',
@@ -1047,7 +1068,7 @@ export default function MembrosPage() {
     setDadosPessoais({
       matricula: membro.matricula || '',
       cpf: membro.cpf || '',
-      tipoCadastro: 'ministro',
+      tipoCadastro: membro.tipoCadastro || 'ministro',
       nome: membro.nome || '',
       dataNascimento: membro.dataNascimento || '',
       sexo: membro.sexo || 'MASCULINO',
@@ -1069,7 +1090,12 @@ export default function MembrosPage() {
       congregacao: membro.congregacao || '',
       email: membro.email || '',
       celular: membro.celular || '',
-      whatsapp: membro.whatsapp || ''
+      whatsapp: membro.whatsapp || '',
+      profissao: membro.profissao || '',
+      tituloEleitoral: membro.tituloEleitoral || '',
+      zonaEleitoral: membro.zonaEleitoral || '',
+      secaoEleitoral: membro.secaoEleitoral || '',
+      observacoes: membro.observacoes || ''
     });
     setEnderecoData({
       cep: membro.cep || '',
@@ -1140,7 +1166,7 @@ export default function MembrosPage() {
       const baseForCustom: Partial<Membro> = {
         uniqueId: membroEditando?.uniqueId || gerarUniqueId(),
         matricula: dadosPessoais.matricula,
-        tipoCadastro: 'ministro',
+        tipoCadastro: dadosPessoais.tipoCadastro,
         supervisao: dadosPessoais.supervisao,
         campo: dadosPessoais.campo,
         congregacao: dadosPessoais.congregacao,
@@ -1163,6 +1189,11 @@ export default function MembrosPage() {
         email: dadosPessoais.email,
         celular: dadosPessoais.celular,
         whatsapp: dadosPessoais.whatsapp,
+        profissao: dadosPessoais.profissao,
+        tituloEleitoral: dadosPessoais.tituloEleitoral,
+        zonaEleitoral: dadosPessoais.zonaEleitoral,
+        secaoEleitoral: dadosPessoais.secaoEleitoral,
+        observacoes: dadosPessoais.observacoes,
         ...enderecoData,
         ...dadosMinisteriais,
         cargoMinisterial: cargoSelecionado,
@@ -1181,40 +1212,43 @@ export default function MembrosPage() {
       const latitudeNumber = enderecoData.latitude ? Number(String(enderecoData.latitude).replace(',', '.')) : null
       const longitudeNumber = enderecoData.longitude ? Number(String(enderecoData.longitude).replace(',', '.')) : null
 
+      // Converte para maiúsculo, retorna null se vazio
+      const u = (v: string | null | undefined): string | null => v ? v.toUpperCase().trim() : null;
+
       const payloadBase: CreateMemberRequest = {
-        name: dadosPessoais.nome,
+        name: (dadosPessoais.nome || '').toUpperCase().trim(),
         cpf: onlyDigits(dadosPessoais.cpf) || null,
-        email: dadosPessoais.email || null,
+        email: dadosPessoais.email?.trim().toLowerCase() || null,
         phone: dadosPessoais.celular || null,
         // Aba Dados
-        matricula: dadosPessoais.matricula || null,
+        matricula: u(dadosPessoais.matricula),
         unique_id: baseForCustom.uniqueId || null,
-        tipo_cadastro: 'ministro',
+        tipo_cadastro: dadosPessoais.tipoCadastro,
         data_nascimento: dadosPessoais.dataNascimento || null,
-        sexo: dadosPessoais.sexo || null,
-        tipo_sanguineo: dadosPessoais.tipoSanguineo || null,
-        escolaridade: dadosPessoais.escolaridade || null,
-        estado_civil: dadosPessoais.estadoCivil || null,
-        nome_conjuge: dadosPessoais.nomeConjuge || null,
+        sexo: u(dadosPessoais.sexo),
+        tipo_sanguineo: u(dadosPessoais.tipoSanguineo),
+        escolaridade: u(dadosPessoais.escolaridade),
+        estado_civil: u(dadosPessoais.estadoCivil),
+        nome_conjuge: u(dadosPessoais.nomeConjuge),
         cpf_conjuge: dadosPessoais.cpfConjuge ? onlyDigits(dadosPessoais.cpfConjuge) : null,
         data_nascimento_conjuge: dadosPessoais.dataNascimentoConjuge || null,
-        nome_pai: dadosPessoais.nomePai || null,
-        nome_mae: dadosPessoais.nomeMae || null,
-        rg: dadosPessoais.rg || null,
-        orgao_emissor: dadosPessoais.orgaoEmissor || null,
-        nacionalidade: dadosPessoais.nacionalidade || null,
-        naturalidade: dadosPessoais.naturalidade || null,
-        uf_naturalidade: dadosPessoais.uf || null,
+        nome_pai: u(dadosPessoais.nomePai),
+        nome_mae: u(dadosPessoais.nomeMae),
+        rg: u(dadosPessoais.rg),
+        orgao_emissor: u(dadosPessoais.orgaoEmissor),
+        nacionalidade: u(dadosPessoais.nacionalidade),
+        naturalidade: u(dadosPessoais.naturalidade),
+        uf_naturalidade: u(dadosPessoais.uf),
         data_batismo_aguas: dadosMinisteriais.dataBatismoAguas || null,
         data_batismo_espirito_santo: dadosMinisteriais.dataBatismoEspiritoSanto || null,
         // Aba Endereço
         cep: onlyDigits(enderecoData.cep) || null,
-        logradouro: enderecoData.logradouro || null,
-        numero: enderecoData.numero || null,
-        bairro: enderecoData.bairro || null,
-        complemento: enderecoData.complemento || null,
-        cidade: enderecoData.cidade || null,
-        estado: dadosPessoais.uf || null,
+        logradouro: u(enderecoData.logradouro),
+        numero: u(enderecoData.numero),
+        bairro: u(enderecoData.bairro),
+        complemento: u(enderecoData.complemento),
+        cidade: u(enderecoData.cidade),
+        estado: u(dadosPessoais.uf),
         // Aba Contato
         celular: dadosPessoais.celular || null,
         whatsapp: dadosPessoais.whatsapp || null,
@@ -1223,18 +1257,21 @@ export default function MembrosPage() {
         latitude: Number.isFinite(latitudeNumber) ? latitudeNumber : null,
         longitude: Number.isFinite(longitudeNumber) ? longitudeNumber : null,
         // Aba Ministerial
-        profissao: dadosMinisteriais.qualFuncao || cargoSelecionado || null,
-        curso_teologico: dadosMinisteriais.cursoTeologico || null,
-        instituicao_teologica: dadosMinisteriais.instituicaoTeologica || null,
+        profissao: u(dadosPessoais.profissao),
+        titulo_eleitoral: u(dadosPessoais.tituloEleitoral),
+        zona_eleitoral: u(dadosPessoais.zonaEleitoral),
+        secao_eleitoral: u(dadosPessoais.secaoEleitoral),
+        curso_teologico: u(dadosMinisteriais.cursoTeologico),
+        instituicao_teologica: u(dadosMinisteriais.instituicaoTeologica),
         pastor_auxiliar: dadosMinisteriais.pastorAuxiliar ?? false,
-        procedencia: dadosMinisteriais.procedencia || null,
-        procedencia_local: dadosMinisteriais.procedenciaLocal || null,
-        cargo_ministerial: cargoSelecionado || null,
+        procedencia: u(dadosMinisteriais.procedencia),
+        procedencia_local: u(dadosMinisteriais.procedenciaLocal),
+        cargo_ministerial: u(cargoSelecionado),
         dados_cargos: dadosCargos || {},
         tem_funcao_igreja: dadosMinisteriais.temFuncaoIgreja ?? false,
-        qual_funcao: dadosMinisteriais.qualFuncao || null,
-        setor_departamento: dadosMinisteriais.setorDepartamento || null,
-        observacoes_ministeriais: dadosMinisteriais.observacoesMinisteriais || null,
+        qual_funcao: u(dadosMinisteriais.qualFuncao),
+        setor_departamento: u(dadosMinisteriais.setorDepartamento),
+        observacoes_ministeriais: u(dadosMinisteriais.observacoesMinisteriais),
         // Aba Foto
         foto_url: fotoMembro || null,
         // Datas ministeriais
@@ -1243,8 +1280,8 @@ export default function MembrosPage() {
         data_validade_credencial: dadosMinisteriais.dataValidadeCredencial || null,
         // Sistema
         status: uiStatusToDb('ativo'),
-        role: 'ministro',
-        observacoes: null,
+        role: dadosPessoais.tipoCadastro,
+        observacoes: u(dadosPessoais.observacoes),
         custom_fields,
       };
 
@@ -1290,7 +1327,7 @@ export default function MembrosPage() {
     setDadosPessoais({
       matricula: '',
       cpf: '',
-      tipoCadastro: 'ministro',
+      tipoCadastro: 'membro',
       nome: '',
       dataNascimento: '',
       sexo: 'MASCULINO',
@@ -1312,7 +1349,12 @@ export default function MembrosPage() {
       congregacao: '',
       email: '',
       celular: '',
-      whatsapp: ''
+      whatsapp: '',
+      profissao: '',
+      tituloEleitoral: '',
+      zonaEleitoral: '',
+      secaoEleitoral: '',
+      observacoes: ''
     });
     setEnderecoData({
       cep: '',
@@ -1336,8 +1378,7 @@ export default function MembrosPage() {
       procedencia: '',
       procedenciaLocal: '',
       dataConsagracao: '',
-      dataEmissao: '',
-      dataValidadeCredencial: '',
+      dataEmissao: '',      dataValidadeCredencial: '',
       observacoesMinisteriais: ''
     });
     setFotoMembro(null);
@@ -2485,15 +2526,17 @@ export default function MembrosPage() {
                   >
                     🌍 Endereço + Contato
                   </button>
-                  <button
-                    onClick={() => setActiveTab('ministerial')}
-                    className={`px-4 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'ministerial'
-                      ? 'text-teal-700 border-teal-600'
-                      : 'text-gray-600 border-transparent hover:text-teal-600'
-                      }`}
-                  >
-                    ⛪ Ministerial
-                  </button>
+                  {dadosPessoais.tipoCadastro === 'ministro' && (
+                    <button
+                      onClick={() => setActiveTab('ministerial')}
+                      className={`px-4 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'ministerial'
+                        ? 'text-teal-700 border-teal-600'
+                        : 'text-gray-600 border-transparent hover:text-teal-600'
+                        }`}
+                    >
+                      ⛪ Ministerial
+                    </button>
+                  )}
                   <button
                     onClick={() => setActiveTab('foto')}
                     className={`px-4 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'foto'
@@ -2568,12 +2611,21 @@ export default function MembrosPage() {
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-gray-700 mb-1">Tipo de Cadastro *</label>
-                          <input
-                            type="text"
-                            value="Ministro"
-                            disabled
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-600 cursor-not-allowed focus:outline-none"
-                          />
+                          <select
+                            value={dadosPessoais.tipoCadastro}
+                            onChange={(e) => {
+                              const v = e.target.value as Membro['tipoCadastro'];
+                              setDadosPessoais({ ...dadosPessoais, tipoCadastro: v });
+                              if (v !== 'ministro' && activeTab === 'ministerial') {
+                                setActiveTab('dados');
+                              }
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          >
+                            <option value="ministro">Ministro</option>
+                            <option value="membro">Membro</option>
+                            <option value="congregado">Congregado</option>
+                          </select>
                         </div>
                       </div>
 
@@ -2847,19 +2899,39 @@ export default function MembrosPage() {
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                         <div>
                           <label className="block text-xs font-semibold text-gray-700 mb-1">Profissão</label>
-                          <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
+                          <input
+                            type="text"
+                            value={dadosPessoais.profissao}
+                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, profissao: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-gray-700 mb-1">Título Eleitoral</label>
-                          <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
+                          <input
+                            type="text"
+                            value={dadosPessoais.tituloEleitoral}
+                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, tituloEleitoral: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-gray-700 mb-1">Zona</label>
-                          <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
+                          <input
+                            type="text"
+                            value={dadosPessoais.zonaEleitoral}
+                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, zonaEleitoral: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-gray-700 mb-1">Seção</label>
-                          <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
+                          <input
+                            type="text"
+                            value={dadosPessoais.secaoEleitoral}
+                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, secaoEleitoral: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          />
                         </div>
                       </div>
 
@@ -2943,7 +3015,12 @@ export default function MembrosPage() {
 
                       <div>
                         <label className="block text-xs font-semibold text-gray-700 mb-1">Observações</label>
-                        <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
+                        <input
+                          type="text"
+                          value={dadosPessoais.observacoes}
+                          onChange={(e) => setDadosPessoais({ ...dadosPessoais, observacoes: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        />
                       </div>
 
                     </div>
@@ -3176,29 +3253,6 @@ export default function MembrosPage() {
                           />
                         </div>
                       </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Data de Consagração</label>
-                          <input
-                            type="date"
-                            value={dadosMinisteriais.dataConsagracao}
-                            onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, dataConsagracao: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Data de Validade (Credencial)</label>
-                          <input
-                            type="date"
-                            value={dadosMinisteriais.dataValidadeCredencial}
-                            onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, dataValidadeCredencial: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-
-
 
                       {/* Bloco de Consagração/Recebimento - Aparece quando cargo é selecionado */}
                       {cargoSelecionado && (

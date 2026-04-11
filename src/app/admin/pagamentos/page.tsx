@@ -93,7 +93,7 @@ export default function PagamentosPage() {
           router.push('/admin/login')
           return
         }
-        throw new Error('Erro ao carregar instituições')
+        throw new Error('Erro ao carregar ministérios')
       }
 
       const data = await response.json()
@@ -373,7 +373,7 @@ export default function PagamentosPage() {
           </div>
           <h1>Recibo de Pagamento</h1>
           <div class="box">
-            <div class="row"><span class="label">Instituição</span><span class="value">${ministryName}</span></div>
+            <div class="row"><span class="label">Ministério</span><span class="value">${ministryName}</span></div>
             <div class="row"><span class="label">Plano</span><span class="value">${planName}</span></div>
             <div class="row"><span class="label">Valor</span><span class="value">R$ ${payment.amount.toFixed(2)}</span></div>
             <div class="row"><span class="label">Vencimento</span><span class="value">${dueDate}</span></div>
@@ -464,7 +464,7 @@ export default function PagamentosPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="relative">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Instituição</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Ministério</label>
                   <input
                     type="text"
                     value={ministrySearch}
@@ -480,7 +480,7 @@ export default function PagamentosPage() {
                   {ministrySearch.length >= 3 && (
                     <div className="absolute z-20 mt-2 w-full rounded-lg border border-gray-700 bg-gray-900 shadow-lg max-h-56 overflow-auto">
                       {ministeriosLoading && (
-                        <div className="px-4 py-2 text-sm text-gray-400">Carregando instituições...</div>
+                        <div className="px-4 py-2 text-sm text-gray-400">Carregando ministérios...</div>
                       )}
                       {!ministeriosLoading && ministerios
                         .filter((m) => m.name.toLowerCase().includes(ministrySearch.toLowerCase()))
@@ -599,16 +599,16 @@ export default function PagamentosPage() {
                   className="grid grid-cols-1 md:grid-cols-2 gap-4 [&_input]:bg-gray-900 [&_input]:border-gray-700 [&_input]:text-gray-100 [&_input]:placeholder:text-gray-500 [&_select]:bg-gray-900 [&_select]:border-gray-700 [&_select]:text-gray-100"
                 >
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Instituição</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Ministério</label>
                     <select
                       value={formData.ministry_id}
                       onChange={(e) => setFormData({ ...formData, ministry_id: e.target.value })}
                       required
                       className="w-full px-4 py-2 border rounded-lg"
                     >
-                      <option value="">Selecione a instituição...</option>
+                      <option value="">Selecione o ministério...</option>
                       {ministeriosLoading && (
-                        <option value="" disabled>Carregando instituições...</option>
+                        <option value="" disabled>Carregando ministérios...</option>
                       )}
                       {!ministeriosLoading && ministerios.map((m) => (
                         <option key={m.id} value={m.id}>
@@ -651,7 +651,6 @@ export default function PagamentosPage() {
                     <input
                       type="number"
                       step="0.01"
-                      placeholder="0,00"
                       value={formData.amount}
                       onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                       required
@@ -675,7 +674,6 @@ export default function PagamentosPage() {
                     <input
                       type="number"
                       min="1"
-                      placeholder="1"
                       value={formData.installments}
                       onChange={(e) => setFormData({ ...formData, installments: e.target.value })}
                       className="w-full px-4 py-2 border rounded-lg"
@@ -700,7 +698,6 @@ export default function PagamentosPage() {
                     <label className="block text-sm font-medium text-gray-300 mb-2">Descrição (opcional)</label>
                     <input
                       type="text"
-                      placeholder="Ex: Ordem de serviço anual"
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       className="w-full px-4 py-2 border rounded-lg"
@@ -736,16 +733,16 @@ export default function PagamentosPage() {
                   className="grid grid-cols-1 md:grid-cols-2 gap-4 [&_input]:bg-gray-900 [&_input]:border-gray-700 [&_input]:text-gray-100 [&_input]:placeholder:text-gray-500 [&_select]:bg-gray-900 [&_select]:border-gray-700 [&_select]:text-gray-100"
                 >
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Instituição</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Ministério</label>
                     <select
                       value={avulsoForm.ministry_id}
                       onChange={(e) => setAvulsoForm({ ...avulsoForm, ministry_id: e.target.value })}
                       required
                       className="w-full px-4 py-2 border rounded-lg"
                     >
-                      <option value="">Selecione a instituição...</option>
+                      <option value="">Selecione o ministério...</option>
                       {ministeriosLoading && (
-                        <option value="" disabled>Carregando instituições...</option>
+                        <option value="" disabled>Carregando ministérios...</option>
                       )}
                       {!ministeriosLoading && ministerios.map((m) => (
                         <option key={m.id} value={m.id}>
@@ -779,7 +776,6 @@ export default function PagamentosPage() {
                     <input
                       type="number"
                       step="0.01"
-                      placeholder="0,00"
                       value={avulsoForm.amount}
                       onChange={(e) => setAvulsoForm({ ...avulsoForm, amount: e.target.value })}
                       required
@@ -816,7 +812,6 @@ export default function PagamentosPage() {
                     <label className="block text-sm font-medium text-gray-300 mb-2">Descrição (opcional)</label>
                     <input
                       type="text"
-                      placeholder="Ex: Implantação" 
                       value={avulsoForm.description}
                       onChange={(e) => setAvulsoForm({ ...avulsoForm, description: e.target.value })}
                       className="w-full px-4 py-2 border rounded-lg"
@@ -857,7 +852,7 @@ export default function PagamentosPage() {
                 <table className="w-full">
                   <thead className="bg-gray-800 border-b border-gray-700">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300">Instituição</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300">Ministério</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300">Valor</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300">Vencimento</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300">Status</th>
@@ -995,7 +990,6 @@ export default function PagamentosPage() {
                   note: e.target.value,
                 })}
                 className="w-full px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-100"
-                placeholder={manualModal.isAsaas ? 'Ex: Recebido em mãos' : 'Ex: Recebido via transferência'}
               />
             </div>
             <div className="mt-6 flex items-center justify-end gap-3">
@@ -1030,7 +1024,7 @@ export default function PagamentosPage() {
             </div>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div className="bg-gray-800 rounded-lg p-3">
-                <p className="text-gray-400">Instituição</p>
+                <p className="text-gray-400">Ministério</p>
                 <p className="text-gray-100 font-semibold">
                   {(detailsModal.payment as any).ministries?.name || detailsModal.payment.ministry_id}
                 </p>

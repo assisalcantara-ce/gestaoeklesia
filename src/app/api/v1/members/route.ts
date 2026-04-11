@@ -169,6 +169,11 @@ export async function POST(request: NextRequest) {
         'cargo_ministerial',
         'procedencia',
         'dados_cargos',
+        // Campos com valores controlados (enums lowercase no banco)
+        'tipo_cadastro',
+        'role',
+        'status',
+        'email',
       ],
     })
 

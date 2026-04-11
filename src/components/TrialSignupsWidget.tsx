@@ -344,7 +344,7 @@ export default function TrialSignupsWidget() {
               Ministério: <span className="font-semibold text-white">{efetivarSignup.ministry_name}</span>
             </p>
             <p className="text-xs text-gray-500 mb-4">
-              Isso criará a instituição na base de produção com acesso ativo.
+              Isso criará o ministério na base de produção com acesso ativo.
             </p>
             <div className="mb-6">
               <label className="block text-sm font-semibold text-gray-300 mb-2">Selecionar plano</label>

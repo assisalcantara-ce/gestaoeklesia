@@ -407,7 +407,7 @@ export default function SuportePage() {
                   ticketView === 'tenant' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
                 }`}
               >
-                Tickets de Instituições
+                Tickets de Ministérios
               </button>
               <button
                 type="button"
@@ -477,7 +477,7 @@ export default function SuportePage() {
               <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
                 <input
                   type="text"
-                  placeholder="ID da Instituição"
+                  placeholder="ID do Ministério"
                   value={formData.ministry_id}
                   onChange={(e) => setFormData({ ...formData, ministry_id: e.target.value })}
                   required
@@ -520,12 +520,31 @@ export default function SuportePage() {
                   rows={4}
                   className="col-span-2 px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg placeholder-gray-500 resize-none focus:outline-none focus:border-blue-500"
                 />
-                <button
-                  type="submit"
-                  className="col-span-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
-                >
-                  Criar Ticket
-                </button>
+                <div className="col-span-2 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForm(false)
+                      setFormData({
+                        ministry_id: '',
+                        subject: '',
+                        description: '',
+                        category: 'technical',
+                        priority: 'medium',
+                      })
+                      setError('')
+                    }}
+                    className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 font-semibold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+                  >
+                    Criar Ticket
+                  </button>
+                </div>
               </form>
             </div>
           )}
@@ -610,7 +629,7 @@ export default function SuportePage() {
                   <thead className="bg-gray-900 border-b border-gray-700">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">#</th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Instituição</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Ministério</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Contato</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Email</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
@@ -651,7 +670,7 @@ export default function SuportePage() {
         </div>
       </main>
 
-      {/* Modal: Ticket de Instituição */}
+      {/* Modal: Ticket de Ministério */}
       {ticketView === 'tenant' && selectedTicket && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden border border-gray-700">

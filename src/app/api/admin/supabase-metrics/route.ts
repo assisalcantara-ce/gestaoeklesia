@@ -5,7 +5,7 @@ type AlertLevel = 'warning' | 'critical'
 
 interface CapacityAlert {
   level: AlertLevel
-  code: 'DB_NEAR_LIMIT' | 'DB_LIMIT_REACHED' | 'DB_LIMIT_NOT_CONFIGURED'
+  code: 'DB_NEAR_LIMIT' | 'DB_LIMIT_REACHED' | 'DB_LIMIT_NOT_CONFIGURED' | 'DB_METRICS_UNAVAILABLE'
   message: string
 }
 
@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
     const criticalPct = clampPct(parseEnvInt(process.env.SUPABASE_PLAN_DB_CRITICAL_PCT) ?? 95, 95)
 
     let dbBytesUsed = 0
+    const alerts: CapacityAlert[] = []
 
     // Preferência: tamanho TOTAL do banco (todos os schemas)
     const { data: dbSizeBytes, error: dbSizeError } = await supabase.rpc('get_database_size_bytes')
@@ -83,10 +84,14 @@ export async function GET(request: NextRequest) {
       } else {
         console.log('[SUPABASE METRICS] RPC get_tables_info indisponível');
         if (tablesError) console.log('[SUPABASE METRICS] Erro RPC:', tablesError.message);
+        alerts.push({
+          level: 'warning',
+          code: 'DB_METRICS_UNAVAILABLE',
+          message: 'Não foi possível ler métricas reais do banco (RPCs não disponíveis).',
+        })
       }
     }
 
-    const alerts: CapacityAlert[] = []
     let dbPercentUsed: number | null = null
     let dbBytesRemaining: number | null = null
 

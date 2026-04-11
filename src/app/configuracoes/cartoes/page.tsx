@@ -9,7 +9,6 @@ import InteractiveCanvas from '@/components/InteractiveCanvas';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { createClient } from '@/lib/supabase-client';
 import { loadOrgNomenclaturasFromSupabaseOrMigrate } from '@/lib/org-nomenclaturas';
-import { obterPreviewTexto } from '@/lib/cartoes-utils';
 import {
   persistTemplatesSnapshotToSupabase,
   loadTemplatesForCurrentUser,
@@ -44,6 +43,7 @@ interface TemplateCartao {
   id: string;
   nome: string;
   tipoCadastro: 'membro' | 'congregado' | 'ministro' | 'funcionario';
+  tipo?: TipoCartao;
   backgroundUrl?: string;
   backgroundFile?: File;
   elementos: ElementoCartao[];
@@ -56,7 +56,6 @@ interface TemplateCartao {
   atualizadoEm: Date;
   ativo?: boolean;
   validadeAnos?: number;
-  dataEmissao?: string;
   tipoImpressao?: 'pvc' | 'a4';
   orientacao?: 'landscape' | 'portrait';
   previewImage?: string;
@@ -96,17 +95,13 @@ const PLACEHOLDERS_DISPONIVEIS = [
   { campo: 'matricula', label: 'Matrícula', placeholder: '{matricula}' },
   { campo: 'cpf', label: 'CPF', placeholder: '{cpf}' },
   { campo: 'rg', label: 'RG', placeholder: '{rg}' },
-  { campo: 'cargoMinisterial', label: 'Cargo Ministerial', placeholder: '{cargo_ministerial}' },
+  { campo: 'cargo', label: 'Cargo', placeholder: '{cargo}' },
   { campo: 'supervisao', label: 'Supervisão', placeholder: '{supervisao}' },
   { campo: 'campo', label: 'Campo', placeholder: '{campo}' },
   { campo: 'dataNascimento', label: 'Data de Nascimento', placeholder: '{dataNascimento}' },
   { campo: 'dataBatismo', label: 'Data de Batismo', placeholder: '{dataBatismo}' },
-  { campo: 'dataConsagracao', label: 'Data de Consagração', placeholder: '{dataConsagracao}' },
-  { campo: 'dataEmissao', label: 'Data de Emissão', placeholder: '{dataEmissao}' },
   { campo: 'validade', label: 'Validade', placeholder: '{validade}' },
-  { campo: 'validadeCredencial', label: 'Validade (Credencial)', placeholder: '{validadeCredencial}' },
-  { campo: 'nomePai', label: 'Pai', placeholder: '{nomePai}' },
-  { campo: 'nomeMae', label: 'Mãe', placeholder: '{nomeMae}' },
+  { campo: 'filiacao', label: 'Filiação (Pai/Mãe)', placeholder: '{filiacao}' },
   { campo: 'estadoCivil', label: 'Estado Civil', placeholder: '{estadoCivil}' },
   { campo: 'tipoSanguineo', label: 'Tipo Sanguíneo', placeholder: '{tipoSanguineo}' },
   { campo: 'naturalidade', label: 'Naturalidade', placeholder: '{naturalidade}' },
@@ -129,7 +124,7 @@ export default function ConfiguracaoCartoesPage() {
   const supabase = createClient();
 
   const [activeMenu, setActiveMenu] = useState('cartoes');
-  const [tipoCadastroAtivo, setTipoCadastroAtivo] = useState<'ministro' | 'funcionario'>('ministro');
+  const [tipoCadastroAtivo, setTipoCadastroAtivo] = useState<'membro' | 'congregado' | 'ministro' | 'funcionario'>('membro');
   const [_nomenclaturas, setNomenclaturasState] = useState<any>(null);
   const [placeholdersDisponiveis, setPlaceholdersDisponiveis] = useState(PLACEHOLDERS_DISPONIVEIS);
 
@@ -148,64 +143,6 @@ export default function ConfiguracaoCartoesPage() {
 
   const fileInputRefFrente = useRef<HTMLInputElement>(null);
   const fileInputRefVerso = useRef<HTMLInputElement>(null);
-
-  const formatDateForInput = (valor?: string) => {
-    if (!valor) return '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) return valor;
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(valor)) {
-      const [dia, mes, ano] = valor.split('/');
-      return `${ano}-${mes}-${dia}`;
-    }
-    const parsed = new Date(valor);
-    if (Number.isNaN(parsed.getTime())) return '';
-    const ano = parsed.getFullYear();
-    const mes = String(parsed.getMonth() + 1).padStart(2, '0');
-    const dia = String(parsed.getDate()).padStart(2, '0');
-    return `${ano}-${mes}-${dia}`;
-  };
-
-  const getPreviewTextForCanvas = (texto: string) => {
-    const previewBase = obterPreviewTexto(texto, _nomenclaturas);
-    const anos = templateEmEdicao?.validadeAnos ?? 1;
-
-    const parseDataEmissao = (valor?: string) => {
-      if (!valor) return null;
-      if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
-        const [ano, mes, dia] = valor.split('-').map(Number);
-        const parsed = new Date(ano, mes - 1, dia);
-        return Number.isNaN(parsed.getTime()) ? null : parsed;
-      }
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(valor)) {
-        const [dia, mes, ano] = valor.split('/').map(Number);
-        const parsed = new Date(ano, mes - 1, dia);
-        return Number.isNaN(parsed.getTime()) ? null : parsed;
-      }
-      const parsed = new Date(valor);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    };
-
-    const dataEmissaoBase = parseDataEmissao(templateEmEdicao?.dataEmissao) || new Date();
-    const dataValidade = new Date(dataEmissaoBase);
-    dataValidade.setFullYear(dataValidade.getFullYear() + anos);
-
-    const formatar = (data: Date) => {
-      const dia = String(data.getDate()).padStart(2, '0');
-      const mes = String(data.getMonth() + 1).padStart(2, '0');
-      const ano = data.getFullYear();
-      return `${dia}/${mes}/${ano}`;
-    };
-
-    const validadeTexto = formatar(dataValidade);
-    const emissaoTexto = formatar(dataEmissaoBase);
-
-    return previewBase
-      .replace(/\{validade\}/g, validadeTexto)
-      .replace(/\{validadeCredencial\}/g, validadeTexto)
-      .replace(/\{dataEmissao\}/g, emissaoTexto)
-      .replace(/\[Validade\]/g, validadeTexto)
-      .replace(/\[Validade \(Credencial\)\]/g, validadeTexto)
-      .replace(/\[Data de Emissão\]/g, emissaoTexto);
-  };
 
   const generateId = () => {
     try {
@@ -231,12 +168,12 @@ export default function ConfiguracaoCartoesPage() {
       setMinistryId(resolvedMinistryId);
       setTemplates(loadedTemplates as any);
 
-      const ativo = (loadedTemplates as any[]).find((t: any) => t.ativo && t.tipoCadastro === 'ministro');
+      const ativo = (loadedTemplates as any[]).find((t: any) => t.ativo && t.tipoCadastro === 'membro');
       if (ativo) {
         setTemplateEmEdicao(ativo);
       } else {
         const { getTemplatesPorTipo, converterParaTemplateEditavel } = require('@/lib/card-templates');
-        const padroes = getTemplatesPorTipo('ministro');
+        const padroes = getTemplatesPorTipo('membro');
         const fallback = padroes.length > 0 ? padroes[0] : null;
         if (fallback) setTemplateEmEdicao(converterParaTemplateEditavel(fallback));
       }
@@ -651,7 +588,7 @@ export default function ConfiguracaoCartoesPage() {
 
     setTemplates(novasTemplates);
     if (ministryId) {
-      persistTemplatesSnapshotToSupabase(supabase, ministryId, (templateEmEdicao.tipoCadastro as TipoCartao) || 'ministro', novasTemplates)
+      persistTemplatesSnapshotToSupabase(supabase, ministryId, (templateEmEdicao.tipoCadastro as TipoCartao) || 'membro', novasTemplates)
         .catch(() => null);
     }
     
@@ -697,12 +634,6 @@ export default function ConfiguracaoCartoesPage() {
     console.log('✅ [SALVAR] templateCorrigido.tipoCadastro:', templateCorrigido.tipoCadastro);
     console.log('✅ [SALVAR] templateCorrigido.id:', templateCorrigido.id);
 
-    // --- MINIATURA DO SIDEBAR ---
-    // Para qualquer template que tenha backgroundUrl, usa como previewImage
-    if (templateCorrigido.backgroundUrl) {
-      templateCorrigido.previewImage = templateCorrigido.backgroundUrl;
-    }
-
     // --- PROTEÇÃO DE PREVIEW ---
     // Se for um template nativo e perdeu o previewImage, restaurar da fábrica
     if ((templateCorrigido.id === 'congregado-01' || templateCorrigido.id === 'congregado-02' || templateCorrigido.id === 'membro-02' || templateCorrigido.id === 'membro-classico') && !templateCorrigido.previewImage) {
@@ -728,7 +659,7 @@ export default function ConfiguracaoCartoesPage() {
     const indexExistente = novasTemplates.findIndex(t => t.id === templateCorrigido.id);
 
     // Se for um ID de template oficial/editável (podem ser salvos como branco), remover qualquer versão antiga antes de adicionar a nova
-    const TEMPLATES_EDITABLE = ['ministro-classico', 'ministro-02', 'ministro-branco', 'funcionario-customizado', 'funcionario-branco'];
+    const TEMPLATES_EDITABLE = ['membro-01', 'membro-02', 'membro-classico', 'congregado-01', 'congregado-02', 'congregado-branco', 'congregado-moderno', 'ministro-classico', 'ministro-02'];
     if (TEMPLATES_EDITABLE.includes(templateCorrigido.id)) {
       if (indexExistente >= 0) {
         console.log('🧹 Removendo versão antiga do template para garantir integridade...');
@@ -771,7 +702,7 @@ export default function ConfiguracaoCartoesPage() {
       persistTemplatesSnapshotToSupabase(
         supabase,
         ministryId,
-        (templateCorrigido.tipoCadastro as TipoCartao) || 'ministro',
+        (templateCorrigido.tipoCadastro as TipoCartao) || 'membro',
         novasTemplates
       ).catch(() => null);
     }
@@ -793,47 +724,56 @@ export default function ConfiguracaoCartoesPage() {
   const copiarJSON = async () => {
     if (!templateEmEdicao) return;
 
+    let templateAtualizado = { ...templateEmEdicao };
+
+    // Para templates personalizados (ex.: modelo 03), usar o fundo da frente como miniatura.
+    if (templateAtualizado.backgroundUrl) {
+      templateAtualizado = {
+        ...templateAtualizado,
+        previewImage: templateAtualizado.backgroundUrl,
+        atualizadoEm: new Date(),
+      };
+
+      setTemplateEmEdicao(templateAtualizado);
+
+      const templatesAtualizados = templates.map((t) =>
+        t.id === templateAtualizado.id ? { ...templateAtualizado } : t
+      );
+
+      // Se o template atual ainda não estiver na lista, adiciona para exibir no sidebar.
+      if (!templatesAtualizados.some((t) => t.id === templateAtualizado.id)) {
+        templatesAtualizados.push(templateAtualizado);
+      }
+
+      setTemplates(templatesAtualizados);
+
+      if (ministryId) {
+        try {
+          await persistTemplatesSnapshotToSupabase(
+            supabase,
+            ministryId,
+            (templateAtualizado.tipoCadastro as TipoCartao) || 'membro',
+            templatesAtualizados
+          );
+        } catch {
+          // Não bloqueia a cópia do JSON em caso de falha de rede/persistência.
+        }
+      }
+    }
+
     // Preparar JSON limpo (sem arquivos ou objetos circulares)
-    const jsonStr = JSON.stringify(templateEmEdicao, (key, value) => {
+    const jsonStr = JSON.stringify(templateAtualizado, (key, value) => {
       if (key === 'backgroundFile' || key === 'backgroundFileVerso') return undefined;
       return value;
     }, 2);
 
-    // Copiar para clipboard
-    try {
-      await navigator.clipboard.writeText(jsonStr);
-    } catch (err) {
+    navigator.clipboard.writeText(jsonStr).then(() => {
+      setMensagemSucesso('JSON copiado e miniatura atualizada!');
+      setTimeout(() => setMensagemSucesso(''), 3000);
+    }).catch(err => {
       console.error('Erro ao copiar JSON:', err);
       alert('Erro ao copiar para a área de transferência');
-      return;
-    }
-
-    // Salvar snapshot do template no banco para preservar a configuração atual
-    if (ministryId) {
-      try {
-        // Garante que o template atual está no snapshot antes de persistir
-        const snapshotAtualizado = templates.map(t =>
-          t.id === templateEmEdicao.id ? templateEmEdicao : t
-        );
-        if (!templates.find(t => t.id === templateEmEdicao.id)) {
-          snapshotAtualizado.push(templateEmEdicao);
-        }
-        await persistTemplatesSnapshotToSupabase(
-          supabase,
-          ministryId,
-          (templateEmEdicao.tipoCadastro as TipoCartao) || 'ministro',
-          snapshotAtualizado
-        );
-        setMensagemSucesso('JSON copiado e salvo no banco com sucesso!');
-      } catch (err) {
-        console.error('Erro ao salvar JSON no banco:', err);
-        setMensagemSucesso('JSON copiado (falha ao salvar no banco)');
-      }
-    } else {
-      setMensagemSucesso('JSON copiado para a área de transferência!');
-    }
-
-    setTimeout(() => setMensagemSucesso(''), 4000);
+    });
   };
 
   const duplicarTemplate = (templateId: string) => {
@@ -852,7 +792,7 @@ export default function ConfiguracaoCartoesPage() {
     const next = [...templates, novoTemplate];
     setTemplates(next);
     if (ministryId) {
-      persistTemplatesSnapshotToSupabase(supabase, ministryId, (novoTemplate.tipoCadastro as TipoCartao) || 'ministro', next)
+      persistTemplatesSnapshotToSupabase(supabase, ministryId, (novoTemplate.tipoCadastro as TipoCartao) || 'membro', next)
         .catch(() => null);
     }
     setTemplateEmEdicao(novoTemplate);
@@ -865,8 +805,9 @@ export default function ConfiguracaoCartoesPage() {
 
     // Lista de IDs de templates nativos que NÃO podem ser deletados
     const TEMPLATES_NATIVOS = [
-      'ministro-branco', 'ministro-classico', 'ministro-02',
-      'funcionario-customizado', 'funcionario-branco'
+      'membro-01', 'membro-branco', 'membro-classico', 'membro-02',
+      'congregado-01', 'congregado-branco', 'congregado-02', 'congregado-moderno',
+      'ministro-branco', 'ministro-classico', 'ministro-02'
     ];
 
     // Impedir deleção de templates nativos
@@ -881,7 +822,7 @@ export default function ConfiguracaoCartoesPage() {
     const novasTemplates = templates.filter(t => t.id !== templateId);
     setTemplates(novasTemplates);
     if (ministryId) {
-      persistTemplatesSnapshotToSupabase(supabase, ministryId, (templateADeletar.tipoCadastro as TipoCartao) || 'ministro', novasTemplates)
+      persistTemplatesSnapshotToSupabase(supabase, ministryId, (templateADeletar.tipoCadastro as TipoCartao) || 'membro', novasTemplates)
         .catch(() => null);
     }
 
@@ -914,8 +855,8 @@ export default function ConfiguracaoCartoesPage() {
       console.log('🔄 [ativarTemplate] Buscando em templates nativos...');
       const { getTemplatesPorTipo } = require('@/lib/card-templates');
       
-      // Procurar apenas nos tipos suportados do projeto
-      const tipos = ['ministro', 'funcionario'];
+      // Procurar em TODOS os tipos (incluindo funcionario)
+      const tipos = ['membro', 'congregado', 'ministro', 'funcionario'];
       for (const tipo of tipos) {
         const nativosDoTipo = getTemplatesPorTipo(tipo);
         targetTemplate = nativosDoTipo.find((t: any) => t.id === templateId);
@@ -971,7 +912,7 @@ export default function ConfiguracaoCartoesPage() {
     console.log('🔄 [ativarTemplate] Salvando novas templates:', novasTemplates.map(t => ({ id: t.id, ativo: t.ativo })));
     setTemplates(novasTemplates);
     if (ministryId) {
-      persistTemplatesSnapshotToSupabase(supabase, ministryId, (tipoAlvo as TipoCartao) || 'ministro', novasTemplates)
+      persistTemplatesSnapshotToSupabase(supabase, ministryId, (tipoAlvo as TipoCartao) || 'membro', novasTemplates)
         .catch(() => null);
     }
 
@@ -994,7 +935,7 @@ export default function ConfiguracaoCartoesPage() {
     setTemplates(novasTemplates);
     if (ministryId) {
       const t = templates.find(tt => tt.id === templateId);
-      const tipo = (t?.tipoCadastro as TipoCartao) || 'ministro';
+      const tipo = (t?.tipoCadastro as TipoCartao) || (t?.tipo as TipoCartao) || 'membro';
       persistTemplatesSnapshotToSupabase(supabase, ministryId, tipo, novasTemplates).catch(() => null);
     }
 
@@ -1002,9 +943,9 @@ export default function ConfiguracaoCartoesPage() {
       // Se o template sendo desativado é o que está no canvas, volta para um modelo em branco limpo
       // PRIORIZAR template customizado se existir
       const { TEMPLATES_CUSTOMIZADOS } = require('@/lib/custom-card-templates');
-      const { TEMPLATE_MINISTRO_CLASSICO, converterParaTemplateEditavel } = require('@/lib/card-templates');
-      const customizado = TEMPLATES_CUSTOMIZADOS.find((t: any) => t.id === 'ministro-classico');
-      const templateParaUsar = customizado || TEMPLATE_MINISTRO_CLASSICO;
+      const { TEMPLATE_MEMBRO_01, converterParaTemplateEditavel } = require('@/lib/card-templates');
+      const customizado = TEMPLATES_CUSTOMIZADOS.find((t: any) => t.id === 'membro-01');
+      const templateParaUsar = customizado || TEMPLATE_MEMBRO_01;
       setTemplateEmEdicao(converterParaTemplateEditavel(templateParaUsar));
     }
   };
@@ -1079,21 +1020,6 @@ export default function ConfiguracaoCartoesPage() {
                   </div>
 
                   <div className="grid grid-cols-4 gap-4 items-end">
-                    <div className="col-span-1">
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Data de Emissão
-                      </label>
-                      <input
-                        type="date"
-                        value={formatDateForInput(templateEmEdicao.dataEmissao)}
-                        onChange={(e) => setTemplateEmEdicao({
-                          ...templateEmEdicao,
-                          dataEmissao: e.target.value
-                        })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-
                     <div className="col-span-1">
                       <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Validade do Cartão
@@ -1246,7 +1172,6 @@ export default function ConfiguracaoCartoesPage() {
                       elementoSelecionado={elementoSelecionado}
                       elementosSelecionados={elementosSelecionados || []}
                       nomenclaturas={_nomenclaturas}
-                      getPreviewText={getPreviewTextForCanvas}
                       backgroundUrl={editandoVerso ? templateEmEdicao.backgroundUrlVerso : templateEmEdicao.backgroundUrl}
                       onElementoSelecionado={setElementoSelecionado}
                       onElementosSelecionados={setElementosSelecionados}

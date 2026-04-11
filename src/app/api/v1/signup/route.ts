@@ -7,6 +7,10 @@ import { consumeRateLimit } from '@/lib/rate-limit-db'
 
 export async function POST(request: NextRequest) {
   try {
+    const upperText = (value?: string | null) => value?.trim().toUpperCase() || ''
+    const lowerText = (value?: string | null) => value?.trim().toLowerCase() || ''
+    const onlyDigits = (value?: string | null) => value?.replace(/\D/g, '') || ''
+
     const ip = getClientIp(request)
     const limit = Number(process.env.PUBLIC_RATE_LIMIT_SIGNUP_PER_10MIN || 5)
     const windowMs = 10 * 60 * 1000
@@ -56,10 +60,33 @@ export async function POST(request: NextRequest) {
       plan,
     } = body
 
-    console.log('[SIGNUP] Recebido:', { ministerio, pastor, cpf, whatsapp, email, senhaLength: senha?.length })
+    const ministryName = upperText(ministerio)
+    const pastorName = upperText(pastor)
+    const cpfCnpj = onlyDigits(cpf)
+    const whatsappNumber = onlyDigits(whatsapp)
+    const emailValue = lowerText(email)
+    const phoneValue = onlyDigits(phone) || null
+    const websiteValue = lowerText(website) || null
+    const responsibleName = upperText(responsible_name) || pastorName || null
+    const addressZip = onlyDigits(address_zip) || null
+    const addressStreet = upperText(address_street) || null
+    const addressNumber = upperText(address_number) || null
+    const addressComplement = upperText(address_complement) || null
+    const addressCity = upperText(address_city) || null
+    const addressState = upperText(address_state) || null
+    const descriptionValue = upperText(description) || null
+
+    console.log('[SIGNUP] Recebido:', {
+      ministerio: ministryName,
+      pastor: pastorName,
+      cpf: cpfCnpj,
+      whatsapp: whatsappNumber,
+      email: emailValue,
+      senhaLength: senha?.length,
+    })
 
     // Validações
-    if (!ministerio?.trim()) {
+    if (!ministryName) {
       console.error('[SIGNUP] Validação falhou: ministerio vazio')
       return NextResponse.json(
         { error: 'Nome do ministério é obrigatório' },
@@ -67,7 +94,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!pastor?.trim()) {
+    if (!pastorName) {
       console.error('[SIGNUP] Validação falhou: pastor vazio')
       return NextResponse.json(
         { error: 'Nome do pastor é obrigatório' },
@@ -75,7 +102,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!cpf?.trim()) {
+    if (!cpfCnpj) {
       console.error('[SIGNUP] Validação falhou: cpf vazio')
       return NextResponse.json(
         { error: 'CPF/CNPJ é obrigatório' },
@@ -83,7 +110,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!whatsapp?.trim()) {
+    if (!whatsappNumber) {
       console.error('[SIGNUP] Validação falhou: whatsapp vazio')
       return NextResponse.json(
         { error: 'WhatsApp é obrigatório' },
@@ -91,7 +118,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!email?.trim()) {
+    if (!emailValue) {
       console.error('[SIGNUP] Validação falhou: email vazio')
       return NextResponse.json(
         { error: 'Email é obrigatório' },
@@ -99,8 +126,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      console.error('[SIGNUP] Validação falhou: email inválido:', email)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
+      console.error('[SIGNUP] Validação falhou: email inválido:', emailValue)
       return NextResponse.json(
         { error: 'Email inválido' },
         { status: 400 }
@@ -132,8 +159,8 @@ export async function POST(request: NextRequest) {
       const { data: dupData, error: dupError } = await supabaseAdmin.rpc(
         'check_pre_registration_duplicate',
         {
-          p_email: email,
-          p_cpf_cnpj: cpf,
+          p_email: emailValue,
+          p_cpf_cnpj: cpfCnpj,
         }
       )
 
@@ -160,7 +187,7 @@ export async function POST(request: NextRequest) {
 
     // Criar usuário no Supabase Auth via signup (sem service_role)
     const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
-      email,
+      email: emailValue,
       password: senha,
       options: {
         emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`,
@@ -207,21 +234,21 @@ export async function POST(request: NextRequest) {
       .from('pre_registrations')
       .insert({
         user_id: signUpData.user.id,
-        ministry_name: ministerio,
-        pastor_name: pastor,
-        cpf_cnpj: cpf,
-        whatsapp,
-        email,
-        phone: phone || null,
-        website: website || null,
-        responsible_name: responsible_name || pastor || null,
-        address_zip: address_zip || null,
-        address_street: address_street || null,
-        address_number: address_number || null,
-        address_complement: address_complement || null,
-        address_city: address_city || null,
-        address_state: address_state || null,
-        description: description || null,
+        ministry_name: ministryName,
+        pastor_name: pastorName,
+        cpf_cnpj: cpfCnpj,
+        whatsapp: whatsappNumber,
+        email: emailValue,
+        phone: phoneValue,
+        website: websiteValue,
+        responsible_name: responsibleName,
+        address_zip: addressZip,
+        address_street: addressStreet,
+        address_number: addressNumber,
+        address_complement: addressComplement,
+        address_city: addressCity,
+        address_state: addressState,
+        description: descriptionValue,
         plan: planValue,
         trial_expires_at: trialExpiresAt.toISOString(),
         trial_days: 7,
@@ -261,13 +288,13 @@ export async function POST(request: NextRequest) {
       .insert({
         admin_id: null, // Notificação para todos os admins
         type: 'new_trial_signup',
-        title: `📝 Novo Pré-Cadastro: ${ministerio}`,
-        message: `Pastor: ${pastor} | Email: ${email} | Vencimento: ${trialExpiresAt.toLocaleDateString('pt-BR')}`,
+        title: `📝 Novo Pré-Cadastro: ${ministryName}`,
+        message: `Pastor: ${pastorName} | Email: ${emailValue} | Vencimento: ${trialExpiresAt.toLocaleDateString('pt-BR')}`,
         data: {
           prescadastro_id: prescadastro.id,
-          ministry_name: ministerio,
-          pastor_name: pastor,
-          email,
+          ministry_name: ministryName,
+          pastor_name: pastorName,
+          email: emailValue,
           trial_expires_at: trialExpiresAt.toISOString(),
         },
         is_read: false,
@@ -308,9 +335,9 @@ export async function POST(request: NextRequest) {
                       </tr>
                       <tr>
                         <td style="padding:32px;color:#0f172a;">
-                          <p style="margin:0 0 12px;font-size:16px;">Olá, ${pastor}!</p>
+                          <p style="margin:0 0 12px;font-size:16px;">Olá, ${pastorName}!</p>
                           <p style="margin:0 0 16px;color:#475569;">
-                            Recebemos o pré-cadastro da instituição <strong>${ministerio}</strong> no plano <strong>${planLabel}</strong>.
+                            Recebemos o pré-cadastro da instituição <strong>${ministryName}</strong> no plano <strong>${planLabel}</strong>.
                           </p>
                           <div style="background:#f1f5f9;border-radius:12px;padding:16px;margin-bottom:16px;">
                             <p style="margin:0 0 8px;font-size:14px;color:#0f172a;"><strong>Período de teste:</strong> 7 dias</p>
@@ -318,7 +345,7 @@ export async function POST(request: NextRequest) {
                           </div>
                           <div style="background:#ecfeff;border-radius:12px;padding:16px;margin-bottom:16px;">
                             <p style="margin:0 0 6px;font-size:14px;color:#0f172a;"><strong>Dados de acesso</strong></p>
-                            <p style="margin:0;font-size:13px;color:#475569;">Email: ${email}</p>
+                            <p style="margin:0;font-size:13px;color:#475569;">Email: ${emailValue}</p>
                             <p style="margin:4px 0 0;font-size:13px;color:#475569;">Use o email e a senha que você cadastrou para acessar o sistema.</p>
                           </div>
                           <a href="${appUrl}/login" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:bold;">Acessar o sistema</a>
@@ -341,18 +368,18 @@ export async function POST(request: NextRequest) {
 
         await resend.emails.send({
           from: resendFrom,
-          to: email,
+          to: emailValue,
           subject: 'Bem-vindo ao Gestão Eklesia - acesso de teste',
           html,
         })
-        console.log('[SIGNUP] ✅ Email enviado para:', email)
+        console.log('[SIGNUP] ✅ Email enviado para:', emailValue)
       } catch (emailError: any) {
         console.warn('[SIGNUP] Falha ao enviar email de boas-vindas:', {
           message: emailError?.message,
           statusCode: emailError?.statusCode,
           name: emailError?.name,
           from: resendFrom,
-          to: email,
+          to: emailValue,
         })
       }
     } else {
@@ -361,8 +388,8 @@ export async function POST(request: NextRequest) {
 
     console.log('[SIGNUP] ✅ Pré-cadastro criado com sucesso:', {
       user_id: signUpData.user.id,
-      email,
-      ministry_name: ministerio,
+      email: emailValue,
+      ministry_name: ministryName,
       trial_expires_at: trialExpiresAt.toISOString(),
     })
 
@@ -370,7 +397,7 @@ export async function POST(request: NextRequest) {
       request,
       route: 'v1/signup',
       type: 'request_ok',
-      email,
+      email: emailValue,
       meta: {
         prescadastro_id: prescadastro.id,
       },
@@ -381,7 +408,7 @@ export async function POST(request: NextRequest) {
       message: 'Cadastro realizado com sucesso! Verifique seu email para confirmar.',
       data: {
         user_id: signUpData.user.id,
-        email,
+        email: emailValue,
         trial_expires_at: trialExpiresAt.toISOString(),
         trial_days: 7,
       },

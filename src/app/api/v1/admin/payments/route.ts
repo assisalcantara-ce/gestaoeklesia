@@ -192,6 +192,11 @@ export async function POST(request: NextRequest) {
               .from('payments')
               .update({
                 asaas_payment_id: asaasPayment.id,
+                asaas_status: asaasPayment.status || null,
+                asaas_invoice_url: asaasPayment.invoiceUrl || null,
+                asaas_bank_slip_url: asaasPayment.bankSlipUrl || null,
+                asaas_pix_qr_code: asaasPayment.pixQrCodeUrl || null,
+                asaas_last_sync_at: new Date().toISOString(),
                 asaas_response: asaasPayment,
               })
               .eq('id', payment.id)
@@ -201,6 +206,7 @@ export async function POST(request: NextRequest) {
             await supabase
               .from('payments')
               .update({
+                asaas_last_sync_at: new Date().toISOString(),
                 asaas_response: { error: (err as Error).message },
               })
               .eq('id', payment.id)
@@ -214,7 +220,10 @@ export async function POST(request: NextRequest) {
           payments.map((payment: any) =>
             supabase
               .from('payments')
-              .update({ asaas_response: { error: errMsg, stage: 'customer_or_billing' } })
+              .update({
+                asaas_last_sync_at: new Date().toISOString(),
+                asaas_response: { error: errMsg, stage: 'customer_or_billing' },
+              })
               .eq('id', payment.id)
               .then(() => {})
           )

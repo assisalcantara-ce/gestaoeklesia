@@ -3,6 +3,26 @@ import { requireAdmin } from '@/lib/admin-guard'
 import { Resend } from 'resend'
 import { ensureAsaasCustomer, createAsaasPayment, buildBillingInstallments } from '@/lib/asaas'
 
+function upperText(value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  const normalized = String(value).trim()
+  if (!normalized) return null
+  return normalized.toUpperCase()
+}
+
+function lowerText(value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  const normalized = String(value).trim()
+  if (!normalized) return null
+  return normalized.toLowerCase()
+}
+
+function onlyDigits(value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  const digits = String(value).replace(/\D/g, '')
+  return digits.length ? digits : null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const result = await requireAdmin(request, { requiredRole: 'admin' })
@@ -93,13 +113,13 @@ export async function POST(request: NextRequest) {
         .from('ministries')
         .insert({
           user_id: preReg.user_id,
-          name: preReg.ministry_name,
+          name: upperText(preReg.ministry_name),
           slug,
-          email_admin: preReg.email,
-          cnpj_cpf: preReg.cpf_cnpj,
-          phone: preReg.phone || null,
-          website: preReg.website || null,
-          description: preReg.description || null,
+          email_admin: lowerText(preReg.email),
+          cnpj_cpf: onlyDigits(preReg.cpf_cnpj),
+          phone: onlyDigits(preReg.phone),
+          website: lowerText(preReg.website),
+          description: upperText(preReg.description),
           plan: planFinal,
           subscription_status: 'active',
           subscription_start_date: new Date().toISOString(),
@@ -183,13 +203,13 @@ export async function POST(request: NextRequest) {
             name: preReg.ministry_name,
             email_admin: preReg.email,
             cnpj_cpf: preReg.cpf_cnpj,
-            phone: preReg.phone || null,
-            whatsapp: preReg.whatsapp || null,
-            address_street: preReg.address_street || null,
-            address_number: preReg.address_number || null,
-            address_complement: preReg.address_complement || null,
-            address_city: preReg.address_city || null,
-            address_zip: preReg.address_zip || null,
+            phone: onlyDigits(preReg.phone),
+            whatsapp: onlyDigits(preReg.whatsapp),
+            address_street: upperText(preReg.address_street),
+            address_number: upperText(preReg.address_number),
+            address_complement: upperText(preReg.address_complement),
+            address_city: upperText(preReg.address_city),
+            address_zip: onlyDigits(preReg.address_zip),
           }
 
           const customerId = await ensureAsaasCustomer(supabaseAdmin, ministryForAsaas)

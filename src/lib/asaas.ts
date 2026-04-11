@@ -1,4 +1,4 @@
-const ASAAS_API_URL = 'https://api.asaas.com/v3';
+const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://api.asaas.com/v3';
 
 const getAsaasApiKey = () => {
   // Lida a cada chamada para pegar o valor atualizado do processo
@@ -49,11 +49,37 @@ type AsaasCustomerInput = {
   postalCode?: string | null;
 };
 
+export type AsaasPaymentResponse = {
+  id: string;
+  customer?: string;
+  value?: number;
+  dueDate?: string;
+  status?: string;
+  billingType?: string;
+  description?: string;
+  invoiceUrl?: string | null;
+  bankSlipUrl?: string | null;
+  pixQrCodeUrl?: string | null;
+  [key: string]: any;
+};
+
 export const createAsaasCustomer = async (payload: AsaasCustomerInput) => {
   return asaasFetch('/customers', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+};
+
+export const findAsaasCustomer = async (params: { cpfCnpj?: string | null; email?: string | null }) => {
+  const query = new URLSearchParams();
+  if (params.cpfCnpj) query.set('cpfCnpj', params.cpfCnpj);
+  if (params.email) query.set('email', params.email);
+
+  if (![...query.keys()].length) return null;
+
+  const result = await asaasFetch(`/customers?${query.toString()}`, { method: 'GET' });
+  const first = Array.isArray(result?.data) ? result.data[0] : null;
+  return first || null;
 };
 
 export const deleteAsaasPayment = async (asaasPaymentId: string) => {
@@ -82,7 +108,7 @@ export const createAsaasPayment = async (payload: {
     });
 
     console.log('[ASAAS] Pagamento criado com sucesso:', result.id);
-    return result;
+    return result as AsaasPaymentResponse;
   } catch (err) {
     console.error('[ASAAS] Erro ao criar pagamento:', {
       customer: payload.customer,
@@ -91,6 +117,10 @@ export const createAsaasPayment = async (payload: {
     });
     throw err;
   }
+};
+
+export const getAsaasPayment = async (asaasPaymentId: string) => {
+  return asaasFetch(`/payments/${asaasPaymentId}`, { method: 'GET' }) as Promise<AsaasPaymentResponse>;
 };
 
 export const ensureAsaasCustomer = async (supabase: any, ministry: any) => {
@@ -123,6 +153,21 @@ export const ensureAsaasCustomer = async (supabase: any, ministry: any) => {
   });
 
   try {
+    const existing = await findAsaasCustomer({
+      cpfCnpj: customerPayload.cpfCnpj || null,
+      email: customerPayload.email || null,
+    });
+
+    if (existing?.id) {
+      await supabase
+        .from('ministries')
+        .update({ asaas_customer_id: existing.id })
+        .eq('id', ministry.id);
+
+      console.log('[ASAAS] Cliente reutilizado:', existing.id);
+      return existing.id as string;
+    }
+
     const customer = await createAsaasCustomer(customerPayload);
 
     if (customer?.id) {

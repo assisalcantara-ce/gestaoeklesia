@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Database,
   Users,
+  Link2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 
@@ -34,7 +35,7 @@ export default function AdminSidebar() {
 
   const menuItems = [
     { label: 'Dashboard', href: '/admin/dashboard', icon: Home },
-    { label: 'Instituições', href: '/admin/ministerios', icon: Building2 },
+    { label: 'Ministérios', href: '/admin/ministerios', icon: Building2 },
     { label: 'Pagamentos', href: '/admin/pagamentos', icon: CreditCard },
     { label: 'Planos', href: '/admin/planos', icon: BarChart3 },
     { label: 'Suporte', href: '/admin/suporte', icon: HeadphonesIcon },
@@ -44,6 +45,7 @@ export default function AdminSidebar() {
       submenu: [
         { label: 'Supabase', href: '/admin/configuracoes/supabase', icon: Database },
         { label: 'Usuários', href: '/admin/configuracoes/usuarios', icon: Users },
+        { label: 'Gateway', href: '/admin/configuracoes/gateway', icon: Link2 },
       ],
     },
   ]

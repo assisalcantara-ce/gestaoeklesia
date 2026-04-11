@@ -75,13 +75,22 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        const response = await fetch('/api/v1/admin/verify', {
+        const verifyUrl = '/api/v1/admin/verify'
+        const verifyInit: RequestInit = {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${accessToken}`,
           },
-        })
+          credentials: 'same-origin',
+        }
+
+        let response: Response
+        try {
+          response = await fetch(verifyUrl, verifyInit)
+        } catch {
+          response = await fetch(`${window.location.origin}${verifyUrl}`, verifyInit)
+        }
 
         if (!response.ok) {
           setAdminUser(null)
@@ -95,7 +104,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         setIsAdmin(true)
         setIsAuthenticated(true)
       } catch (error) {
-        console.error('Erro ao verificar sessão de admin:', error)
+        console.error('Erro de rede ao verificar sessão de admin:', error)
         setUser(null)
         setAdminUser(null)
         setIsAuthenticated(false)

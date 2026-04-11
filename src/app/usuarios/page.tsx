@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { createClient } from '@/lib/supabase-client';
+import { useAuditLog } from '@/hooks/useAuditLog';
 
 
 interface Usuario {
@@ -37,6 +38,7 @@ export default function UsuariosPage() {
   const [activeMenu, setActiveMenu] = useState('usuarios');
   const { loading: authLoading } = useRequireSupabaseAuth();
   const supabase = useMemo(() => createClient(), []);
+  const { registrarAcao } = useAuditLog();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [usuariosLoading, setUsuariosLoading] = useState(true);
   const [usuariosError, setUsuariosError] = useState('');
@@ -312,12 +314,33 @@ export default function UsuariosPage() {
     if (!res.ok) {
       const err = await res.json();
       setEditError(err?.error || 'Falha ao salvar usuario.');
+      await registrarAcao({
+        acao: 'editar',
+        modulo: 'usuarios',
+        area: 'perfil',
+        tabela_afetada: 'ministry_users',
+        registro_id: editData.user_id,
+        descricao: `Falha ao editar usuário: ${editData.email}`,
+        status: 'erro',
+        mensagem_erro: err?.error,
+      });
       setEditSaving(false);
       return;
     }
 
     setEditStatus('Usuario atualizado com sucesso.');
     setEditSaving(false);
+
+    await registrarAcao({
+      acao: 'editar',
+      modulo: 'usuarios',
+      area: 'perfil',
+      tabela_afetada: 'ministry_users',
+      registro_id: editData.user_id,
+      descricao: `Usuário editado: ${editData.email} (nível: ${editData.nivel})`,
+      dados_novos: { nome: editData.nome, email: editData.email, nivel: editData.nivel, status: editData.status },
+      status: 'sucesso',
+    });
 
     const { data: sessionData } = await supabase.auth.getSession();
     const refreshToken = sessionData.session?.access_token;
@@ -364,9 +387,30 @@ export default function UsuariosPage() {
     if (!res.ok) {
       const err = await res.json();
       alert(err?.error || 'Falha ao remover usuário.');
+      await registrarAcao({
+        acao: 'deletar',
+        modulo: 'usuarios',
+        area: 'lista',
+        tabela_afetada: 'ministry_users',
+        registro_id: usuarioParaRemover.id,
+        descricao: `Falha ao remover usuário: ${usuarioParaRemover.email}`,
+        status: 'erro',
+        mensagem_erro: err?.error,
+      });
       setRemovendoUsuario(false);
       return;
     }
+
+    await registrarAcao({
+      acao: 'deletar',
+      modulo: 'usuarios',
+      area: 'lista',
+      tabela_afetada: 'ministry_users',
+      registro_id: usuarioParaRemover.id,
+      descricao: `Usuário removido: ${usuarioParaRemover.email} (${usuarioParaRemover.nivel})`,
+      dados_anteriores: { nome: usuarioParaRemover.nome, email: usuarioParaRemover.email, nivel: usuarioParaRemover.nivel },
+      status: 'sucesso',
+    });
 
     setUsuarios(prev => prev.filter(u => u.id !== usuarioParaRemover.id));
     setUsuarioParaRemover(null);
@@ -426,11 +470,29 @@ export default function UsuariosPage() {
     if (!res.ok) {
       const err = await res.json();
       setFormError(err?.error || 'Falha ao criar usuario.');
+      await registrarAcao({
+        acao: 'criar',
+        modulo: 'usuarios',
+        area: 'formulario',
+        tabela_afetada: 'ministry_users',
+        descricao: `Falha ao criar usuário: ${formData.email}`,
+        status: 'erro',
+        mensagem_erro: err?.error,
+      });
       setCreatingUser(false);
       return;
     }
 
     setFormStatus('Usuario criado com sucesso.');
+    await registrarAcao({
+      acao: 'criar',
+      modulo: 'usuarios',
+      area: 'formulario',
+      tabela_afetada: 'ministry_users',
+      descricao: `Novo usuário criado: ${formData.email} (nível: ${formData.nivel})`,
+      dados_novos: { nome: formData.nome.trim(), email: formData.email.trim(), nivel: formData.nivel },
+      status: 'sucesso',
+    });
     setFormData({
       nome: '',
       email: '',

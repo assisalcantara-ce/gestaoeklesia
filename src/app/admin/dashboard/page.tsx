@@ -159,12 +159,12 @@ export default function AdminDashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
               icon={Building2}
-              title="Total de Instituições"
+              title="Total de Ministérios"
               value={metrics?.total_ministries || 0}
             />
             <StatCard
               icon={Users}
-              title="Instituições Ativas"
+              title="Ministérios Ativos"
               value={metrics?.active_ministries || 0}
             />
             <StatCard

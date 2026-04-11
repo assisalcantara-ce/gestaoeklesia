@@ -7,6 +7,26 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
+function upperText(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim();
+  if (!normalized) return null;
+  return normalized.toUpperCase();
+}
+
+function lowerText(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim();
+  if (!normalized) return null;
+  return normalized.toLowerCase();
+}
+
+function onlyDigits(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const digits = String(value).replace(/\D/g, '');
+  return digits.length ? digits : null;
+}
+
 export async function PUT(request: NextRequest) {
   try {
     const guard = await requireAdmin(request, { requiredRole: 'admin' });
@@ -56,23 +76,23 @@ export async function PUT(request: NextRequest) {
     const updateData: any = {};
 
     // Adicionar cada campo ao objeto de atualização se fornecido
-    if (ministry_name !== undefined) updateData.ministry_name = ministry_name;
-    if (cpf_cnpj !== undefined) updateData.cpf_cnpj = cpf_cnpj;
-    if (phone !== undefined) updateData.phone = phone;
-    if (email !== undefined) updateData.email = email;
-    if (whatsapp !== undefined) updateData.whatsapp = whatsapp;
-    if (website !== undefined) updateData.website = website;
-    if (responsible_name !== undefined) updateData.responsible_name = responsible_name;
-    if (pastor_name !== undefined) updateData.pastor_name = pastor_name;
-    if (address_zip !== undefined) updateData.address_zip = address_zip;
-    if (address_street !== undefined) updateData.address_street = address_street;
-    if (address_number !== undefined) updateData.address_number = address_number;
-    if (address_complement !== undefined) updateData.address_complement = address_complement;
-    if (address_city !== undefined) updateData.address_city = address_city;
-    if (address_state !== undefined) updateData.address_state = address_state;
+    if (ministry_name !== undefined) updateData.ministry_name = upperText(ministry_name);
+    if (cpf_cnpj !== undefined) updateData.cpf_cnpj = onlyDigits(cpf_cnpj);
+    if (phone !== undefined) updateData.phone = onlyDigits(phone);
+    if (email !== undefined) updateData.email = lowerText(email);
+    if (whatsapp !== undefined) updateData.whatsapp = onlyDigits(whatsapp);
+    if (website !== undefined) updateData.website = lowerText(website);
+    if (responsible_name !== undefined) updateData.responsible_name = upperText(responsible_name);
+    if (pastor_name !== undefined) updateData.pastor_name = upperText(pastor_name);
+    if (address_zip !== undefined) updateData.address_zip = onlyDigits(address_zip);
+    if (address_street !== undefined) updateData.address_street = upperText(address_street);
+    if (address_number !== undefined) updateData.address_number = upperText(address_number);
+    if (address_complement !== undefined) updateData.address_complement = upperText(address_complement);
+    if (address_city !== undefined) updateData.address_city = upperText(address_city);
+    if (address_state !== undefined) updateData.address_state = upperText(address_state);
     if (quantity_temples !== undefined) updateData.quantity_temples = quantity_temples;
     if (quantity_members !== undefined) updateData.quantity_members = quantity_members;
-    if (description !== undefined) updateData.description = description;
+    if (description !== undefined) updateData.description = upperText(description);
     if (plan !== undefined) updateData.plan = plan;
     if (body.status !== undefined) updateData.status = body.status;
 

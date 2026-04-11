@@ -317,7 +317,7 @@ export default function NomenclaturaPage() {
     try {
       const ministryId = await resolveMinistryId();
       if (!ministryId) {
-        alert('Não foi possível identificar sua instituição para salvar as nomenclaturas.');
+        alert('Não foi possível identificar seu ministério para salvar as nomenclaturas.');
         return;
       }
 
@@ -356,7 +356,7 @@ export default function NomenclaturaPage() {
         <div className="p-6">
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold text-gray-800">📝 Nomenclaturas da Instituição</h1>
+            <h1 className="text-3xl font-bold text-gray-800">📝 Nomenclaturas do Ministério</h1>
             <button
               onClick={() => {
                 if (isEditing) {
@@ -380,7 +380,7 @@ export default function NomenclaturaPage() {
           {/* Explicação */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <p className="text-blue-900 text-sm">
-              <strong>ℹ️ Informação:</strong> Customize os nomes das divisões internas da sua instituição. 
+              <strong>ℹ️ Informação:</strong> Customize os nomes das divisões internas do seu ministério. 
               Essas nomenclaturas serão utilizadas em toda a plataforma e nos documentos gerados.
             </p>
           </div>

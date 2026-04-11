@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
@@ -25,6 +25,11 @@ export default function MinisteriosPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreviewSrc, setLogoPreviewSrc] = useState<string>('')
   const [logoPreviewObjectUrl, setLogoPreviewObjectUrl] = useState<string>('')
+  const [cepLookupLoading, setCepLookupLoading] = useState(false)
+  const [cepLookupError, setCepLookupError] = useState('')
+  const [cepResolved, setCepResolved] = useState('')
+  const cepLookupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastCepRequestedRef = useRef('')
   const [activeTab, setActiveTab] = useState<'ativos' | 'precadastros'>('ativos')
   const [confirmDeleteMinisterio, setConfirmDeleteMinisterio] = useState<SupabaseMinistry | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -33,6 +38,7 @@ export default function MinisteriosPage() {
   useEffect(() => {
     return () => {
       if (logoPreviewObjectUrl) URL.revokeObjectURL(logoPreviewObjectUrl)
+      if (cepLookupTimeoutRef.current) clearTimeout(cepLookupTimeoutRef.current)
     }
   }, [logoPreviewObjectUrl])
 
@@ -84,6 +90,10 @@ export default function MinisteriosPage() {
     setLogoPreviewObjectUrl('')
     setLogoPreviewSrc('')
     setLogoFile(null)
+    setCepLookupLoading(false)
+    setCepLookupError('')
+    setCepResolved('')
+    lastCepRequestedRef.current = ''
   }
 
   useEffect(() => {
@@ -130,11 +140,22 @@ export default function MinisteriosPage() {
 
   const fetchCep = async (cepDigits: string) => {
     try {
+      setCepLookupLoading(true)
+      setCepLookupError('')
+
       const response = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`)
-      if (!response.ok) return
+      if (!response.ok) {
+        setCepLookupError('Não foi possível consultar o CEP agora. Tente novamente.')
+        setCepResolved('')
+        return
+      }
 
       const data = await response.json()
-      if (data?.erro) return
+      if (data?.erro) {
+        setCepLookupError('CEP não encontrado.')
+        setCepResolved('')
+        return
+      }
 
       setFormData((prev) => ({
         ...prev,
@@ -142,10 +163,48 @@ export default function MinisteriosPage() {
         address_city: data.localidade || prev.address_city,
         address_state: data.uf || prev.address_state,
       }))
+
+      setCepResolved(cepDigits)
     } catch {
-      // Silenciar erros de autocomplete
+      setCepLookupError('Erro ao buscar CEP. Verifique sua conexão e tente novamente.')
+      setCepResolved('')
+    } finally {
+      setCepLookupLoading(false)
     }
   }
+
+  useEffect(() => {
+    const cepDigits = onlyDigits(formData.address_zip || '')
+
+    if (cepLookupTimeoutRef.current) {
+      clearTimeout(cepLookupTimeoutRef.current)
+      cepLookupTimeoutRef.current = null
+    }
+
+    if (cepDigits.length < 8) {
+      setCepLookupLoading(false)
+      setCepLookupError('')
+      if (cepResolved && cepResolved !== cepDigits) setCepResolved('')
+      return
+    }
+
+    if (cepDigits === lastCepRequestedRef.current) {
+      return
+    }
+
+    cepLookupTimeoutRef.current = setTimeout(() => {
+      lastCepRequestedRef.current = cepDigits
+      fetchCep(cepDigits)
+    }, 450)
+
+    return () => {
+      if (cepLookupTimeoutRef.current) {
+        clearTimeout(cepLookupTimeoutRef.current)
+        cepLookupTimeoutRef.current = null
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.address_zip])
 
   const compressLogo = async (file: File) => {
     const maxSize = 512
@@ -286,17 +345,17 @@ export default function MinisteriosPage() {
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Erro ao criar instituição')
+        throw new Error(error.error || 'Erro ao criar ministério')
       }
 
       const payload = await response.json()
       const creds = payload?.credentials
       setSuccess(
         editingId
-          ? 'Instituição atualizada com sucesso!'
+          ? 'Ministério atualizado com sucesso!'
           : creds?.email && creds?.password
-            ? `Instituição criada com sucesso! Credenciais geradas: ${creds.email} / ${creds.password}`
-            : 'Instituição criada com sucesso!'
+            ? `Ministério criado com sucesso! Credenciais geradas: ${creds.email} / ${creds.password}`
+            : 'Ministério criado com sucesso!'
       )
       resetForm()
       setEditingId(null)
@@ -354,7 +413,7 @@ export default function MinisteriosPage() {
 
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}))
-        throw new Error(payload.error || 'Erro ao remover instituição')
+        throw new Error(payload.error || 'Erro ao remover ministério')
       }
 
       setConfirmDeleteMinisterio(null)
@@ -373,8 +432,8 @@ export default function MinisteriosPage() {
 
       <main className="flex-1 overflow-auto">
         <div className="sticky top-0 bg-gray-950 border-b border-gray-800 px-6 py-4 z-10">
-          <h2 className="text-2xl font-bold text-white">PAINEL ADMINISTRATIVO: INSTITUIÇÕES</h2>
-          <p className="text-gray-400 text-sm mt-1">Gerencie todas as instituições/clientes</p>
+          <h2 className="text-2xl font-bold text-white">PAINEL ADMINISTRATIVO: MINISTÉRIOS</h2>
+          <p className="text-gray-400 text-sm mt-1">Gerencie todos os ministérios/clientes</p>
         </div>
 
         <div className="p-6 space-y-6">
@@ -402,7 +461,7 @@ export default function MinisteriosPage() {
                       : 'text-gray-400 hover:text-gray-200'
                   }`}
                 >
-                  📋 Instituições Ativas
+                  📋 Ministérios Ativos
                 </button>
                 <button
                   onClick={() => setActiveTab('precadastros')}
@@ -417,10 +476,10 @@ export default function MinisteriosPage() {
               </div>
             </div>
 
-        {/* TAB: Instituições Ativas */}
+        {/* TAB: Ministérios Ativos */}
         {activeTab === 'ativos' && (
           <>
-            {/* Botão para novo instituição */}
+            {/* Botão para novo ministério */}
               <div className="mb-6 flex items-center gap-3">
                 <button
                   onClick={() => {
@@ -440,7 +499,7 @@ export default function MinisteriosPage() {
                       : 'bg-blue-600 hover:bg-blue-700'
                   }`}
                 >
-                  {showForm ? (editingId ? 'Cancelar edição' : 'Cancelar') : '+ Nova Instituição'}
+                  {showForm ? (editingId ? 'Cancelar edição' : 'Cancelar') : '+ Novo Ministério'}
                 </button>
               </div>
 
@@ -448,7 +507,7 @@ export default function MinisteriosPage() {
               {showForm && (
                 <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6 mb-8 text-gray-100">
                   <h3 className="text-xl font-bold mb-4">
-                    {editingId ? 'Editar Instituição' : 'Nova Instituição'}
+                    {editingId ? 'Editar Ministério' : 'Novo Ministério'}
                   </h3>
                 <form
                   onSubmit={handleSubmit}
@@ -459,14 +518,13 @@ export default function MinisteriosPage() {
                     <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">Informações Básicas</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Nome da Instituição *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Nome do Ministério *</label>
                         <input
                           type="text"
                           value={formData.name}
                           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                           required
                           className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                          placeholder="Ex: Igreja Assembleia de Deus"
                         />
                       </div>
                       <div>
@@ -485,7 +543,6 @@ export default function MinisteriosPage() {
                               ? 'border-green-500'
                               : 'border-gray-300'
                           }`}
-                          placeholder="00.000.000/0000-00"
                           maxLength={18}
                         />
                         {formData.cnpj.length === 14 && !validarCnpj(formData.cnpj) && (
@@ -545,7 +602,6 @@ export default function MinisteriosPage() {
                                 value={formData.logo_url}
                                 onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                placeholder="(opcional) URL da foto"
                               />
                               <button
                                 type="button"
@@ -589,7 +645,6 @@ export default function MinisteriosPage() {
                       onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
                       required
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      placeholder="contato@ministerio.com"
                     />
                   </div>
                   <div>
@@ -602,7 +657,6 @@ export default function MinisteriosPage() {
                         setFormData({ ...formData, contact_phone: digits })
                       }}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      placeholder="(11) 3000-0000"
                     />
                   </div>
                   <div>
@@ -615,7 +669,6 @@ export default function MinisteriosPage() {
                         setFormData({ ...formData, whatsapp: digits })
                       }}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      placeholder="(11) 99000-0000"
                     />
                   </div>
                   <div>
@@ -625,7 +678,6 @@ export default function MinisteriosPage() {
                       value={formData.website}
                       onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      placeholder="https://www.ministerio.com"
                     />
                   </div>
                 </div>
@@ -642,7 +694,6 @@ export default function MinisteriosPage() {
                       value={formData.responsible_name}
                       onChange={(e) => setFormData({ ...formData, responsible_name: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      placeholder="Ex: Pastor João Silva"
                     />
                   </div>
                 </div>
@@ -660,7 +711,6 @@ export default function MinisteriosPage() {
                         value={formData.access_email}
                         onChange={(e) => setFormData({ ...formData, access_email: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                        placeholder="(opcional) novo email"
                       />
                     </div>
                     <div>
@@ -670,7 +720,6 @@ export default function MinisteriosPage() {
                         value={formData.access_password}
                         onChange={(e) => setFormData({ ...formData, access_password: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                        placeholder="(opcional) min. 6 caracteres"
                       />
                     </div>
                   </div>
@@ -693,14 +742,21 @@ export default function MinisteriosPage() {
                         const formatted = formatCep(e.target.value)
                         const digits = onlyDigits(formatted)
                         setFormData({ ...formData, address_zip: formatted })
-                        if (digits.length === 8) {
-                          fetchCep(digits)
-                        }
+                        setCepLookupError('')
+                        if (digits.length < 8) setCepResolved('')
                       }}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      placeholder="00000-000"
                       maxLength={9}
                     />
+                    {cepLookupLoading && (
+                      <p className="mt-1 text-xs text-blue-600">Buscando endereço pelo CEP...</p>
+                    )}
+                    {!cepLookupLoading && cepLookupError && (
+                      <p className="mt-1 text-xs text-red-600">{cepLookupError}</p>
+                    )}
+                    {!cepLookupLoading && !cepLookupError && cepResolved === onlyDigits(formData.address_zip || '') && (
+                      <p className="mt-1 text-xs text-green-600">CEP localizado e endereço preenchido automaticamente.</p>
+                    )}
                   </div>
                 </div>
 
@@ -712,7 +768,6 @@ export default function MinisteriosPage() {
                       value={formData.address_street}
                       onChange={(e) => setFormData({ ...formData, address_street: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      placeholder="Rua das Flores"
                     />
                   </div>
                   <div>
@@ -722,7 +777,6 @@ export default function MinisteriosPage() {
                       value={formData.address_number}
                       onChange={(e) => setFormData({ ...formData, address_number: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      placeholder="123"
                     />
                   </div>
                   <div>
@@ -732,7 +786,6 @@ export default function MinisteriosPage() {
                       value={formData.address_complement}
                       onChange={(e) => setFormData({ ...formData, address_complement: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      placeholder="Apto 42, Bloco A"
                     />
                   </div>
                   <div>
@@ -742,7 +795,6 @@ export default function MinisteriosPage() {
                       value={formData.address_city}
                       onChange={(e) => setFormData({ ...formData, address_city: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      placeholder="São Paulo"
                     />
                   </div>
                   <div>
@@ -795,7 +847,6 @@ export default function MinisteriosPage() {
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      placeholder="Descreva brevemente o ministério..."
                       rows={4}
                     />
                   </div>
@@ -835,18 +886,18 @@ export default function MinisteriosPage() {
                 type="submit"
                 className="mt-6 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium"
               >
-                {editingId ? 'Atualizar Instituição' : 'Criar Instituição'}
+                {editingId ? 'Atualizar Ministério' : 'Criar Ministério'}
               </button>
             </form>
           </div>
         )}
 
-        {/* Lista de instituições */}
+        {/* Lista de ministérios */}
             {loading ? (
               <div className="text-center text-gray-400 py-12">Carregando...</div>
             ) : ministerios.length === 0 ? (
               <div className="text-center text-gray-400 py-12">
-                Nenhuma instituição cadastrada
+                Nenhum ministério cadastrado
               </div>
             ) : (
               <div className="bg-gray-800 border border-gray-700 rounded-lg shadow overflow-hidden">
@@ -906,7 +957,7 @@ export default function MinisteriosPage() {
         </div>
       </main>
 
-      {/* Modal: Confirmar remoção de instituição */}
+      {/* Modal: Confirmar remoção de ministério */}
       {confirmDeleteMinisterio && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 border border-red-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-gray-100">
@@ -916,7 +967,7 @@ export default function MinisteriosPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </div>
-              <h2 className="text-lg font-bold text-white">Remover instituição?</h2>
+              <h2 className="text-lg font-bold text-white">Remover ministério?</h2>
             </div>
             <p className="text-sm text-gray-300 mb-1">
               Você está prestes a remover permanentemente:
@@ -928,7 +979,7 @@ export default function MinisteriosPage() {
               )}
             </div>
             <div className="bg-red-950/40 border border-red-800/50 rounded-lg px-4 py-3 mb-5">
-              <p className="text-xs text-red-400 font-medium">⚠️ Esta ação é irreversível. Todos os dados da instituição serão excluídos.</p>
+              <p className="text-xs text-red-400 font-medium">⚠️ Esta ação é irreversível. Todos os dados do ministério serão excluídos.</p>
             </div>
             <div className="flex gap-3">
               <button

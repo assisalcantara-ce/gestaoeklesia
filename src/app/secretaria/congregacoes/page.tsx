@@ -1090,6 +1090,7 @@ export default function CongregacoesPage() {
       ministry_id: ministryId,
       supervisao_id: d3Enabled ? (formD2.supervisao_id || null) : null,
       nome: formD2.nome.trim(),
+      municipio: formD2.municipio.trim() || null,
       is_sede: d3Enabled ? !!formD2.is_sede : false,
       pastor_member_id: formD2.informar_pastor ? (formD2.pastor_member_id || null) : null,
       pastor_nome: formD2.informar_pastor ? (formD2.pastor_nome || formD2.pastor_nome_input || null) : null,
@@ -2411,17 +2412,31 @@ export default function CongregacoesPage() {
                     </h3>
 
                     <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Nome do {nomeD2}
-                        </label>
-                        <input
-                          type="text"
-                          value={formD2.nome}
-                          onChange={(e) => setFormD2(prev => ({ ...prev, nome: e.target.value }))}
-                          placeholder={`Ex: ${nomeD2} Baixada Santista`}
-                          className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Nome do {nomeD2}
+                          </label>
+                          <input
+                            type="text"
+                            value={formD2.nome}
+                            onChange={(e) => setFormD2(prev => ({ ...prev, nome: e.target.value }))}
+                            placeholder={`Ex: ${nomeD2} Baixada Santista`}
+                            className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Município
+                          </label>
+                          <input
+                            type="text"
+                            value={formD2.municipio}
+                            onChange={(e) => setFormD2(prev => ({ ...prev, municipio: e.target.value }))}
+                            placeholder="Ex: São Paulo"
+                            className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
                       </div>
 
 
@@ -2691,7 +2706,7 @@ export default function CongregacoesPage() {
                                   pastor_nome: c.pastor_nome || '',
                                   pastor_data_posse: (c.pastor_data_posse as any) || '',
                                   cep: '',
-                                  municipio: '',
+                                  municipio: (c.municipio as any) || '',
                                   uf: ''
                                 });
                                 setSelectedD1IdsForD2(divisoes3.filter(cg => cg.campo_id === c.id).map(cg => cg.id));

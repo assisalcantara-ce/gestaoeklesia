@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const normalizedBody = normalizePayloadToUppercase(body, {
-      preserveKeys: ['data_admissao'],
+      preserveKeys: ['data_admissao', 'email', 'member_id'],
     })
     
     const {
@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
           grupo,
           funcao,
           data_admissao,
-          email: typeof email === 'string' ? email.toLowerCase() : email,
+          email: typeof email === 'string' ? email.toLowerCase().trim() || null : email,
           telefone,
           whatsapp,
           rg,

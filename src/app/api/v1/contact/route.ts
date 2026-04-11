@@ -6,6 +6,10 @@ import { consumeRateLimit } from '@/lib/rate-limit-db'
 
 export async function POST(request: NextRequest) {
   try {
+    const upperText = (value?: string | null) => value?.trim().toUpperCase() || ''
+    const lowerText = (value?: string | null) => value?.trim().toLowerCase() || ''
+    const onlyDigits = (value?: string | null) => value?.replace(/\D/g, '') || ''
+
     const buildTicketNumber = () => `LND-${Date.now().toString(36).toUpperCase()}`
     const ip = getClientIp(request)
     const limit = Number(process.env.PUBLIC_RATE_LIMIT_CONTACT_PER_10MIN || 10)
@@ -57,45 +61,67 @@ export async function POST(request: NextRequest) {
       plan,
     } = body
 
-    console.log('[CONTACT] Recebido:', { ministerio, pastor, cpf, whatsapp, email })
+    const ministryName = upperText(ministerio)
+    const pastorName = upperText(pastor)
+    const cpfCnpj = onlyDigits(cpf)
+    const whatsappNumber = onlyDigits(whatsapp)
+    const emailValue = lowerText(email)
+    const phoneValue = onlyDigits(phone) || null
+    const websiteValue = lowerText(website) || null
+    const responsibleName = upperText(responsible_name) || pastorName || null
+    const addressStreet = upperText(address_street) || null
+    const addressNumber = upperText(address_number) || null
+    const addressComplement = upperText(address_complement) || null
+    const addressCity = upperText(address_city) || null
+    const addressState = upperText(address_state) || null
+    const addressZip = onlyDigits(address_zip) || null
+    const descriptionValue = upperText(description) || null
+
+    console.log('[CONTACT] Recebido:', {
+      ministerio: ministryName,
+      pastor: pastorName,
+      cpf: cpfCnpj,
+      whatsapp: whatsappNumber,
+      email: emailValue,
+    })
 
     // Validações básicas
-    if (!ministerio?.trim()) {
+    if (!ministryName) {
       return NextResponse.json(
         { error: 'Nome do ministério é obrigatório' },
         { status: 400 }
       )
     }
 
-    if (!pastor?.trim()) {
+    if (!pastorName) {
       return NextResponse.json(
         { error: 'Nome do pastor é obrigatório' },
         { status: 400 }
       )
     }
 
-    if (!cpf?.trim()) {
+    if (!cpfCnpj) {
       return NextResponse.json(
         { error: 'CPF/CNPJ é obrigatório' },
         { status: 400 }
       )
     }
 
-    if (!whatsapp?.trim()) {
+    if (!whatsappNumber) {
       return NextResponse.json(
         { error: 'WhatsApp é obrigatório' },
         { status: 400 }
       )
     }
 
-    if (!email?.trim()) {
+    if (!emailValue) {
       return NextResponse.json(
         { error: 'Email é obrigatório' },
         { status: 400 }
       )
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
       return NextResponse.json(
         { error: 'Email inválido' },
         { status: 400 }
@@ -119,8 +145,8 @@ export async function POST(request: NextRequest) {
       const { data: dupData, error: dupError } = await supabaseAdmin.rpc(
         'check_pre_registration_duplicate',
         {
-          p_email: email,
-          p_cpf_cnpj: cpf,
+          p_email: emailValue,
+          p_cpf_cnpj: cpfCnpj,
         }
       )
 
@@ -162,23 +188,23 @@ export async function POST(request: NextRequest) {
       .from('pre_registrations')
       .insert({
         user_id: null,
-        ministry_name: ministerio,
-        pastor_name: pastor,
-        cpf_cnpj: cpf,
-        whatsapp,
-        email,
-        phone: phone || null,
-        website: website || null,
-        responsible_name: responsible_name || pastor || null,
+        ministry_name: ministryName,
+        pastor_name: pastorName,
+        cpf_cnpj: cpfCnpj,
+        whatsapp: whatsappNumber,
+        email: emailValue,
+        phone: phoneValue,
+        website: websiteValue,
+        responsible_name: responsibleName,
         quantity_temples: templesValue,
         quantity_members: membersValue,
-        address_street: address_street || null,
-        address_number: address_number || null,
-        address_complement: address_complement || null,
-        address_city: address_city || null,
-        address_state: address_state || null,
-        address_zip: address_zip || null,
-        description: description || null,
+        address_street: addressStreet,
+        address_number: addressNumber,
+        address_complement: addressComplement,
+        address_city: addressCity,
+        address_state: addressState,
+        address_zip: addressZip,
+        description: descriptionValue,
         plan: planValue,
         trial_expires_at: new Date().toISOString(), // Data de hoje para pendente; será atualizada quando aprovado
         trial_days: 0,
@@ -211,25 +237,25 @@ export async function POST(request: NextRequest) {
       request,
       route: 'v1/contact',
       type: 'request_ok',
-      email,
+      email: emailValue,
       meta: {
         contact_id: contact.id,
       },
     })
 
     const landingTicketNumber = buildTicketNumber()
-    const landingDescription = description?.trim()
-      ? description.trim()
+    const landingDescription = descriptionValue
+      ? descriptionValue
       : 'Solicitação de contato recebida pela landing page.'
 
     const { error: landingTicketError } = await supabaseAdmin
       .from('support_tickets_landing')
       .insert({
         ticket_number: landingTicketNumber,
-        institution_name: ministerio,
-        contact_name: responsible_name || pastor,
-        email,
-        whatsapp,
+        institution_name: ministryName,
+        contact_name: responsibleName || pastorName,
+        email: emailValue,
+        whatsapp: whatsappNumber,
         description: landingDescription,
         status: 'open',
         priority: 'medium',
@@ -248,15 +274,15 @@ export async function POST(request: NextRequest) {
       .insert({
         admin_id: null, // Notificação para todos os admins
         type: 'new_contact_request',
-        title: `📝 Nova Solicitação de Contato: ${ministerio}`,
-        message: `Pastor: ${pastor} | Email: ${email} | WhatsApp: ${whatsapp} | Plano: ${planValue}`,
+        title: `📝 Nova Solicitação de Contato: ${ministryName}`,
+        message: `Pastor: ${pastorName} | Email: ${emailValue} | WhatsApp: ${whatsappNumber} | Plano: ${planValue}`,
         data: {
           contact_id: contact.id,
-          ministry_name: ministerio,
-          pastor_name: pastor,
-          cpf_cnpj: cpf,
-          email,
-          whatsapp,
+          ministry_name: ministryName,
+          pastor_name: pastorName,
+          cpf_cnpj: cpfCnpj,
+          email: emailValue,
+          whatsapp: whatsappNumber,
           plan: planValue,
         },
         is_read: false,

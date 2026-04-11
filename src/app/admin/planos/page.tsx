@@ -18,6 +18,7 @@ export default function PlanosPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null)
+  const [showInactive, setShowInactive] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const router = useRouter()
@@ -40,6 +41,10 @@ export default function PlanosPage() {
     price_annually: '',
     max_users: '',
     max_members: '',
+    members_unlimited: false,
+    max_ministerios: '',
+    additional_church_monthly_fee: '50',
+    additional_admin_users_per_church: '2',
     setup_fee: '',
     has_api_access: false,
     has_advanced_reports: false,
@@ -101,7 +106,10 @@ export default function PlanosPage() {
           price_monthly: parseFloat(formData.price_monthly),
           price_annually: parseFloat(formData.price_annually || '0'),
           max_users: parseInt(formData.max_users),
-          max_members: parseInt(formData.max_members),
+          max_members: formData.members_unlimited ? 0 : parseInt(formData.max_members || '0'),
+          max_ministerios: parseInt(formData.max_ministerios),
+          additional_church_monthly_fee: parseFloat(formData.additional_church_monthly_fee || '0'),
+          additional_admin_users_per_church: parseInt(formData.additional_admin_users_per_church || '0'),
           setup_fee: parseFloat(formData.setup_fee || '0'),
         }),
       })
@@ -128,6 +136,10 @@ export default function PlanosPage() {
       price_annually: '',
       max_users: '',
       max_members: '',
+      members_unlimited: false,
+      max_ministerios: '',
+      additional_church_monthly_fee: '50',
+      additional_admin_users_per_church: '2',
       setup_fee: '',
       has_api_access: false,
       has_advanced_reports: false,
@@ -149,7 +161,11 @@ export default function PlanosPage() {
       price_monthly: plan.price_monthly.toString(),
       price_annually: (plan.price_annually || 0).toString(),
       max_users: plan.max_users.toString(),
-      max_members: plan.max_members.toString(),
+      max_members: plan.max_members > 0 ? plan.max_members.toString() : '',
+      members_unlimited: plan.max_members <= 0,
+      max_ministerios: String((plan as any).max_ministerios ?? ''),
+      additional_church_monthly_fee: String((plan as any).additional_church_monthly_fee ?? 50),
+      additional_admin_users_per_church: String((plan as any).additional_admin_users_per_church ?? 2),
       setup_fee: plan.setup_fee ? plan.setup_fee.toString() : '',
       has_api_access: plan.has_api_access,
       has_advanced_reports: plan.has_advanced_reports,
@@ -164,7 +180,8 @@ export default function PlanosPage() {
     }, 100)
   }
 
-  const orderedPlanos = [...planos].sort((a, b) => a.price_monthly - b.price_monthly)
+  const visiblePlanos = planos.filter((plan) => showInactive || plan.is_active)
+  const orderedPlanos = [...visiblePlanos].sort((a, b) => a.price_monthly - b.price_monthly)
 
   return (
     <div className="flex h-screen bg-gray-900">
@@ -191,15 +208,24 @@ export default function PlanosPage() {
             )}
 
             <div className="mb-6">
-              <button
-                onClick={() => {
-                  resetForm()
-                  setShowForm(!showForm)
-                }}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                {showForm ? 'Cancelar' : '+ Novo Plano'}
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => {
+                    resetForm()
+                    setShowForm(!showForm)
+                  }}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  {showForm ? 'Cancelar' : '+ Novo Plano'}
+                </button>
+
+                <button
+                  onClick={() => setShowInactive((prev) => !prev)}
+                  className="px-4 py-2 bg-gray-700 text-gray-100 rounded-lg hover:bg-gray-600 text-sm"
+                >
+                  {showInactive ? 'Ocultar Inativos' : 'Mostrar Inativos'}
+                </button>
+              </div>
             </div>
 
             {showForm && (
@@ -212,9 +238,9 @@ export default function PlanosPage() {
                   className="grid grid-cols-1 md:grid-cols-3 gap-4 [&_input]:bg-gray-900 [&_input]:border-gray-700 [&_input]:text-gray-100 [&_input]:placeholder:text-gray-500 [&_textarea]:bg-gray-900 [&_textarea]:border-gray-700 [&_textarea]:text-gray-100 [&_textarea]:placeholder:text-gray-500"
                 >
                   <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Nome do Plano</label>
                     <input
                       type="text"
-                      placeholder="Nome do Plano"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
@@ -222,59 +248,124 @@ export default function PlanosPage() {
                     />
                   </div>
 
-                  <input
-                    type="number"
-                    placeholder="Usuários Administrativos"
-                    value={formData.max_users}
-                    onChange={(e) => setFormData({ ...formData, max_users: e.target.value })}
-                    required
-                    className="px-4 py-2 border rounded-lg"
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Usuários Administrativos</label>
+                    <input
+                      type="number"
+                      value={formData.max_users}
+                      onChange={(e) => setFormData({ ...formData, max_users: e.target.value })}
+                      required
+                      className="w-full px-4 py-2 border rounded-lg"
+                    />
+                  </div>
 
-                  <input
-                    type="number"
-                    placeholder="Máximo de Membros"
-                    value={formData.max_members}
-                    onChange={(e) => setFormData({ ...formData, max_members: e.target.value })}
-                    required
-                    className="px-4 py-2 border rounded-lg"
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Máximo de Membros</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.max_members}
+                      onChange={(e) => setFormData({ ...formData, max_members: e.target.value })}
+                      disabled={formData.members_unlimited}
+                      className="w-full px-4 py-2 border rounded-lg"
+                    />
+                    <label className="mt-2 flex items-center gap-2 text-sm text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={formData.members_unlimited}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            members_unlimited: e.target.checked,
+                            max_members: e.target.checked ? '' : formData.max_members,
+                          })
+                        }
+                        className="w-4 h-4 rounded"
+                      />
+                      Membros ilimitados
+                    </label>
+                  </div>
 
-                  <textarea
-                    placeholder="Descrição"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="md:col-span-3 px-4 py-2 border rounded-lg"
-                    rows={2}
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Igrejas Inclusas</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.max_ministerios}
+                      onChange={(e) => setFormData({ ...formData, max_ministerios: e.target.value })}
+                      required
+                      className="w-full px-4 py-2 border rounded-lg"
+                    />
+                  </div>
 
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Preço Mensal (R$)"
-                    value={formData.price_monthly}
-                    onChange={(e) => setFormData({ ...formData, price_monthly: e.target.value })}
-                    required
-                    className="px-4 py-2 border rounded-lg"
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Taxa por Igreja Adicional (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.additional_church_monthly_fee}
+                      onChange={(e) => setFormData({ ...formData, additional_church_monthly_fee: e.target.value })}
+                      required
+                      className="w-full px-4 py-2 border rounded-lg"
+                    />
+                  </div>
 
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Preço Anual (R$)"
-                    value={formData.price_annually}
-                    onChange={(e) => setFormData({ ...formData, price_annually: e.target.value })}
-                    className="px-4 py-2 border rounded-lg"
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Admins por Igreja Adicional</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.additional_admin_users_per_church}
+                      onChange={(e) => setFormData({ ...formData, additional_admin_users_per_church: e.target.value })}
+                      required
+                      className="w-full px-4 py-2 border rounded-lg"
+                    />
+                  </div>
 
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Preço de Implantação (R$)"
-                    value={formData.setup_fee}
-                    onChange={(e) => setFormData({ ...formData, setup_fee: e.target.value })}
-                    className="px-4 py-2 border rounded-lg"
-                  />
+                  <div className="md:col-span-3">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Descrição</label>
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="w-full px-4 py-2 border rounded-lg"
+                      rows={2}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Preço Mensal (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.price_monthly}
+                      onChange={(e) => setFormData({ ...formData, price_monthly: e.target.value })}
+                      required
+                      className="w-full px-4 py-2 border rounded-lg"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Preço Anual (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.price_annually}
+                      onChange={(e) => setFormData({ ...formData, price_annually: e.target.value })}
+                      className="w-full px-4 py-2 border rounded-lg"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Preço de Implantação (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.setup_fee}
+                      onChange={(e) => setFormData({ ...formData, setup_fee: e.target.value })}
+                      className="w-full px-4 py-2 border rounded-lg"
+                    />
+                  </div>
 
 
                   <h3 className="md:col-span-3 font-semibold text-lg mt-4">Recursos</h3>
@@ -358,7 +449,7 @@ export default function PlanosPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {loading ? (
                 <div className="md:col-span-3 text-center text-gray-400">Carregando...</div>
-              ) : planos.length === 0 ? (
+              ) : orderedPlanos.length === 0 ? (
                 <div className="md:col-span-3 text-center text-gray-400">Nenhum plano encontrado</div>
               ) : (
                 orderedPlanos.map((plan) => (
@@ -368,7 +459,12 @@ export default function PlanosPage() {
                   >
                     <div className="bg-gradient-to-r from-blue-900 to-blue-700 text-white p-6">
                       <h3 className="text-2xl font-bold">{plan.name}</h3>
-                      <p className="text-blue-100 mt-2">{plan.description}</p>
+                      <p className="text-blue-100 mt-2">{plan.description || 'Sem descrição cadastrada.'}</p>
+                      {!plan.is_active && (
+                        <span className="inline-block mt-3 px-2 py-1 text-xs rounded bg-gray-900/40 border border-white/30">
+                          Inativo
+                        </span>
+                      )}
                     </div>
 
                     <div className="p-6 border-b border-gray-800">
@@ -387,11 +483,23 @@ export default function PlanosPage() {
                       <ul className="space-y-3 text-gray-200">
                         <li className="flex items-center text-sm">
                           <span className="font-semibold text-gray-100 mr-2"></span>
-                          Até {plan.max_members} Membros
+                          {plan.max_members > 0 ? `Até ${plan.max_members} Membros` : 'Membros ilimitados'}
+                        </li>
+                        <li className="flex items-center text-sm">
+                          <span className="font-semibold text-gray-100 mr-2">🏛️</span>
+                          Até {(plan as any).max_ministerios || 0} Igrejas Inclusas
                         </li>
                         <li className="flex items-center text-sm">
                           <span className="font-semibold text-gray-100 mr-2">👥</span>
                           Até {plan.max_users} Usuários Administrativos
+                        </li>
+                        <li className="flex items-center text-sm">
+                          <span className="font-semibold text-gray-100 mr-2">➕</span>
+                          R$ {Number((plan as any).additional_church_monthly_fee || 0).toFixed(2)} por igreja adicional/mês
+                        </li>
+                        <li className="flex items-center text-sm">
+                          <span className="font-semibold text-gray-100 mr-2">👤</span>
+                          +{(plan as any).additional_admin_users_per_church || 0} admins por igreja adicional
                         </li>
 
                         {plan.has_api_access && (
@@ -449,12 +557,29 @@ export default function PlanosPage() {
                           })
 
                           if (ok) {
-                            // TODO: Implementar DELETE
+                            try {
+                              setError('')
+                              setSuccess('')
+                              const response = await authenticatedFetch(`/api/v1/admin/plans/${plan.id}`, {
+                                method: 'DELETE',
+                              })
+
+                              if (!response.ok) {
+                                const payload = await response.json().catch(() => ({}))
+                                throw new Error(payload?.error || 'Erro ao desativar plano')
+                              }
+
+                              setSuccess(`Plano "${plan.name}" desativado.`)
+                              fetchPlanos()
+                            } catch (err: any) {
+                              setError(err.message || 'Erro ao desativar plano')
+                            }
                           }
                         }}
-                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                        disabled={!plan.is_active}
+                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Desativar
+                        {plan.is_active ? 'Desativar' : 'Inativo'}
                       </button>
                     </div>
                   </div>

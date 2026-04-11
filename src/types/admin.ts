@@ -18,6 +18,8 @@ export interface SubscriptionPlan {
   max_storage_bytes: number;
   max_members: number;
   max_ministerios: number;
+  additional_church_monthly_fee: number;
+  additional_admin_users_per_church: number;
   max_divisao1: number;
   max_divisao2: number;
   max_divisao3: number;
@@ -44,6 +46,13 @@ export interface Payment {
   id: string;
   ministry_id: string;
   asaas_payment_id?: string;
+  asaas_status?: string;
+  asaas_invoice_url?: string | null;
+  asaas_bank_slip_url?: string | null;
+  asaas_pix_qr_code?: string | null;
+  asaas_last_event?: string | null;
+  asaas_last_event_at?: string | null;
+  asaas_last_sync_at?: string | null;
   subscription_plan_id?: string;
   amount: number;
   description?: string;

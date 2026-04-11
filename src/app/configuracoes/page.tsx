@@ -39,7 +39,7 @@ export default function ConfiguracoesPage() {
       <div className="flex-1 overflow-auto">
         <div className="p-6">
           {/* Header */}
-          <h1 className="text-3xl font-bold text-gray-800 mb-6">⚙️ Configurações da Instituição</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-6">⚙️ Configurações do Ministério</h1>
 
           {/* Abas */}
           <div className="flex border-b border-gray-300 bg-white rounded-t-lg overflow-x-auto mb-6">
@@ -50,7 +50,7 @@ export default function ConfiguracoesPage() {
                 : 'text-gray-600 border-transparent hover:text-teal-600'
                 }`}
             >
-              🏛️ Perfil da Instituição
+              🏛️ Perfil do Ministério
             </button>
             <button
               onClick={() => setActiveTab('identidade')}
@@ -129,6 +129,7 @@ export default function ConfiguracoesPage() {
 function PerfilContent({ onNotification }: { onNotification: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {
   const supabase = createClient();
   const { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase } = require('@/lib/igreja-config-utils');
+  const { registrarAcao } = useAuditLog();
 
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -147,7 +148,7 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
     fetchConfiguracaoIgrejaFromSupabase(supabase)
       .then((config: any) => {
         setFormData({
-          nomeMinisterio: config.nome || 'Instituição',
+          nomeMinisterio: config.nome || 'Ministério',
           cnpj: config.cnpj || '',
           email: config.email || '',
           telefone: config.telefone || '',
@@ -187,10 +188,27 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
         website: formData.website,
         responsavel: formData.responsavel
       });
-      onNotification('Sucesso', 'Dados da instituição atualizados com sucesso!', 'success');
+      await registrarAcao({
+        acao: 'editar',
+        modulo: 'configuracoes',
+        area: 'perfil',
+        tabela_afetada: 'ministries',
+        descricao: 'Perfil do ministério atualizado',
+        status: 'sucesso',
+      });
+      onNotification('Sucesso', 'Dados do ministério atualizados com sucesso!', 'success');
       setIsEditing(false);
     } catch (error: any) {
       console.error('❌ Erro ao salvar perfil:', error);
+      await registrarAcao({
+        acao: 'editar',
+        modulo: 'configuracoes',
+        area: 'perfil',
+        tabela_afetada: 'ministries',
+        descricao: 'Falha ao atualizar perfil do ministério',
+        status: 'erro',
+        mensagem_erro: error?.message,
+      });
       onNotification('Erro', error?.message || 'Erro ao salvar. Tente novamente.', 'error');
     }
   };
@@ -198,7 +216,7 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Perfil da Instituição</h2>
+        <h2 className="text-2xl font-bold text-gray-800">Perfil do Ministério</h2>
         <button
           onClick={() => setIsEditing(!isEditing)}
           className={`px-6 py-2 rounded-lg transition font-semibold ${isEditing
@@ -213,7 +231,7 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Nome da Instituição</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Nome do Ministério</label>
             <input
               type="text"
               name="nomeMinisterio"
@@ -305,7 +323,7 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
             onChange={handleChange}
             disabled={!isEditing}
             rows={3}
-            placeholder="Informações sobre sua instituição"
+            placeholder="Informações sobre seu ministério"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
@@ -347,6 +365,7 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
 function BrandingContent({ onNotification }: { onNotification: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {
   const supabase = createClient();
   const { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase } = require('@/lib/igreja-config-utils');
+  const { registrarAcao } = useAuditLog();
 
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
@@ -379,8 +398,29 @@ function BrandingContent({ onNotification }: { onNotification: (title: string, m
 
   const handleSaveLogo = async () => {
     if (logoPreview) {
-      await updateConfiguracaoIgrejaInSupabase(supabase, { logo: logoPreview });
-      onNotification('Sucesso', 'Configurações salvas com sucesso!', 'success');
+      try {
+        await updateConfiguracaoIgrejaInSupabase(supabase, { logo: logoPreview });
+        await registrarAcao({
+          acao: 'editar',
+          modulo: 'configuracoes',
+          area: 'branding',
+          tabela_afetada: 'ministries',
+          descricao: 'Logomarca do ministério atualizada',
+          status: 'sucesso',
+        });
+        onNotification('Sucesso', 'Logomarca salva com sucesso!', 'success');
+      } catch (error: any) {
+        await registrarAcao({
+          acao: 'editar',
+          modulo: 'configuracoes',
+          area: 'branding',
+          tabela_afetada: 'ministries',
+          descricao: 'Falha ao salvar logomarca',
+          status: 'erro',
+          mensagem_erro: error?.message,
+        });
+        onNotification('Erro', 'Erro ao salvar logomarca. Tente novamente.', 'error');
+      }
     }
   };
 
@@ -439,7 +479,7 @@ function BrandingContent({ onNotification }: { onNotification: (title: string, m
 
       <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-gray-700">
-          💡 <strong>Dica:</strong> As informações da chiesa (nome, endereço, CNPJ, telefone, email) são configuradas na aba <strong>"Perfil da Instituição"</strong> e serão exibidas automaticamente no cabeçalho dos relatórios em PDF.
+          💡 <strong>Dica:</strong> As informações do ministério (nome, endereço, CNPJ, telefone, email) são configuradas na aba <strong>"Perfil do Ministério"</strong> e serão exibidas automaticamente no cabeçalho dos relatórios em PDF.
         </p>
       </div>
     </div>
@@ -724,6 +764,14 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
     const r: string[] = [];
     if (plan.max_users > 0) r.push(`Até ${plan.max_users} Usuários Administrativos`);
     if (plan.max_members > 0) r.push(`Até ${plan.max_members.toLocaleString('pt-BR')} Membros`);
+    else r.push('Membros ilimitados');
+    if ((plan as any).max_ministerios > 0) r.push(`Até ${(plan as any).max_ministerios} Igrejas inclusas`);
+    if ((plan as any).additional_church_monthly_fee > 0) {
+      r.push(`R$ ${Number((plan as any).additional_church_monthly_fee).toFixed(2)}/mês por igreja adicional`);
+    }
+    if ((plan as any).additional_admin_users_per_church > 0) {
+      r.push(`+${(plan as any).additional_admin_users_per_church} admins por igreja adicional`);
+    }
     if (plan.has_advanced_reports) r.push('Relatórios Avançados');
     if (plan.has_api_access) r.push('Acesso à API');
     if (plan.has_priority_support) r.push('Suporte Prioritário');
@@ -749,7 +797,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
         // 1) Carregar planos ativos diretamente do banco
         const { data: plansData } = await supabase
           .from('subscription_plans')
-          .select('*, has_modulo_financeiro, has_modulo_eventos, has_modulo_reunioes')
+          .select('*, has_modulo_financeiro, has_modulo_eventos, has_modulo_reunioes, additional_church_monthly_fee, additional_admin_users_per_church')
           .eq('is_active', true)
           .order('price_monthly', { ascending: true });
 
@@ -772,7 +820,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
         // 3) Buscar dados do ministério com JOIN no plano (coluna subscription_plan_id existe após migration 20260403200000)
         const { data: mData } = await supabase
           .from('ministries')
-          .select('plan, subscription_plan_id, subscription_status, subscription_start_date, subscription_end_date, created_at, subscription_plans:subscription_plan_id(id, slug, name, price_monthly, price_annually, description, max_users, max_members, max_ministerios, has_api_access, has_custom_domain, has_advanced_reports, has_priority_support, has_white_label, has_automation, has_modulo_financeiro, has_modulo_eventos, has_modulo_reunioes, is_active, display_order)')
+          .select('plan, subscription_plan_id, subscription_status, subscription_start_date, subscription_end_date, created_at, subscription_plans:subscription_plan_id(id, slug, name, price_monthly, price_annually, description, max_users, max_members, max_ministerios, additional_church_monthly_fee, additional_admin_users_per_church, has_api_access, has_custom_domain, has_advanced_reports, has_priority_support, has_white_label, has_automation, has_modulo_financeiro, has_modulo_eventos, has_modulo_reunioes, is_active, display_order)')
           .eq('id', mId)
           .maybeSingle();
 
@@ -1037,6 +1085,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
 // Componente Nomenclaturas
 function NomenclaturaContent({ onNotification }: { onNotification: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {
   const dialog = useAppDialog();
+  const { registrarAcao } = useAuditLog();
   const [isEditing, setIsEditing] = useState(false);
 
   const supabase = createClient();
@@ -1305,7 +1354,7 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
     try {
       const ministryId = await resolveMinistryId();
       if (!ministryId) {
-        onNotification('Erro', 'Não foi possível identificar sua instituição.', 'error');
+        onNotification('Erro', 'Não foi possível identificar seu ministério.', 'error');
         return;
       }
 
@@ -1321,9 +1370,26 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
       }
 
       setIsEditing(false);
+      await registrarAcao({
+        acao: 'editar',
+        modulo: 'configuracoes',
+        area: 'nomenclaturas',
+        tabela_afetada: 'configurations',
+        descricao: 'Nomenclaturas e cargos ministeriais atualizados',
+        status: 'sucesso',
+      });
       onNotification('Sucesso', 'Nomenclaturas atualizadas com sucesso!', 'success');
     } catch (error: any) {
       console.error('❌ Erro ao salvar nomenclaturas:', error);
+      await registrarAcao({
+        acao: 'editar',
+        modulo: 'configuracoes',
+        area: 'nomenclaturas',
+        tabela_afetada: 'configurations',
+        descricao: 'Falha ao salvar nomenclaturas',
+        status: 'erro',
+        mensagem_erro: error?.message,
+      });
       onNotification('Erro', `Erro ao salvar: ${error?.message || 'Tente novamente'}`, 'error');
     }
   };

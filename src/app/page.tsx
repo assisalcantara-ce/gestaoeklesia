@@ -105,6 +105,8 @@ type PlanoDB = {
   max_users: number;
   max_members: number;
   max_ministerios: number;
+  additional_church_monthly_fee: number;
+  additional_admin_users_per_church: number;
   max_divisao1: number;
   max_divisao2: number;
   max_divisao3: number;
@@ -125,6 +127,14 @@ function buildHighlights(plan: PlanoDB): string[] {
   const h: string[] = [];
   if (plan.max_users > 0) h.push(`Até ${plan.max_users} Usuários Administrativos`);
   if (plan.max_members > 0) h.push(`Até ${plan.max_members.toLocaleString('pt-BR')} Membros`);
+  else h.push('Membros ilimitados');
+  if (plan.max_ministerios > 0) h.push(`Até ${plan.max_ministerios} Igrejas inclusas`);
+  if (plan.additional_church_monthly_fee > 0) {
+    h.push(`R$ ${plan.additional_church_monthly_fee.toFixed(2)}/mês por igreja adicional`);
+  }
+  if (plan.additional_admin_users_per_church > 0) {
+    h.push(`+${plan.additional_admin_users_per_church} admins por igreja adicional`);
+  }
   if (plan.has_advanced_reports) h.push('Relatórios Avançados');
   if (plan.has_api_access) h.push('Acesso à API');
   if (plan.has_priority_support) h.push('Suporte Prioritário');
@@ -176,7 +186,7 @@ export default function LandingPage() {
     const supabase = createClient();
     supabase
       .from('subscription_plans')
-      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,max_divisao1,max_divisao2,max_divisao3,is_active,display_order,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes')
+      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,additional_church_monthly_fee,additional_admin_users_per_church,max_divisao1,max_divisao2,max_divisao3,is_active,display_order,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes')
       .eq('is_active', true)
       .order('display_order', { ascending: true })
       .order('price_monthly', { ascending: true })

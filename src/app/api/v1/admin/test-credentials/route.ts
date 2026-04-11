@@ -9,6 +9,20 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
 
+function upperText(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim();
+  if (!normalized) return null;
+  return normalized.toUpperCase();
+}
+
+function lowerText(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim();
+  if (!normalized) return null;
+  return normalized.toLowerCase();
+}
+
 // Gerar senha temporária aleatória
 function generatePassword(length = 12) {
   return crypto.randomBytes(length).toString('hex').slice(0, length);
@@ -74,11 +88,19 @@ export async function POST(request: NextRequest) {
 
     // Gerar credenciais (email real para credenciais permanentes, temporário para trial)
     const suffix = isPermanent ? Date.now() : `test_${Date.now()}`;
-    const userEmail = isPermanent 
-      ? email 
+    const normalizedEmail = lowerText(email);
+    if (isPermanent && !normalizedEmail) {
+      return NextResponse.json(
+        { success: false, error: 'email inválido para credenciais permanentes' },
+        { status: 400 }
+      );
+    }
+
+    const userEmail: string = isPermanent
+      ? (normalizedEmail as string)
       : `${suffix}@test.local`;
     const username = isPermanent 
-      ? email.split('@')[0] 
+      ? String(normalizedEmail || '').split('@')[0] 
       : `test_${Date.now()}`;
     const password = generatePassword(12);
 
@@ -119,9 +141,9 @@ export async function POST(request: NextRequest) {
       .from('ministries')
       .insert({
         user_id: authUser.user.id,
-        name: `${ministryPrefix}${preReg.ministry_name}`,
+        name: `${ministryPrefix}${upperText(preReg.ministry_name)}`,
         slug: slug,
-        email_admin: email,
+        email_admin: normalizedEmail,
         plan: isPermanent ? 'profissional' : 'trial',
         subscription_status: 'active',
         subscription_start_date: startDate.toISOString(),

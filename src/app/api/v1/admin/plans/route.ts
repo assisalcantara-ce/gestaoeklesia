@@ -62,28 +62,65 @@ export async function POST(request: NextRequest) {
     const { supabaseAdmin: supabase, adminUser } = result.ctx
     const body = await request.json()
 
+    const name = String(body?.name || '').trim()
+    const slug = String(body?.slug || '').trim()
+    const priceMonthly = Number(body?.price_monthly)
+    const priceAnnually = Number(body?.price_annually || 0)
+    const setupFee = Number(body?.setup_fee || 0)
+    const maxUsers = Number(body?.max_users)
+    const maxMembers = Number(body?.max_members ?? 0)
+    const maxMinisterios = Number(body?.max_ministerios)
+    const additionalChurchMonthlyFee = Number(body?.additional_church_monthly_fee ?? 50)
+    const additionalAdminsPerChurch = Number(body?.additional_admin_users_per_church ?? 2)
+
     // Validar campos
-    if (!body.name || !body.slug || !body.price_monthly || !body.max_users || !body.max_members) {
+    if (!name || !slug) {
       return NextResponse.json(
-        { error: 'Campos obrigatórios: name, slug, price_monthly, max_users, max_members' },
+        { error: 'Campos obrigatórios: name, slug' },
         { status: 400 }
       )
+    }
+
+    if (!Number.isFinite(priceMonthly) || priceMonthly <= 0) {
+      return NextResponse.json({ error: 'price_monthly inválido' }, { status: 400 })
+    }
+
+    if (!Number.isFinite(maxUsers) || maxUsers <= 0) {
+      return NextResponse.json({ error: 'max_users inválido' }, { status: 400 })
+    }
+
+    if (!Number.isFinite(maxMinisterios) || maxMinisterios <= 0) {
+      return NextResponse.json({ error: 'max_ministerios inválido' }, { status: 400 })
+    }
+
+    if (!Number.isFinite(maxMembers) || maxMembers < 0) {
+      return NextResponse.json({ error: 'max_members inválido (use 0 para ilimitado)' }, { status: 400 })
+    }
+
+    if (!Number.isFinite(additionalChurchMonthlyFee) || additionalChurchMonthlyFee < 0) {
+      return NextResponse.json({ error: 'additional_church_monthly_fee inválido' }, { status: 400 })
+    }
+
+    if (!Number.isFinite(additionalAdminsPerChurch) || additionalAdminsPerChurch < 0) {
+      return NextResponse.json({ error: 'additional_admin_users_per_church inválido' }, { status: 400 })
     }
 
     // Criar plano
     const { data, error } = await supabase
       .from('subscription_plans')
       .insert([{
-        name: body.name,
-        slug: body.slug,
+        name,
+        slug,
         description: body.description,
-        price_monthly: body.price_monthly,
-        price_annually: body.price_annually,
-        setup_fee: body.setup_fee || 0,
-        max_users: body.max_users,
+        price_monthly: priceMonthly,
+        price_annually: Number.isFinite(priceAnnually) ? priceAnnually : 0,
+        setup_fee: Number.isFinite(setupFee) ? setupFee : 0,
+        max_users: maxUsers,
         max_storage_bytes: body.max_storage_bytes ?? 0,
-        max_members: body.max_members,
-        max_ministerios: body.max_ministerios || 1,
+        max_members: maxMembers,
+        max_ministerios: maxMinisterios,
+        additional_church_monthly_fee: additionalChurchMonthlyFee,
+        additional_admin_users_per_church: additionalAdminsPerChurch,
         max_divisao1: body.max_divisao1 ?? 5,
         max_divisao2: body.max_divisao2 ?? 0,
         max_divisao3: body.max_divisao3 ?? -1,
