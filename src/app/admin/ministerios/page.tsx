@@ -35,6 +35,22 @@ export default function MinisteriosPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const router = useRouter()
 
+  // === Importação CSV ===
+  const [showImport, setShowImport] = useState(false)
+  const [importMinistryId, setImportMinistryId] = useState('')
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importRows, setImportRows] = useState<Record<string, string>[]>([])
+  const [importHeaders, setImportHeaders] = useState<string[]>([])
+  const [importLoading, setImportLoading] = useState(false)
+  const [importResult, setImportResult] = useState<{
+    inserted: number
+    skipped: number
+    total_rows: number
+    ministry_name: string
+    errors: { row: number; name: string; reason: string }[]
+  } | null>(null)
+  const importFileRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     return () => {
       if (logoPreviewObjectUrl) URL.revokeObjectURL(logoPreviewObjectUrl)
@@ -426,6 +442,76 @@ export default function MinisteriosPage() {
     }
   }
 
+  // === Funções CSV ===
+  const downloadTemplate = async () => {
+    const response = await authenticatedFetch('/api/v1/admin/import-members')
+    if (!response.ok) return
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'modelo_importacao_membros.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImportFile = (file: File) => {
+    setImportFile(file)
+    setImportResult(null)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = e.target?.result as string
+      if (!text) return
+      const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
+      if (lines.length < 2) { setImportRows([]); setImportHeaders([]); return }
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase())
+      setImportHeaders(headers)
+      const rows: Record<string, string>[] = []
+      for (let i = 1; i < lines.length && i <= 200; i++) {
+        const line = lines[i].trim()
+        if (!line) continue
+        // Parse simples respeitando aspas
+        const cols: string[] = []
+        let current = ''
+        let inQ = false
+        for (const ch of line) {
+          if (ch === '"') { inQ = !inQ }
+          else if (ch === ',' && !inQ) { cols.push(current.trim()); current = '' }
+          else current += ch
+        }
+        cols.push(current.trim())
+        const row: Record<string, string> = {}
+        headers.forEach((h, idx) => { row[h] = (cols[idx] ?? '').replace(/^"|"$/g, '') })
+        rows.push(row)
+      }
+      setImportRows(rows)
+    }
+    reader.readAsText(file, 'utf-8')
+  }
+
+  const doImport = async () => {
+    if (!importFile || !importMinistryId) return
+    setImportLoading(true)
+    setImportResult(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', importFile)
+      fd.append('ministry_id', importMinistryId)
+      const response = await authenticatedFetch('/api/v1/admin/import-members', {
+        method: 'POST',
+        body: fd,
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Erro ao importar')
+      setImportResult(data)
+      fetchMinisterios()
+    } catch (err: any) {
+      setImportResult({ inserted: 0, skipped: 0, total_rows: 0, ministry_name: '', errors: [{ row: 0, name: '', reason: err.message }] })
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
   return (
     <div className="flex h-screen bg-gray-900">
       <AdminSidebar />
@@ -479,8 +565,8 @@ export default function MinisteriosPage() {
         {/* TAB: Ministérios Ativos */}
         {activeTab === 'ativos' && (
           <>
-            {/* Botão para novo ministério */}
-              <div className="mb-6 flex items-center gap-3">
+            {/* Botões de ação */}
+              <div className="mb-6 flex items-center gap-3 flex-wrap">
                 <button
                   onClick={() => {
                     if (showForm) {
@@ -500,6 +586,12 @@ export default function MinisteriosPage() {
                   }`}
                 >
                   {showForm ? (editingId ? 'Cancelar edição' : 'Cancelar') : '+ Novo Ministério'}
+                </button>
+                <button
+                  onClick={() => { setShowImport(true); setImportResult(null); setImportRows([]); setImportHeaders([]); setImportFile(null); setImportMinistryId('') }}
+                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded transition text-sm font-medium"
+                >
+                  📥 Importar CSV
                 </button>
               </div>
 
@@ -956,6 +1048,141 @@ export default function MinisteriosPage() {
           </div>
         </div>
       </main>
+
+      {/* Modal: Importar CSV de membros */}
+      {showImport && (
+        <div className="fixed inset-0 bg-black/75 flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-3xl my-8 text-gray-100">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+              <h2 className="text-lg font-bold text-white">📥 Importar Membros via CSV</h2>
+              <button
+                onClick={() => { setShowImport(false); setImportResult(null); setImportRows([]); setImportHeaders([]); setImportFile(null) }}
+                className="text-gray-400 hover:text-white transition text-xl leading-none"
+              >✕</button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Passo 1: Baixar modelo */}
+              <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <p className="text-sm font-semibold text-gray-200 mb-1">Passo 1 — Baixe o modelo CSV</p>
+                <p className="text-xs text-gray-400 mb-3">O modelo contém todas as colunas suportadas com um exemplo de linha. Use ponto-e-vírgula como separador no Excel se necessário.</p>
+                <button
+                  onClick={downloadTemplate}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition font-medium"
+                >
+                  📄 Baixar modelo CSV
+                </button>
+              </div>
+
+              {/* Passo 2: Selecionar ministério */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Passo 2 — Selecione o ministério destino <span className="text-red-400">*</span>
+                </label>
+                <select
+                  value={importMinistryId}
+                  onChange={(e) => setImportMinistryId(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-gray-100 text-sm focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">— Selecione o ministério —</option>
+                  {ministerios.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Passo 3: Selecionar arquivo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Passo 3 — Selecione o arquivo CSV <span className="text-red-400">*</span>
+                </label>
+                <input
+                  ref={importFileRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFile(f) }}
+                  className="block w-full text-sm text-gray-300 file:mr-3 file:px-4 file:py-2 file:rounded file:bg-gray-700 file:text-gray-100 file:border-0 hover:file:bg-gray-600 cursor-pointer"
+                />
+                {importFile && (
+                  <p className="mt-1 text-xs text-gray-400">{importFile.name} — {importRows.length} linha{importRows.length !== 1 ? 's' : ''} encontrada{importRows.length !== 1 ? 's' : ''}</p>
+                )}
+              </div>
+
+              {/* Preview */}
+              {importRows.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pré-visualização (primeiras 5 linhas)</p>
+                  <div className="overflow-x-auto rounded border border-gray-700">
+                    <table className="text-xs w-full">
+                      <thead className="bg-gray-800">
+                        <tr>
+                          <th className="px-2 py-1 text-gray-400 font-medium text-left">#</th>
+                          {importHeaders.slice(0, 8).map(h => (
+                            <th key={h} className="px-2 py-1 text-gray-300 font-medium text-left whitespace-nowrap">{h}</th>
+                          ))}
+                          {importHeaders.length > 8 && <th className="px-2 py-1 text-gray-500">+{importHeaders.length - 8} cols</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-700/50">
+                        {importRows.slice(0, 5).map((row, idx) => (
+                          <tr key={idx} className="hover:bg-gray-800/40">
+                            <td className="px-2 py-1 text-gray-500">{idx + 2}</td>
+                            {importHeaders.slice(0, 8).map(h => (
+                              <td key={h} className="px-2 py-1 text-gray-300 max-w-[120px] truncate" title={row[h]}>{row[h] || <span className="text-gray-600">—</span>}</td>
+                            ))}
+                            {importHeaders.length > 8 && <td />}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Resultado */}
+              {importResult && (
+                <div className={`rounded-xl p-4 border ${importResult.inserted > 0 ? 'bg-green-950/40 border-green-800' : 'bg-red-950/40 border-red-800'}`}>
+                  {importResult.inserted > 0 && (
+                    <p className="text-green-300 font-semibold text-sm mb-1">
+                      ✅ {importResult.inserted} membro{importResult.inserted !== 1 ? 's' : ''} importado{importResult.inserted !== 1 ? 's' : ''} com sucesso em <strong>{importResult.ministry_name}</strong>!
+                    </p>
+                  )}
+                  {importResult.skipped > 0 && (
+                    <p className="text-yellow-400 text-xs">⚠️ {importResult.skipped} linha{importResult.skipped !== 1 ? 's' : ''} ignorada{importResult.skipped !== 1 ? 's' : ''} (sem nome)</p>
+                  )}
+                  {importResult.errors.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-red-400 text-xs font-semibold mb-1">Erros ({importResult.errors.length}):</p>
+                      <ul className="space-y-1 max-h-40 overflow-y-auto">
+                        {importResult.errors.map((e, i) => (
+                          <li key={i} className="text-xs text-red-300">Linha {e.row} {e.name ? `"${e.name}"` : ''}: {e.reason}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Botão importar */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={doImport}
+                  disabled={!importFile || !importMinistryId || importLoading || importRows.length === 0}
+                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded transition text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {importLoading ? 'Importando...' : `📥 Importar ${importRows.length > 0 ? importRows.length + ' membro' + (importRows.length !== 1 ? 's' : '') : 'membros'}`}
+                </button>
+                <button
+                  onClick={() => { setShowImport(false); setImportResult(null); setImportRows([]); setImportHeaders([]); setImportFile(null) }}
+                  className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded transition text-sm"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal: Confirmar remoção de ministério */}
       {confirmDeleteMinisterio && (

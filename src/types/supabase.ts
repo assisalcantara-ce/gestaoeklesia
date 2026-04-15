@@ -119,6 +119,8 @@ export type Member = {
   observacoes_ministeriais?: string | null
   // Aba Foto
   foto_url?: string | null
+  // Dizimistas
+  is_dizimista?: boolean | null
   // Campos do sistema
   member_since: string
   role: string | null
@@ -280,6 +282,8 @@ export type CreateMemberRequest = {
   observacoes_ministeriais?: string | null
   // Aba Foto
   foto_url?: string | null
+  // Dizimistas
+  is_dizimista?: boolean | null
   // Sistema
   member_since?: string | Date
   role?: string | null

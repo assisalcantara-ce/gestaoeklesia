@@ -32,7 +32,6 @@ INSERT INTO public.subscription_plans (
   max_ministerios,
   additional_church_monthly_fee,
   additional_admin_users_per_church,
-  max_divisao1,
   max_divisao2,
   max_divisao3,
   has_api_access,
@@ -60,18 +59,17 @@ VALUES
   1,
   50,
   2,
-  5,
   0,
   -1,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
+  false, -- has_api_access
+  false, -- has_custom_domain
+  false, -- has_advanced_reports
+  false, -- has_priority_support
+  false, -- has_white_label
+  false, -- has_automation
+  false, -- has_modulo_financeiro
+  false, -- has_modulo_eventos
+  false, -- has_modulo_reunioes
   true,
   1
 ),
@@ -87,18 +85,17 @@ VALUES
   5,
   50,
   2,
-  25,
   3,
   -1,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
+  false, -- has_api_access
+  false, -- has_custom_domain
+  false, -- has_advanced_reports
+  false, -- has_priority_support
+  false, -- has_white_label
+  false, -- has_automation
+  true,  -- has_modulo_financeiro (Tesouraria)
+  false, -- has_modulo_eventos
+  false, -- has_modulo_reunioes
   true,
   2
 ),
@@ -114,18 +111,17 @@ VALUES
   10,
   50,
   2,
-  50,
   10,
   -1,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
+  false, -- has_api_access
+  false, -- has_custom_domain
+  false, -- has_advanced_reports
+  false, -- has_priority_support
+  false, -- has_white_label
+  false, -- has_automation
+  true,  -- has_modulo_financeiro (Tesouraria)
+  false, -- has_modulo_eventos
+  false, -- has_modulo_reunioes
   true,
   3
 ),
@@ -141,18 +137,17 @@ VALUES
   10,
   50,
   2,
-  100,
   20,
   -1,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
+  false, -- has_api_access
+  false, -- has_custom_domain
+  false, -- has_advanced_reports
+  false, -- has_priority_support
+  false, -- has_white_label
+  false, -- has_automation
+  true,  -- has_modulo_financeiro (Tesouraria + futuro Financeiro avançado)
+  false, -- has_modulo_eventos
+  false, -- has_modulo_reunioes
   true,
   4
 )
@@ -168,7 +163,6 @@ SET
   max_ministerios = EXCLUDED.max_ministerios,
   additional_church_monthly_fee = EXCLUDED.additional_church_monthly_fee,
   additional_admin_users_per_church = EXCLUDED.additional_admin_users_per_church,
-  max_divisao1 = EXCLUDED.max_divisao1,
   max_divisao2 = EXCLUDED.max_divisao2,
   max_divisao3 = EXCLUDED.max_divisao3,
   has_api_access = EXCLUDED.has_api_access,

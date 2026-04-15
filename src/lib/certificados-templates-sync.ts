@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { CERTIFICADOS_TEMPLATES_PADRAO } from '@/lib/certificados-templates-padrao';
 
 function sanitizeTemplateForStorage(template: any): any {
   if (!template || typeof template !== 'object') return template;
@@ -126,7 +127,30 @@ export async function loadCertificadosTemplatesForCurrentUser(
   try {
     const ministryId = await resolveMinistryId(supabase);
     if (!ministryId) return { templates: [], ministryId: null };
+
     const fromDb = await fetchCertificadosTemplatesFromSupabase(supabase, ministryId);
+
+    // Auto-seed: para cada template padrão, verifica se o ministério já tem essa categoria
+    for (const padrao of CERTIFICADOS_TEMPLATES_PADRAO) {
+      const jaTemCategoria = fromDb.some((t: any) => t.categoria === padrao.categoria);
+      if (!jaTemCategoria) {
+        const row = {
+          ministry_id: ministryId,
+          template_key: padrao.id,
+          name: padrao.nome,
+          description: null,
+          template_data: padrao,
+          preview_url: null,
+          is_default: true,
+          is_active: true,
+        };
+        const { error } = await supabase
+          .from('certificados_templates')
+          .upsert(row as any, { onConflict: 'ministry_id,template_key' });
+        if (!error) fromDb.push({ ...padrao, ativo: true });
+      }
+    }
+
     return { templates: fromDb, ministryId };
   } catch {
     return { templates: [], ministryId: null };

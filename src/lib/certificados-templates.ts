@@ -28,7 +28,7 @@ export interface CertificadoTemplate {
   elementos: ElementoCertificado[];
   orientacao?: 'landscape' | 'portrait';
   variacao?: 'branco';
-  categoria?: 'ministerial';
+  categoria?: 'ministerial' | 'apresentacao-criancas';
   ativo?: boolean;
   criado_pelo_usuario?: boolean;
 }

@@ -22,7 +22,7 @@ export default function ComissaoPage() {
     <PageLayout
       title="Comissão"
       description="Gestão de comissões e grupos de trabalho"
-      activeMenu="comissao"
+      activeMenu="comissoes"
     >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500">

@@ -58,19 +58,26 @@ export async function GET(request: NextRequest) {
     }
 
     const ticketIds = (data || []).map((row: any) => row.id)
-    let lastMessageByTicket: Record<string, { user_id: string; created_at: string }> = {}
+    let lastMessageByTicket: Record<
+      string,
+      { user_id: string; created_at: string; sender_role?: 'support' | 'user' | null }
+    > = {}
 
     if (ticketIds.length > 0) {
       const { data: lastMessages } = await supabaseAdmin
         .from('support_ticket_messages')
-        .select('ticket_id,user_id,created_at')
+        .select('ticket_id,user_id,created_at,sender_role')
         .in('ticket_id', ticketIds)
         .eq('is_internal', false)
         .order('created_at', { ascending: false })
 
       lastMessageByTicket = (lastMessages || []).reduce((acc: any, msg: any) => {
         if (!acc[msg.ticket_id]) {
-          acc[msg.ticket_id] = { user_id: msg.user_id, created_at: msg.created_at }
+          acc[msg.ticket_id] = {
+            user_id: msg.user_id,
+            created_at: msg.created_at,
+            sender_role: msg.sender_role ?? null,
+          }
         }
         return acc
       }, {})
@@ -82,6 +89,7 @@ export async function GET(request: NextRequest) {
         ...ticket,
         last_message_user_id: lastMessage?.user_id || null,
         last_message_at: lastMessage?.created_at || null,
+        last_message_sender_role: lastMessage?.sender_role ?? null,
       }
     })
 

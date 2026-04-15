@@ -70,20 +70,31 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
     if (fichaRef.current) {
       const printWindow = window.open('', '', 'height=1000,width=900');
       if (printWindow) {
-        const html = fichaRef.current.innerHTML;
+        // Captura o outerHTML do div da ficha (preserva estilos inline do container)
+        const html = fichaRef.current.outerHTML;
         printWindow.document.write(`
           <!DOCTYPE html>
           <html>
             <head>
               <meta charset="UTF-8">
-              <title>Ficha do Ministro - ${membro.nome}</title>
+              <title>Ficha do Membro - ${membro.nome}</title>
               <style>
-                * { margin: 0; padding: 0; }
-                body { 
-                  font-family: Arial, sans-serif; 
-                  padding: 0;
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                html, body {
+                  width: 210mm;
                   background: white;
+                  font-family: Arial, sans-serif;
                 }
+                @page {
+                  size: A4 portrait;
+                  margin: 15mm 20mm;
+                }
+                @media print {
+                  html, body { width: 100%; }
+                }
+                /* Garante que grids e flexbox imprimem corretamente */
+                table { border-collapse: collapse; }
+                img { max-width: 100%; }
               </style>
             </head>
             <body>
@@ -93,8 +104,10 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
         `);
         printWindow.document.close();
         setTimeout(() => {
+          printWindow.focus();
           printWindow.print();
-        }, 250);
+          printWindow.close();
+        }, 400);
       }
     }
   };
@@ -479,26 +492,11 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
           paddingTop: '10px',
           fontSize: '11px',
           color: '#333',
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '15px'
+          textAlign: 'right'
         }}>
-          <div>
-            <p style={{ margin: '0', fontWeight: 'bold', color: '#003d7a' }}>Data:</p>
-            <p style={{ margin: '4px 0 0 0' }}>{new Date().toLocaleDateString('pt-BR')}</p>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ margin: '0', color: '#666', fontWeight: 'bold' }}>GESTÃO EKLESIA</p>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ margin: '0', fontWeight: 'bold', color: '#003d7a' }}>Assinatura:</p>
-            <div style={{
-              borderTop: '2px solid #333',
-              marginTop: '12px',
-              width: '100px',
-              marginLeft: 'auto'
-            }}></div>
-          </div>
+          <p style={{ margin: '0', color: '#666' }}>
+            Impresso em: {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </p>
         </div>
       </div>
     </div>

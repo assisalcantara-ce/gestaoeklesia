@@ -18,7 +18,6 @@ type PlanoDB = {
   max_ministerios: number;
   additional_church_monthly_fee: number;
   additional_admin_users_per_church: number;
-  max_divisao1: number;
   has_advanced_reports: boolean;
   has_api_access: boolean;
   has_priority_support: boolean;
@@ -42,7 +41,6 @@ function buildHighlights(plan: PlanoDB): string[] {
   if (plan.additional_admin_users_per_church > 0) {
     h.push(`+${plan.additional_admin_users_per_church} admins por igreja adicional`);
   }
-  if (plan.max_divisao1 > 0) h.push(`Até ${plan.max_divisao1} Campos`);
   if (plan.has_modulo_financeiro) h.push('Módulo Financeiro');
   if (plan.has_modulo_eventos) h.push('Módulo Eventos');
   if (plan.has_modulo_reunioes) h.push('Módulo Reuniões');
@@ -78,6 +76,7 @@ export default function PreCadastroPage() {
     address_zip: string;
     address_street: string;
     address_number: string;
+    address_neighborhood: string;
     address_complement: string;
     address_city: string;
     address_state: string;
@@ -95,6 +94,7 @@ export default function PreCadastroPage() {
     address_zip: '',
     address_street: '',
     address_number: '',
+    address_neighborhood: '',
     address_complement: '',
     address_city: '',
     address_state: '',
@@ -106,12 +106,15 @@ export default function PreCadastroPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const successMessageRef = useRef<HTMLDivElement>(null);
+  const [cepLoading, setCepLoading] = useState(false);
+  const [cepError, setCepError] = useState('');
+  const lastCepLookup = useRef('');
 
   // Busca planos ativos do banco
   useEffect(() => {
     supabase
       .from('subscription_plans')
-      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,additional_church_monthly_fee,additional_admin_users_per_church,max_divisao1,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes')
+      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,additional_church_monthly_fee,additional_admin_users_per_church,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes')
       .eq('is_active', true)
       .order('display_order', { ascending: true })
       .order('price_monthly', { ascending: true })
@@ -133,6 +136,60 @@ export default function PreCadastroPage() {
     const matched = planos.find((p) => p.slug === formData.plan || p.name?.toLowerCase() === formData.plan);
     setPlanoAtivo(matched ?? null);
   }, [formData.plan, planos]);
+
+  useEffect(() => {
+    const cepDigits = onlyDigits(formData.address_zip);
+
+    if (cepDigits.length !== 8) {
+      setCepLoading(false);
+      setCepError('');
+      lastCepLookup.current = '';
+      return;
+    }
+
+    if (cepDigits === lastCepLookup.current) return;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      setCepLoading(true);
+      setCepError('');
+
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`, {
+          signal: controller.signal
+        });
+
+        if (!res.ok) {
+          throw new Error('Falha ao consultar CEP');
+        }
+
+        const data = await res.json();
+        if (data?.erro) {
+          setCepError('CEP nao encontrado');
+          return;
+        }
+
+        lastCepLookup.current = cepDigits;
+        setFormData((prev) => ({
+          ...prev,
+          address_street: data.logradouro || prev.address_street,
+          address_neighborhood: data.bairro || prev.address_neighborhood,
+          address_city: data.localidade || prev.address_city,
+          address_state: data.uf || prev.address_state
+        }));
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return;
+        setCepError('Nao foi possivel consultar o CEP');
+      } finally {
+        setCepLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [formData.address_zip]);
 
   useEffect(() => {
     if (success && successMessageRef.current) {
@@ -222,6 +279,7 @@ export default function PreCadastroPage() {
           address_zip: formData.address_zip,
           address_street: formData.address_street,
           address_number: formData.address_number,
+          address_neighborhood: formData.address_neighborhood,
           address_complement: formData.address_complement,
           address_city: formData.address_city,
           address_state: formData.address_state,
@@ -251,6 +309,7 @@ export default function PreCadastroPage() {
         address_zip: '',
         address_street: '',
         address_number: '',
+        address_neighborhood: '',
         address_complement: '',
         address_city: '',
         address_state: '',
@@ -264,50 +323,78 @@ export default function PreCadastroPage() {
   };
 
   return (
-    <div
-      className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#0b2a4a] to-[#0b2a4a] text-white"
-      style={{
-        ['--brand-primary' as any]: '#3b82f6',
-        ['--brand-accent' as any]: '#fbbf24'
-      }}
-    >
-      <div className="max-w-6xl mx-auto px-6 py-16">
+    <div className="min-h-screen bg-[#f6f2ea] text-[#1f1b16] relative overflow-hidden">
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap');
+        body {
+          font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+          background: radial-gradient(circle at top, #f8f5ef 0%, #eef5f2 55%, #f6f2ea 100%);
+        }
+        .landing-title {
+          font-family: 'Cormorant Garamond', 'Georgia', serif;
+          letter-spacing: -0.02em;
+        }
+        .landing-orb {
+          position: absolute;
+          border-radius: 9999px;
+          filter: blur(80px);
+          opacity: 0.55;
+          pointer-events: none;
+        }
+        .landing-orb.orb-a {
+          width: 420px;
+          height: 420px;
+          background: #ccebe3;
+          top: -120px;
+          left: -140px;
+        }
+        .landing-orb.orb-b {
+          width: 520px;
+          height: 520px;
+          background: #f3d8bf;
+          bottom: -220px;
+          right: -160px;
+        }
+      `}</style>
+      <div className="landing-orb orb-a" />
+      <div className="landing-orb orb-b" />
+      <div className="max-w-6xl mx-auto px-6 py-16 relative">
         <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr] items-start">
           <div className="space-y-6">
             <a
               href="/"
-              className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-yellow-300 hover:text-yellow-200 transition"
+              className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700 hover:text-emerald-800 transition"
             >
               <span aria-hidden="true">←</span>
-              Voltar ao inicio
-            </a><br></br>
-            <span className="inline-flex items-center px-4 py-1 rounded-full bg-white/10 text-xs uppercase tracking-[0.4em]">
-              Pré-cadastro
+              Voltar ao site
+            </a>
+            <span className="inline-flex items-center px-4 py-1 rounded-full bg-emerald-50 text-xs uppercase tracking-[0.4em] text-emerald-700 border border-emerald-100">
+              Pré-cadastro ministerial
             </span>
-            <h1 className="text-4xl md:text-5xl font-bold leading-tight">
-              Sua instituição pronta + 07 dias para testar.
+            <h1 className="landing-title text-4xl md:text-5xl font-bold leading-tight">
+              Sua igreja pronta para crescer com organização e clareza.
             </h1>
-            <p className="text-lg text-blue-100">
-              Preencha os dados da instituição e cadastre um Email e Senha para começar o período de teste.
+            <p className="text-lg text-slate-600">
+              Preencha os dados da igreja ou ministério e crie o acesso para iniciar o período de teste.
             </p>
 
-            <div className="rounded-2xl bg-white/10 border border-white/10 p-6 space-y-4">
+            <div className="rounded-2xl bg-white/90 border border-[#e7e0d6] p-6 space-y-4 shadow-lg">
               <div className="flex items-center justify-between">
-                <span className="text-sm uppercase tracking-[0.3em] text-blue-100">Plano escolhido</span>
-                <span className="text-sm text-blue-50">07 dias grátis</span>
+                <span className="text-sm uppercase tracking-[0.3em] text-emerald-700">Plano escolhido</span>
+                <span className="text-sm text-slate-500">07 dias grátis</span>
               </div>
-              <p className="text-3xl font-bold">
+              <p className="text-3xl font-bold text-slate-900">
                 {planoAtivo?.name || 'Carregando...'}
               </p>
               <div className="space-y-3">
-                <p className="text-sm text-blue-100">
+                <p className="text-sm text-slate-600">
                   {planoAtivo?.description || ''}
                 </p>
                 {planoAtivo && (
-                  <ul className="space-y-2 text-xs text-blue-100">
+                  <ul className="space-y-2 text-xs text-slate-600">
                     {buildHighlights(planoAtivo).map((item) => (
                       <li key={item} className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-yellow-300" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
                         {item}
                       </li>
                     ))}
@@ -316,17 +403,17 @@ export default function PreCadastroPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-6 space-y-4">
+            <div className="rounded-2xl bg-white/80 border border-[#e7e0d6] p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm uppercase tracking-[0.3em] text-blue-100">Valores após o período</span>
+                <span className="text-sm uppercase tracking-[0.3em] text-emerald-700">Valores após o período</span>
               </div>
-              <p className="text-sm text-blue-100">
+              <p className="text-sm text-slate-600">
                 Após o período de testes, você poderá assinar um dos planos abaixo.
               </p>
               <div className="space-y-3">
                 {planos.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between text-blue-50 text-sm">
-                    <span className="font-semibold">{p.name}</span>
+                  <div key={p.id} className="flex items-center justify-between text-slate-700 text-sm">
+                    <span className="font-semibold text-slate-900">{p.name}</span>
                     <span>{formatarPreco(p.price_monthly)}/mês</span>
                   </div>
                 ))}
@@ -334,7 +421,7 @@ export default function PreCadastroPage() {
               {(() => {
                 const comAnual = planos.find((p) => p.price_annually && p.price_annually > 0);
                 return comAnual ? (
-                  <p className="text-xs text-blue-100">
+                  <p className="text-xs text-slate-500">
                     Valores anuais a partir de {formatarPreco(comAnual.price_annually!)}/ano.
                   </p>
                 ) : null;
@@ -345,23 +432,23 @@ export default function PreCadastroPage() {
               href="https://wa.me/5591981755021"
               target="_blank"
               rel="noreferrer"
-              className="block rounded-2xl bg-white/5 border border-white/10 p-4 hover:border-white/20 hover:bg-white/10 transition"
+              className="block rounded-2xl bg-white/80 border border-[#e7e0d6] p-4 hover:border-emerald-200 hover:bg-emerald-50/60 transition"
             >
-              <p className="text-sm font-semibold flex items-center gap-2">
+              <p className="text-sm font-semibold flex items-center gap-2 text-slate-900">
                 <img
                   src="/img/zap1.png"
                   alt="WhatsApp"
                   className="h-4 w-4"
                 />
-                DÚVIDAS? Deixe uma mensagem para nossa equipe comercial.
+                DÚVIDAS? Fale com nossa equipe comercial.
               </p>
-              <p className="text-xs text-blue-100 mt-2">Fale com nosso time: (91) 98175-5021</p>
+              <p className="text-xs text-slate-600 mt-2">Fale com nosso time: (91) 98175-5021</p>
             </a>
           </div>
 
-          <form onSubmit={handleSubmit} className="bg-white text-slate-900 rounded-3xl p-8 shadow-2xl space-y-6">
+          <form onSubmit={handleSubmit} className="bg-white/95 text-slate-900 rounded-3xl p-8 shadow-2xl space-y-6 border border-[#e7e0d6]">
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Dados da instituição</p>
+              <p className="text-xs uppercase tracking-[0.3em] text-emerald-700">Dados da igreja</p>
               <h2 className="text-2xl font-bold text-slate-900 mt-2">Formulário de pré-cadastro</h2>
             </div>
 
@@ -379,13 +466,13 @@ export default function PreCadastroPage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Nome da instituição *</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Nome da igreja ou ministério *</label>
                 <input
                   name="ministry_name"
                   value={formData.ministry_name}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
-                  placeholder="Ex: Convenção Estadual de Ministros"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
+                  placeholder="Ex: Igreja Comunidade Viva"
                 />
               </div>
               <div>
@@ -394,7 +481,7 @@ export default function PreCadastroPage() {
                   name="cpf_cnpj"
                   value={formData.cpf_cnpj}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
                   placeholder="00.000.000/0000-00"
                 />
               </div>
@@ -404,7 +491,7 @@ export default function PreCadastroPage() {
                   name="plan"
                   value={formData.plan}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
                 >
                   {planos.map((p) => (
                     <option key={p.id} value={p.slug || p.name.toLowerCase()}>
@@ -416,50 +503,50 @@ export default function PreCadastroPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Nome do responsável *</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Nome do pastor ou dirigente *</label>
               <input
                 name="responsible_name"
                 value={formData.responsible_name}
                 onChange={handleChange}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
-                placeholder="Nome completo"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
+                placeholder="Nome completo do responsavel"
               />
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Email de acesso *</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Email do responsável *</label>
                 <input
                   name="email"
                   type="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
-                  placeholder="acesso@ministerio.com"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
+                  placeholder="contato@igreja.com"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Senha de teste *</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Senha de acesso *</label>
                 <input
                   name="password"
                   type="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
                   placeholder="Crie uma senha segura"
                 />
-                <p className="text-xs text-slate-500 mt-1">Senha de teste expira em 7 dias.</p>
+                <p className="text-xs text-slate-500 mt-1">Senha do acesso expira em 7 dias se o plano nao for ativado.</p>
               </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">WhatsApp *</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">WhatsApp do responsável *</label>
                 <input
                   name="whatsapp"
                   value={formData.whatsapp}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
                   placeholder="(11) 99000-0000"
                 />
               </div>
@@ -469,7 +556,7 @@ export default function PreCadastroPage() {
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
                   placeholder="(11) 3000-0000"
                 />
               </div>
@@ -477,12 +564,12 @@ export default function PreCadastroPage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Website</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Site ou rede social</label>
                 <input
                   name="website"
                   value={formData.website}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
                   placeholder="https://"
                 />
               </div>
@@ -492,22 +579,11 @@ export default function PreCadastroPage() {
                   name="address_zip"
                   value={formData.address_zip}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
                   placeholder="00000-000"
                 />
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Cidade</label>
-                <input
-                  name="address_city"
-                  value={formData.address_city}
-                  onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
-                  placeholder="Cidade"
-                />
+                {cepLoading && <p className="text-xs text-slate-500 mt-1">Buscando endereco...</p>}
+                {cepError && <p className="text-xs text-red-600 mt-1">{cepError}</p>}
               </div>
             </div>
 
@@ -518,7 +594,7 @@ export default function PreCadastroPage() {
                   name="address_street"
                   value={formData.address_street}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
                   placeholder="Rua das Flores"
                 />
               </div>
@@ -528,8 +604,31 @@ export default function PreCadastroPage() {
                   name="address_number"
                   value={formData.address_number}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
                   placeholder="123"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Bairro</label>
+                <input
+                  name="address_neighborhood"
+                  value={formData.address_neighborhood}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
+                  placeholder="Bairro"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Cidade</label>
+                <input
+                  name="address_city"
+                  value={formData.address_city}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
+                  placeholder="Cidade"
                 />
               </div>
             </div>
@@ -541,7 +640,7 @@ export default function PreCadastroPage() {
                   name="address_complement"
                   value={formData.address_complement}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
                   placeholder="Apto 42"
                 />
               </div>
@@ -551,7 +650,7 @@ export default function PreCadastroPage() {
                   name="address_state"
                   value={formData.address_state}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
                 >
                   <option value="">Selecione...</option>
                   <option value="AC">AC</option>
@@ -586,21 +685,21 @@ export default function PreCadastroPage() {
             </div>
 
             <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Descrição</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Conte sobre a igreja</label>
               <textarea
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
                 rows={4}
-                placeholder="Conte um pouco sobre a instituição"
+                placeholder="Conte um pouco sobre a igreja e seus departamentos"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl bg-blue-600 px-4 py-3 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-60"
+              className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-white font-semibold hover:bg-emerald-800 transition disabled:opacity-60"
             >
               {loading ? 'Enviando...' : 'Enviar pré-cadastro'}
             </button>

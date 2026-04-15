@@ -2,69 +2,148 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import NotificationModal from '@/components/NotificationModal';
 import { formatCpfOrCnpj, formatPhone } from '@/lib/mascaras';
 import { createClient } from '@/lib/supabase-client';
 import { formatarPreco } from '@/config/plans';
 
-const benefits = [
+const pillars = [
   {
-    title: 'Gestão multi-institucional',
-    text: 'Gerencie uma ou várias instituições com usuários isolados e acesso controlado.'
+    title: 'Secretaria que organiza',
+    text: 'Documentos, certificados e cadastros sempre atualizados e prontos para consulta.'
   },
   {
-    title: 'Estrutura hierárquica completa',
-    text: 'Supervisões, congregações e departamentos com fluxo de autoridade definido.'
+    title: 'Finanças sob controle',
+    text: 'Tesouraria, receitas, despesas e relatórios em um fluxo confiavel e simples.'
   },
   {
-    title: 'Relatórios e métricas',
-    text: 'Acompanhe indicadores, frequência, crescimento e dados escancaradamente úteis.'
-  },
-  {
-    title: '100% na nuvem',
-    text: 'Acesse de qualquer lugar, qualquer dispositivo, dados sempre sincronizados.'
-  },
-  {
-    title: 'Conformidade LGPD',
-    text: 'Dados protegidos com criptografia, controle de acesso e boas práticas legais.'
-  },
-  {
-    title: 'Implementação rápida',
-    text: 'Setup em horas, não semanas. Equipe de onboarding inclusa em todos os planos.'
+    title: 'Pessoas no centro',
+    text: 'Membros, congregados e ministros com historico ministerial completo.'
   }
 ];
 
-const features = [
+const modules = [
   {
-    title: 'Gestão de membros',
-    text: 'Cadastro completo com fotos, CPF/RG, histórico ministerial e documentos.',
-    bullets: ['Dados pessoais completos', 'Cargo e setor', 'Histórico de atividades']
+    title: 'Secretaria Geral',
+    text: 'Documentos, cadastros e processos administrativos em um so lugar.',
+    bullets: ['Cartas e certificados', 'Registro unificado', 'Fluxo documental'],
+    icon: '🗂️'
   },
   {
-    title: 'Credenciais e cartões',
-    text: 'Gere cartões personalizados com logo, dados e QR Code para impressão em lote.',
-    bullets: ['4 tipos de cartão', 'Templates customizáveis', 'Impressão em massa']
+    title: 'Achados e Perdidos',
+    text: 'Controle de itens encontrados e devolucoes com historico.',
+    bullets: ['Registro rapido', 'Contato com membros', 'Devolucoes'],
+    icon: '🧾'
   },
   {
-    title: 'Estrutura hierárquica',
-    text: 'Supervisões, congregações e departamentos com fluxo de autoridade definido.',
-    bullets: ['Múltiplos níveis', 'Acesso por departamento', 'Relatórios por área']
+    title: 'Patrimonio',
+    text: 'Inventario de bens com status, localizacao e manutencao.',
+    bullets: ['Cadastro de bens', 'Controle por setor', 'Relatorios'],
+    icon: '🏛️'
   },
   {
-    title: 'Financeiro integrado',
-    text: 'Controle de receitas, despesas, tesouraria com relatórios detalhados.',
-    bullets: ['Fluxo de caixa', 'Categorias customizáveis', 'Relatórios por período']
+    title: 'Comissao',
+    text: 'Gestao de comissoes, equipes e atas com clareza.',
+    bullets: ['Membros e cargos', 'Reunioes registradas', 'Decisoes'],
+    icon: '🧩'
   },
   {
-    title: 'Suporte via tickets',
-    text: 'Atendimento estruturado com equipe especializada para resolver demandas com rapidez.',
-    bullets: ['Fila inteligente', 'Acompanhamento por status', 'Histórico completo']
+    title: 'Missoes',
+    text: 'Projetos missionarios acompanhados com dados e metas.',
+    bullets: ['Campos e projetos', 'Relatorios de campo', 'Equipe envolvida'],
+    icon: '✈️'
   },
   {
-    title: 'Eventos e reuniões',
-    text: 'Agende eventos, cultos, reuniões com controle de frequência automático.',
-    bullets: ['Eventos recorrentes', 'Listas de presença', 'Notificações']
+    title: 'Kids',
+    text: 'Ministerio infantil com turmas, presenca e seguranca.',
+    bullets: ['Turmas e lideres', 'Check-in seguro', 'Comunicacoes'],
+    icon: '🧸'
+  },
+  {
+    title: 'Eventos',
+    text: 'Agenda completa com inscricoes e listas de presenca.',
+    bullets: ['Calendario', 'Inscricoes', 'Relatorios'],
+    icon: '📅'
+  },
+  {
+    title: 'Geolocalizacao',
+    text: 'Mapa de igrejas e congregacoes com visao regional.',
+    bullets: ['Enderecos no mapa', 'Rotas e regioes', 'Visao por campo'],
+    icon: '🗺️'
+  },
+  {
+    title: 'Funcionarios',
+    text: 'Controle de equipe com dados, cargos e situacao.',
+    bullets: ['Dados e documentos', 'Cargos e setores', 'Status ativo'],
+    icon: '👔'
+  },
+  {
+    title: 'Reunioes',
+    text: 'Pautas, atas e participantes em um fluxo simples.',
+    bullets: ['Convocacoes', 'Atas', 'Participantes'],
+    icon: '🤝'
+  },
+  {
+    title: 'Presidencia',
+    text: 'Visao executiva com indicadores e aprovacoes.',
+    bullets: ['Indicadores-chave', 'Aprovacoes', 'Visao consolidada'],
+    icon: '👑'
+  },
+  {
+    title: 'Financeiro',
+    text: 'Receitas, despesas e relatorios com transparencia.',
+    bullets: ['Fluxo de caixa', 'Categorias', 'Exportacoes'],
+    icon: '💳'
+  },
+  {
+    title: 'Tesouraria',
+    text: 'Lançamentos e conciliacoes organizadas.',
+    bullets: ['Entradas e saidas', 'Conferencia', 'Histórico'],
+    icon: '💼'
+  },
+  {
+    title: 'EBD',
+    text: 'Escola biblica dominical com classes e presenca.',
+    bullets: ['Classes e professores', 'Presenca', 'Conteudos'],
+    icon: '📘'
+  },
+  {
+    title: 'Auditoria',
+    text: 'Rastreabilidade completa de acessos e acoes.',
+    bullets: ['Registro de acoes', 'Alertas', 'Conformidade'],
+    icon: '✅'
+  },
+  {
+    title: 'Chat Interno',
+    text: 'Comunicacao rapida entre setores e equipes.',
+    bullets: ['Canais por area', 'Mensagens rapidas', 'Historico'],
+    icon: '💬'
   }
+];
+
+const journey = [
+  {
+    step: '01',
+    title: 'Organize sua base',
+    text: 'Cadastre membros, congregados e ministros com dados completos e hierarquia definida.'
+  },
+  {
+    step: '02',
+    title: 'Gerencie o dia a dia',
+    text: 'Fluxos de secretaria, financeiro e eventos conectados em tempo real.'
+  },
+  {
+    step: '03',
+    title: 'Acompanhe resultados',
+    text: 'Relatorios, auditoria e indicadores para tomada de decisao segura.'
+  }
+];
+
+const metrics = [
+  { value: '16', label: 'Modulos integrados' },
+  { value: '24h', label: 'Suporte em dias uteis' },
+  { value: 'LGPD', label: 'Conformidade e seguranca' }
 ];
 
 
@@ -72,15 +151,15 @@ const features = [
 const faqs = [
   {
     question: 'Quanto tempo leva para implementar?',
-    answer: 'Setup inicial em 1-2 horas. A equipe de onboarding acompanha toda a implantação no seu plano.'
+    answer: 'Setup inicial em poucas horas. A equipe de onboarding acompanha toda a implantacao.'
   },
   {
-    question: 'Os cartões podem ser customizados?',
-    answer: 'Sim! Configure cores, logos, campos e templates. Imprima um ou centenas de cartões em lote.'
+    question: 'Consigo personalizar documentos e cartoes?',
+    answer: 'Sim. Configure modelos, cores, logos e imprima em lote com QR Code.'
   },
   {
-    question: 'Preciso contratar suporte extra?',
-    answer: 'Não. Suporte está incluído em todos os planos. Professional já tem chat + email.'
+    question: 'O suporte esta incluso?',
+    answer: 'Sim. Todos os planos incluem suporte e acompanhamento na implantacao.'
   },
   {
     question: 'Os dados estão seguros?',
@@ -107,7 +186,6 @@ type PlanoDB = {
   max_ministerios: number;
   additional_church_monthly_fee: number;
   additional_admin_users_per_church: number;
-  max_divisao1: number;
   max_divisao2: number;
   max_divisao3: number;
   is_active: boolean;
@@ -121,6 +199,7 @@ type PlanoDB = {
   has_modulo_financeiro: boolean;
   has_modulo_eventos: boolean;
   has_modulo_reunioes: boolean;
+  modulos: string[];
 };
 
 function buildHighlights(plan: PlanoDB): string[] {
@@ -144,12 +223,37 @@ function buildHighlights(plan: PlanoDB): string[] {
   return h;
 }
 
-function buildModuleHighlights(plan: PlanoDB): string[] {
-  const modules: string[] = [];
-  if (plan.has_modulo_financeiro) modules.push('Financeiro');
-  if (plan.has_modulo_eventos) modules.push('Eventos');
-  if (plan.has_modulo_reunioes) modules.push('Reuniões');
-  return modules;
+function buildModuleHighlights(plan: PlanoDB): { modules: string[]; label: string } {
+  const normalizeKey = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .trim();
+
+  const key = normalizeKey(plan.slug || plan.name || '');
+  const base = ['Secretaria Geral', 'Achados e perdido', 'Patrimônio', 'Geolocalização', 'Auditoria'];
+  const starter = [...base, 'Tesouraria', 'Missões', 'Chat Interno', 'EBD'];
+  const intermediario = [...starter, 'Funcionários', 'Comissão', 'Kids', 'Reuniões'];
+  const profissional = [...intermediario, 'Eventos', 'Financeiro', 'Presidência'];
+
+  if (key === 'basic' || key === 'basico') {
+    return { modules: base, label: 'Modulos inclusos' };
+  }
+
+  if (key === 'starter') {
+    return { modules: ['Todos do Basic', 'Tesouraria', 'Missões', 'Chat Interno', 'EBD'], label: 'Modulos inclusos' };
+  }
+
+  if (key === 'intermediario') {
+    return { modules: ['Todos do Starter', 'Funcionários', 'Comissão', 'Kids', 'Reuniões'], label: 'Modulos inclusos' };
+  }
+
+  if (key === 'profissional' || key === 'professional') {
+    return { modules: ['Todos do Intermediário', 'Eventos', 'Financeiro', 'Presidência'], label: 'Modulos inclusos' };
+  }
+
+  return { modules: base, label: 'Modulos inclusos' };
 }
 
 export default function LandingPage() {
@@ -167,6 +271,8 @@ export default function LandingPage() {
     email: ''
   });
   const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string } | null>(null);
+  const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
+  const [showModules, setShowModules] = useState(false);
   const [contactData, setContactData] = useState({
     ministerio: '',
     pastor: '',
@@ -186,7 +292,7 @@ export default function LandingPage() {
     const supabase = createClient();
     supabase
       .from('subscription_plans')
-      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,additional_church_monthly_fee,additional_admin_users_per_church,max_divisao1,max_divisao2,max_divisao3,is_active,display_order,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes')
+      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,additional_church_monthly_fee,additional_admin_users_per_church,max_divisao2,max_divisao3,is_active,display_order,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes,modulos')
       .eq('is_active', true)
       .order('display_order', { ascending: true })
       .order('price_monthly', { ascending: true })
@@ -309,21 +415,56 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&family=DM+Serif+Display&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap');
         :root {
-          --landing-bg: #ffffff;
-          --landing-card: #f8fafb;
-          --landing-accent: #0ea5e9;
-          --landing-gold: #f59e0b;
-          --landing-text: #1e293b;
+          --landing-bg: #f6f2ea;
+          --landing-card: #ffffff;
+          --landing-ink: #1f1b16;
+          --landing-muted: #5f6b66;
+          --landing-accent: #0f766e;
+          --landing-warm: #c26b2b;
+          --landing-line: #e7e0d6;
         }
         body {
-          font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
-          background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+          font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+          background: radial-gradient(circle at top, #f8f5ef 0%, #eef5f2 55%, #f6f2ea 100%);
+          color: var(--landing-ink);
         }
         .landing-title {
           font-family: 'DM Serif Display', 'Georgia', serif;
-          color: #0f172a;
+          letter-spacing: -0.01em;
+        }
+        .landing-orb {
+          position: absolute;
+          border-radius: 9999px;
+          filter: blur(70px);
+          opacity: 0.6;
+          animation: float 12s ease-in-out infinite;
+        }
+        .landing-orb.orb-a {
+          width: 420px;
+          height: 420px;
+          background: #ccebe3;
+          top: -140px;
+          left: -120px;
+        }
+        .landing-orb.orb-b {
+          width: 520px;
+          height: 520px;
+          background: #f3d8bf;
+          bottom: -200px;
+          right: -140px;
+        }
+        .reveal {
+          animation: rise 0.7s ease both;
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(18px); }
+        }
+        @keyframes rise {
+          from { opacity: 0; transform: translateY(18px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
 
@@ -372,91 +513,131 @@ export default function LandingPage() {
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/img/logo-eklesia.png" alt="Gestão Eklesia" className="h-10" />
+            <img src="/img/logo_modal.png" alt="Gestão Eklesia" className="h-12" />
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
-            <a href="#beneficios" className="hover:text-slate-900 transition">Benefícios</a>
+            <a href="#visao" className="hover:text-slate-900 transition">Visão</a>
+            <a href="#modulos" className="hover:text-slate-900 transition">Módulos</a>
+            <a href="#fluxo" className="hover:text-slate-900 transition">Fluxo</a>
             <a href="#telas" className="hover:text-slate-900 transition">Telas</a>
-            <a href="#funcionalidades" className="hover:text-slate-900 transition">Funcionalidades</a>
             <a href="#planos" className="hover:text-slate-900 transition">Planos</a>
             <a href="#faq" className="hover:text-slate-900 transition">FAQ</a>
             <a href="#contato" className="hover:text-slate-900 transition">Contato</a>
           </nav>
-          <button
-            onClick={() => router.push('/login')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+          <Link
+            href="/login"
+            className="px-4 py-2 bg-emerald-700 text-white rounded-lg font-semibold hover:bg-emerald-800 transition"
           >
             Acesso ao Sistema
-          </button>
+          </Link>
         </div>
       </header>
 
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/img/bgslider.jpg')" }} />
-        <div className="absolute inset-0 bg-white/60" />
-        <div className="relative max-w-6xl mx-auto px-6 py-20 grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-center">
-          <div className="space-y-6">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-xs font-semibold uppercase tracking-[0.3em] text-blue-600">
-              Gestão inteligente
+      <section
+        id="visao"
+        className="relative overflow-hidden"
+        style={{
+          backgroundImage: "url('/img/bgslider.png')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      >
+        <div className="relative max-w-6xl mx-auto px-6 py-20 grid gap-12 lg:grid-cols-[1.05fr_0.95fr] items-center">
+          <div className="space-y-6 reveal" style={{ animationDelay: '0.05s' }}>
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-50 text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">
+              Para ministérios
             </span>
-            <h1 className="landing-title text-4xl md:text-5xl">
-              Gestão inteligente para instituições modernas.
+            <h1 className="landing-title text-4xl md:text-6xl">
+              Gestão clara para ministérios que cuidam de pessoas.
             </h1>
             <p className="text-lg text-slate-600">
-              Administre sua instituição com ferramentas para membros, financeiro, estrutura hierárquica, cartões e relatórios.
+              Unifique secretaria, financeiro, cadastros e relatórios em um fluxo leve, feito para membros,
+              congregados e ministros.
             </p>
             <div className="flex flex-wrap gap-4">
               <a
                 href="#planos"
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition"
+                className="px-6 py-3 bg-emerald-700 text-white rounded-full font-bold hover:bg-emerald-800 transition"
               >
                 Começar agora - 7 dias grátis
               </a>
               <a
                 href="#contato"
-                className="px-6 py-3 border-2 border-slate-300 text-slate-900 rounded-lg font-semibold hover:border-slate-400 hover:bg-slate-50 transition"
+                className="px-6 py-3 border-2 border-emerald-700 text-emerald-800 rounded-full font-semibold hover:bg-emerald-50 transition"
               >
                 Agendar demonstração
               </a>
             </div>
             <div className="flex flex-wrap gap-3 text-sm text-slate-600">
-              <span className="px-3 py-1 bg-slate-100 rounded-full">7 dias grátis</span>
-              <span className="px-3 py-1 bg-slate-100 rounded-full">Suporte especializado</span>
-              <span className="px-3 py-1 bg-slate-100 rounded-full">Cancele quando quiser</span>
+              <span className="px-3 py-1 bg-white/70 border border-[#e7e0d6] rounded-full">Secretaria integrada</span>
+              <span className="px-3 py-1 bg-white/70 border border-[#e7e0d6] rounded-full">Financeiro confiável</span>
+              <span className="px-3 py-1 bg-white/70 border border-[#e7e0d6] rounded-full">Cadastros completos</span>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-white to-blue-50 border border-slate-200 rounded-2xl p-8 shadow-lg">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Resumo</p>
+          <div className="bg-white/90 border border-[#e7e0d6] rounded-3xl p-8 shadow-xl backdrop-blur reveal" style={{ animationDelay: '0.2s' }}>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Mapa do ministério</p>
+              <span className="text-xs text-slate-500">Atualizado hoje</span>
+            </div>
             <div className="mt-6 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-slate-600">Tempo de implantação</span>
-                <span className="text-slate-900 font-semibold">~1 dia</span>
+                <span className="text-slate-600">Secretaria</span>
+                <span className="text-slate-900 font-semibold">Documentos vivos</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-600">Módulo mais usado</span>
-                <span className="text-slate-900 font-semibold">Secretaria</span>
+                <span className="text-slate-600">Financeiro</span>
+                <span className="text-slate-900 font-semibold">Fluxo supervisionado</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-600">Suporte</span>
-                <span className="text-slate-900 font-semibold">24h úteis</span>
-              </div>
-              <div className="mt-6 bg-blue-500/10 border border-blue-200 rounded-xl p-4">
-                <p className="text-xs font-semibold uppercase text-blue-600">Impacto</p>
-                <p className="text-2xl font-bold text-slate-900">+45% produtividade</p>
-                <p className="text-xs text-slate-600">Em gestão, relatórios e controle operacional.</p>
+                <span className="text-slate-600">Pessoas</span>
+                <span className="text-slate-900 font-semibold">Membros e ministros</span>
               </div>
             </div>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-[#e7e0d6] bg-emerald-50/70 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Rotina</p>
+                <p className="text-lg font-semibold text-slate-900 mt-2">Reuniões e eventos</p>
+              </div>
+              <div className="rounded-2xl border border-[#e7e0d6] bg-amber-50/70 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-amber-700">Controle</p>
+                <p className="text-lg font-semibold text-slate-900 mt-2">Auditoria e logs</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="relative max-w-6xl mx-auto px-6 pb-14">
+          <div className="grid gap-4 md:grid-cols-3">
+            {metrics.map((metric, index) => (
+              <div
+                key={metric.label}
+                className="bg-white/80 border border-[#e7e0d6] rounded-2xl p-5 shadow-sm reveal"
+                style={{ animationDelay: `${0.25 + index * 0.1}s` }}
+              >
+                <p className="text-2xl font-bold text-slate-900">{metric.value}</p>
+                <p className="text-sm text-slate-600 mt-1">{metric.label}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       <section id="telas" className="max-w-6xl mx-auto px-6 py-16">
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Veja na prática</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Veja na pratica</p>
           <h2 className="landing-title text-3xl">Telas do sistema</h2>
           <p className="text-slate-600 mt-3">Um panorama real do que sua equipe vai usar no dia a dia.</p>
         </div>
-        <div className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory md:justify-center touch-manipulation">
+        <div
+          className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory md:justify-center touch-manipulation rounded-2xl border border-slate-200 p-4"
+          style={{
+            backgroundImage: "url('/img/bgslider.png')",
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            minHeight: '220px',
+          }}
+        >
           {gallery.map((item) => (
             <div
               key={item.src}
@@ -475,71 +656,127 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="beneficios" className="max-w-6xl mx-auto px-6 py-16">
+      <section
+        id="modulos"
+        className="max-w-6xl mx-auto px-6 py-16 rounded-3xl"
+        style={{
+          backgroundImage: 'linear-gradient(135deg, rgba(15,118,110,0.06), rgba(194,107,43,0.06))',
+        }}
+      >
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Por que escolher</p>
-          <h2 className="landing-title text-3xl">Gestão Eklesia</h2>
-          <p className="text-slate-600 mt-3">Tudo que você precisa para gerir sua instituição de forma eficiente e segura.</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Nossos pilares</p>
+          <h2 className="landing-title text-3xl">16 modulos para toda a operacao</h2>
+          <p className="text-slate-600 mt-3">Da secretaria ao financeiro, tudo conectado para a igreja crescer com seguranca.</p>
         </div>
-        <div className="grid gap-6 md:grid-cols-3">
-          {benefits.map((card) => (
-            <div key={card.title} className="bg-gradient-to-br from-slate-50 to-blue-50 border border-blue-100 rounded-2xl p-6 hover:shadow-lg hover:border-blue-200 transition duration-300">
+        <div className="grid gap-6 md:grid-cols-3 mb-14">
+          {pillars.map((card) => (
+            <div key={card.title} className="bg-white border border-[#e7e0d6] rounded-2xl p-6 shadow-sm hover:shadow-lg transition duration-300">
               <h3 className="text-lg font-bold text-slate-900">{card.title}</h3>
               <p className="text-sm text-slate-600 mt-2">{card.text}</p>
             </div>
           ))}
         </div>
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => setShowModules((value) => !value)}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full border-2 border-emerald-700 text-emerald-700 font-semibold hover:bg-emerald-700 hover:text-white transition"
+          >
+            {showModules ? 'Ocultar módulos' : 'Ver todos os Módulos'}
+            <span className={`transition-transform ${showModules ? 'rotate-180' : ''}`}>▾</span>
+          </button>
+        </div>
+        <div className={`mt-10 ${showModules ? '' : 'hidden'}`}>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {modules.map((feature) => (
+              <div key={feature.title} className="bg-gradient-to-br from-white to-emerald-50 border border-[#e7e0d6] rounded-2xl p-6 hover:shadow-lg hover:border-emerald-200 transition duration-300">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-slate-900">{feature.title}</h3>
+                  <span className="text-2xl">{feature.icon}</span>
+                </div>
+                <p className="text-sm text-slate-600 mt-2">{feature.text}</p>
+                <ul className="mt-4 space-y-2 text-sm text-slate-600">
+                  {feature.bullets.map((bullet) => (
+                    <li key={bullet} className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                      {bullet}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
-      <section id="funcionalidades" className="max-w-6xl mx-auto px-6 py-16">
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Tudo que você precisa</p>
-          <h2 className="landing-title text-3xl">Ferramentas completas</h2>
-          <p className="text-slate-600 mt-3">Módulos integrados para administrar sua instituição de forma centralizada.</p>
-        </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {features.map((feature) => (
-            <div key={feature.title} className="bg-gradient-to-br from-slate-50 to-blue-50 border border-blue-100 rounded-2xl p-6 hover:shadow-lg hover:border-blue-200 transition duration-300">
-              <h3 className="text-lg font-bold text-slate-900">{feature.title}</h3>
-              <p className="text-sm text-slate-600 mt-2">{feature.text}</p>
-              <ul className="mt-4 space-y-2 text-sm text-slate-600">
-                {feature.bullets.map((bullet) => (
-                  <li key={bullet} className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-blue-500" />
-                    {bullet}
-                  </li>
-                ))}
-              </ul>
+      <section id="fluxo" className="max-w-6xl mx-auto px-6 py-16">
+        <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] items-center">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Fluxo de trabalho</p>
+            <h2 className="landing-title text-3xl">Uma jornada simples, clara e previsivel</h2>
+            <p className="text-slate-600 mt-3">
+              Do cadastro inicial aos relatorios finais. Tudo conectado e com visibilidade para lideres e equipes.
+            </p>
+            <div className="mt-8 space-y-5">
+              {journey.map((item) => (
+                <div key={item.step} className="flex gap-4">
+                  <div className="h-10 w-10 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold">
+                    {item.step}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
+                    <p className="text-sm text-slate-600 mt-1">{item.text}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+          <div className="bg-white border border-[#e7e0d6] rounded-3xl p-8 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">Resumo operacional</h3>
+            <p className="text-sm text-slate-600 mt-2">O que sua equipe enxerga em um unico painel.</p>
+            <div className="mt-6 grid gap-4">
+              {['Secretaria ativa', 'Financeiro consolidado', 'Indicadores de crescimento'].map((item) => (
+                <div key={item} className="flex items-center justify-between rounded-2xl border border-[#e7e0d6] p-4">
+                  <span className="text-slate-700 font-semibold">{item}</span>
+                  <span className="text-emerald-700 text-sm font-semibold">OK</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-amber-700">Acompanhamento</p>
+              <p className="text-lg font-semibold text-slate-900 mt-2">Equipe alinhada e sem retrabalho</p>
+            </div>
+          </div>
         </div>
       </section>
 
       <section id="planos" className="max-w-6xl mx-auto px-6 py-16">
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Planos que crescem com você</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Planos que crescem com voce</p>
           <h2 className="landing-title text-3xl">Escolha o plano ideal</h2>
           <p className="text-slate-600 mt-3">Todos incluem suporte, onboarding e 7 dias de teste gratuito.</p>
         </div>
         {planosLanding.length === 0 && (
           <p className="text-center text-slate-400 text-sm py-8">Carregando planos...</p>
         )}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 items-start">
           {planosVisiveis.map((plan, idx) => {
             const featured = idx === 1;
             const highlights = buildHighlights(plan);
-            const modules = buildModuleHighlights(plan);
+            const modulePack = buildModuleHighlights(plan);
+            const modules = modulePack.modules;
+            const isExpanded = expandedPlanId === plan.id;
             return (
               <div
                 key={plan.id}
-                className={`rounded-2xl p-6 border transition duration-300 ${
+                className={`rounded-2xl p-6 border transition duration-300 self-start ${
                   featured
-                    ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white border-blue-600 shadow-xl scale-105'
-                    : 'bg-white text-slate-900 border-slate-200 hover:shadow-lg'
+                    ? 'bg-gradient-to-br from-emerald-700 to-emerald-800 text-white border-emerald-700 shadow-xl scale-105'
+                    : 'bg-white text-slate-900 border-[#e7e0d6] hover:shadow-lg'
                 }`}
               >
                 {featured && (
-                  <span className="inline-flex text-xs font-semibold bg-yellow-400 text-slate-900 px-2 py-1 rounded-full">
+                  <span className="inline-flex text-xs font-semibold bg-amber-300 text-slate-900 px-2 py-1 rounded-full">
                     Mais popular
                   </span>
                 )}
@@ -549,7 +786,7 @@ export default function LandingPage() {
                 </p>
                 <div className="mt-4">
                   <p className="text-3xl font-bold">{formatarPreco(plan.price_monthly)}</p>
-                  {plan.price_annually && (
+                  {Number(plan.price_annually) > 0 && (
                     <p className={`text-xs mt-1 ${featured ? 'text-blue-100' : 'text-slate-500'}`}>
                       {formatarPreco(plan.price_annually)}/ano
                     </p>
@@ -558,61 +795,69 @@ export default function LandingPage() {
                 <ul className="mt-6 space-y-2 text-sm">
                   {highlights.map((item) => (
                     <li key={item} className="flex items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full ${featured ? 'bg-yellow-300' : 'bg-blue-500'}`} />
+                      <span className={`h-2 w-2 rounded-full ${featured ? 'bg-amber-200' : 'bg-emerald-600'}`} />
                       {item}
                     </li>
                   ))}
                 </ul>
-                {modules.length > 0 && (
-                  <div className="mt-6">
-                    <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${featured ? 'text-blue-100' : 'text-slate-500'}`}>
-                      Módulos
-                    </p>
-                    <ul className="mt-3 space-y-2 text-sm">
-                      {modules.map((item) => (
-                        <li key={item} className="flex items-center gap-2">
-                          <span className={`h-2 w-2 rounded-full ${featured ? 'bg-yellow-300' : 'bg-blue-500'}`} />
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
                 <a
                   href={`/pre-cadastro?plan=${plan.slug}`}
-                  className={`mt-6 inline-flex w-full justify-center px-4 py-2 rounded-lg font-semibold transition ${
+                  className={`mt-6 inline-flex w-full justify-center px-4 py-2 rounded-full font-semibold transition ${
                     featured
-                      ? 'bg-yellow-400 text-slate-900 hover:bg-yellow-300'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                      ? 'bg-amber-300 text-slate-900 hover:bg-amber-200'
+                      : 'bg-emerald-700 text-white hover:bg-emerald-800'
                   }`}
                 >
                   Assinar agora
                 </a>
+                <button
+                  type="button"
+                  onClick={() => setExpandedPlanId(isExpanded ? null : plan.id)}
+                  className={`mt-3 flex w-fit items-center justify-center gap-2 text-sm mx-auto ${
+                    featured ? 'text-blue-100 hover:text-white' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  aria-expanded={isExpanded}
+                >
+                  Módulos inclusos
+                  <span className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
+                </button>
+                <div className={`mt-4 overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[360px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className={`rounded-xl border p-4 space-y-4 ${
+                    featured ? 'bg-white/90 border-white/30 text-slate-900' : 'bg-white border-slate-200'
+                  }`}>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{modulePack.label}</p>
+                      {modules.length > 0 ? (
+                        <ul className="mt-2 space-y-2 text-sm text-slate-600">
+                          {modules.map((item) => (
+                            <li key={item} className="flex items-center gap-2">
+                              <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                              <span className={item.startsWith('Todos do ') ? 'font-semibold text-slate-900' : ''}>
+                                {item}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-2 text-sm text-slate-500">Sem modulos adicionais incluidos.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             );
           })}
         </div>
-        {planosLanding.length > 0 && (
-          <div className="text-center mt-10">
-            <button
-              onClick={() => setShowAllPlanos(v => !v)}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full border-2 border-blue-600 text-blue-600 font-semibold hover:bg-blue-600 hover:text-white transition"
-            >
-              {showAllPlanos ? 'Mostrar menos' : 'Exibir todos os planos'}
-              <span className={`transition-transform ${showAllPlanos ? 'rotate-180' : ''}`}>▾</span>
-            </button>
-          </div>
-        )}
       </section>
 
       <section id="faq" className="max-w-6xl mx-auto px-6 py-16">
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Perguntas frequentes</p>
-          <h2 className="landing-title text-3xl">Tire suas dúvidas</h2>
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Perguntas frequentes</p>
+          <h2 className="landing-title text-3xl">Tire suas duvidas</h2>
         </div>
         <div className="grid gap-4">
           {faqs.map((faq) => (
-            <details key={faq.question} className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition cursor-pointer group">
+            <details key={faq.question} className="bg-white border border-[#e7e0d6] rounded-xl p-5 hover:shadow-md transition cursor-pointer group">
               <summary className="font-semibold text-slate-900 cursor-pointer flex justify-between items-center">
                 {faq.question}
                 <span className="ml-2 group-open:rotate-180 transition duration-300">▾</span>
@@ -626,7 +871,7 @@ export default function LandingPage() {
       <section id="contato" className="max-w-6xl mx-auto px-6 py-16">
         <div className="grid gap-10 lg:grid-cols-[1fr_1fr] items-start">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Ainda tem dúvidas?</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Ainda tem duvidas?</p>
             <h2 className="landing-title text-3xl">Vamos conversar</h2>
             <p className="text-slate-600 mt-3">
               Nossa equipe responde em até 24h úteis. Agendamos uma demonstração, liberamos acesso ao trial e guiamos sua implementação.
@@ -638,7 +883,7 @@ export default function LandingPage() {
               <p>Onboarding com sua equipe</p>
             </div>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-lg">
+          <div className="bg-white border border-[#e7e0d6] rounded-2xl p-6 shadow-lg">
             <form onSubmit={handleContactSubmit} className="space-y-4">
               {error && (
                 <div className="bg-red-100 border border-red-300 text-sm text-red-900 p-3 rounded-lg">
@@ -651,7 +896,7 @@ export default function LandingPage() {
                 value={contactData.ministerio}
                 onChange={handleContactChange}
                 placeholder="Nome da Instituição"
-                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
               <input
                 type="text"
@@ -659,7 +904,7 @@ export default function LandingPage() {
                 value={contactData.pastor}
                 onChange={handleContactChange}
                 placeholder="Seu Nome Completo"
-                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
               <input
                 type="text"
@@ -667,7 +912,7 @@ export default function LandingPage() {
                 value={contactData.cpf}
                 onChange={handleContactChange}
                 placeholder="CPF / CNPJ"
-                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
               <input
                 type="text"
@@ -675,7 +920,7 @@ export default function LandingPage() {
                 value={contactData.whatsapp}
                 onChange={handleContactChange}
                 placeholder="WhatsApp (com DDD)"
-                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
               <input
                 type="email"
@@ -683,12 +928,12 @@ export default function LandingPage() {
                 value={contactData.email}
                 onChange={handleContactChange}
                 placeholder="Email para contato"
-                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 bg-emerald-700 text-white rounded-lg font-bold hover:bg-emerald-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Enviando...' : 'Enviar mensagem'}
               </button>

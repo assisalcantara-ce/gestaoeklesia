@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import { buildPasswordFingerprint } from '@/lib/password-fingerprint'
 import { getClientIp } from '@/lib/public-request'
 import { logPublicApiEvent } from '@/lib/public-api-audit'
 import { consumeRateLimit } from '@/lib/rate-limit-db'
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
       address_zip,
       address_street,
       address_number,
+      address_neighborhood,
       address_complement,
       address_city,
       address_state,
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
     const addressZip = onlyDigits(address_zip) || null
     const addressStreet = upperText(address_street) || null
     const addressNumber = upperText(address_number) || null
+    const addressNeighborhood = upperText(address_neighborhood) || null
     const addressComplement = upperText(address_complement) || null
     const addressCity = upperText(address_city) || null
     const addressState = upperText(address_state) || null
@@ -154,6 +157,43 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     )
 
+    // Bloquear email ja registrado no Auth
+    try {
+      const { data: existingAuth } = await supabaseAdmin.auth.admin.getUserByEmail(emailValue)
+      if (existingAuth?.user?.id) {
+        return NextResponse.json(
+          { error: 'Este email ja foi registrado. Use outro email ou faca login.' },
+          { status: 400 }
+        )
+      }
+    } catch {
+      // ignore: fallback para o erro do signUp
+    }
+
+    // Bloquear reuso de senha entre usuarios
+    let passwordFingerprint = ''
+    try {
+      passwordFingerprint = buildPasswordFingerprint(senha)
+    } catch {
+      return NextResponse.json(
+        { error: 'Configuracao de senha nao definida. Contate o administrador.' },
+        { status: 500 }
+      )
+    }
+
+    const { data: existingFingerprint } = await supabaseAdmin
+      .from('user_password_fingerprints')
+      .select('user_id')
+      .eq('fingerprint', passwordFingerprint)
+      .maybeSingle()
+
+    if (existingFingerprint?.user_id) {
+      return NextResponse.json(
+        { error: 'Senha ja utilizada por outro usuario. Escolha outra senha.' },
+        { status: 400 }
+      )
+    }
+
     // Checagem rápida (case-insensitive / cpf digits-only) para evitar criar usuário órfão
     try {
       const { data: dupData, error: dupError } = await supabaseAdmin.rpc(
@@ -212,6 +252,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const { error: fingerprintError } = await supabaseAdmin
+      .from('user_password_fingerprints')
+      .insert({ user_id: signUpData.user.id, fingerprint: passwordFingerprint })
+
+    if (fingerprintError) {
+      await supabaseAdmin.auth.admin.deleteUser(signUpData.user.id)
+      return NextResponse.json(
+        { error: 'Nao foi possivel registrar a senha. Tente novamente.' },
+        { status: 400 }
+      )
+    }
+
     // Calcular data de expiração do trial (7 dias)
     const trialExpiresAt = new Date()
     trialExpiresAt.setDate(trialExpiresAt.getDate() + 7)
@@ -245,6 +297,7 @@ export async function POST(request: NextRequest) {
         address_zip: addressZip,
         address_street: addressStreet,
         address_number: addressNumber,
+        address_neighborhood: addressNeighborhood,
         address_complement: addressComplement,
         address_city: addressCity,
         address_state: addressState,
@@ -306,7 +359,7 @@ export async function POST(request: NextRequest) {
       // Não falhar se notificação não funcionar
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const loginUrl = 'https://www.gestaoeklesia.com.br/'
     const resendKey = process.env.RESEND_API_KEY
     const resendFrom = process.env.RESEND_FROM || 'noreply@gestaoeklesia.com.br'
 
@@ -320,41 +373,49 @@ export async function POST(request: NextRequest) {
             <head>
               <meta charset="UTF-8" />
               <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <title>Bem-vindo ao Gestão Eklesia</title>
+              <title>Pré-cadastro confirmado</title>
             </head>
-            <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:24px 0;">
+            <body style="margin:0;padding:0;background:#f6f2ea;font-family:Arial,sans-serif;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f2ea;padding:24px 0;">
                 <tr>
                   <td align="center">
-                    <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(15,23,42,0.08);">
+                    <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 12px 30px rgba(31,27,22,0.12);">
                       <tr>
-                        <td style="background:#0f172a;color:#ffffff;padding:28px 32px;">
-                          <h1 style="margin:0;font-size:22px;">Bem-vindo ao Gestão Eklesia</h1>
-                          <p style="margin:8px 0 0;font-size:14px;color:#cbd5f5;">Seu acesso de teste já está ativo.</p>
+                        <td style="background:#0f766e;color:#ffffff;padding:28px 32px;">
+                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                            <tr>
+                              <td style="width:48px;padding-right:12px;">
+                                <img src="https://www.gestaoeklesia.com.br/img/logo-eklesia.png" alt="Gestao Eklesia" width="40" height="40" style="display:block;border-radius:8px;" />
+                              </td>
+                              <td>
+                                <h1 style="margin:0;font-size:22px;">Pré-cadastro confirmado</h1>
+                                <p style="margin:8px 0 0;font-size:14px;color:#d1fae5;">Seu acesso de teste já está ativo.</p>
+                              </td>
+                            </tr>
+                          </table>
                         </td>
                       </tr>
                       <tr>
-                        <td style="padding:32px;color:#0f172a;">
+                        <td style="padding:32px;color:#1f1b16;">
                           <p style="margin:0 0 12px;font-size:16px;">Olá, ${pastorName}!</p>
-                          <p style="margin:0 0 16px;color:#475569;">
-                            Recebemos o pré-cadastro da instituição <strong>${ministryName}</strong> no plano <strong>${planLabel}</strong>.
+                          <p style="margin:0 0 16px;color:#5f6b66;">
+                            Recebemos o pré-cadastro da igreja/ministério <strong>${ministryName}</strong> no plano <strong>${planLabel}</strong>.
                           </p>
-                          <div style="background:#f1f5f9;border-radius:12px;padding:16px;margin-bottom:16px;">
-                            <p style="margin:0 0 8px;font-size:14px;color:#0f172a;"><strong>Período de teste:</strong> 7 dias</p>
-                            <p style="margin:0;font-size:13px;color:#475569;">Seu acesso expira em ${trialExpiresAt.toLocaleDateString('pt-BR')}.</p>
+                          <div style="background:#f3f4f1;border-radius:12px;padding:16px;margin-bottom:16px;">
+                            <p style="margin:0 0 8px;font-size:14px;color:#1f1b16;"><strong>Período de teste:</strong> 7 dias</p>
+                            <p style="margin:0;font-size:13px;color:#5f6b66;">Seu acesso expira em ${trialExpiresAt.toLocaleDateString('pt-BR')}.</p>
                           </div>
-                          <div style="background:#ecfeff;border-radius:12px;padding:16px;margin-bottom:16px;">
-                            <p style="margin:0 0 6px;font-size:14px;color:#0f172a;"><strong>Dados de acesso</strong></p>
-                            <p style="margin:0;font-size:13px;color:#475569;">Email: ${emailValue}</p>
-                            <p style="margin:4px 0 0;font-size:13px;color:#475569;">Use o email e a senha que você cadastrou para acessar o sistema.</p>
+                          <div style="background:#ecfdf5;border-radius:12px;padding:16px;margin-bottom:16px;">
+                            <p style="margin:0 0 6px;font-size:14px;color:#1f1b16;"><strong>Dados de acesso</strong></p>
+                            <p style="margin:0;font-size:13px;color:#5f6b66;">Email: ${emailValue}</p>
+                            <p style="margin:4px 0 0;font-size:13px;color:#5f6b66;">Use o email e a senha cadastrados para acessar o sistema.</p>
                           </div>
-                          <a href="${appUrl}/login" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:bold;">Acessar o sistema</a>
-                          <p style="margin:16px 0 0;font-size:12px;color:#64748b;">Suporte WhatsApp: <a href="https://wa.me/5591981755021" style="color:#2563eb;">(91) 98175-5021</a>.</p>
-                          <p style="margin:8px 0 0;font-size:12px;color:#64748b;">Se você não solicitou este acesso, ignore este email.</p>
+                          <a href="${loginUrl}" style="display:inline-block;background:#0f766e;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:bold;">Acessar o sistema</a>
+                          <p style="margin:8px 0 0;font-size:12px;color:#5f6b66;">Se você não solicitou este acesso, ignore este email.</p>
                         </td>
                       </tr>
                       <tr>
-                        <td style="background:#f8fafc;color:#94a3b8;padding:16px 32px;font-size:11px;">
+                        <td style="background:#f3f4f1;color:#7a857f;padding:16px 32px;font-size:11px;">
                           Gestão Eklesia © ${new Date().getFullYear()} - suporte@gestaoeklesia.com.br
                         </td>
                       </tr>
@@ -369,7 +430,7 @@ export async function POST(request: NextRequest) {
         await resend.emails.send({
           from: resendFrom,
           to: emailValue,
-          subject: 'Bem-vindo ao Gestão Eklesia - acesso de teste',
+          subject: 'Gestão Eklesia | Pré-cadastro confirmado',
           html,
         })
         console.log('[SIGNUP] ✅ Email enviado para:', emailValue)

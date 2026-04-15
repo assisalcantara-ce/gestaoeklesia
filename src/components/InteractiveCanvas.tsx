@@ -7,7 +7,7 @@ import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 
 interface ElementoCartao {
     id: string;
-    tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem';
+    tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha';
     x: number;
     y: number;
     largura: number;
@@ -26,6 +26,7 @@ interface ElementoCartao {
     sombreado?: boolean;
     imagemUrl?: string;
     foto?: string; // URL da foto do membro (base64)
+    locked?: boolean;
     visivel: boolean;
 }
 
@@ -44,6 +45,8 @@ interface InteractiveCanvasProps {
     onElementoRemovido?: (elementoId: string) => void;
     larguraCanvas?: number;
     alturaCanvas?: number;
+    showGrid?: boolean;
+    gridSize?: number;
 }
 
 export default function InteractiveCanvas({
@@ -60,7 +63,9 @@ export default function InteractiveCanvas({
     onElementosAdicionados,
     onElementoRemovido,
     larguraCanvas = 465,
-    alturaCanvas = 291
+    alturaCanvas = 291,
+    showGrid = false,
+    gridSize = 24
 }: InteractiveCanvasProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [configIgreja, setConfigIgreja] = useState<any>(null);
@@ -105,11 +110,23 @@ export default function InteractiveCanvas({
             return;
         }
 
+        if (elemento.locked) {
+            onElementoSelecionado(elemento);
+            onElementosSelecionados([elemento]);
+            return;
+        }
+
         // Click normal
         const elementoJaEstaSelecionado = elementosSelecionados.some(el => el.id === elemento.id);
 
+        const hasLockedSelection = elementosSelecionados.some(el => el.locked);
+
         if (elementosSelecionados.length > 1 && elementoJaEstaSelecionado) {
             // Se há múltiplos selecionados e clicou em um deles, iniciar drag de todos
+            if (hasLockedSelection) {
+                onElementoSelecionado(elemento);
+                return;
+            }
             setIsDragging(true);
             const startPositions = new Map();
             elementosSelecionados.forEach(el => {
@@ -145,7 +162,7 @@ export default function InteractiveCanvas({
     const handleResizeMouseDown = (e: React.MouseEvent, handle: 'tl' | 'tr' | 'bl' | 'br') => {
         e.preventDefault();
         e.stopPropagation();
-        if (!elementoSelecionado) return;
+        if (!elementoSelecionado || elementoSelecionado.locked) return;
 
         setIsResizing(true);
         setResizeHandle(handle);
@@ -172,9 +189,14 @@ export default function InteractiveCanvas({
             const deltaX = e.clientX - dragStart.x;
             const deltaY = e.clientY - dragStart.y;
 
-            if (onMultiplosElementosAtualizados && elementosSelecionados.length > 1) {
+            const elementosMoviveis = elementosSelecionados.filter(elemento => !elemento.locked);
+            if (elementosMoviveis.length === 0) {
+                return;
+            }
+
+            if (onMultiplosElementosAtualizados && elementosMoviveis.length > 1) {
                 // Atualizar todos de uma vez para evitar condição de corrida
-                const atualizacoes = elementosSelecionados.map(elemento => {
+                const atualizacoes = elementosMoviveis.map(elemento => {
                     const startPos = multiDragStart.get(elemento.id);
                     if (startPos) {
                         const novoX = Math.max(0, Math.min(larguraCanvas - elemento.largura, startPos.x + deltaX));
@@ -187,7 +209,7 @@ export default function InteractiveCanvas({
                 onMultiplosElementosAtualizados(atualizacoes);
             } else {
                 // Fallback: atualizar um por um
-                elementosSelecionados.forEach(elemento => {
+                elementosMoviveis.forEach(elemento => {
                     const startPos = multiDragStart.get(elemento.id);
                     if (startPos) {
                         const novoX = Math.max(0, Math.min(larguraCanvas - elemento.largura, startPos.x + deltaX));
@@ -279,7 +301,7 @@ export default function InteractiveCanvas({
         if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
             if (elementosSelecionados.length > 0) {
                 e.preventDefault();
-                setClipboard(elementosSelecionados);
+                setClipboard(elementosSelecionados.map(el => ({ ...el, locked: false })));
                 console.log(`📋 ${elementosSelecionados.length} elemento(s) copiado(s)`);
             }
             return;
@@ -295,6 +317,7 @@ export default function InteractiveCanvas({
                 const elementosCopias: ElementoCartao[] = clipboard.map(el => ({
                     ...JSON.parse(JSON.stringify(el)), // Deep clone
                     id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                    locked: false,
                     x: Math.min(el.x + offset, larguraCanvas - el.largura),
                     y: Math.min(el.y + offset, alturaCanvas - el.altura)
                 }));
@@ -309,7 +332,7 @@ export default function InteractiveCanvas({
         // Deletar: Delete ou Backspace
         if ((e.key === 'Delete' || e.key === 'Backspace') && elementosSelecionados.length > 0) {
             e.preventDefault();
-            elementosSelecionados.forEach(el => {
+            elementosSelecionados.filter(el => !el.locked).forEach(el => {
                 if (onElementoRemovido) {
                     onElementoRemovido(el.id);
                 }
@@ -349,30 +372,40 @@ export default function InteractiveCanvas({
 
         // Atualizar posição dos elementos selecionados
         if (onMultiplosElementosAtualizados && elementosSelecionados.length > 0) {
-            const atualizacoes = elementosSelecionados.map(elemento => {
+            const atualizacoes = elementosSelecionados
+                .filter(elemento => !elemento.locked)
+                .map(elemento => {
                 const novoX = Math.max(0, Math.min(larguraCanvas - elemento.largura, elemento.x + deltaX));
                 const novoY = Math.max(0, Math.min(alturaCanvas - elemento.altura, elemento.y + deltaY));
                 return { id: elemento.id, propriedades: { x: novoX, y: novoY } };
             });
-            onMultiplosElementosAtualizados(atualizacoes);
+            if (atualizacoes.length > 0) {
+                onMultiplosElementosAtualizados(atualizacoes);
+            }
         }
     };
 
     const renderElemento = (elemento: ElementoCartao) => {
         const isSelected = elementoSelecionado?.id === elemento.id;
         const isInSelection = elementosSelecionados.some(el => el.id === elemento.id);
+        const isLocked = !!elemento.locked;
         const baseStyle: React.CSSProperties = {
             position: 'absolute',
             left: `${elemento.x}px`,
             top: `${elemento.y}px`,
             width: `${elemento.largura}px`,
             height: `${elemento.altura}px`,
-            cursor: isDragging ? 'grabbing' : 'grab',
-            border: isSelected ? '2px solid #3b82f6' : isInSelection ? '2px solid #60a5fa' : '1px dashed rgba(0,0,0,0.2)',
+            cursor: isLocked ? 'not-allowed' : isDragging ? 'grabbing' : 'grab',
+            border: isSelected
+                ? (isLocked ? '2px solid #f59e0b' : '2px solid #3b82f6')
+                : isInSelection
+                    ? '2px solid #60a5fa'
+                    : (isLocked ? '1px dashed rgba(148,163,184,0.7)' : '1px dashed rgba(0,0,0,0.2)'),
             outline: isInSelection && !isSelected ? '1px solid #93c5fd' : 'none',
             outlineOffset: '2px',
             boxSizing: 'border-box',
-            userSelect: 'none'
+            userSelect: 'none',
+            opacity: isLocked ? 0.9 : 1
         };
 
         let conteudo: React.ReactNode = null;
@@ -535,6 +568,20 @@ export default function InteractiveCanvas({
                 );
                 break;
 
+            case 'linha':
+                conteudo = (
+                    <div
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            backgroundColor: elemento.cor || '#111',
+                            borderRadius: `${elemento.borderRadius || 0}px`,
+                            opacity: elemento.transparencia || 1
+                        }}
+                    />
+                );
+                break;
+
             case 'chapa':
                 conteudo = (
                     <div
@@ -567,7 +614,7 @@ export default function InteractiveCanvas({
                 {conteudo}
 
                 {/* Handles de redimensionamento */}
-                {isSelected && (
+                {isSelected && !isLocked && (
                     <>
                         {/* Top-left */}
                         <div
@@ -644,9 +691,21 @@ export default function InteractiveCanvas({
                 width: `${larguraCanvas}px`,
                 height: `${alturaCanvas}px`,
                 backgroundColor: '#fff',
-                backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : 'none',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
+                backgroundImage: backgroundUrl
+                    ? `${showGrid ? `linear-gradient(to right, rgba(15, 23, 42, 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(15, 23, 42, 0.08) 1px, transparent 1px), ` : ''}url(${backgroundUrl})`
+                    : showGrid
+                        ? 'linear-gradient(to right, rgba(15, 23, 42, 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(15, 23, 42, 0.08) 1px, transparent 1px)'
+                        : 'none',
+                backgroundSize: backgroundUrl
+                    ? `${showGrid ? `${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px, ` : ''}cover`
+                    : showGrid
+                        ? `${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px`
+                        : 'cover',
+                backgroundPosition: backgroundUrl
+                    ? `${showGrid ? '0 0, 0 0, center' : 'center'}`
+                    : showGrid
+                        ? '0 0, 0 0'
+                        : 'center',
                 border: '1px solid #d1d5db',
                 overflow: 'hidden',
                 cursor: isDragging || isResizing ? 'default' : 'auto',

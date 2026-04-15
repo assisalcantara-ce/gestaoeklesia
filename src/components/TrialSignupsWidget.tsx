@@ -13,6 +13,7 @@ interface PreRegistration {
   cpf_cnpj: string
   plan: string
   trial_expires_at: string
+  trial_days?: number | null
   status: 'trial' | 'encerrado' | 'efetivado'
   created_at: string
 }
@@ -66,9 +67,19 @@ export default function TrialSignupsWidget() {
 
   useEffect(() => { fetchData() }, [])
 
-  const daysUntilExpiry = (expiryDate: string) => {
-    const diff = new Date(expiryDate).getTime() - new Date().getTime()
-    return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  const daysUntilExpiry = (signup: PreRegistration) => {
+    const totalDays = Number.isFinite(signup.trial_days) ? Number(signup.trial_days) : 7
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const createdAt = new Date(signup.created_at)
+    createdAt.setHours(0, 0, 0, 0)
+
+    const msInDay = 1000 * 60 * 60 * 24
+    const elapsedDays = Math.max(0, Math.floor((today.getTime() - createdAt.getTime()) / msInDay))
+    const remaining = totalDays - elapsedDays
+
+    return Math.max(0, remaining)
   }
 
   const handleCancelarTrial = async (id: string) => {
@@ -316,7 +327,7 @@ export default function TrialSignupsWidget() {
               {!isExpired(selectedSignup) && (
                 <div className="bg-blue-900/40 border border-blue-700 rounded-lg p-3">
                   <p className="text-xs text-blue-300 font-semibold uppercase mb-1">Dias restantes</p>
-                  <p className="text-sm text-blue-100">{daysUntilExpiry(selectedSignup.trial_expires_at)} dias</p>
+                  <p className="text-sm text-blue-100">{daysUntilExpiry(selectedSignup)} dias</p>
                 </div>
               )}
             </div>

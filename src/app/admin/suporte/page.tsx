@@ -33,6 +33,8 @@ export default function SuportePage() {
   const [replyText, setReplyText] = useState('')
   const [replying, setReplying] = useState(false)
   const [replyStatus, setReplyStatus] = useState<SupportTicket['status']>('waiting_customer')
+  const [closingTicketId, setClosingTicketId] = useState<string | null>(null)
+  const [closingTicket, setClosingTicket] = useState<SupportTicket | null>(null)
   const router = useRouter()
 
   const [formData, setFormData] = useState({
@@ -121,7 +123,7 @@ export default function SuportePage() {
           router.push('/admin/login')
           return
         }
-        throw new Error('Erro ao carregar tickets da landing')
+        throw new Error('Erro ao carregar tickets do site')
       }
 
       const data = await response.json()
@@ -218,6 +220,64 @@ export default function SuportePage() {
     }
   }
 
+  const closeTicket = async (ticket: SupportTicket) => {
+    if (ticket.status === 'closed') return
+
+    try {
+      setClosingTicketId(ticket.id)
+      setError('')
+      setSuccess('')
+
+      const response = await authenticatedFetch('/api/v1/admin/tickets/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticket_id: ticket.id,
+          message: 'Ticket fechado pelo suporte.',
+          is_internal: false,
+          next_status: 'closed',
+        }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json()
+        throw new Error(payload.error || 'Erro ao fechar ticket')
+      }
+
+      const now = new Date().toISOString()
+      setTickets((prev) =>
+        prev.map((item) =>
+          item.id === ticket.id
+            ? {
+                ...item,
+                status: 'closed',
+                response_at: now,
+                updated_at: now,
+              }
+            : item,
+        ),
+      )
+      setSelectedTicket((prev) =>
+        prev && prev.id === ticket.id
+          ? {
+              ...prev,
+              status: 'closed',
+              response_at: now,
+              updated_at: now,
+            }
+          : prev,
+      )
+      await fetchMessages(ticket.id)
+      await fetchTickets()
+      setSuccess('Ticket fechado.')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setClosingTicketId(null)
+      setClosingTicket(null)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -264,7 +324,7 @@ export default function SuportePage() {
     switch (priority) {
       case 'urgent': return 'URGENTE'
       case 'high': return 'ALTA'
-      case 'medium': return 'MEDIA'
+      case 'medium': return 'MÉDIA'
       case 'low': return 'BAIXA'
       default: return priority.toUpperCase()
     }
@@ -274,7 +334,7 @@ export default function SuportePage() {
     switch (status) {
       case 'open': return 'bg-red-500/20 text-red-400 border border-red-500/30'
       case 'in_progress': return 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-      case 'waiting_customer': return 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+      case 'waiting_customer': return 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
       case 'em_atendimento': return 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
       case 'aguardando_contrato': return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
       case 'contrato_finalizado': return 'bg-green-500/20 text-green-400 border border-green-500/30'
@@ -289,7 +349,7 @@ export default function SuportePage() {
     switch (status) {
       case 'open': return 'ABERTO'
       case 'in_progress': return 'EM PROGRESSO'
-      case 'waiting_customer': return 'AGUARDANDO CLIENTE'
+      case 'waiting_customer': return 'RESPOSTA DO SUPORTE'
       case 'em_atendimento': return 'EM ATENDIMENTO'
       case 'aguardando_contrato': return 'AGUARDANDO CONTRATO'
       case 'contrato_finalizado': return 'CONTRATO FINALIZADO'
@@ -303,7 +363,7 @@ export default function SuportePage() {
     switch (status) {
       case 'open': return 'border-l-red-500'
       case 'in_progress': return 'border-l-blue-500'
-      case 'waiting_customer': return 'border-l-purple-500'
+      case 'waiting_customer': return 'border-l-teal-500'
       case 'em_atendimento': return 'border-l-blue-400'
       case 'aguardando_contrato': return 'border-l-yellow-500'
       case 'contrato_finalizado': return 'border-l-green-500'
@@ -372,6 +432,20 @@ export default function SuportePage() {
     }
   }
 
+  const getReplyState = (ticket?: SupportTicket | null) => {
+    if (!ticket) return 'none'
+    if (ticket.status === 'closed') return 'none'
+    if (ticket.last_message_sender_role === 'support') return 'support'
+    if (ticket.last_message_sender_role === 'user') return 'customer'
+    if (ticket.response_at) return 'support'
+    if (ticket.last_message_user_id && ticket.user_id) {
+      return ticket.last_message_user_id === ticket.user_id ? 'customer' : 'support'
+    }
+    return 'none'
+  }
+
+  const selectedTicketReplyState = getReplyState(selectedTicket)
+
   return (
     <div className="flex h-screen bg-gray-900">
       <AdminSidebar />
@@ -416,7 +490,7 @@ export default function SuportePage() {
                   ticketView === 'landing' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
                 }`}
               >
-                Tickets da Landing
+                Tickets do site
               </button>
             </div>
 
@@ -427,11 +501,9 @@ export default function SuportePage() {
                   onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
                   className="px-3 py-2 bg-gray-800 border border-gray-700 text-gray-300 rounded-lg text-sm"
                 >
-                  <option value="active">Em atendimento</option>
-                  <option value="open">Abertos (apenas novos)</option>
-                  <option value="in_progress">Em Progresso</option>
-                  <option value="waiting_customer">Aguardando Cliente</option>
-                  <option value="closed">Fechados</option>
+                  <option value="open">ABERTO</option>
+                  <option value="in_progress">EM ATENDIMENTO</option>
+                  <option value="closed">FECHADO</option>
                 </select>
                 <select
                   value={priorityFilter}
@@ -459,13 +531,9 @@ export default function SuportePage() {
                 onChange={(e) => { setLandingStatusFilter(e.target.value); setLandingPage(1) }}
                 className="px-3 py-2 bg-gray-800 border border-gray-700 text-gray-300 rounded-lg text-sm"
               >
-                <option value="active">Em atendimento</option>
-                <option value="open">Abertos (apenas novos)</option>
-                <option value="em_atendimento">Em Atendimento</option>
-                <option value="aguardando_contrato">Aguardando Contrato</option>
-                <option value="contrato_finalizado">Contrato Finalizado</option>
-                <option value="cancelado">Cancelado</option>
-                <option value="closed">Fechados</option>
+                <option value="open">ABERTO</option>
+                <option value="em_atendimento">EM ATENDIMENTO</option>
+                <option value="closed">FECHADO</option>
               </select>
             )}
           </div>
@@ -561,7 +629,7 @@ export default function SuportePage() {
                   <thead className="bg-gray-900 border-b border-gray-700">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">#</th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Assunto</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider max-w-xs whitespace-nowrap truncate">Assunto</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Ministério</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Prioridade</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
@@ -570,14 +638,23 @@ export default function SuportePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700">
-                    {tickets.map((t) => (
+                    {tickets.map((t) => {
+                      const replyState = getReplyState(t)
+
+                      return (
                       <tr
                         key={t.id}
-                        className={`border-l-4 ${getStatusRowBorder(t.status)} hover:bg-gray-750 transition ${
-                          t.last_message_user_id && t.user_id && t.last_message_user_id === t.user_id
-                            ? 'bg-yellow-900/10'
-                            : t.last_message_user_id
-                            ? 'bg-green-900/10'
+                        className={`border-l-4 ${
+                          replyState === 'support'
+                            ? 'border-l-orange-500'
+                            : replyState === 'customer'
+                            ? 'border-l-emerald-500'
+                            : getStatusRowBorder(t.status)
+                        } hover:bg-gray-750 transition ${
+                          replyState === 'support'
+                            ? 'bg-orange-900/20'
+                            : replyState === 'customer'
+                            ? 'bg-emerald-900/20'
                             : ''
                         }`}
                       >
@@ -591,12 +668,22 @@ export default function SuportePage() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-col gap-1">
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold w-fit ${getStatusColor(t.status)}`}>
-                              {getStatusLabel(t.status)}
-                            </span>
+                            {replyState === 'support' ? (
+                              <span className="px-2 py-1 rounded-full text-xs font-semibold w-fit bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                                RESPOSTA DO SUPORTE
+                              </span>
+                            ) : replyState === 'customer' ? (
+                              <span className="px-2 py-1 rounded-full text-xs font-semibold w-fit bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                RESPOSTA DO CLIENTE
+                              </span>
+                            ) : (
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold w-fit ${getStatusColor(t.status)}`}>
+                                {getStatusLabel(t.status)}
+                              </span>
+                            )}
                             {t.response_at && (
                               <span className="text-[10px] text-gray-500">
-                                Resp. {new Date(t.response_at).toLocaleDateString('pt-BR')}
+                                em {new Date(t.response_at).toLocaleDateString('pt-BR')}
                               </span>
                             )}
                           </div>
@@ -605,15 +692,26 @@ export default function SuportePage() {
                           {new Date(t.created_at).toLocaleDateString('pt-BR')}
                         </td>
                         <td className="px-6 py-4">
-                          <button
-                            onClick={() => setSelectedTicket(t)}
-                            className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition"
-                          >
-                            {t.status === 'closed' ? 'Visualizar' : 'Responder'}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setSelectedTicket(t)}
+                              className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition"
+                            >
+                              {t.status === 'closed' ? 'Visualizar' : 'Responder'}
+                            </button>
+                            {t.status !== 'closed' && (
+                              <button
+                                onClick={() => setClosingTicket(t)}
+                                disabled={closingTicketId === t.id}
+                                className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-700 text-white hover:bg-gray-600 transition disabled:opacity-50"
+                              >
+                                {closingTicketId === t.id ? 'Fechando...' : 'Fechar'}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               )
@@ -690,14 +788,24 @@ export default function SuportePage() {
                 </button>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedTicket.status)}`}>
-                  {getStatusLabel(selectedTicket.status)}
-                </span>
+                {selectedTicketReplyState === 'support' ? (
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                    RESPOSTA DO SUPORTE
+                  </span>
+                ) : selectedTicketReplyState === 'customer' ? (
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    RESPOSTA DO CLIENTE
+                  </span>
+                ) : (
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedTicket.status)}`}>
+                    {getStatusLabel(selectedTicket.status)}
+                  </span>
+                )}
                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPriorityColor(selectedTicket.priority)}`}>
                   PRIORIDADE {getPriorityLabel(selectedTicket.priority)}
                 </span>
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white">
-                  MINISTERIO {selectedTicket.ministry_id}
+                  MINISTÉRIO {selectedTicket.ministry_id}
                 </span>
               </div>
             </div>
@@ -720,31 +828,40 @@ export default function SuportePage() {
                       <p className="text-gray-500 text-sm">Nenhuma mensagem ainda.</p>
                     ) : (
                       <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                        {messages.map((msg) => (
-                          <div
-                            key={msg.id}
-                            className={`rounded-xl p-3 border ${
-                              msg.user_id === selectedTicket.user_id
-                                ? 'bg-yellow-900/20 border-yellow-700/40'
-                                : 'bg-green-900/20 border-green-700/40'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
-                              <span className="inline-flex items-center gap-2 font-semibold">
-                                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${
-                                  msg.user_id === selectedTicket.user_id
-                                    ? 'bg-yellow-700/50 text-yellow-300'
-                                    : 'bg-green-700/50 text-green-300'
-                                }`}>
-                                  {msg.user_id === selectedTicket.user_id ? 'CL' : 'SP'}
+                        {messages.map((msg, index) => {
+                          const isLatestMessage = index === 0
+                          const forceSupportOnRespondedTicket =
+                            isLatestMessage && (selectedTicket.status === 'waiting_customer' || Boolean(selectedTicket.response_at))
+                          const isSupportMessage = msg.sender_role
+                            ? msg.sender_role === 'support'
+                            : msg.user_id !== selectedTicket.user_id || forceSupportOnRespondedTicket
+
+                          return (
+                            <div
+                              key={msg.id}
+                              className={`rounded-xl p-3 border ${
+                                isSupportMessage
+                                  ? 'bg-orange-900/20 border-orange-700/40'
+                                  : 'bg-emerald-900/20 border-emerald-700/40'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                                <span className="inline-flex items-center gap-2 font-semibold">
+                                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${
+                                    isSupportMessage
+                                      ? 'bg-orange-700/50 text-orange-300'
+                                      : 'bg-emerald-700/50 text-emerald-300'
+                                  }`}>
+                                    {isSupportMessage ? 'ST' : 'CL'}
+                                  </span>
+                                  {isSupportMessage ? 'Suporte Técnico' : 'Cliente'}
                                 </span>
-                                {msg.user_id === selectedTicket.user_id ? 'Cliente' : 'Suporte'}
-                              </span>
-                              <span>{new Date(msg.created_at).toLocaleString('pt-BR')}</span>
+                                <span>{new Date(msg.created_at).toLocaleString('pt-BR')}</span>
+                              </div>
+                              <p className="text-gray-300 whitespace-pre-wrap text-sm leading-relaxed">{msg.message}</p>
                             </div>
-                            <p className="text-gray-300 whitespace-pre-wrap text-sm leading-relaxed">{msg.message}</p>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                   </div>
@@ -790,7 +907,7 @@ export default function SuportePage() {
                           onChange={(e) => setReplyStatus(e.target.value as SupportTicket['status'])}
                           className="bg-gray-800 border border-gray-700 text-gray-300 rounded-lg px-3 py-2 text-sm"
                         >
-                          <option value="waiting_customer">Aguardando Cliente</option>
+                          <option value="waiting_customer">Resposta do Suporte</option>
                           <option value="in_progress">Em Progresso</option>
                           <option value="closed">Fechado</option>
                         </select>
@@ -806,6 +923,37 @@ export default function SuportePage() {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {closingTicket && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-900 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-800">
+              <h3 className="text-lg font-semibold text-white">Fechar ticket</h3>
+              <p className="text-sm text-gray-400 mt-1">
+                Confirma o fechamento do ticket <span className="text-gray-200 font-semibold">{closingTicket.ticket_number}</span>?
+              </p>
+            </div>
+            <div className="px-6 py-5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setClosingTicket(null)}
+                disabled={closingTicketId === closingTicket.id}
+                className="px-4 py-2 rounded-full text-sm font-semibold bg-gray-800 text-gray-200 hover:bg-gray-700 transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => closeTicket(closingTicket)}
+                disabled={closingTicketId === closingTicket.id}
+                className="px-4 py-2 rounded-full text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-50"
+              >
+                {closingTicketId === closingTicket.id ? 'Fechando...' : 'Fechar ticket'}
+              </button>
             </div>
           </div>
         </div>

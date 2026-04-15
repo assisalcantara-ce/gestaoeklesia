@@ -23,6 +23,9 @@ interface Ticket {
   data_atualizacao: string
   respondido_em?: string
   usuario_id: string
+  ultimo_autor_id?: string | null
+  ultimo_autor_role?: 'support' | 'user' | null
+  suporte_respondeu?: boolean
   ministry_id: string
   ticket_number?: string
 }
@@ -43,10 +46,14 @@ export default function SuportePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
-  const [filtroStatus, setFiltroStatus] = useState<TicketStatus | 'todos'>('todos')
+  const [filtroGrupo, setFiltroGrupo] = useState<'todos' | 'abertos' | 'finalizados'>('todos')
+  const [buscaTicket, setBuscaTicket] = useState('')
   const [selecionado, setSelecionado] = useState<Ticket | null>(null)
   const [ministryId, setMinistryId] = useState<string | null>(null)
-  const [mensagens, setMensagens] = useState<Array<{ id: string; user_id: string; message: string; created_at: string }>>([])
+  const [ministryResolved, setMinistryResolved] = useState(false)
+  const [mensagens, setMensagens] = useState<
+    Array<{ id: string; user_id: string; message: string; created_at: string; sender_role?: 'support' | 'user' | null }>
+  >([])
   const [carregandoMensagens, setCarregandoMensagens] = useState(false)
   const [resposta, setResposta] = useState('')
   const [enviandoResposta, setEnviandoResposta] = useState(false)
@@ -55,6 +62,7 @@ export default function SuportePage() {
   const [podeEditarDescricao, setPodeEditarDescricao] = useState(false)
   const [descricaoEditada, setDescricaoEditada] = useState('')
   const [salvandoDescricao, setSalvandoDescricao] = useState(false)
+  const [apagandoTicketId, setApagandoTicketId] = useState<string | null>(null)
   const [novoTicket, setNovoTicket] = useState<NovoTicket>({
     titulo: '',
     descricao: '',
@@ -107,35 +115,40 @@ export default function SuportePage() {
   // Carregar tickets
   useEffect(() => {
     if (authLoading) return
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      setMinistryResolved(true)
+      return
+    }
     resolveMinistryId().then((resolved) => {
       setMinistryId(resolved)
+      setMinistryResolved(true)
     })
   }, [authLoading, user?.id])
 
   useEffect(() => {
-    if (!user || !ministryId) return
+    if (!user || !ministryResolved) return
     carregarTickets()
-  }, [user?.id, ministryId])
+  }, [user?.id, ministryResolved])
 
   useEffect(() => {
-    if (!user || !ministryId) return
+    if (!user || !ministryResolved) return
     const intervalId = setInterval(() => {
       carregarTickets()
     }, 20000)
 
     return () => clearInterval(intervalId)
-  }, [user?.id, ministryId])
+  }, [user?.id, ministryResolved])
 
   useEffect(() => {
     if (!selecionado) return
     carregarMensagens(selecionado.id)
-    setMostrarResposta(selecionado.status !== 'aguardando_cliente')
+    setMostrarResposta(ticketTemRespostaDoSuporte(selecionado))
     setDescricaoEditada(selecionado.descricao)
   }, [selecionado?.id])
 
   useEffect(() => {
-    if (!selecionado || !user || !ministryId) return
+    if (!selecionado || !user) return
     const intervalId = setInterval(() => {
       carregarMensagens(selecionado.id)
       carregarTickets()
@@ -207,7 +220,7 @@ export default function SuportePage() {
   const carregarTickets = async () => {
     try {
       setLoading(true)
-      if (!user || !ministryId) return
+      if (!user) return
 
       // Buscar tickets do usuário
       const { data, error } = await supabase
@@ -228,6 +241,49 @@ export default function SuportePage() {
 
       // Sucesso! Limpar erro se houver
       setError('')
+
+      const ticketIds = (data || []).map((row: any) => row.id)
+      const ticketOwnerById: Record<string, string> = (data || []).reduce((acc: any, row: any) => {
+        if (row?.id && row?.user_id) {
+          acc[row.id] = row.user_id
+        }
+        return acc
+      }, {})
+      let lastMessageByTicket: Record<
+        string,
+        { user_id: string; created_at: string; sender_role?: 'support' | 'user' | null }
+      > = {}
+      let suporteRespondeuPorTicket: Record<string, boolean> = {}
+
+      if (ticketIds.length > 0) {
+        const { data: lastMessages } = await supabase
+          .from('support_ticket_messages')
+          .select('ticket_id,user_id,created_at,sender_role')
+          .in('ticket_id', ticketIds)
+          .eq('is_internal', false)
+          .order('created_at', { ascending: false })
+
+        lastMessageByTicket = (lastMessages || []).reduce((acc: any, msg: any) => {
+          if (!acc[msg.ticket_id]) {
+            acc[msg.ticket_id] = { user_id: msg.user_id, created_at: msg.created_at, sender_role: msg.sender_role }
+          }
+          return acc
+        }, {})
+
+        suporteRespondeuPorTicket = (lastMessages || []).reduce((acc: any, msg: any) => {
+          const ownerId = ticketOwnerById[msg.ticket_id]
+          const role = msg.sender_role
+          if (role === 'support') {
+            acc[msg.ticket_id] = true
+            return acc
+          }
+          if (!role && ownerId && (!msg.user_id || msg.user_id !== ownerId)) {
+            acc[msg.ticket_id] = true
+          }
+          return acc
+        }, {})
+      }
+
       const mapped: Ticket[] = (data || []).map((row: any) => ({
         id: row.id,
         titulo: row.subject,
@@ -239,6 +295,9 @@ export default function SuportePage() {
         data_atualizacao: row.updated_at,
         respondido_em: row.response_at || row.resolved_at,
         usuario_id: row.user_id,
+        ultimo_autor_id: lastMessageByTicket[row.id]?.user_id || null,
+        ultimo_autor_role: lastMessageByTicket[row.id]?.sender_role ?? null,
+        suporte_respondeu: Boolean(suporteRespondeuPorTicket[row.id]),
         ministry_id: row.ministry_id,
         ticket_number: row.ticket_number,
       }))
@@ -255,6 +314,10 @@ export default function SuportePage() {
         return new Date(b.data_criacao).getTime() - new Date(a.data_criacao).getTime()
       })
       setTickets(sorted)
+
+      if (!ministryId && sorted.length > 0 && sorted[0]?.ministry_id) {
+        setMinistryId(sorted[0].ministry_id)
+      }
 
       if (selecionado) {
         const updatedSelected = mapped.find((ticket) => ticket.id === selecionado.id)
@@ -296,18 +359,22 @@ export default function SuportePage() {
         return
       }
 
-      const visible: Array<{ id: string; user_id: string; message: string; created_at: string }> = (data || [])
+      const visible: Array<{ id: string; user_id: string; message: string; created_at: string; sender_role?: 'support' | 'user' | null }> = (data || [])
         .filter((msg: any) => msg.is_internal !== true)
         .map((msg: any) => ({
           id: msg.id,
           user_id: msg.user_id,
           message: msg.message,
           created_at: msg.created_at,
+          sender_role: msg.sender_role ?? null,
         }))
       setMensagens(visible)
-      const suporteRespondeuLocal = visible.some((msg) => msg.user_id !== user?.id)
+      const suporteRespondeuLocal =
+        visible.some((msg) => msg.sender_role === 'support') ||
+        Boolean(selecionado && ticketTemRespostaDoSuporte(selecionado)) ||
+        visible.some((msg) => msg.sender_role == null && msg.user_id !== user?.id)
       setSuporteRespondeu(suporteRespondeuLocal)
-      const podeEditar = selecionado?.status === 'aberto' && !selecionado?.respondido_em && !suporteRespondeuLocal
+      const podeEditar = selecionado?.status === 'aberto' && !suporteRespondeuLocal
       setPodeEditarDescricao(Boolean(podeEditar))
     } finally {
       setCarregandoMensagens(false)
@@ -358,6 +425,7 @@ export default function SuportePage() {
           user_id: user.id,
           message: resposta,
           is_internal: false,
+          sender_role: 'user',
         })
 
       if (insertError) {
@@ -380,6 +448,52 @@ export default function SuportePage() {
       await carregarTickets()
     } finally {
       setEnviandoResposta(false)
+    }
+  }
+
+  const apagarTicket = async (ticket: Ticket) => {
+    if (!user) return
+
+    const ok = await dialog.confirm({
+      title: 'Confirmar',
+      type: 'warning',
+      message: `Deseja apagar o ticket ${ticket.ticket_number || ticket.id.slice(0, 7).toUpperCase()}?`,
+      confirmText: 'Apagar',
+      cancelText: 'Cancelar',
+    })
+
+    if (!ok) return
+
+    try {
+      setApagandoTicketId(ticket.id)
+
+      const { error: deleteError } = await supabase
+        .from('support_tickets')
+        .delete()
+        .eq('id', ticket.id)
+        .eq('user_id', user.id)
+
+      if (deleteError) {
+        await dialog.alert({ title: 'Erro', type: 'error', message: `Não foi possível apagar o ticket: ${deleteError.message}` })
+        return
+      }
+
+      setTickets((prev) => prev.filter((t) => t.id !== ticket.id))
+      if (selecionado?.id === ticket.id) {
+        setSelecionado(null)
+      }
+
+      await registrarAcao({
+        acao: 'excluir',
+        modulo: 'suporte',
+        area: 'tickets',
+        tabela_afetada: 'support_tickets',
+        registro_id: ticket.id,
+        descricao: `Apagou ticket ${ticket.ticket_number || ticket.id.slice(0, 7).toUpperCase()}`,
+        status: 'sucesso',
+      })
+    } finally {
+      setApagandoTicketId(null)
     }
   }
 
@@ -485,23 +599,6 @@ export default function SuportePage() {
     }
   }
 
-  const getCardBorderColor = (status: TicketStatus) => {
-    switch (status) {
-      case 'aberto':
-        return 'border-blue-400'
-      case 'em_progresso':
-        return 'border-yellow-400'
-      case 'aguardando_cliente':
-        return 'border-purple-400'
-      case 'resolvido':
-        return 'border-green-400'
-      case 'fechado':
-        return 'border-red-300'
-      default:
-        return 'border-gray-300'
-    }
-  }
-
   const getStatusLabel = (status: TicketStatus) => {
     switch (status) {
       case 'aberto':
@@ -513,32 +610,67 @@ export default function SuportePage() {
       case 'fechado':
         return 'Fechado'
       case 'aguardando_cliente':
-        return 'Aguardando cliente'
+        return 'RESPOSTA DO SUPORTE'
       default:
         return 'Aberto'
     }
   }
 
-  if (authLoading) return <div className="p-8">Carregando...</div>
-
-  const getPriorityColor = (prioridade: TicketPriority) => {
-    switch (prioridade) {
-      case 'baixa':
-        return 'text-green-600'
-      case 'media':
-        return 'text-yellow-600'
-      case 'alta':
-        return 'text-orange-600'
-      case 'critica':
-        return 'text-red-600'
-      default:
-        return 'text-gray-600'
-    }
+  const ticketTemRespostaDoSuporte = (ticket: Ticket) => {
+    const ultimoAutorSuporte = Boolean(
+      ticket.ultimo_autor_id && ticket.usuario_id && ticket.ultimo_autor_id !== ticket.usuario_id
+    )
+    return (
+      ticket.ultimo_autor_role === 'support' ||
+      ticket.status === 'aguardando_cliente' ||
+      Boolean(ticket.respondido_em) ||
+      Boolean(ticket.suporte_respondeu) ||
+      ultimoAutorSuporte
+    )
   }
 
-  const ticketsFiltrados = filtroStatus === 'todos'
-    ? tickets
-    : tickets.filter(t => t.status === filtroStatus)
+  const ticketTemRespostaDoCliente = (ticket: Ticket) => {
+    if (ticket.ultimo_autor_role) return ticket.ultimo_autor_role === 'user'
+    if (ticket.ultimo_autor_id && ticket.usuario_id) return ticket.ultimo_autor_id === ticket.usuario_id
+    return false
+  }
+
+  const getStatusLabelExibicao = (ticket: Ticket) => {
+    if (ticket.status === 'fechado') return 'Finalizado'
+    if (ticketTemRespostaDoCliente(ticket)) return 'RESPOSTA DO CLIENTE'
+    if (ticketTemRespostaDoSuporte(ticket)) return 'RESPOSTA DO SUPORTE'
+    return getStatusLabel(ticket.status)
+  }
+
+  const getStatusBadgeClass = (ticket: Ticket) => {
+    if (ticket.status === 'fechado') return 'bg-red-50 text-red-700'
+    if (ticketTemRespostaDoCliente(ticket)) return 'bg-emerald-100 text-emerald-800'
+    if (ticketTemRespostaDoSuporte(ticket)) return 'bg-orange-100 text-orange-800'
+    return 'bg-[#eceff3] text-[#2f3f52]'
+  }
+
+  const getStatusColorExibicao = (ticket: Ticket) => {
+    if (ticketTemRespostaDoCliente(ticket)) return 'bg-emerald-100 text-emerald-800'
+    if (ticketTemRespostaDoSuporte(ticket)) return 'bg-orange-100 text-orange-800'
+    return getStatusColor(ticket.status)
+  }
+
+  if (authLoading) return <div className="p-8">Carregando...</div>
+
+  const statusEhFinalizado = (status: TicketStatus) => status === 'fechado' || status === 'resolvido'
+
+  const ticketsFiltrados = tickets.filter((ticket) => {
+    if (filtroGrupo === 'abertos' && statusEhFinalizado(ticket.status)) return false
+    if (filtroGrupo === 'finalizados' && !statusEhFinalizado(ticket.status)) return false
+
+    const termo = buscaTicket.trim().toLowerCase()
+    if (!termo) return true
+
+    return ticket.titulo.toLowerCase().includes(termo)
+  })
+
+  const chamadosEmAberto = tickets.filter((ticket) => ticket.status === 'aberto').length
+  const selecionadoTemResposta = Boolean(selecionado && ticketTemRespostaDoSuporte(selecionado))
 
   return (
     <PageLayout
@@ -556,16 +688,6 @@ export default function SuportePage() {
             </p>
           </div>
         )}
-
-        {/* BOTÃO ABRIR TICKET */}
-        <div className="mb-6">
-          <button
-            onClick={() => setMostrarFormulario(!mostrarFormulario)}
-            className="px-6 py-3 bg-[#0284c7] text-white rounded-lg font-semibold hover:bg-[#0270b0] transition shadow-lg"
-          >
-            {mostrarFormulario ? '✕ Cancelar' : '+ Abrir Novo Ticket'}
-          </button>
-        </div>
 
         {/* FORMULÁRIO NOVO TICKET */}
         {mostrarFormulario && (
@@ -667,27 +789,55 @@ export default function SuportePage() {
           </div>
         )}
 
-        {/* FILTROS */}
-        <div className="mb-6 flex gap-2 flex-wrap items-center">
-          {['todos', 'aberto', 'em_progresso', 'aguardando_cliente', 'fechado'].map((status) => (
-            <button
-              key={status}
-              onClick={() => setFiltroStatus(status as TicketStatus | 'todos')}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                filtroStatus === status
-                  ? 'bg-[#0284c7] text-white'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              {status === 'todos' ? 'Todos' : getStatusLabel(status as TicketStatus)}
-            </button>
-          ))}
-          <button
-            onClick={carregarTickets}
-            className="px-4 py-2 rounded-lg font-semibold bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-          >
-            Atualizar
-          </button>
+        {/* FILTROS E BUSCA */}
+        <div className="mb-2 border-b border-gray-200 pb-5">
+          <h3 className="text-3xl leading-tight font-medium text-[#2d3e50]">Listagem de chamados</h3>
+          <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-2">Filtrar por</p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setFiltroGrupo('todos')}
+                  className={`px-5 py-2 rounded-full text-base transition ${
+                    filtroGrupo === 'todos' ? 'bg-[#e8eef5] text-[#2f4a66] font-semibold' : 'text-[#2f4a66] hover:bg-gray-100'
+                  }`}
+                >
+                  ✓ Todos
+                </button>
+                <button
+                  onClick={() => setFiltroGrupo('abertos')}
+                  className={`px-5 py-2 rounded-full text-base transition ${
+                    filtroGrupo === 'abertos' ? 'bg-[#e8eef5] text-[#2f4a66] font-semibold' : 'text-[#2f4a66] hover:bg-gray-100'
+                  }`}
+                >
+                  Abertos
+                </button>
+                <button
+                  onClick={() => setFiltroGrupo('finalizados')}
+                  className={`px-5 py-2 rounded-full text-base transition ${
+                    filtroGrupo === 'finalizados' ? 'bg-[#e8eef5] text-[#2f4a66] font-semibold' : 'text-[#2f4a66] hover:bg-gray-100'
+                  }`}
+                >
+                  Finalizados
+                </button>
+              </div>
+            </div>
+
+            <div className="w-full lg:max-w-md">
+              <label className="block text-gray-500 text-sm mb-1">Busca por assunto</label>
+              <div className="flex items-center gap-3 border-b border-[#c8d2dc] pb-2">
+                <input
+                  value={buscaTicket}
+                  onChange={(e) => setBuscaTicket(e.target.value)}
+                  placeholder=""
+                  className="w-full bg-transparent outline-none text-[#2d3e50] placeholder:text-gray-400"
+                />
+                <svg className="w-6 h-6 text-[#2380e6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" />
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* LISTA DE TICKETS */}
@@ -712,7 +862,7 @@ export default function SuportePage() {
           </div>
         ) : ticketsFiltrados.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg shadow">
-            <p className="text-gray-600 text-lg">📭 Nenhum ticket {filtroStatus !== 'todos' ? 'nesta categoria' : 'encontrado'}</p>
+            <p className="text-gray-600 text-lg">📭 Nenhum ticket encontrado para os filtros aplicados.</p>
             <button
               onClick={() => setMostrarFormulario(true)}
               className="mt-4 px-6 py-2 bg-[#0284c7] text-white rounded-lg hover:bg-[#0270b0] transition"
@@ -721,102 +871,119 @@ export default function SuportePage() {
             </button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="border border-gray-200 rounded-md overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 bg-[#f8fafc] border-b border-gray-200">
+              <div className="flex items-center gap-3 text-[#2d3e50]">
+                <span className="text-lg">ℹ</span>
+                <span className="text-base">
+                  {chamadosEmAberto > 0
+                    ? `Você possui ${chamadosEmAberto} chamado${chamadosEmAberto > 1 ? 's' : ''} em aberto.`
+                    : 'Você não possui chamados em aberto.'}
+                </span>
+              </div>
+              <button
+                onClick={() => setMostrarFormulario(true)}
+                className="px-8 py-2.5 bg-[#0074e8] text-white rounded-full font-semibold hover:bg-[#0067cf] transition"
+              >
+                Novo chamado
+              </button>
+            </div>
+
+            <div className="hidden lg:grid lg:grid-cols-[minmax(0,4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 px-4 py-2 bg-[#f3f6fa] border-b border-gray-200">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#5f7388]">Assunto</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#5f7388]">Status</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#5f7388]">Número</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#5f7388]">Abertura</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#5f7388]">Ações</span>
+            </div>
+
             {ticketsFiltrados.map((ticket) => (
               <div
                 key={ticket.id}
-                className={`bg-white rounded-lg shadow hover:shadow-lg transition border-l-4 ${getCardBorderColor(ticket.status)}`}
+                className={`px-4 py-4 border-b border-gray-200 last:border-b-0 ${
+                  ticketTemRespostaDoCliente(ticket)
+                    ? 'bg-emerald-50'
+                    : ticketTemRespostaDoSuporte(ticket)
+                    ? 'bg-orange-50'
+                    : 'bg-white'
+                }`}
               >
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h3 className={`text-xl font-bold mb-1 ${getStatusColor(ticket.status)}`}>
-                        #{ticket.ticket_number || ticket.id.slice(0, 8).toUpperCase()}
-                      </h3>
-                      <p className="text-lg font-semibold text-gray-800">{ticket.titulo}</p>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(ticket.status)}`}>
-                        {getStatusLabel(ticket.status)}
-                      </span>
-                      {ticket.status === 'aguardando_cliente' && (
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setSelecionado(ticket)
-                            setMostrarResposta(true)
-                          }}
-                          className="px-3 py-1 text-xs font-semibold rounded-full bg-[#123b63] text-white hover:bg-[#0f2f4d] transition"
-                        >
-                          Responder ticket
-                        </button>
-                      )}
-                      {ticket.status === 'aberto' && !ticket.respondido_em && (
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setSelecionado(ticket)
-                            setMostrarResposta(false)
-                          }}
-                          className="px-3 py-1 text-xs font-semibold rounded-full bg-white text-[#123b63] border border-[#123b63]/20 hover:bg-[#123b63] hover:text-white transition"
-                        >
-                          Visualizar
-                        </button>
-                      )}
-                      {ticket.status === 'em_progresso' && (
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setSelecionado(ticket)
-                            setMostrarResposta(true)
-                          }}
-                          className="px-3 py-1 text-xs font-semibold rounded-full bg-white text-[#123b63] border border-[#123b63]/20 hover:bg-[#123b63] hover:text-white transition"
-                        >
-                          Visualizar
-                        </button>
-                      )}
-                      {ticket.status === 'fechado' && (
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setSelecionado(ticket)
-                            setMostrarResposta(true)
-                          }}
-                          className="px-3 py-1 text-xs font-semibold rounded-full bg-gray-700 text-white hover:bg-gray-800 transition"
-                        >
-                          Reabrir e enviar
-                        </button>
-                      )}
-                    </div>
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] items-center gap-4">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-base text-[#1e2948]">◔</span>
+                    <p
+                      className={`text-base leading-tight font-semibold truncate ${
+                        ticketTemRespostaDoSuporte(ticket) ? 'text-[#b45309]' : 'text-[#1f2d3d]'
+                      }`}
+                    >
+                      {ticket.titulo}
+                    </p>
                   </div>
 
-                  <p className="text-gray-600 mb-3 line-clamp-2">{ticket.descricao}</p>
+                  <div>
+                    <span className={`inline-flex px-3 py-1 rounded-md font-semibold text-xs uppercase ${getStatusBadgeClass(ticket)}`}>
+                      {getStatusLabelExibicao(ticket)}
+                    </span>
+                  </div>
 
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-500">Categoria:</span>
-                      <span className="font-semibold text-gray-800">{ticket.categoria}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-500">Prioridade:</span>
-                      <span className={`font-bold ${getPriorityColor(ticket.prioridade)}`}>
-                        {ticket.prioridade.toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-500">Criado em:</span>
-                      <span className="font-semibold text-gray-800">
-                        {new Date(ticket.data_criacao).toLocaleDateString('pt-BR')}
-                      </span>
-                    </div>
-                    {ticket.respondido_em && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-500">Respondido em:</span>
-                        <span className="font-semibold text-gray-800">
-                          {new Date(ticket.respondido_em).toLocaleDateString('pt-BR')}
-                        </span>
-                      </div>
-                    )}
+                  <div>
+                    <p className="text-base leading-none font-bold text-[#283848]">{ticket.ticket_number || ticket.id.slice(0, 7).toUpperCase()}</p>
+                    <p className="text-xs text-gray-500 mt-1">Número chamado</p>
+                  </div>
+
+                  <div>
+                    <p className="text-base leading-none font-bold text-[#283848]">{new Date(ticket.data_criacao).toLocaleDateString('pt-BR')}</p>
+                    <p className="text-xs text-gray-500 mt-1">Abertura</p>
+                  </div>
+
+                  <div className="flex justify-start lg:justify-end gap-2">
+                    <button
+                      onClick={() => {
+                        setSelecionado(ticket)
+                        setMostrarResposta(ticket.status !== 'aberto' || Boolean(ticket.respondido_em))
+                      }}
+                      className="px-6 py-2 border border-[#2681e5] rounded-full text-[#006ed8] text-sm font-semibold hover:bg-[#f1f7ff] transition"
+                    >
+                      Ver chamado
+                    </button>
+                    <button
+                      onClick={() => {
+                        apagarTicket(ticket)
+                      }}
+                      disabled={apagandoTicketId === ticket.id}
+                      aria-label="Apagar ticket"
+                      title="Apagar"
+                      className="h-10 w-10 border border-red-300 rounded-full text-red-600 hover:bg-red-50 transition flex items-center justify-center disabled:opacity-50"
+                    >
+                      {apagandoTicketId === ticket.id ? (
+                        <svg
+                          className="h-5 w-5 animate-spin"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <circle className="opacity-25" cx="12" cy="12" r="10" />
+                          <path className="opacity-75" d="M4 12a8 8 0 0 1 8-8" />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="h-5 w-5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M3 6h18" />
+                          <path d="M8 6v-2h8v2" />
+                          <path d="M6 6l1 14h10l1-14" />
+                          <path d="M10 11v6" />
+                          <path d="M14 11v6" />
+                        </svg>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -843,8 +1010,8 @@ export default function SuportePage() {
                   </button>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selecionado.status)}`}>
-                    {getStatusLabel(selecionado.status)}
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColorExibicao(selecionado)}`}>
+                    {getStatusLabelExibicao(selecionado)}
                   </span>
                   <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white">
                     Prioridade {selecionado.prioridade.toUpperCase()}
@@ -901,23 +1068,36 @@ export default function SuportePage() {
                       <p className="text-gray-500 text-sm">Nenhuma mensagem ainda.</p>
                     ) : (
                       <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                        {mensagens.map((msg) => (
-                          <div
-                            key={msg.id}
-                            className={`rounded-xl p-3 border ${msg.user_id === user?.id ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}
-                          >
-                            <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
-                              <span className="inline-flex items-center gap-2 font-semibold">
-                                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${msg.user_id === user?.id ? 'bg-yellow-200 text-yellow-800' : 'bg-green-200 text-green-800'}`}>
-                                  {msg.user_id === user?.id ? 'VC' : 'SP'}
+                        {mensagens.map((msg, index) => {
+                          const ownerId = selecionado?.usuario_id
+                          const currentUserId = user?.id
+                          const baseUserId = ownerId || currentUserId
+                          const isSupportMessage = msg.sender_role
+                            ? msg.sender_role === 'support'
+                            : baseUserId
+                              ? msg.user_id !== baseUserId
+                              : true
+
+                          return (
+                            <div
+                              key={msg.id}
+                              className={`rounded-xl p-3 border ${
+                                isSupportMessage ? 'bg-orange-50 border-orange-200' : 'bg-emerald-50 border-emerald-200'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
+                                <span className="inline-flex items-center gap-2 font-semibold">
+                                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${isSupportMessage ? 'bg-orange-200 text-orange-800' : 'bg-emerald-200 text-emerald-800'}`}>
+                                    {isSupportMessage ? 'SP' : 'US'}
+                                  </span>
+                                  {isSupportMessage ? 'SUPORTE' : 'USUARIO'}
                                 </span>
-                                {msg.user_id === user?.id ? 'Você' : 'Suporte'}
-                              </span>
-                              <span>{new Date(msg.created_at).toLocaleString('pt-BR')}</span>
+                                <span>{new Date(msg.created_at).toLocaleString('pt-BR')}</span>
+                              </div>
+                              <p className="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">{msg.message}</p>
                             </div>
-                            <p className="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">{msg.message}</p>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                   </div>
@@ -944,7 +1124,7 @@ export default function SuportePage() {
                       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Responder</h3>
                       <span className="text-xs text-gray-400">Envie sua mensagem</span>
                     </div>
-                    {(selecionado.status === 'em_progresso' || suporteRespondeu) && (selecionado.status === 'aguardando_cliente' || selecionado.status === 'fechado' || selecionado.status === 'em_progresso' || mostrarResposta) ? (
+                    {selecionadoTemResposta ? (
                       <>
                         <textarea
                           value={resposta}

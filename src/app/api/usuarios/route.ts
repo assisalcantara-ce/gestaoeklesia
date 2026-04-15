@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { buildPasswordFingerprint } from '@/lib/password-fingerprint';
 import { createServerClient } from '@/lib/supabase-server';
 import { requireFlowAuth, hasRole } from '@/lib/flows/flow-auth';
 
@@ -7,7 +8,7 @@ type UsuarioResponse = {
   nome: string;
   email: string;
   email_confirmed: boolean;
-  nivel: 'administrador' | 'financeiro' | 'operador' | 'supervisor';
+  nivel: 'administrador' | 'financeiro' | 'supervisor' | 'admin_local' | 'financeiro_local';
   congregacao?: string;
   congregacao_id?: string | null;
   status: 'ativo' | 'inativo';
@@ -40,9 +41,12 @@ function mapNivel(role: string | null | undefined, permissions: any): UsuarioRes
   if (permSet.has('ADMINISTRADOR') || ['admin'].includes(base)) return 'administrador';
   if (permSet.has('FINANCEIRO') || ['financeiro', 'financial'].includes(base)) return 'financeiro';
   if (permSet.has('SUPERVISOR') || ['supervisor', 'manager'].includes(base)) return 'supervisor';
-  if (permSet.has('OPERADOR') || ['operador', 'operator'].includes(base)) return 'operador';
+  if (permSet.has('ADMIN_LOCAL') || ['admin_local'].includes(base)) return 'admin_local';
+  if (permSet.has('FINANCEIRO_LOCAL') || ['financeiro_local'].includes(base)) return 'financeiro_local';
+  // legado
+  if (['operator', 'operador', 'viewer'].includes(base)) return 'admin_local';
 
-  return 'operador';
+  return 'admin_local';
 }
 
 function resolveStatus(user: any): 'ativo' | 'inativo' {
@@ -141,11 +145,15 @@ function mapRoleAndPermissions(nivel: UsuarioResponse['nivel']) {
     case 'administrador':
       return { role: 'admin', permissions: ['ADMINISTRADOR'] };
     case 'financeiro':
-      return { role: 'financeiro', permissions: ['FINANCEIRO'] };
+      return { role: 'manager', permissions: ['FINANCEIRO'] };
     case 'supervisor':
-      return { role: 'supervisor', permissions: ['SUPERVISOR'] };
+      return { role: 'manager', permissions: ['SUPERVISOR'] };
+    case 'admin_local':
+      return { role: 'operator', permissions: ['ADMIN_LOCAL'] };
+    case 'financeiro_local':
+      return { role: 'operator', permissions: ['FINANCEIRO_LOCAL'] };
     default:
-      return { role: 'operator', permissions: ['OPERADOR'] };
+      return { role: 'operator', permissions: ['ADMIN_LOCAL'] };
   }
 }
 
@@ -171,7 +179,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Senha muito curta' }, { status: 400 });
     }
 
-    if (nivel === 'operador' && !congregacaoId) {
+    let passwordFingerprint = '';
+    try {
+      passwordFingerprint = buildPasswordFingerprint(senha);
+    } catch {
+      return NextResponse.json({ error: 'Configuracao de senha nao definida' }, { status: 500 });
+    }
+
+    if (['admin_local', 'financeiro_local'].includes(nivel) && !congregacaoId) {
       return NextResponse.json({ error: 'Congregacao obrigatoria para este nivel' }, { status: 400 });
     }
 
@@ -202,6 +217,16 @@ export async function POST(request: NextRequest) {
 
     const roleConfig = mapRoleAndPermissions(nivel);
 
+    const { data: existingFingerprint } = await admin
+      .from('user_password_fingerprints')
+      .select('user_id')
+      .eq('fingerprint', passwordFingerprint)
+      .maybeSingle();
+
+    if (existingFingerprint?.user_id) {
+      return NextResponse.json({ error: 'Senha ja utilizada por outro usuario' }, { status: 400 });
+    }
+
     const { data: authUser, error: authError } = await admin.auth.admin.createUser({
       email,
       password: senha,
@@ -211,6 +236,15 @@ export async function POST(request: NextRequest) {
 
     if (authError || !authUser?.user) {
       return NextResponse.json({ error: authError?.message || 'Erro ao criar usuario' }, { status: 400 });
+    }
+
+    const { error: fingerprintError } = await admin
+      .from('user_password_fingerprints')
+      .insert({ user_id: authUser.user.id, fingerprint: passwordFingerprint });
+
+    if (fingerprintError) {
+      await admin.auth.admin.deleteUser(authUser.user.id);
+      return NextResponse.json({ error: 'Senha ja utilizada por outro usuario' }, { status: 400 });
     }
 
     const { error: linkError } = await admin
@@ -274,7 +308,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Senha muito curta' }, { status: 400 });
     }
 
-    if (nivel === 'operador' && !congregacaoId) {
+    if (['admin_local', 'financeiro_local'].includes(nivel) && !congregacaoId) {
       return NextResponse.json({ error: 'Congregacao obrigatoria para este nivel' }, { status: 400 });
     }
 
@@ -299,12 +333,37 @@ export async function PUT(request: NextRequest) {
       email_confirm: true,
     };
 
-    if (senha) updatePayload.password = senha;
+    let passwordFingerprint = '';
+    if (senha) {
+      try {
+        passwordFingerprint = buildPasswordFingerprint(senha);
+      } catch {
+        return NextResponse.json({ error: 'Configuracao de senha nao definida' }, { status: 500 });
+      }
+
+      const { data: existingFingerprint } = await admin
+        .from('user_password_fingerprints')
+        .select('user_id')
+        .eq('fingerprint', passwordFingerprint)
+        .maybeSingle();
+
+      if (existingFingerprint?.user_id && existingFingerprint.user_id !== userId) {
+        return NextResponse.json({ error: 'Senha ja utilizada por outro usuario' }, { status: 400 });
+      }
+
+      updatePayload.password = senha;
+    }
     if (banned_until !== undefined) updatePayload.banned_until = banned_until;
 
     const { error: authError } = await admin.auth.admin.updateUserById(userId, updatePayload);
     if (authError) {
       return NextResponse.json({ error: authError.message }, { status: 400 });
+    }
+
+    if (senha && passwordFingerprint) {
+      await admin
+        .from('user_password_fingerprints')
+        .upsert({ user_id: userId, fingerprint: passwordFingerprint });
     }
 
     const { data: existing, error: existingError } = await admin

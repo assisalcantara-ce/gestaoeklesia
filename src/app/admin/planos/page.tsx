@@ -21,6 +21,7 @@ export default function PlanosPage() {
   const [showInactive, setShowInactive] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [expandedModulos, setExpandedModulos] = useState<Record<string, boolean>>({})
   const router = useRouter()
 
   const slugify = (value: string) =>
@@ -52,6 +53,10 @@ export default function PlanosPage() {
     has_modulo_financeiro: false,
     has_modulo_eventos: false,
     has_modulo_reunioes: false,
+    has_custom_domain: false,
+    has_white_label: false,
+    has_automation: false,
+    modulos: '' as string, // um módulo por linha
   })
 
   useEffect(() => {
@@ -111,6 +116,10 @@ export default function PlanosPage() {
           additional_church_monthly_fee: parseFloat(formData.additional_church_monthly_fee || '0'),
           additional_admin_users_per_church: parseInt(formData.additional_admin_users_per_church || '0'),
           setup_fee: parseFloat(formData.setup_fee || '0'),
+          modulos: formData.modulos
+            .split('\n')
+            .map((m) => m.trim())
+            .filter(Boolean),
         }),
       })
 
@@ -147,6 +156,10 @@ export default function PlanosPage() {
       has_modulo_financeiro: false,
       has_modulo_eventos: false,
       has_modulo_reunioes: false,
+      has_custom_domain: false,
+      has_white_label: false,
+      has_automation: false,
+      modulos: '',
     })
     setSelectedPlan(null)
     setShowForm(false)
@@ -173,6 +186,10 @@ export default function PlanosPage() {
       has_modulo_financeiro: (plan as any).has_modulo_financeiro || false,
       has_modulo_eventos: (plan as any).has_modulo_eventos || false,
       has_modulo_reunioes: (plan as any).has_modulo_reunioes || false,
+      has_custom_domain: (plan as any).has_custom_domain || false,
+      has_white_label: (plan as any).has_white_label || false,
+      has_automation: (plan as any).has_automation || false,
+      modulos: Array.isArray((plan as any).modulos) ? (plan as any).modulos.join('\n') : '',
     })
     setShowForm(true)
     setTimeout(() => {
@@ -434,7 +451,48 @@ export default function PlanosPage() {
                     <span className="ml-2">Reuniões</span>
                   </label>
 
+                  <label className="col-span-1 flex items-center text-sm text-gray-200">
+                    <input
+                      type="checkbox"
+                      checked={formData.has_custom_domain}
+                      onChange={(e) => setFormData({ ...formData, has_custom_domain: e.target.checked })}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="ml-2">Domínio Próprio</span>
+                  </label>
 
+                  <label className="col-span-1 flex items-center text-sm text-gray-200">
+                    <input
+                      type="checkbox"
+                      checked={formData.has_white_label}
+                      onChange={(e) => setFormData({ ...formData, has_white_label: e.target.checked })}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="ml-2">White Label</span>
+                  </label>
+
+                  <label className="col-span-1 flex items-center text-sm text-gray-200">
+                    <input
+                      type="checkbox"
+                      checked={formData.has_automation}
+                      onChange={(e) => setFormData({ ...formData, has_automation: e.target.checked })}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="ml-2">Automação</span>
+                  </label>
+
+                  <div className="md:col-span-3">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Módulos inclusos <span className="text-gray-500 font-normal">(um por linha)</span>
+                    </label>
+                    <textarea
+                      value={formData.modulos}
+                      onChange={(e) => setFormData({ ...formData, modulos: e.target.value })}
+                      rows={6}
+                      placeholder={'Secretaria Geral\nTesouraria\nMissões\nChat Interno'}
+                      className="w-full px-4 py-2 border rounded-lg font-mono text-sm"
+                    />
+                  </div>
 
                   <button
                     type="submit"
@@ -446,11 +504,11 @@ export default function PlanosPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               {loading ? (
-                <div className="md:col-span-3 text-center text-gray-400">Carregando...</div>
+                <div className="col-span-4 text-center text-gray-400">Carregando...</div>
               ) : orderedPlanos.length === 0 ? (
-                <div className="md:col-span-3 text-center text-gray-400">Nenhum plano encontrado</div>
+                <div className="col-span-4 text-center text-gray-400">Nenhum plano encontrado</div>
               ) : (
                 orderedPlanos.map((plan) => (
                   <div
@@ -472,9 +530,9 @@ export default function PlanosPage() {
                         R$ {plan.price_monthly.toFixed(2)}
                         <span className="text-base text-gray-300">/mês</span>
                       </div>
-                      {plan.price_annually && (
+                      {(plan.price_annually ?? 0) > 0 && (
                         <p className="text-sm text-gray-300 mt-2">
-                          R$ {plan.price_annually.toFixed(2)}/ano
+                          R$ {plan.price_annually!.toFixed(2)}/ano
                         </p>
                       )}
                     </div>
@@ -482,7 +540,7 @@ export default function PlanosPage() {
                     <div className="p-6 border-b border-gray-800">
                       <ul className="space-y-3 text-gray-200">
                         <li className="flex items-center text-sm">
-                          <span className="font-semibold text-gray-100 mr-2"></span>
+                          <span className="font-semibold text-gray-100 mr-2">👥</span>
                           {plan.max_members > 0 ? `Até ${plan.max_members} Membros` : 'Membros ilimitados'}
                         </li>
                         <li className="flex items-center text-sm">
@@ -501,39 +559,32 @@ export default function PlanosPage() {
                           <span className="font-semibold text-gray-100 mr-2">👤</span>
                           +{(plan as any).additional_admin_users_per_church || 0} admins por igreja adicional
                         </li>
-
-                        {plan.has_api_access && (
-                          <li className="text-green-300 text-sm flex items-center">
-                            <span className="mr-2">✓</span> API Access
-                          </li>
-                        )}
-                        {plan.has_advanced_reports && (
-                          <li className="text-green-300 text-sm flex items-center">
-                            <span className="mr-2">✓</span> Relatórios Avançados
-                          </li>
-                        )}
-                        {plan.has_priority_support && (
-                          <li className="text-green-300 text-sm flex items-center">
-                            <span className="mr-2">✓</span> Suporte Prioritário
-                          </li>
-                        )}
-                        {plan.has_modulo_financeiro && (
-                          <li className="text-green-300 text-sm flex items-center">
-                            <span className="mr-2">✓</span> Módulo Financeiro
-                          </li>
-                        )}
-                        {plan.has_modulo_eventos && (
-                          <li className="text-green-300 text-sm flex items-center">
-                            <span className="mr-2">✓</span> Módulo Eventos
-                          </li>
-                        )}
-                        {plan.has_modulo_reunioes && (
-                          <li className="text-green-300 text-sm flex items-center">
-                            <span className="mr-2">✓</span> Módulo Reuniões
-                          </li>
-                        )}
                       </ul>
                     </div>
+
+                    {Array.isArray((plan as any).modulos) && (plan as any).modulos.length > 0 && (
+                      <div className="border-b border-gray-800">
+                        <button
+                          onClick={() => setExpandedModulos(prev => ({ ...prev, [plan.id]: !prev[plan.id] }))}
+                          className="w-full flex items-center justify-between px-6 py-3 text-left hover:bg-gray-800/50 transition"
+                        >
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                            Módulos inclusos ({(plan as any).modulos.length})
+                          </span>
+                          <span className="text-gray-500 text-xs transition-transform duration-200" style={{ display: 'inline-block', transform: expandedModulos[plan.id] ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                        </button>
+                        {expandedModulos[plan.id] && (
+                          <ul className="px-6 pb-4 space-y-1">
+                            {(plan as any).modulos.map((m: string) => (
+                              <li key={m} className="flex items-center gap-2 text-sm text-gray-300">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                                {m}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
 
                     <div className="p-6 flex gap-2">
                       <button

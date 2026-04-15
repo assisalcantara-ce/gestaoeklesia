@@ -88,6 +88,7 @@ interface Membro {
     }
   };
   observacoesMinisteriais?: string;
+  isDizimista?: boolean;
 }
 
 interface DivisaoOption {
@@ -130,7 +131,7 @@ interface DadosPessoaisState {
   observacoes: string;
 }
 
-type MembrosFormTab = 'dados' | 'endereco' | 'ministerial' | 'foto';
+type MembrosFormTab = 'dados' | 'endereco' | 'ministerial' | 'foto' | 'dizimos';
 
 export default function MembrosPage() {
   const supabase = createClient();
@@ -138,6 +139,9 @@ export default function MembrosPage() {
   const [dashboardView, setDashboardView] = useState<'overview' | 'list'>('overview');
   const [activeMenu, setActiveMenu] = useState('membros');
   const [activeTab, setActiveTab] = useState<MembrosFormTab>('dados');
+  const [isDizimista, setIsDizimista] = useState(false);
+  const [dizimosHistorico, setDizimosHistorico] = useState<Array<{mes_referencia: string; status: string; valor: number | null; data_pagamento: string | null}>>([]);
+  const [loadingDizimosHistorico, setLoadingDizimosHistorico] = useState(false);
   const [templatesSnapshot, setTemplatesSnapshot] = useState<any[]>([]);
   const [configIgreja, setConfigIgreja] = useState({
     nome: 'Igreja/Ministério',
@@ -264,6 +268,7 @@ export default function MembrosPage() {
       dataBatismoAguas: String(member.data_batismo_aguas || (cf as any).dataBatismoAguas || ''),
       dataBatismoEspiritoSanto: String(member.data_batismo_espirito_santo || (cf as any).dataBatismoEspiritoSanto || ''),
       fotoUrl: member.foto_url || (cf as any).fotoUrl || undefined,
+      isDizimista: member.is_dizimista ?? (cf as any).isDizimista ?? false,
     };
   };
 
@@ -896,6 +901,7 @@ export default function MembrosPage() {
     setCargoSelecionado('');
     setDadosCargos({});
     setIsEditando(false);
+    setIsDizimista(false);
     setShowForm(true);
     setActiveTab('dados');
   };
@@ -1012,7 +1018,7 @@ export default function MembrosPage() {
     yPos += 8;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('Listagem de Ministros', pageWidth / 2, yPos, { align: 'center' });
+    doc.text('Listagem de Membros', pageWidth / 2, yPos, { align: 'center' });
 
     // Informações do relatório
     doc.setFontSize(9);
@@ -1087,7 +1093,7 @@ export default function MembrosPage() {
 
     // Salvar PDF
     const dataHora = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-    doc.save(`listagem_ministros_${dataHora}.pdf`);
+    doc.save(`listagem_membros_${dataHora}.pdf`);
 
     setNotification({
       isOpen: true,
@@ -1165,6 +1171,8 @@ export default function MembrosPage() {
     setDadosCargos(membro.dadosCargos || {});
     setIsEditando(false);
     setIsAdminMode(true); // Modo admin ativado para edição
+    setIsDizimista(membro.isDizimista ?? false);
+    setDizimosHistorico([]);
     setShowForm(true);
     setActiveTab('dados');
   };
@@ -1309,6 +1317,8 @@ export default function MembrosPage() {
         observacoes_ministeriais: u(dadosMinisteriais.observacoesMinisteriais),
         // Aba Foto
         foto_url: fotoMembro || null,
+        // Dizimistas
+        is_dizimista: isDizimista || dadosPessoais.tipoCadastro === 'ministro',
         // Datas ministeriais
         data_consagracao: dadosMinisteriais.dataConsagracao || null,
         data_emissao: dadosMinisteriais.dataEmissao || null,
@@ -1327,7 +1337,7 @@ export default function MembrosPage() {
         setNotification({
           isOpen: true,
           title: 'Sucesso',
-          message: 'Ministro atualizado com sucesso!',
+          message: 'Membro atualizado com sucesso!',
           type: 'success'
         });
       } else {
@@ -1338,7 +1348,7 @@ export default function MembrosPage() {
         setNotification({
           isOpen: true,
           title: 'Sucesso',
-          message: 'Novo ministro cadastrado com sucesso!',
+          message: 'Novo membro cadastrado com sucesso!',
           type: 'success'
         });
       }
@@ -1424,11 +1434,26 @@ export default function MembrosPage() {
     setShowForm(false);
     setMembroEditando(null);
     setIsAdminMode(false);
+    setIsDizimista(false);
+    setDizimosHistorico([]);
   };
 
   // Função para fechar formulário
   const fecharFormulario = () => {
     resetarFormulario();
+  };
+
+  // Carregar histórico de dízimos do membro (aba Dízimos)
+  const carregarDizimosHistorico = async (memberId: string) => {
+    setLoadingDizimosHistorico(true);
+    const { data } = await supabase
+      .from('dizimistas_pagamentos')
+      .select('mes_referencia, status, valor, data_pagamento')
+      .eq('member_id', memberId)
+      .order('mes_referencia', { ascending: false })
+      .limit(24);
+    setDizimosHistorico((data as any[]) || []);
+    setLoadingDizimosHistorico(false);
   };
 
   // Função para abrir modal de confirmação de deleção
@@ -1446,7 +1471,7 @@ export default function MembrosPage() {
       setNotification({
         isOpen: true,
         title: 'Sucesso',
-        message: `Ministro "${membroDeletando.nome}" foi deletado com sucesso!`,
+        message: `Membro "${membroDeletando.nome}" foi deletado com sucesso!`,
         type: 'success'
       });
       setMembroDeletando(null);
@@ -1697,7 +1722,7 @@ export default function MembrosPage() {
             {/* Conteúdo */}
             <div className="px-6 py-6 space-y-4">
               <p className="text-gray-700 font-semibold">
-                Tem certeza que deseja deletar este ministro?
+                Tem certeza que deseja deletar este membro?
               </p>
               <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
                 <p className="text-sm text-gray-700">
@@ -1897,7 +1922,7 @@ export default function MembrosPage() {
             {/* Header */}
             <div className="flex justify-between items-center px-6 py-4 border-b-2 border-teal-500 bg-gradient-to-r from-teal-600 to-teal-700 flex-shrink-0">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <span>🖨️</span> Ficha do Ministro
+                <span>🖨️</span> Ficha do Membro
               </h2>
               <button
                 onClick={() => setMembroImprimindo(null)}
@@ -2074,7 +2099,7 @@ export default function MembrosPage() {
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                👥 Dados de Ministros
+                👥 Dados de Membros
               </button>
             </div>
           </div>
@@ -2170,11 +2195,11 @@ export default function MembrosPage() {
             <div className="flex items-center justify-between p-4 border-b-2 border-teal-500">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">☰</span>
-                <h2 className="text-lg font-bold text-teal-700">Listagem de Ministros</h2>
+                <h2 className="text-lg font-bold text-teal-700">Listagem de Membros</h2>
               </div>
               <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-600">
-                  Quantidade de Ministros:
+                  Quantidade de Membros:
                   <span className="ml-2 px-2 py-0.5 bg-teal-100 text-teal-700 font-bold rounded-full text-sm">
                     {membrosFiltrados.length}
                   </span>
@@ -2536,7 +2561,7 @@ export default function MembrosPage() {
                 <div className="flex justify-between items-center px-4 py-4 border-b-2 border-teal-500 bg-gradient-to-r from-teal-600 to-teal-700 flex-shrink-0">
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <span>{membroEditando ? '✏️' : '➕'}</span>
-                    {membroEditando ? `Editar Ministro - ${membroEditando.nome}` : 'Inserir Novo Ministro'}
+                    {membroEditando ? `Editar Membro - ${membroEditando.nome}` : 'Inserir Novo Membro'}
                   </h2>
                   <button
                     onClick={() => setShowForm(false)}
@@ -2586,6 +2611,22 @@ export default function MembrosPage() {
                   >
                     📸 Foto
                   </button>
+                  {isDizimista && (
+                    <button
+                      onClick={async () => {
+                        setActiveTab('dizimos');
+                        if (membroEditando && dizimosHistorico.length === 0) {
+                          await carregarDizimosHistorico(membroEditando.id);
+                        }
+                      }}
+                      className={`px-4 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'dizimos'
+                        ? 'text-teal-700 border-teal-600'
+                        : 'text-gray-600 border-transparent hover:text-teal-600'
+                        }`}
+                    >
+                      💰 Dízimos
+                    </button>
+                  )}
                 </div>
 
                 {/* Conteúdo das Abas - Scrollável com margens laterais e altura fixa */}
@@ -2656,6 +2697,7 @@ export default function MembrosPage() {
                             onChange={(e) => {
                               const v = e.target.value as Membro['tipoCadastro'];
                               setDadosPessoais({ ...dadosPessoais, tipoCadastro: v });
+                              if (v === 'ministro') setIsDizimista(true);
                               if (v !== 'ministro') {
                                 setActiveTab((prev) => (prev === 'ministerial' ? 'dados' : prev));
                               }
@@ -2671,16 +2713,37 @@ export default function MembrosPage() {
 
 
 
-                      {/* Nome */}
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">NOME *</label>
-                        <input
-                          type="text"
-                          placeholder="Nome da Pessoa"
-                          value={dadosPessoais.nome}
-                          onChange={(e) => setDadosPessoais({ ...dadosPessoais, nome: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                        />
+                      {/* Nome + É dizimista? */}
+                      <div className="flex gap-3 items-end">
+                        <div className="flex-1">
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">NOME *</label>
+                          <input
+                            type="text"
+                            placeholder="Nome da Pessoa"
+                            value={dadosPessoais.nome}
+                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, nome: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 pb-2">
+                          <input
+                            type="checkbox"
+                            id="chk-dizimista"
+                            checked={isDizimista || dadosPessoais.tipoCadastro === 'ministro'}
+                            disabled={dadosPessoais.tipoCadastro === 'ministro'}
+                            onChange={(e) => {
+                              setIsDizimista(e.target.checked);
+                              if (!e.target.checked && activeTab === 'dizimos') setActiveTab('dados');
+                            }}
+                            className="w-4 h-4 accent-teal-600 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                          <label
+                            htmlFor="chk-dizimista"
+                            className={`text-xs font-semibold whitespace-nowrap select-none ${dadosPessoais.tipoCadastro === 'ministro' ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 cursor-pointer'}`}
+                          >
+                            É dizimista?
+                          </label>
+                        </div>
                       </div>
 
                       {/* Data Nascimento, Sexo e Tipo Sanguíneo */}
@@ -3463,6 +3526,58 @@ export default function MembrosPage() {
                             </button>
                           )}
                         </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ABA: DÍZIMOS */}
+                  {activeTab === 'dizimos' && (
+                    <div className="space-y-4">
+                      {!membroEditando ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <p className="text-sm">Salve o membro primeiro para visualizar o histórico de dízimos.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-sm text-teal-800">
+                            <p>Para registrar pagamentos, use a aba <strong>Tesouraria → Dizimistas</strong>.</p>
+                            <p className="mt-1 text-teal-600">Aqui você vê o histórico deste membro.</p>
+                          </div>
+                          {loadingDizimosHistorico ? (
+                            <div className="text-center py-6 text-gray-400 text-sm">Carregando...</div>
+                          ) : dizimosHistorico.length === 0 ? (
+                            <div className="text-center py-6 text-gray-400 text-sm">Nenhum registro de dízimo encontrado.</div>
+                          ) : (
+                            <table className="w-full text-sm border-collapse">
+                              <thead>
+                                <tr className="bg-gray-100">
+                                  <th className="text-left p-2 text-xs font-semibold text-gray-700 border-b">Mês/Ano</th>
+                                  <th className="text-left p-2 text-xs font-semibold text-gray-700 border-b">Status</th>
+                                  <th className="text-left p-2 text-xs font-semibold text-gray-700 border-b">Valor</th>
+                                  <th className="text-left p-2 text-xs font-semibold text-gray-700 border-b">Pagamento</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {dizimosHistorico.map((h) => (
+                                  <tr key={h.mes_referencia} className="border-b last:border-0 hover:bg-gray-50">
+                                    <td className="p-2 text-gray-800">{h.mes_referencia.split('-').reverse().join('/')}</td>
+                                    <td className="p-2">
+                                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${h.status === 'pago' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                        {h.status === 'pago' ? 'Pago' : 'Pendente'}
+                                      </span>
+                                    </td>
+                                    <td className="p-2 text-gray-700">
+                                      {h.valor != null ? `R$ ${Number(h.valor).toFixed(2).replace('.', ',')}` : '—'}
+                                    </td>
+                                    <td className="p-2 text-gray-700">
+                                      {h.data_pagamento ? h.data_pagamento.split('-').reverse().join('/') : '—'}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </>
                       )}
                     </div>
                   )}

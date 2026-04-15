@@ -32,7 +32,7 @@ export default function PageLayout({
         </div>
 
         {/* CONTENT */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div id="page-scroll-container" className="flex-1 overflow-y-auto p-6">
           {children}
         </div>
       </div>

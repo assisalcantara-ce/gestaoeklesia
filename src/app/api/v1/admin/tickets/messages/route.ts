@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         message,
         is_internal: is_internal === true,
+        sender_role: 'support',
       })
       .select()
       .single()

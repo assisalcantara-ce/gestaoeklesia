@@ -119,7 +119,7 @@ export default function MembrosOverview({
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow-lg hover:shadow-xl transition">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm opacity-90 font-medium">Total de Ministros</p>
+              <p className="text-sm opacity-90 font-medium">Total de Membros</p>
               <p className="text-3xl font-bold mt-2">{totalMembros}</p>
             </div>
             <svg className="w-10 h-10 opacity-60" fill="currentColor" viewBox="0 0 24 24">
@@ -132,7 +132,7 @@ export default function MembrosOverview({
         <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-lg shadow-lg hover:shadow-xl transition">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm opacity-90 font-medium">Ministros Ativos</p>
+              <p className="text-sm opacity-90 font-medium">Membros Ativos</p>
               <p className="text-3xl font-bold mt-2">{ativos}</p>
               <p className="text-xs opacity-75 mt-1">{percentualAtivo}% do total</p>
             </div>
@@ -146,7 +146,7 @@ export default function MembrosOverview({
         <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-6 rounded-lg shadow-lg hover:shadow-xl transition">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm opacity-90 font-medium">Ministros Inativos</p>
+              <p className="text-sm opacity-90 font-medium">Membros Inativos</p>
               <p className="text-3xl font-bold mt-2">{inativos}</p>
               <p className="text-xs opacity-75 mt-1">{percentualInativo}% do total</p>
             </div>

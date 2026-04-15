@@ -7,8 +7,8 @@ import { UsuarioProvider } from '@/providers/UsuarioContext';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Gestão Eklesia - Login',
-  description: 'Sistema de Gestão para Igrejas',
+  title: 'Gestão Eklesia — Gestão que fortalece sua igreja',
+  description: 'Gestão Eklesia: organização, pessoas e finanças para igrejas.',
 };
 
 export default function RootLayout({

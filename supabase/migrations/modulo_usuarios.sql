@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS public.subscription_plans (
   max_storage_bytes     BIGINT  NOT NULL DEFAULT 524288000,
   max_members           INTEGER NOT NULL DEFAULT 100,
   max_ministerios       INTEGER NOT NULL DEFAULT 1,
-  max_divisao1          INTEGER NOT NULL DEFAULT 5,
   max_divisao2          INTEGER NOT NULL DEFAULT 0,
   max_divisao3          INTEGER NOT NULL DEFAULT 0,
   has_api_access        BOOLEAN DEFAULT false,
@@ -69,12 +68,12 @@ CREATE TRIGGER subscription_plans_updated_at
 -- Dados dos planos
 INSERT INTO public.subscription_plans
   (name, slug, description, price_monthly, price_annually, max_users, max_storage_bytes, max_members,
-   max_divisao1, max_divisao2, max_divisao3, has_api_access, has_advanced_reports, has_priority_support, display_order)
+   max_divisao2, max_divisao3, has_api_access, has_advanced_reports, has_priority_support, display_order)
 VALUES
-  ('Starter',       'starter',       'Para igrejas pequenas',          0,      0,        5,   5368709120,   100, 5,  0,  0,  false, false, false, 1),
-  ('Intermediário', 'intermediario', 'Para igrejas em crescimento',    79.90,  799.00,   10,  10737418240,  500, 25, 3,  -1, false, true,  false, 2),
-  ('Profissional',  'profissional',  'Para igrejas estabelecidas',     149.90, 1499.00,  30,  21474836480,  2000,50, 10, -1, true,  true,  false, 3),
-  ('Expert',        'expert',        'Para redes e denominações',      299.90, 2999.00,  100, 107374182400, 10000,100,20, -1, true,  true,  true,  4)
+  ('Starter',       'starter',       'Para igrejas pequenas',          0,      0,        5,   5368709120,   100, 0,  0,  false, false, false, 1),
+  ('Intermediário', 'intermediario', 'Para igrejas em crescimento',    79.90,  799.00,   10,  10737418240,  500, 3,  -1, false, true,  false, 2),
+  ('Profissional',  'profissional',  'Para igrejas estabelecidas',     149.90, 1499.00,  30,  21474836480,  2000,10, -1, true,  true,  false, 3),
+  ('Expert',        'expert',        'Para redes e denominações',      299.90, 2999.00,  100, 107374182400, 10000,20, -1, true,  true,  true,  4)
 ON CONFLICT (slug) DO UPDATE SET
   name             = EXCLUDED.name,
   description      = EXCLUDED.description,
@@ -82,7 +81,6 @@ ON CONFLICT (slug) DO UPDATE SET
   price_annually   = EXCLUDED.price_annually,
   max_users        = EXCLUDED.max_users,
   max_members      = EXCLUDED.max_members,
-  max_divisao1     = EXCLUDED.max_divisao1,
   max_divisao2     = EXCLUDED.max_divisao2,
   max_divisao3     = EXCLUDED.max_divisao3,
   updated_at       = CURRENT_TIMESTAMP;

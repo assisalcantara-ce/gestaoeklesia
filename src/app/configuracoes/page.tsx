@@ -749,6 +749,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [planoSelecionado, setPlanoSelecionado] = useState<SubscriptionPlan | null>(null);
   const [criandoTicket, setCriandoTicket] = useState(false);
+  const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
   const dialog = useAppDialog();
   const { registrarAcao } = useAuditLog();
 
@@ -760,7 +761,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
   const [loading, setLoading] = useState(true);
   const [ministryId, setMinistryId] = useState<string>('');
 
-  const buildRecursos = (plan: SubscriptionPlan & { max_divisao1?: number; max_divisao2?: number; max_divisao3?: number }): string[] => {
+  const buildRecursos = (plan: SubscriptionPlan): string[] => {
     const r: string[] = [];
     if (plan.max_users > 0) r.push(`Até ${plan.max_users} Usuários Administrativos`);
     if (plan.max_members > 0) r.push(`Até ${plan.max_members.toLocaleString('pt-BR')} Membros`);
@@ -782,11 +783,37 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
   };
 
   const buildModulos = (plan: SubscriptionPlan): string[] => {
-    const m: string[] = [];
-    if ((plan as any).has_modulo_financeiro) m.push('Financeiro');
+    const normalizeKey = (v: string) =>
+      v.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+    const key = normalizeKey(plan.slug || plan.name || '');
+    const base = ['Secretaria Geral', 'Achados e Perdidos', 'Patrimônio', 'Geolocalização', 'Auditoria'];
+    if (key === 'basic' || key === 'basico') return base;
+    if (key === 'starter') return [...base, 'Tesouraria', 'Missões', 'Chat Interno', 'EBD'];
+    if (key === 'intermediario') return [...base, 'Tesouraria', 'Missões', 'Chat Interno', 'EBD', 'Funcionários', 'Comissão', 'Kids', 'Reuniões'];
+    if (key === 'profissional' || key === 'professional') return [...base, 'Tesouraria', 'Missões', 'Chat Interno', 'EBD', 'Funcionários', 'Comissão', 'Kids', 'Reuniões', 'Eventos', 'Financeiro', 'Presidência'];
+    if (key === 'expert' || key === 'enterprise') return [...base, 'Tesouraria', 'Missões', 'Chat Interno', 'EBD', 'Funcionários', 'Comissão', 'Kids', 'Reuniões', 'Eventos', 'Financeiro', 'Presidência', 'White Label', 'API', 'Suporte Prioritário'];
+    // Fallback: usa flags do banco
+    const m: string[] = [...base];
+    if ((plan as any).has_modulo_financeiro) m.push('Tesouraria');
     if ((plan as any).has_modulo_eventos) m.push('Eventos');
     if ((plan as any).has_modulo_reunioes) m.push('Reuniões');
+    if (plan.has_advanced_reports) m.push('Relatórios Avançados');
+    if (plan.has_api_access) m.push('API');
+    if (plan.has_priority_support) m.push('Suporte Prioritário');
+    if (plan.has_white_label) m.push('White Label');
     return m;
+  };
+
+  const buildModulosDiff = (plan: SubscriptionPlan): { diff: string[]; base: string } => {
+    const normalizeKey = (v: string) =>
+      v.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+    const key = normalizeKey(plan.slug || plan.name || '');
+    if (key === 'basic' || key === 'basico') return { diff: ['Secretaria Geral', 'Achados e Perdidos', 'Patrimônio', 'Geolocalização', 'Auditoria'], base: '' };
+    if (key === 'starter') return { diff: ['Tesouraria', 'Missões', 'Chat Interno', 'EBD'], base: 'Todos do Basic' };
+    if (key === 'intermediario') return { diff: ['Funcionários', 'Comissão', 'Kids', 'Reuniões'], base: 'Todos do Starter' };
+    if (key === 'profissional' || key === 'professional') return { diff: ['Eventos', 'Financeiro', 'Presidência'], base: 'Todos do Intermediário' };
+    if (key === 'expert' || key === 'enterprise') return { diff: ['White Label', 'API', 'Suporte Prioritário'], base: 'Todos do Profissional' };
+    return { diff: buildModulos(plan), base: '' };
   };
 
   useEffect(() => {
@@ -935,53 +962,50 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
 
       {/* Card plano atual */}
       {planoAtual && (
-        <div className="bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg shadow-lg p-8 mb-8">
-          <h3 className="text-2xl font-bold mb-2">Seu Plano Atual</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-xl shadow-lg p-8 mb-8">
+          <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
             <div>
-              <p className="text-teal-100 text-sm mb-1">Plano</p>
-              <p className="text-2xl font-bold">{planoAtual.name}</p>
-              <p className="text-teal-100 text-xs">Status: {planoStatus}</p>
+              <p className="text-teal-200 text-xs font-semibold uppercase tracking-widest mb-1">Seu Plano Atual</p>
+              <h3 className="text-3xl font-bold">{planoAtual.name}</h3>
+              {planoAtual.description && <p className="text-teal-200 text-sm mt-1">{planoAtual.description}</p>}
             </div>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
+              planoStatus === 'ativo' ? 'bg-emerald-400/30 text-emerald-100 border border-emerald-300/40' : 'bg-yellow-400/30 text-yellow-100 border border-yellow-300/40'
+            }`}>{planoStatus}</span>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pb-6 border-b border-white/20">
             <div>
-              <p className="text-teal-100 text-sm mb-1">Valor</p>
+              <p className="text-teal-200 text-xs mb-1">Valor mensal</p>
               <p className="text-2xl font-bold">{formatarPreco(planoAtual.price_monthly)}</p>
-              {planoAtual.price_annually && (
-                <p className="text-teal-100 text-xs">{formatarPreco(planoAtual.price_annually)}/ano</p>
+              {planoAtual.price_annually > 0 && (
+                <p className="text-teal-300 text-xs mt-0.5">{formatarPreco(planoAtual.price_annually)}/ano</p>
               )}
             </div>
             <div>
-              <p className="text-teal-100 text-sm mb-1">Ativo desde</p>
+              <p className="text-teal-200 text-xs mb-1">Usuários</p>
+              <p className="text-xl font-bold">{planoAtual.max_users > 0 ? `Até ${planoAtual.max_users}` : 'Ilimitados'}</p>
+            </div>
+            <div>
+              <p className="text-teal-200 text-xs mb-1">Ativo desde</p>
               <p className="text-lg font-semibold">{planoInicio ? new Date(planoInicio).toLocaleDateString('pt-BR') : '—'}</p>
             </div>
             <div>
-              <p className="text-teal-100 text-sm mb-1">Próxima renovação</p>
+              <p className="text-teal-200 text-xs mb-1">Próxima renovação</p>
               <p className="text-lg font-semibold">{planoRenovacao ? new Date(planoRenovacao).toLocaleDateString('pt-BR') : '—'}</p>
             </div>
           </div>
-          {(recursosPlanAtual.length > 0 || modulosPlanAtual.length > 0) && (
-            <div className="mt-6">
-              <h4 className="text-lg font-bold mb-3">Seu Plano Inclui:</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {recursosPlanAtual.map((feature, index) => (
-                  <p key={index} className="text-teal-100">✓ {feature}</p>
-                ))}
-              </div>
-              {modulosPlanAtual.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-teal-200 text-xs font-semibold uppercase tracking-widest mb-2">Módulos Incluídos</p>
-                  <div className="flex flex-wrap gap-2">
-                    {modulosPlanAtual.map((m, i) => (
-                      <span key={i} className="px-3 py-1 bg-white/20 text-white text-xs font-semibold rounded-full">✓ {m}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {planoAtual.description && (
-                <p className="text-teal-200 text-sm mt-3 italic">{planoAtual.description}</p>
-              )}
+
+          <div className="mt-6">
+            <p className="text-teal-200 text-xs font-semibold uppercase tracking-widest mb-3">Módulos Incluídos</p>
+            <div className="flex flex-wrap gap-2">
+              {buildModulos(planoAtual).map((m, i) => (
+                <span key={i} className="flex items-center gap-1.5 px-3 py-1 bg-white/15 hover:bg-white/25 text-white text-xs font-medium rounded-full border border-white/20 transition">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-300"></span>{m}
+                </span>
+              ))}
             </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -994,48 +1018,66 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
               const isAtual = plano.id === planoAtual?.id;
               const isRecomendado = plano.id === recommendedPlanId && !isAtual;
               const recursos = buildRecursos(plano as any);
-              const modulos = buildModulos(plano);
+              const { diff, base } = buildModulosDiff(plano);
+              const isExpanded = expandedPlanId === plano.id;
               return (
-                <div key={plano.id} className={`rounded-lg shadow-lg overflow-hidden transition transform hover:scale-105 bg-white ${isRecomendado ? 'ring-2 ring-teal-500' : ''} ${isAtual ? 'ring-2 ring-blue-500' : ''}`}>
+                <div key={plano.id} className={`rounded-xl shadow-md overflow-hidden bg-white flex flex-col ${
+                  isRecomendado ? 'ring-2 ring-teal-500' : isAtual ? 'ring-2 ring-blue-500' : 'border border-gray-200'
+                }`}>
                   {isRecomendado && (
-                    <div className="bg-teal-500 text-white px-4 py-2 text-center text-sm font-bold">⭐ RECOMENDADO</div>
+                    <div className="bg-teal-500 text-white px-4 py-2 text-center text-xs font-bold uppercase tracking-widest">⭐ Recomendado</div>
                   )}
                   {isAtual && (
-                    <div className="bg-blue-600 text-white px-4 py-2 text-center text-sm font-bold">✓ PLANO ATUAL</div>
+                    <div className="bg-blue-600 text-white px-4 py-2 text-center text-xs font-bold uppercase tracking-widest">✓ Plano Atual</div>
                   )}
-                  <div className="p-4">
-                    <h4 className="text-lg font-bold text-gray-800 mb-1">{plano.name}</h4>
-                    {plano.description && <p className="text-gray-500 text-xs mb-3">{plano.description}</p>}
-                    <p className="text-2xl font-bold text-teal-600 mb-1">{formatarPreco(plano.price_monthly)}</p>
-                    <p className="text-gray-600 text-sm">por mês</p>
-                    {plano.price_annually && (
-                      <p className="text-gray-500 text-xs mb-3">{formatarPreco(plano.price_annually)}/ano</p>
-                    )}
+                  <div className="p-5 flex flex-col flex-1">
+                    <h4 className="text-lg font-bold text-gray-900 mb-1">{plano.name}</h4>
+                    {plano.description && <p className="text-gray-400 text-xs mb-3 leading-relaxed">{plano.description}</p>}
 
-                    {recursos.length > 0 && (
-                      <div className="space-y-1 mb-3 mt-2">
-                        {recursos.map((feature, idx) => (
-                          <p key={idx} className="text-xs text-gray-700">✓ {feature}</p>
+                    <div className="mb-4">
+                      <p className="text-3xl font-bold text-teal-600">{formatarPreco(plano.price_monthly)}<span className="text-sm font-normal text-gray-400">/mês</span></p>
+                      {plano.price_annually > 0 && (
+                        <p className="text-gray-400 text-xs mt-0.5">{formatarPreco(plano.price_annually)}/ano</p>
+                      )}
+                    </div>
+
+                    <ul className="space-y-1.5 mb-4">
+                      {recursos.map((feature, idx) => (
+                        <li key={idx} className="flex items-center gap-2 text-xs text-gray-600">
+                          <span className="h-1.5 w-1.5 rounded-full bg-teal-500 flex-shrink-0"></span>{feature}
+                        </li>
+                      ))}
+                    </ul>
+
+                    {/* Botão expansível de módulos */}
+                    <button
+                      type="button"
+                      onClick={() => setExpandedPlanId(isExpanded ? null : plano.id)}
+                      className="flex items-center justify-between w-full text-xs font-semibold text-teal-600 hover:text-teal-800 py-2 border-t border-gray-100 mt-auto transition"
+                    >
+                      <span>Módulos inclusos</span>
+                      <span className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
+                    </button>
+                    <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                      <div className="pt-3 pb-1 space-y-1.5">
+                        {base && (
+                          <div className="flex items-center gap-2 text-xs font-semibold text-gray-800">
+                            <span className="h-1.5 w-1.5 rounded-full bg-teal-600"></span>{base}
+                          </div>
+                        )}
+                        {diff.map((m, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>{m}
+                          </div>
                         ))}
                       </div>
-                    )}
-
-                    {modulos.length > 0 && (
-                      <div className="mb-4">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Módulos</p>
-                        <div className="flex flex-wrap gap-1">
-                          {modulos.map((m, i) => (
-                            <span key={i} className="px-2 py-0.5 bg-teal-50 border border-teal-200 text-teal-700 text-xs font-semibold rounded-full">{m}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    </div>
 
                     <button
                       onClick={() => { if (!isAtual) handleUpgradeClick(plano); }}
                       disabled={isAtual}
-                      className={`w-full py-2 rounded-lg font-semibold transition ${
-                        isAtual ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-teal-600 text-white hover:bg-teal-700'
+                      className={`w-full mt-4 py-2.5 rounded-lg font-semibold text-sm transition ${
+                        isAtual ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-teal-600 text-white hover:bg-teal-700'
                       }`}
                     >
                       {isAtual ? '✓ Plano Atual' : 'Solicitar Upgrade'}

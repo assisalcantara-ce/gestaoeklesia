@@ -71,7 +71,6 @@ export async function PATCH(
       max_ministerios: maxMinisterios,
       additional_church_monthly_fee: additionalChurchMonthlyFee,
       additional_admin_users_per_church: additionalAdminsPerChurch,
-      max_divisao1: body.max_divisao1 ?? undefined,
       max_divisao2: body.max_divisao2 ?? undefined,
       max_divisao3: body.max_divisao3 ?? undefined,
       has_api_access: body.has_api_access || false,
@@ -83,6 +82,7 @@ export async function PATCH(
       has_modulo_reunioes: body.has_modulo_reunioes || false,
       has_white_label: body.has_white_label || false,
       has_automation: body.has_automation || false,
+      modulos: Array.isArray(body.modulos) ? body.modulos : [],
       display_order: body.display_order || 0,
       updated_at: new Date().toISOString(),
     };

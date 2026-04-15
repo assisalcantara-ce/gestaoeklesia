@@ -1,7 +1,7 @@
 # 📋 DAILY BRIEFING - GestãoEklesia
 
-**Data de Última Atualização:** 2 de abril de 2026  
-**Última Sessão:** Trial automático com expiração, UI de pré-cadastros e migrações de status
+**Data de Última Atualização:** 14 de abril de 2026  
+**Última Sessão:** Correções de acesso por tenant, ajustes de nomenclatura (Ministros -> Membros) e validação de migrações
 
 ---
 
@@ -178,6 +178,19 @@ git merge feature/nova-feature
 ---
 
 ## ✨ ÚLTIMAS IMPLEMENTAÇÕES
+
+### 📅 14 de Abril de 2026 — Acesso por tenant + Membros + Consagração
+
+#### ✅ Concluído
+- [x] Fallback server-side para resolver `ministry_id` via service role quando RLS bloqueia o token do usuário.
+    - Rotas: `/api/v1/members`, `/api/v1/members/[id]`, `/api/v1/employees`, `/api/v1/employees/[id]`, `/api/v1/secretaria/uploads/igreja-foto`.
+- [x] Ajuste de nomenclatura: “Ministros” -> “Membros” no menu e na tela de membros (inclui PDF e modais).
+- [x] Módulo Consagração: migrations aplicadas e validadas (tabela `consagracao_registros` + campos de origem).
+- [x] Trial: criado ministry + vínculo para `assisalcantara.ce@gmail.com` (tenant “AD ROCHA ETERNA DE MARITUBA”).
+
+#### ▶️ Próximo passo (amanhã)
+- Validar fluxo completo de `/secretaria/membros` e `/secretaria/funcionarios` com os usuários admin e wci.
+- Revisar se há outros pontos de UI ainda com “Ministro/Ministros” que devam virar “Membro/Membros”.
 
 ### 📅 2 de Abril de 2026 — Pré-cadastro (Trial) e Expiração
 

@@ -121,7 +121,6 @@ export async function POST(request: NextRequest) {
         max_ministerios: maxMinisterios,
         additional_church_monthly_fee: additionalChurchMonthlyFee,
         additional_admin_users_per_church: additionalAdminsPerChurch,
-        max_divisao1: body.max_divisao1 ?? 5,
         max_divisao2: body.max_divisao2 ?? 0,
         max_divisao3: body.max_divisao3 ?? -1,
         has_api_access: body.has_api_access || false,
@@ -133,6 +132,7 @@ export async function POST(request: NextRequest) {
         has_modulo_reunioes: body.has_modulo_reunioes || false,
         has_white_label: body.has_white_label || false,
         has_automation: body.has_automation || false,
+        modulos: Array.isArray(body.modulos) ? body.modulos : [],
         is_active: true,
         display_order: body.display_order || 0,
       }])

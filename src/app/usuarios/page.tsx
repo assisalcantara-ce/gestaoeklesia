@@ -14,7 +14,7 @@ interface Usuario {
   nome: string;
   email: string;
   email_confirmed?: boolean;
-  nivel: 'administrador' | 'financeiro' | 'operador' | 'supervisor';
+  nivel: 'administrador' | 'financeiro' | 'supervisor' | 'admin_local' | 'financeiro_local';
   congregacao?: string;
   congregacao_id?: string | null;
   supervisao?: string;
@@ -78,7 +78,9 @@ export default function UsuariosPage() {
   const [showForm, setShowForm] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const [filtroNivel, setFiltroNivel] = useState('');
+  const [busca, setBusca] = useState('');
+  const itemsPerPage = 10;
 
   const [maxUsuarios, setMaxUsuarios] = useState<number>(1);
   const limiteUsuarios = maxUsuarios;
@@ -89,30 +91,37 @@ export default function UsuariosPage() {
     {
       id: 'administrador',
       nome: 'Administrador',
-      descricao: 'Secretaria Geral - Acesso total ao sistema',
+      descricao: 'Secretaria Geral — Acesso total ao sistema',
       icon: '👑',
       cor: 'bg-purple-100 border-purple-300',
     },
     {
       id: 'financeiro',
       nome: 'Financeiro',
-      descricao: 'Funções reduzidas com acesso ao módulo financeiro',
+      descricao: 'Funções reduzidas com acesso ao módulo Financeiro Geral',
       icon: '💳',
       cor: 'bg-blue-100 border-blue-300',
     },
     {
       id: 'supervisor',
       nome: 'Supervisor',
-      descricao: 'Responsável por um grupo de Supervisão/regional',
+      descricao: 'Consultas cadastrais da sua área. Sem acesso ao financeiro ou cadastros gerais',
       icon: '🗺️',
       cor: 'bg-indigo-100 border-indigo-300',
     },
     {
-      id: 'operador',
-      nome: 'Operador',
-      descricao: 'Cadastros e consultas - Secretaria local',
+      id: 'admin_local',
+      nome: 'Administrador Local',
+      descricao: 'Cadastros e consultas da sua congregação. Sem acesso ao financeiro ou cadastros gerais',
       icon: '🏢',
       cor: 'bg-green-100 border-green-300',
+    },
+    {
+      id: 'financeiro_local',
+      nome: 'Financeiro Local',
+      descricao: 'Funções reduzidas com acesso ao módulo Financeiro da sua Congregação',
+      icon: '💰',
+      cor: 'bg-yellow-50 border-yellow-300',
     },
   ];
 
@@ -277,8 +286,8 @@ export default function UsuariosPage() {
       return;
     }
 
-    if (editData.nivel === 'operador' && !editData.congregacao_id) {
-      setEditError('Congregacao obrigatoria para este nivel.');
+    if (['admin_local', 'financeiro_local'].includes(editData.nivel) && !editData.congregacao_id) {
+      setEditError('Congregação obrigatória para este nível.');
       return;
     }
 
@@ -435,8 +444,8 @@ export default function UsuariosPage() {
       return;
     }
 
-    if (formData.nivel === 'operador' && !formData.congregacao_id) {
-      setFormError('Congregacao obrigatoria para este nivel.');
+    if (['admin_local', 'financeiro_local'].includes(formData.nivel) && !formData.congregacao_id) {
+      setFormError('Congregação obrigatória para este nível.');
       return;
     }
 
@@ -517,11 +526,24 @@ export default function UsuariosPage() {
     }
   };
 
+  // Filtro + Busca
+  const usuariosFiltrados = useMemo(() =>
+    usuarios.filter(u => {
+      if (filtroNivel && u.nivel !== filtroNivel) return false;
+      if (busca.trim()) {
+        const q = busca.toLowerCase();
+        if (!u.nome.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    }),
+    [usuarios, filtroNivel, busca]
+  );
+
   // Paginação
-  const totalPages = Math.max(1, Math.ceil(usuarios.length / itemsPerPage));
-  const startIndex = usuarios.length === 0 ? 0 : (currentPage - 1) * itemsPerPage;
+  const totalPages = Math.max(1, Math.ceil(usuariosFiltrados.length / itemsPerPage));
+  const startIndex = usuariosFiltrados.length === 0 ? 0 : (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const usuariosPaginados = usuarios.slice(startIndex, endIndex);
+  const usuariosPaginados = usuariosFiltrados.slice(startIndex, endIndex);
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -556,11 +578,14 @@ export default function UsuariosPage() {
           </div>
 
           {/* Níveis de Acesso */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
             {nivelAcessoInfo.map(nivel => (
               <div
                 key={nivel.id}
-                className={`${nivel.cor} border-2 rounded-lg p-4 cursor-pointer transition hover:shadow-lg flex items-center justify-between`}
+                onClick={() => { setFiltroNivel(prev => prev === nivel.id ? '' : nivel.id); setCurrentPage(1); }}
+                className={`${nivel.cor} border-2 rounded-lg p-4 cursor-pointer transition hover:shadow-md flex items-center justify-between select-none ${
+                  filtroNivel === nivel.id ? 'ring-2 ring-[#123b63] ring-offset-1 shadow-md' : ''
+                }`}
               >
                 <div className="flex-1">
                   <div className="text-2xl mb-1">{nivel.icon}</div>
@@ -622,7 +647,7 @@ export default function UsuariosPage() {
                     ))}
                   </select>
                 </div>
-                {selectedLevel && selectedLevel === 'operador' && (
+                {selectedLevel && ['admin_local', 'financeiro_local'].includes(selectedLevel) && (
                   <select
                     value={formData.congregacao_id}
                     onChange={(e) => handleFormChange('congregacao_id', e.target.value)}
@@ -685,8 +710,31 @@ export default function UsuariosPage() {
 
           {/* Lista de Usuários */}
           <div className="bg-white rounded-lg shadow-md overflow-hidden mt-4">
-            <div className="bg-[#123b63] text-white px-6 py-3">
-              <h2 className="text-xl font-bold">Usuários Cadastrados ({usuarios.length})</h2>
+            <div className="bg-[#123b63] text-white px-6 py-3 flex items-center justify-between gap-4">
+              <h2 className="text-xl font-bold">
+                Usuários Cadastrados
+                {filtroNivel || busca.trim()
+                  ? ` (${usuariosFiltrados.length} de ${usuarios.length})`
+                  : ` (${usuarios.length})`}
+              </h2>
+              {filtroNivel && (
+                <button
+                  onClick={() => setFiltroNivel('')}
+                  className="text-xs text-blue-200 hover:text-white underline shrink-0"
+                >
+                  Limpar: {getNomeNivel(filtroNivel)}
+                </button>
+              )}
+            </div>
+
+            <div className="px-6 py-3 border-b border-gray-100">
+              <input
+                type="text"
+                placeholder="Buscar por nome ou e-mail..."
+                value={busca}
+                onChange={e => { setBusca(e.target.value); setCurrentPage(1); }}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#0284c7]"
+              />
             </div>
 
             {usuariosError && (
@@ -774,7 +822,7 @@ export default function UsuariosPage() {
             {/* Paginação */}
             <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t">
               <div className="text-sm text-gray-600">
-                Mostrando {usuarios.length === 0 ? 0 : startIndex + 1} a {Math.min(endIndex, usuarios.length)} de {usuarios.length} usuários
+                Mostrando {usuariosFiltrados.length === 0 ? 0 : startIndex + 1} a {Math.min(endIndex, usuariosFiltrados.length)} de {usuariosFiltrados.length} usuários
               </div>
               <div className="flex gap-2">
                 <button
@@ -880,7 +928,7 @@ export default function UsuariosPage() {
                   </div>
                 </div>
 
-                {editData.nivel === 'operador' && (
+                {['admin_local', 'financeiro_local'].includes(editData.nivel) && (
                   <div>
                     <label className="block text-sm font-semibold text-[#123b63] mb-2">Congregação</label>
                     <select

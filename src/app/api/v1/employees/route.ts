@@ -11,7 +11,7 @@
  * - grupo: filtrar por grupo
  */
 
-import { createServerClientFromRequest } from '@/lib/supabase-server'
+import { createServerClient, createServerClientFromRequest } from '@/lib/supabase-server'
 import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -113,6 +113,26 @@ async function resolveMinistryId(supabase: any, userId: string): Promise<string 
     .maybeSingle()
 
   if (!mErr && m?.id) return String(m.id)
+
+  const admin = createServerClient()
+
+  const { data: muAdmin } = await admin
+    .from('ministry_users')
+    .select('ministry_id')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle()
+
+  if (muAdmin?.ministry_id) return String(muAdmin.ministry_id)
+
+  const { data: mAdmin } = await admin
+    .from('ministries')
+    .select('id')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle()
+
+  if (mAdmin?.id) return String(mAdmin.id)
 
   return null
 }

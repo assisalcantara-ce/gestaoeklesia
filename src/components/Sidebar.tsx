@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
@@ -17,6 +17,26 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const planFeatures = usePlanFeatures();
 
+  // Auto-expande o menu pai quando um filho está ativo
+  const parentMap: Record<string, string> = {
+    'consagracao': 'comissao',
+    'comissoes': 'comissao',
+    'estrutura-hierarquica': 'secretaria',
+    'membros': 'secretaria',
+    'departamentos': 'secretaria',
+    'apresentacao-criancas': 'secretaria',
+    'batismo-aguas': 'secretaria',
+    'cartas': 'secretaria',
+    'certificados': 'secretaria',
+    'config-geral': 'configuracoes',
+    'config-cartoes': 'configuracoes',
+    'ativar-fluxo': 'configuracoes',
+  };
+  useEffect(() => {
+    if (parentMap[activeMenu]) setExpandedMenu(parentMap[activeMenu]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMenu]);
+
   const allMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
     {
@@ -26,18 +46,26 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
       path: '/secretaria',
       submenu: [
         { id: 'estrutura-hierarquica', label: 'Estrutura Hierárquica', icon: '🏛️', path: '/secretaria/estrutura-hierarquica' },
-        { id: 'membros', label: 'Ministros', icon: '👥', path: '/secretaria/membros' },
-        { id: 'funcionarios', label: 'Funcionários', icon: '👔', path: '/secretaria/funcionarios' },
-        { id: 'consagracao', label: 'Consagração (obreiros)', icon: '🙏', path: '/secretaria/consagracao' },
+        { id: 'membros', label: 'Membros', icon: '👥', path: '/secretaria/membros' },
+        { id: 'departamentos', label: 'Departamentos', icon: '🏷️', path: '/secretaria/departamentos' },
+        { id: 'apresentacao-criancas', label: 'Apresentação de Crianças', icon: '🧒', path: '/secretaria/apresentacao-criancas' },
+        { id: 'batismo-aguas', label: 'Batismo nas Águas', icon: '✝️', path: '/secretaria/batismo-aguas' },
         { id: 'cartas', label: 'Cartas ministeriais', icon: '📜', path: '/secretaria/cartas' },
         { id: 'certificados', label: 'Certificados', icon: '🎓', path: '/secretaria/certificados' }
       ]
     },
+    { id: 'achados-perdidos', label: 'Achados e Perdidos', icon: '🔍', path: '/secretaria/achados-perdidos' },
+    { id: 'tesouraria', label: 'Tesouraria', icon: '💰', path: '/tesouraria' },
     { id: 'financeiro', label: 'Financeiro', icon: '💳', path: '/financeiro' },
+    { id: 'funcionarios', label: 'Funcionários', icon: '👔', path: '/secretaria/funcionarios' },
     { id: 'eventos', label: 'Eventos', icon: '📅', path: '/eventos' },
     { id: 'presidencia', label: 'Presidência', icon: '👑', path: '/presidencia' },
     { id: 'reunioes', label: 'Reuniões', icon: '🤝', path: '/reunioes' },
-    { id: 'comissao', label: 'Comissão', icon: '👥', path: '/comissao' },
+    { id: 'comissao', label: 'Comissão', icon: '👥', path: '/comissao', submenu: [
+        { id: 'comissoes', label: 'Comissões', icon: '👥', path: '/comissao' },
+        { id: 'consagracao', label: 'Consagração (obreiros)', icon: '🙏', path: '/secretaria/consagracao' },
+      ]
+    },
     { id: 'patrimonio', label: 'Patrimônio', icon: '🏢', path: '/patrimonio' },
     { id: 'missoes', label: 'Missões', icon: '✈️', path: '/missoes' },
     { id: 'auditoria', label: 'Auditoria', icon: '✅', path: '/auditoria' },
@@ -50,7 +78,6 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
       path: '/configuracoes',
       submenu: [
         { id: 'config-geral', label: 'Geral', icon: '⚙️', path: '/configuracoes' },
-        { id: 'config-certificados', label: 'Certificados', icon: '🎓', path: '/configuracoes/certificados' },
         { id: 'config-cartoes', label: 'Cartões', icon: '🎫', path: '/configuracoes/cartoes' },
         { id: 'ativar-fluxo', label: 'Ativar Fluxo', icon: '🔄', path: '/secretaria/ativar-fluxo' },
       ]
@@ -59,9 +86,10 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
 
   // Filtra menus restritos por plano (enquanto carrega, mantém oculto para não piscar)
   const menuItems = planFeatures.loading
-    ? allMenuItems.filter(i => !['financeiro', 'eventos', 'reunioes'].includes(i.id))
+    ? allMenuItems.filter(i => !['tesouraria', 'financeiro', 'eventos', 'reunioes'].includes(i.id))
     : allMenuItems.filter(i => {
-        if (i.id === 'financeiro') return planFeatures.has_modulo_financeiro;
+        if (i.id === 'tesouraria') return planFeatures.has_modulo_financeiro;
+        if (i.id === 'financeiro') return planFeatures.has_modulo_financeiro_avancado;
         if (i.id === 'eventos') return planFeatures.has_modulo_eventos;
         if (i.id === 'reunioes') return planFeatures.has_modulo_reunioes;
         return true;

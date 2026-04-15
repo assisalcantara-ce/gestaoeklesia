@@ -1,14 +1,13 @@
 const https = require('https');
 
 const sql = [
-  "ALTER TABLE public.subscription_plans ADD COLUMN IF NOT EXISTS max_divisao1 INTEGER NOT NULL DEFAULT 5",
   "ALTER TABLE public.subscription_plans ADD COLUMN IF NOT EXISTS max_divisao2 INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE public.subscription_plans ADD COLUMN IF NOT EXISTS max_divisao3 INTEGER NOT NULL DEFAULT -1",
-  "UPDATE public.subscription_plans SET max_divisao1 = 5,  max_divisao2 = 0,  max_divisao3 = 0   WHERE slug = 'basic'",
-  "UPDATE public.subscription_plans SET max_divisao1 = 10, max_divisao2 = 1,  max_divisao3 = -1  WHERE slug = 'starter'",
-  "UPDATE public.subscription_plans SET max_divisao1 = 50, max_divisao2 = 10, max_divisao3 = -1  WHERE slug = 'profissional'",
-  "UPDATE public.subscription_plans SET max_divisao1 = 25, max_divisao2 = 3,  max_divisao3 = -1  WHERE slug = 'professional'",
-  "UPDATE public.subscription_plans SET max_divisao1 = 100,max_divisao2 = 20, max_divisao3 = -1  WHERE slug = 'expert'"
+  "UPDATE public.subscription_plans SET max_divisao2 = 0,  max_divisao3 = 0   WHERE slug = 'basic'",
+  "UPDATE public.subscription_plans SET max_divisao2 = 1,  max_divisao3 = -1  WHERE slug = 'starter'",
+  "UPDATE public.subscription_plans SET max_divisao2 = 10, max_divisao3 = -1  WHERE slug = 'profissional'",
+  "UPDATE public.subscription_plans SET max_divisao2 = 3,  max_divisao3 = -1  WHERE slug = 'professional'",
+  "UPDATE public.subscription_plans SET max_divisao2 = 20, max_divisao3 = -1  WHERE slug = 'expert'"
 ];
 
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';

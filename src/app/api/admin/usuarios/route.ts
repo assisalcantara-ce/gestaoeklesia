@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcrypt'
 import { requireAdmin } from '@/lib/admin-guard'
+import { buildPasswordFingerprint } from '@/lib/password-fingerprint'
 
 function sanitizeAdminUser(row: any) {
   if (!row || typeof row !== 'object') return row
@@ -164,7 +165,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Cria usuário no Supabase Auth (necessário para login)
+      let passwordFingerprint = ''
+      try {
+        passwordFingerprint = buildPasswordFingerprint(String(body.password))
+      } catch {
+        return NextResponse.json(
+          { error: 'Configuracao de senha nao definida' },
+          { status: 500 }
+        )
+      }
+
+      const { data: existingFingerprint } = await supabase
+        .from('user_password_fingerprints')
+        .select('user_id')
+        .eq('fingerprint', passwordFingerprint)
+        .maybeSingle()
+
+      if (existingFingerprint?.user_id) {
+        return NextResponse.json(
+          { error: 'Senha ja utilizada por outro usuario' },
+          { status: 400 }
+        )
+      }
+
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: body.email,
       password: body.password,
@@ -228,6 +251,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+      const { error: fingerprintError } = await supabase
+        .from('user_password_fingerprints')
+        .insert({ user_id: authData.user.id, fingerprint: passwordFingerprint })
+
+      if (fingerprintError) {
+        await supabase.auth.admin.deleteUser(authData.user.id)
+        await supabase.from('admin_users').delete().eq('id', data?.id || '')
+        return NextResponse.json({ error: 'Senha ja utilizada por outro usuario' }, { status: 400 })
+      }
+
     return NextResponse.json(sanitizeAdminUser(data), { status: 201 })
   } catch (error) {
     return NextResponse.json(
@@ -254,8 +287,38 @@ export async function PUT(request: NextRequest) {
     const { password, ...updateData } = body
 
     // Se senha fornecida, atualiza no Auth e no admin_users
+    let passwordFingerprint = ''
     if (password && String(password).trim().length >= 6) {
       const newPassword = String(password).trim()
+      try {
+        passwordFingerprint = buildPasswordFingerprint(newPassword)
+      } catch {
+        return NextResponse.json(
+          { error: 'Configuracao de senha nao definida' },
+          { status: 500 }
+        )
+      }
+
+      const { data: existingFingerprint } = await supabase
+        .from('user_password_fingerprints')
+        .select('user_id')
+        .eq('fingerprint', passwordFingerprint)
+        .maybeSingle()
+
+      if (existingFingerprint?.user_id) {
+        const { data: currentAdmin } = await supabase
+          .from('admin_users')
+          .select('user_id')
+          .eq('id', id)
+          .single()
+
+        if (currentAdmin?.user_id && existingFingerprint.user_id !== currentAdmin.user_id) {
+          return NextResponse.json(
+            { error: 'Senha ja utilizada por outro usuario' },
+            { status: 400 }
+          )
+        }
+      }
 
       // Busca user_id vinculado para atualizar no Supabase Auth
       const { data: existing } = await supabase
@@ -286,6 +349,12 @@ export async function PUT(request: NextRequest) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    if (passwordFingerprint) {
+      await supabase
+        .from('user_password_fingerprints')
+        .upsert({ user_id: data?.user_id, fingerprint: passwordFingerprint })
     }
 
     return NextResponse.json(sanitizeAdminUser(data))

@@ -20,7 +20,6 @@ export interface SubscriptionPlan {
   max_ministerios: number;
   additional_church_monthly_fee: number;
   additional_admin_users_per_church: number;
-  max_divisao1: number;
   max_divisao2: number;
   max_divisao3: number;
   has_api_access: boolean;
@@ -32,6 +31,7 @@ export interface SubscriptionPlan {
   has_modulo_financeiro: boolean;
   has_modulo_eventos: boolean;
   has_modulo_reunioes: boolean;
+  modulos: string[];
   is_active: boolean;
   display_order: number;
   created_at: string;
@@ -87,6 +87,7 @@ export interface SupportTicket {
   response_at?: string;
   last_message_user_id?: string | null;
   last_message_at?: string | null;
+  last_message_sender_role?: 'support' | 'user' | null;
   created_at: string;
   updated_at: string;
 }
@@ -97,6 +98,7 @@ export interface SupportTicketMessage {
   user_id: string;
   message: string;
   is_internal: boolean;
+  sender_role?: 'support' | 'user' | null;
   attachments?: any[];
   created_at: string;
   updated_at: string;

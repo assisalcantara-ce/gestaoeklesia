@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-client';
 
 export interface PlanFeatures {
   has_modulo_financeiro: boolean;
+  has_modulo_financeiro_avancado: boolean;
   has_modulo_eventos: boolean;
   has_modulo_reunioes: boolean;
   /** true enquanto carrega, false quando resolvido */
@@ -13,6 +14,7 @@ export interface PlanFeatures {
 
 const DEFAULT_FEATURES: PlanFeatures = {
   has_modulo_financeiro: true,
+  has_modulo_financeiro_avancado: false,
   has_modulo_eventos: true,
   has_modulo_reunioes: true,
   loading: true,
@@ -47,13 +49,13 @@ export function usePlanFeatures(): PlanFeatures {
         const query = ministryId
           ? supabase
               .from('ministries')
-              .select('subscription_plan_id, subscription_plans(has_modulo_financeiro, has_modulo_eventos, has_modulo_reunioes)')
+              .select('subscription_plan_id, subscription_plans(has_modulo_financeiro, has_modulo_financeiro_avancado, has_modulo_eventos, has_modulo_reunioes)')
               .eq('id', ministryId)
               .limit(1)
               .maybeSingle()
           : supabase
               .from('ministries')
-              .select('subscription_plan_id, subscription_plans(has_modulo_financeiro, has_modulo_eventos, has_modulo_reunioes)')
+              .select('subscription_plan_id, subscription_plans(has_modulo_financeiro, has_modulo_financeiro_avancado, has_modulo_eventos, has_modulo_reunioes)')
               .eq('user_id', user.id)
               .limit(1)
               .maybeSingle();
@@ -65,6 +67,7 @@ export function usePlanFeatures(): PlanFeatures {
         if (!cancelled) {
           setFeatures({
             has_modulo_financeiro: plan?.has_modulo_financeiro ?? true,
+            has_modulo_financeiro_avancado: plan?.has_modulo_financeiro_avancado ?? false,
             has_modulo_eventos: plan?.has_modulo_eventos ?? true,
             has_modulo_reunioes: plan?.has_modulo_reunioes ?? true,
             loading: false,
