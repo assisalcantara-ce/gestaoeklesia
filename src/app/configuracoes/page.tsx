@@ -944,9 +944,6 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
     return idx >= 0 && idx < planosDB.length - 1 ? planosDB[idx + 1].id : null;
   })();
 
-  const recursosPlanAtual = planoAtual ? buildRecursos(planoAtual as any) : [];
-  const modulosPlanAtual = planoAtual ? buildModulos(planoAtual) : [];
-
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Plano de Assinatura</h2>
@@ -978,8 +975,8 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
             <div>
               <p className="text-teal-200 text-xs mb-1">Valor mensal</p>
               <p className="text-2xl font-bold">{formatarPreco(planoAtual.price_monthly)}</p>
-              {planoAtual.price_annually > 0 && (
-                <p className="text-teal-300 text-xs mt-0.5">{formatarPreco(planoAtual.price_annually)}/ano</p>
+              {(planoAtual.price_annually ?? 0) > 0 && (
+                <p className="text-teal-300 text-xs mt-0.5">{formatarPreco(planoAtual.price_annually ?? 0)}/ano</p>
               )}
             </div>
             <div>
@@ -1036,8 +1033,8 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
 
                     <div className="mb-4">
                       <p className="text-3xl font-bold text-teal-600">{formatarPreco(plano.price_monthly)}<span className="text-sm font-normal text-gray-400">/mês</span></p>
-                      {plano.price_annually > 0 && (
-                        <p className="text-gray-400 text-xs mt-0.5">{formatarPreco(plano.price_annually)}/ano</p>
+                      {(plano.price_annually ?? 0) > 0 && (
+                        <p className="text-gray-400 text-xs mt-0.5">{formatarPreco(plano.price_annually ?? 0)}/ano</p>
                       )}
                     </div>
 

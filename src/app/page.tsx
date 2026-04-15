@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import NotificationModal from '@/components/NotificationModal';
 import { formatCpfOrCnpj, formatPhone } from '@/lib/mascaras';
@@ -233,9 +232,6 @@ function buildModuleHighlights(plan: PlanoDB): { modules: string[]; label: strin
 
   const key = normalizeKey(plan.slug || plan.name || '');
   const base = ['Secretaria Geral', 'Achados e perdido', 'Patrimônio', 'Geolocalização', 'Auditoria'];
-  const starter = [...base, 'Tesouraria', 'Missões', 'Chat Interno', 'EBD'];
-  const intermediario = [...starter, 'Funcionários', 'Comissão', 'Kids', 'Reuniões'];
-  const profissional = [...intermediario, 'Eventos', 'Financeiro', 'Presidência'];
 
   if (key === 'basic' || key === 'basico') {
     return { modules: base, label: 'Modulos inclusos' };
@@ -257,11 +253,10 @@ function buildModuleHighlights(plan: PlanoDB): { modules: string[]; label: strin
 }
 
 export default function LandingPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [planosLanding, setPlanosLanding] = useState<PlanoDB[]>([]);
-  const [showAllPlanos, setShowAllPlanos] = useState(false);
+  const [showAllPlanos] = useState(false);
   const [successModal, setSuccessModal] = useState({
     isOpen: false,
     email: ''
@@ -788,7 +783,7 @@ export default function LandingPage() {
                   <p className="text-3xl font-bold">{formatarPreco(plan.price_monthly)}</p>
                   {Number(plan.price_annually) > 0 && (
                     <p className={`text-xs mt-1 ${featured ? 'text-blue-100' : 'text-slate-500'}`}>
-                      {formatarPreco(plan.price_annually)}/ano
+                      {formatarPreco(plan.price_annually ?? 0)}/ano
                     </p>
                   )}
                 </div>

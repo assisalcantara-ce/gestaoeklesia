@@ -157,19 +157,6 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     )
 
-    // Bloquear email ja registrado no Auth
-    try {
-      const { data: existingAuth } = await supabaseAdmin.auth.admin.getUserByEmail(emailValue)
-      if (existingAuth?.user?.id) {
-        return NextResponse.json(
-          { error: 'Este email ja foi registrado. Use outro email ou faca login.' },
-          { status: 400 }
-        )
-      }
-    } catch {
-      // ignore: fallback para o erro do signUp
-    }
-
     // Bloquear reuso de senha entre usuarios
     let passwordFingerprint = ''
     try {

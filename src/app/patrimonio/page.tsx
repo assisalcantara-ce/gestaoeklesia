@@ -9,7 +9,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
-import { Pencil, Trash2, Printer, Search, Building2 } from 'lucide-react';
+import { Pencil, Trash2, Printer, Search } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -314,10 +314,10 @@ export default function PatrimonioPage() {
 
   const [notification, setNotification] = useState({
     isOpen: false, title: '', message: '',
-    type: 'success' as 'success' | 'error' | 'warning' | 'info', autoClose: true,
+    type: 'success' as 'success' | 'error' | 'warning' | 'info', autoClose: 3000 as number | undefined,
   });
 
-  const showNotif = (type: typeof notification.type, title: string, message: string, autoClose = true) =>
+  const showNotif = (type: typeof notification.type, title: string, message: string, autoClose: number | undefined = 3000) =>
     setNotification({ isOpen: true, title, message, type, autoClose });
 
   const resetForm = () => { setFormData({ ...EMPTY_FORM }); setEditingId(null); setFieldErrors({}); };
@@ -513,7 +513,6 @@ export default function PatrimonioPage() {
   }), [itens, filterStatus, filterCategoria, filterLocal, filterSearch, locais]);
 
   const totalValorFiltrado = itensFiltrados.reduce((acc, i) => acc + (i.valor_aquisicao || 0), 0);
-  const countAtivos = itens.filter((i) => i.status === 'ativo').length;
 
   if (loading || loadingData) return <div className="p-8">Carregando...</div>;
 

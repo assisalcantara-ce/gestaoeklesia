@@ -36,7 +36,7 @@ const ELEMENTOS_TIPOS = [
 
 interface CertificadoElemento {
   id: string;
-  tipo: 'texto' | 'logo' | 'imagem' | 'chapa' | 'foto-membro' | 'qrcode';
+  tipo: 'texto' | 'logo' | 'imagem' | 'chapa' | 'foto-membro' | 'qrcode' | 'linha';
   x: number;
   y: number;
   largura: number;
@@ -57,6 +57,8 @@ interface CertificadoElemento {
 interface CertificadoTemplate {
   id: string;
   nome: string;
+  chave?: string;
+  categoria?: string;
   backgroundUrl?: string;
   elementos: CertificadoElemento[];
   orientacao?: 'landscape' | 'portrait';
