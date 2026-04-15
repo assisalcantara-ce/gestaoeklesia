@@ -57,8 +57,6 @@ export default function SuportePage() {
   const [carregandoMensagens, setCarregandoMensagens] = useState(false)
   const [resposta, setResposta] = useState('')
   const [enviandoResposta, setEnviandoResposta] = useState(false)
-  const [mostrarResposta, setMostrarResposta] = useState(false)
-  const [suporteRespondeu, setSuporteRespondeu] = useState(false)
   const [podeEditarDescricao, setPodeEditarDescricao] = useState(false)
   const [descricaoEditada, setDescricaoEditada] = useState('')
   const [salvandoDescricao, setSalvandoDescricao] = useState(false)
@@ -143,7 +141,6 @@ export default function SuportePage() {
   useEffect(() => {
     if (!selecionado) return
     carregarMensagens(selecionado.id)
-    setMostrarResposta(ticketTemRespostaDoSuporte(selecionado))
     setDescricaoEditada(selecionado.descricao)
   }, [selecionado?.id])
 
@@ -373,7 +370,6 @@ export default function SuportePage() {
         visible.some((msg) => msg.sender_role === 'support') ||
         Boolean(selecionado && ticketTemRespostaDoSuporte(selecionado)) ||
         visible.some((msg) => msg.sender_role == null && msg.user_id !== user?.id)
-      setSuporteRespondeu(suporteRespondeuLocal)
       const podeEditar = selecionado?.status === 'aberto' && !suporteRespondeuLocal
       setPodeEditarDescricao(Boolean(podeEditar))
     } finally {
@@ -484,7 +480,7 @@ export default function SuportePage() {
       }
 
       await registrarAcao({
-        acao: 'excluir',
+        acao: 'deletar',
         modulo: 'suporte',
         area: 'tickets',
         tabela_afetada: 'support_tickets',
@@ -940,7 +936,6 @@ export default function SuportePage() {
                     <button
                       onClick={() => {
                         setSelecionado(ticket)
-                        setMostrarResposta(ticket.status !== 'aberto' || Boolean(ticket.respondido_em))
                       }}
                       className="px-6 py-2 border border-[#2681e5] rounded-full text-[#006ed8] text-sm font-semibold hover:bg-[#f1f7ff] transition"
                     >
@@ -1068,7 +1063,7 @@ export default function SuportePage() {
                       <p className="text-gray-500 text-sm">Nenhuma mensagem ainda.</p>
                     ) : (
                       <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                        {mensagens.map((msg, index) => {
+                        {mensagens.map((msg) => {
                           const ownerId = selecionado?.usuario_id
                           const currentUserId = user?.id
                           const baseUserId = ownerId || currentUserId

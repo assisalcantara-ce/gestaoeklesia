@@ -2733,7 +2733,7 @@ export default function MembrosPage() {
                             disabled={dadosPessoais.tipoCadastro === 'ministro'}
                             onChange={(e) => {
                               setIsDizimista(e.target.checked);
-                              if (!e.target.checked && activeTab === 'dizimos') setActiveTab('dados');
+                              if (!e.target.checked && (activeTab as string) === 'dizimos') setActiveTab('dados');
                             }}
                             className="w-4 h-4 accent-teal-600 cursor-pointer disabled:cursor-not-allowed"
                           />

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
@@ -108,10 +108,10 @@ export default function AchadosPerdidosPage() {
   const [notification, setNotification] = useState({
     isOpen: false, title: '', message: '',
     type: 'success' as 'success' | 'error' | 'warning' | 'info',
-    autoClose: true,
+    autoClose: 3000,
   });
 
-  const showNotification = (type: typeof notification.type, title: string, message: string, autoClose = true) =>
+  const showNotification = (type: typeof notification.type, title: string, message: string, autoClose: number | undefined = 3000) =>
     setNotification({ isOpen: true, title, message, type, autoClose });
 
   const resetForm = () => {
@@ -147,7 +147,7 @@ export default function AchadosPerdidosPage() {
       .select('*')
       .eq('ministry_id', mid)
       .order('created_at', { ascending: false });
-    if (error) { showNotification('error', 'Erro', error.message, false); return; }
+    if (error) { showNotification('error', 'Erro', error.message, undefined); return; }
     setRegistros((data || []) as AchadoPerdido[]);
   };
 
@@ -194,18 +194,18 @@ export default function AchadosPerdidosPage() {
         .eq('id', editingId)
         .select('*')
         .single();
-      if (error) { showNotification('error', 'Erro', error.message, false); return; }
+      if (error) { showNotification('error', 'Erro', error.message, undefined); return; }
       setRegistros((prev) => prev.map((r) => (r.id === editingId ? (data as AchadoPerdido) : r)));
-      showNotification('success', 'Sucesso', 'Registro atualizado.', true);
+      showNotification('success', 'Sucesso', 'Registro atualizado.', 3000);
     } else {
       const { data, error } = await supabase
         .from('achados_perdidos_registros')
         .insert({ ...payload, created_at: new Date().toISOString() })
         .select('*')
         .single();
-      if (error) { showNotification('error', 'Erro', error.message, false); return; }
+      if (error) { showNotification('error', 'Erro', error.message, undefined); return; }
       setRegistros((prev) => [data as AchadoPerdido, ...prev]);
-      showNotification('success', 'Sucesso', 'Objeto registrado com sucesso.', true);
+      showNotification('success', 'Sucesso', 'Objeto registrado com sucesso.', 3000);
     }
 
     resetForm();
@@ -235,9 +235,9 @@ export default function AchadosPerdidosPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Deseja excluir este registro?')) return;
     const { error } = await supabase.from('achados_perdidos_registros').delete().eq('id', id);
-    if (error) { showNotification('error', 'Erro', error.message, false); return; }
+    if (error) { showNotification('error', 'Erro', error.message, undefined); return; }
     setRegistros((prev) => prev.filter((r) => r.id !== id));
-    showNotification('success', 'Sucesso', 'Registro excluído.', true);
+    showNotification('success', 'Sucesso', 'Registro excluído.', 3000);
   };
 
   const handleMarcarReclamado = async (r: AchadoPerdido) => {
@@ -246,11 +246,11 @@ export default function AchadosPerdidosPage() {
       .from('achados_perdidos_registros')
       .update({ status: 'reclamado', data_reclamado: nowIso.slice(0, 10), updated_at: nowIso })
       .eq('id', r.id);
-    if (error) { showNotification('error', 'Erro', error.message, false); return; }
+    if (error) { showNotification('error', 'Erro', error.message, undefined); return; }
     setRegistros((prev) =>
       prev.map((reg) => reg.id === r.id ? { ...reg, status: 'reclamado', data_reclamado: nowIso.slice(0, 10) } : reg)
     );
-    showNotification('success', 'Devolvido', 'Item marcado como reclamado.', true);
+    showNotification('success', 'Devolvido', 'Item marcado como reclamado.', 3000);
   };
 
   const getNomeLocal = (r: AchadoPerdido) => {

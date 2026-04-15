@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
@@ -16,20 +16,15 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
-  ArrowLeftRight,
-  ArrowUpDown,
   Bold,
   Copy,
   Eraser,
   Image,
   Italic,
   Lock,
-  MoveHorizontal,
-  MoveVertical,
   Minus,
   Palette,
   Paintbrush,
-  Ruler,
   Shield,
   Trash2,
   Type,
@@ -157,14 +152,6 @@ const CANVAS_ELEMENT_LABELS: Record<CartaCanvasElement['tipo'], string> = {
   'foto-membro': 'Foto do Membro',
   chapa: 'Chapa',
 };
-
-const TEMPLATE_TIPOS: Array<{ value: TemplateTipo; label: string }> = [
-  { value: 'mudanca', label: 'Carta de Mudanca' },
-  { value: 'transito', label: 'Carta de Transito' },
-  { value: 'desligamento', label: 'Carta de Desligamento' },
-  { value: 'recomendacao', label: 'Carta de Recomendacao' },
-  { value: 'custom', label: 'Personalizada' },
-];
 
 const PLACEHOLDER_GROUPS = [
   {
@@ -362,12 +349,15 @@ export default function CartasPage() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
-  const [notification, setNotification] = useState({
+  const [notification, setNotification] = useState<{
+    isOpen: boolean; title: string; message: string;
+    type: 'success' | 'error' | 'warning' | 'info'; autoClose: number | undefined;
+  }>({
     isOpen: false,
     title: '',
     message: '',
-    type: 'success' as 'success' | 'error' | 'warning' | 'info',
-    autoClose: true,
+    type: 'success',
+    autoClose: 3000,
   });
 
   const tabs = [
@@ -539,7 +529,7 @@ export default function CartasPage() {
         title: 'Erro',
         message: error.message || 'Erro ao carregar templates',
         type: 'error',
-        autoClose: false,
+        autoClose: undefined,
       });
       return;
     }
@@ -659,7 +649,7 @@ export default function CartasPage() {
         title: 'Aviso',
         message: 'Informe um titulo valido para o modelo.',
         type: 'warning',
-        autoClose: true,
+        autoClose: 3000,
       });
       return;
     }
@@ -674,7 +664,7 @@ export default function CartasPage() {
         title: 'Aviso',
         message: 'Ministério não encontrado para salvar o modelo.',
         type: 'warning',
-        autoClose: true,
+        autoClose: 3000,
       });
       return;
     }
@@ -686,7 +676,7 @@ export default function CartasPage() {
         title: 'Aviso',
         message: 'Informe um titulo valido para o modelo.',
         type: 'warning',
-        autoClose: true,
+        autoClose: 3000,
       });
       return;
     }
@@ -744,7 +734,7 @@ export default function CartasPage() {
         title: 'Sucesso',
         message: 'Modelo salvo com sucesso!',
         type: 'success',
-        autoClose: false,
+        autoClose: undefined,
       });
 
       if (typeof window !== 'undefined') {
@@ -764,7 +754,7 @@ export default function CartasPage() {
         title: 'Erro',
         message: err?.message || 'Erro ao salvar modelo',
         type: 'error',
-        autoClose: false,
+        autoClose: undefined,
       });
     } finally {
       setIsSaving(false);
@@ -780,7 +770,7 @@ export default function CartasPage() {
         title: 'Sucesso',
         message: 'Modelo restaurado para o padrao do sistema.',
         type: 'success',
-        autoClose: true,
+        autoClose: 3000,
       });
       await loadTemplates();
     } catch (err: any) {
@@ -789,7 +779,7 @@ export default function CartasPage() {
         title: 'Erro',
         message: err?.message || 'Erro ao restaurar modelo',
         type: 'error',
-        autoClose: false,
+        autoClose: undefined,
       });
     }
   };
@@ -899,7 +889,7 @@ export default function CartasPage() {
         title: 'Aviso',
         message: 'Selecione um elemento de texto no canvas para inserir o placeholder.',
         type: 'warning',
-        autoClose: true,
+        autoClose: 3000,
       });
       return;
     }
@@ -909,7 +899,7 @@ export default function CartasPage() {
         title: 'Aviso',
         message: 'Desbloqueie o elemento para editar o texto.',
         type: 'warning',
-        autoClose: true,
+        autoClose: 3000,
       });
       return;
     }
@@ -956,7 +946,7 @@ export default function CartasPage() {
         title: 'Erro',
         message: err?.message || 'Erro ao enviar imagem',
         type: 'error',
-        autoClose: false,
+        autoClose: undefined,
       });
     }
   };
@@ -971,7 +961,7 @@ export default function CartasPage() {
         title: 'Erro',
         message: err?.message || 'Erro ao enviar background',
         type: 'error',
-        autoClose: false,
+        autoClose: undefined,
       });
     }
   };
@@ -984,7 +974,7 @@ export default function CartasPage() {
         title: 'Aviso',
         message: 'Ministério não encontrado.',
         type: 'warning',
-        autoClose: true,
+        autoClose: 3000,
       });
       return;
     }
@@ -995,7 +985,7 @@ export default function CartasPage() {
         title: 'Aviso',
         message: 'Selecione um membro para emitir a carta.',
         type: 'warning',
-        autoClose: true,
+        autoClose: 3000,
       });
       return;
     }
@@ -1031,7 +1021,7 @@ export default function CartasPage() {
         title: 'Sucesso',
         message: 'Carta emitida com sucesso!',
         type: 'success',
-        autoClose: true,
+        autoClose: 3000,
       });
 
       await loadRecords();
@@ -1042,7 +1032,7 @@ export default function CartasPage() {
         title: 'Erro',
         message: err?.message || 'Erro ao emitir carta',
         type: 'error',
-        autoClose: false,
+        autoClose: undefined,
       });
     } finally {
       setIsIssuing(false);

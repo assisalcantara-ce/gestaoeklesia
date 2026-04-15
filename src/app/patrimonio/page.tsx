@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
@@ -361,7 +361,7 @@ export default function PatrimonioPage() {
   const loadItens = async (mid: string) => {
     const { data, error } = await supabase
       .from('patrimonio_itens').select('*').eq('ministry_id', mid).order('created_at', { ascending: false });
-    if (error) { showNotif('error', 'Erro ao carregar', error.message, false); return; }
+    if (error) { showNotif('error', 'Erro ao carregar', error.message, undefined); return; }
     setItens((data || []) as PatrimonioItem[]);
   };
 
@@ -427,15 +427,15 @@ export default function PatrimonioPage() {
 
     if (editingId) {
       const { data, error } = await supabase.from('patrimonio_itens').update(payload).eq('id', editingId).select('*').single();
-      if (error) { showNotif('error', 'Erro', error.message, false); return; }
+      if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
       setItens((prev) => prev.map((i) => (i.id === editingId ? (data as PatrimonioItem) : i)));
-      showNotif('success', 'Atualizado', 'Bem atualizado com sucesso.', true);
+      showNotif('success', 'Atualizado', 'Bem atualizado com sucesso.', 3000);
     } else {
       const { data, error } = await supabase
         .from('patrimonio_itens').insert({ ...payload, created_at: new Date().toISOString() }).select('*').single();
-      if (error) { showNotif('error', 'Erro', error.message, false); return; }
+      if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
       setItens((prev) => [data as PatrimonioItem, ...prev]);
-      showNotif('success', 'Cadastrado', 'Bem registrado com sucesso.', true);
+      showNotif('success', 'Cadastrado', 'Bem registrado com sucesso.', 3000);
     }
 
     const wasNew = !editingId;
@@ -473,9 +473,9 @@ export default function PatrimonioPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir este bem do patrimônio?')) return;
     const { error } = await supabase.from('patrimonio_itens').delete().eq('id', id);
-    if (error) { showNotif('error', 'Erro', error.message, false); return; }
+    if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
     setItens((prev) => prev.filter((i) => i.id !== id));
-    showNotif('success', 'Excluído', 'Bem removido do patrimônio.', true);
+    showNotif('success', 'Excluído', 'Bem removido do patrimônio.', 3000);
   };
 
   const getNomeLocal = (item: PatrimonioItem) => {
@@ -491,7 +491,7 @@ export default function PatrimonioPage() {
       localTipo === 'congregacao' ? i.congregacao_id === localId : i.campo_id === localId
     );
     if (itensFicha.length === 0) {
-      showNotif('warning', 'Aviso', 'Nenhum bem encontrado com os filtros atuais para este local.', true);
+      showNotif('warning', 'Aviso', 'Nenhum bem encontrado com os filtros atuais para este local.', 3000);
       return;
     }
     imprimirFichaPatrimonio({ itens: itensFicha, local, configIgreja });

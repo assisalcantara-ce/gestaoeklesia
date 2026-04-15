@@ -8,7 +8,7 @@ import NotificationModal from '@/components/NotificationModal';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
-import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, ChevronDown, Printer, Users } from 'lucide-react';
+import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, Printer, Users } from 'lucide-react';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import type { ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 

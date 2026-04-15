@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
@@ -132,7 +132,7 @@ export default function BatismoAguasPage() {
     title: '',
     message: '',
     type: 'success' as 'success' | 'error' | 'warning' | 'info',
-    autoClose: true,
+    autoClose: 3000,
   });
 
   const [printModalOpen, setPrintModalOpen] = useState(false);
@@ -148,7 +148,7 @@ export default function BatismoAguasPage() {
     type: 'success' | 'error' | 'warning' | 'info',
     title: string,
     message: string,
-    autoClose = true
+    autoClose: number | undefined = 3000
   ) => {
     setNotification({ isOpen: true, title, message, type, autoClose });
   };
@@ -179,7 +179,7 @@ export default function BatismoAguasPage() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      showNotification('error', 'Erro', error.message || 'Erro ao carregar registros', false);
+      showNotification('error', 'Erro', error.message || 'Erro ao carregar registros', undefined);
       return;
     }
     setRegistros((data || []) as BatismoRegistro[]);
@@ -265,7 +265,7 @@ export default function BatismoAguasPage() {
 
   const handleSubmit = async () => {
     if (!ministryId) {
-      showNotification('warning', 'Aviso', 'Ministerio nao encontrado.', true);
+      showNotification('warning', 'Aviso', 'Ministerio nao encontrado.', 3000);
       return;
     }
     if (!validateForm()) return;
@@ -295,11 +295,11 @@ export default function BatismoAguasPage() {
         .single();
 
       if (error) {
-        showNotification('error', 'Erro', error.message || 'Erro ao atualizar registro', false);
+        showNotification('error', 'Erro', error.message || 'Erro ao atualizar registro', undefined);
         return;
       }
       setRegistros((prev) => prev.map((r) => (r.id === editingId ? (data as BatismoRegistro) : r)));
-      showNotification('success', 'Sucesso', 'Registro atualizado com sucesso.', true);
+      showNotification('success', 'Sucesso', 'Registro atualizado com sucesso.', 3000);
       resetForm();
       setActiveTab('registros');
       return;
@@ -312,12 +312,12 @@ export default function BatismoAguasPage() {
       .single();
 
     if (error) {
-      showNotification('error', 'Erro', error.message || 'Erro ao salvar registro', false);
+      showNotification('error', 'Erro', error.message || 'Erro ao salvar registro', undefined);
       return;
     }
 
     setRegistros((prev) => [data as BatismoRegistro, ...prev]);
-    showNotification('success', 'Sucesso', 'Registro criado com sucesso.', true);
+    showNotification('success', 'Sucesso', 'Registro criado com sucesso.', 3000);
     resetForm();
     setActiveTab('registros');
   };
@@ -345,11 +345,11 @@ export default function BatismoAguasPage() {
     if (!confirm('Deseja realmente excluir este registro?')) return;
     const { error } = await supabase.from('batismo_aguas_registros').delete().eq('id', id);
     if (error) {
-      showNotification('error', 'Erro', error.message || 'Erro ao excluir registro', false);
+      showNotification('error', 'Erro', error.message || 'Erro ao excluir registro', undefined);
       return;
     }
     setRegistros((prev) => prev.filter((r) => r.id !== id));
-    showNotification('success', 'Sucesso', 'Registro excluido.', true);
+    showNotification('success', 'Sucesso', 'Registro excluido.', 3000);
   };
 
   const buildPlaceholderMap = (registro: BatismoRegistro) => ({
@@ -452,7 +452,7 @@ export default function BatismoAguasPage() {
         'warning',
         'Certificado nao configurado',
         'Crie um certificado na categoria "Batismo nas Aguas" em Configuracoes > Certificados.',
-        false
+        undefined
       );
       return;
     }
