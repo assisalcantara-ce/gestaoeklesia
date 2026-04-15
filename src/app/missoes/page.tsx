@@ -61,6 +61,7 @@ interface Arrecadacao {
   forma: string;
   descricao?: string | null;
   congregacao_id?: string | null;
+  tesouraria_lancamento_id?: string | null;
   created_at?: string | null;
 }
 
@@ -126,6 +127,15 @@ const fmtDate = (v?: string | null) => {
   const [y, m, d] = v.slice(0, 10).split('-');
   return `${d}/${m}/${y}`;
 };
+
+// Mapeia a forma de arrecadação em Missões para tipo_recebimento válido na Tesouraria
+const formaParaTipoTesouraria = (forma: string): string => ({
+  oferta:            'oferta',
+  dizimo_especifico: 'dizimo',
+  doacao:            'contribuicao',
+  campanha:          'campanha',
+  outro:             'contribuicao',
+} as Record<string, string>)[forma] ?? 'contribuicao';
 
 const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63] focus:border-transparent';
 const labelCls = 'block text-xs font-semibold text-gray-700 mb-1';
@@ -446,23 +456,81 @@ export default function MissoesPage() {
 
   const saveArrecadacao = async () => {
     if (!validateArrecadacao() || !ministryId) return;
+
+    const projetoNome = projetos.find(p => p.id === formArrecadacao.projeto_id)?.nome;
+    const descricaoTes = ['Missões', projetoNome, formArrecadacao.descricao.trim() || null]
+      .filter(Boolean).join(' — ');
+    const now = new Date().toISOString();
+    const tesPayload = {
+      ministry_id:      ministryId,
+      congregacao_id:   formArrecadacao.congregacao_id || null,
+      departamento_id:  null,
+      tipo_recebimento: formaParaTipoTesouraria(formArrecadacao.forma),
+      descricao:        descricaoTes,
+      referencia:       projetoNome ?? null,
+      valor:            Number(formArrecadacao.valor),
+      forma_pagamento:  'dinheiro',
+      data_lancamento:  formArrecadacao.data,
+      observacoes:      'Lançamento automático — Módulo Missões',
+      updated_at:       now,
+    };
+
     const payload: Record<string, unknown> = {
-      ministry_id: ministryId,
-      projeto_id: formArrecadacao.projeto_id || null,
-      data: formArrecadacao.data,
-      valor: Number(formArrecadacao.valor),
-      forma: formArrecadacao.forma,
-      descricao: formArrecadacao.descricao.trim() || null,
+      ministry_id:   ministryId,
+      projeto_id:    formArrecadacao.projeto_id || null,
+      data:          formArrecadacao.data,
+      valor:         Number(formArrecadacao.valor),
+      forma:         formArrecadacao.forma,
+      descricao:     formArrecadacao.descricao.trim() || null,
       congregacao_id: formArrecadacao.congregacao_id || null,
     };
+
     if (editArrecadacaoId) {
+      // Busca o vínculo existente com a Tesouraria
+      const { data: existing } = await supabase
+        .from('missoes_arrecadacoes')
+        .select('tesouraria_lancamento_id')
+        .eq('id', editArrecadacaoId)
+        .single();
+
       const { error } = await supabase.from('missoes_arrecadacoes').update(payload).eq('id', editArrecadacaoId);
       if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-      showNotif('success', 'Atualizado', 'Registro atualizado.');
+
+      // Sincroniza lançamento na Tesouraria
+      if (existing?.tesouraria_lancamento_id) {
+        await supabase.from('tesouraria_lancamentos').update(tesPayload).eq('id', existing.tesouraria_lancamento_id);
+      } else {
+        const { data: newLanc } = await supabase
+          .from('tesouraria_lancamentos')
+          .insert({ ...tesPayload, created_at: now })
+          .select('id')
+          .single();
+        if (newLanc?.id) {
+          await supabase.from('missoes_arrecadacoes').update({ tesouraria_lancamento_id: newLanc.id }).eq('id', editArrecadacaoId);
+        }
+      }
+      showNotif('success', 'Atualizado', 'Registro e lançamento da Tesouraria atualizados.');
     } else {
-      const { error } = await supabase.from('missoes_arrecadacoes').insert(payload);
+      // Insere a arrecadação e recupera o id
+      const { data: newArr, error } = await supabase
+        .from('missoes_arrecadacoes')
+        .insert(payload)
+        .select('id')
+        .single();
       if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-      showNotif('success', 'Registrado', 'Arrecadação registrada.');
+
+      // Gera lançamento automático na Tesouraria
+      if (newArr?.id) {
+        const { data: newLanc } = await supabase
+          .from('tesouraria_lancamentos')
+          .insert({ ...tesPayload, created_at: now })
+          .select('id')
+          .single();
+        if (newLanc?.id) {
+          await supabase.from('missoes_arrecadacoes').update({ tesouraria_lancamento_id: newLanc.id }).eq('id', newArr.id);
+        }
+      }
+      showNotif('success', 'Registrado', 'Arrecadação registrada e lançamento gerado na Tesouraria.');
     }
     setFormArrecadacao({ ...EMPTY_ARRECADACAO, data: new Date().toISOString().slice(0, 10) });
     setEditArrecadacaoId(null);
@@ -481,9 +549,19 @@ export default function MissoesPage() {
 
   const deleteArrecadacao = async (id: string) => {
     if (!ministryId) return;
+    // Busca o vínculo com a Tesouraria antes de deletar
+    const { data: rec } = await supabase
+      .from('missoes_arrecadacoes')
+      .select('tesouraria_lancamento_id')
+      .eq('id', id)
+      .single();
     const { error } = await supabase.from('missoes_arrecadacoes').delete().eq('id', id);
     if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-    showNotif('success', 'Excluído', 'Registro removido.');
+    // Remove o lançamento vinculado da Tesouraria
+    if (rec?.tesouraria_lancamento_id) {
+      await supabase.from('tesouraria_lancamentos').delete().eq('id', rec.tesouraria_lancamento_id);
+    }
+    showNotif('success', 'Excluído', 'Registro e lançamento da Tesouraria removidos.');
     await loadArrecadacoes(ministryId);
   };
 
