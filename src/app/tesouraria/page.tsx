@@ -223,6 +223,7 @@ export default function TesourariaPage() {
   const [relMes,           setRelMes]           = useState(mesAtual());
   const [relCong,          setRelCong]          = useState('');
   const [relMostrarDet,    setRelMostrarDet]    = useState(false);
+  const [relTipoRel,       setRelTipoRel]       = useState<'entradas' | 'saidas' | 'ambos'>('entradas');
 
   // Formulário
   const [showForm,  setShowForm]  = useState(false);
@@ -492,15 +493,33 @@ export default function TesourariaPage() {
     return true;
   }), [lancamentos, relMes, relCong]);
 
-  const relTotal = useMemo(() => relFiltrado.reduce((s, l) => s + Number(l.valor), 0), [relFiltrado]);
+  const relEntradas = useMemo(() => relFiltrado.filter(l => l.tipo_movimento !== 'saida'), [relFiltrado]);
+  const relSaidas   = useMemo(() => relFiltrado.filter(l => l.tipo_movimento === 'saida'),  [relFiltrado]);
+  const relTotalEntradas = useMemo(() => relEntradas.reduce((s, l) => s + Number(l.valor), 0), [relEntradas]);
+  const relTotalSaidas   = useMemo(() => relSaidas.reduce((s, l) => s + Number(l.valor), 0),   [relSaidas]);
+
+  const relDados = useMemo(() =>
+    relTipoRel === 'entradas' ? relEntradas :
+    relTipoRel === 'saidas'   ? relSaidas   : relFiltrado
+  , [relTipoRel, relEntradas, relSaidas, relFiltrado]);
+
+  const relTotal = useMemo(() => relDados.reduce((s, l) => s + Number(l.valor), 0), [relDados]);
 
   const relPorTipo = useMemo(() => {
     const acc: Record<string, number> = {};
-    relFiltrado.forEach(l => {
+    relEntradas.forEach(l => {
       acc[l.tipo_recebimento] = (acc[l.tipo_recebimento] ?? 0) + Number(l.valor);
     });
     return acc;
-  }, [relFiltrado]);
+  }, [relEntradas]);
+
+  const relPorTipoSaida = useMemo(() => {
+    const acc: Record<string, number> = {};
+    relSaidas.forEach(l => {
+      acc[l.tipo_recebimento] = (acc[l.tipo_recebimento] ?? 0) + Number(l.valor);
+    });
+    return acc;
+  }, [relSaidas]);
 
   const handlePrint = () => window.print();
 
@@ -1184,6 +1203,19 @@ export default function TesourariaPage() {
           {/* Filtros do relatório */}
           <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-wrap gap-4 items-end">
             <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo de relatório</label>
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+                {(['entradas', 'saidas', 'ambos'] as const).map(v => (
+                  <button key={v} onClick={() => setRelTipoRel(v)}
+                    className={`px-3 py-1.5 font-medium transition ${
+                      relTipoRel === v ? 'bg-[#123b63] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                    }`}>
+                    {v === 'entradas' ? 'Entradas' : v === 'saidas' ? 'Saídas' : 'Ambos'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Mês de referência</label>
               <MonthPicker
                 value={relMes}
@@ -1241,41 +1273,98 @@ export default function TesourariaPage() {
                 {ministerio?.logo && <div className="w-16" />}
               </div>
             </div>
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-start flex-wrap gap-3">
               <div>
-                <h2 className="text-lg font-bold text-[#123b63]">Relatório de Arrecadação</h2>
+                <h2 className="text-lg font-bold text-[#123b63]">
+                  {relTipoRel === 'entradas' ? 'Relatório de Entradas' : relTipoRel === 'saidas' ? 'Relatório de Saídas' : 'Relatório Financeiro'}
+                </h2>
                 <p className="text-sm text-gray-500">
                   {relMes ? `Período: ${relMes.split('-')[1]}/${relMes.split('-')[0]}` : 'Todos os períodos'}
                   {relCong ? ` • ${congNome(relCong)}` : ' • Todas as congregações'}
                 </p>
               </div>
-              <p className="text-xl font-bold text-[#123b63]">{fmtBRL(relTotal)}</p>
+              {relTipoRel === 'ambos' ? (
+                <div className="flex gap-3">
+                  <div className="bg-green-50 rounded-lg px-4 py-2 text-center">
+                    <p className="text-xs text-green-600 font-semibold">Entradas</p>
+                    <p className="text-base font-bold text-green-700">{fmtBRL(relTotalEntradas)}</p>
+                  </div>
+                  <div className="bg-red-50 rounded-lg px-4 py-2 text-center">
+                    <p className="text-xs text-red-500 font-semibold">Saídas</p>
+                    <p className="text-base font-bold text-red-600">{fmtBRL(relTotalSaidas)}</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg px-4 py-2 text-center">
+                    <p className="text-xs text-[#123b63] font-semibold">Saldo</p>
+                    <p className={`text-base font-bold ${relTotalEntradas - relTotalSaidas >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>
+                      {fmtBRL(relTotalEntradas - relTotalSaidas)}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className={`text-xl font-bold ${relTipoRel === 'saidas' ? 'text-red-600' : 'text-[#123b63]'}`}>{fmtBRL(relTotal)}</p>
+              )}
             </div>
 
-            {/* Por tipo */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-600 mb-2">Resumo por tipo</h3>
-              <div className="divide-y divide-gray-100">
-                {TIPOS.map(t => {
-                  const val = relPorTipo[t.value] ?? 0;
-                  const pct = relTotal > 0 ? ((val / relTotal) * 100).toFixed(1) : '0.0';
-                  return (
-                    <div key={t.value} className="flex items-center justify-between py-2 text-sm">
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${t.cor}`}>{t.label}</span>
-                      <div className="flex gap-4 items-center">
-                        <span className="text-gray-400 text-xs">{pct}%</span>
-                        <span className="font-semibold text-gray-800 w-28 text-right">{fmtBRL(val)}</span>
+            {/* Por tipo — Entradas */}
+            {(relTipoRel === 'entradas' || relTipoRel === 'ambos') && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-600 mb-2">Resumo de Entradas por tipo</h3>
+                <div className="divide-y divide-gray-100">
+                  {TIPOS.map(t => {
+                    const val = relPorTipo[t.value] ?? 0;
+                    const base = relTotalEntradas > 0 ? relTotalEntradas : 1;
+                    const pct = ((val / base) * 100).toFixed(1);
+                    return (
+                      <div key={t.value} className="flex items-center justify-between py-2 text-sm">
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${t.cor}`}>{t.label}</span>
+                        <div className="flex gap-4 items-center">
+                          <span className="text-gray-400 text-xs">{pct}%</span>
+                          <span className="font-semibold text-gray-800 w-28 text-right">{fmtBRL(val)}</span>
+                        </div>
                       </div>
+                    );
+                  })}
+                  {relTipoRel === 'ambos' && (
+                    <div className="flex items-center justify-between py-2 text-sm border-t border-gray-200">
+                      <span className="text-xs font-bold text-gray-600">TOTAL ENTRADAS</span>
+                      <span className="font-bold text-green-700 w-28 text-right">{fmtBRL(relTotalEntradas)}</span>
                     </div>
-                  );
-                })}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Por tipo — Saídas */}
+            {(relTipoRel === 'saidas' || relTipoRel === 'ambos') && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-600 mb-2">Resumo de Saídas por categoria</h3>
+                <div className="divide-y divide-gray-100">
+                  {TIPOS_SAIDA.map(t => {
+                    const val = relPorTipoSaida[t.value] ?? 0;
+                    const base = relTotalSaidas > 0 ? relTotalSaidas : 1;
+                    const pct = ((val / base) * 100).toFixed(1);
+                    return (
+                      <div key={t.value} className="flex items-center justify-between py-2 text-sm">
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${t.cor}`}>{t.label}</span>
+                        <div className="flex gap-4 items-center">
+                          <span className="text-gray-400 text-xs">{pct}%</span>
+                          <span className="font-semibold text-red-700 w-28 text-right">{fmtBRL(val)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="flex items-center justify-between py-2 text-sm border-t border-gray-200">
+                    <span className="text-xs font-bold text-gray-600">{relTipoRel === 'ambos' ? 'TOTAL SAÍDAS' : 'TOTAL'}</span>
+                    <span className="font-bold text-red-600 w-28 text-right">{fmtBRL(relTotalSaidas)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Detalhado */}
             <div className={relMostrarDet ? '' : 'no-print'}>
               <h3 className="text-sm font-semibold text-gray-600 mb-2">Lançamentos detalhados</h3>
-              {relFiltrado.length === 0 ? (
+              {relDados.length === 0 ? (
                 <p className="text-sm text-gray-400">Nenhum lançamento no período.</p>
               ) : (
                 <div className="overflow-x-auto">
@@ -1292,8 +1381,8 @@ export default function TesourariaPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {relFiltrado.map(l => (
-                        <tr key={l.id}>
+                      {relDados.map(l => (
+                        <tr key={l.id} className={l.tipo_movimento === 'saida' ? 'bg-red-50/30' : ''}>
                           <td className="px-3 py-2 text-gray-600">{fmtDate(l.data_lancamento)}</td>
                           <td className="px-3 py-2 text-gray-700">{l.congregacao_nome}</td>
                           <td className="px-3 py-2 text-gray-500 text-xs">{l.departamento_nome}</td>
@@ -1304,14 +1393,16 @@ export default function TesourariaPage() {
                           </td>
                           <td className="px-3 py-2 text-gray-500">{l.referencia || l.descricao || '—'}</td>
                           <td className="px-3 py-2 text-gray-500 capitalize">{l.forma_pagamento}</td>
-                          <td className="px-3 py-2 text-right font-semibold text-[#123b63]">{fmtBRL(Number(l.valor))}</td>
+                          <td className={`px-3 py-2 text-right font-semibold ${l.tipo_movimento === 'saida' ? 'text-red-600' : 'text-[#123b63]'}`}>
+                            {l.tipo_movimento === 'saida' ? '−' : ''}{fmtBRL(Number(l.valor))}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr className="bg-[#123b63]/5 border-t border-gray-200">
                         <td colSpan={6} className="px-3 py-2 text-xs font-bold text-gray-600 text-right">TOTAL</td>
-                        <td className="px-3 py-2 text-right font-bold text-[#123b63]">{fmtBRL(relTotal)}</td>
+                        <td className={`px-3 py-2 text-right font-bold ${relTipoRel === 'saidas' ? 'text-red-600' : 'text-[#123b63]'}`}>{fmtBRL(relTotal)}</td>
                       </tr>
                     </tfoot>
                   </table>
