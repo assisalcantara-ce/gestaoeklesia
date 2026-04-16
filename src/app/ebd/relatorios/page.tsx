@@ -36,8 +36,8 @@ const anoAtual = () => new Date().getFullYear();
 export default function EbdRelatoriosPage() {
   const { user } = useRequireSupabaseAuth();
   const supabase  = useMemo(() => createClient(), []);
+  const dialog    = useAppDialog();
 
-  const dialog = useAppDialog();
   const [ministryId,   setMinistryId]   = useState<string | null>(null);
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
   const [turmas,       setTurmas]       = useState<EbdTurma[]>([]);

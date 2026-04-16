@@ -41,20 +41,20 @@ const calcIdade = (nasc: string | null): string => {
 export default function EbdAlunosPage() {
   const { user } = useRequireSupabaseAuth();
   const supabase  = useMemo(() => createClient(), []);
+  const dialog    = useAppDialog();
 
-  const dialog = useAppDialog();
-  const [ministryId,   setMinistryId]   = useState<string | null>(null);
+  const [ministryId,    setMinistryId]    = useState<string | null>(null);
   const [encerrarModal, setEncerrarModal] = useState<{ mat: EbdMatricula } | null>(null);
   const [motivoSaida,   setMotivoSaida]   = useState('');
-  const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
-  const [turmas,       setTurmas]       = useState<EbdTurma[]>([]);
-  const [alunos,       setAlunos]       = useState<EbdAluno[]>([]);
-  const [matriculas,   setMatriculas]   = useState<EbdMatricula[]>([]);
+  const [congregacoes,  setCongregacoes]  = useState<Congregacao[]>([]);
+  const [turmas,        setTurmas]        = useState<EbdTurma[]>([]);
+  const [alunos,        setAlunos]        = useState<EbdAluno[]>([]);
+  const [matriculas,    setMatriculas]    = useState<EbdMatricula[]>([]);
 
-  const [aba,      setAba]      = useState<Aba>('alunos');
-  const [loading,  setLoading]  = useState(false);
-  const [msg,      setMsg]      = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
-  const [busca,    setBusca]    = useState('');
+  const [aba,        setAba]        = useState<Aba>('alunos');
+  const [loading,    setLoading]    = useState(false);
+  const [msg,        setMsg]        = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
+  const [busca,      setBusca]      = useState('');
   const [filtroCong, setFiltroCong] = useState('');
 
   // Form Aluno
@@ -66,8 +66,11 @@ export default function EbdAlunosPage() {
   });
 
   // Form Matrícula
-  const [showMatForm,  setShowMatForm]  = useState(false);
-  const [formMat, setFormMat] = useState({ aluno_id: '', turma_id: '', data_inicio: new Date().toISOString().slice(0,10) });
+  const [showMatForm, setShowMatForm] = useState(false);
+  const [formMat, setFormMat] = useState({
+    aluno_id: '', turma_id: '',
+    data_inicio: new Date().toISOString().slice(0, 10),
+  });
 
   // ── Carregar dados ───────────────────────────────────────────────────────
 
@@ -167,7 +170,7 @@ export default function EbdAlunosPage() {
       data_inicio: formMat.data_inicio,
     });
     if (e2) flash('erro', e2.message);
-    else { flash('ok', 'Aluno matriculado!'); setShowMatForm(false); load(ministryId); }
+    else { flash('ok', 'Matrícula realizada!'); setShowMatForm(false); load(ministryId); }
   };
 
   const encerrarMatricula = (m: EbdMatricula) => {
@@ -179,7 +182,7 @@ export default function EbdAlunosPage() {
     if (!ministryId || !encerrarModal) return;
     const { error } = await supabase
       .from('ebd_matriculas')
-      .update({ data_fim: new Date().toISOString().slice(0,10), motivo_saida: motivoSaida.trim() || null })
+      .update({ data_fim: new Date().toISOString().slice(0, 10), motivo_saida: motivoSaida.trim() || null })
       .eq('id', encerrarModal.mat.id);
     if (error) flash('erro', error.message);
     else { flash('ok', 'Matrícula encerrada.'); setEncerrarModal(null); load(ministryId); }
@@ -197,8 +200,8 @@ export default function EbdAlunosPage() {
   const matsHistorico = matriculas.filter(m => m.data_fim);
 
   const TABS = [
-    { id: 'alunos'    as Aba, label: 'Alunos',     icon: <Users className="h-4 w-4" />,     count: alunos.length },
-    { id: 'matriculas'as Aba, label: 'Matrículas',  icon: <UserCheck className="h-4 w-4" />, count: matsAtivas.length },
+    { id: 'alunos'     as Aba, label: 'Alunos',    icon: <Users className="h-4 w-4" />,     count: alunos.length },
+    { id: 'matriculas' as Aba, label: 'Matrículas', icon: <UserCheck className="h-4 w-4" />, count: matsAtivas.length },
   ];
 
   return (
@@ -366,7 +369,7 @@ export default function EbdAlunosPage() {
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-base font-bold text-gray-700">Matrículas ativas ({matsAtivas.length})</h2>
-            <button onClick={() => setShowMatForm(true)}
+            <button onClick={() => { setFormMat({ aluno_id: '', turma_id: '', data_inicio: new Date().toISOString().slice(0, 10) }); setShowMatForm(true); }}
               className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition">
               <Plus className="h-4 w-4" /> Matricular Aluno
             </button>
@@ -430,52 +433,52 @@ export default function EbdAlunosPage() {
               </div>
             </div>
           )}
-
-          {/* Form Matrícula */}
-          {showMatForm && (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-                <div className="flex justify-between items-center mb-5">
-                  <h3 className="font-bold text-[#123b63] text-lg">Matricular Aluno</h3>
-                  <button onClick={() => setShowMatForm(false)}><X className="h-5 w-5 text-gray-400" /></button>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Aluno *</label>
-                    <select value={formMat.aluno_id} onChange={e => setFormMat(f => ({ ...f, aluno_id: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                      <option value="">Selecione...</option>
-                      {alunos.filter(a => a.ativo).map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Turma *</label>
-                    <select value={formMat.turma_id} onChange={e => setFormMat(f => ({ ...f, turma_id: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                      <option value="">Selecione...</option>
-                      {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Data de início</label>
-                    <input type="date" value={formMat.data_inicio} onChange={e => setFormMat(f => ({ ...f, data_inicio: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-                  </div>
-                </div>
-                <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mt-4">
-                  Se o aluno já tiver uma matrícula ativa, ela será encerrada automaticamente.
-                </p>
-                <div className="flex gap-3 mt-5">
-                  <button onClick={() => setShowMatForm(false)} className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition">Cancelar</button>
-                  <button onClick={matricular} className="flex-1 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition">Matricular</button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Modal encerrar matrícula */}
+      {/* Modal: Matricular Aluno */}
+      {showMatForm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="font-bold text-[#123b63] text-lg">Matricular Aluno</h3>
+              <button onClick={() => setShowMatForm(false)}><X className="h-5 w-5 text-gray-400" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Aluno *</label>
+                <select value={formMat.aluno_id} onChange={e => setFormMat(f => ({ ...f, aluno_id: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                  <option value="">Selecione...</option>
+                  {alunos.filter(a => a.ativo).map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Turma *</label>
+                <select value={formMat.turma_id} onChange={e => setFormMat(f => ({ ...f, turma_id: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                  <option value="">Selecione...</option>
+                  {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Data de início</label>
+                <input type="date" value={formMat.data_inicio} onChange={e => setFormMat(f => ({ ...f, data_inicio: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mt-4">
+              Se o aluno já tiver uma matrícula ativa, ela será encerrada automaticamente.
+            </p>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setShowMatForm(false)} className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition">Cancelar</button>
+              <button onClick={matricular} className="flex-1 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition">Matricular</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Encerrar Matrícula */}
       {encerrarModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">

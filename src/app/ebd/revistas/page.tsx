@@ -59,8 +59,8 @@ const anoAtual = () => new Date().getFullYear();
 export default function EbdRevistasPage() {
   const { user } = useRequireSupabaseAuth();
   const supabase  = useMemo(() => createClient(), []);
+  const dialog    = useAppDialog();
 
-  const dialog = useAppDialog();
   const [ministryId,   setMinistryId]   = useState<string | null>(null);
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
   const [classes,      setClasses]      = useState<EbdClasse[]>([]);

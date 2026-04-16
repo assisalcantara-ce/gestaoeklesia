@@ -9,7 +9,6 @@ import { Plus, Pencil, Trash2, X, BookOpen, Users, GraduationCap, Sparkles } fro
 import { useAppDialog } from '@/providers/AppDialogProvider';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
-
 interface Congregacao { id: string; nome: string; }
 
 interface EbdClasse {
@@ -43,12 +42,11 @@ const CORES_CLASSE = [
 ];
 
 // ─── Componente ──────────────────────────────────────────────────────────────
-
 export default function EbdTurmasPage() {
   const { user } = useRequireSupabaseAuth();
   const supabase  = useMemo(() => createClient(), []);
+  const dialog    = useAppDialog();
 
-  const dialog = useAppDialog();
   const [ministryId,   setMinistryId]   = useState<string | null>(null);
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
   const [classes,      setClasses]      = useState<EbdClasse[]>([]);
@@ -64,17 +62,17 @@ export default function EbdTurmasPage() {
   const [filtroCong, setFiltroCong] = useState('');
 
   // Forms
-  const [showClasseForm, setShowClasseForm]   = useState(false);
-  const [editClasse,     setEditClasse]        = useState<EbdClasse | null>(null);
-  const [formClasse,     setFormClasse]        = useState({ nome: '', faixa_etaria_min: '', faixa_etaria_max: '', descricao: '', cor: '#3b82f6', ordem: 0 });
+  const [showClasseForm, setShowClasseForm] = useState(false);
+  const [editClasse,     setEditClasse]     = useState<EbdClasse | null>(null);
+  const [formClasse,     setFormClasse]     = useState({ nome: '', faixa_etaria_min: '', faixa_etaria_max: '', descricao: '', cor: '#3b82f6', ordem: 0 });
 
-  const [showTurmaForm, setShowTurmaForm]   = useState(false);
-  const [editTurma,     setEditTurma]       = useState<EbdTurma | null>(null);
-  const [formTurma,     setFormTurma]       = useState({ church_id: '', classe_id: '', nome: '', professor_titular_id: '', sala: '', capacidade_max: '' });
+  const [showTurmaForm, setShowTurmaForm] = useState(false);
+  const [editTurma,     setEditTurma]     = useState<EbdTurma | null>(null);
+  const [formTurma,     setFormTurma]     = useState({ church_id: '', classe_id: '', nome: '', professor_titular_id: '', sala: '', capacidade_max: '' });
 
-  const [showProfForm,  setShowProfForm]    = useState(false);
-  const [editProf,      setEditProf]        = useState<EbdProfessor | null>(null);
-  const [formProf,      setFormProf]        = useState({ church_id: '', nome: '', telefone: '', email: '' });
+  const [showProfForm, setShowProfForm] = useState(false);
+  const [editProf,     setEditProf]     = useState<EbdProfessor | null>(null);
+  const [formProf,     setFormProf]     = useState({ church_id: '', nome: '', telefone: '', email: '' });
 
   // ── Carregar dados ───────────────────────────────────────────────────────
 
@@ -91,9 +89,9 @@ export default function EbdTurmasPage() {
     setProfessores(profsR.data ?? []);
 
     const rawTurmas: EbdTurma[] = turmasR.data ?? [];
-    const congMap  = new Map<string, string>((congsR.data ?? []).map((c: { id: string; nome: string }) => [c.id, c.nome]));
-    const clasMap  = new Map<string, string>((classesR.data ?? []).map((c: { id: string; nome: string }) => [c.id, c.nome]));
-    const profMap  = new Map<string, string>((profsR.data ?? []).map((p: { id: string; nome: string }) => [p.id, p.nome]));
+    const congMap = new Map<string, string>((congsR.data ?? []).map((c: { id: string; nome: string }) => [c.id, c.nome]));
+    const clasMap = new Map<string, string>((classesR.data ?? []).map((c: { id: string; nome: string }) => [c.id, c.nome]));
+    const profMap = new Map<string, string>((profsR.data ?? []).map((p: { id: string; nome: string }) => [p.id, p.nome]));
     setTurmas(rawTurmas.map(t => ({
       ...t,
       church_nome:    congMap.get(t.church_id) ?? '—',
@@ -247,14 +245,13 @@ export default function EbdTurmasPage() {
   const profsFiltrados  = filtroCong ? professores.filter(p => p.church_id === filtroCong) : professores;
 
   const TABS: { id: Aba; label: string; icon: React.ReactNode; count: number }[] = [
-    { id: 'classes',    label: 'Classes EBD', icon: <BookOpen className="h-4 w-4" />,     count: classes.length },
-    { id: 'turmas',     label: 'Turmas',      icon: <Users className="h-4 w-4" />,         count: turmas.length },
-    { id: 'professores',label: 'Professores', icon: <GraduationCap className="h-4 w-4" />, count: professores.length },
+    { id: 'classes',     label: 'Classes EBD', icon: <BookOpen className="h-4 w-4" />,      count: classes.length },
+    { id: 'turmas',      label: 'Turmas',       icon: <Users className="h-4 w-4" />,          count: turmas.length },
+    { id: 'professores', label: 'Professores',  icon: <GraduationCap className="h-4 w-4" />,  count: professores.length },
   ];
 
   return (
     <PageLayout title="EBD — Turmas" description="Gerencie classes, turmas e professores da Escola Bíblica Dominical" activeMenu="ebd-turmas">
-      {/* Mensagem de feedback */}
       {msg && (
         <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${msg.tipo === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
           {msg.texto}
@@ -311,7 +308,7 @@ export default function EbdTurmasPage() {
             <div className="text-center py-12 text-gray-400">
               <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p className="text-sm">Nenhuma classe cadastrada.</p>
-              <p className="text-xs mt-1">Use "Importar classes padrão" para começar rapidamente.</p>
+              <p className="text-xs mt-1">Use &quot;Importar classes padrão&quot; para começar rapidamente.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
