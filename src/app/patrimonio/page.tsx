@@ -413,7 +413,7 @@ export default function PatrimonioPage() {
       numero_serie: formData.numero_serie.trim() || null,
       cor: formData.cor.trim() || null,
       estado_conservacao: formData.estado_conservacao,
-      valor_aquisicao: formData.valor_aquisicao ? parseFloat(String(formData.valor_aquisicao).replace(',', '.')) : null,
+      valor_aquisicao: formData.valor_aquisicao ? parseFloat(String(formData.valor_aquisicao).replace(/\./g, '').replace(',', '.')) : null,
       data_aquisicao: formData.data_aquisicao || null,
       origem: formData.origem,
       responsavel_nome: nomeDirigente || null,
@@ -458,7 +458,7 @@ export default function PatrimonioPage() {
       numero_serie: item.numero_serie || '',
       cor: item.cor || '',
       estado_conservacao: item.estado_conservacao,
-      valor_aquisicao: item.valor_aquisicao != null ? String(item.valor_aquisicao) : '',
+      valor_aquisicao: item.valor_aquisicao != null ? (() => { const n = Math.round(item.valor_aquisicao! * 100); const d = String(n).replace(/\D/g,''); const num = parseInt(d,10)/100; return num.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); })() : '',
       data_aquisicao: formatIso(item.data_aquisicao),
       origem: item.origem || 'compra',
 
@@ -580,10 +580,12 @@ export default function PatrimonioPage() {
                       <label className="text-xs font-semibold text-gray-600">Nº de tombamento</label>
                       <input
                         value={formData.numero_tombamento}
-                        onChange={(e) => setFormData((p) => ({ ...p, numero_tombamento: e.target.value }))}
+                        onChange={(e) => !editingId && setFormData((p) => ({ ...p, numero_tombamento: e.target.value }))}
+                        readOnly={!!editingId}
                         placeholder="Ex: PAT-001"
-                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${editingId ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200' : 'border-gray-200'}`}
                       />
+                      {editingId && <p className="text-xs text-gray-400 mt-1">O nº de tombamento não pode ser alterado após o cadastro.</p>}
                     </div>
                     <div className="md:col-span-2">
                       <label className="text-xs font-semibold text-gray-600">Descrição do bem *</label>
@@ -642,9 +644,15 @@ export default function PatrimonioPage() {
                     <div>
                       <label className="text-xs font-semibold text-gray-600">Valor de aquisição (R$)</label>
                       <input
-                        type="number" min="0" step="0.01"
+                        inputMode="numeric"
                         value={formData.valor_aquisicao}
-                        onChange={(e) => setFormData((p) => ({ ...p, valor_aquisicao: e.target.value }))}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, '');
+                          if (!digits) { setFormData((p) => ({ ...p, valor_aquisicao: '' })); return; }
+                          const num = parseInt(digits, 10) / 100;
+                          setFormData((p) => ({ ...p, valor_aquisicao: num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }));
+                        }}
+                        placeholder="0,00"
                         className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                       />
                     </div>
