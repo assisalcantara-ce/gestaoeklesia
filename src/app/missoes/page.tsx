@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
@@ -12,7 +12,7 @@ import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import type { ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { Pencil, Trash2, Printer } from 'lucide-react';
 
-// â”€â”€â”€ Tipos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tipos ────────────────────────────────────────────────────────────────────
 
 interface Projeto {
   id: string;
@@ -70,18 +70,18 @@ interface Arrecadacao {
 interface CongregacaoOption { id: string; nome: string; }
 interface MemberOption { id: string; nome: string; }
 
-// â”€â”€â”€ Constantes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constantes ───────────────────────────────────────────────────────────────
 
 const STATUS_PROJETO = [
   { value: 'planejado',    label: 'Planejado',    color: 'bg-gray-100 text-gray-600' },
   { value: 'em_andamento', label: 'Em andamento', color: 'bg-blue-100 text-blue-700' },
-  { value: 'concluido',    label: 'ConcluÃ­do',    color: 'bg-emerald-100 text-emerald-700' },
+  { value: 'concluido',    label: 'Concluído',    color: 'bg-emerald-100 text-emerald-700' },
   { value: 'suspenso',     label: 'Suspenso',     color: 'bg-orange-100 text-orange-700' },
 ];
 
 const TIPO_MISSIONARIO = [
   { value: 'sustentado', label: 'Sustentado' },
-  { value: 'voluntario', label: 'VoluntÃ¡rio' },
+  { value: 'voluntario', label: 'Voluntário' },
   { value: 'enviado',    label: 'Enviado' },
 ];
 
@@ -92,8 +92,8 @@ const STATUS_MISSIONARIO = [
 ];
 
 const TIPO_EVENTO = [
-  { value: 'culto_missionario', label: 'Culto MissionÃ¡rio' },
-  { value: 'conferencia',       label: 'ConferÃªncia' },
+  { value: 'culto_missionario', label: 'Culto Missionário' },
+  { value: 'conferencia',       label: 'Conferência' },
   { value: 'retiro',            label: 'Retiro' },
   { value: 'campanha',          label: 'Campanha' },
   { value: 'outro',             label: 'Outro' },
@@ -101,18 +101,18 @@ const TIPO_EVENTO = [
 
 const FORMA_ARRECADACAO = [
   { value: 'oferta',             label: 'Oferta' },
-  { value: 'dizimo_especifico',  label: 'DÃ­zimo especÃ­fico' },
-  { value: 'doacao',             label: 'DoaÃ§Ã£o' },
+  { value: 'dizimo_especifico',  label: 'Dízimo específico' },
+  { value: 'doacao',             label: 'Doação' },
   { value: 'campanha',           label: 'Campanha' },
   { value: 'outro',              label: 'Outro' },
 ];
 
 const TABS = [
-  { id: 'projetos',      label: 'Projetos MissionÃ¡rios', icon: 'ðŸŒ' },
-  { id: 'missionarios',  label: 'MissionÃ¡rios',          icon: 'âœˆï¸' },
-  { id: 'eventos',       label: 'Eventos',               icon: 'ðŸ“…' },
-  { id: 'arrecadacoes',  label: 'ArrecadaÃ§Ãµes',          icon: 'ðŸ’°' },
-  { id: 'relatorio',     label: 'RelatÃ³rio',             icon: 'ðŸ–¨ï¸' },
+  { id: 'projetos',      label: 'Projetos Missionários', icon: '🌍' },
+  { id: 'missionarios',  label: 'Missionários',          icon: '✈️' },
+  { id: 'eventos',       label: 'Eventos',               icon: '📅' },
+  { id: 'arrecadacoes',  label: 'Arrecadações',          icon: '💰' },
+  { id: 'relatorio',     label: 'Relatório',             icon: '🖨️' },
 ];
 
 const EMPTY_PROJETO = { nome: '', descricao: '', pais_regiao: '', status: 'planejado', data_inicio: '', data_fim: '', meta_arrecadacao: '' };
@@ -121,14 +121,14 @@ const EMPTY_EVENTO = { titulo: '', tipo: 'culto_missionario', data_evento: '', l
 const FORMA_PAGAMENTO = [
   { value: 'dinheiro',      label: 'Dinheiro'      },
   { value: 'pix',           label: 'PIX'           },
-  { value: 'cartao',        label: 'CartÃ£o'        },
-  { value: 'transferencia', label: 'TransferÃªncia' },
+  { value: 'cartao',        label: 'Cartão'        },
+  { value: 'transferencia', label: 'Transferência' },
   { value: 'cheque',        label: 'Cheque'        },
 ];
 
 const EMPTY_ARRECADACAO = { projeto_id: '', data: new Date().toISOString().slice(0, 10), valor: '', forma: 'oferta', forma_pagamento: 'dinheiro', descricao: '', congregacao_id: '' };
 
-// â”€â”€â”€ UtilitÃ¡rios â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Utilitários ──────────────────────────────────────────────────────────────
 
 const fmtCurrency = (v?: number | null) =>
   v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-';
@@ -139,10 +139,10 @@ const fmtDate = (v?: string | null) => {
   return `${d}/${m}/${y}`;
 };
 
-// Todas as arrecadaÃ§Ãµes de MissÃµes aparecem como tipo 'missoes' na Tesouraria
+// Todas as arrecadações de Missões aparecem como tipo 'missoes' na Tesouraria
 const formaParaTipoTesouraria = (_forma: string): string => 'missoes';
 
-// MÃ¡scara de moeda BR: digitando apenas dÃ­gitos, formata como 1.250,00
+// Máscara de moeda BR: digitando apenas dígitos, formata como 1.250,00
 const maskCurrency = (raw: string): string => {
   const digits = raw.replace(/\D/g, '');
   if (!digits) return '';
@@ -152,7 +152,7 @@ const maskCurrency = (raw: string): string => {
 const parseCurrency = (masked: string): number =>
   parseFloat(masked.replace(/\./g, '').replace(',', '.')) || 0;
 
-// MÃ¡scara de telefone: (xx) xxxxx-xxxx ou (xx) xxxx-xxxx
+// Máscara de telefone: (xx) xxxxx-xxxx ou (xx) xxxx-xxxx
 const maskPhone = (raw: string): string => {
   const d = raw.replace(/\D/g, '').slice(0, 11);
   if (d.length <= 10)
@@ -164,7 +164,7 @@ const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-md text-sm foc
 const labelCls = 'block text-xs font-semibold text-gray-700 mb-1';
 const errCls = 'text-xs text-red-600 mt-1';
 
-// â”€â”€â”€ Componentes de formulÃ¡rio inline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Componentes de formulário inline ─────────────────────────────────────────
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
@@ -196,7 +196,7 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
   );
 }
 
-// â”€â”€â”€ PÃ¡gina principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function MissoesPage() {
   const { loading } = useRequireSupabaseAuth();
@@ -215,13 +215,13 @@ export default function MissoesPage() {
   const [members,       setMembers]       = useState<MemberOption[]>([]);
   const [configIgreja,  setConfigIgreja]  = useState<ConfiguracaoIgreja | null>(null);
 
-  // Filtros do relatÃ³rio
+  // Filtros do relatório
   const [relDtInicio,  setRelDtInicio]  = useState('');
   const [relDtFim,     setRelDtFim]     = useState('');
   const [relProjetoId, setRelProjetoId] = useState('');
   const [relCongId,    setRelCongId]    = useState('');
 
-  // NotificaÃ§Ã£o
+  // Notificação
   const [notification, setNotification] = useState<{
     isOpen: boolean; title: string; message: string;
     type: 'success' | 'error' | 'warning' | 'info'; autoClose: number | undefined;
@@ -230,7 +230,7 @@ export default function MissoesPage() {
   const showNotif = (type: typeof notification.type, title: string, message: string, autoClose: number | undefined = 3000) =>
     setNotification({ isOpen: true, title, message, type, autoClose });
 
-  // FormulÃ¡rios
+  // Formulários
   const [formProjeto,      setFormProjeto]      = useState<typeof EMPTY_PROJETO>({ ...EMPTY_PROJETO });
   const [formMissionario,  setFormMissionario]  = useState<typeof EMPTY_MISSIONARIO>({ ...EMPTY_MISSIONARIO });
   const [formEvento,       setFormEvento]       = useState<typeof EMPTY_EVENTO>({ ...EMPTY_EVENTO });
@@ -246,7 +246,7 @@ export default function MissoesPage() {
   const [errEvento,       setErrEvento]       = useState<Record<string, string>>({});
   const [errArrecadacao,  setErrArrecadacao]  = useState<Record<string, string>>({});
 
-  // â”€â”€ Carregamento inicial â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Carregamento inicial ──────────────────────────────────────────────────
 
   useEffect(() => {
     if (loading) return;
@@ -295,12 +295,12 @@ export default function MissoesPage() {
     setMembers((data || []) as MemberOption[]);
   };
 
-  // â”€â”€ Cards de resumo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Cards de resumo ───────────────────────────────────────────────────────
 
   const anoAtual = new Date().getFullYear();
   const [anoFiltro, setAnoFiltro] = useState(anoAtual);
 
-  // Anos disponÃ­veis com base nas arrecadaÃ§Ãµes registradas + ano atual
+  // Anos disponíveis com base nas arrecadações registradas + ano atual
   const anosDisponiveis = useMemo(() => {
     const anos = new Set<number>([anoAtual]);
     arrecadacoes.forEach((a) => { if (a.data) anos.add(new Date(a.data).getFullYear()); });
@@ -320,7 +320,7 @@ export default function MissoesPage() {
     [projetos]
   );
 
-  // â”€â”€ RelatÃ³rio filtrado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Relatório filtrado ────────────────────────────────────────────────────
 
   const relFiltrado = useMemo(() => arrecadacoes.filter((a) => {
     if (relDtInicio && a.data < relDtInicio) return false;
@@ -347,7 +347,7 @@ export default function MissoesPage() {
     return m;
   }, [relFiltrado]);
 
-  // â”€â”€ Totais por projeto para aba ArrecadaÃ§Ãµes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Totais por projeto para aba Arrecadações ──────────────────────────────
 
   const totaisPorProjeto = useMemo(() => {
     const map: Record<string, number> = {};
@@ -357,7 +357,7 @@ export default function MissoesPage() {
     return map;
   }, [arrecadacoes]);
 
-  // â”€â”€ Handlers: Projetos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Handlers: Projetos ────────────────────────────────────────────────────
 
   const validateProjeto = () => {
     const e: Record<string, string> = {};
@@ -407,15 +407,15 @@ export default function MissoesPage() {
     if (!ministryId) return;
     const { error } = await supabase.from('missoes_projetos').delete().eq('id', id);
     if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-    showNotif('success', 'ExcluÃ­do', 'Projeto removido.');
+    showNotif('success', 'Excluído', 'Projeto removido.');
     await loadProjetos(ministryId);
   };
 
-  // â”€â”€ Handlers: MissionÃ¡rios â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Handlers: Missionários ────────────────────────────────────────────────
 
   const validateMissionario = () => {
     const e: Record<string, string> = {};
-    if (!formMissionario.nome.trim()) e.nome = 'Informe o nome do missionÃ¡rio.';
+    if (!formMissionario.nome.trim()) e.nome = 'Informe o nome do missionário.';
     setErrMissionario(e);
     return Object.keys(e).length === 0;
   };
@@ -436,11 +436,11 @@ export default function MissoesPage() {
     if (editMissionarioId) {
       const { error } = await supabase.from('missoes_missionarios').update(payload).eq('id', editMissionarioId);
       if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-      showNotif('success', 'Atualizado', 'MissionÃ¡rio atualizado.');
+      showNotif('success', 'Atualizado', 'Missionário atualizado.');
     } else {
       const { error } = await supabase.from('missoes_missionarios').insert(payload);
       if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-      showNotif('success', 'Cadastrado', 'MissionÃ¡rio registrado.');
+      showNotif('success', 'Cadastrado', 'Missionário registrado.');
     }
     setFormMissionario({ ...EMPTY_MISSIONARIO });
     setEditMissionarioId(null);
@@ -462,15 +462,15 @@ export default function MissoesPage() {
     if (!ministryId) return;
     const { error } = await supabase.from('missoes_missionarios').delete().eq('id', id);
     if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-    showNotif('success', 'ExcluÃ­do', 'MissionÃ¡rio removido.');
+    showNotif('success', 'Excluído', 'Missionário removido.');
     await loadMissionarios(ministryId);
   };
 
-  // â”€â”€ Handlers: Eventos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Handlers: Eventos ─────────────────────────────────────────────────────
 
   const validateEvento = () => {
     const e: Record<string, string> = {};
-    if (!formEvento.titulo.trim()) e.titulo = 'Informe o tÃ­tulo do evento.';
+    if (!formEvento.titulo.trim()) e.titulo = 'Informe o título do evento.';
     if (!formEvento.data_evento) e.data_evento = 'Informe a data.';
     setErrEvento(e);
     return Object.keys(e).length === 0;
@@ -514,16 +514,16 @@ export default function MissoesPage() {
     if (!ministryId) return;
     const { error } = await supabase.from('missoes_eventos').delete().eq('id', id);
     if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-    showNotif('success', 'ExcluÃ­do', 'Evento removido.');
+    showNotif('success', 'Excluído', 'Evento removido.');
     await loadEventos(ministryId);
   };
 
-  // â”€â”€ Handlers: ArrecadaÃ§Ãµes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Handlers: Arrecadações ────────────────────────────────────────────────
 
   const validateArrecadacao = () => {
     const e: Record<string, string> = {};
     if (!formArrecadacao.data) e.data = 'Informe a data.';
-    if (!formArrecadacao.valor || parseCurrency(formArrecadacao.valor) <= 0) e.valor = 'Informe um valor vÃ¡lido.';
+    if (!formArrecadacao.valor || parseCurrency(formArrecadacao.valor) <= 0) e.valor = 'Informe um valor válido.';
     setErrArrecadacao(e);
     return Object.keys(e).length === 0;
   };
@@ -532,8 +532,8 @@ export default function MissoesPage() {
     if (!validateArrecadacao() || !ministryId) return;
 
     const projetoNome = projetos.find(p => p.id === formArrecadacao.projeto_id)?.nome;
-    const descricaoTes = ['MissÃµes', projetoNome, formArrecadacao.descricao.trim() || null]
-      .filter(Boolean).join(' â€” ');
+    const descricaoTes = ['Missões', projetoNome, formArrecadacao.descricao.trim() || null]
+      .filter(Boolean).join(' — ');
     const now = new Date().toISOString();
     const tesPayload = {
       ministry_id:      ministryId,
@@ -545,7 +545,7 @@ export default function MissoesPage() {
       valor:         Number(formArrecadacao.valor) > 0 ? parseCurrency(formArrecadacao.valor) : Number(formArrecadacao.valor),
       forma_pagamento:  formArrecadacao.forma_pagamento || 'dinheiro',
       data_lancamento:  formArrecadacao.data,
-      observacoes:      'LanÃ§amento automÃ¡tico â€” MÃ³dulo MissÃµes',
+      observacoes:      'Lançamento automático — Módulo Missões',
       updated_at:       now,
     };
 
@@ -560,7 +560,7 @@ export default function MissoesPage() {
     };
 
     if (editArrecadacaoId) {
-      // Busca o vÃ­nculo existente com a Tesouraria
+      // Busca o vínculo existente com a Tesouraria
       const { data: existing } = await supabase
         .from('missoes_arrecadacoes')
         .select('tesouraria_lancamento_id')
@@ -570,7 +570,7 @@ export default function MissoesPage() {
       const { error } = await supabase.from('missoes_arrecadacoes').update(payload).eq('id', editArrecadacaoId);
       if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
 
-      // Sincroniza lanÃ§amento na Tesouraria
+      // Sincroniza lançamento na Tesouraria
       if (existing?.tesouraria_lancamento_id) {
         await supabase.from('tesouraria_lancamentos').update(tesPayload).eq('id', existing.tesouraria_lancamento_id);
       } else {
@@ -583,9 +583,9 @@ export default function MissoesPage() {
           await supabase.from('missoes_arrecadacoes').update({ tesouraria_lancamento_id: newLanc.id }).eq('id', editArrecadacaoId);
         }
       }
-      showNotif('success', 'Atualizado', 'Registro e lanÃ§amento da Tesouraria atualizados.');
+      showNotif('success', 'Atualizado', 'Registro e lançamento da Tesouraria atualizados.');
     } else {
-      // Insere a arrecadaÃ§Ã£o e recupera o id
+      // Insere a arrecadação e recupera o id
       const { data: newArr, error } = await supabase
         .from('missoes_arrecadacoes')
         .insert(payload)
@@ -593,7 +593,7 @@ export default function MissoesPage() {
         .single();
       if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
 
-      // Gera lanÃ§amento automÃ¡tico na Tesouraria
+      // Gera lançamento automático na Tesouraria
       if (newArr?.id) {
         const { data: newLanc, error: errLanc } = await supabase
           .from('tesouraria_lancamentos')
@@ -601,13 +601,13 @@ export default function MissoesPage() {
           .select('id')
           .single();
         if (errLanc) {
-          showNotif('warning', 'ArrecadaÃ§Ã£o salva', `Registrado em MissÃµes, mas nÃ£o foi possÃ­vel criar o lanÃ§amento na Tesouraria: ${errLanc.message}`, undefined);
+          showNotif('warning', 'Arrecadação salva', `Registrado em Missões, mas não foi possível criar o lançamento na Tesouraria: ${errLanc.message}`, undefined);
         } else if (newLanc?.id) {
           await supabase.from('missoes_arrecadacoes').update({ tesouraria_lancamento_id: newLanc.id }).eq('id', newArr.id);
-          showNotif('success', 'Registrado', 'ArrecadaÃ§Ã£o registrada e lanÃ§amento gerado na Tesouraria.');
+          showNotif('success', 'Registrado', 'Arrecadação registrada e lançamento gerado na Tesouraria.');
         }
       } else {
-        showNotif('success', 'Registrado', 'ArrecadaÃ§Ã£o registrada.');  
+        showNotif('success', 'Registrado', 'Arrecadação registrada.');  
       }
     }
     setFormArrecadacao({ ...EMPTY_ARRECADACAO, data: new Date().toISOString().slice(0, 10) });
@@ -627,7 +627,7 @@ export default function MissoesPage() {
 
   const deleteArrecadacao = async (id: string) => {
     if (!ministryId) return;
-    // Busca o vÃ­nculo com a Tesouraria antes de deletar
+    // Busca o vínculo com a Tesouraria antes de deletar
     const { data: rec } = await supabase
       .from('missoes_arrecadacoes')
       .select('tesouraria_lancamento_id')
@@ -635,29 +635,29 @@ export default function MissoesPage() {
       .single();
     const { error } = await supabase.from('missoes_arrecadacoes').delete().eq('id', id);
     if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-    // Remove o lanÃ§amento vinculado da Tesouraria
+    // Remove o lançamento vinculado da Tesouraria
     if (rec?.tesouraria_lancamento_id) {
       await supabase.from('tesouraria_lancamentos').delete().eq('id', rec.tesouraria_lancamento_id);
     }
-    showNotif('success', 'ExcluÃ­do', 'Registro e lanÃ§amento da Tesouraria removidos.');
+    showNotif('success', 'Excluído', 'Registro e lançamento da Tesouraria removidos.');
     await loadArrecadacoes(ministryId);
   };
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─────────────────────────────────────────────────────────────────────────
 
   if (loading || loadingData) return <div className="p-8 text-gray-500">Carregando...</div>;
 
   return (
-    <PageLayout title="MissÃµes" description="GestÃ£o de atividades missionÃ¡rias" activeMenu="missoes">
+    <PageLayout title="Missões" description="Gestão de atividades missionárias" activeMenu="missoes">
       <NotificationModal
         isOpen={notification.isOpen} title={notification.title} message={notification.message}
         type={notification.type} onClose={() => setNotification((p) => ({ ...p, isOpen: false }))}
         autoClose={notification.autoClose}
       />
 
-      {/* â”€â”€ Cards de resumo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Cards de resumo ─────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs text-gray-500 font-medium">ExercÃ­cio</span>
+        <span className="text-xs text-gray-500 font-medium">Exercício</span>
         <select
           value={anoFiltro}
           onChange={(e) => setAnoFiltro(Number(e.target.value))}
@@ -672,32 +672,32 @@ export default function MissoesPage() {
           <p className="text-2xl font-bold text-[#123b63] mt-1">{projetosEmAndamento}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border-l-4 border-emerald-500 p-4">
-          <p className="text-xs text-gray-500">MissionÃ¡rios ativos</p>
+          <p className="text-xs text-gray-500">Missionários ativos</p>
           <p className="text-2xl font-bold text-[#123b63] mt-1">{missionariosAtivos}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border-l-4 border-yellow-500 p-4">
-          <p className="text-xs text-gray-500">Total arrecadado <span className="text-gray-300">Â· {anoFiltro}</span></p>
+          <p className="text-xs text-gray-500">Total arrecadado <span className="text-gray-300">· {anoFiltro}</span></p>
           <p className="text-xl font-bold text-[#123b63] mt-1">{fmtCurrency(totalArrecadado)}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border-l-4 border-purple-500 p-4">
           <p className="text-xs text-gray-500">Meta projetos ativos</p>
-          <p className="text-xl font-bold text-[#123b63] mt-1">{metaTotalAtivos > 0 ? fmtCurrency(metaTotalAtivos) : 'â€”'}</p>
+          <p className="text-xl font-bold text-[#123b63] mt-1">{metaTotalAtivos > 0 ? fmtCurrency(metaTotalAtivos) : '—'}</p>
         </div>
       </div>
 
-      {/* â”€â”€ Abas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Abas ────────────────────────────────────────────────────────── */}
       <Tabs tabs={TABS} activeTab={activeTab} onTabChange={(id) => setActiveTab(id)}>
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• ABA: PROJETOS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        {/* ═══════════════════ ABA: PROJETOS ═══════════════════════════ */}
         {activeTab === 'projetos' && (
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* FormulÃ¡rio */}
-            <Section icon="ðŸ“" title={editProjetoId ? 'Editar Projeto' : 'Novo Projeto'}>
+            {/* Formulário */}
+            <Section icon="📝" title={editProjetoId ? 'Editar Projeto' : 'Novo Projeto'}>
               <div className="space-y-3">
                 <Field label="Nome do projeto *" error={errProjeto.nome}>
-                  <input className={inputCls} value={formProjeto.nome} onChange={(e) => setFormProjeto((p) => ({ ...p, nome: e.target.value }))} placeholder="Ex: MissÃ£o AmazÃ´nia" />
+                  <input className={inputCls} value={formProjeto.nome} onChange={(e) => setFormProjeto((p) => ({ ...p, nome: e.target.value }))} placeholder="Ex: Missão Amazônia" />
                 </Field>
-                <Field label="PaÃ­s / RegiÃ£o">
+                <Field label="País / Região">
                   <input className={inputCls} value={formProjeto.pais_regiao} onChange={(e) => setFormProjeto((p) => ({ ...p, pais_regiao: e.target.value }))} placeholder="Ex: Brasil - AM" />
                 </Field>
                 <Field label="Status">
@@ -706,22 +706,22 @@ export default function MissoesPage() {
                   </select>
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Data inÃ­cio">
+                  <Field label="Data início">
                     <input className={inputCls} type="date" value={formProjeto.data_inicio} onChange={(e) => setFormProjeto((p) => ({ ...p, data_inicio: e.target.value }))} />
                   </Field>
                   <Field label="Data fim">
                     <input className={inputCls} type="date" value={formProjeto.data_fim} onChange={(e) => setFormProjeto((p) => ({ ...p, data_fim: e.target.value }))} />
                   </Field>
                 </div>
-                <Field label="Meta de arrecadaÃ§Ã£o (R$)">
+                <Field label="Meta de arrecadação (R$)">
                   <input className={inputCls} inputMode="numeric" value={formProjeto.meta_arrecadacao} onChange={(e) => setFormProjeto((p) => ({ ...p, meta_arrecadacao: maskCurrency(e.target.value) }))} placeholder="0,00" />
                 </Field>
-                <Field label="DescriÃ§Ã£o">
-                  <textarea className={inputCls} rows={3} value={formProjeto.descricao} onChange={(e) => setFormProjeto((p) => ({ ...p, descricao: e.target.value }))} placeholder="DescriÃ§Ã£o do projeto..." />
+                <Field label="Descrição">
+                  <textarea className={inputCls} rows={3} value={formProjeto.descricao} onChange={(e) => setFormProjeto((p) => ({ ...p, descricao: e.target.value }))} placeholder="Descrição do projeto..." />
                 </Field>
                 <div className="flex gap-2 pt-1">
                   <button onClick={saveProjeto} className="flex-1 bg-[#123b63] text-white py-2 rounded-md text-sm font-semibold hover:bg-[#0f2a45] transition">
-                    {editProjetoId ? 'Salvar alteraÃ§Ãµes' : 'Cadastrar projeto'}
+                    {editProjetoId ? 'Salvar alterações' : 'Cadastrar projeto'}
                   </button>
                   {editProjetoId && (
                     <button onClick={() => { setFormProjeto({ ...EMPTY_PROJETO }); setEditProjetoId(null); setErrProjeto({}); }} className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition">
@@ -747,9 +747,9 @@ export default function MissoesPage() {
                             <h3 className="font-semibold text-[#123b63] text-sm">{p.nome}</h3>
                             <StatusBadge value={p.status} options={STATUS_PROJETO} />
                           </div>
-                          {p.pais_regiao && <p className="text-xs text-gray-500 mt-0.5">ðŸ“ {p.pais_regiao}</p>}
+                          {p.pais_regiao && <p className="text-xs text-gray-500 mt-0.5">📍 {p.pais_regiao}</p>}
                           {p.descricao && <p className="text-xs text-gray-600 mt-1 line-clamp-2">{p.descricao}</p>}
-                          {p.data_inicio && <p className="text-xs text-gray-400 mt-1">ðŸ“… {fmtDate(p.data_inicio)}{p.data_fim ? ` â†’ ${fmtDate(p.data_fim)}` : ''}</p>}
+                          {p.data_inicio && <p className="text-xs text-gray-400 mt-1">📅 {fmtDate(p.data_inicio)}{p.data_fim ? ` → ${fmtDate(p.data_fim)}` : ''}</p>}
                           {(p.meta_arrecadacao ?? 0) > 0 && <ProgressBar value={arrecadado} max={p.meta_arrecadacao!} />}
                         </div>
                         <div className="flex gap-1 shrink-0">
@@ -765,17 +765,17 @@ export default function MissoesPage() {
           </div>
         )}
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• ABA: MISSIONÃRIOS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        {/* ═══════════════════ ABA: MISSIONÁRIOS ═══════════════════════ */}
         {activeTab === 'missionarios' && (
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* FormulÃ¡rio */}
-            <Section icon="âœˆï¸" title={editMissionarioId ? 'Editar MissionÃ¡rio' : 'Novo MissionÃ¡rio'}>
+            {/* Formulário */}
+            <Section icon="✈️" title={editMissionarioId ? 'Editar Missionário' : 'Novo Missionário'}>
               <div className="space-y-3">
                 <Field label="Nome *" error={errMissionario.nome}>
                   <input className={inputCls} value={formMissionario.nome} onChange={(e) => setFormMissionario((p) => ({ ...p, nome: e.target.value }))} placeholder="Nome completo" />
                 </Field>
-                <Field label="Campo de atuaÃ§Ã£o">
-                  <input className={inputCls} value={formMissionario.campo_atuacao} onChange={(e) => setFormMissionario((p) => ({ ...p, campo_atuacao: e.target.value }))} placeholder="PaÃ­s / Cidade" />
+                <Field label="Campo de atuação">
+                  <input className={inputCls} value={formMissionario.campo_atuacao} onChange={(e) => setFormMissionario((p) => ({ ...p, campo_atuacao: e.target.value }))} placeholder="País / Cidade" />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Tipo">
@@ -799,16 +799,16 @@ export default function MissoesPage() {
                   <input className={inputCls} inputMode="numeric" value={formMissionario.valor_sustento_mensal} onChange={(e) => setFormMissionario((p) => ({ ...p, valor_sustento_mensal: maskCurrency(e.target.value) }))} placeholder="0,00" />
                 </Field>
                 {members.length > 0 && (
-                  <Field label="VÃ­nculo com membro (opcional)">
+                  <Field label="Vínculo com membro (opcional)">
                     <select className={inputCls} value={formMissionario.member_id} onChange={(e) => setFormMissionario((p) => ({ ...p, member_id: e.target.value }))}>
-                      <option value="">â€” Sem vÃ­nculo â€”</option>
+                      <option value="">— Sem vínculo —</option>
                       {members.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
                     </select>
                   </Field>
                 )}
                 <div className="flex gap-2 pt-1">
                   <button onClick={saveMissionario} className="flex-1 bg-[#123b63] text-white py-2 rounded-md text-sm font-semibold hover:bg-[#0f2a45] transition">
-                    {editMissionarioId ? 'Salvar alteraÃ§Ãµes' : 'Cadastrar missionÃ¡rio'}
+                    {editMissionarioId ? 'Salvar alterações' : 'Cadastrar missionário'}
                   </button>
                   {editMissionarioId && (
                     <button onClick={() => { setFormMissionario({ ...EMPTY_MISSIONARIO }); setEditMissionarioId(null); setErrMissionario({}); }} className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition">
@@ -822,7 +822,7 @@ export default function MissoesPage() {
             {/* Lista */}
             <div className="lg:col-span-2">
               {missionarios.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-400">Nenhum missionÃ¡rio cadastrado</div>
+                <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-400">Nenhum missionário cadastrado</div>
               ) : (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   <table className="w-full text-sm">
@@ -831,7 +831,7 @@ export default function MissoesPage() {
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Nome</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Campo</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Tipo</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Sustento/mÃªs</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Sustento/mês</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Status</th>
                         <th className="px-4 py-3 w-16" />
                       </tr>
@@ -840,7 +840,7 @@ export default function MissoesPage() {
                       {missionarios.map((m, i) => (
                         <tr key={m.id} className={`border-t border-gray-100 ${i % 2 === 0 ? '' : 'bg-gray-50'}`}>
                           <td className="px-4 py-3 font-medium text-[#123b63]">{m.nome}</td>
-                          <td className="px-4 py-3 text-gray-600">{m.campo_atuacao || 'â€”'}</td>
+                          <td className="px-4 py-3 text-gray-600">{m.campo_atuacao || '—'}</td>
                           <td className="px-4 py-3 text-gray-600">{TIPO_MISSIONARIO.find((t) => t.value === m.tipo)?.label}</td>
                           <td className="px-4 py-3 text-gray-600">{fmtCurrency(m.valor_sustento_mensal)}</td>
                           <td className="px-4 py-3"><StatusBadge value={m.status} options={STATUS_MISSIONARIO} /></td>
@@ -860,13 +860,13 @@ export default function MissoesPage() {
           </div>
         )}
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• ABA: EVENTOS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        {/* ═══════════════════ ABA: EVENTOS ════════════════════════════ */}
         {activeTab === 'eventos' && (
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* FormulÃ¡rio */}
-            <Section icon="ðŸ“…" title={editEventoId ? 'Editar Evento' : 'Novo Evento'}>
+            {/* Formulário */}
+            <Section icon="📅" title={editEventoId ? 'Editar Evento' : 'Novo Evento'}>
               <div className="space-y-3">
-                <Field label="TÃ­tulo *" error={errEvento.titulo}>
+                <Field label="Título *" error={errEvento.titulo}>
                   <input className={inputCls} value={formEvento.titulo} onChange={(e) => setFormEvento((p) => ({ ...p, titulo: e.target.value }))} placeholder="Nome do evento" />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
@@ -884,16 +884,16 @@ export default function MissoesPage() {
                 </Field>
                 <Field label="Projeto vinculado (opcional)">
                   <select className={inputCls} value={formEvento.projeto_id} onChange={(e) => setFormEvento((p) => ({ ...p, projeto_id: e.target.value }))}>
-                    <option value="">â€” Nenhum â€”</option>
+                    <option value="">— Nenhum —</option>
                     {projetos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
                   </select>
                 </Field>
-                <Field label="DescriÃ§Ã£o">
+                <Field label="Descrição">
                   <textarea className={inputCls} rows={3} value={formEvento.descricao} onChange={(e) => setFormEvento((p) => ({ ...p, descricao: e.target.value }))} placeholder="Detalhes do evento..." />
                 </Field>
                 <div className="flex gap-2 pt-1">
                   <button onClick={saveEvento} className="flex-1 bg-[#123b63] text-white py-2 rounded-md text-sm font-semibold hover:bg-[#0f2a45] transition">
-                    {editEventoId ? 'Salvar alteraÃ§Ãµes' : 'Registrar evento'}
+                    {editEventoId ? 'Salvar alterações' : 'Registrar evento'}
                   </button>
                   {editEventoId && (
                     <button onClick={() => { setFormEvento({ ...EMPTY_EVENTO }); setEditEventoId(null); setErrEvento({}); }} className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition">
@@ -904,7 +904,7 @@ export default function MissoesPage() {
               </div>
             </Section>
 
-            {/* Lista cronolÃ³gica */}
+            {/* Lista cronológica */}
             <div className="lg:col-span-2 space-y-3">
               {eventos.length === 0 ? (
                 <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-400">Nenhum evento registrado</div>
@@ -924,8 +924,8 @@ export default function MissoesPage() {
                           <span className="font-semibold text-[#123b63] text-sm">{ev.titulo}</span>
                           <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{tipoLabel}</span>
                         </div>
-                        {ev.local && <p className="text-xs text-gray-500 mt-0.5">ðŸ“ {ev.local}</p>}
-                        {projeto && <p className="text-xs text-purple-600 mt-0.5">ðŸŒ {projeto.nome}</p>}
+                        {ev.local && <p className="text-xs text-gray-500 mt-0.5">📍 {ev.local}</p>}
+                        {projeto && <p className="text-xs text-purple-600 mt-0.5">🌍 {projeto.nome}</p>}
                         {ev.descricao && <p className="text-xs text-gray-600 mt-1 line-clamp-2">{ev.descricao}</p>}
                       </div>
                       <div className="flex gap-1 shrink-0">
@@ -940,16 +940,16 @@ export default function MissoesPage() {
           </div>
         )}
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• ABA: ARRECADAÃ‡Ã•ES â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        {/* ═══════════════════ ABA: ARRECADAÇÕES ══════════════════════ */}
         {activeTab === 'arrecadacoes' && (
           <div className="space-y-6">
             <div className="grid lg:grid-cols-3 gap-6">
-              {/* FormulÃ¡rio */}
-              <Section icon="ðŸ’°" title={editArrecadacaoId ? 'Editar Registro' : 'Novo Registro'}>
+              {/* Formulário */}
+              <Section icon="💰" title={editArrecadacaoId ? 'Editar Registro' : 'Novo Registro'}>
                 <div className="space-y-3">
                   <Field label="Projeto vinculado (opcional)">
                     <select className={inputCls} value={formArrecadacao.projeto_id} onChange={(e) => setFormArrecadacao((p) => ({ ...p, projeto_id: e.target.value }))}>
-                      <option value="">â€” Geral / Sem projeto â€”</option>
+                      <option value="">— Geral / Sem projeto —</option>
                       {projetos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
                     </select>
                   </Field>
@@ -974,19 +974,19 @@ export default function MissoesPage() {
                     </Field>
                   </div>
                   {congregacoes.length > 0 && (
-                    <Field label="CongregaÃ§Ã£o de origem">
+                    <Field label="Congregação de origem">
                       <select className={inputCls} value={formArrecadacao.congregacao_id} onChange={(e) => setFormArrecadacao((p) => ({ ...p, congregacao_id: e.target.value }))}>
-                        <option value="">â€” Todas â€”</option>
+                        <option value="">— Todas —</option>
                         {congregacoes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                       </select>
                     </Field>
                   )}
-                  <Field label="DescriÃ§Ã£o">
-                    <input className={inputCls} value={formArrecadacao.descricao} onChange={(e) => setFormArrecadacao((p) => ({ ...p, descricao: e.target.value }))} placeholder="ObservaÃ§Ã£o..." />
+                  <Field label="Descrição">
+                    <input className={inputCls} value={formArrecadacao.descricao} onChange={(e) => setFormArrecadacao((p) => ({ ...p, descricao: e.target.value }))} placeholder="Observação..." />
                   </Field>
                   <div className="flex gap-2 pt-1">
                     <button onClick={saveArrecadacao} className="flex-1 bg-[#123b63] text-white py-2 rounded-md text-sm font-semibold hover:bg-[#0f2a45] transition">
-                      {editArrecadacaoId ? 'Salvar alteraÃ§Ãµes' : 'Registrar entrada'}
+                      {editArrecadacaoId ? 'Salvar alterações' : 'Registrar entrada'}
                     </button>
                     {editArrecadacaoId && (
                       <button onClick={() => { setFormArrecadacao({ ...EMPTY_ARRECADACAO, data: new Date().toISOString().slice(0, 10) }); setEditArrecadacaoId(null); setErrArrecadacao({}); }} className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition">
@@ -997,11 +997,11 @@ export default function MissoesPage() {
                 </div>
               </Section>
 
-              {/* Comparativo meta Ã— realizado por projeto */}
+              {/* Comparativo meta × realizado por projeto */}
               <div className="lg:col-span-2 space-y-3">
-                <h3 className="text-sm font-semibold text-gray-700 mb-1">Meta Ã— Realizado por projeto</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-1">Meta × Realizado por projeto</h3>
                 {projetos.filter((p) => (p.meta_arrecadacao ?? 0) > 0 || (totaisPorProjeto[p.id] ?? 0) > 0).length === 0 ? (
-                  <div className="bg-white rounded-xl shadow-sm p-6 text-center text-gray-400 text-sm">Nenhum projeto com meta ou arrecadaÃ§Ã£o</div>
+                  <div className="bg-white rounded-xl shadow-sm p-6 text-center text-gray-400 text-sm">Nenhum projeto com meta ou arrecadação</div>
                 ) : (
                   projetos
                     .filter((p) => (p.meta_arrecadacao ?? 0) > 0 || (totaisPorProjeto[p.id] ?? 0) > 0)
@@ -1027,10 +1027,10 @@ export default function MissoesPage() {
               </div>
             </div>
 
-            {/* HistÃ³rico de entradas */}
-            <Section icon="ðŸ“‹" title="HistÃ³rico de entradas">
+            {/* Histórico de entradas */}
+            <Section icon="📋" title="Histórico de entradas">
               {arrecadacoes.length === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-4">Nenhuma arrecadaÃ§Ã£o registrada</p>
+                <p className="text-gray-400 text-sm text-center py-4">Nenhuma arrecadação registrada</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -1039,8 +1039,8 @@ export default function MissoesPage() {
                         <th className="py-2 px-3 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
                         <th className="py-2 px-3 text-left text-xs font-semibold text-gray-500 uppercase">Projeto</th>
                         <th className="py-2 px-3 text-left text-xs font-semibold text-gray-500 uppercase">Forma</th>
-                        <th className="py-2 px-3 text-left text-xs font-semibold text-gray-500 uppercase">CongregaÃ§Ã£o</th>
-                        <th className="py-2 px-3 text-left text-xs font-semibold text-gray-500 uppercase">DescriÃ§Ã£o</th>
+                        <th className="py-2 px-3 text-left text-xs font-semibold text-gray-500 uppercase">Congregação</th>
+                        <th className="py-2 px-3 text-left text-xs font-semibold text-gray-500 uppercase">Descrição</th>
                         <th className="py-2 px-3 text-right text-xs font-semibold text-gray-500 uppercase">Valor</th>
                         <th className="py-2 px-3 w-16" />
                       </tr>
@@ -1055,8 +1055,8 @@ export default function MissoesPage() {
                             <td className="py-2 px-3 text-gray-600 whitespace-nowrap">{fmtDate(a.data)}</td>
                             <td className="py-2 px-3 text-gray-700">{projeto?.nome ?? <span className="text-gray-400 italic">Geral</span>}</td>
                             <td className="py-2 px-3 text-gray-600">{formaLabel}</td>
-                            <td className="py-2 px-3 text-gray-600">{cong?.nome ?? 'â€”'}</td>
-                            <td className="py-2 px-3 text-gray-600 max-w-[200px] truncate">{a.descricao || 'â€”'}</td>
+                            <td className="py-2 px-3 text-gray-600">{cong?.nome ?? '—'}</td>
+                            <td className="py-2 px-3 text-gray-600 max-w-[200px] truncate">{a.descricao || '—'}</td>
                             <td className="py-2 px-3 text-right font-semibold text-emerald-700 whitespace-nowrap">{fmtCurrency(a.valor)}</td>
                             <td className="py-2 px-3">
                               <div className="flex gap-1">
@@ -1082,7 +1082,7 @@ export default function MissoesPage() {
           </div>
         )}
 
-        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• ABA: RELATÃ“RIO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        {/* ═══════════════════ ABA: RELATÓRIO ══════════════════════════ */}
         {activeTab === 'relatorio' && (
           <>
             <style>{`
@@ -1097,7 +1097,7 @@ export default function MissoesPage() {
               {/* Filtros */}
               <div className="no-print bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-wrap gap-4 items-end">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Data inÃ­cio</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Data início</label>
                   <input type="date" value={relDtInicio} onChange={(e) => setRelDtInicio(e.target.value)}
                     className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
                 </div>
@@ -1116,7 +1116,7 @@ export default function MissoesPage() {
                 </div>
                 {congregacoes.length > 0 && (
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">CongregaÃ§Ã£o</label>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Congregação</label>
                     <select value={relCongId} onChange={(e) => setRelCongId(e.target.value)}
                       className="border border-gray-200 rounded-lg px-3 py-2 text-sm">
                       <option value="">Todas</option>
@@ -1130,10 +1130,10 @@ export default function MissoesPage() {
                 </button>
               </div>
 
-              {/* Corpo do relatÃ³rio */}
+              {/* Corpo do relatório */}
               <div id="missoes-relatorio-print" className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
 
-                {/* Timbre (sÃ³ na impressÃ£o) */}
+                {/* Timbre (só na impressão) */}
                 <div className="hidden print:block border-b border-gray-300 pb-4 mb-2">
                   <div className="flex items-center gap-4">
                     {configIgreja?.logo && <img src={configIgreja.logo} alt="Logo" className="h-16 w-16 object-contain" />}
@@ -1150,16 +1150,16 @@ export default function MissoesPage() {
                   </div>
                 </div>
 
-                {/* CabeÃ§alho */}
+                {/* Cabeçalho */}
                 <div className="flex justify-between items-start">
                   <div>
-                    <h2 className="text-lg font-bold text-[#123b63]">RelatÃ³rio de ArrecadaÃ§Ãµes â€” MissÃµes</h2>
+                    <h2 className="text-lg font-bold text-[#123b63]">Relatório de Arrecadações — Missões</h2>
                     <p className="text-sm text-gray-500 mt-0.5">
                       {relDtInicio || relDtFim
-                        ? `${relDtInicio ? fmtDate(relDtInicio) : 'â€”'} atÃ© ${relDtFim ? fmtDate(relDtFim) : 'â€”'}`
-                        : 'Todos os perÃ­odos'}
-                      {relProjetoId ? ` Â· ${projetos.find((p) => p.id === relProjetoId)?.nome}` : ' Â· Todos os projetos'}
-                      {relCongId ? ` Â· ${congregacoes.find((c) => c.id === relCongId)?.nome}` : ''}
+                        ? `${relDtInicio ? fmtDate(relDtInicio) : '—'} até ${relDtFim ? fmtDate(relDtFim) : '—'}`
+                        : 'Todos os períodos'}
+                      {relProjetoId ? ` · ${projetos.find((p) => p.id === relProjetoId)?.nome}` : ' · Todos os projetos'}
+                      {relCongId ? ` · ${congregacoes.find((c) => c.id === relCongId)?.nome}` : ''}
                     </p>
                   </div>
                   <p className="text-xl font-bold text-[#123b63]">{fmtCurrency(relTotal)}</p>
@@ -1208,9 +1208,9 @@ export default function MissoesPage() {
 
                 {/* Detalhado */}
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-600 mb-2">LanÃ§amentos detalhados</h3>
+                  <h3 className="text-sm font-semibold text-gray-600 mb-2">Lançamentos detalhados</h3>
                   {relFiltrado.length === 0 ? (
-                    <p className="text-sm text-gray-400">Nenhum registro no perÃ­odo.</p>
+                    <p className="text-sm text-gray-400">Nenhum registro no período.</p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm border border-gray-100 rounded-lg overflow-hidden">
@@ -1219,8 +1219,8 @@ export default function MissoesPage() {
                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Data</th>
                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Projeto</th>
                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Tipo</th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">CongregaÃ§Ã£o</th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">DescriÃ§Ã£o</th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Congregação</th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Descrição</th>
                             <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">Valor</th>
                           </tr>
                         </thead>
@@ -1228,14 +1228,14 @@ export default function MissoesPage() {
                           {relFiltrado.map((a) => (
                             <tr key={a.id}>
                               <td className="px-3 py-2 text-gray-600">{fmtDate(a.data)}</td>
-                              <td className="px-3 py-2 text-gray-700">{projetos.find((p) => p.id === a.projeto_id)?.nome ?? 'â€”'}</td>
+                              <td className="px-3 py-2 text-gray-700">{projetos.find((p) => p.id === a.projeto_id)?.nome ?? '—'}</td>
                               <td className="px-3 py-2">
                                 <span className="px-2 py-0.5 rounded bg-teal-50 text-teal-700 text-xs font-semibold">
                                   {FORMA_ARRECADACAO.find((f) => f.value === a.forma)?.label ?? a.forma}
                                 </span>
                               </td>
-                              <td className="px-3 py-2 text-gray-500 text-xs">{congregacoes.find((c) => c.id === a.congregacao_id)?.nome ?? 'â€”'}</td>
-                              <td className="px-3 py-2 text-gray-500">{a.descricao || 'â€”'}</td>
+                              <td className="px-3 py-2 text-gray-500 text-xs">{congregacoes.find((c) => c.id === a.congregacao_id)?.nome ?? '—'}</td>
+                              <td className="px-3 py-2 text-gray-500">{a.descricao || '—'}</td>
                               <td className="px-3 py-2 text-right font-semibold text-[#123b63]">{fmtCurrency(a.valor)}</td>
                             </tr>
                           ))}
@@ -1251,9 +1251,9 @@ export default function MissoesPage() {
                   )}
                 </div>
 
-                {/* RodapÃ© de impressÃ£o */}
+                {/* Rodapé de impressão */}
                 <div className="hidden print:block border-t border-gray-200 pt-3 text-center text-xs text-gray-400">
-                  Emitido em {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })} â€” {configIgreja?.nome}
+                  Emitido em {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })} — {configIgreja?.nome}
                 </div>
               </div>
             </div>
