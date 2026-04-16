@@ -8,7 +8,7 @@ import NotificationModal from '@/components/NotificationModal';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
-import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, Printer, Users } from 'lucide-react';
+import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, Printer, Users, CalendarDays, Lock, Unlock } from 'lucide-react';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import type { ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 
@@ -30,6 +30,7 @@ interface Lancamento {
   congregacao_id: string | null;
   departamento_id: string | null;
   tipo_recebimento: TipoRecebimento;
+  tipo_movimento: TipoMovimento;
   descricao: string | null;
   referencia: string | null;
   valor: number;
@@ -45,7 +46,33 @@ interface Lancamento {
 
 type TipoRecebimento = 'oferta' | 'dizimo' | 'evento' | 'campanha' | 'contribuicao' | 'outros' | 'missoes';
 type FormaPagamento  = 'dinheiro' | 'pix' | 'cartao' | 'transferencia' | 'cheque';
-type Aba = 'dashboard' | 'lancamentos' | 'relatorio' | 'dizimistas';
+type TipoMovimento  = 'entrada' | 'saida';
+type Aba = 'dashboard' | 'lancamentos' | 'caixa' | 'relatorio' | 'dizimistas';
+
+const TIPOS_SAIDA: { value: string; label: string; cor: string }[] = [
+  { value: 'aluguel',         label: 'Aluguel',              cor: 'bg-red-100 text-red-800'     },
+  { value: 'utilidades',      label: 'Água / Luz / Internet', cor: 'bg-orange-100 text-orange-800'},
+  { value: 'material',        label: 'Material',              cor: 'bg-yellow-100 text-yellow-800'},
+  { value: 'pessoal',         label: 'Pessoal / Salários',    cor: 'bg-rose-100 text-rose-800'   },
+  { value: 'manutencao',      label: 'Manutenção',            cor: 'bg-amber-100 text-amber-800' },
+  { value: 'missoes_saida',   label: 'Missões (repasse)',     cor: 'bg-teal-100 text-teal-800'  },
+  { value: 'eventos_despesa', label: 'Eventos (despesa)',     cor: 'bg-purple-100 text-purple-800'},
+  { value: 'outros_despesa',  label: 'Outros',                cor: 'bg-gray-100 text-gray-700'  },
+];
+
+interface Fechamento {
+  id: string;
+  ministry_id: string;
+  mes_referencia: string;
+  saldo_inicial: number;
+  total_entradas: number;
+  total_saidas: number;
+  saldo_final: number;
+  status: 'aberto' | 'fechado';
+  observacoes: string | null;
+  fechado_por: string | null;
+  fechado_em: string | null;
+}
 
 const TIPOS: { value: TipoRecebimento; label: string; cor: string }[] = [
   { value: 'oferta',       label: 'Oferta',       cor: 'bg-blue-100 text-blue-800'    },
@@ -120,7 +147,9 @@ const mesAtual = () => {
 type FormLanc = {
   congregacao_id: string;
   departamento_id: string;
+  tipo_movimento: TipoMovimento;
   tipo_recebimento: TipoRecebimento | '';
+  categoria_saida: string;
   descricao: string;
   referencia: string;
   valor: string;
@@ -130,15 +159,17 @@ type FormLanc = {
 };
 
 const emptyForm = (): FormLanc => ({
-  congregacao_id:  '',
-  departamento_id: '',
+  congregacao_id:   '',
+  departamento_id:  '',
+  tipo_movimento:   'entrada',
   tipo_recebimento: '',
-  descricao:       '',
-  referencia:      '',
-  valor:           '',
-  forma_pagamento: 'dinheiro',
-  data_lancamento: new Date().toISOString().split('T')[0],
-  observacoes:     '',
+  categoria_saida:  '',
+  descricao:        '',
+  referencia:       '',
+  valor:            '',
+  forma_pagamento:  'dinheiro',
+  data_lancamento:  new Date().toISOString().split('T')[0],
+  observacoes:      '',
 });
 
 // ─── Role helpers ─────────────────────────────────────────────────────────────
@@ -167,6 +198,14 @@ export default function TesourariaPage() {
 
   const [loadingData, setLoadingData] = useState(true);
   const [aba, setAba] = useState<Aba>('dashboard');
+
+  // Fechamentos
+  const [fechamentos, setFechamentos] = useState<Fechamento[]>([]);
+  const [abaFechaMes, setAbaFechaMes] = useState(mesAtual());
+  const [showFechaModal, setShowFechaModal] = useState(false);
+  const [fechaObs, setFechaObs] = useState('');
+  const [fechaSaldoInicial, setFechaSaldoInicial] = useState('');
+  const [salvandoFecha, setSalvandoFecha] = useState(false);
 
   // Dizimistas
   const [dizimistas, setDizimistas] = useState<Dizimista[]>([]);
@@ -268,10 +307,19 @@ export default function TesourariaPage() {
       const depMap  = new Map((deps as Departamento[] || []).map(d => [d.id, `${d.sigla} - ${d.nome}`]));
       setLancamentos((lancs as Lancamento[]).map(l => ({
         ...l,
+        tipo_movimento:    (l as any).tipo_movimento ?? 'entrada',
         congregacao_nome:  l.congregacao_id  ? (congMap.get(l.congregacao_id)  ?? 'Sede') : 'Caixa Geral (Sede)',
         departamento_nome: l.departamento_id ? (depMap.get(l.departamento_id)  ?? '—')    : '—',
       })));
     }
+
+    // Fechamentos
+    const { data: fechs } = await supabase
+      .from('tesouraria_fechamentos')
+      .select('*')
+      .eq('ministry_id', mid)
+      .order('mes_referencia', { ascending: false });
+    setFechamentos((fechs as Fechamento[]) || []);
 
     setLoadingData(false);
   }, [authLoading, supabase]);
@@ -299,29 +347,35 @@ export default function TesourariaPage() {
     const mes = new Date().toISOString().slice(0, 7);
     const doMes = lancamentos.filter(l => l.data_lancamento.startsWith(mes));
 
-    const totalGeral = lancamentos.reduce((s, l) => s + Number(l.valor), 0);
-    const totalMes   = doMes.reduce((s, l) => s + Number(l.valor), 0);
+    const totalGeral   = lancamentos.reduce((s, l) => s + Number(l.valor), 0);
+    const totalMes     = doMes.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
+    const totalSaidas  = doMes.filter(l => l.tipo_movimento === 'saida').reduce((s, l) => s + Number(l.valor), 0);
+    const saldoMes     = totalMes - totalSaidas;
 
     const porTipo: Record<string, number> = {};
-    doMes.forEach(l => {
+    doMes.filter(l => l.tipo_movimento === 'entrada').forEach(l => {
       porTipo[l.tipo_recebimento] = (porTipo[l.tipo_recebimento] ?? 0) + Number(l.valor);
     });
 
     const porCong: Record<string, number> = {};
-    doMes.forEach(l => {
+    doMes.filter(l => l.tipo_movimento === 'entrada').forEach(l => {
       const k = l.congregacao_nome ?? 'Caixa Geral (Sede)';
       porCong[k] = (porCong[k] ?? 0) + Number(l.valor);
     });
 
-    return { totalGeral, totalMes, porTipo, porCong };
+    return { totalGeral, totalMes, totalSaidas, saldoMes, porTipo, porCong };
   }, [lancamentos]);
 
   // ── Salvar ────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
     if (!ministryId) return;
-    if (!form.tipo_recebimento || !form.valor || !form.data_lancamento) {
-      showModal('Campos obrigatórios', 'Preencha tipo, valor e data.', 'error'); return;
+    const isSaida = form.tipo_movimento === 'saida';
+    if (!isSaida && !form.tipo_recebimento) {
+      showModal('Campos obrigatórios', 'Preencha o tipo de recebimento.', 'error'); return;
+    }
+    if (!form.valor || !form.data_lancamento) {
+      showModal('Campos obrigatórios', 'Preencha valor e data.', 'error'); return;
     }
     if (!scope.isFinanceiroLocal && !form.congregacao_id) {
       showModal('Congregação obrigatória', 'Selecione a congregação do lançamento.', 'error'); return;
@@ -336,7 +390,8 @@ export default function TesourariaPage() {
       ministry_id:      ministryId,
       congregacao_id:   form.congregacao_id  || null,
       departamento_id:  form.departamento_id || null,
-      tipo_recebimento: form.tipo_recebimento,
+      tipo_movimento:   form.tipo_movimento,
+      tipo_recebimento: isSaida ? (form.categoria_saida || 'outros_despesa') : form.tipo_recebimento,
       descricao:        form.descricao.trim()  || null,
       referencia:       form.referencia.trim() || null,
       valor:            valorNum,
@@ -365,10 +420,13 @@ export default function TesourariaPage() {
   // ── Editar ────────────────────────────────────────────────────────────────
 
   const handleEdit = (l: Lancamento) => {
+    const isSaida = l.tipo_movimento === 'saida';
     setForm({
       congregacao_id:   l.congregacao_id  ?? '',
       departamento_id:  l.departamento_id ?? '',
-      tipo_recebimento: l.tipo_recebimento,
+      tipo_movimento:   l.tipo_movimento,
+      tipo_recebimento: isSaida ? '' : l.tipo_recebimento,
+      categoria_saida:  isSaida ? l.tipo_recebimento : '',
       descricao:        l.descricao  ?? '',
       referencia:       l.referencia ?? '',
       valor:            String(l.valor),
@@ -388,6 +446,40 @@ export default function TesourariaPage() {
     if (error) { showModal('Erro', error.message, 'error'); return; }
     setConfirmDel(null);
     showModal('Excluído!', 'Lançamento removido.');
+    load();
+  };
+
+  // ── Fechar Mês ───────────────────────────────────────────────────
+
+  const handleFecharMes = async () => {
+    if (!ministryId) return;
+    const saldoIni = parseFloat(fechaSaldoInicial.replace(',', '.')) || 0;
+    const doMes   = lancamentos.filter(l => l.data_lancamento.startsWith(abaFechaMes));
+    const entradas = doMes.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
+    const saidas   = doMes.filter(l => l.tipo_movimento === 'saida').reduce((s, l) => s + Number(l.valor), 0);
+    const saldoFinal = saldoIni + entradas - saidas;
+    setSalvandoFecha(true);
+    const { data: sd } = await supabase.auth.getSession();
+    const uid = sd.session?.user.id;
+    const { error } = await supabase.from('tesouraria_fechamentos').upsert({
+      ministry_id:    ministryId,
+      mes_referencia: abaFechaMes,
+      saldo_inicial:  saldoIni,
+      total_entradas: entradas,
+      total_saidas:   saidas,
+      saldo_final:    saldoFinal,
+      status:         'fechado',
+      observacoes:    fechaObs || null,
+      fechado_por:    uid ?? null,
+      fechado_em:     new Date().toISOString(),
+    }, { onConflict: 'ministry_id,mes_referencia' });
+    setSalvandoFecha(false);
+    if (error) { showModal('Erro', error.message, 'error'); return; }
+    const [ano, mon] = abaFechaMes.split('-');
+    showModal('Mês fechado!', `Caixa de ${MESES_LABEL[Number(mon) - 1]}/${ano} fechado. Saldo: ${fmtBRL(saldoFinal)}.`);
+    setShowFechaModal(false);
+    setFechaObs('');
+    setFechaSaldoInicial('');
     load();
   };
 
@@ -491,10 +583,11 @@ export default function TesourariaPage() {
       {/* ── Abas ── */}
       <div className="mb-6 border-b border-gray-200 flex gap-1 flex-wrap">
         {([
-          { id: 'dashboard',   icon: <TrendingUp className="h-4 w-4" />, label: 'Dashboard'    },
-          { id: 'lancamentos', icon: <Tag className="h-4 w-4" />,        label: 'Lançamentos'  },
-          { id: 'relatorio',   icon: <Printer className="h-4 w-4" />,    label: 'Relatório'    },
-          { id: 'dizimistas',  icon: <Users className="h-4 w-4" />,      label: 'Dizimistas'   },
+          { id: 'dashboard',   icon: <TrendingUp className="h-4 w-4" />,    label: 'Dashboard'     },
+          { id: 'lancamentos', icon: <Tag className="h-4 w-4" />,           label: 'Lançamentos'   },
+          { id: 'caixa',       icon: <CalendarDays className="h-4 w-4" />,  label: 'Caixa Mensal'  },
+          { id: 'relatorio',   icon: <Printer className="h-4 w-4" />,       label: 'Relatório'     },
+          { id: 'dizimistas',  icon: <Users className="h-4 w-4" />,         label: 'Dizimistas'    },
         ] as const).map(t => (
           <button
             key={t.id}
@@ -514,15 +607,20 @@ export default function TesourariaPage() {
       {aba === 'dashboard' && (
         <div className="space-y-6">
           {/* Cards resumo */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Geral (todos os períodos)</p>
-              <p className="text-2xl font-bold text-[#123b63]">{fmtBRL(dashStats.totalGeral)}</p>
-              <p className="text-xs text-gray-400 mt-1">{lancamentos.length} lançamentos</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Entradas (mês atual)</p>
+              <p className="text-2xl font-bold text-green-600">{fmtBRL(dashStats.totalMes)}</p>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Arrecadado no mês atual</p>
-              <p className="text-2xl font-bold text-green-600">{fmtBRL(dashStats.totalMes)}</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Saídas (mês atual)</p>
+              <p className="text-2xl font-bold text-red-500">{fmtBRL(dashStats.totalSaidas)}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Saldo do mês</p>
+              <p className={`text-2xl font-bold ${dashStats.saldoMes >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>
+                {fmtBRL(dashStats.saldoMes)}
+              </p>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Congregações ativas</p>
@@ -652,6 +750,26 @@ export default function TesourariaPage() {
                 </button>
               </div>
 
+              {/* Toggle Entrada / Saída */}
+              <div className="flex gap-2 mb-4">
+                {(['entrada', 'saida'] as const).map(mv => (
+                  <button
+                    key={mv}
+                    type="button"
+                    onClick={() => setForm(p => ({ ...p, tipo_movimento: mv, tipo_recebimento: '', categoria_saida: '' }))}
+                    className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${
+                      form.tipo_movimento === mv
+                        ? mv === 'entrada'
+                          ? 'bg-green-600 text-white border-green-600'
+                          : 'bg-red-500 text-white border-red-500'
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {mv === 'entrada' ? '↑ Entrada (Receita)' : '↓ Saída (Despesa)'}
+                  </button>
+                ))}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Caixa / Congregação */}
                 <div>
@@ -674,20 +792,34 @@ export default function TesourariaPage() {
                   )}
                 </div>
 
-                {/* Tipo */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Tipo de recebimento <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={form.tipo_recebimento}
-                    onChange={e => setForm(p => ({ ...p, tipo_recebimento: e.target.value as TipoRecebimento }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  >
-                    <option value="">Selecione</option>
-                    {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
+                {/* Tipo de Entrada ou Categoria de Saída */}
+                {form.tipo_movimento === 'entrada' ? (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Tipo de recebimento <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={form.tipo_recebimento}
+                      onChange={e => setForm(p => ({ ...p, tipo_recebimento: e.target.value as TipoRecebimento }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="">Selecione</option>
+                      {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria da despesa</label>
+                    <select
+                      value={form.categoria_saida}
+                      onChange={e => setForm(p => ({ ...p, categoria_saida: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="">Selecione</option>
+                      {TIPOS_SAIDA.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                  </div>
+                )}
 
                 {/* Departamento */}
                 <div>
@@ -818,20 +950,31 @@ export default function TesourariaPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {lancsFiltrados.map(l => (
-                      <tr key={l.id} className="hover:bg-gray-50 transition">
+                      <tr key={l.id} className={`hover:bg-gray-50 transition ${l.tipo_movimento === 'saida' ? 'bg-red-50/30' : ''}`}>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(l.data_lancamento)}</td>
                         <td className="px-4 py-3 text-gray-700">{l.congregacao_nome}</td>
                         <td className="px-4 py-3 text-gray-500 text-xs">{l.departamento_nome}</td>
                         <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${tipoCor(l.tipo_recebimento)}`}>
-                            {tipoLabel(l.tipo_recebimento)}
-                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className={`px-2 py-0.5 rounded text-xs font-semibold w-fit ${
+                              l.tipo_movimento === 'saida'
+                                ? (TIPOS_SAIDA.find(t => t.value === l.tipo_recebimento)?.cor ?? 'bg-red-100 text-red-800')
+                                : tipoCor(l.tipo_recebimento)
+                            }`}>
+                              {l.tipo_movimento === 'saida'
+                                ? (TIPOS_SAIDA.find(t => t.value === l.tipo_recebimento)?.label ?? l.tipo_recebimento)
+                                : tipoLabel(l.tipo_recebimento)}
+                            </span>
+                            <span className={`text-xs font-semibold ${l.tipo_movimento === 'saida' ? 'text-red-500' : 'text-green-600'}`}>
+                              {l.tipo_movimento === 'saida' ? '↓ Saída' : '↑ Entrada'}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">
                           {l.referencia || l.descricao || '—'}
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold text-[#123b63] whitespace-nowrap">
-                          {fmtBRL(Number(l.valor))}
+                        <td className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${l.tipo_movimento === 'saida' ? 'text-red-600' : 'text-[#123b63]'}`}>
+                          {l.tipo_movimento === 'saida' ? '- ' : ''}{fmtBRL(Number(l.valor))}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2 justify-center">
@@ -863,6 +1006,174 @@ export default function TesourariaPage() {
           </div>
         </div>
       )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          ABA: CAIXA MENSAL
+      ══════════════════════════════════════════════════════════════════════ */}
+      {aba === 'caixa' && (() => {
+        const doMesSel   = lancamentos.filter(l => l.data_lancamento.startsWith(abaFechaMes));
+        const entMes     = doMesSel.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
+        const saiMes     = doMesSel.filter(l => l.tipo_movimento === 'saida').reduce((s, l)   => s + Number(l.valor), 0);
+        const fechAtual  = fechamentos.find(f => f.mes_referencia === abaFechaMes);
+        const isFechado  = fechAtual?.status === 'fechado';
+        // Sugerir saldo_inicial = último fechamento anterior
+        const fechAnterior = fechamentos
+          .filter(f => f.mes_referencia < abaFechaMes && f.status === 'fechado')
+          .sort((a, b) => b.mes_referencia.localeCompare(a.mes_referencia))[0];
+        const saldoInicial = fechAtual?.saldo_inicial ?? fechAnterior?.saldo_final ?? 0;
+        const saldoFinal   = fechAtual?.saldo_final   ?? (saldoInicial + entMes - saiMes);
+        const [ano, mon]   = abaFechaMes.split('-');
+        return (
+          <div className="space-y-6">
+            {/* Seletor de mês */}
+            <div className="flex items-center gap-4 flex-wrap">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Mês / Ano</label>
+                <MonthPicker value={abaFechaMes} onChange={setAbaFechaMes} />
+              </div>
+              {!isFechado && scope.canWrite && (
+                <button
+                  onClick={() => { setFechaSaldoInicial(String(saldoInicial)); setFechaObs(''); setShowFechaModal(true); }}
+                  className="flex items-center gap-2 px-5 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition mt-4"
+                >
+                  <Lock className="h-4 w-4" /> Fechar Mês
+                </button>
+              )}
+              {isFechado && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm font-semibold mt-4">
+                  <Lock className="h-4 w-4" /> Mês fechado em {fechAtual!.fechado_em ? fmtDate(fechAtual!.fechado_em.slice(0,10)) : '—'}
+                </div>
+              )}
+            </div>
+
+            {/* Cards do mês */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Saldo Inicial</p>
+                <p className="text-xl font-bold text-gray-700">{fmtBRL(saldoInicial)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{fechAnterior ? `do fechamento de ${fechAnterior.mes_referencia.split('-').reverse().join('/')}` : 'não há fechamento anterior'}</p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Entradas</p>
+                <p className="text-xl font-bold text-green-600">{fmtBRL(fechAtual?.total_entradas ?? entMes)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{doMesSel.filter(l => l.tipo_movimento === 'entrada').length} lançamentos</p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Saídas</p>
+                <p className="text-xl font-bold text-red-500">{fmtBRL(fechAtual?.total_saidas ?? saiMes)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{doMesSel.filter(l => l.tipo_movimento === 'saida').length} lançamentos</p>
+              </div>
+              <div className={`rounded-xl border p-4 shadow-sm ${isFechado ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Saldo Final</p>
+                <p className={`text-xl font-bold ${saldoFinal >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>{fmtBRL(saldoFinal)}</p>
+                {isFechado && <p className="text-xs text-green-600 mt-0.5 font-semibold">✓ Fechado</p>}
+              </div>
+            </div>
+
+            {/* Modal de fechamento */}
+            {showFechaModal && (
+              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-base font-bold text-[#123b63]">Fechar Caixa — {MESES_LABEL[Number(mon) - 1]}/{ano}</h3>
+                    <button onClick={() => setShowFechaModal(false)}><X className="h-5 w-5 text-gray-400" /></button>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Saldo inicial do mês (R$)</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={fechaSaldoInicial}
+                      onChange={e => setFechaSaldoInicial(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                    {fechAnterior && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Sugerido: {fmtBRL(fechAnterior.saldo_final)} (saldo de {fechAnterior.mes_referencia.split('-').reverse().join('/')})
+                      </p>
+                    )}
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+                    <div className="flex justify-between"><span className="text-gray-500">Entradas do mês:</span><span className="font-semibold text-green-600">{fmtBRL(entMes)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Saídas do mês:</span><span className="font-semibold text-red-500">{fmtBRL(saiMes)}</span></div>
+                    <div className="flex justify-between border-t pt-1 mt-1">
+                      <span className="text-gray-700 font-semibold">Saldo final:</span>
+                      <span className={`font-bold ${(parseFloat(fechaSaldoInicial.replace(',', '.')) || 0) + entMes - saiMes >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>
+                        {fmtBRL((parseFloat(fechaSaldoInicial.replace(',', '.')) || 0) + entMes - saiMes)}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Observações</label>
+                    <textarea
+                      rows={2}
+                      value={fechaObs}
+                      onChange={e => setFechaObs(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleFecharMes}
+                      disabled={salvandoFecha}
+                      className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition disabled:opacity-50"
+                    >
+                      <Lock className="h-4 w-4" /> {salvandoFecha ? 'Fechando...' : 'Confirmar Fechamento'}
+                    </button>
+                    <button onClick={() => setShowFechaModal(false)} className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Histórico de fechamentos */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4">Histórico de fechamentos</h3>
+              {fechamentos.length === 0 ? (
+                <p className="text-sm text-gray-400">Nenhum mês fechado ainda.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-100">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Mês</th>
+                        <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Saldo Inicial</th>
+                        <th className="px-4 py-2 text-right text-xs font-semibold text-green-600">Entradas</th>
+                        <th className="px-4 py-2 text-right text-xs font-semibold text-red-500">Saídas</th>
+                        <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Saldo Final</th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {fechamentos.map(f => {
+                        const [fy, fm] = f.mes_referencia.split('-');
+                        return (
+                          <tr key={f.id} className="hover:bg-gray-50 transition">
+                            <td className="px-4 py-3 font-semibold text-gray-700">{MESES_LABEL[Number(fm) - 1]}/{fy}</td>
+                            <td className="px-4 py-3 text-right text-gray-600">{fmtBRL(f.saldo_inicial)}</td>
+                            <td className="px-4 py-3 text-right text-green-600 font-semibold">{fmtBRL(f.total_entradas)}</td>
+                            <td className="px-4 py-3 text-right text-red-500 font-semibold">{fmtBRL(f.total_saidas)}</td>
+                            <td className={`px-4 py-3 text-right font-bold ${f.saldo_final >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>{fmtBRL(f.saldo_final)}</td>
+                            <td className="px-4 py-3 text-center">
+                              {f.status === 'fechado'
+                                ? <span className="flex items-center justify-center gap-1 text-green-700 text-xs font-semibold"><Lock className="h-3 w-3" /> Fechado</span>
+                                : <span className="flex items-center justify-center gap-1 text-yellow-600 text-xs font-semibold"><Unlock className="h-3 w-3" /> Aberto</span>
+                              }
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ══════════════════════════════════════════════════════════════════════
           ABA: RELATÓRIO

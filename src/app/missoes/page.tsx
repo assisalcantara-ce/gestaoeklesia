@@ -713,7 +713,7 @@ export default function MissoesPage() {
                     <input className={inputCls} type="date" value={formProjeto.data_fim} onChange={(e) => setFormProjeto((p) => ({ ...p, data_fim: e.target.value }))} />
                   </Field>
                 </div>
-                <Field label="Meta de arrecadação (R$)">
+                <Field label="Meta de Investimento (R$)">
                   <input className={inputCls} inputMode="numeric" value={formProjeto.meta_arrecadacao} onChange={(e) => setFormProjeto((p) => ({ ...p, meta_arrecadacao: maskCurrency(e.target.value) }))} placeholder="0,00" />
                 </Field>
                 <Field label="Descrição">
