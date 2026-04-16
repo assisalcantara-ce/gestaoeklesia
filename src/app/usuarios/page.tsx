@@ -846,7 +846,7 @@ export default function UsuariosPage() {
                     <th className="px-6 py-4 text-left text-sm font-semibold text-[#123b63]">Nome</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-[#123b63]">E-mail</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-[#123b63]">Nível de Acesso</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-[#123b63]">Escop>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-[#123b63]">Escopo</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-[#123b63]">Status</th>
                     <th className="px-6 py-4 text-center text-sm font-semibold text-[#123b63]">Ações</th>
                   </tr>
@@ -1032,33 +1032,16 @@ export default function UsuariosPage() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
                     >
                       <option value="ativo">Ativo</option>
-                      <option value="inativo">Inativo</option> / Igreja *</label>
-                    <select
-                      value={editData.congregacao_id}
-                      onChange={(e) => handleEditChange('congregacao_id', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
-                      disabled={congregacoesLoading}
-                    >
-                      <option value="">Selecione a congregação</option>
-                      {congregacoes.map((c) => (
-                        <option key={c.id} value={c.id}>{c.nome}</option>
-                      ))}
+                      <option value="inativo">Inativo</option>
                     </select>
                   </div>
-                )}
+                </div>
 
-                {editData.nivel === 'supervisor' && (
+                {['admin_local', 'financeiro_local'].includes(editData.nivel) && (
                   <div>
-                    <label className="block text-sm font-semibold text-[#123b63] mb-2">Campo / Setor *</label>
+                    <label className="block text-sm font-semibold text-[#123b63] mb-2">Congregação / Igreja *</label>
                     <select
-                      value={editData.supervisao_id}
-                      onChange={(e) => handleEditChange('supervisao_id', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
-                      disabled={supervisoesLoading}
-                    >
-                      <option value="">Selecione o Campo/Setor</option>
-                      {supervisoes.map((s) => (
-                        <option key={s.id} value={s.id}>{s
+                      value={editData.congregacao_id}
                       onChange={(e) => handleEditChange('congregacao_id', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
                       disabled={congregacoesLoading}

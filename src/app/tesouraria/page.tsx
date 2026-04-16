@@ -8,7 +8,7 @@ import NotificationModal from '@/components/NotificationModal';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
-import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, Printer, Users, CalendarDays, Lock, Unlock } from 'lucide-react';
+import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, Printer, Users, CalendarDays, Lock, Unlock, CheckCircle, Search } from 'lucide-react';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import type { ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 
@@ -232,6 +232,13 @@ export default function TesourariaPage() {
   const [saving,    setSaving]    = useState(false);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
 
+  // Busca de dizimista no formulário
+  const [dizBusca,    setDizBusca]    = useState('');
+  const [dizBuscaRes, setDizBuscaRes] = useState<{id: string; nome: string}[]>([]);
+  const [dizSelId,    setDizSelId]    = useState<string | null>(null);
+  const [dizSelNome,  setDizSelNome]  = useState('');
+  const [dizBuscando, setDizBuscando] = useState(false);
+
   const [modal, setModal] = useState<{ open: boolean; title: string; message: string; type: 'success'|'error'|'info' }>({
     open: false, title: '', message: '', type: 'success',
   });
@@ -368,6 +375,30 @@ export default function TesourariaPage() {
     return { totalGeral, totalMes, totalSaidas, saldoMes, porTipo, porCong };
   }, [lancamentos]);
 
+  // ── Busca de dizimista ─────────────────────────────────────────────────────
+
+  const buscarMembDizimista = useCallback(async (q: string) => {
+    if (!ministryId || q.trim().length < 3) { setDizBuscaRes([]); return; }
+    setDizBuscando(true);
+    const { data } = await supabase
+      .from('members')
+      .select('id, name')
+      .eq('ministry_id', ministryId)
+      .eq('is_dizimista', true)
+      .eq('status', 'active')
+      .ilike('name', `${q.trim()}%`)
+      .limit(8);
+    setDizBuscaRes((data || []).map((m: any) => ({ id: m.id, nome: m.name })));
+    setDizBuscando(false);
+  }, [ministryId, supabase]);
+
+  const resetDizForm = () => {
+    setDizBusca('');
+    setDizBuscaRes([]);
+    setDizSelId(null);
+    setDizSelNome('');
+  };
+
   // ── Salvar ────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
@@ -410,12 +441,23 @@ export default function TesourariaPage() {
     } else {
       const { error } = await supabase.from('tesouraria_lancamentos').insert({ ...payload, created_at: now });
       if (error) { showModal('Erro', error.message, 'error'); setSaving(false); return; }
+      // Se for dízimo com membro selecionado, registrar pagamento
+      if (form.tipo_recebimento === 'dizimo' && dizSelId) {
+        const mesRef = form.data_lancamento.slice(0, 7);
+        await supabase.from('dizimistas_pagamentos').upsert({
+          ministry_id:    ministryId,
+          member_id:      dizSelId,
+          mes_referencia: mesRef,
+          status:         'pago',
+        }, { onConflict: 'ministry_id,member_id,mes_referencia' });
+      }
       showModal('Registrado!', 'Lançamento registrado com sucesso.');
     }
     setSaving(false);
     setForm(emptyForm());
     setEditId(null);
     setShowForm(false);
+    resetDizForm();
     load();
   };
 
@@ -765,7 +807,7 @@ export default function TesourariaPage() {
                 <h3 className="text-base font-bold text-[#123b63]">
                   {editId ? 'Editar Lançamento' : 'Novo Lançamento'}
                 </h3>
-                <button onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm()); }}>
+                <button onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm()); resetDizForm(); }}>
                   <X className="h-5 w-5 text-gray-400 hover:text-gray-700" />
                 </button>
               </div>
@@ -838,6 +880,56 @@ export default function TesourariaPage() {
                       <option value="">Selecione</option>
                       {TIPOS_SAIDA.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>
+                  </div>
+                )}
+
+                {/* Busca de membro dizimista */}
+                {form.tipo_movimento === 'entrada' && form.tipo_recebimento === 'dizimo' && (
+                  <div className="relative">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Membro dizimista
+                      <span className="ml-1 font-normal text-gray-400">(opcional)</span>
+                    </label>
+                    {dizSelId ? (
+                      <div className="flex items-center gap-2 px-3 py-2 border border-green-300 rounded-lg bg-green-50 text-sm">
+                        <CheckCircle size={14} className="text-green-500 shrink-0" />
+                        <span className="flex-1 text-green-800 font-medium truncate">{dizSelNome}</span>
+                        <button type="button" onClick={resetDizForm} className="text-green-600 hover:text-red-500 transition">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="relative">
+                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="text"
+                            placeholder="Digite 3 letras do nome..."
+                            value={dizBusca}
+                            onChange={e => { setDizBusca(e.target.value); buscarMembDizimista(e.target.value); }}
+                            className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-sm"
+                          />
+                        </div>
+                        {dizBuscando && <p className="text-xs text-gray-400 mt-1">Buscando...</p>}
+                        {!dizBuscando && dizBusca.trim().length >= 3 && dizBuscaRes.length === 0 && (
+                          <p className="text-xs text-orange-500 mt-1">Nenhum dizimista encontrado com esse nome.</p>
+                        )}
+                        {dizBuscaRes.length > 0 && (
+                          <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                            {dizBuscaRes.map(m => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => { setDizSelId(m.id); setDizSelNome(m.nome); setDizBusca(''); setDizBuscaRes([]); }}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition border-b border-gray-100 last:border-0"
+                              >
+                                {m.nome}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -941,7 +1033,7 @@ export default function TesourariaPage() {
                   {saving ? 'Salvando...' : editId ? 'Atualizar' : 'Registrar'}
                 </button>
                 <button
-                  onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm()); }}
+                  onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm()); resetDizForm(); }}
                   className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
                 >
                   Cancelar
