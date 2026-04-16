@@ -43,17 +43,18 @@ interface Lancamento {
   departamento_nome?: string;
 }
 
-type TipoRecebimento = 'oferta' | 'dizimo' | 'evento' | 'campanha' | 'contribuicao' | 'outros';
+type TipoRecebimento = 'oferta' | 'dizimo' | 'evento' | 'campanha' | 'contribuicao' | 'outros' | 'missoes';
 type FormaPagamento  = 'dinheiro' | 'pix' | 'cartao' | 'transferencia' | 'cheque';
 type Aba = 'dashboard' | 'lancamentos' | 'relatorio' | 'dizimistas';
 
 const TIPOS: { value: TipoRecebimento; label: string; cor: string }[] = [
-  { value: 'oferta',       label: 'Oferta',       cor: 'bg-blue-100 text-blue-800'   },
-  { value: 'dizimo',       label: 'Dízimo',        cor: 'bg-green-100 text-green-800' },
+  { value: 'oferta',       label: 'Oferta',       cor: 'bg-blue-100 text-blue-800'    },
+  { value: 'dizimo',       label: 'Dízimo',        cor: 'bg-green-100 text-green-800'  },
   { value: 'evento',       label: 'Evento',        cor: 'bg-purple-100 text-purple-800'},
   { value: 'campanha',     label: 'Campanha',      cor: 'bg-orange-100 text-orange-800'},
   { value: 'contribuicao', label: 'Contribuição',  cor: 'bg-pink-100 text-pink-800'   },
-  { value: 'outros',       label: 'Outros',         cor: 'bg-gray-100 text-gray-700'   },
+  { value: 'missoes',      label: 'Missões',       cor: 'bg-teal-100 text-teal-800'   },
+  { value: 'outros',       label: 'Outros',        cor: 'bg-gray-100 text-gray-700'   },
 ];
 
 const FORMAS: { value: FormaPagamento; label: string }[] = [

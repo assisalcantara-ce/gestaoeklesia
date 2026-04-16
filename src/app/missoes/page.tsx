@@ -128,14 +128,8 @@ const fmtDate = (v?: string | null) => {
   return `${d}/${m}/${y}`;
 };
 
-// Mapeia a forma de arrecadação em Missões para tipo_recebimento válido na Tesouraria
-const formaParaTipoTesouraria = (forma: string): string => ({
-  oferta:            'oferta',
-  dizimo_especifico: 'dizimo',
-  doacao:            'contribuicao',
-  campanha:          'campanha',
-  outro:             'contribuicao',
-} as Record<string, string>)[forma] ?? 'contribuicao';
+// Todas as arrecadações de Missões aparecem como tipo 'missoes' na Tesouraria
+const formaParaTipoTesouraria = (_forma: string): string => 'missoes';
 
 const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63] focus:border-transparent';
 const labelCls = 'block text-xs font-semibold text-gray-700 mb-1';
@@ -521,16 +515,20 @@ export default function MissoesPage() {
 
       // Gera lançamento automático na Tesouraria
       if (newArr?.id) {
-        const { data: newLanc } = await supabase
+        const { data: newLanc, error: errLanc } = await supabase
           .from('tesouraria_lancamentos')
           .insert({ ...tesPayload, created_at: now })
           .select('id')
           .single();
-        if (newLanc?.id) {
+        if (errLanc) {
+          showNotif('warning', 'Arrecadação salva', `Registrado em Missões, mas não foi possível criar o lançamento na Tesouraria: ${errLanc.message}`, undefined);
+        } else if (newLanc?.id) {
           await supabase.from('missoes_arrecadacoes').update({ tesouraria_lancamento_id: newLanc.id }).eq('id', newArr.id);
+          showNotif('success', 'Registrado', 'Arrecadação registrada e lançamento gerado na Tesouraria.');
         }
+      } else {
+        showNotif('success', 'Registrado', 'Arrecadação registrada.');  
       }
-      showNotif('success', 'Registrado', 'Arrecadação registrada e lançamento gerado na Tesouraria.');
     }
     setFormArrecadacao({ ...EMPTY_ARRECADACAO, data: new Date().toISOString().slice(0, 10) });
     setEditArrecadacaoId(null);
