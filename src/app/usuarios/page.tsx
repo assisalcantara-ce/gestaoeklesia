@@ -18,6 +18,7 @@ interface Usuario {
   congregacao?: string;
   congregacao_id?: string | null;
   supervisao?: string;
+  supervisao_id?: string | null;
   status: 'ativo' | 'inativo';
 }
 
@@ -34,6 +35,11 @@ interface CongregacaoOption {
   nome: string;
 }
 
+interface SupervisaoOption {
+  id: string;
+  nome: string;
+}
+
 export default function UsuariosPage() {
   const [activeMenu, setActiveMenu] = useState('usuarios');
   const { loading: authLoading } = useRequireSupabaseAuth();
@@ -44,11 +50,14 @@ export default function UsuariosPage() {
   const [usuariosError, setUsuariosError] = useState('');
   const [congregacoes, setCongregacoes] = useState<CongregacaoOption[]>([]);
   const [congregacoesLoading, setCongregacoesLoading] = useState(true);
+  const [supervisoes, setSupervisoes] = useState<SupervisaoOption[]>([]);
+  const [supervisoesLoading, setSupervisoesLoading] = useState(true);
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
     nivel: '',
     congregacao_id: '',
+    supervisao_id: '',
     senha: '',
     confirmar_senha: '',
   });
@@ -70,6 +79,7 @@ export default function UsuariosPage() {
     email: '',
     nivel: '',
     congregacao_id: '',
+    supervisao_id: '',
     status: 'ativo',
     senha: '',
     confirmar_senha: '',
@@ -208,7 +218,22 @@ export default function UsuariosPage() {
       setCongregacoesLoading(false);
     };
 
+    const loadSupervisoes = async () => {
+      if (authLoading) return;
+      setSupervisoesLoading(true);
+      const { data: sess } = await supabase.auth.getSession();
+      if (!sess.session) { setSupervisoes([]); setSupervisoesLoading(false); return; }
+      const { data: rows, error } = await supabase
+        .from('supervisoes')
+        .select('id, nome')
+        .eq('is_active', true)
+        .order('nome');
+      setSupervisoes(!error && rows ? (rows as SupervisaoOption[]) : []);
+      setSupervisoesLoading(false);
+    };
+
     loadCongregacoes();
+    loadSupervisoes();
   }, [authLoading, supabase]);
 
   useEffect(() => {
@@ -245,7 +270,7 @@ export default function UsuariosPage() {
     loadPlano();
   }, [authLoading, supabase]);
 
-  const openEditModal = (usuario: Usuario & { congregacao_id?: string | null }) => {
+  const openEditModal = (usuario: Usuario & { congregacao_id?: string | null; supervisao_id?: string | null }) => {
     setEditError('');
     setEditStatus('');
     setEditEmailConfirmed(Boolean(usuario.email_confirmed));
@@ -256,6 +281,7 @@ export default function UsuariosPage() {
       email: usuario.email,
       nivel: usuario.nivel,
       congregacao_id: usuario.congregacao_id || '',
+      supervisao_id: usuario.supervisao_id || '',
       status: usuario.status,
       senha: '',
       confirmar_senha: '',
@@ -291,6 +317,11 @@ export default function UsuariosPage() {
       return;
     }
 
+    if (editData.nivel === 'supervisor' && !editData.supervisao_id) {
+      setEditError('Campo/Setor obrigatório para o nível Supervisor.');
+      return;
+    }
+
     if (editOriginalStatus === 'ativo' && editData.status === 'inativo') {
       const confirmed = window.confirm('Tem certeza que deseja desativar este usuario?');
       if (!confirmed) return;
@@ -315,6 +346,7 @@ export default function UsuariosPage() {
         email: editData.email.trim(),
         nivel: editData.nivel,
         congregacao_id: editData.congregacao_id || null,
+        supervisao_id: editData.supervisao_id || null,
         status: editData.status,
         senha: editData.senha ? editData.senha : undefined,
       })
@@ -449,6 +481,11 @@ export default function UsuariosPage() {
       return;
     }
 
+    if (formData.nivel === 'supervisor' && !formData.supervisao_id) {
+      setFormError('Campo/Setor obrigatório para o nível Supervisor.');
+      return;
+    }
+
     if (formData.senha !== formData.confirmar_senha) {
       setFormError('As senhas nao coincidem.');
       return;
@@ -472,6 +509,7 @@ export default function UsuariosPage() {
         email: formData.email.trim(),
         nivel: formData.nivel,
         congregacao_id: formData.congregacao_id || null,
+        supervisao_id: formData.supervisao_id || null,
         senha: formData.senha,
       })
     });
@@ -507,6 +545,7 @@ export default function UsuariosPage() {
       email: '',
       nivel: '',
       congregacao_id: '',
+      supervisao_id: '',
       senha: '',
       confirmar_senha: '',
     });
@@ -600,83 +639,139 @@ export default function UsuariosPage() {
             ))}
           </div>
 
-          {/* Form de novo usuário */}
           {showForm && (
             <div className="bg-white rounded-lg p-6 shadow-md mb-6 border-2 border-[#123b63]">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-[#123b63]">Adicionar Novo Usuário</h2>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-[#123b63]">Adicionar Novo Usuário</h2>
+                  <p className="text-sm text-gray-500 mt-1">Sub-usuários têm acesso restrito ao escopo do seu nível</p>
+                </div>
                 <span className={`text-sm font-semibold px-3 py-1 rounded-full ${limiteAtingido ? 'bg-red-100 text-red-700' : totalUsuarios >= limiteUsuarios - 1 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
                   {totalUsuarios}/{limiteUsuarios} usuários
                 </span>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <input
-                  type="text"
-                  placeholder="Nome completo"
-                  value={formData.nome}
-                  onChange={(e) => handleFormChange('nome', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
-                />
-                <input
-                  type="email"
-                  placeholder="E-mail"
-                  value={formData.email}
-                  onChange={(e) => handleFormChange('email', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
-                />
-              </div>
 
+              {/* Dados básicos */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-semibold text-[#123b63] mb-2">Nível de Acesso</label>
-                  <select
-                    value={formData.nivel}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      handleFormChange('nivel', value);
-                      setSelectedLevel(value);
-                    }}
+                  <label className="block text-sm font-semibold text-[#123b63] mb-1">Nome completo *</label>
+                  <input
+                    type="text"
+                    placeholder="Nome completo"
+                    value={formData.nome}
+                    onChange={(e) => handleFormChange('nome', e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#123b63] mb-1">E-mail *</label>
+                  <input
+                    type="email"
+                    placeholder="E-mail"
+                    value={formData.email}
+                    onChange={(e) => handleFormChange('email', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
+                  />
+                </div>
+              </div>
+
+              {/* Nível de acesso */}
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-[#123b63] mb-2">Nível de Acesso *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {nivelAcessoInfo.map(nivel => (
+                    <button
+                      key={nivel.id}
+                      type="button"
+                      onClick={() => {
+                        handleFormChange('nivel', nivel.id);
+                        setSelectedLevel(nivel.id);
+                        handleFormChange('congregacao_id', '');
+                        handleFormChange('supervisao_id', '');
+                      }}
+                      className={`text-left p-3 rounded-lg border-2 transition ${
+                        formData.nivel === nivel.id
+                          ? 'border-[#123b63] bg-[#123b63]/5 ring-2 ring-[#123b63]/30'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">{nivel.icon}</span>
+                        <span className="font-semibold text-sm text-[#123b63]">{nivel.nome}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 leading-tight">{nivel.descricao}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Seleção de escopo: Supervisor → 2ª divisão; Admin/Fin Local → 1ª divisão */}
+              {selectedLevel === 'supervisor' && (
+                <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <label className="block text-sm font-semibold text-indigo-800 mb-1">
+                    Campo / Setor * <span className="font-normal text-indigo-600">(2ª divisão — área de visibilidade do Supervisor)</span>
+                  </label>
+                  <select
+                    value={formData.supervisao_id}
+                    onChange={(e) => handleFormChange('supervisao_id', e.target.value)}
+                    className="w-full px-4 py-3 border border-indigo-300 rounded-lg focus:outline-none focus:border-indigo-600 bg-white"
+                    disabled={supervisoesLoading}
                   >
-                    <option value="">Selecione um nível</option>
-                    {nivelAcessoInfo.map(nivel => (
-                      <option key={nivel.id} value={nivel.id}>
-                        {nivel.icon} {nivel.nome}
-                      </option>
+                    <option value="">Selecione o Campo/Setor...</option>
+                    {supervisoes.map((s) => (
+                      <option key={s.id} value={s.id}>{s.nome}</option>
                     ))}
                   </select>
+                  {supervisoes.length === 0 && !supervisoesLoading && (
+                    <p className="text-xs text-indigo-500 mt-1">Nenhum Campo/Setor cadastrado. Crie em Configurações → Estrutura Hierárquica.</p>
+                  )}
                 </div>
-                {selectedLevel && ['admin_local', 'financeiro_local'].includes(selectedLevel) && (
+              )}
+
+              {['admin_local', 'financeiro_local'].includes(selectedLevel) && (
+                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <label className="block text-sm font-semibold text-green-800 mb-1">
+                    Congregação / Igreja * <span className="font-normal text-green-600">(1ª divisão — escopo de acesso)</span>
+                  </label>
                   <select
                     value={formData.congregacao_id}
                     onChange={(e) => handleFormChange('congregacao_id', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
+                    className="w-full px-4 py-3 border border-green-300 rounded-lg focus:outline-none focus:border-green-600 bg-white"
                     disabled={congregacoesLoading}
                   >
-                    <option value="">Selecione a congregacao</option>
+                    <option value="">Selecione a Congregação/Igreja...</option>
                     {congregacoes.map((c) => (
                       <option key={c.id} value={c.id}>{c.nome}</option>
                     ))}
                   </select>
-                )}
-              </div>
+                  {congregacoes.length === 0 && !congregacoesLoading && (
+                    <p className="text-xs text-green-600 mt-1">Nenhuma congregação cadastrada. Crie em Configurações → Congregações.</p>
+                  )}
+                </div>
+              )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <input
-                  type="password"
-                  placeholder="Senha"
-                  value={formData.senha}
-                  onChange={(e) => handleFormChange('senha', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
-                />
-                <input
-                  type="password"
-                  placeholder="Confirmar Senha"
-                  value={formData.confirmar_senha}
-                  onChange={(e) => handleFormChange('confirmar_senha', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
-                />
+              {/* Senha */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                <div>
+                  <label className="block text-sm font-semibold text-[#123b63] mb-1">Senha *</label>
+                  <input
+                    type="password"
+                    placeholder="Mínimo 6 caracteres"
+                    value={formData.senha}
+                    onChange={(e) => handleFormChange('senha', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#123b63] mb-1">Confirmar Senha *</label>
+                  <input
+                    type="password"
+                    placeholder="Repita a senha"
+                    value={formData.confirmar_senha}
+                    onChange={(e) => handleFormChange('confirmar_senha', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
+                  />
+                </div>
               </div>
 
               {formError && (
@@ -690,17 +785,17 @@ export default function UsuariosPage() {
                 </div>
               )}
 
-              <div className="flex gap-6">
+              <div className="flex gap-4">
                 <button
                   onClick={() => setShowForm(false)}
-                  className="flex-1 bg-gray-300 text-[#123b63] px-6 py-3 rounded-lg hover:bg-gray-400 transition font-semibold"
+                  className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition font-semibold"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleCreateUser}
                   disabled={creatingUser}
-                  className="flex-1 bg-[#0284c7] text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold"
+                  className="flex-1 bg-[#0284c7] text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold disabled:opacity-60"
                 >
                   {creatingUser ? 'Criando...' : 'Criar Usuário'}
                 </button>
@@ -751,7 +846,7 @@ export default function UsuariosPage() {
                     <th className="px-6 py-4 text-left text-sm font-semibold text-[#123b63]">Nome</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-[#123b63]">E-mail</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-[#123b63]">Nível de Acesso</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-[#123b63]">Congregação</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-[#123b63]">Escop>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-[#123b63]">Status</th>
                     <th className="px-6 py-4 text-center text-sm font-semibold text-[#123b63]">Ações</th>
                   </tr>
@@ -788,7 +883,21 @@ export default function UsuariosPage() {
                           {getNomeNivel(usuario.nivel)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-700">{usuario.congregacao || '—'}</td>
+                      <td className="px-6 py-4 text-gray-700">
+                        {usuario.nivel === 'supervisor'
+                          ? (usuario.supervisao || <span className="text-amber-500 text-xs font-medium">Campo não definido</span>)
+                          : ['admin_local', 'financeiro_local'].includes(usuario.nivel)
+                          ? (usuario.congregacao || <span className="text-amber-500 text-xs font-medium">Congregação não definida</span>)
+                          : <span className="text-gray-400 text-xs">— Acesso geral —</span>
+                        }
+                      
+                        {usuario.nivel === 'supervisor'
+                          ? (usuario.supervisao || <span className="text-amber-500 text-xs font-medium">Campo não definido</span>)
+                          : ['admin_local', 'financeiro_local'].includes(usuario.nivel)
+                          ? (usuario.congregacao || <span className="text-amber-500 text-xs font-medium">Congregação não definida</span>)
+                          : <span className="text-gray-400 text-xs">— Acesso geral —</span>
+                        }
+                      </td>
                       <td className="px-6 py-4">
                         <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
                           usuario.status === 'ativo'
@@ -923,23 +1032,57 @@ export default function UsuariosPage() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
                     >
                       <option value="ativo">Ativo</option>
-                      <option value="inativo">Inativo</option>
-                    </select>
-                  </div>
-                </div>
-
-                {['admin_local', 'financeiro_local'].includes(editData.nivel) && (
-                  <div>
-                    <label className="block text-sm font-semibold text-[#123b63] mb-2">Congregação</label>
+                      <option value="inativo">Inativo</option> / Igreja *</label>
                     <select
                       value={editData.congregacao_id}
                       onChange={(e) => handleEditChange('congregacao_id', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
                       disabled={congregacoesLoading}
                     >
-                      <option value="">Selecione a congregacao</option>
+                      <option value="">Selecione a congregação</option>
                       {congregacoes.map((c) => (
                         <option key={c.id} value={c.id}>{c.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {editData.nivel === 'supervisor' && (
+                  <div>
+                    <label className="block text-sm font-semibold text-[#123b63] mb-2">Campo / Setor *</label>
+                    <select
+                      value={editData.supervisao_id}
+                      onChange={(e) => handleEditChange('supervisao_id', e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
+                      disabled={supervisoesLoading}
+                    >
+                      <option value="">Selecione o Campo/Setor</option>
+                      {supervisoes.map((s) => (
+                        <option key={s.id} value={s.id}>{s
+                      onChange={(e) => handleEditChange('congregacao_id', e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
+                      disabled={congregacoesLoading}
+                    >
+                      <option value="">Selecione a congregação</option>
+                      {congregacoes.map((c) => (
+                        <option key={c.id} value={c.id}>{c.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {editData.nivel === 'supervisor' && (
+                  <div>
+                    <label className="block text-sm font-semibold text-[#123b63] mb-2">Campo / Setor *</label>
+                    <select
+                      value={editData.supervisao_id}
+                      onChange={(e) => handleEditChange('supervisao_id', e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
+                      disabled={supervisoesLoading}
+                    >
+                      <option value="">Selecione o Campo/Setor</option>
+                      {supervisoes.map((s) => (
+                        <option key={s.id} value={s.id}>{s.nome}</option>
                       ))}
                     </select>
                   </div>

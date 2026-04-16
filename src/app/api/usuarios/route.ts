@@ -11,6 +11,8 @@ type UsuarioResponse = {
   nivel: 'administrador' | 'financeiro' | 'supervisor' | 'admin_local' | 'financeiro_local';
   congregacao?: string;
   congregacao_id?: string | null;
+  supervisao?: string;
+  supervisao_id?: string | null;
   status: 'ativo' | 'inativo';
 };
 
@@ -20,6 +22,7 @@ type UsuarioCreateBody = {
   senha: string;
   nivel: UsuarioResponse['nivel'];
   congregacao_id?: string | null;
+  supervisao_id?: string | null;
 };
 
 
@@ -29,6 +32,7 @@ type UsuarioUpdateBody = {
   email: string;
   nivel: UsuarioResponse['nivel'];
   congregacao_id?: string | null;
+  supervisao_id?: string | null;
   status?: UsuarioResponse['status'];
   senha?: string | null;
 };
@@ -75,7 +79,7 @@ export async function GET(request: NextRequest) {
 
     const { data: muRows, error: muError } = await admin
       .from('ministry_users')
-      .select('user_id, role, permissions, congregacao_id')
+      .select('user_id, role, permissions, congregacao_id, supervisao_id')
       .eq('ministry_id', ministryId);
 
     if (muError) {
@@ -105,6 +109,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const supervisaoIds = Array.from(
+      new Set(rows.map((row: any) => row.supervisao_id).filter(Boolean))
+    ).map(String);
+
+    const supervisaoMap = new Map<string, string>();
+    if (supervisaoIds.length > 0) {
+      const { data: supervisoes, error: supError } = await admin
+        .from('supervisoes')
+        .select('id, nome')
+        .in('id', supervisaoIds);
+
+      if (!supError && supervisoes) {
+        supervisoes.forEach((s: any) => {
+          supervisaoMap.set(String(s.id), String(s.nome || ''));
+        });
+      }
+    }
+
     const authResults = await Promise.all(
       rows.map(async (row: any) => {
         const { data, error } = await admin.auth.admin.getUserById(row.user_id);
@@ -114,6 +136,7 @@ export async function GET(request: NextRequest) {
 
     const usuarios: UsuarioResponse[] = authResults.map(({ row, user }) => {
       const congregacaoId = row.congregacao_id ? String(row.congregacao_id) : '';
+      const supervisaoId  = row.supervisao_id  ? String(row.supervisao_id)  : '';
       return {
         id: String(row.user_id),
         nome: resolveNome(user),
@@ -122,6 +145,8 @@ export async function GET(request: NextRequest) {
         nivel: mapNivel(row.role, row.permissions),
         congregacao: congregacaoMap.get(congregacaoId) || undefined,
         congregacao_id: row.congregacao_id ?? null,
+        supervisao: supervisaoMap.get(supervisaoId) || undefined,
+        supervisao_id: row.supervisao_id ?? null,
         status: resolveStatus(user),
       };
     });
@@ -170,6 +195,7 @@ export async function POST(request: NextRequest) {
     const senha = String(body?.senha || '').trim();
     const nivel = body?.nivel as UsuarioResponse['nivel'];
     const congregacaoId = body?.congregacao_id ? String(body.congregacao_id) : null;
+    const supervisaoId  = body?.supervisao_id  ? String(body.supervisao_id)  : null;
 
     if (!nome || !email || !senha || !nivel) {
       return NextResponse.json({ error: 'nome, email, senha e nivel sao obrigatorios' }, { status: 400 });
@@ -188,6 +214,10 @@ export async function POST(request: NextRequest) {
 
     if (['admin_local', 'financeiro_local'].includes(nivel) && !congregacaoId) {
       return NextResponse.json({ error: 'Congregacao obrigatoria para este nivel' }, { status: 400 });
+    }
+
+    if (nivel === 'supervisor' && !supervisaoId) {
+      return NextResponse.json({ error: 'Campo/Setor obrigatorio para o nivel Supervisor' }, { status: 400 });
     }
 
     const admin = createServerClient();
@@ -255,6 +285,7 @@ export async function POST(request: NextRequest) {
         role: roleConfig.role,
         permissions: roleConfig.permissions,
         congregacao_id: congregacaoId,
+        supervisao_id: supervisaoId,
       } as any);
 
     if (linkError) {
@@ -297,6 +328,7 @@ export async function PUT(request: NextRequest) {
     const email = String(body?.email || '').trim();
     const nivel = body?.nivel as UsuarioResponse['nivel'];
     const congregacaoId = body?.congregacao_id ? String(body.congregacao_id) : null;
+    const supervisaoId  = body?.supervisao_id  ? String(body.supervisao_id)  : null;
     const status = body?.status as UsuarioResponse['status'] | undefined;
     const senha = body?.senha ? String(body.senha).trim() : '';
 
@@ -310,6 +342,10 @@ export async function PUT(request: NextRequest) {
 
     if (['admin_local', 'financeiro_local'].includes(nivel) && !congregacaoId) {
       return NextResponse.json({ error: 'Congregacao obrigatoria para este nivel' }, { status: 400 });
+    }
+
+    if (nivel === 'supervisor' && !supervisaoId) {
+      return NextResponse.json({ error: 'Campo/Setor obrigatorio para o nivel Supervisor' }, { status: 400 });
     }
 
     const admin = createServerClient();
@@ -384,6 +420,7 @@ export async function PUT(request: NextRequest) {
           role: roleConfig.role,
           permissions: roleConfig.permissions,
           congregacao_id: congregacaoId,
+          supervisao_id: supervisaoId,
         })
         .eq('id', existing.id);
 
@@ -399,6 +436,7 @@ export async function PUT(request: NextRequest) {
           role: roleConfig.role,
           permissions: roleConfig.permissions,
           congregacao_id: congregacaoId,
+          supervisao_id: supervisaoId,
         } as any);
 
       if (insertError) {
