@@ -1,7 +1,7 @@
 # 📋 DAILY BRIEFING - GestãoEklesia
 
-**Data de Última Atualização:** 14 de abril de 2026  
-**Última Sessão:** Correções de acesso por tenant, ajustes de nomenclatura (Ministros -> Membros) e validação de migrações
+**Data de Última Atualização:** 16 de abril de 2026  
+**Última Sessão:** Módulo EBD completo implantado + correções de bugs (turma vazia, oferta, encoding) + máscaras de input
 
 ---
 
@@ -179,7 +179,69 @@ git merge feature/nova-feature
 
 ## ✨ ÚLTIMAS IMPLEMENTAÇÕES
 
-### 📅 14 de Abril de 2026 — Acesso por tenant + Membros + Consagração
+### 📅 16 de Abril de 2026 — Módulo EBD completo + correções + máscaras
+
+#### ✅ Concluído
+
+**Módulo EBD (Escola Bíblica Dominical) — implantação completa:**
+- [x] 7 arquivos criados: `ebd/chamada`, `ebd/turmas`, `ebd/alunos`, `ebd/relatorios`, `ebd/revistas`, layout e hook.
+- [x] Migration `20260416110000_ebd_module.sql` — 13 tabelas, RLS, índices, seed de classes padrão.
+- [x] Migration `20260416120000_ebd_ofertas_aula_unique.sql` — constraint `UNIQUE(aula_id)` em `ebd_ofertas` (necessária para upsert de oferta funcionar).
+- [x] Commits: `bffc769` (módulo original), `d8f96e8` (useAppDialog), `22c870c` (bug fixes + máscaras).
+
+**Correção de bugs críticos:**
+- [x] **Bug "Turma vazia" no modal Matricular Aluno** — causa: JSX do modal "Encerrar Matrícula" foi inserido DENTRO do modal "Matricular Aluno" por multi_replace corrompido. Corrigido reescrevendo `alunos/page.tsx` do zero.
+- [x] **Confirm/prompt nativos substituídos por `useAppDialog`** em todas as 4 páginas EBD (alunos, turmas, relatorios, revistas). Padrão: `const ok = await dialog.confirm({...}); if (!ok) return;`
+- [x] **Bug "não registra oferta"** — causa: `ebd_ofertas` não tinha `UNIQUE` constraint em `aula_id`, então `upsert({ onConflict: 'aula_id' })` falhava silenciosamente. Corrigido com migration + guard `!selCong` adicionado.
+- [x] Encoding corrompido (UTF-8 BOM do `Out-File`) nos arquivos restaurados via PowerShell → resolvido com `git checkout bffc769 --` direto.
+
+**Máscaras de input:**
+- [x] **Valor da oferta** (`chamada/page.tsx`): `type="text"` com helpers `fmtMoeda`/`parseMoeda` → exibe `1.250,00`, envia `float` para o banco.
+- [x] **Telefone do visitante** (`chamada/page.tsx`): máscara `(xx) xxxxx-xxxx` via `fmtFone`.
+- [x] **Telefone do professor** (`turmas/page.tsx`): máscara `(xx) xxxxx-xxxx` via `fmtFone`.
+
+#### ⚠️ AÇÃO OBRIGATÓRIA ANTES DE USAR NO BANCO (Supabase)
+As migrations **ainda não foram aplicadas no banco de produção**. Rodar no **SQL Editor do Supabase** antes de testar:
+
+1. `supabase/migrations/20260416110000_ebd_module.sql` — cria todas as tabelas EBD
+2. `supabase/migrations/20260416120000_ebd_ofertas_aula_unique.sql` — adiciona UNIQUE em `ebd_ofertas.aula_id`
+
+> Atenção: a migration 1 pode falhar se partes já existirem (usa `CREATE TABLE IF NOT EXISTS`, então é seguro re-rodar).
+
+#### 📋 Status dos arquivos EBD (todos ✅ limpos e buildando)
+| Arquivo | Status | Notas |
+|---|---|---|
+| `ebd/chamada/page.tsx` | ✅ | Chamada semanal + visitantes + oferta com máscara |
+| `ebd/turmas/page.tsx` | ✅ | Classes/turmas/professores + tel com máscara |
+| `ebd/alunos/page.tsx` | ✅ | Matrícula + encerramento com motivo |
+| `ebd/relatorios/page.tsx` | ✅ | Frequência + ofertas + integração tesouraria |
+| `ebd/revistas/page.tsx` | ✅ | Catálogo + pedidos de revistas |
+
+#### ▶️ PRÓXIMOS PASSOS (amanhã)
+
+**1. Aplicar migrations no Supabase (PRIORIDADE 1)**
+- Rodar `20260416110000_ebd_module.sql` e `20260416120000_ebd_ofertas_aula_unique.sql` no SQL Editor.
+- Verificar se as tabelas foram criadas corretamente com `\dt ebd_*`.
+
+**2. Teste completo do fluxo EBD**
+- Login → EBD → Turmas: criar classe, criar turma, cadastrar professor.
+- EBD → Alunos: matricular aluno em turma.
+- EBD → Chamada: selecionar igreja/turma/data → salvar chamada → registrar oferta → adicionar visitante.
+- EBD → Relatórios → aba Ofertas: verificar oferta listada → botão "Integrar com Tesouraria".
+- EBD → Revistas: cadastrar revista → criar pedido.
+
+**3. Verificar integração Oferta → Tesouraria**
+- Após integrar, checar se aparece em `/tesouraria` como lançamento de entrada.
+- Confirmar que `tesouraria_lancamentos.id` é salvo em `ebd_ofertas.lancamento_tesouraria_id`.
+
+**4. Ajustes de UX pendentes (identificados mas não iniciados)**
+- Feedback visual quando o upsert de oferta retorna erro do Supabase (exibir mensagem do RLS).
+- Paginação/filtro na lista de alunos (atualmente carrega todos).
+- Exportar PDF do relatório de frequência.
+
+---
+
+
 
 #### ✅ Concluído
 - [x] Fallback server-side para resolver `ministry_id` via service role quando RLS bloqueia o token do usuário.
