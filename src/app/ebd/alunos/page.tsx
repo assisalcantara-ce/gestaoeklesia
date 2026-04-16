@@ -6,6 +6,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { Plus, Pencil, Trash2, X, Users, UserCheck, Search } from 'lucide-react';
+import { useAppDialog } from '@/providers/AppDialogProvider';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -41,7 +42,10 @@ export default function EbdAlunosPage() {
   const { user } = useRequireSupabaseAuth();
   const supabase  = useMemo(() => createClient(), []);
 
+  const dialog = useAppDialog();
   const [ministryId,   setMinistryId]   = useState<string | null>(null);
+  const [encerrarModal, setEncerrarModal] = useState<{ mat: EbdMatricula } | null>(null);
+  const [motivoSaida,   setMotivoSaida]   = useState('');
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
   const [turmas,       setTurmas]       = useState<EbdTurma[]>([]);
   const [alunos,       setAlunos]       = useState<EbdAluno[]>([]);
@@ -130,7 +134,9 @@ export default function EbdAlunosPage() {
   };
 
   const excluir = async (id: string) => {
-    if (!ministryId || !confirm('Excluir este aluno?')) return;
+    if (!ministryId) return;
+    const ok = await dialog.confirm({ title: 'Excluir aluno', type: 'warning', message: 'Tem certeza que deseja excluir este aluno?', confirmText: 'Excluir', cancelText: 'Cancelar' });
+    if (!ok) return;
     const { error } = await supabase.from('ebd_alunos').delete().eq('id', id);
     if (error) flash('erro', error.message);
     else { flash('ok', 'Aluno excluído.'); load(ministryId); }
@@ -164,15 +170,19 @@ export default function EbdAlunosPage() {
     else { flash('ok', 'Aluno matriculado!'); setShowMatForm(false); load(ministryId); }
   };
 
-  const encerrarMatricula = async (m: EbdMatricula) => {
-    if (!ministryId || !confirm('Encerrar esta matrícula?')) return;
-    const motivo = prompt('Motivo de saída (opcional):') ?? '';
+  const encerrarMatricula = (m: EbdMatricula) => {
+    setMotivoSaida('');
+    setEncerrarModal({ mat: m });
+  };
+
+  const confirmarEncerramento = async () => {
+    if (!ministryId || !encerrarModal) return;
     const { error } = await supabase
       .from('ebd_matriculas')
-      .update({ data_fim: new Date().toISOString().slice(0,10), motivo_saida: motivo || null })
-      .eq('id', m.id);
+      .update({ data_fim: new Date().toISOString().slice(0,10), motivo_saida: motivoSaida.trim() || null })
+      .eq('id', encerrarModal.mat.id);
     if (error) flash('erro', error.message);
-    else { flash('ok', 'Matrícula encerrada.'); load(ministryId); }
+    else { flash('ok', 'Matrícula encerrada.'); setEncerrarModal(null); load(ministryId); }
   };
 
   // ── Filtros ──────────────────────────────────────────────────────────────
@@ -462,6 +472,37 @@ export default function EbdAlunosPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal encerrar matrícula */}
+      {encerrarModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <UserCheck className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-800">Encerrar matrícula</h3>
+                <p className="text-xs text-gray-400">{encerrarModal.mat.aluno_nome}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">Informe o motivo da saída (opcional):</p>
+            <input
+              value={motivoSaida}
+              onChange={e => setMotivoSaida(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-5"
+              placeholder="Ex: Mudança de cidade, formatura..."
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setEncerrarModal(null)}
+                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition">Cancelar</button>
+              <button onClick={confirmarEncerramento}
+                className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-semibold hover:bg-amber-600 transition">Encerrar</button>
+            </div>
+          </div>
         </div>
       )}
     </PageLayout>

@@ -6,6 +6,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { Plus, Pencil, Trash2, X, BookOpen, Users, GraduationCap, Sparkles } from 'lucide-react';
+import { useAppDialog } from '@/providers/AppDialogProvider';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,7 @@ export default function EbdTurmasPage() {
   const { user } = useRequireSupabaseAuth();
   const supabase  = useMemo(() => createClient(), []);
 
+  const dialog = useAppDialog();
   const [ministryId,   setMinistryId]   = useState<string | null>(null);
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
   const [classes,      setClasses]      = useState<EbdClasse[]>([]);
@@ -153,7 +155,9 @@ export default function EbdTurmasPage() {
   };
 
   const excluirClasse = async (id: string) => {
-    if (!ministryId || !confirm('Excluir esta classe?')) return;
+    if (!ministryId) return;
+    const ok = await dialog.confirm({ title: 'Excluir classe', type: 'warning', message: 'Tem certeza que deseja excluir esta classe?', confirmText: 'Excluir', cancelText: 'Cancelar' });
+    if (!ok) return;
     const { error } = await supabase.from('ebd_classes').delete().eq('id', id);
     if (error) flash('erro', error.message);
     else { flash('ok', 'Classe excluída.'); load(ministryId); }
@@ -188,7 +192,9 @@ export default function EbdTurmasPage() {
   };
 
   const excluirTurma = async (id: string) => {
-    if (!ministryId || !confirm('Excluir esta turma?')) return;
+    if (!ministryId) return;
+    const ok = await dialog.confirm({ title: 'Excluir turma', type: 'warning', message: 'Tem certeza que deseja excluir esta turma?', confirmText: 'Excluir', cancelText: 'Cancelar' });
+    if (!ok) return;
     const { error } = await supabase.from('ebd_turmas').delete().eq('id', id);
     if (error) flash('erro', error.message);
     else { flash('ok', 'Turma excluída.'); load(ministryId); }
@@ -227,7 +233,9 @@ export default function EbdTurmasPage() {
   };
 
   const excluirProf = async (id: string) => {
-    if (!ministryId || !confirm('Excluir este professor?')) return;
+    if (!ministryId) return;
+    const ok = await dialog.confirm({ title: 'Excluir professor', type: 'warning', message: 'Tem certeza que deseja excluir este professor?', confirmText: 'Excluir', cancelText: 'Cancelar' });
+    if (!ok) return;
     const { error } = await supabase.from('ebd_professores').delete().eq('id', id);
     if (error) flash('erro', error.message);
     else { flash('ok', 'Professor excluído.'); load(ministryId); }

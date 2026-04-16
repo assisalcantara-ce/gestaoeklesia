@@ -6,6 +6,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { Plus, Pencil, Trash2, X, BookOpen, ShoppingCart, ChevronDown, ChevronRight } from 'lucide-react';
+import { useAppDialog } from '@/providers/AppDialogProvider';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ export default function EbdRevistasPage() {
   const { user } = useRequireSupabaseAuth();
   const supabase  = useMemo(() => createClient(), []);
 
+  const dialog = useAppDialog();
   const [ministryId,   setMinistryId]   = useState<string | null>(null);
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
   const [classes,      setClasses]      = useState<EbdClasse[]>([]);
@@ -145,7 +147,9 @@ export default function EbdRevistasPage() {
   };
 
   const excluirRevista = async (id: string) => {
-    if (!ministryId || !confirm('Excluir esta revista?')) return;
+    if (!ministryId) return;
+    const ok = await dialog.confirm({ title: 'Excluir revista', type: 'warning', message: 'Tem certeza que deseja excluir esta revista?', confirmText: 'Excluir', cancelText: 'Cancelar' });
+    if (!ok) return;
     const { error } = await supabase.from('ebd_revistas').delete().eq('id', id);
     if (error) flash('erro', error.message);
     else { flash('ok', 'Revista excluída.'); load(ministryId); }
@@ -203,7 +207,9 @@ export default function EbdRevistasPage() {
   };
 
   const cancelarPedido = async (id: string) => {
-    if (!ministryId || !confirm('Cancelar este pedido?')) return;
+    if (!ministryId) return;
+    const ok = await dialog.confirm({ title: 'Cancelar pedido', type: 'warning', message: 'Tem certeza que deseja cancelar este pedido?', confirmText: 'Cancelar pedido', cancelText: 'Voltar' });
+    if (!ok) return;
     await supabase.from('ebd_pedidos_revistas').update({ status: 'cancelado' }).eq('id', id);
     load(ministryId);
   };

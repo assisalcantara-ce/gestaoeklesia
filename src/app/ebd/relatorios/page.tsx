@@ -6,6 +6,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { BarChart3, DollarSign, Link2 } from 'lucide-react';
+import { useAppDialog } from '@/providers/AppDialogProvider';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ export default function EbdRelatoriosPage() {
   const { user } = useRequireSupabaseAuth();
   const supabase  = useMemo(() => createClient(), []);
 
+  const dialog = useAppDialog();
   const [ministryId,   setMinistryId]   = useState<string | null>(null);
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
   const [turmas,       setTurmas]       = useState<EbdTurma[]>([]);
@@ -185,7 +187,8 @@ export default function EbdRelatoriosPage() {
 
   const integrarTesouraria = async (oferta: EbdOferta) => {
     if (!ministryId || oferta.lancamento_tesouraria_id) return;
-    if (!confirm(`Integrar oferta de ${fmtBRL(oferta.valor)} com a Tesouraria?`)) return;
+    const ok = await dialog.confirm({ title: 'Integrar com Tesouraria', type: 'info', message: `Deseja criar um lançamento de ${fmtBRL(oferta.valor)} na Tesouraria para esta oferta?`, confirmText: 'Integrar', cancelText: 'Cancelar' });
+    if (!ok) return;
     setIntegrandoId(oferta.id);
 
     const cong = congregacoes.find(c => c.id === oferta.church_id);
