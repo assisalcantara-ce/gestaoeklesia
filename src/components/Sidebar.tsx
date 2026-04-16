@@ -31,6 +31,11 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
     'config-geral': 'configuracoes',
     'config-cartoes': 'configuracoes',
     'ativar-fluxo': 'configuracoes',
+    'ebd-chamada': 'ebd',
+    'ebd-turmas': 'ebd',
+    'ebd-alunos': 'ebd',
+    'ebd-revistas': 'ebd',
+    'ebd-relatorios': 'ebd',
   };
   useEffect(() => {
     if (parentMap[activeMenu]) setExpandedMenu(parentMap[activeMenu]);
@@ -68,6 +73,19 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
     },
     { id: 'patrimonio', label: 'Patrimônio', icon: '🏢', path: '/patrimonio' },
     { id: 'missoes', label: 'Missões', icon: '✈️', path: '/missoes' },
+    {
+      id: 'ebd',
+      label: 'EBD',
+      icon: '📖',
+      path: '/ebd/chamada',
+      submenu: [
+        { id: 'ebd-chamada',    label: 'Chamada Semanal', icon: '✏️', path: '/ebd/chamada'    },
+        { id: 'ebd-turmas',    label: 'Turmas',          icon: '🏫', path: '/ebd/turmas'    },
+        { id: 'ebd-alunos',    label: 'Alunos',          icon: '👦', path: '/ebd/alunos'    },
+        { id: 'ebd-revistas',  label: 'Revistas',        icon: '📚', path: '/ebd/revistas'  },
+        { id: 'ebd-relatorios',label: 'Relatórios',      icon: '📊', path: '/ebd/relatorios'},
+      ]
+    },
     { id: 'auditoria', label: 'Auditoria', icon: '✅', path: '/auditoria' },
     { id: 'usuarios', label: 'Usuários', icon: '👤', path: '/usuarios' },
     { id: 'suporte', label: 'Suporte', icon: '🎫', path: '/suporte' },
