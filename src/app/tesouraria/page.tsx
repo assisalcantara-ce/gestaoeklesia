@@ -220,8 +220,9 @@ export default function TesourariaPage() {
   const [filtroCong,  setFiltroCong]  = useState('');
   const [filtroTipo,  setFiltroTipo]  = useState('');
   const [filtroMes,   setFiltroMes]   = useState(mesAtual());
-  const [relMes,      setRelMes]      = useState(mesAtual());
-  const [relCong,     setRelCong]     = useState('');
+  const [relMes,           setRelMes]           = useState(mesAtual());
+  const [relCong,          setRelCong]          = useState('');
+  const [relMostrarDet,    setRelMostrarDet]    = useState(false);
 
   // Formulário
   const [showForm,  setShowForm]  = useState(false);
@@ -1202,6 +1203,15 @@ export default function TesourariaPage() {
                 </select>
               </div>
             )}
+            <label className="no-print flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={relMostrarDet}
+                onChange={e => setRelMostrarDet(e.target.checked)}
+                className="w-4 h-4 accent-[#123b63] cursor-pointer"
+              />
+              <span className="text-sm text-gray-600">Incluir lançamentos detalhados</span>
+            </label>
             <button
               onClick={handlePrint}
               className="no-print flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition"
@@ -1263,7 +1273,7 @@ export default function TesourariaPage() {
             </div>
 
             {/* Detalhado */}
-            <div>
+            <div className={relMostrarDet ? '' : 'no-print'}>
               <h3 className="text-sm font-semibold text-gray-600 mb-2">Lançamentos detalhados</h3>
               {relFiltrado.length === 0 ? (
                 <p className="text-sm text-gray-400">Nenhum lançamento no período.</p>
