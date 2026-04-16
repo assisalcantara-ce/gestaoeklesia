@@ -41,6 +41,14 @@ const CORES_CLASSE = [
   '#ef4444','#14b8a6','#f59e0b','#06b6d4',
 ];
 
+const fmtFone = (v: string): string => {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (!d) return '';
+  if (d.length <= 2)  return `(${d}`;
+  if (d.length <= 7)  return `(${d.slice(0,2)}) ${d.slice(2)}`;
+  return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+};
+
 // ─── Componente ──────────────────────────────────────────────────────────────
 export default function EbdTurmasPage() {
   const { user } = useRequireSupabaseAuth();
@@ -579,7 +587,7 @@ export default function EbdTurmasPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1">Telefone</label>
-                    <input value={formProf.telefone} onChange={e => setFormProf(f => ({ ...f, telefone: e.target.value }))}
+                    <input type="tel" value={formProf.telefone} onChange={e => setFormProf(f => ({ ...f, telefone: fmtFone(e.target.value) }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="(00) 00000-0000" />
                   </div>
                   <div>

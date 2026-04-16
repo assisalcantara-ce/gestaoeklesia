@@ -37,6 +37,27 @@ const anoAtual  = () => new Date().getFullYear();
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+// formata dígitos como BRL sem símbolo: 1250.5 → "1.250,50"
+const fmtMoeda = (val: string): string => {
+  if (!val) return '';
+  const n = parseFloat(val);
+  return isNaN(n) ? '' : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+// extrai valor numérico de string mascarada: "1.250,50" → "1250.50"
+const parseMoeda = (raw: string): string => {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  return (parseInt(digits, 10) / 100).toString();
+};
+// máscara de telefone celular: → (xx) xxxxx-xxxx
+const fmtFone = (v: string): string => {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (!d) return '';
+  if (d.length <= 2)  return `(${d}`;
+  if (d.length <= 7)  return `(${d.slice(0,2)}) ${d.slice(2)}`;
+  return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+};
+
 // ─── Componente ──────────────────────────────────────────────────────────────
 
 export default function EbdChamadaPage() {
@@ -277,7 +298,7 @@ export default function EbdChamadaPage() {
   // ── Oferta ───────────────────────────────────────────────────────────────
 
   const salvarOferta = async () => {
-    if (!aula?.id || !ministryId || !oferta || parseFloat(oferta) <= 0) return;
+    if (!aula?.id || !ministryId || !selCong || !oferta || parseFloat(oferta) <= 0) return;
     const ano  = anoAtual();
     const trimestre = parseInt(aulaForm.trimestre) || trimAtual();
     const { error } = await supabase.from('ebd_ofertas').upsert({
@@ -476,8 +497,8 @@ export default function EbdChamadaPage() {
                   <div className="px-5 py-4 bg-blue-50/50 border-b border-gray-100 space-y-2">
                     <input value={novoVisit.nome} onChange={e => setNovoVisit(v => ({ ...v, nome: e.target.value }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Nome do visitante *" />
-                    <input value={novoVisit.telefone} onChange={e => setNovoVisit(v => ({ ...v, telefone: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Telefone (opcional)" />
+                    <input type="tel" value={novoVisit.telefone} onChange={e => setNovoVisit(v => ({ ...v, telefone: fmtFone(e.target.value) }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="(00) 00000-0000" />
                     <div className="flex gap-2">
                       <button onClick={() => setShowVisitForm(false)} className="flex-1 text-xs py-1.5 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">Cancelar</button>
                       <button onClick={adicionarVisitante} className="flex-1 text-xs py-1.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">Salvar</button>
@@ -511,7 +532,7 @@ export default function EbdChamadaPage() {
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-1">Valor (R$)</label>
-                      <input type="number" step="0.01" value={oferta} onChange={e => { setOferta(e.target.value); setOfertaSalva(false); }}
+                      <input type="text" inputMode="numeric" value={fmtMoeda(oferta)} onChange={e => { setOferta(parseMoeda(e.target.value)); setOfertaSalva(false); }}
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="0,00" />
                     </div>
                     <div>
