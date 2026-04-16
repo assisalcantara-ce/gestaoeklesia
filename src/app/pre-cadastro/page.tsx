@@ -27,6 +27,7 @@ type PlanoDB = {
   has_modulo_financeiro: boolean;
   has_modulo_eventos: boolean;
   has_modulo_reunioes: boolean;
+  modulos: string[] | null;
 };
 
 function buildHighlights(plan: PlanoDB): string[] {
@@ -36,16 +37,22 @@ function buildHighlights(plan: PlanoDB): string[] {
   else h.push('Membros ilimitados');
   if (plan.max_ministerios > 0) h.push(`Até ${plan.max_ministerios} Igrejas inclusas`);
   if (plan.additional_church_monthly_fee > 0) {
-    h.push(`R$ ${plan.additional_church_monthly_fee.toFixed(2)}/mês por igreja adicional`);
+    h.push(`R$ ${plan.additional_church_monthly_fee.toFixed(2).replace('.', ',')}/mês por igreja adicional`);
   }
   if (plan.additional_admin_users_per_church > 0) {
     h.push(`+${plan.additional_admin_users_per_church} admins por igreja adicional`);
   }
-  if (plan.has_modulo_financeiro) h.push('Módulo Financeiro');
-  if (plan.has_modulo_eventos) h.push('Módulo Eventos');
-  if (plan.has_modulo_reunioes) h.push('Módulo Reuniões');
-  if (plan.has_advanced_reports) h.push('Relatórios Avançados');
-  if (plan.has_priority_support) h.push('Suporte Prioritário');
+  // Módulos registrados no banco (coluna modulos)
+  if (plan.modulos && plan.modulos.length > 0) {
+    plan.modulos.forEach(m => h.push(m));
+  } else {
+    // fallback por booleans
+    if (plan.has_modulo_financeiro) h.push('Módulo Financeiro');
+    if (plan.has_modulo_eventos) h.push('Módulo Eventos');
+    if (plan.has_modulo_reunioes) h.push('Módulo Reuniões');
+    if (plan.has_advanced_reports) h.push('Relatórios Avançados');
+    if (plan.has_priority_support) h.push('Suporte Prioritário');
+  }
   return h;
 }
 
@@ -114,7 +121,7 @@ export default function PreCadastroPage() {
   useEffect(() => {
     supabase
       .from('subscription_plans')
-      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,additional_church_monthly_fee,additional_admin_users_per_church,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes')
+      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,additional_church_monthly_fee,additional_admin_users_per_church,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes,modulos')
       .eq('is_active', true)
       .order('display_order', { ascending: true })
       .order('price_monthly', { ascending: true })
