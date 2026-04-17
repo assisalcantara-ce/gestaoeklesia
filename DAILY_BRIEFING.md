@@ -1,7 +1,7 @@
 # 📋 DAILY BRIEFING - GestãoEklesia
 
-**Data de Última Atualização:** 16 de abril de 2026  
-**Última Sessão:** Módulo EBD completo implantado + correções de bugs (turma vazia, oferta, encoding) + máscaras de input
+**Data de Última Atualização:** 17 de abril de 2026  
+**Última Sessão:** Fluxo completo de Pedidos de Cartas Ministeriais (operador → secretaria → impressão)
 
 ---
 
@@ -178,6 +178,52 @@ git merge feature/nova-feature
 ---
 
 ## ✨ ÚLTIMAS IMPLEMENTAÇÕES
+
+### 📅 17 de Abril de 2026 — Fluxo de Pedidos de Cartas Ministeriais
+
+#### ✅ Concluído
+
+**Migration `migrations/006_create_carta_pedidos.sql`**
+- Tabela `carta_pedidos` com colunas: `id, ministry_id, congregacao_id, solicitante_id, solicitante_nome, member_id, membro_nome, membro_cargo, tipo_carta (mudanca|transito|desligamento|recomendacao), destino, observacoes, status (pendente|autorizado|rejeitado), autorizador_id, autorizador_nome, data_autorizacao, motivo_rejeicao, created_at, updated_at`.
+- RLS: SELECT = qualquer membro do ministry; INSERT = próprio `solicitante_id`; UPDATE = admin/supervisor (comparação jsonb `'["ADMINISTRADOR"]'::jsonb`).
+- **Atenção:** migration ainda precisa ser aplicada no SQL Editor do Supabase.
+
+**Nova página `src/app/secretaria/cartas/pedidos/page.tsx`**
+- Aba **Solicitar**: formulário com busca dinâmica de membro (autocomplete com `skipSearchRef` para fechar dropdown após seleção), cargo, tipo de carta, destino, observações.
+- **Trânsito e Recomendação** → `status: 'autorizado'` na hora, botão exibe "Emitir Carta", carta disponível para impressão imediata.
+- **Mudança e Desligamento** → `status: 'pendente'`, botão exibe "Enviar Pedido à Secretaria Geral", aguarda aprovação.
+- Aba **Meus Pedidos** (operador): lista com `StatusBadge` (amber/green/red), botão "Imprimir Carta" quando autorizado.
+- Aba **Pendentes** (gestor): lista pedidos aguardando → botão "Avaliar" abre modal com campos de motivo de rejeição.
+- Aba **Histórico** (gestor): todos os pedidos do ministry.
+- Modal de avaliação: botões "Rejeitar" (exige motivo) e "Autorizar".
+- Componente `CartaParaImprimir`: layout de carta em estilo formal para `window.print()`.
+- Tema 100% claro (compatível com `PageLayout`): `border-gray-300`, `text-gray-800`, `bg-white`, etc.
+
+**Sidebar (`src/components/Sidebar.tsx`)**
+- Item `cartas` (Cartas ministeriais): mantido com `modulo: 'gestao'` — oculto para operador.
+- Novo item `cartas-pedidos` (Pedidos de Cartas): sem `modulo` — visível para todos com secretaria.
+- Item `certificados`: adicionado `modulo: 'gestao'` — oculto para operador (edição é privilégio da secretaria geral).
+
+**`src/app/secretaria/cartas/page.tsx`** (editor de cartas)
+- Aba "Modelos" ocultada para operador (`visibleTabs` filtra por `isOperador`).
+- `useEffect` redireciona operador para aba `emitir` caso tente acessar `modelos`.
+- `templatesFiltrados`: operador só vê tipos `transito` e `recomendacao` no select de modelos.
+- Info box âmbar com botão "Solicitar à Secretaria" → navega para `/secretaria/cartas/pedidos`.
+
+#### ⚠️ AÇÃO OBRIGATÓRIA ANTES DE USAR NO BANCO (Supabase)
+Rodar no **SQL Editor do Supabase**:
+- `migrations/006_create_carta_pedidos.sql` — cria tabela `carta_pedidos` com RLS
+
+#### ▶️ PRÓXIMOS PASSOS
+
+1. **Aplicar migration** `006_create_carta_pedidos.sql` no Supabase.
+2. **Testar fluxo completo:**
+   - Login como operador → `/secretaria/cartas/pedidos` → solicitar Carta de Trânsito → confirmar impressão imediata.
+   - Login como operador → solicitar Carta de Mudança → confirmar status "pendente".
+   - Login como admin/supervisor → aba Pendentes → Avaliar → Autorizar → confirmar carta disponível para impressão.
+3. **Verificar** que operador não vê Cartas ministeriais nem Certificados no sidebar.
+
+---
 
 ### 📅 16 de Abril de 2026 — Módulo EBD completo + correções + máscaras
 

@@ -205,7 +205,7 @@ export default function EbdAlunosPage() {
   ];
 
   return (
-    <PageLayout title="EBD — Alunos" description="Gerencie alunos e matrículas da Escola Bíblica Dominical" activeMenu="ebd-alunos">
+    <PageLayout title="EBD — Alunos" description="Gerencie alunos e matrículas da Escola Bíblica Dominical" activeMenu="ebd-cadastro-alunos">
       {msg && (
         <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${msg.tipo === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
           {msg.texto}

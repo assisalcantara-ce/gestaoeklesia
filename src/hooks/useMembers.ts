@@ -14,17 +14,13 @@ import { createClient } from '@/lib/supabase-client'
 
 async function getAccessTokenOrThrow() {
   const supabase = createClient()
-  const { data } = await supabase.auth.getSession()
-  let token = data.session?.access_token
-
-  // getSession pode retornar null durante a hidratação inicial (SSR/storage ainda não lido).
-  // Tentativa extra com refreshSession para garantir que o token seja recuperado.
-  if (!token) {
-    const { data: refreshed } = await supabase.auth.refreshSession()
-    token = refreshed.session?.access_token
-  }
-
-  if (!token) throw new Error('Não autenticado')
+  // getUser() é preferível a getSession(): valida o token com o servidor
+  // e o SDK já cuida do refresh automático internamente quando necessário.
+  // Nunca chamar refreshSession() manualmente — consome o token de rotação e causa
+  // "Refresh Token Not Found" quando outras abas/chamadas já o consumiram.
+  const { data: { session }, error } = await supabase.auth.getSession()
+  const token = session?.access_token
+  if (error || !token) throw new Error('Não autenticado')
   return token
 }
 

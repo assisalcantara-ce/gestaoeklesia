@@ -119,16 +119,21 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     // Ouvir mudanças de autenticação
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-      if (!session?.user) {
+    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      if (!session?.user || event === 'SIGNED_OUT') {
+        // Token expirado/revogado ou logout explícito
         setUser(null)
         setAdminUser(null)
         setIsAuthenticated(false)
         setIsAdmin(false)
-      } else {
+        setIsLoading(false)
+      } else if (event === 'SIGNED_IN') {
+        // Só re-verifica admin no login, não em cada TOKEN_REFRESHED
         setUser(session.user)
-        // Re-verificar status de admin
         checkAdminSession()
+      } else {
+        // TOKEN_REFRESHED, INITIAL_SESSION etc — apenas atualiza o user
+        setUser(session.user)
       }
     })
 

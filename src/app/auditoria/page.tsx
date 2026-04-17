@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth'
+import { useRequireModulo } from '@/hooks/useRequireModulo'
 import Sidebar from '@/components/Sidebar'
 
 type AuditLog = {
@@ -23,6 +24,7 @@ type AuditLog = {
 export default function AuditoriaPage() {
   const supabase = createClient()
   const { loading: authLoading } = useRequireSupabaseAuth()
+  const { bloqueado } = useRequireModulo('auditoria')
 
   const [activeMenu, setActiveMenu] = useState('auditoria')
   const [logs, setLogs] = useState<AuditLog[]>([])
@@ -122,7 +124,7 @@ export default function AuditoriaPage() {
     }
   }
 
-  if (authLoading) return <div className="p-8">Carregando...</div>
+  if (bloqueado || authLoading) return <div className="p-8">Carregando...</div>
 
   // Cores para status
   const getStatusColor = (status: string) => {

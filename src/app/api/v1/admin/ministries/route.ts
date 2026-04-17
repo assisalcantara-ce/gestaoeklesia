@@ -132,9 +132,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Criar usuário dono (Auth)
-    const password = cryptoRandomPassword(12)
+    // Prioriza access_email/access_password se fornecidos pelo admin
+    const authEmail = lowerText(body?.access_email) || emailAdmin
+    const password = (body?.access_password && String(body.access_password).trim().length >= 6)
+      ? String(body.access_password).trim()
+      : cryptoRandomPassword(12)
     const { data: authUserData, error: authError } = await supabase.auth.admin.createUser({
-      email: emailAdmin,
+      email: authEmail,
       password,
       email_confirm: true,
       user_metadata: {
@@ -150,6 +154,14 @@ export async function POST(request: NextRequest) {
 
     const slug = body?.slug ? String(body.slug) : slugify(name)
     const plan = body?.plan ? String(body.plan) : mapPlan(body?.subscription_plan_id)
+
+    // Trial
+    const isTrial = body?.trial_mode === true
+    const trialDays = isTrial ? Math.max(1, Math.min(90, Number(body?.trial_days) || 7)) : 0
+    const subscriptionStatus = isTrial ? 'trial' : 'active'
+    const subscriptionEndDate = isTrial
+      ? new Date(Date.now() + trialDays * 86400 * 1000).toISOString()
+      : null
 
     // Criar ministério
     const { data, error } = await supabase
@@ -176,8 +188,9 @@ export async function POST(request: NextRequest) {
           quantity_temples: typeof quantityTemples === 'number' ? quantityTemples : 1,
           quantity_members: typeof quantityMembers === 'number' ? quantityMembers : 0,
           plan,
-          subscription_status: 'active',
-          auto_renew: body?.auto_renew !== false,
+          subscription_status: subscriptionStatus,
+          subscription_end_date: subscriptionEndDate,
+          auto_renew: !isTrial && body?.auto_renew !== false,
           max_users: body?.max_users || 10,
           max_storage_bytes: body?.max_storage_bytes || 5368709120,
           timezone: body?.timezone || 'America/Sao_Paulo',
@@ -225,7 +238,7 @@ export async function POST(request: NextRequest) {
       {
         data,
         credentials: {
-          email: emailAdmin,
+          email: authEmail,
           password,
         },
       },

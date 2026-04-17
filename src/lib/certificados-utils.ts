@@ -1,9 +1,10 @@
-export type CertificadoCategoria = 'ministerial' | 'apresentacao-criancas' | 'batismo-aguas';
+export type CertificadoCategoria = 'ministerial' | 'apresentacao-criancas' | 'batismo-aguas' | 'ebd';
 
 export const CERTIFICADO_CATEGORIAS: Array<{ value: CertificadoCategoria; label: string }> = [
   { value: 'ministerial', label: 'Ministerial' },
   { value: 'apresentacao-criancas', label: 'Apresentacao de Criancas' },
   { value: 'batismo-aguas', label: 'Batismo nas Aguas' },
+  { value: 'ebd', label: 'EBD — Escola Bíblica Dominical' },
 ];
 
 const CERTIFICADO_PLACEHOLDERS_POR_CATEGORIA: Record<CertificadoCategoria, Array<{ campo: string; placeholder: string; label: string }>> = {
@@ -39,6 +40,18 @@ const CERTIFICADO_PLACEHOLDERS_POR_CATEGORIA: Record<CertificadoCategoria, Array
     { campo: 'pastor_nome', placeholder: '{pastor_nome}', label: 'Nome do Pastor' },
     { campo: 'data_emissao', placeholder: '{data_emissao}', label: 'Data de Emissao' },
     { campo: 'nome_igreja', placeholder: '{nome_igreja}', label: 'Nome da Igreja' },
+  ],
+  ebd: [
+    { campo: 'aluno_nome',            placeholder: '{aluno_nome}',            label: 'Nome do Aluno' },
+    { campo: 'aluno_data_nascimento', placeholder: '{aluno_data_nascimento}', label: 'Data de Nascimento' },
+    { campo: 'turma_nome',            placeholder: '{turma_nome}',            label: 'Nome da Turma' },
+    { campo: 'classe_nome',           placeholder: '{classe_nome}',           label: 'Nome da Classe' },
+    { campo: 'professor_nome',        placeholder: '{professor_nome}',        label: 'Professor Titular' },
+    { campo: 'trimestre',             placeholder: '{trimestre}',             label: 'Trimestre' },
+    { campo: 'ano',                   placeholder: '{ano}',                   label: 'Ano' },
+    { campo: 'responsavel_nome',      placeholder: '{responsavel_nome}',      label: 'Respons\u00e1vel' },
+    { campo: 'nome_igreja',           placeholder: '{nome_igreja}',           label: 'Nome da Igreja' },
+    { campo: 'data_emissao',          placeholder: '{data_emissao}',          label: 'Data de Emiss\u00e3o' },
   ],
 };
 

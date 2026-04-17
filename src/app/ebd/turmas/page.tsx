@@ -5,7 +5,7 @@ import PageLayout from '@/components/PageLayout';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
-import { Plus, Pencil, Trash2, X, BookOpen, Users, GraduationCap, Sparkles } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, BookOpen, Users, GraduationCap, Sparkles, Crown } from 'lucide-react';
 import { useAppDialog } from '@/providers/AppDialogProvider';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -24,6 +24,13 @@ interface EbdProfessor {
   telefone: string | null; email: string | null; ativo: boolean;
 }
 
+interface EbdSuperintendente {
+  id: string; ministry_id: string; church_id: string;
+  member_id: string | null; nome: string;
+  telefone: string | null; email: string | null;
+  observacoes: string | null; ativo: boolean;
+}
+
 interface EbdTurma {
   id: string; ministry_id: string; church_id: string;
   classe_id: string | null; nome: string;
@@ -33,7 +40,7 @@ interface EbdTurma {
   church_nome?: string; classe_nome?: string; professor_nome?: string;
 }
 
-type Aba = 'classes' | 'turmas' | 'professores';
+type Aba = 'classes' | 'turmas' | 'professores' | 'superintendentes';
 
 const CORES_CLASSE = [
   '#ec4899','#f97316','#eab308','#22c55e',
@@ -82,19 +89,26 @@ export default function EbdTurmasPage() {
   const [editProf,     setEditProf]     = useState<EbdProfessor | null>(null);
   const [formProf,     setFormProf]     = useState({ church_id: '', nome: '', telefone: '', email: '' });
 
+  const [superintendentes, setSuperintendentes] = useState<EbdSuperintendente[]>([]);
+  const [showSuperForm,    setShowSuperForm]    = useState(false);
+  const [editSuper,        setEditSuper]        = useState<EbdSuperintendente | null>(null);
+  const [formSuper,        setFormSuper]        = useState({ church_id: '', nome: '', telefone: '', email: '', observacoes: '' });
+
   // ── Carregar dados ───────────────────────────────────────────────────────
 
   const load = useCallback(async (mid: string) => {
     setLoading(true);
-    const [congsR, classesR, profsR, turmasR] = await Promise.all([
+    const [congsR, classesR, profsR, turmasR, supersR] = await Promise.all([
       supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome'),
       supabase.from('ebd_classes').select('*').eq('ministry_id', mid).order('ordem').order('nome'),
       supabase.from('ebd_professores').select('*').eq('ministry_id', mid).order('nome'),
       supabase.from('ebd_turmas').select('*').eq('ministry_id', mid).order('nome'),
+      supabase.from('ebd_superintendentes').select('*').eq('ministry_id', mid).order('nome'),
     ]);
     setCongregacoes(congsR.data ?? []);
     setClasses(classesR.data ?? []);
     setProfessores(profsR.data ?? []);
+    setSuperintendentes(supersR.data ?? []);
 
     const rawTurmas: EbdTurma[] = turmasR.data ?? [];
     const congMap = new Map<string, string>((congsR.data ?? []).map((c: { id: string; nome: string }) => [c.id, c.nome]));
@@ -247,19 +261,56 @@ export default function EbdTurmasPage() {
     else { flash('ok', 'Professor excluído.'); load(ministryId); }
   };
 
+  // ── CRUD Superintendentes ────────────────────────────────────────────────
+
+  const abrirFormSuper = (s?: EbdSuperintendente) => {
+    setEditSuper(s ?? null);
+    setFormSuper(s
+      ? { church_id: s.church_id, nome: s.nome, telefone: s.telefone ?? '', email: s.email ?? '', observacoes: s.observacoes ?? '' }
+      : { church_id: '', nome: '', telefone: '', email: '', observacoes: '' });
+    setShowSuperForm(true);
+  };
+
+  const salvarSuper = async () => {
+    if (!ministryId || !formSuper.church_id || !formSuper.nome.trim()) return;
+    const payload = {
+      ministry_id:  ministryId,
+      church_id:    formSuper.church_id,
+      nome:         formSuper.nome.trim(),
+      telefone:     formSuper.telefone || null,
+      email:        formSuper.email    || null,
+      observacoes:  formSuper.observacoes || null,
+    };
+    const { error } = editSuper
+      ? await supabase.from('ebd_superintendentes').update(payload).eq('id', editSuper.id)
+      : await supabase.from('ebd_superintendentes').insert(payload);
+    if (error) flash('erro', error.message);
+    else { flash('ok', editSuper ? 'Superintendente atualizado!' : 'Superintendente cadastrado!'); setShowSuperForm(false); load(ministryId); }
+  };
+
+  const excluirSuper = async (id: string) => {
+    if (!ministryId) return;
+    const ok = await dialog.confirm({ title: 'Remover superintendente', type: 'warning', message: 'Tem certeza que deseja remover este superintendente?', confirmText: 'Remover', cancelText: 'Cancelar' });
+    if (!ok) return;
+    const { error } = await supabase.from('ebd_superintendentes').delete().eq('id', id);
+    if (error) flash('erro', error.message);
+    else { flash('ok', 'Superintendente removido.'); load(ministryId); }
+  };
+
   // ── Renderização ─────────────────────────────────────────────────────────
 
   const turmasFiltradas = filtroCong ? turmas.filter(t => t.church_id === filtroCong) : turmas;
   const profsFiltrados  = filtroCong ? professores.filter(p => p.church_id === filtroCong) : professores;
 
   const TABS: { id: Aba; label: string; icon: React.ReactNode; count: number }[] = [
-    { id: 'classes',     label: 'Classes EBD', icon: <BookOpen className="h-4 w-4" />,      count: classes.length },
-    { id: 'turmas',      label: 'Turmas',       icon: <Users className="h-4 w-4" />,          count: turmas.length },
-    { id: 'professores', label: 'Professores',  icon: <GraduationCap className="h-4 w-4" />,  count: professores.length },
+    { id: 'classes',          label: 'Classes EBD',     icon: <BookOpen className="h-4 w-4" />,      count: classes.length },
+    { id: 'turmas',           label: 'Turmas',           icon: <Users className="h-4 w-4" />,          count: turmas.length },
+    { id: 'professores',      label: 'Professores',      icon: <GraduationCap className="h-4 w-4" />,  count: professores.length },
+    { id: 'superintendentes', label: 'Superintendentes', icon: <Crown className="h-4 w-4" />,          count: superintendentes.length },
   ];
 
   return (
-    <PageLayout title="EBD — Turmas" description="Gerencie classes, turmas e professores da Escola Bíblica Dominical" activeMenu="ebd-turmas">
+    <PageLayout title="EBD — Turmas" description="Gerencie classes, turmas e professores da Escola Bíblica Dominical" activeMenu="ebd-cadastro-turmas">
       {msg && (
         <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${msg.tipo === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
           {msg.texto}
@@ -599,6 +650,116 @@ export default function EbdTurmasPage() {
                 <div className="flex gap-3 mt-6">
                   <button onClick={() => setShowProfForm(false)} className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition">Cancelar</button>
                   <button onClick={salvarProf} className="flex-1 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition">Salvar</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {/* ══ ABA: SUPERINTENDENTES ══ */}
+      {aba === 'superintendentes' && !loading && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-base font-bold text-gray-700">Superintendentes ({superintendentes.length})</h2>
+            <button onClick={() => abrirFormSuper()}
+              className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition">
+              <Plus className="h-4 w-4" /> Novo Superintendente
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-400">Cada congregação pode ter no máximo 1 superintendente da EBD.</p>
+
+          {superintendentes.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <Crown className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Nenhum superintendente cadastrado.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Nome</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Igreja</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Telefone</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">E-mail</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Observações</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {superintendentes.map(s => (
+                    <tr key={s.id}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Crown className="h-4 w-4 text-amber-500 shrink-0" />
+                          <span className="font-medium text-gray-800">{s.nome}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{congregacoes.find(c => c.id === s.church_id)?.nome ?? '—'}</td>
+                      <td className="px-4 py-3 text-gray-500">{s.telefone || '—'}</td>
+                      <td className="px-4 py-3 text-gray-500">{s.email || '—'}</td>
+                      <td className="px-4 py-3 text-gray-400 text-xs max-w-xs truncate">{s.observacoes || '—'}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => abrirFormSuper(s)} className="text-gray-400 hover:text-[#123b63] transition"><Pencil className="h-4 w-4" /></button>
+                          <button onClick={() => excluirSuper(s.id)} className="text-gray-400 hover:text-red-500 transition"><Trash2 className="h-4 w-4" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Form Superintendente */}
+          {showSuperForm && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                <div className="flex justify-between items-center mb-5">
+                  <h3 className="font-bold text-[#123b63] text-lg">{editSuper ? 'Editar Superintendente' : 'Novo Superintendente'}</h3>
+                  <button onClick={() => setShowSuperForm(false)}><X className="h-5 w-5 text-gray-400" /></button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Igreja *</label>
+                    <select value={formSuper.church_id} onChange={e => setFormSuper(f => ({ ...f, church_id: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                      <option value="">Selecione...</option>
+                      {congregacoes
+                        .filter(c => !superintendentes.some(s => s.church_id === c.id && s.id !== editSuper?.id))
+                        .map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                    </select>
+                    {!editSuper && congregacoes.length > 0 &&
+                      congregacoes.every(c => superintendentes.some(s => s.church_id === c.id)) && (
+                      <p className="text-xs text-amber-600 mt-1">Todas as igrejas já possuem superintendente.</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Nome *</label>
+                    <input value={formSuper.nome} onChange={e => setFormSuper(f => ({ ...f, nome: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Nome completo" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Telefone</label>
+                    <input type="tel" value={formSuper.telefone} onChange={e => setFormSuper(f => ({ ...f, telefone: fmtFone(e.target.value) }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="(00) 00000-0000" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">E-mail</label>
+                    <input type="email" value={formSuper.email} onChange={e => setFormSuper(f => ({ ...f, email: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="super@email.com" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Observações</label>
+                    <textarea value={formSuper.observacoes} onChange={e => setFormSuper(f => ({ ...f, observacoes: e.target.value }))}
+                      rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" placeholder="Opcional" />
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button onClick={() => setShowSuperForm(false)} className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition">Cancelar</button>
+                  <button onClick={salvarSuper} className="flex-1 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition">Salvar</button>
                 </div>
               </div>
             </div>

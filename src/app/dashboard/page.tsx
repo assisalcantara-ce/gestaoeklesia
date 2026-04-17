@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { useUserContext } from '@/hooks/useUserContext';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -44,6 +45,10 @@ interface DashData {
   ebdTurmas: number;
   ebdMediaPresenca: number | null;
   totalUsuarios: number;
+  membrosVisitantes: number;
+  ultimasCartas: { id: string; tipo: string; created_at: string; membro_nome: string }[];
+  ultimosFluxos: { id: string; status: string; tipo_fluxo: string }[];
+  cartaPedidosPendentes: { id: string; status: string; tipo_carta: string }[];
 }
 
 const EMPTY: DashData = {
@@ -54,12 +59,17 @@ const EMPTY: DashData = {
   historico6m: [], porTipo: [],
   ebdTurmas: 0, ebdMediaPresenca: null,
   totalUsuarios: 0,
+  membrosVisitantes: 0,
+  ultimasCartas: [],
+  ultimosFluxos: [],
+  cartaPedidosPendentes: [],
 };
 
 // component
 export default function DashboardPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const userCtx = useUserContext();
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [dataAtual, setDataAtual] = useState('');
   const [usuarioLogado, setUsuarioLogado] = useState<{ nome: string; email: string; nivel: string } | null>(null);
@@ -103,6 +113,12 @@ export default function DashboardPage() {
       const ministryId = await resolveMinistryId(supabase);
       if (!ministryId) { setLoadingDash(false); return; }
 
+      const temFinanceiro = userCtx.podeAcessar('tesouraria');
+
+      // Escopo por nível: admin_local/financeiro_local → congregacao; supervisor → supervisao
+      const scopeCongId  = userCtx.congregacaoId;  // não-null só para admin_local / financeiro_local
+      const scopeSupId   = userCtx.supervisaoId;    // não-null só para supervisor
+
       const agora    = new Date();
       const anoAtual = agora.getFullYear();
       const mesAtual = agora.getMonth() + 1;
@@ -117,22 +133,55 @@ export default function DashboardPage() {
         ultimos6.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}`);
       }
 
+      // Helper: aplica filtro de congregação ou supervisão conforme o nível
+      const withScope = (q: ReturnType<typeof supabase.from>) => {
+        if (scopeCongId) return (q as any).eq('congregacao_id', scopeCongId);
+        if (scopeSupId)  return (q as any).eq('supervisao_id', scopeSupId);
+        return q;
+      };
+      const withScopeMember = (q: ReturnType<typeof supabase.from>) => {
+        if (scopeCongId) return (q as any).eq('congregacao_id', scopeCongId);
+        // supervisor: filtra membros cuja congregação pertence à supervisão dele
+        // (feito via campo supervisao_id dos membros)
+        if (scopeSupId)  return (q as any).eq('supervisao_id', scopeSupId);
+        return q;
+      };
+      const withScopeLanc = (q: ReturnType<typeof supabase.from>) => {
+        if (scopeCongId) return (q as any).eq('congregacao_id', scopeCongId);
+        return q;
+      };
+
       const [
         membrosRes, fluxosRes, cartasRes, congsRes, deptsRes,
         lancMesRes, lancAnteriorRes, lancHistRes,
         ebdTurmasRes, ebdChamadasRes, usuariosRes,
+        visitantesRes, ultimasCartasRes, ultimosFluxosRes, cartaPedidosRes,
       ] = await Promise.all([
-        supabase.from('members').select('status2, batizado').eq('ministry_id', ministryId),
-        supabase.from('flow_instances').select('status').eq('ministry_id', ministryId),
+        withScopeMember(supabase.from('members').select('status2, batizado, gender').eq('ministry_id', ministryId)),
+        supabase.from('flow_instances').select('status, tipo_fluxo, created_at').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(10),
         supabase.from('cartas_ministeriais').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId),
-        supabase.from('congregacoes').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('is_active', true),
+        scopeCongId
+          ? supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('id', scopeCongId).eq('is_active', true)
+          : scopeSupId
+            ? supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('supervisao_id', scopeSupId).eq('is_active', true)
+            : supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('is_active', true),
         supabase.from('departamentos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId),
-        supabase.from('tesouraria_lancamentos').select('tipo_movimento, tipo_recebimento, valor').eq('ministry_id', ministryId).like('data_lancamento', `${mesRef}%`),
-        supabase.from('tesouraria_lancamentos').select('tipo_movimento, valor').eq('ministry_id', ministryId).like('data_lancamento', `${mesAnterior}%`),
-        supabase.from('tesouraria_lancamentos').select('tipo_movimento, valor, data_lancamento').eq('ministry_id', ministryId).gte('data_lancamento', `${ultimos6[0]}-01`),
+        temFinanceiro
+          ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, tipo_recebimento, valor').eq('ministry_id', ministryId).like('data_lancamento', `${mesRef}%`))
+          : Promise.resolve({ data: [] }),
+        temFinanceiro
+          ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, valor').eq('ministry_id', ministryId).like('data_lancamento', `${mesAnterior}%`))
+          : Promise.resolve({ data: [] }),
+        temFinanceiro
+          ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, valor, data_lancamento').eq('ministry_id', ministryId).gte('data_lancamento', `${ultimos6[0]}-01`))
+          : Promise.resolve({ data: [] }),
         supabase.from('ebd_turmas').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('ativo', true),
         supabase.from('ebd_chamadas').select('presentes, total_alunos').eq('ministry_id', ministryId).gte('data_chamada', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).limit(100),
         supabase.from('ministry_users').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'ativo'),
+        supabase.from('members').select('id').eq('ministry_id', ministryId).is('congregacao_id', null),
+        supabase.from('cartas_ministeriais').select('id, tipo, created_at, membro_nome').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(5),
+        supabase.from('flow_instances').select('id, status, tipo_fluxo').eq('ministry_id', ministryId).neq('status', 'concluido').limit(5),
+        supabase.from('carta_pedidos').select('id, status, tipo_carta').eq('ministry_id', ministryId).neq('status', 'rejeitado').order('created_at', { ascending: false }).limit(3),
       ]);
 
       // membros
@@ -145,6 +194,31 @@ export default function DashboardPage() {
       const fluxos          = fluxosRes.data ?? [];
       const totalFluxos     = fluxos.length;
       const fluxosPendentes = fluxos.filter((f: any) => f.status === 'pendente' || f.status === 'em_andamento').length;
+
+      // últimas cartas
+      const ultimasCartas = (ultimasCartasRes.data ?? []).map((c: any) => ({
+        id: c.id,
+        tipo: c.tipo,
+        created_at: c.created_at,
+        membro_nome: c.membro_nome,
+      }));
+
+      // últimos fluxos pendentes
+      const ultimosFluxos = (ultimosFluxosRes.data ?? []).filter((f: any) => f.status !== 'concluido').slice(0, 3).map((f: any) => ({
+        id: f.id,
+        status: f.status,
+        tipo_fluxo: f.tipo_fluxo,
+      }));
+
+      // cartas de pedidos pendentes
+      const cartaPedidosPendentes = (cartaPedidosRes.data ?? []).slice(0, 3).map((p: any) => ({
+        id: p.id,
+        status: p.status,
+        tipo_carta: p.tipo_carta,
+      }));
+
+      // visitantes
+      const membrosVisitantes = (visitantesRes.data ?? []).length;
 
       // lancamentos mês
       const lancMes   = lancMesRes.data   ?? [];
@@ -206,6 +280,10 @@ export default function DashboardPage() {
         ebdTurmas: ebdTurmasRes.count ?? 0,
         ebdMediaPresenca,
         totalUsuarios: usuariosRes.count ?? 0,
+        membrosVisitantes,
+        ultimasCartas,
+        ultimosFluxos,
+        cartaPedidosPendentes,
       });
       setLoadingDash(false);
     };
@@ -226,12 +304,13 @@ export default function DashboardPage() {
     supervisor: 'bg-indigo-100 text-indigo-800', viewer: 'bg-gray-100 text-gray-600',
   };
 
-  if (authLoading) return (
+  if (authLoading || userCtx.loading) return (
     <div className="flex h-screen items-center justify-center text-[#123b63] font-semibold">
       Carregando...
     </div>
   );
 
+  const temFinanceiro = userCtx.podeAcessar('tesouraria');
   const saldoPositivo = dash.saldoMes >= 0;
 
   return (
@@ -266,10 +345,66 @@ export default function DashboardPage() {
 
         <div className="p-6 space-y-6">
 
-          {/* ROW 1: KPIs principais */}
+          {/* ROW 1: Cards Secundários de Contexto (TOPO) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Membros por Status */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-5 shadow-sm border border-blue-200">
+              <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-3">Membros Ativos</p>
+              {loadingDash ? (
+                <div className="h-8 w-20 bg-blue-200 rounded animate-pulse" />
+              ) : (
+                <>
+                  <p className="text-3xl font-bold text-[#123b63]">{dash.membrosAtivos}</p>
+                  <p className="text-xs text-blue-700 mt-2 font-medium">{dash.totalMembros > 0 ? Math.round((dash.membrosAtivos / dash.totalMembros) * 100) : 0}% do total</p>
+                </>
+              )}
+            </div>
+
+            {/* Membros Batizados */}
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl p-5 shadow-sm border border-emerald-200">
+              <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-3">Batizados</p>
+              {loadingDash ? (
+                <div className="h-8 w-20 bg-emerald-200 rounded animate-pulse" />
+              ) : (
+                <>
+                  <p className="text-3xl font-bold text-emerald-700">{dash.membrosBatizados}</p>
+                  <p className="text-xs text-emerald-700 mt-2 font-medium">{dash.totalMembros > 0 ? Math.round((dash.membrosBatizados / dash.totalMembros) * 100) : 0}% do total</p>
+                </>
+              )}
+            </div>
+
+            {/* Visitantes */}
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-5 shadow-sm border border-purple-200">
+              <p className="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-3">Visitantes</p>
+              {loadingDash ? (
+                <div className="h-8 w-20 bg-purple-200 rounded animate-pulse" />
+              ) : (
+                <>
+                  <p className="text-3xl font-bold text-purple-700">{dash.membrosVisitantes}</p>
+                  <p className="text-xs text-purple-700 mt-2 font-medium">Sem congregação</p>
+                </>
+              )}
+            </div>
+
+            {/* Total de Usuários */}
+            <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-2xl p-5 shadow-sm border border-amber-200">
+              <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-3">Usuários Ativos</p>
+              {loadingDash ? (
+                <div className="h-8 w-20 bg-amber-200 rounded animate-pulse" />
+              ) : (
+                <>
+                  <p className="text-3xl font-bold text-amber-700">{dash.totalUsuarios}</p>
+                  <p className="text-xs text-amber-700 mt-2 font-medium">Admins e operadores</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* ROW 2: KPIs principais */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
-            {/* Entradas do mês */}
+            {/* Entradas do mês — só financeiro */}
+            {temFinanceiro && (
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Entradas (mês)</span>
@@ -293,8 +428,10 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
+            )}
 
-            {/* Saídas do mês */}
+            {/* Saídas do mês — só financeiro */}
+            {temFinanceiro && (
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Saídas (mês)</span>
@@ -311,8 +448,10 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
+            )}
 
-            {/* Saldo */}
+            {/* Saldo — só financeiro */}
+            {temFinanceiro && (
             <div className={`rounded-2xl p-5 shadow-sm border ${saldoPositivo ? 'bg-emerald-600 border-emerald-500' : 'bg-red-600 border-red-500'}`}>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-semibold text-white/80 uppercase tracking-wide">Saldo (mês)</span>
@@ -329,27 +468,140 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
+            )}
 
-            {/* Membros */}
+          </div>
+
+          {/* ROW 3: Atividades Recentes + Pendências */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* Últimas Cartas Emitidas */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Membros</span>
-                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
-                  <Users size={18} className="text-blue-600" />
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-[#123b63]">Cartas Recentes</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Últimas emitidas</p>
                 </div>
+                <button
+                  onClick={() => router.push('/secretaria/cartas')}
+                  className="text-xs text-blue-600 font-semibold hover:underline"
+                >
+                  Ver mais
+                </button>
               </div>
               {loadingDash ? (
-                <div className="h-8 w-16 bg-gray-100 rounded animate-pulse" />
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />)}
+                </div>
+              ) : dash.ultimasCartas.length === 0 ? (
+                <div className="py-8 flex flex-col items-center justify-center text-gray-300 gap-2">
+                  <FileText size={24} className="opacity-30" />
+                  <span className="text-xs">Nenhuma carta emitida</span>
+                </div>
               ) : (
-                <>
-                  <p className="text-2xl font-bold text-[#123b63]">{dash.totalMembros}</p>
-                  <p className="text-xs text-gray-400 mt-1">{dash.membrosAtivos} ativos | {dash.membrosBatizados} batizados</p>
-                </>
+                <div className="space-y-2">
+                  {dash.ultimasCartas.map(carta => (
+                    <div key={carta.id} className="p-3 rounded-lg bg-gray-50 hover:bg-blue-50 transition border border-transparent hover:border-blue-200 cursor-pointer" onClick={() => router.push('/secretaria/cartas')}>
+                      <p className="text-xs font-semibold text-gray-700 truncate">{carta.membro_nome}</p>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-xs text-gray-400 capitalize bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{carta.tipo}</span>
+                        <span className="text-xs text-gray-400">{new Date(carta.created_at).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' })}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Fluxos Pendentes */}
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-[#123b63]">Fluxos Pendentes</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Aguardando ação</p>
+                </div>
+                <button
+                  onClick={() => router.push('/secretaria/fluxos')}
+                  className="text-xs text-blue-600 font-semibold hover:underline"
+                >
+                  Ver mais
+                </button>
+              </div>
+              {loadingDash ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />)}
+                </div>
+              ) : dash.ultimosFluxos.length === 0 ? (
+                <div className="py-8 flex flex-col items-center justify-center text-gray-300 gap-2">
+                  <CheckCircle size={24} className="opacity-30" />
+                  <span className="text-xs">Sem fluxos pendentes!</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {dash.ultimosFluxos.map(fluxo => (
+                    <div key={fluxo.id} className="p-3 rounded-lg bg-gray-50 hover:bg-purple-50 transition border border-transparent hover:border-purple-200 cursor-pointer" onClick={() => router.push('/secretaria/fluxos')}>
+                      <p className="text-xs font-semibold text-gray-700 capitalize truncate">{fluxo.tipo_fluxo}</p>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className={`text-xs px-2 py-0.5 rounded font-semibold ${
+                          fluxo.status === 'pendente' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'
+                        }`}>
+                          {fluxo.status === 'pendente' ? '⏳ Pendente' : '⚙️ Em andamento'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Cartas de Pedidos */}
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-[#123b63]">Pedidos de Cartas</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Status dos pedidos</p>
+                </div>
+                <button
+                  onClick={() => router.push('/secretaria/cartas/pedidos')}
+                  className="text-xs text-blue-600 font-semibold hover:underline"
+                >
+                  Ver mais
+                </button>
+              </div>
+              {loadingDash ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />)}
+                </div>
+              ) : dash.cartaPedidosPendentes.length === 0 ? (
+                <div className="py-8 flex flex-col items-center justify-center text-gray-300 gap-2">
+                  <CheckCircle size={24} className="opacity-30" />
+                  <span className="text-xs">Nenhum pedido pendente</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {dash.cartaPedidosPendentes.map(pedido => (
+                    <div key={pedido.id} className="p-3 rounded-lg bg-gray-50 hover:bg-sky-50 transition border border-transparent hover:border-sky-200 cursor-pointer" onClick={() => router.push('/secretaria/cartas/pedidos')}>
+                      <p className="text-xs font-semibold text-gray-700 capitalize truncate">{pedido.tipo_carta}</p>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className={`text-xs px-2 py-0.5 rounded font-semibold ${
+                          pedido.status === 'pendente' ? 'bg-amber-50 text-amber-700' : 
+                          pedido.status === 'autorizado' ? 'bg-emerald-50 text-emerald-700' : 
+                          'bg-red-50 text-red-700'
+                        }`}>
+                          {pedido.status === 'pendente' ? '⏳ Pendente' : 
+                           pedido.status === 'autorizado' ? '✓ Autorizado' : 
+                           '✗ Rejeitado'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
 
-          {/* ROW 2: Gráfico área + Pizza */}
+          {/* ROW 3: Gráfico área + Pizza — só financeiro */}
+          {temFinanceiro && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             {/* Gráfico área: entradas x saídas 6 meses */}
@@ -454,8 +706,9 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+          )}
 
-          {/* ROW 3: Secretaria + EBD */}
+          {/* ROW 4: Secretaria + EBD */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
             {/* Fluxos */}
@@ -464,7 +717,7 @@ export default function DashboardPage() {
               onClick={() => router.push('/secretaria/fluxos')}
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fluxos</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fluxos Totais</span>
                 <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center">
                   <FileText size={18} className="text-purple-600" />
                 </div>
@@ -552,10 +805,11 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ROW 4: Barra de receitas + Atalhos */}
+          {/* ROW 5: Barra de receitas (só financeiro) + Atalhos */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-            {/* Barra horizontal: top categorias */}
+            {/* Barra horizontal: top categorias — só financeiro */}
+            {temFinanceiro && (
             <div className="lg:col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -608,18 +862,19 @@ export default function DashboardPage() {
                 </ResponsiveContainer>
               )}
             </div>
+            )}
 
             {/* Atalhos rápidos */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
+            <div className={`bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3 ${temFinanceiro ? '' : 'lg:col-span-3'}`}>
               <h3 className="text-sm font-bold text-[#123b63] mb-1">Acesso Rápido</h3>
 
               {[
-                { label: 'Cadastrar Membro', sub: 'Secretaria', icon: '👤', href: '/secretaria/membros' },
-                { label: 'Lançar Entrada', sub: 'Tesouraria', icon: '💰', href: '/tesouraria' },
-                { label: 'Emitir Carta', sub: 'Secretaria', icon: '📄', href: '/secretaria/cartas' },
-                { label: 'Chamada EBD', sub: 'EBD', icon: '📚', href: '/secretaria/ebd/chamada' },
-                { label: 'Novo Usuário', sub: 'Administração', icon: '🔑', href: '/usuarios' },
-              ].map(item => (
+                { label: 'Cadastrar Membro',  sub: 'Secretaria',    icon: '👤', href: '/secretaria/membros',      modulo: 'secretaria' },
+                { label: 'Lançar Entrada',    sub: 'Tesouraria',    icon: '💰', href: '/tesouraria',              modulo: 'tesouraria' },
+                { label: 'Emitir Carta',      sub: 'Secretaria',    icon: '📄', href: '/secretaria/cartas',       modulo: 'secretaria' },
+                { label: 'Chamada EBD',       sub: 'EBD',           icon: '📚', href: '/secretaria/ebd/chamada',  modulo: 'ebd'        },
+                { label: 'Novo Usuário',      sub: 'Administração', icon: '🔑', href: '/usuarios',                modulo: 'usuarios'   },
+              ].filter(item => userCtx.podeAcessar(item.modulo)).map(item => (
                 <button
                   key={item.href}
                   onClick={() => router.push(item.href)}

@@ -1,14 +1,30 @@
 /**
  * Hook para gerenciar permissões de acesso baseado no nível do usuário
- * Implementa a hierarquia: Administrador > Superintendente > Supervisor > Operador
- *                          Administrador > Financeiro
- *                          Superintendente > Coordenador
+ *
+ * Hierarquia:
+ *   administrador  → acesso total ao ministry
+ *   financeiro     → dashboard (visão financeira) + módulo financeiro geral
+ *   supervisor     → dashboard (visão operador) + secretaria da sua supervisão
+ *   admin_local    → dashboard (visão operador) + secretaria da sua congregação
+ *   financeiro_local → dashboard (visão operador) + financeiro da sua congregação
+ *   superintendente → EBD geral
+ *   coordenador    → EBD local
+ *   operador       → secretaria da sua congregação (legado)
  */
 
-export type NivelAcesso = 'administrador' | 'financeiro' | 'operador' | 'supervisor' | 'superintendente' | 'coordenador';
+export type NivelAcesso =
+  | 'administrador'
+  | 'financeiro'
+  | 'supervisor'
+  | 'admin_local'
+  | 'financeiro_local'
+  | 'superintendente'
+  | 'coordenador'
+  | 'operador';
 
-// Definir quais módulos cada nível pode acessar
+// Quais módulos cada nível pode ACESSAR (leitura)
 const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
+  // Tenant admin: acesso total
   administrador: [
     'secretaria',
     'financeiro',
@@ -22,31 +38,50 @@ const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'missoes',
     'patrimonio',
     'geolocalizacao',
+    'comissao',
+    'gestao',
   ],
+  // Financeiro geral: dashboard financeiro + módulo financeiro de todo o ministry
   financeiro: [
+    'dashboard',
     'financeiro',
     'tesouraria',
-    'configuracoes', // apenas branding/nomenclaturas
+    'configuracoes',
   ],
-  superintendente: [
-    'ebd', // Apenas EBD
-    'configuracoes', // leitura apenas
-  ],
+  // Supervisor: dashboard operador + secretaria da sua supervisão (campo/setor)
   supervisor: [
-    'secretaria', // Apenas seus grupos de congregações
-    'configuracoes', // leitura apenas
+    'dashboard',
+    'secretaria',
+    'configuracoes',
+    'comissao',
   ],
-  operador: [
-    'secretaria', // Apenas sua congregação
-    'configuracoes', // leitura apenas
+  // Admin local: dashboard operador + secretaria da sua congregação
+  admin_local: [
+    'dashboard',
+    'secretaria',
+    'configuracoes',
+  ],
+  // Financeiro local: dashboard operador + financeiro da sua congregação
+  financeiro_local: [
+    'dashboard',
+    'financeiro',
+    'tesouraria',
+  ],
+  // Legado / EBD
+  superintendente: [
+    'ebd',
+    'configuracoes',
   ],
   coordenador: [
-    'ebd', // Apenas EBD local
-    'configuracoes', // leitura apenas
+    'ebd',
+    'configuracoes',
+  ],
+  operador: [
+    'secretaria',
   ],
 };
 
-// Definir qual módulo cada nível pode ESCREVER
+// Quais módulos cada nível pode ESCREVER
 const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
   administrador: [
     'secretaria',
@@ -66,17 +101,24 @@ const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'financeiro',
     'tesouraria',
   ],
-  superintendente: [
-    'ebd', // Pode editar EBD geral
-  ],
   supervisor: [
-    'secretaria', // Pode editar secretaria de seus grupos
+    'secretaria',
   ],
-  operador: [
-    'secretaria', // Pode editar secretaria de sua congregação
+  admin_local: [
+    'secretaria',
+  ],
+  financeiro_local: [
+    'financeiro',
+    'tesouraria',
+  ],
+  superintendente: [
+    'ebd',
   ],
   coordenador: [
-    'ebd', // Pode editar EBD local
+    'ebd',
+  ],
+  operador: [
+    'secretaria',
   ],
 };
 

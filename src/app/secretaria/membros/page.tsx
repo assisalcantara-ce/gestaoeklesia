@@ -13,6 +13,7 @@ import { getMensagemSemTemplate } from '@/lib/cartoes-utils';
 import { createClient } from '@/lib/supabase-client';
 import { loadOrgNomenclaturasFromSupabaseOrMigrate } from '@/lib/org-nomenclaturas';
 import { loadTemplatesForCurrentUser } from '@/lib/cartoes-templates-sync';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useMembers } from '@/hooks/useMembers';
 import type { Member, CreateMemberRequest, UpdateMemberRequest } from '@/types/supabase';
 
@@ -134,6 +135,7 @@ interface DadosPessoaisState {
 type MembrosFormTab = 'dados' | 'endereco' | 'ministerial' | 'foto' | 'dizimos';
 
 export default function MembrosPage() {
+  const { bloqueado } = useRequireModulo('secretaria');
   const supabase = createClient();
 
   const [dashboardView, setDashboardView] = useState<'overview' | 'list'>('overview');
@@ -1694,6 +1696,8 @@ export default function MembrosPage() {
     }
     return true;
   });
+
+  if (bloqueado) return null;
 
   return (
     <div className="flex h-screen bg-gray-100">

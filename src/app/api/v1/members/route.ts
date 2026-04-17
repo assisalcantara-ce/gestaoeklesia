@@ -76,6 +76,24 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Resolve escopo do usuário (congregação ou supervisão) a partir de ministry_users
+    const admin = createServerClient()
+    const { data: muScope } = await admin
+      .from('ministry_users')
+      .select('role, permissions, congregacao_id, supervisao_id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    const permsSet = new Set(
+      (Array.isArray(muScope?.permissions) ? muScope.permissions : []).map((p: any) => String(p).toUpperCase())
+    )
+    const isAdminScope  = !muScope || permsSet.has('ADMINISTRADOR') || String(muScope?.role || '').toLowerCase() === 'admin'
+    const isAdminLocal  = permsSet.has('ADMIN_LOCAL')
+    const isFinLocal    = permsSet.has('FINANCEIRO_LOCAL')
+    const isSupervisor  = permsSet.has('SUPERVISOR')
+    const scopeCongId   = (isAdminLocal || isFinLocal) ? (muScope?.congregacao_id ?? null) : null
+    const scopeSupId    = isSupervisor ? (muScope?.supervisao_id ?? null) : null
+
     // Extrair query params
     const searchParams = request.nextUrl.searchParams
     const page = parseInt(searchParams.get('page') || '1')
@@ -86,11 +104,19 @@ export async function GET(request: NextRequest) {
 
     const offset = (page - 1) * limit
 
-    // Construir query - FILTRAR SEMPRE POR MINISTRY_ID
+    // Construir query — sempre filtrada por ministry_id
     let query = supabase
       .from('members')
       .select('*', { count: 'exact' })
       .eq('ministry_id', ministryId)
+
+    // Aplicar escopo por nível
+    if (scopeCongId) {
+      query = query.eq('congregacao_id', scopeCongId)
+    } else if (scopeSupId) {
+      query = query.eq('supervisao_id', scopeSupId)
+    }
+    // isAdminScope → sem filtro extra (vê tudo do ministry)
 
     // Aplicar filtros
     if (status) {

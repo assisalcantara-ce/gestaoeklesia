@@ -13,12 +13,12 @@ export function useRequireSupabaseAuth(options?: { redirectTo?: string }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const redirectTo = options?.redirectTo || '/'
+    const redirectTo = options?.redirectTo || '/login'
 
     const run = async () => {
       try {
-        const { data } = await supabase.auth.getUser()
-        if (!data.user) {
+        const { data, error } = await supabase.auth.getUser()
+        if (error || !data.user) {
           router.push(redirectTo)
           return
         }

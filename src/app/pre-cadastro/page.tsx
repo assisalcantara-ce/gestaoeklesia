@@ -447,7 +447,7 @@ export default function PreCadastroPage() {
                   alt="WhatsApp"
                   className="h-4 w-4"
                 />
-                DÚVIDAS? Fale com nossa equipe comercial.
+                DÚVIDAS? Fale com nossa equipe comercial. Clique aqui...
               </p>
               <p className="text-xs text-slate-600 mt-2">Fale com nosso time: (91) 98175-5021</p>
             </a>

@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { useAuditLog } from '@/hooks/useAuditLog';
 
@@ -43,6 +44,7 @@ interface SupervisaoOption {
 export default function UsuariosPage() {
   const [activeMenu, setActiveMenu] = useState('usuarios');
   const { loading: authLoading } = useRequireSupabaseAuth();
+  const { bloqueado } = useRequireModulo('usuarios');
   const supabase = useMemo(() => createClient(), []);
   const { registrarAcao } = useAuditLog();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -563,6 +565,10 @@ export default function UsuariosPage() {
         setUsuarios(payload?.data || []);
       }
     }
+
+    // Fecha o formulário e volta para a lista
+    setFormStatus('');
+    setShowForm(false);
   };
 
   // Filtro + Busca
@@ -583,6 +589,8 @@ export default function UsuariosPage() {
   const startIndex = usuariosFiltrados.length === 0 ? 0 : (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const usuariosPaginados = usuariosFiltrados.slice(startIndex, endIndex);
+
+  if (bloqueado) return null;
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -884,13 +892,6 @@ export default function UsuariosPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-gray-700">
-                        {usuario.nivel === 'supervisor'
-                          ? (usuario.supervisao || <span className="text-amber-500 text-xs font-medium">Campo não definido</span>)
-                          : ['admin_local', 'financeiro_local'].includes(usuario.nivel)
-                          ? (usuario.congregacao || <span className="text-amber-500 text-xs font-medium">Congregação não definida</span>)
-                          : <span className="text-gray-400 text-xs">— Acesso geral —</span>
-                        }
-                      
                         {usuario.nivel === 'supervisor'
                           ? (usuario.supervisao || <span className="text-amber-500 text-xs font-medium">Campo não definido</span>)
                           : ['admin_local', 'financeiro_local'].includes(usuario.nivel)

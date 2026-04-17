@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import EbdSidebarMenu, { ALL_EBD_IDS } from '@/components/EbdSidebarMenu';
+import { useUserContext } from '@/hooks/useUserContext';
 
 interface SidebarProps {
   activeMenu: string;
@@ -16,6 +18,7 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const planFeatures = usePlanFeatures();
+  const userCtx = useUserContext();
 
   // Auto-expande o menu pai quando um filho está ativo
   const parentMap: Record<string, string> = {
@@ -27,91 +30,98 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
     'apresentacao-criancas': 'secretaria',
     'batismo-aguas': 'secretaria',
     'cartas': 'secretaria',
+    'cartas-pedidos': 'secretaria',
     'certificados': 'secretaria',
     'config-geral': 'configuracoes',
     'config-cartoes': 'configuracoes',
     'ativar-fluxo': 'configuracoes',
+    // Todos os IDs EBD → raiz 'ebd' (EbdSidebarMenu gerencia expansão interna)
+    ...Object.fromEntries(ALL_EBD_IDS.map(id => [id, 'ebd'])),
+    // legados — compatibilidade com páginas ainda não migradas
+    'ebd-historico': 'ebd',
+    'ebd-trimestres': 'ebd',
     'ebd-chamada': 'ebd',
-    'ebd-turmas': 'ebd',
-    'ebd-alunos': 'ebd',
-    'ebd-revistas': 'ebd',
-    'ebd-relatorios': 'ebd',
   };
   useEffect(() => {
     if (parentMap[activeMenu]) setExpandedMenu(parentMap[activeMenu]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMenu]);
 
+  // Módulo que cada item requer (undefined = visível para todos autenticados)
   const allMenuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
+    { id: 'dashboard',        label: 'Dashboard',          icon: '📊', path: '/dashboard' },
     {
       id: 'secretaria',
       label: 'Secretaria',
       icon: '📝',
       path: '/secretaria',
+      modulo: 'secretaria',
       submenu: [
-        { id: 'estrutura-hierarquica', label: 'Estrutura Hierárquica', icon: '🏛️', path: '/secretaria/estrutura-hierarquica' },
-        { id: 'membros', label: 'Membros', icon: '👥', path: '/secretaria/membros' },
-        { id: 'departamentos', label: 'Departamentos', icon: '🏷️', path: '/secretaria/departamentos' },
-        { id: 'apresentacao-criancas', label: 'Apresentação de Crianças', icon: '🧒', path: '/secretaria/apresentacao-criancas' },
-        { id: 'batismo-aguas', label: 'Batismo nas Águas', icon: '✝️', path: '/secretaria/batismo-aguas' },
-        { id: 'cartas', label: 'Cartas ministeriais', icon: '📜', path: '/secretaria/cartas' },
-        { id: 'certificados', label: 'Certificados', icon: '🎓', path: '/secretaria/certificados' }
+        { id: 'estrutura-hierarquica', label: 'Estrutura Hierárquica',  icon: '🏛️', path: '/secretaria/estrutura-hierarquica', modulo: 'gestao'     },
+        { id: 'membros',               label: 'Membros',                icon: '👥', path: '/secretaria/membros'                                       },
+        { id: 'departamentos',         label: 'Departamentos',          icon: '🏷️', path: '/secretaria/departamentos'                                 },
+        { id: 'apresentacao-criancas', label: 'Apresentação de Crianças', icon: '🧒', path: '/secretaria/apresentacao-criancas'                       },
+        { id: 'batismo-aguas',         label: 'Batismo nas Águas',      icon: '✝️', path: '/secretaria/batismo-aguas'                                 },
+        { id: 'cartas',                label: 'Cartas ministeriais',    icon: '📜', path: '/secretaria/cartas',         modulo: 'gestao'          },
+        { id: 'cartas-pedidos',        label: 'Pedidos de Cartas',      icon: '✉️', path: '/secretaria/cartas/pedidos'                                },
+        { id: 'certificados',          label: 'Certificados',           icon: '🎓', path: '/secretaria/certificados',  modulo: 'gestao'          },
       ]
     },
-    { id: 'achados-perdidos', label: 'Achados e Perdidos', icon: '🔍', path: '/secretaria/achados-perdidos' },
-    { id: 'tesouraria', label: 'Tesouraria', icon: '💰', path: '/tesouraria' },
-    { id: 'financeiro', label: 'Financeiro', icon: '💳', path: '/financeiro' },
-    { id: 'funcionarios', label: 'Funcionários', icon: '👔', path: '/secretaria/funcionarios' },
-    { id: 'eventos', label: 'Eventos', icon: '📅', path: '/eventos' },
-    { id: 'presidencia', label: 'Presidência', icon: '👑', path: '/presidencia' },
-    { id: 'reunioes', label: 'Reuniões', icon: '🤝', path: '/reunioes' },
-    { id: 'comissao', label: 'Comissão', icon: '👥', path: '/comissao', submenu: [
-        { id: 'comissoes', label: 'Comissões', icon: '👥', path: '/comissao' },
-        { id: 'consagracao', label: 'Consagração (obreiros)', icon: '🙏', path: '/secretaria/consagracao' },
-      ]
-    },
-    { id: 'patrimonio', label: 'Patrimônio', icon: '🏢', path: '/patrimonio' },
-    { id: 'missoes', label: 'Missões', icon: '✈️', path: '/missoes' },
+    { id: 'tesouraria', label: 'Tesouraria', icon: '💰', path: '/tesouraria', modulo: 'tesouraria' },
     {
       id: 'ebd',
       label: 'EBD',
       icon: '📖',
-      path: '/ebd/chamada',
-      submenu: [
-        { id: 'ebd-chamada',    label: 'Chamada Semanal', icon: '✏️', path: '/ebd/chamada'    },
-        { id: 'ebd-turmas',    label: 'Turmas',          icon: '🏫', path: '/ebd/turmas'    },
-        { id: 'ebd-alunos',    label: 'Alunos',          icon: '👦', path: '/ebd/alunos'    },
-        { id: 'ebd-revistas',  label: 'Revistas',        icon: '📚', path: '/ebd/revistas'  },
-        { id: 'ebd-relatorios',label: 'Relatórios',      icon: '📊', path: '/ebd/relatorios'},
+      path: '/ebd/dashboard/geral',
+      modulo: 'ebd',
+      ebdMenu: true,
+    },
+    { id: 'comissao', label: 'Comissão', icon: '👥', path: '/comissao', modulo: 'comissao', submenu: [
+        { id: 'comissoes',   label: 'Comissões',              icon: '👥', path: '/comissao'                },
+        { id: 'consagracao', label: 'Consagração (obreiros)', icon: '🙏', path: '/secretaria/consagracao'  },
       ]
     },
-    { id: 'auditoria', label: 'Auditoria', icon: '✅', path: '/auditoria' },
-    { id: 'usuarios', label: 'Usuários', icon: '👤', path: '/usuarios' },
-    { id: 'suporte', label: 'Suporte', icon: '🎫', path: '/suporte' },
+    { id: 'reunioes',         label: 'Reuniões',           icon: '🤝', path: '/reunioes',                   modulo: 'reunioes'   },
+    { id: 'missoes',          label: 'Missões',            icon: '✈️', path: '/missoes',                    modulo: 'missoes'    },
+    { id: 'eventos',          label: 'Eventos',            icon: '📅', path: '/eventos',                    modulo: 'eventos'    },
+    { id: 'presidencia',      label: 'Presidência',        icon: '👑', path: '/presidencia'                                     },
+    { id: 'patrimonio',       label: 'Patrimônio',         icon: '🏢', path: '/patrimonio',                 modulo: 'patrimonio' },
+    { id: 'achados-perdidos', label: 'Achados e Perdidos', icon: '🔍', path: '/secretaria/achados-perdidos', modulo: 'secretaria' },
+    { id: 'funcionarios',     label: 'Funcionários',       icon: '👔', path: '/secretaria/funcionarios',     modulo: 'gestao'     },
+    { id: 'financeiro',       label: 'Financeiro',         icon: '💳', path: '/financeiro',                 modulo: 'financeiro' },
+    { id: 'auditoria',        label: 'Auditoria',          icon: '✅', path: '/auditoria',                  modulo: 'auditoria'  },
+    { id: 'usuarios',         label: 'Usuários',           icon: '👤', path: '/usuarios',                   modulo: 'usuarios'   },
+    { id: 'suporte',          label: 'Suporte',            icon: '🎫', path: '/suporte'                                         },
     {
       id: 'configuracoes',
       label: 'Configurações',
       icon: '⚙️',
       path: '/configuracoes',
+      modulo: 'configuracoes',
       submenu: [
-        { id: 'config-geral', label: 'Geral', icon: '⚙️', path: '/configuracoes' },
-        { id: 'config-cartoes', label: 'Cartões', icon: '🎫', path: '/configuracoes/cartoes' },
-        { id: 'ativar-fluxo', label: 'Ativar Fluxo', icon: '🔄', path: '/secretaria/ativar-fluxo' },
+        { id: 'config-geral',   label: 'Geral',        icon: '⚙️', path: '/configuracoes'           },
+        { id: 'config-cartoes', label: 'Cartões',      icon: '🎫', path: '/configuracoes/cartoes'   },
+        { id: 'ativar-fluxo',   label: 'Ativar Fluxo', icon: '🔄', path: '/secretaria/ativar-fluxo' },
       ]
     },
   ];
 
-  // Filtra menus restritos por plano (enquanto carrega, mantém oculto para não piscar)
-  const menuItems = planFeatures.loading
-    ? allMenuItems.filter(i => !['tesouraria', 'financeiro', 'eventos', 'reunioes'].includes(i.id))
-    : allMenuItems.filter(i => {
-        if (i.id === 'tesouraria') return planFeatures.has_modulo_financeiro;
-        if (i.id === 'financeiro') return planFeatures.has_modulo_financeiro_avancado;
-        if (i.id === 'eventos') return planFeatures.has_modulo_eventos;
-        if (i.id === 'reunioes') return planFeatures.has_modulo_reunioes;
-        return true;
-      });
+  // Filtra menus: 1) por plano  2) por nível de acesso do usuário
+  const menuItems = allMenuItems.filter(i => {
+    // Enquanto algum dos dois carrega, oculta itens sensíveis para não piscar
+    if (planFeatures.loading || userCtx.loading) {
+      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios'].includes(i.id);
+    }
+    // Filtro por plano
+    if (i.id === 'tesouraria' && !planFeatures.has_modulo_financeiro)          return false;
+    if (i.id === 'financeiro' && !planFeatures.has_modulo_financeiro_avancado) return false;
+    if (i.id === 'eventos'    && !planFeatures.has_modulo_eventos)             return false;
+    if (i.id === 'reunioes'   && !planFeatures.has_modulo_reunioes)            return false;
+    // Filtro por permissão de nível
+    const modulo = (i as any).modulo as string | undefined;
+    if (modulo && !userCtx.podeAcessar(modulo)) return false;
+    return true;
+  });
 
   const handleNavigate = (id: string, path: string) => {
     setActiveMenu(id);
@@ -137,7 +147,7 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
             <div key={item.id}>
               <button
                 onClick={() => {
-                  if ((item as any).submenu) {
+                  if ((item as any).submenu || (item as any).ebdMenu) {
                     setExpandedMenu(expandedMenu === item.id ? null : item.id);
                   } else {
                     handleNavigate(item.id, item.path);
@@ -150,30 +160,40 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
               >
                 <span className="text-lg w-6 text-center">{item.icon}</span>
                 <span className="text-sm font-medium flex-1 text-left">{item.label}</span>
-                {(item as any).submenu && (
+                {((item as any).submenu || (item as any).ebdMenu) && (
                   <span className={`text-white/50 transition transform text-xs ${expandedMenu === item.id ? 'rotate-180' : ''}`}>
                     ▼
                   </span>
                 )}
               </button>
 
-              {/* SUBMENUS */}
+              {/* SUBMENU FLAT — outros módulos */}
               {(item as any).submenu && expandedMenu === item.id && (
                 <div className="bg-[#0f2a45] border-y border-white/10">
-                  {(item as any).submenu.map((submenu: any, index: number) => (
+                  {((item as any).submenu as any[])
+                    .filter((sub) => !sub.modulo || userCtx.podeAcessar(sub.modulo))
+                    .map((submenu: any, index: number, arr: any[]) => (
                     <button
                       key={submenu.id}
                       onClick={() => handleNavigate(submenu.id, submenu.path)}
                       className={`w-full flex items-center gap-3 px-4 py-3 transition text-sm text-left ${activeMenu === submenu.id
                           ? 'bg-white/20 text-white font-semibold'
                           : 'text-white/60 hover:bg-white/15 hover:text-white'
-                        } ${index < (item as any).submenu.length - 1 ? 'border-b border-white/5' : ''}`}
+                        } ${index < arr.length - 1 ? 'border-b border-white/5' : ''}`}
                     >
                       <span className="text-orange-400 text-lg w-6 text-center">▸</span>
                       <span className="flex-1">{submenu.label}</span>
                     </button>
                   ))}
                 </div>
+              )}
+
+              {/* SUBMENU EBD — hierarquia de 3 níveis (EbdSidebarMenu) */}
+              {(item as any).ebdMenu && expandedMenu === item.id && (
+                <EbdSidebarMenu
+                  activeMenu={activeMenu}
+                  onNavigate={handleNavigate}
+                />
               )}
             </div>
           ))}

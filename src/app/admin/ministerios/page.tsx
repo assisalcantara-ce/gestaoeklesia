@@ -22,6 +22,23 @@ export default function MinisteriosPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const errorRef = useRef<HTMLDivElement>(null)
+
+  const friendlyError = (msg: string): string => {
+    if (!msg) return msg
+    if (msg.includes('ministries_email_admin_key') || (msg.includes('duplicate key') && msg.includes('email')))
+      return 'Este e-mail j\u00e1 est\u00e1 cadastrado em outro minist\u00e9rio. Utilize um e-mail diferente.'
+    if (msg.includes('duplicate key') || msg.includes('unique constraint'))
+      return 'J\u00e1 existe um registro com esses dados. Verifique os campos e tente novamente.'
+    if (msg.includes('auth/email-already-in-use') || msg.includes('User already registered'))
+      return 'Este e-mail j\u00e1 possui uma conta no sistema. Utilize outro e-mail de acesso.'
+    return msg
+  }
+
+  const showError = (msg: string) => {
+    setError(friendlyError(msg))
+    setTimeout(() => errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+  }
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreviewSrc, setLogoPreviewSrc] = useState<string>('')
   const [logoPreviewObjectUrl, setLogoPreviewObjectUrl] = useState<string>('')
@@ -80,6 +97,9 @@ export default function MinisteriosPage() {
     is_active: true,
   })
 
+  const [isTrial, setIsTrial] = useState(false)
+  const [trialDays, setTrialDays] = useState(7)
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -102,6 +122,8 @@ export default function MinisteriosPage() {
       subscription_plan_id: '',
       is_active: true,
     })
+    setIsTrial(false)
+    setTrialDays(7)
     if (logoPreviewObjectUrl) URL.revokeObjectURL(logoPreviewObjectUrl)
     setLogoPreviewObjectUrl('')
     setLogoPreviewSrc('')
@@ -327,7 +349,7 @@ export default function MinisteriosPage() {
     // Validar CNPJ se preenchido
     const cnpjDigits = onlyDigits(formData.cnpj)
     if (cnpjDigits && !validarCnpj(cnpjDigits)) {
-      setError('CNPJ inválido. Verifique os dígitos e tente novamente.')
+      showError('CNPJ inválido. Verifique os dígitos e tente novamente.')
       return
     }
 
@@ -341,12 +363,21 @@ export default function MinisteriosPage() {
         contact_phone: onlyDigits(formData.contact_phone),
         whatsapp: onlyDigits(formData.whatsapp),
         logo_url: uploadedLogoUrl || formData.logo_url,
+        // Trial
+        trial_mode: !editingId && isTrial,
+        trial_days: !editingId && isTrial ? trialDays : undefined,
       }
 
       if (!editingId) {
-        // Remove credential fields when creating new ministry
-        const { access_email, access_password, ...rest } = payloadToSend
-        payloadToSend = rest
+        // Validar credenciais obrigatórias na criação
+        if (!formData.access_email?.trim()) {
+          showError('Email de acesso é obrigatório para criar um ministério.')
+          return
+        }
+        if (!formData.access_password?.trim() || formData.access_password.trim().length < 8) {
+          showError('Senha de acesso é obrigatória e deve ter no mínimo 8 caracteres.')
+          return
+        }
       } else {
         // Remove empty credential fields when editing
         if (!payloadToSend.access_email?.trim()) delete payloadToSend.access_email
@@ -378,7 +409,7 @@ export default function MinisteriosPage() {
       setShowForm(false)
       fetchMinisterios()
     } catch (err: any) {
-      setError(err.message)
+      showError(err.message)
     }
   }
 
@@ -525,8 +556,9 @@ export default function MinisteriosPage() {
         <div className="p-6 space-y-6">
           <div className="max-w-7xl mx-auto">
             {error && (
-              <div className="bg-red-900 border border-red-700 text-red-200 p-4 rounded mb-6">
-                {error}
+              <div ref={errorRef} className="bg-red-900 border border-red-700 text-red-200 p-4 rounded mb-6 flex items-start gap-3">
+                <span className="text-xl leading-none mt-0.5">&#9888;</span>
+                <span>{error}</span>
               </div>
             )}
 
@@ -792,34 +824,44 @@ export default function MinisteriosPage() {
               </div>
 
               {/* Seção 3.1: Credenciais de Acesso */}
-              {editingId && (
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">Credenciais de Acesso</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Novo Email de Acesso</label>
-                      <input
-                        type="email"
-                        value={formData.access_email}
-                        onChange={(e) => setFormData({ ...formData, access_email: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Nova Senha de Acesso</label>
-                      <input
-                        type="password"
-                        value={formData.access_password}
-                        onChange={(e) => setFormData({ ...formData, access_password: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
+              <div className="mb-6">
+                <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">
+                  {editingId ? 'Alterar Credenciais de Acesso' : 'Credenciais de Acesso'}
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {editingId ? 'Novo Email de Acesso' : 'Email de Acesso'}
+                      {!editingId && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.access_email}
+                      onChange={(e) => setFormData({ ...formData, access_email: e.target.value })}
+                      placeholder="admin@ministerio.com"
+                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                    />
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Se preencher, o email/senha de acesso do tenant sera atualizado.
-                  </p>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {editingId ? 'Nova Senha de Acesso' : 'Senha de Acesso'}
+                      {!editingId && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    <input
+                      type="password"
+                      value={formData.access_password}
+                      onChange={(e) => setFormData({ ...formData, access_password: e.target.value })}
+                      placeholder={editingId ? 'Deixe em branco para manter' : 'Mínimo 8 caracteres'}
+                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
                 </div>
-              )}
+                <p className="text-xs text-gray-500 mt-2">
+                  {editingId
+                    ? 'Se preencher, o email/senha de acesso do tenant será atualizado.'
+                    : 'Email e senha que o administrador do ministério usará para acessar o sistema.'}
+                </p>
+              </div>
 
               {/* Seção 4: Endereço */}
               <div className="mb-6">
@@ -971,6 +1013,43 @@ export default function MinisteriosPage() {
                       <option value="inativo">Inativo</option>
                     </select>
                   </div>
+                  {/* Trial */}
+                  {!editingId && (
+                    <div className="md:col-span-2">
+                      <div className="flex items-center gap-3 p-4 rounded-lg border-2 transition"
+                        style={{ borderColor: isTrial ? '#2563eb' : '#e5e7eb', background: isTrial ? '#eff6ff' : '#f9fafb' }}
+                      >
+                        <input
+                          type="checkbox"
+                          id="chk-trial"
+                          checked={isTrial}
+                          onChange={e => setIsTrial(e.target.checked)}
+                          className="w-5 h-5 accent-blue-600 cursor-pointer"
+                        />
+                        <label htmlFor="chk-trial" className="font-semibold text-gray-800 cursor-pointer select-none">
+                          Período Trial
+                        </label>
+                        <span className="text-xs text-gray-500">— o ministério iniciará em modo trial e será desativado após o prazo</span>
+                      </div>
+                      {isTrial && (
+                        <div className="mt-3 flex items-center gap-3">
+                          <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Duração do trial:</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={90}
+                            value={trialDays}
+                            onChange={e => setTrialDays(Math.max(1, Math.min(90, Number(e.target.value))))}
+                            className="w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500 text-sm"
+                          />
+                          <span className="text-sm text-gray-600">dias</span>
+                          <span className="text-xs text-blue-600 ml-1">
+                            (expira em {new Date(Date.now() + trialDays * 86400000).toLocaleDateString('pt-BR')})
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

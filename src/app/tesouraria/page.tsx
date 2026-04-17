@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, Printer, Users, CalendarDays, Lock, Unlock, CheckCircle, Search } from 'lucide-react';
@@ -22,6 +23,7 @@ interface Dizimista {
   nome: string;
   congregacao_id: string | null;
   congregacao_nome: string;
+  membro_desde: string; // YYYY-MM
 }
 
 interface Lancamento {
@@ -29,6 +31,8 @@ interface Lancamento {
   ministry_id: string;
   congregacao_id: string | null;
   departamento_id: string | null;
+  member_id: string | null;
+  dizimista_nome: string | null;
   tipo_recebimento: TipoRecebimento;
   tipo_movimento: TipoMovimento;
   descricao: string | null;
@@ -112,7 +116,7 @@ const MESES_LABEL = [
 function MonthPicker({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
   const anoAtual = new Date().getFullYear();
   const anos = Array.from({ length: 6 }, (_, i) => anoAtual - 2 + i); // -2 a +3
-  const [mes, ano] = value ? value.split('-') : [String(new Date().getMonth() + 1).padStart(2,'0'), String(anoAtual)];
+  const [ano, mes] = value ? value.split('-') : [String(anoAtual), String(new Date().getMonth() + 1).padStart(2,'0')];
 
   const update = (m: string, a: string) => onChange(`${a}-${m}`);
 
@@ -185,6 +189,7 @@ interface UserScope {
 
 export default function TesourariaPage() {
   const { loading: authLoading } = useRequireSupabaseAuth();
+  const { bloqueado } = useRequireModulo('tesouraria');
   const supabase = useMemo(() => createClient(), []);
 
   const [ministryId,  setMinistryId]  = useState<string | null>(null);
@@ -213,7 +218,7 @@ export default function TesourariaPage() {
   const [loadingDizimistas, setLoadingDizimistas] = useState(false);
   const [abaDizimistaMes, setAbaDizimistaMes] = useState(mesAtual());
   const [filtroNomeDiz, setFiltroNomeDiz] = useState('');
-  const [filtroStatusDiz, setFiltroStatusDiz] = useState<'' | 'pago' | 'pendente'>('');
+  const [filtroStatusDiz, setFiltroStatusDiz] = useState<'' | 'pago' | 'pendente' | 'avulso'>('');
   const [filtroConsDiz, setFiltroConsDiz] = useState('');
 
   // Filtros
@@ -238,6 +243,8 @@ export default function TesourariaPage() {
   const [dizSelId,    setDizSelId]    = useState<string | null>(null);
   const [dizSelNome,  setDizSelNome]  = useState('');
   const [dizBuscando, setDizBuscando] = useState(false);
+  const [dizIsAvulso, setDizIsAvulso] = useState(false);
+  const [dizAvulsoNome, setDizAvulsoNome] = useState('');
 
   const [modal, setModal] = useState<{ open: boolean; title: string; message: string; type: 'success'|'error'|'info' }>({
     open: false, title: '', message: '', type: 'success',
@@ -388,7 +395,14 @@ export default function TesourariaPage() {
       .eq('status', 'active')
       .ilike('name', `${q.trim()}%`)
       .limit(8);
-    setDizBuscaRes((data || []).map((m: any) => ({ id: m.id, nome: m.name })));
+    const results = (data || []).map((m: any) => ({ id: m.id, nome: m.name }));
+    setDizBuscaRes(results);
+    // Se não encontrou ninguém, ativa automaticamente o modo avulso
+    if (results.length === 0) {
+      setDizIsAvulso(true);
+      setDizAvulsoNome(q.trim());
+      setDizBusca('');
+    }
     setDizBuscando(false);
   }, [ministryId, supabase]);
 
@@ -397,6 +411,8 @@ export default function TesourariaPage() {
     setDizBuscaRes([]);
     setDizSelId(null);
     setDizSelNome('');
+    setDizIsAvulso(false);
+    setDizAvulsoNome('');
   };
 
   // ── Salvar ────────────────────────────────────────────────────────────────
@@ -413,7 +429,7 @@ export default function TesourariaPage() {
     if (!scope.isFinanceiroLocal && !form.congregacao_id) {
       showModal('Congregação obrigatória', 'Selecione a congregação do lançamento.', 'error'); return;
     }
-    const valorNum = parseFloat(form.valor.replace(',', '.'));
+    const valorNum = parseFloat(form.valor.replace(/[^\d,]/g, '').replace(',', '.'));
     if (isNaN(valorNum) || valorNum <= 0) {
       showModal('Valor inválido', 'Informe um valor maior que zero.', 'error'); return;
     }
@@ -423,6 +439,7 @@ export default function TesourariaPage() {
       ministry_id:      ministryId,
       congregacao_id:   form.congregacao_id  || null,
       departamento_id:  form.departamento_id || null,
+      member_id:        dizSelId || null,
       tipo_movimento:   form.tipo_movimento,
       tipo_recebimento: isSaida ? (form.categoria_saida || 'outros_despesa') : form.tipo_recebimento,
       descricao:        form.descricao.trim()  || null,
@@ -434,14 +451,24 @@ export default function TesourariaPage() {
       updated_at:       now,
     };
 
+    // Sempre incluir dizimista_nome e member_id no payload (insert e update)
+    if (!isSaida && form.tipo_recebimento === 'dizimo') {
+      if (dizSelId) {
+        payload.member_id      = dizSelId;
+        payload.dizimista_nome = dizSelNome;
+      } else if (dizIsAvulso) {
+        payload.member_id      = null;
+        payload.dizimista_nome = dizAvulsoNome.trim() || null;
+      } else {
+        payload.member_id      = null;
+        payload.dizimista_nome = null;
+      }
+    }
+
     if (editId) {
       const { error } = await supabase.from('tesouraria_lancamentos').update(payload).eq('id', editId);
       if (error) { showModal('Erro', error.message, 'error'); setSaving(false); return; }
-      showModal('Atualizado!', 'Lançamento atualizado com sucesso.');
-    } else {
-      const { error } = await supabase.from('tesouraria_lancamentos').insert({ ...payload, created_at: now });
-      if (error) { showModal('Erro', error.message, 'error'); setSaving(false); return; }
-      // Se for dízimo com membro selecionado, registrar pagamento
+      // Atualizar dizimistas_pagamentos se houver membro vinculado
       if (form.tipo_recebimento === 'dizimo' && dizSelId) {
         const mesRef = form.data_lancamento.slice(0, 7);
         await supabase.from('dizimistas_pagamentos').upsert({
@@ -450,6 +477,21 @@ export default function TesourariaPage() {
           mes_referencia: mesRef,
           status:         'pago',
         }, { onConflict: 'ministry_id,member_id,mes_referencia' });
+      }
+      showModal('Atualizado!', 'Lançamento atualizado com sucesso.');
+    } else {
+      const { error } = await supabase.from('tesouraria_lancamentos').insert({ ...payload, created_at: now });
+      if (error) { showModal('Erro', error.message, 'error'); setSaving(false); return; }
+      // Se for dízimo com membro selecionado, registrar pagamento
+      if (form.tipo_recebimento === 'dizimo' && dizSelId) {
+        const mesRef = form.data_lancamento.slice(0, 7);
+        const { error: errPag } = await supabase.from('dizimistas_pagamentos').upsert({
+          ministry_id:    ministryId,
+          member_id:      dizSelId,
+          mes_referencia: mesRef,
+          status:         'pago',
+        }, { onConflict: 'ministry_id,member_id,mes_referencia' });
+        if (errPag) { showModal('Aviso', `Dízimo salvo, mas houve erro ao registrar adimplência: ${errPag.message}`, 'error'); }
       }
       showModal('Registrado!', 'Lançamento registrado com sucesso.');
     }
@@ -465,6 +507,8 @@ export default function TesourariaPage() {
 
   const handleEdit = (l: Lancamento) => {
     const isSaida = l.tipo_movimento === 'saida';
+    // Limpar estado de busca antes de restaurar
+    resetDizForm();
     setForm({
       congregacao_id:   l.congregacao_id  ?? '',
       departamento_id:  l.departamento_id ?? '',
@@ -473,11 +517,19 @@ export default function TesourariaPage() {
       categoria_saida:  isSaida ? l.tipo_recebimento : '',
       descricao:        l.descricao  ?? '',
       referencia:       l.referencia ?? '',
-      valor:            String(l.valor),
+      valor:            fmtBRL(Number(l.valor)),
       forma_pagamento:  l.forma_pagamento,
       data_lancamento:  l.data_lancamento,
       observacoes:      l.observacoes ?? '',
     });
+    // Restaurar vínculo de dizimista
+    if (l.member_id && l.dizimista_nome) {
+      setDizSelId(l.member_id);
+      setDizSelNome(l.dizimista_nome);
+    } else if (!l.member_id && l.dizimista_nome && l.tipo_recebimento === 'dizimo') {
+      setDizIsAvulso(true);
+      setDizAvulsoNome(l.dizimista_nome);
+    }
     setEditId(l.id);
     setShowForm(true);
     setAba('lancamentos');
@@ -573,7 +625,7 @@ export default function TesourariaPage() {
     const congMap = new Map(congregacoes.map(c => [c.id, c.nome]));
     const { data: mems } = await supabase
       .from('members')
-      .select('id, name, congregacao_id')
+      .select('id, name, congregacao_id, created_at')
       .eq('ministry_id', ministryId)
       .eq('is_dizimista', true)
       .eq('status', 'active')
@@ -583,6 +635,7 @@ export default function TesourariaPage() {
       nome: m.name,
       congregacao_id: m.congregacao_id,
       congregacao_nome: m.congregacao_id ? (congMap.get(m.congregacao_id) ?? '—') : 'Sede',
+      membro_desde: (m.created_at as string).slice(0, 7),
     })));
 
     const { data: pags } = await supabase
@@ -601,21 +654,69 @@ export default function TesourariaPage() {
 
   const dizimistasComStatus = useMemo(() => {
     const pagMap = new Map(dizimistaPagamentos.map(p => [p.member_id, p.status]));
+    // Fallback: lancamentos com member_id no mês também marcam como 'pago'
+    lancamentos
+      .filter(l => l.member_id && l.tipo_recebimento === 'dizimo' && l.data_lancamento.startsWith(abaDizimistaMes))
+      .forEach(l => { if (!pagMap.has(l.member_id!)) pagMap.set(l.member_id!, 'pago'); });
     return dizimistas.map(d => ({ ...d, status: (pagMap.get(d.id) ?? 'pendente') as 'pago' | 'pendente' }));
-  }, [dizimistas, dizimistaPagamentos]);
+  }, [dizimistas, dizimistaPagamentos, lancamentos, abaDizimistaMes]);
 
   const dizimistasVisiveis = useMemo(() => dizimistasComStatus.filter(d => {
     if (filtroNomeDiz && !d.nome.toLowerCase().includes(filtroNomeDiz.toLowerCase())) return false;
-    if (filtroStatusDiz && d.status !== filtroStatusDiz) return false;
     if (filtroConsDiz && d.congregacao_id !== filtroConsDiz) return false;
-    return true;
-  }), [dizimistasComStatus, filtroNomeDiz, filtroStatusDiz, filtroConsDiz]);
+    if (filtroStatusDiz === '' || filtroStatusDiz === 'pago') {
+      // Todos ou Adimplente: exibe apenas quem pagou no mês
+      return d.status === 'pago';
+    }
+    if (filtroStatusDiz === 'pendente') {
+      // Inadimplente: só membros que já eram dizimistas no mês selecionado
+      return d.status === 'pendente' && d.membro_desde <= abaDizimistaMes;
+    }
+    return false; // 'avulso' não usa essa lista
+  }), [dizimistasComStatus, filtroNomeDiz, filtroStatusDiz, filtroConsDiz, abaDizimistaMes]);
+
+  const dizimosAvulsos = useMemo(() => lancamentos.filter(l =>
+    l.tipo_recebimento === 'dizimo' &&
+    l.data_lancamento.startsWith(abaDizimistaMes) &&
+    !l.member_id
+  ), [lancamentos, abaDizimistaMes]);
+
+  // Lista unificada para o filtro "Todos" (adimplentes + avulsos do mês)
+  const listaUnificadaTodos = useMemo(() => {
+    if (filtroStatusDiz !== '') return [];
+    // Mapa member_id → soma dos dízimos do mês
+    const valorPorMembro = new Map<string, number>();
+    lancamentos
+      .filter(l => l.member_id && l.tipo_recebimento === 'dizimo' && l.data_lancamento.startsWith(abaDizimistaMes))
+      .forEach(l => {
+        valorPorMembro.set(l.member_id!, (valorPorMembro.get(l.member_id!) ?? 0) + Number(l.valor));
+      });
+    const adimplentes = dizimistasVisiveis.map(d => ({
+      key: `m-${d.id}`,
+      nome: d.nome,
+      congregacao_nome: d.congregacao_nome,
+      situacao: 'Adimplente' as const,
+      valor: valorPorMembro.get(d.id) ?? null,
+    }));
+    const avulsosFiltrados = dizimosAvulsos
+      .filter(l => !filtroNomeDiz ||
+        (l.dizimista_nome || '').toLowerCase().includes(filtroNomeDiz.toLowerCase()))
+      .map(l => ({
+        key: `a-${l.id}`,
+        nome: l.dizimista_nome || 'Não informado',
+        congregacao_nome: l.congregacao_nome || '—',
+        situacao: 'Avulso' as const,
+        valor: Number(l.valor),
+      }));
+    return [...adimplentes, ...avulsosFiltrados]
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }, [filtroStatusDiz, dizimistasVisiveis, dizimosAvulsos, filtroNomeDiz, lancamentos, abaDizimistaMes]);
 
   const totalPagos = useMemo(() => dizimistasComStatus.filter(d => d.status === 'pago').length, [dizimistasComStatus]);
 
   // ─────────────────────────────────────────────────────────────────────────
 
-  if (authLoading || loadingData) return <div className="p-8 text-gray-500">Carregando...</div>;
+  if (bloqueado || authLoading || loadingData) return <div className="p-8 text-gray-500">Carregando...</div>;
 
   const congNome = (id: string | null) => {
     if (!id) return 'Caixa Geral (Sede)';
@@ -643,7 +744,7 @@ export default function TesourariaPage() {
       `}} />
 
       {/* ── Abas ── */}
-      <div className="mb-6 border-b border-gray-200 flex gap-1 flex-wrap">
+      <div className="mb-6 border-b-2 border-slate-200 flex gap-1 flex-wrap">
         {([
           { id: 'dashboard',   icon: <TrendingUp className="h-4 w-4" />,    label: 'Dashboard'     },
           { id: 'lancamentos', icon: <Tag className="h-4 w-4" />,           label: 'Lançamentos'   },
@@ -670,28 +771,28 @@ export default function TesourariaPage() {
         <div className="space-y-6">
           {/* Cards resumo */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-green-500 p-5 shadow-md">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Entradas (mês atual)</p>
               <p className="text-2xl font-bold text-green-600">{fmtBRL(dashStats.totalMes)}</p>
             </div>
-            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-red-500 p-5 shadow-md">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Saídas (mês atual)</p>
               <p className="text-2xl font-bold text-red-500">{fmtBRL(dashStats.totalSaidas)}</p>
             </div>
-            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-[#123b63] p-5 shadow-md">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Saldo do mês</p>
               <p className={`text-2xl font-bold ${dashStats.saldoMes >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>
                 {fmtBRL(dashStats.saldoMes)}
               </p>
             </div>
-            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-amber-500 p-5 shadow-md">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Congregações ativas</p>
               <p className="text-2xl font-bold text-[#123b63]">{congregacoes.length}</p>
             </div>
           </div>
 
           {/* Por tipo de recebimento */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-md">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Arrecadação do mês por tipo</h3>
             {Object.keys(dashStats.porTipo).length === 0 ? (
               <p className="text-sm text-gray-400">Nenhum lançamento no mês atual.</p>
@@ -718,7 +819,7 @@ export default function TesourariaPage() {
           </div>
 
           {/* Por congregação */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-md">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Arrecadação do mês por congregação / caixa</h3>
             {Object.keys(dashStats.porCong).length === 0 ? (
               <p className="text-sm text-gray-400">Nenhum lançamento no mês atual.</p>
@@ -747,7 +848,7 @@ export default function TesourariaPage() {
       {aba === 'lancamentos' && (
         <div className="space-y-4">
           {/* Barra de filtros */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-md">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Mês</label>
@@ -802,7 +903,7 @@ export default function TesourariaPage() {
 
           {/* Formulário inline */}
           {showForm && (
-            <div className="bg-white rounded-xl border-2 border-[#123b63] p-5 shadow-sm">
+            <div className="bg-white rounded-2xl border-2 border-[#123b63] p-5 shadow-lg">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-base font-bold text-[#123b63]">
                   {editId ? 'Editar Lançamento' : 'Novo Lançamento'}
@@ -890,7 +991,9 @@ export default function TesourariaPage() {
                       Membro dizimista
                       <span className="ml-1 font-normal text-gray-400">(opcional)</span>
                     </label>
-                    {dizSelId ? (
+
+                    {/* Membro cadastrado selecionado */}
+                    {dizSelId && (
                       <div className="flex items-center gap-2 px-3 py-2 border border-green-300 rounded-lg bg-green-50 text-sm">
                         <CheckCircle size={14} className="text-green-500 shrink-0" />
                         <span className="flex-1 text-green-800 font-medium truncate">{dizSelNome}</span>
@@ -898,7 +1001,30 @@ export default function TesourariaPage() {
                           <X size={14} />
                         </button>
                       </div>
-                    ) : (
+                    )}
+
+                    {/* Dízimo avulso */}
+                    {!dizSelId && dizIsAvulso && (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-300 text-xs text-amber-700 font-medium">
+                          <span>Membro não encontrado — será salvo como dízimo avulso</span>
+                          <button type="button" onClick={resetDizForm} className="ml-auto text-amber-500 hover:text-red-500" title="Limpar e buscar novamente">
+                            <X size={12} />
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Nome do contribuinte (opcional)"
+                          value={dizAvulsoNome}
+                          onChange={e => setDizAvulsoNome(e.target.value)}
+                          className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm bg-amber-50 placeholder-amber-400"
+                        />
+                        <p className="text-xs text-amber-600">Será identificado no relatório como “Avulso”.</p>
+                      </div>
+                    )}
+
+                    {/* Busca */}
+                    {!dizSelId && !dizIsAvulso && (
                       <>
                         <div className="relative">
                           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -911,9 +1037,6 @@ export default function TesourariaPage() {
                           />
                         </div>
                         {dizBuscando && <p className="text-xs text-gray-400 mt-1">Buscando...</p>}
-                        {!dizBuscando && dizBusca.trim().length >= 3 && dizBuscaRes.length === 0 && (
-                          <p className="text-xs text-orange-500 mt-1">Nenhum dizimista encontrado com esse nome.</p>
-                        )}
                         {dizBuscaRes.length > 0 && (
                           <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                             {dizBuscaRes.map(m => (
@@ -955,10 +1078,22 @@ export default function TesourariaPage() {
                   </label>
                   <input
                     type="text"
-                    inputMode="decimal"
+                    inputMode="numeric"
                     placeholder="0,00"
                     value={form.valor}
-                    onChange={e => setForm(p => ({ ...p, valor: e.target.value }))}
+                    onChange={e => {
+                      // Permite digitar livremente: só dígitos e vírgula
+                      const raw = e.target.value.replace(/[^\d,]/g, '');
+                      setForm(p => ({ ...p, valor: raw }));
+                    }}
+                    onBlur={e => {
+                      // Formata para 1.250,00 ao sair do campo
+                      const raw = e.target.value.replace(/\./g, '').replace(',', '.');
+                      const num = parseFloat(raw);
+                      if (!isNaN(num) && num > 0) {
+                        setForm(p => ({ ...p, valor: num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }));
+                      }
+                    }}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                   />
                 </div>
@@ -1043,13 +1178,13 @@ export default function TesourariaPage() {
           )}
 
           {/* Tabela */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
             {lancsFiltrados.length === 0 ? (
               <p className="text-center text-gray-400 py-12 text-sm">Nenhum lançamento no período.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-100">
+                  <thead className="bg-slate-50 border-b-2 border-slate-200">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Data</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Caixa</th>
@@ -1060,9 +1195,9 @@ export default function TesourariaPage() {
                       <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Ações</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-slate-100">
                     {lancsFiltrados.map(l => (
-                      <tr key={l.id} className={`hover:bg-gray-50 transition ${l.tipo_movimento === 'saida' ? 'bg-red-50/30' : ''}`}>
+                      <tr key={l.id} className={`hover:bg-slate-50 transition ${l.tipo_movimento === 'saida' ? 'bg-red-50/40' : ''}`}>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(l.data_lancamento)}</td>
                         <td className="px-4 py-3 text-gray-700">{l.congregacao_nome}</td>
                         <td className="px-4 py-3 text-gray-500 text-xs">{l.departamento_nome}</td>
@@ -1160,22 +1295,22 @@ export default function TesourariaPage() {
 
             {/* Cards do mês */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-slate-400 p-4 shadow-md">
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Saldo Inicial</p>
                 <p className="text-xl font-bold text-gray-700">{fmtBRL(saldoInicial)}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{fechAnterior ? `do fechamento de ${fechAnterior.mes_referencia.split('-').reverse().join('/')}` : 'não há fechamento anterior'}</p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-green-500 p-4 shadow-md">
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Entradas</p>
                 <p className="text-xl font-bold text-green-600">{fmtBRL(fechAtual?.total_entradas ?? entMes)}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{doMesSel.filter(l => l.tipo_movimento === 'entrada').length} lançamentos</p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-red-500 p-4 shadow-md">
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Saídas</p>
                 <p className="text-xl font-bold text-red-500">{fmtBRL(fechAtual?.total_saidas ?? saiMes)}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{doMesSel.filter(l => l.tipo_movimento === 'saida').length} lançamentos</p>
               </div>
-              <div className={`rounded-xl border p-4 shadow-sm ${isFechado ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
+              <div className={`rounded-2xl border-2 p-4 shadow-md ${isFechado ? 'bg-green-50 border-green-500' : 'bg-white border-[#123b63]'}`}>
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Saldo Final</p>
                 <p className={`text-xl font-bold ${saldoFinal >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>{fmtBRL(saldoFinal)}</p>
                 {isFechado && <p className="text-xs text-green-600 mt-0.5 font-semibold">✓ Fechado</p>}
@@ -1185,7 +1320,7 @@ export default function TesourariaPage() {
             {/* Modal de fechamento */}
             {showFechaModal && (
               <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
+                <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 w-full max-w-md space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-base font-bold text-[#123b63]">Fechar Caixa — {MESES_LABEL[Number(mon) - 1]}/{ano}</h3>
                     <button onClick={() => setShowFechaModal(false)}><X className="h-5 w-5 text-gray-400" /></button>
@@ -1242,14 +1377,14 @@ export default function TesourariaPage() {
             )}
 
             {/* Histórico de fechamentos */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-md">
               <h3 className="text-sm font-semibold text-gray-700 mb-4">Histórico de fechamentos</h3>
               {fechamentos.length === 0 ? (
                 <p className="text-sm text-gray-400">Nenhum mês fechado ainda.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-100">
+                    <thead className="bg-slate-50 border-b-2 border-slate-200">
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Mês</th>
                         <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Saldo Inicial</th>
@@ -1259,7 +1394,7 @@ export default function TesourariaPage() {
                         <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-slate-100">
                       {fechamentos.map(f => {
                         const [fy, fm] = f.mes_referencia.split('-');
                         return (
@@ -1293,7 +1428,7 @@ export default function TesourariaPage() {
       {aba === 'relatorio' && (
         <div className="space-y-4">
           {/* Filtros do relatório */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-wrap gap-4 items-end">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-md flex flex-wrap gap-4 items-end">
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo de relatório</label>
               <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
@@ -1345,7 +1480,7 @@ export default function TesourariaPage() {
           </div>
 
           {/* Resumo por tipo */}
-          <div id="relatorio-print" className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-5">
+          <div id="relatorio-print" className="bg-white rounded-2xl border border-slate-200 p-6 shadow-md space-y-5">
 
             {/* Timbre (visível apenas na impressão) */}
             <div className="hidden print:block border-b border-gray-300 pb-4 mb-4">
@@ -1518,7 +1653,7 @@ export default function TesourariaPage() {
         <div className="space-y-5">
 
           {/* Filtros */}
-          <div className="no-print bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-wrap gap-3 items-end">
+          <div className="no-print bg-white rounded-2xl border border-slate-200 p-4 shadow-md flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-[160px]">
               <label className="block text-xs font-semibold text-gray-600 mb-1">Mês/Ano</label>
               <MonthPicker value={abaDizimistaMes} onChange={v => setAbaDizimistaMes(v)} />
@@ -1548,12 +1683,13 @@ export default function TesourariaPage() {
               <label className="block text-xs font-semibold text-gray-600 mb-1">Status</label>
               <select
                 value={filtroStatusDiz}
-                onChange={e => setFiltroStatusDiz(e.target.value as '' | 'pago' | 'pendente')}
+                onChange={e => setFiltroStatusDiz(e.target.value as '' | 'pago' | 'pendente' | 'avulso')}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
               >
                 <option value="">Todos</option>
-                <option value="pago">Pago</option>
-                <option value="pendente">Pendente</option>
+                <option value="pago">Adimplente</option>
+                <option value="pendente">Inadimplente</option>
+                <option value="avulso">Dízimos avulsos</option>
               </select>
             </div>
             <button
@@ -1566,22 +1702,22 @@ export default function TesourariaPage() {
 
           {/* Cards resumo */}
           <div className="no-print grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-[#123b63] p-4 shadow-md">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Dizimistas</p>
               <p className="text-2xl font-bold text-[#123b63]">{dizimistas.length}</p>
             </div>
-            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-green-500 p-4 shadow-md">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Deram dízimo este mês</p>
               <p className="text-2xl font-bold text-green-600">{totalPagos}</p>
             </div>
-            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Não registrado</p>
+            <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-yellow-400 p-4 shadow-md">
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Inadimplentes</p>
               <p className="text-2xl font-bold text-yellow-600">{dizimistas.length - totalPagos}</p>
             </div>
           </div>
 
           {/* Área de impressão */}
-          <div id="dizimistas-print" className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <div id="dizimistas-print" className="bg-white rounded-2xl border border-slate-200 p-6 shadow-md">
             {/* Timbre — visível apenas na impressão */}
             <div className="hidden print:block mb-6 border-b pb-4">
               {ministerio?.logo && (
@@ -1594,15 +1730,111 @@ export default function TesourariaPage() {
                   {[ministerio.telefone, ministerio.email].filter(Boolean).join(' | ')}
                 </p>
               )}
-              <h2 className="text-base font-semibold text-gray-700 mt-3">Lista de Dizimistas — {abaDizimistaMes.split('-').reverse().join('/')}</h2>
+              <h2 className="text-base font-semibold text-gray-700 mt-3">
+                {filtroStatusDiz === 'avulso'
+                  ? `Dízimos Avulsos — ${abaDizimistaMes.split('-').reverse().join('/')}`
+                  : filtroStatusDiz === 'pendente'
+                  ? `Inadimplentes — ${abaDizimistaMes.split('-').reverse().join('/')}`
+                  : filtroStatusDiz === 'pago'
+                  ? `Adimplentes — ${abaDizimistaMes.split('-').reverse().join('/')}`
+                  : `Dizimistas (Adimplentes + Avulsos) — ${abaDizimistaMes.split('-').reverse().join('/')}`}
+              </h2>
             </div>
 
-            {loadingDizimistas ? (
+            {/* Tabela de dízimos avulsos */}
+            {filtroStatusDiz === 'avulso' ? (
+              dizimosAvulsos.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  Nenhum dízimo avulso registrado em {abaDizimistaMes.split('-').reverse().join('/')}.
+                </div>
+              ) : (
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-amber-50 border-b border-amber-200">
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">#</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Nome / Contribuinte</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Congregação</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Data</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dizimosAvulsos.map((l, i) => (
+                      <tr key={l.id} className="border-b border-gray-100 hover:bg-gray-50 last:border-0">
+                        <td className="px-3 py-2 text-gray-400 text-xs">{i + 1}</td>
+                        <td className="px-3 py-2 font-medium text-gray-800">
+                          {l.dizimista_nome || <span className="text-gray-400 italic">Não informado</span>}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600 text-xs">
+                          {l.congregacao_nome || <span className="text-gray-400">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">
+                          {new Date(l.data_lancamento + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold text-[#123b63]">
+                          {fmtBRL(Number(l.valor))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-amber-200 bg-amber-50">
+                      <td colSpan={4} className="px-3 py-2 text-xs font-semibold text-gray-600">Total ({dizimosAvulsos.length} registro{dizimosAvulsos.length !== 1 ? 's' : ''})</td>
+                      <td className="px-3 py-2 text-right font-bold text-[#123b63]">
+                        {fmtBRL(dizimosAvulsos.reduce((s, l) => s + Number(l.valor), 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )
+
+            ) : filtroStatusDiz === '' ? (
+              // Lista unificada: Adimplentes + Avulsos
+              loadingDizimistas ? (
+                <div className="text-center py-8 text-gray-400">Carregando...</div>
+              ) : listaUnificadaTodos.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  Nenhum dízimo registrado em {abaDizimistaMes.split('-').reverse().join('/')}.
+                </div>
+              ) : (
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">#</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Nome</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Congregação</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Situação</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {listaUnificadaTodos.map((row, i) => (
+                      <tr key={row.key} className="border-b border-gray-100 hover:bg-gray-50 last:border-0">
+                        <td className="px-3 py-2 text-gray-400 text-xs">{i + 1}</td>
+                        <td className="px-3 py-2 font-medium text-gray-800">{row.nome}</td>
+                        <td className="px-3 py-2 text-gray-600">{row.congregacao_nome}</td>
+                        <td className="px-3 py-2">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            row.situacao === 'Adimplente'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>{row.situacao}</span>
+                        </td>
+                        <td className="px-3 py-2 text-right text-gray-500 text-xs">
+                          {row.valor != null ? fmtBRL(row.valor) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+
+            ) : loadingDizimistas ? (
               <div className="text-center py-8 text-gray-400">Carregando...</div>
             ) : dizimistasVisiveis.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
-                {dizimistas.length === 0
-                  ? 'Nenhum dizimista cadastrado. Marque membros como dizimistas na tela de Membros.'
+                {filtroStatusDiz === 'pendente'
+                  ? 'Nenhum inadimplente no período selecionado.'
                   : 'Nenhum resultado para os filtros selecionados.'}
               </div>
             ) : (
@@ -1612,7 +1844,7 @@ export default function TesourariaPage() {
                     <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">#</th>
                     <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Nome</th>
                     <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Congregação</th>
-                    <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Status</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Situação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1625,9 +1857,9 @@ export default function TesourariaPage() {
                         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                           d.status === 'pago'
                             ? 'bg-green-100 text-green-700'
-                            : 'bg-yellow-100 text-yellow-700'
+                            : 'bg-red-100 text-red-700'
                         }`}>
-                          {d.status === 'pago' ? 'Registrado' : 'Não registrado'}
+                          {d.status === 'pago' ? 'Adimplente' : 'Inadimplente'}
                         </span>
                       </td>
                     </tr>

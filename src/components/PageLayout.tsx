@@ -8,13 +8,15 @@ interface PageLayoutProps {
   description: string;
   children: ReactNode;
   activeMenu?: string;
+  headerExtra?: ReactNode;
 }
 
 export default function PageLayout({
   title,
   description,
   children,
-  activeMenu = 'dashboard'
+  activeMenu = 'dashboard',
+  headerExtra,
 }: PageLayoutProps) {
   const [sidebarActive, setSidebarActive] = useState(activeMenu);
 
@@ -27,8 +29,13 @@ export default function PageLayout({
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* HEADER */}
         <div className="bg-white shadow-sm border-b border-gray-200 p-6">
-          <h1 className="text-3xl font-bold text-[#123b63]">{title}</h1>
-          <p className="text-gray-600 text-sm mt-1">{description}</p>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="text-3xl font-bold text-[#123b63]">{title}</h1>
+              <p className="text-gray-600 text-sm mt-1">{description}</p>
+            </div>
+            {headerExtra && <div className="self-center">{headerExtra}</div>}
+          </div>
         </div>
 
         {/* CONTENT */}

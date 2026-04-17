@@ -7,6 +7,7 @@ import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import InteractiveCanvas from '@/components/InteractiveCanvas';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useUserContext } from '@/hooks/useUserContext';
 import { createClient } from '@/lib/supabase-client';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { useMembers } from '@/hooks/useMembers';
@@ -31,7 +32,9 @@ import {
   Underline,
   Unlock,
   Upload,
+  Send,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 type TemplateScope = 'system' | 'tenant';
 type TemplateTipo = 'mudanca' | 'transito' | 'desligamento' | 'recomendacao' | 'custom';
@@ -310,6 +313,9 @@ const replacePlaceholders = (html: string, map: Record<string, string>) => {
 export default function CartasPage() {
   const { loading } = useRequireSupabaseAuth();
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
+  const userCtx = useUserContext();
+  const isOperador = !userCtx.loading && userCtx.nivel === 'operador';
   const { fetchMembers } = useMembers();
   const canvasImageInputRef = useRef<HTMLInputElement>(null);
   const canvasBackgroundInputRef = useRef<HTMLInputElement>(null);
@@ -365,6 +371,20 @@ export default function CartasPage() {
     { id: 'emitir', label: 'Emitir', icon: '📄' },
     { id: 'historico', label: 'Historico', icon: '🗂️' },
   ];
+
+  // Operador não acessa o editor de modelos
+  const visibleTabs = isOperador ? tabs.filter(t => t.id !== 'modelos') : tabs;
+
+  // Se operador cair na aba modelos (ex: URL direta), redireciona para emitir
+  useEffect(() => {
+    if (isOperador && activeTab === 'modelos') setActiveTab('emitir');
+  }, [isOperador, activeTab]);
+
+  // Templates disponíveis para operador: apenas transito e recomendacao
+  const TIPOS_LIVRES: TemplateTipo[] = ['transito', 'recomendacao'];
+  const templatesFiltrados = isOperador
+    ? templates.filter(t => TIPOS_LIVRES.includes(t.tipo))
+    : templates;
 
   const selectedMember = useMemo(
     () => members.find((m) => m.id === selectedMemberId) || null,
@@ -908,13 +928,9 @@ export default function CartasPage() {
   };
 
   const getAccessTokenOrThrow = async () => {
-    const { data } = await supabase.auth.getSession();
-    let token = data.session?.access_token;
-    if (!token) {
-      const { data: refreshed } = await supabase.auth.refreshSession();
-      token = refreshed.session?.access_token;
-    }
-    if (!token) throw new Error('Nao autenticado');
+    const { data: { session }, error } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (error || !token) throw new Error('Nao autenticado');
     return token;
   };
 
@@ -1115,7 +1131,7 @@ export default function CartasPage() {
 
         <div className="rounded-2xl border border-white/70 bg-white/80 shadow-xl/10 backdrop-blur">
           <div className="p-4 md:p-6">
-            <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab}>
+            <Tabs tabs={visibleTabs} activeTab={activeTab} onTabChange={setActiveTab}>
         {activeTab === 'modelos' && (
           <Section icon="🧩" title="Modelos de Cartas">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1693,17 +1709,35 @@ export default function CartasPage() {
                     <select
                       value={selectedTemplate?.id || ''}
                       onChange={(e) => {
-                        const tpl = templates.find((t) => t.id === e.target.value);
+                        const tpl = templatesFiltrados.find((t) => t.id === e.target.value);
                         if (tpl) handleSelectTemplate(tpl);
                       }}
                       className="w-full rounded-lg border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
                     >
                       <option value="" disabled>Selecione o modelo</option>
-                      {templates.map((tpl) => (
+                      {templatesFiltrados.map((tpl) => (
                         <option key={tpl.id} value={tpl.id}>{tpl.title}</option>
                       ))}
                     </select>
                   </div>
+
+                  {/* Aviso para operador sobre cartas que exigem autorização */}
+                  {isOperador && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                      <p className="text-xs font-semibold text-amber-700 mb-1">Carta de Mudança ou Desligamento?</p>
+                      <p className="text-xs text-amber-600 mb-2">
+                        Essas cartas precisam de autorização da Sede. Envie um pedido e acompanhe o status.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => router.push('/secretaria/cartas/pedidos')}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition"
+                      >
+                        <Send size={12} />
+                        Solicitar à Secretaria
+                      </button>
+                    </div>
+                  )}
                   <div>
                     <label className="text-xs font-semibold text-gray-600">Membro</label>
                     <select

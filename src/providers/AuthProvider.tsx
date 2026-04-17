@@ -49,8 +49,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkSession()
 
     // Ouvir mudanças de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-      setUser(session?.user || null)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      setUser(session?.user ?? null)
+      setIsLoading(false)
+      // Se o refresh token expirou ou foi revogado, o SDK emite SIGNED_OUT
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+      }
     })
 
     return () => {

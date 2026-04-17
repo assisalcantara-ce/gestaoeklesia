@@ -238,7 +238,7 @@ export default function EbdRevistasPage() {
   ];
 
   return (
-    <PageLayout title="EBD — Revistas" description="Catálogo de revistas e pedidos trimestrais" activeMenu="ebd-revistas">
+    <PageLayout title="EBD — Revistas" description="Catálogo de revistas e pedidos trimestrais" activeMenu="ebd-pedidos-revistas">
       {msg && (
         <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${msg.tipo === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
           {msg.texto}
