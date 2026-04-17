@@ -172,6 +172,7 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
                 <div className="bg-[#0f2a45] border-y border-white/10">
                   {((item as any).submenu as any[])
                     .filter((sub) => !sub.modulo || userCtx.podeAcessar(sub.modulo))
+                    .filter((sub) => !(sub.id === 'cartas-pedidos' && userCtx.nivel === 'administrador'))
                     .map((submenu: any, index: number, arr: any[]) => (
                     <button
                       key={submenu.id}

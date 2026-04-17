@@ -87,7 +87,6 @@ export async function GET(request: NextRequest) {
     const permsSet = new Set(
       (Array.isArray(muScope?.permissions) ? muScope.permissions : []).map((p: any) => String(p).toUpperCase())
     )
-    const isAdminScope  = !muScope || permsSet.has('ADMINISTRADOR') || String(muScope?.role || '').toLowerCase() === 'admin'
     const isAdminLocal  = permsSet.has('ADMIN_LOCAL')
     const isFinLocal    = permsSet.has('FINANCEIRO_LOCAL')
     const isSupervisor  = permsSet.has('SUPERVISOR')

@@ -5,6 +5,7 @@ import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
+import { useRouter } from 'next/navigation';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useUserContext } from '@/hooks/useUserContext';
 import { createClient } from '@/lib/supabase-client';
@@ -82,8 +83,16 @@ function CartaParaImprimir({ pedido, ministerioNome }: { pedido: CartaPedido; mi
 export default function CartaPedidosPage() {
   const { loading } = useRequireSupabaseAuth();
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   const userCtx = useUserContext();
   const isGestor = userCtx.nivel === 'administrador' || userCtx.nivel === 'supervisor';
+
+  // Administrador tem o editor completo em /secretaria/cartas
+  useEffect(() => {
+    if (!userCtx.loading && userCtx.nivel === 'administrador') {
+      router.replace('/secretaria/cartas');
+    }
+  }, [userCtx.loading, userCtx.nivel, router]);
 
   const [pedidos, setPedidos] = useState<CartaPedido[]>([]);
   const [loadingData, setLoadingData] = useState(true);
