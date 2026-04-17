@@ -13,7 +13,7 @@ import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import {
-  Users, FileText, TrendingUp, TrendingDown, DollarSign,
+  FileText, TrendingUp, TrendingDown, DollarSign,
   BookOpen, Building2, ArrowRight, AlertCircle, CheckCircle,
   ChevronUp, ChevronDown,
 } from 'lucide-react';
