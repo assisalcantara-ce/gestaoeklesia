@@ -134,11 +134,6 @@ export default function DashboardPage() {
       }
 
       // Helper: aplica filtro de congregação ou supervisão conforme o nível
-      const withScope = (q: ReturnType<typeof supabase.from>) => {
-        if (scopeCongId) return (q as any).eq('congregacao_id', scopeCongId);
-        if (scopeSupId)  return (q as any).eq('supervisao_id', scopeSupId);
-        return q;
-      };
       const withScopeMember = (q: ReturnType<typeof supabase.from>) => {
         if (scopeCongId) return (q as any).eq('congregacao_id', scopeCongId);
         // supervisor: filtra membros cuja congregação pertence à supervisão dele
