@@ -1,7 +1,7 @@
 # 📋 DAILY BRIEFING - GestãoEklesia
 
 **Data de Última Atualização:** 17 de abril de 2026  
-**Última Sessão:** Fluxo completo de Pedidos de Cartas Ministeriais (operador → secretaria → impressão)
+**Última Sessão:** Sistema de permissões multi-nível + correções de build + Sidebar por nível de acesso
 
 ---
 
@@ -178,6 +178,70 @@ git merge feature/nova-feature
 ---
 
 ## ✨ ÚLTIMAS IMPLEMENTAÇÕES
+
+### 📅 17 de Abril de 2026 (tarde) — Sistema de Permissões Multi-Nível + Correções de Build
+
+#### ✅ Concluído
+
+**Sistema de permissões multi-nível (`src/hooks/usePermissions.ts`)**
+- `NivelAcesso` expandido para 8 níveis: `administrador | financeiro | supervisor | admin_local | financeiro_local | superintendente | coordenador | operador`
+- `MODULOS_ACESSO` e `MODULOS_ESCRITA` configurados por nível com isolamento correto
+- `resolveNivel()` em `useUserContext.ts`: permissões explícitas têm prioridade sobre o role base
+
+**`useUserContext.ts` — reescrito completo**
+- Usa `useAuth()` do `AuthProvider` (aguarda validação JWT antes de consultar DB)
+- Novo campo `supervisaoId` na interface
+- Fallback para donos de ministry (sem registro em `ministry_users`)
+- Evita refetch com `lastFetchedUserId` ref
+
+**Dashboard (`src/app/dashboard/page.tsx`) — scoping de dados**
+- Helpers `withScopeMember` e `withScopeLanc` aplicam filtro por `congregacao_id` ou `supervisao_id`
+- Admin local e financeiro local veem dados apenas da sua congregação
+- Supervisor vê dados da sua supervisão
+
+**API Members (`src/app/api/v1/members/route.ts`) — scoping server-side**
+- Resolve `role` + `permissions` via service role
+- Aplica `.eq('congregacao_id', ...)` ou `.eq('supervisao_id', ...)` conforme o nível
+
+**Correção AuthApiError**
+- Removido `refreshSession()` manual de `useMembers.ts` e `cartas/page.tsx`
+- `AdminAuthProvider.tsx`: parou de re-disparar em `TOKEN_REFRESHED`
+- `AuthProvider.tsx`: adicionado handler `SIGNED_OUT`
+
+**Sidebar (`src/components/Sidebar.tsx`)**
+- "Pedidos de Cartas" oculto do administrador (filtro no `.filter()` de submenus)
+- Administrador vai direto para `/secretaria/cartas` (editor completo com canvas)
+- `cartas/pedidos/page.tsx`: redireciona administrador para `/secretaria/cartas` via `router.replace`
+
+**Correções de build TypeScript (3 erros)**
+- `isAdminScope` declarado e não lido → removido de `api/v1/members/route.ts`
+- `Users` importado e não usado → removido de `dashboard/page.tsx`
+- `withScope` declarado e não lido → removido de `dashboard/page.tsx`
+
+**Commits desta sessão:**
+- `47a33d3` — feat: sistema de permissões multi-nível + EBD + scoping + correção AuthApiError
+- `d8047df` — fix: isAdminScope não utilizado + Pedidos de Cartas oculto para admin no Sidebar
+- `6837b47` — fix: Users icon import não utilizado no dashboard
+- `f5581ac` — fix: withScope helper não utilizado no dashboard
+
+#### ▶️ PRÓXIMOS PASSOS
+
+1. **Testar permissões por nível** criando sub-usuários via `/usuarios`:
+   - `financeiro` → acessa Financeiro/Tesouraria, não vê Secretaria/Usuários
+   - `supervisor` → vê secretaria/membros filtrados pela sua supervisão
+   - `admin_local` → vê secretaria/membros filtrados pela sua congregação
+   - `financeiro_local` → vê financeiro filtrado pela sua congregação
+2. **Aplicar migrations pendentes no Supabase** (caso ainda não feito):
+   - `migrations/006_create_carta_pedidos.sql`
+   - `supabase/migrations/20260416110000_ebd_module.sql`
+   - `supabase/migrations/20260416120000_ebd_ofertas_aula_unique.sql`
+   - `supabase/migrations/20260416200000_tesouraria_add_member_id.sql`
+   - `supabase/migrations/20260416220000_ebd_superintendentes.sql`
+   - `supabase/migrations/20260416230000_ebd_trimestres.sql`
+3. **Validar Tesouraria/Financeiro** — pode precisar de scoping server-side similar ao members API
+4. **Validar `/secretaria/cartas`** — `congregacao_id` das cartas emitidas por admin_local
+
+---
 
 ### 📅 17 de Abril de 2026 — Fluxo de Pedidos de Cartas Ministeriais
 
