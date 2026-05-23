@@ -15,7 +15,7 @@ interface Usuario {
   nome: string;
   email: string;
   email_confirmed?: boolean;
-  nivel: 'administrador' | 'financeiro' | 'supervisor' | 'admin_local' | 'financeiro_local';
+  nivel: 'administrador' | 'financeiro' | 'supervisor' | 'admin_local' | 'financeiro_local' | 'superintendente';
   congregacao?: string;
   congregacao_id?: string | null;
   supervisao?: string;
@@ -122,18 +122,25 @@ export default function UsuariosPage() {
       cor: 'bg-indigo-100 border-indigo-300',
     },
     {
-      id: 'admin_local',
-      nome: 'Administrador Local',
-      descricao: 'Cadastros e consultas da sua congregação. Sem acesso ao financeiro ou cadastros gerais',
-      icon: '🏢',
-      cor: 'bg-green-100 border-green-300',
-    },
-    {
       id: 'financeiro_local',
       nome: 'Financeiro Local',
       descricao: 'Funções reduzidas com acesso ao módulo Financeiro da sua Congregação',
       icon: '💰',
       cor: 'bg-yellow-50 border-yellow-300',
+    },
+    {
+      id: 'superintendente',
+      nome: 'Superintendente EBD',
+      descricao: 'Acesso exclusivo ao módulo EBD da sua congregação',
+      icon: '📖',
+      cor: 'bg-teal-100 border-teal-300',
+    },
+    {
+      id: 'operador',
+      nome: 'Operador Local',
+      descricao: 'Acesso somente à secretaria da sua congregação. Sem acesso a financeiro, suporte ou configurações',
+      icon: '👤',
+      cor: 'bg-gray-100 border-gray-300',
     },
   ];
 
@@ -736,7 +743,7 @@ export default function UsuariosPage() {
                 </div>
               )}
 
-              {['admin_local', 'financeiro_local'].includes(selectedLevel) && (
+              {['admin_local', 'financeiro_local', 'superintendente', 'operador'].includes(selectedLevel) && (
                 <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                   <label className="block text-sm font-semibold text-green-800 mb-1">
                     Congregação / Igreja * <span className="font-normal text-green-600">(1ª divisão — escopo de acesso)</span>
@@ -1038,7 +1045,7 @@ export default function UsuariosPage() {
                   </div>
                 </div>
 
-                {['admin_local', 'financeiro_local'].includes(editData.nivel) && (
+                {['admin_local', 'financeiro_local', 'superintendente', 'operador'].includes(editData.nivel) && (
                   <div>
                     <label className="block text-sm font-semibold text-[#123b63] mb-2">Congregação / Igreja *</label>
                     <select

@@ -14,109 +14,109 @@ const pillars = [
   },
   {
     title: 'Finanças sob controle',
-    text: 'Tesouraria, receitas, despesas e relatórios em um fluxo confiavel e simples.'
+    text: 'Tesouraria, receitas, despesas e relatórios em um fluxo confiável e simples.'
   },
   {
     title: 'Pessoas no centro',
-    text: 'Membros, congregados e ministros com historico ministerial completo.'
+    text: 'Membros, congregados e ministros com histórico ministerial completo.'
   }
 ];
 
 const modules = [
   {
     title: 'Secretaria Geral',
-    text: 'Documentos, cadastros e processos administrativos em um so lugar.',
+    text: 'Documentos, cadastros e processos administrativos em um só lugar.',
     bullets: ['Cartas e certificados', 'Registro unificado', 'Fluxo documental'],
     icon: '🗂️'
   },
   {
     title: 'Achados e Perdidos',
-    text: 'Controle de itens encontrados e devolucoes com historico.',
-    bullets: ['Registro rapido', 'Contato com membros', 'Devolucoes'],
+    text: 'Controle de itens encontrados e devoluções com histórico.',
+    bullets: ['Registro rápido', 'Contato com membros', 'Devoluções'],
     icon: '🧾'
   },
   {
-    title: 'Patrimonio',
-    text: 'Inventario de bens com status, localizacao e manutencao.',
-    bullets: ['Cadastro de bens', 'Controle por setor', 'Relatorios'],
+    title: 'Patrimônio',
+    text: 'Inventário de bens com status, localização e manutenção.',
+    bullets: ['Cadastro de bens', 'Controle por setor', 'Relatórios'],
     icon: '🏛️'
   },
   {
-    title: 'Comissao',
-    text: 'Gestao de comissoes, equipes e atas com clareza.',
-    bullets: ['Membros e cargos', 'Reunioes registradas', 'Decisoes'],
+    title: 'Comissão',
+    text: 'Gestão de comissões, equipes e atas com clareza.',
+    bullets: ['Membros e cargos', 'Reuniões registradas', 'Decisões'],
     icon: '🧩'
   },
   {
-    title: 'Missoes',
-    text: 'Projetos missionarios acompanhados com dados e metas.',
-    bullets: ['Campos e projetos', 'Relatorios de campo', 'Equipe envolvida'],
+    title: 'Missões',
+    text: 'Projetos missionários acompanhados com dados e metas.',
+    bullets: ['Campos e projetos', 'Relatórios de campo', 'Equipe envolvida'],
     icon: '✈️'
   },
   {
     title: 'Kids',
-    text: 'Ministerio infantil com turmas, presenca e seguranca.',
-    bullets: ['Turmas e lideres', 'Check-in seguro', 'Comunicacoes'],
+    text: 'Ministério infantil com turmas, presença e segurança.',
+    bullets: ['Turmas e líderes', 'Check-in seguro', 'Comunicações'],
     icon: '🧸'
   },
   {
     title: 'Eventos',
-    text: 'Agenda completa com inscricoes e listas de presenca.',
-    bullets: ['Calendario', 'Inscricoes', 'Relatorios'],
+    text: 'Agenda completa com inscrições e listas de presença.',
+    bullets: ['Calendário', 'Inscrições', 'Relatórios'],
     icon: '📅'
   },
   {
-    title: 'Geolocalizacao',
-    text: 'Mapa de igrejas e congregacoes com visao regional.',
-    bullets: ['Enderecos no mapa', 'Rotas e regioes', 'Visao por campo'],
+    title: 'Geolocalização',
+    text: 'Mapa de igrejas e congregações com visão regional.',
+    bullets: ['Endereços no mapa', 'Rotas e regiões', 'Visão por campo'],
     icon: '🗺️'
   },
   {
     title: 'Funcionarios',
-    text: 'Controle de equipe com dados, cargos e situacao.',
+    text: 'Controle de equipe com dados, cargos e situação.',
     bullets: ['Dados e documentos', 'Cargos e setores', 'Status ativo'],
     icon: '👔'
   },
   {
-    title: 'Reunioes',
+    title: 'Reuniões',
     text: 'Pautas, atas e participantes em um fluxo simples.',
-    bullets: ['Convocacoes', 'Atas', 'Participantes'],
+    bullets: ['Convocações', 'Atas', 'Participantes'],
     icon: '🤝'
   },
   {
-    title: 'Presidencia',
-    text: 'Visao executiva com indicadores e aprovacoes.',
-    bullets: ['Indicadores-chave', 'Aprovacoes', 'Visao consolidada'],
+    title: 'Presidência',
+    text: 'Visão executiva com indicadores e aprovações.',
+    bullets: ['Indicadores-chave', 'Aprovações', 'Visão consolidada'],
     icon: '👑'
   },
   {
     title: 'Financeiro',
-    text: 'Receitas, despesas e relatorios com transparencia.',
-    bullets: ['Fluxo de caixa', 'Categorias', 'Exportacoes'],
+    text: 'Receitas, despesas e relatórios com transparência.',
+    bullets: ['Fluxo de caixa', 'Categorias', 'Exportações'],
     icon: '💳'
   },
   {
     title: 'Tesouraria',
-    text: 'Lançamentos e conciliacoes organizadas.',
-    bullets: ['Entradas e saidas', 'Conferencia', 'Histórico'],
+    text: 'Lançamentos e conciliações organizadas.',
+    bullets: ['Entradas e saídas', 'Conferencia', 'Histórico'],
     icon: '💼'
   },
   {
     title: 'EBD',
-    text: 'Escola biblica dominical com classes e presenca.',
-    bullets: ['Classes e professores', 'Presenca', 'Conteudos'],
+    text: 'Escola bíblica dominical com classes e presença.',
+    bullets: ['Classes e professores', 'Presenca', 'Conteúdos'],
     icon: '📘'
   },
   {
     title: 'Auditoria',
-    text: 'Rastreabilidade completa de acessos e acoes.',
-    bullets: ['Registro de acoes', 'Alertas', 'Conformidade'],
+    text: 'Rastreabilidade completa de acessos e ações.',
+    bullets: ['Registro de ações', 'Alertas', 'Conformidade'],
     icon: '✅'
   },
   {
     title: 'Chat Interno',
-    text: 'Comunicacao rapida entre setores e equipes.',
-    bullets: ['Canais por area', 'Mensagens rapidas', 'Historico'],
+    text: 'Comunicação rápida entre setores e equipes.',
+    bullets: ['Canais por area', 'Mensagens rápidas', 'Histórico'],
     icon: '💬'
   }
 ];
@@ -135,14 +135,14 @@ const journey = [
   {
     step: '03',
     title: 'Acompanhe resultados',
-    text: 'Relatorios, auditoria e indicadores para tomada de decisao segura.'
+    text: 'Relatórios, auditoria e indicadores para tomada de decisao segura.'
   }
 ];
 
 const metrics = [
-  { value: '16', label: 'Modulos integrados' },
-  { value: '24h', label: 'Suporte em dias uteis' },
-  { value: 'LGPD', label: 'Conformidade e seguranca' }
+  { value: '16', label: 'Módulos integrados' },
+  { value: '24h', label: 'Suporte em dias úteis' },
+  { value: 'LGPD', label: 'Conformidade e segurança' }
 ];
 
 
@@ -150,15 +150,15 @@ const metrics = [
 const faqs = [
   {
     question: 'Quanto tempo leva para implementar?',
-    answer: 'Setup inicial em poucas horas. A equipe de onboarding acompanha toda a implantacao.'
+    answer: 'O setup inicial pode ser feito em poucas horas. A equipe de onboarding acompanha sua igreja na implantação.'
   },
   {
     question: 'Consigo personalizar documentos e cartoes?',
-    answer: 'Sim. Configure modelos, cores, logos e imprima em lote com QR Code.'
+    answer: 'Sim. Você pode configurar modelos, cores, logotipo e documentos com QR Code.'
   },
   {
     question: 'O suporte esta incluso?',
-    answer: 'Sim. Todos os planos incluem suporte e acompanhamento na implantacao.'
+    answer: 'Sim. Todos os planos incluem suporte e acompanhamento na implantação.'
   },
   {
     question: 'Os dados estão seguros?',
@@ -168,9 +168,9 @@ const faqs = [
 
 const gallery = [
   { src: '/img/img1.png', alt: 'Tela do dashboard do sistema' },
-  { src: '/img/img2.png', alt: 'Tela de gestao de membros' },
-  { src: '/img/img3.png', alt: 'Tela de cartoes e credenciais' },
-  { src: '/img/img4.png', alt: 'Tela de relatorios e indicadores' }
+  { src: '/img/img2.png', alt: 'Tela de gestão de membros' },
+  { src: '/img/img3.png', alt: 'Tela de cartões e credenciais' },
+  { src: '/img/img4.png', alt: 'Tela de relatórios e indicadores' }
 ];
 
 type PlanoDB = {
@@ -231,25 +231,25 @@ function buildModuleHighlights(plan: PlanoDB): { modules: string[]; label: strin
       .trim();
 
   const key = normalizeKey(plan.slug || plan.name || '');
-  const base = ['Secretaria Geral', 'Achados e perdido', 'Patrimônio', 'Geolocalização', 'Auditoria'];
+  const base = ['Secretaria Geral', 'Achados e Perdidos', 'Patrimônio', 'Geolocalização', 'Auditoria'];
 
   if (key === 'basic' || key === 'basico') {
-    return { modules: base, label: 'Modulos inclusos' };
+    return { modules: base, label: 'Módulos inclusos' };
   }
 
   if (key === 'starter') {
-    return { modules: ['Todos do Basic', 'Tesouraria', 'Missões', 'Chat Interno', 'EBD'], label: 'Modulos inclusos' };
+    return { modules: ['Todos do Basic', 'Tesouraria', 'Missões', 'Chat Interno', 'EBD'], label: 'Módulos inclusos' };
   }
 
   if (key === 'intermediario') {
-    return { modules: ['Todos do Starter', 'Funcionários', 'Comissão', 'Kids', 'Reuniões'], label: 'Modulos inclusos' };
+    return { modules: ['Todos do Starter', 'Funcionários', 'Comissão', 'Kids', 'Reuniões'], label: 'Módulos inclusos' };
   }
 
   if (key === 'profissional' || key === 'professional') {
-    return { modules: ['Todos do Intermediário', 'Eventos', 'Financeiro', 'Presidência'], label: 'Modulos inclusos' };
+    return { modules: ['Todos do Intermediário', 'Eventos', 'Financeiro', 'Presidência'], label: 'Módulos inclusos' };
   }
 
-  return { modules: base, label: 'Modulos inclusos' };
+  return { modules: base, label: 'Módulos inclusos' };
 }
 
 export default function LandingPage() {
@@ -512,6 +512,7 @@ export default function LandingPage() {
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
             <a href="#visao" className="hover:text-slate-900 transition">Visão</a>
+            <a href="#dores" className="hover:text-slate-900 transition">Dores</a>
             <a href="#modulos" className="hover:text-slate-900 transition">Módulos</a>
             <a href="#fluxo" className="hover:text-slate-900 transition">Fluxo</a>
             <a href="#telas" className="hover:text-slate-900 transition">Telas</a>
@@ -544,18 +545,17 @@ export default function LandingPage() {
               Para ministérios
             </span>
             <h1 className="landing-title text-4xl md:text-6xl">
-              Gestão clara para ministérios que cuidam de pessoas.
+              Tenha controle total da sua igreja em um único painel
             </h1>
             <p className="text-lg text-slate-600">
-              Unifique secretaria, financeiro, cadastros e relatórios em um fluxo leve, feito para membros,
-              congregados e ministros.
+              Organize membros, finanças, ministérios e relatórios com transparência, segurança e sem retrabalho.
             </p>
             <div className="flex flex-wrap gap-4">
               <a
                 href="#planos"
                 className="px-6 py-3 bg-emerald-700 text-white rounded-full font-bold hover:bg-emerald-800 transition"
               >
-                Começar agora - 7 dias grátis
+                Teste grátis por 7 dias — sem compromisso
               </a>
               <a
                 href="#contato"
@@ -565,38 +565,38 @@ export default function LandingPage() {
               </a>
             </div>
             <div className="flex flex-wrap gap-3 text-sm text-slate-600">
-              <span className="px-3 py-1 bg-white/70 border border-[#e7e0d6] rounded-full">Secretaria integrada</span>
-              <span className="px-3 py-1 bg-white/70 border border-[#e7e0d6] rounded-full">Financeiro confiável</span>
-              <span className="px-3 py-1 bg-white/70 border border-[#e7e0d6] rounded-full">Cadastros completos</span>
+              <span className="px-3 py-1 bg-white/70 border border-[#e7e0d6] rounded-full">Membros organizados</span>
+              <span className="px-3 py-1 bg-white/70 border border-[#e7e0d6] rounded-full">Finanças transparentes</span>
+              <span className="px-3 py-1 bg-white/70 border border-[#e7e0d6] rounded-full">Tudo em um painel</span>
             </div>
           </div>
           <div className="bg-white/90 border border-[#e7e0d6] rounded-3xl p-8 shadow-xl backdrop-blur reveal" style={{ animationDelay: '0.2s' }}>
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Mapa do ministério</p>
-              <span className="text-xs text-slate-500">Atualizado hoje</span>
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Painel da igreja</p>
+              <span className="text-xs text-slate-500">Visão em tempo real</span>
             </div>
             <div className="mt-6 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-slate-600">Secretaria</span>
-                <span className="text-slate-900 font-semibold">Documentos vivos</span>
+                <span className="text-slate-900 font-semibold">Documentos organizados</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-600">Financeiro</span>
-                <span className="text-slate-900 font-semibold">Fluxo supervisionado</span>
+                <span className="text-slate-900 font-semibold">Entradas e saídas claras</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-600">Pessoas</span>
-                <span className="text-slate-900 font-semibold">Membros e ministros</span>
+                <span className="text-slate-900 font-semibold">Histórico completo</span>
               </div>
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3">
               <div className="rounded-2xl border border-[#e7e0d6] bg-emerald-50/70 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Rotina</p>
-                <p className="text-lg font-semibold text-slate-900 mt-2">Reuniões e eventos</p>
+                <p className="text-lg font-semibold text-slate-900 mt-2">Agenda integrada</p>
               </div>
               <div className="rounded-2xl border border-[#e7e0d6] bg-amber-50/70 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-amber-700">Controle</p>
-                <p className="text-lg font-semibold text-slate-900 mt-2">Auditoria e logs</p>
+                <p className="text-lg font-semibold text-slate-900 mt-2">Segurança e transparência</p>
               </div>
             </div>
           </div>
@@ -617,11 +617,36 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section id="dores" className="max-w-6xl mx-auto px-6 py-16">
+        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] items-start">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Problemas que resolvemos</p>
+            <h2 className="landing-title text-3xl">Sua igreja não precisa depender de planilhas, cadernos e informações espalhadas.</h2>
+            <p className="text-slate-600 mt-3">
+              O Gestão Eklesia centraliza a rotina administrativa para que líderes tenham mais clareza, equipes trabalhem com menos retrabalho e a igreja cresça com organização.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {[
+              ['Membros sem acompanhamento', 'Cadastre, acompanhe histórico ministerial e mantenha dados sempre atualizados.'],
+              ['Finanças pouco transparentes', 'Registre entradas, saídas, categorias e relatórios com mais segurança.'],
+              ['Documentos dispersos', 'Organize cartas, certificados, atas e registros em um único lugar.'],
+              ['Liderança sem visão geral', 'Acompanhe indicadores, auditoria e módulos estratégicos em tempo real.'],
+            ].map(([title, text]) => (
+              <div key={title} className="bg-white border border-[#e7e0d6] rounded-2xl p-5 shadow-sm hover:shadow-lg transition">
+                <h3 className="font-bold text-slate-900">{title}</h3>
+                <p className="text-sm text-slate-600 mt-2">{text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section id="telas" className="max-w-6xl mx-auto px-6 py-16">
         <div className="text-center max-w-2xl mx-auto mb-10">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Veja na pratica</p>
-          <h2 className="landing-title text-3xl">Telas do sistema</h2>
-          <p className="text-slate-600 mt-3">Um panorama real do que sua equipe vai usar no dia a dia.</p>
+          <h2 className="landing-title text-3xl">Veja o Gestão Eklesia em funcionamento</h2>
+          <p className="text-slate-600 mt-3">Conheça as telas que ajudam sua equipe a organizar membros, finanças, eventos e relatórios no dia a dia.</p>
         </div>
         <div
           className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory md:justify-center touch-manipulation rounded-2xl border border-slate-200 p-4"
@@ -660,8 +685,8 @@ export default function LandingPage() {
       >
         <div className="text-center max-w-2xl mx-auto mb-10">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Nossos pilares</p>
-          <h2 className="landing-title text-3xl">16 modulos para toda a operacao</h2>
-          <p className="text-slate-600 mt-3">Da secretaria ao financeiro, tudo conectado para a igreja crescer com seguranca.</p>
+          <h2 className="landing-title text-3xl">Tudo que sua igreja precisa, em um único sistema</h2>
+          <p className="text-slate-600 mt-3">Da secretaria ao financeiro, tudo conectado para sua igreja crescer com organização, segurança e transparência.</p>
         </div>
         <div className="grid gap-6 md:grid-cols-3 mb-14">
           {pillars.map((card) => (
@@ -677,7 +702,7 @@ export default function LandingPage() {
             onClick={() => setShowModules((value) => !value)}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-full border-2 border-emerald-700 text-emerald-700 font-semibold hover:bg-emerald-700 hover:text-white transition"
           >
-            {showModules ? 'Ocultar módulos' : 'Ver todos os Módulos'}
+            {showModules ? 'Ocultar módulos' : 'Ver todos os módulos'}
             <span className={`transition-transform ${showModules ? 'rotate-180' : ''}`}>▾</span>
           </button>
         </div>
@@ -708,9 +733,9 @@ export default function LandingPage() {
         <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Fluxo de trabalho</p>
-            <h2 className="landing-title text-3xl">Uma jornada simples, clara e previsivel</h2>
+            <h2 className="landing-title text-3xl">Uma jornada simples, clara e previsível</h2>
             <p className="text-slate-600 mt-3">
-              Do cadastro inicial aos relatorios finais. Tudo conectado e com visibilidade para lideres e equipes.
+              Do cadastro inicial aos relatórios finais. Tudo conectado e com visibilidade para líderes e equipes.
             </p>
             <div className="mt-8 space-y-5">
               {journey.map((item) => (
@@ -728,7 +753,7 @@ export default function LandingPage() {
           </div>
           <div className="bg-white border border-[#e7e0d6] rounded-3xl p-8 shadow-xl">
             <h3 className="text-lg font-semibold text-slate-900">Resumo operacional</h3>
-            <p className="text-sm text-slate-600 mt-2">O que sua equipe enxerga em um unico painel.</p>
+            <p className="text-sm text-slate-600 mt-2">O que sua equipe acompanha em um único painel.</p>
             <div className="mt-6 grid gap-4">
               {['Secretaria ativa', 'Financeiro consolidado', 'Indicadores de crescimento'].map((item) => (
                 <div key={item} className="flex items-center justify-between rounded-2xl border border-[#e7e0d6] p-4">
@@ -747,7 +772,7 @@ export default function LandingPage() {
 
       <section id="planos" className="max-w-6xl mx-auto px-6 py-16">
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Planos que crescem com voce</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Planos que crescem com você</p>
           <h2 className="landing-title text-3xl">Escolha o plano ideal</h2>
           <p className="text-slate-600 mt-3">Todos incluem suporte, onboarding e 7 dias de teste gratuito.</p>
         </div>
@@ -834,7 +859,7 @@ export default function LandingPage() {
                           ))}
                         </ul>
                       ) : (
-                        <p className="mt-2 text-sm text-slate-500">Sem modulos adicionais incluidos.</p>
+                        <p className="mt-2 text-sm text-slate-500">Sem módulos adicionais incluídos.</p>
                       )}
                     </div>
                   </div>
@@ -848,7 +873,7 @@ export default function LandingPage() {
       <section id="faq" className="max-w-6xl mx-auto px-6 py-16">
         <div className="text-center max-w-2xl mx-auto mb-10">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Perguntas frequentes</p>
-          <h2 className="landing-title text-3xl">Tire suas duvidas</h2>
+          <h2 className="landing-title text-3xl">Tire suas dúvidas</h2>
         </div>
         <div className="grid gap-4">
           {faqs.map((faq) => (
@@ -866,7 +891,7 @@ export default function LandingPage() {
       <section id="contato" className="max-w-6xl mx-auto px-6 py-16">
         <div className="grid gap-10 lg:grid-cols-[1fr_1fr] items-start">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Ainda tem duvidas?</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Ainda tem dúvidas?</p>
             <h2 className="landing-title text-3xl">Vamos conversar</h2>
             <p className="text-slate-600 mt-3">
               Nossa equipe responde em até 24h úteis. Agendamos uma demonstração, liberamos acesso ao trial e guiamos sua implementação.
@@ -930,7 +955,7 @@ export default function LandingPage() {
                 disabled={loading}
                 className="w-full px-4 py-3 bg-emerald-700 text-white rounded-lg font-bold hover:bg-emerald-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Enviando...' : 'Enviar mensagem'}
+                {loading ? 'Enviando...' : 'Quero ver o sistema funcionando'}
               </button>
               <p className="text-xs text-slate-500">
                 Ao enviar, você concorda com nossa política de privacidade.
@@ -941,7 +966,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="border-t border-slate-200 py-10 text-center text-xs text-slate-500">
-        Gestão Eklesia - Tecnologia para igrejas. Desenvolvido por Moove Sistemas.
+        Gestão Eklesia — tecnologia para igrejas. Desenvolvido por Moove Sistemas.
       </footer>
     </div>
   );

@@ -554,32 +554,40 @@ export default function ConfiguracaoCartoesPage() {
       nativoCorrespondente = TEMPLATES_DISPONIVEIS.find((t: any) => t.id === templateEmEdicao.id);
     }
 
-    if (!nativoCorrespondente) {
-      alert('Não foi possível encontrar o template nativo para restaurar.');
-      return;
+    let templateRestaurado: any;
+
+    if (nativoCorrespondente) {
+      // Template nativo: restaura ao estado original
+      templateRestaurado = converterParaTemplateEditavel(nativoCorrespondente);
+      templateRestaurado.tipoCadastro = templateEmEdicao.tipoCadastro;
+    } else {
+      // Template personalizado (criado pelo usuário) ou "em branco": esvazia elementos e background
+      templateRestaurado = {
+        ...templateEmEdicao,
+        elementos: [],
+        elementosVerso: [],
+        backgroundUrl: undefined,
+        backgroundUrlVerso: undefined,
+        backgroundFile: undefined,
+        backgroundFileVerso: undefined,
+        previewImage: undefined,
+      };
     }
 
-    // Restaurar para a versão nativa padrão
-    const templateRestaurado = converterParaTemplateEditavel(nativoCorrespondente);
-    // IMPORTANTE: Preservar tipoCadastro do template original
-    templateRestaurado.tipoCadastro = templateEmEdicao.tipoCadastro;
     delete templateRestaurado.foiEditado; // Remove marcação de editado ao restaurar
     
-    console.log('🔄 Resetando template para modelo nativo:', templateEmEdicao.id, '- tipoCadastro:', templateRestaurado.tipoCadastro);
+    console.log('🔄 Resetando template:', templateEmEdicao.id, '- tipoCadastro:', templateEmEdicao.tipoCadastro);
 
     // Atualizar templates com a versão restaurada
     let novasTemplates = templates.map(t => {
       if (t.id === templateEmEdicao.id) {
-        // Ativa o template restaurado, preservando tipoCadastro
         return { 
           ...templateRestaurado, 
           ativo: true, 
           atualizadoEm: new Date(),
-          tipoCadastro: t.tipoCadastro || templateEmEdicao.tipoCadastro // Preservar tipo
+          tipoCadastro: t.tipoCadastro || templateEmEdicao.tipoCadastro
         };
       }
-
-      // Desativa outros do MESMO tipo (comparar com o template original para ter certeza do tipo)
       if (t.tipoCadastro && t.tipoCadastro === (templateEmEdicao.tipoCadastro || templateRestaurado.tipoCadastro)) {
         return { ...t, ativo: false };
       }
@@ -592,7 +600,6 @@ export default function ConfiguracaoCartoesPage() {
         .catch(() => null);
     }
     
-    // Garantir que templateEmEdicao tenha tipoCadastro correto
     const templateParaExibir = { 
       ...templateRestaurado, 
       tipoCadastro: templateEmEdicao.tipoCadastro,
@@ -600,13 +607,15 @@ export default function ConfiguracaoCartoesPage() {
     };
     setTemplateEmEdicao(templateParaExibir);
 
-    // Disparar evento de storage
     if (typeof window !== 'undefined') {
       setTimeout(() => window.dispatchEvent(new Event('storage')), 100);
     }
 
-    // Mostrar mensagem de sucesso
-    setMensagemSucesso('Template resetado para o modelo nativo com sucesso!');
+    setMensagemSucesso(
+      nativoCorrespondente
+        ? 'Template resetado para o modelo nativo com sucesso!'
+        : 'Template personalizado limpo com sucesso!'
+    );
     setTimeout(() => setMensagemSucesso(''), 3000);
   };
 
@@ -721,7 +730,7 @@ export default function ConfiguracaoCartoesPage() {
     setTimeout(() => setMensagemSucesso(''), 3000);
   };
 
-  const copiarJSON = async () => {
+  const copiarJSON = () => {
     if (!templateEmEdicao) return;
 
     let templateAtualizado = { ...templateEmEdicao };
@@ -733,35 +742,10 @@ export default function ConfiguracaoCartoesPage() {
         previewImage: templateAtualizado.backgroundUrl,
         atualizadoEm: new Date(),
       };
-
-      setTemplateEmEdicao(templateAtualizado);
-
-      const templatesAtualizados = templates.map((t) =>
-        t.id === templateAtualizado.id ? { ...templateAtualizado } : t
-      );
-
-      // Se o template atual ainda não estiver na lista, adiciona para exibir no sidebar.
-      if (!templatesAtualizados.some((t) => t.id === templateAtualizado.id)) {
-        templatesAtualizados.push(templateAtualizado);
-      }
-
-      setTemplates(templatesAtualizados);
-
-      if (ministryId) {
-        try {
-          await persistTemplatesSnapshotToSupabase(
-            supabase,
-            ministryId,
-            (templateAtualizado.tipoCadastro as TipoCartao) || 'membro',
-            templatesAtualizados
-          );
-        } catch {
-          // Não bloqueia a cópia do JSON em caso de falha de rede/persistência.
-        }
-      }
     }
 
-    // Preparar JSON limpo (sem arquivos ou objetos circulares)
+    // Preparar JSON limpo (sem arquivos ou objetos circulares) e copiar IMEDIATAMENTE,
+    // enquanto ainda temos a ativação do usuário (evita NotAllowedError no clipboard).
     const jsonStr = JSON.stringify(templateAtualizado, (key, value) => {
       if (key === 'backgroundFile' || key === 'backgroundFileVerso') return undefined;
       return value;
@@ -774,6 +758,28 @@ export default function ConfiguracaoCartoesPage() {
       console.error('Erro ao copiar JSON:', err);
       alert('Erro ao copiar para a área de transferência');
     });
+
+    // Persistir estado em background (sem bloquear o clipboard)
+    if (templateAtualizado.backgroundUrl) {
+      setTemplateEmEdicao(templateAtualizado);
+
+      const templatesAtualizados = templates.map((t) =>
+        t.id === templateAtualizado.id ? { ...templateAtualizado } : t
+      );
+      if (!templatesAtualizados.some((t) => t.id === templateAtualizado.id)) {
+        templatesAtualizados.push(templateAtualizado);
+      }
+      setTemplates(templatesAtualizados);
+
+      if (ministryId) {
+        persistTemplatesSnapshotToSupabase(
+          supabase,
+          ministryId,
+          (templateAtualizado.tipoCadastro as TipoCartao) || 'membro',
+          templatesAtualizados
+        ).catch(() => null);
+      }
+    }
   };
 
   const duplicarTemplate = (templateId: string) => {
@@ -1195,13 +1201,8 @@ export default function ConfiguracaoCartoesPage() {
                   </button>
                   <button
                     onClick={resetarTemplate}
-                    disabled={!templateEmEdicao?.foiEditado}
-                    className={`flex-1 px-4 py-2 rounded-lg transition font-semibold ${
-                      !templateEmEdicao?.foiEditado
-                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50'
-                        : 'bg-orange-600 text-white hover:bg-orange-700'
-                    }`}
-                    title={!templateEmEdicao?.foiEditado ? 'Este é um template nativo - nada a resetar' : 'Resetar para a versão nativa'}
+                    className="flex-1 px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 rounded-lg transition font-semibold"
+                    title="Resetar para a versão nativa (ou esvaziar se for modelo personalizado)"
                   >
                     🔄 Resetar para Nativo
                   </button>

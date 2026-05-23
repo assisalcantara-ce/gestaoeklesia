@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
-import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
 
@@ -19,7 +19,7 @@ interface CertificadoTemplate {
 }
 
 export default function SecretariaCertificadosPage() {
-  const { loading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('gestao');
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
@@ -28,15 +28,17 @@ export default function SecretariaCertificadosPage() {
   const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
-    if (loading) return;
+    if (ctx.loading || bloqueado) return;
     (async () => {
       const res = await loadCertificadosTemplatesForCurrentUser(supabase);
       setTemplates(res.templates as CertificadoTemplate[]);
       setLoadingData(false);
     })();
-  }, [loading, supabase]);
+  }, [ctx.loading, bloqueado, supabase]);
 
-  if (loading || loadingData) return <div className="p-8">Carregando...</div>;
+  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
+  if (loadingData) return <div className="p-8">Carregando...</div>;
 
   return (
     <div className="flex h-screen bg-gray-50">

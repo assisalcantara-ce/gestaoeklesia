@@ -89,6 +89,15 @@ export default function InteractiveCanvas({
 
     const canvasRef = useRef<HTMLDivElement>(null);
 
+    // Auto-focar o canvas sempre que a seleção muda e o foco está fora dele.
+    // Isso garante que setas do teclado e Ctrl+C/V funcionem logo após
+    // adicionar um elemento via botão externo (que retém o foco).
+    useEffect(() => {
+        if (elementosSelecionados.length > 0 && document.activeElement !== canvasRef.current) {
+            canvasRef.current?.focus();
+        }
+    }, [elementosSelecionados]);
+
     const handleElementMouseDown = (e: React.MouseEvent, elemento: ElementoCartao) => {
         e.preventDefault();
         e.stopPropagation();
@@ -375,8 +384,12 @@ export default function InteractiveCanvas({
             const atualizacoes = elementosSelecionados
                 .filter(elemento => !elemento.locked)
                 .map(elemento => {
-                const novoX = Math.max(0, Math.min(larguraCanvas - elemento.largura, elemento.x + deltaX));
-                const novoY = Math.max(0, Math.min(alturaCanvas - elemento.altura, elemento.y + deltaY));
+                // Busca a posição atual em `elementos` (fonte da verdade).
+                // `elementosSelecionados` pode ter posições desatualizadas pois o parent
+                // atualiza `elementos` no movimento mas não re-sincroniza `elementosSelecionados`.
+                const atual = elementos.find(el => el.id === elemento.id) ?? elemento;
+                const novoX = Math.max(0, Math.min(larguraCanvas - atual.largura, atual.x + deltaX));
+                const novoY = Math.max(0, Math.min(alturaCanvas - atual.altura, atual.y + deltaY));
                 return { id: elemento.id, propriedades: { x: novoX, y: novoY } };
             });
             if (atualizacoes.length > 0) {

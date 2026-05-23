@@ -7,6 +7,7 @@ import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRouter } from 'next/navigation';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useUserContext } from '@/hooks/useUserContext';
 import { createClient } from '@/lib/supabase-client';
 import { CheckCircle, Clock, FileText, Printer, Send, XCircle } from 'lucide-react';
@@ -82,6 +83,7 @@ function CartaParaImprimir({ pedido, ministerioNome }: { pedido: CartaPedido; mi
 
 export default function CartaPedidosPage() {
   const { loading } = useRequireSupabaseAuth();
+  const { bloqueado } = useRequireModulo('secretaria_local');
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const userCtx = useUserContext();
@@ -122,11 +124,11 @@ export default function CartaPedidosPage() {
   const [activeTab, setActiveTab] = useState('solicitar');
 
   useEffect(() => {
-    if (userCtx.loading || loading) return;
+    if (userCtx.loading || loading || bloqueado) return;
     loadData();
     loadMinisterio();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userCtx.loading, loading, userCtx.ministryId]);
+  }, [userCtx.loading, loading, bloqueado, userCtx.ministryId]);
 
   async function loadData() {
     if (!userCtx.ministryId) return;
@@ -331,7 +333,8 @@ export default function CartaPedidosPage() {
     );
   }
 
-  if (loading) return null;
+  if (loading || userCtx.loading) return null;
+  if (bloqueado) return null;
 
   return (
     <PageLayout

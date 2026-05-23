@@ -33,6 +33,33 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ expired: false })
   }
 
+  // Pagamento confirmado via webhook: nunca considerar expirado
+  if (data.status === 'efetivado') {
+    return NextResponse.json({
+      expired: false,
+      status: data.status,
+      trial_expires_at: data.trial_expires_at,
+      trial_days: data.trial_days ?? null,
+    })
+  }
+
+  // Assinatura ativa no ministério (ex: ativação manual pelo admin do sistema)
+  // Cobre edge case onde pre_registrations.status='encerrado' mas ministries.subscription_status='active'
+  const { data: ministry } = await supabaseAdmin
+    .from('ministries')
+    .select('subscription_status')
+    .eq('user_id', authData.user.id)
+    .maybeSingle()
+
+  if (ministry?.subscription_status === 'active') {
+    return NextResponse.json({
+      expired: false,
+      status: 'active',
+      trial_expires_at: data.trial_expires_at,
+      trial_days: data.trial_days ?? null,
+    })
+  }
+
   const expiresAt = data.trial_expires_at ? new Date(data.trial_expires_at) : null
   const isExpired = data.status === 'encerrado' || (expiresAt && expiresAt.getTime() <= Date.now())
 

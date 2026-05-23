@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import { useAuditLog } from '@/hooks/useAuditLog'
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth'
+import { useRequireModulo } from '@/hooks/useRequireModulo'
 import PageLayout from '@/components/PageLayout'
 import { useAppDialog } from '@/providers/AppDialogProvider'
 
@@ -41,6 +42,7 @@ export default function SuportePage() {
   const supabase = createClient()
   const { registrarAcao } = useAuditLog()
   const { user, loading: authLoading } = useRequireSupabaseAuth()
+  const { ctx, bloqueado } = useRequireModulo('suporte')
   const dialog = useAppDialog()
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
@@ -112,7 +114,7 @@ export default function SuportePage() {
 
   // Carregar tickets
   useEffect(() => {
-    if (authLoading) return
+    if (authLoading || ctx.loading || bloqueado) return
     if (!user) {
       setLoading(false)
       setMinistryResolved(true)
@@ -122,7 +124,7 @@ export default function SuportePage() {
       setMinistryId(resolved)
       setMinistryResolved(true)
     })
-  }, [authLoading, user?.id])
+  }, [authLoading, ctx.loading, bloqueado, user?.id])
 
   useEffect(() => {
     if (!user || !ministryResolved) return
@@ -651,7 +653,8 @@ export default function SuportePage() {
     return getStatusColor(ticket.status)
   }
 
-  if (authLoading) return <div className="p-8">Carregando...</div>
+  if (authLoading || ctx.loading) return <div className="p-8">Carregando...</div>
+  if (bloqueado) return null
 
   const statusEhFinalizado = (status: TicketStatus) => status === 'fechado' || status === 'resolvido'
 

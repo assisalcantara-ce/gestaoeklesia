@@ -53,11 +53,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Pre-cadastro nao encontrado' }, { status: 404 })
     }
 
-    const expiresAt = preReg.trial_expires_at ? new Date(preReg.trial_expires_at) : null
-    const isExpired = preReg.status === 'encerrado' || (expiresAt && expiresAt.getTime() <= Date.now())
-
-    if (!isExpired) {
-      return NextResponse.json({ error: 'Trial ainda ativo' }, { status: 400 })
+    // Usuário que já assinou (pagamento confirmado via webhook) não precisa gerar novo boleto
+    if (preReg.status === 'efetivado') {
+      return NextResponse.json({ error: 'Assinatura ja efetivada para este cadastro' }, { status: 409 })
     }
 
     let planRow: any = null

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireFlowAuth, hasRole } from '@/lib/flows/flow-auth';
-import { createServerClient } from '@/lib/supabase-server';
 import { FLOW_SEEDS } from '@/lib/flows/flow-seeds';
 
 export async function GET(request: NextRequest) {
@@ -18,9 +17,8 @@ export async function GET(request: NextRequest) {
     }
 
     const allowSeedFallback = process.env.FEATURE_SEED_FALLBACK === 'true';
-    if ((!templates || templates.length === 0) && allowSeedFallback) {
-      const seedClient = hasRole(roles, 'ADMINISTRADOR') ? supabase : createServerClient();
-      const created = await seedFlowTemplates(seedClient, ministryId);
+    if ((!templates || templates.length === 0) && allowSeedFallback && hasRole(roles, 'ADMINISTRADOR')) {
+      const created = await seedFlowTemplates(supabase, ministryId);
       return NextResponse.json({ data: created });
     }
 

@@ -7,11 +7,12 @@ import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import {
-  BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Cell,
 } from 'recharts';
 import {
-  BookOpen, Users, TrendingUp,
+  BookOpen,
   Building2, ChevronRight, Globe, MapPin, Award,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -68,7 +69,7 @@ interface DashboardConteudoProps {
 
 function DashboardConteudo({
   loading, selTri, setSelTri, selAno, setSelAno,
-  kpis, turmasRes, rankingAlunos, tendencia, barData, pieData,
+  kpis, turmasRes, rankingAlunos, barData,
 }: DashboardConteudoProps) {
   return (
     <>
@@ -267,67 +268,6 @@ function DashboardConteudo({
                     );
                   })}
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* ROW 3: AreaChart tendencia (2/3) + PieChart alunos (1/3) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-lg shadow-lg p-6">
-              <div className="mb-4">
-                <h3 className="text-lg font-bold text-gray-800">Tendência de Presenças</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Total de presentes por domingo registrado no trimestre</p>
-              </div>
-              {tendencia.length < 2 ? (
-                <div className="h-48 flex flex-col items-center justify-center text-gray-300 gap-2">
-                  <TrendingUp size={32} className="opacity-30" />
-                  <span className="text-sm">Registre mais aulas para ver a tendência</span>
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={200}>
-                  <AreaChart data={tendencia} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gPresenca" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="data" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      formatter={(v: any) => [v, 'Presentes']}
-                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', fontSize: 12 }}
-                      labelStyle={{ color: '#374151' }}
-                    />
-                    <Area type="monotone" dataKey="presentes" stroke="#3b82f6" strokeWidth={2.5} fill="url(#gPresenca)" dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="mb-4">
-                <h3 className="text-lg font-bold text-gray-800">Alunos por Turma</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Distribuição de matrículas ativas</p>
-              </div>
-              {pieData.length === 0 ? (
-                <div className="h-48 flex flex-col items-center justify-center text-gray-300 gap-2">
-                  <Users size={28} className="opacity-30" />
-                  <span className="text-sm">Sem alunos matriculados</span>
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={48} outerRadius={76} paddingAngle={3}>
-                      {pieData.map((_, i) => <Cell key={i} fill={CORES[i % CORES.length]} />)}
-                    </Pie>
-                    <Tooltip
-                      formatter={(v: any) => [v, 'alunos']}
-                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', fontSize: 12 }}
-                    />
-                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
               )}
             </div>
           </div>
@@ -597,7 +537,7 @@ export default function EbdDashboardPage() {
 
   // ── Inicialização: carrega ministério + role do usuário ──
   useEffect(() => {
-    if (!user) return;
+    if (!user || ebdBloqueado) return;
     (async () => {
       const mid = await resolveMinistryId(supabase);
       if (!mid) return;
@@ -627,12 +567,12 @@ export default function EbdDashboardPage() {
       carregar(mid);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, supabase]);
+  }, [user, ebdBloqueado, supabase]);
 
   // ── Recarrega ao mudar trimestre / ano ──
   useEffect(() => {
-    if (ministryId) carregar(ministryId);
-  }, [ministryId, selTri, selAno, carregar]);
+    if (ministryId && !ebdBloqueado) carregar(ministryId);
+  }, [ministryId, selTri, selAno, ebdBloqueado, carregar]);
 
   // ── Dados derivados para gráficos ──
   const barData = turmasRes.map(t => ({

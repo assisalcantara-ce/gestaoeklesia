@@ -20,6 +20,15 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
   const planFeatures = usePlanFeatures();
   const userCtx = useUserContext();
 
+  // Calcula dias restantes do trial de forma segura
+  const trialDaysLeft: number | null = (() => {
+    if (planFeatures.loading) return null;
+    if (planFeatures.subscription_status !== 'trial') return null;
+    if (!planFeatures.subscription_end_date) return null;
+    const msLeft = new Date(planFeatures.subscription_end_date).getTime() - Date.now();
+    return Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+  })();
+
   // Auto-expande o menu pai quando um filho está ativo
   const parentMap: Record<string, string> = {
     'consagracao': 'comissao',
@@ -29,9 +38,11 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
     'departamentos': 'secretaria',
     'apresentacao-criancas': 'secretaria',
     'batismo-aguas': 'secretaria',
+    'casamento': 'secretaria',
     'cartas': 'secretaria',
     'cartas-pedidos': 'secretaria',
     'certificados': 'secretaria',
+    'relatorios-secretaria': 'secretaria',
     'config-geral': 'configuracoes',
     'config-cartoes': 'configuracoes',
     'ativar-fluxo': 'configuracoes',
@@ -49,7 +60,7 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
 
   // Módulo que cada item requer (undefined = visível para todos autenticados)
   const allMenuItems = [
-    { id: 'dashboard',        label: 'Dashboard',          icon: '📊', path: '/dashboard' },
+    { id: 'dashboard',        label: 'Dashboard',          icon: '📊', path: '/dashboard',   modulo: 'dashboard'  },
     {
       id: 'secretaria',
       label: 'Secretaria',
@@ -57,14 +68,16 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
       path: '/secretaria',
       modulo: 'secretaria',
       submenu: [
-        { id: 'estrutura-hierarquica', label: 'Estrutura Hierárquica',  icon: '🏛️', path: '/secretaria/estrutura-hierarquica', modulo: 'gestao'     },
-        { id: 'membros',               label: 'Membros',                icon: '👥', path: '/secretaria/membros'                                       },
-        { id: 'departamentos',         label: 'Departamentos',          icon: '🏷️', path: '/secretaria/departamentos'                                 },
-        { id: 'apresentacao-criancas', label: 'Apresentação de Crianças', icon: '🧒', path: '/secretaria/apresentacao-criancas'                       },
-        { id: 'batismo-aguas',         label: 'Batismo nas Águas',      icon: '✝️', path: '/secretaria/batismo-aguas'                                 },
-        { id: 'cartas',                label: 'Cartas ministeriais',    icon: '📜', path: '/secretaria/cartas',         modulo: 'gestao'          },
-        { id: 'cartas-pedidos',        label: 'Pedidos de Cartas',      icon: '✉️', path: '/secretaria/cartas/pedidos'                                },
-        { id: 'certificados',          label: 'Certificados',           icon: '🎓', path: '/secretaria/certificados',  modulo: 'gestao'          },
+        { id: 'estrutura-hierarquica', label: 'Estrutura Hierárquica',  icon: '🏛️', path: '/secretaria/estrutura-hierarquica', modulo: 'gestao'          },
+        { id: 'membros',               label: 'Membros',                icon: '👥', path: '/secretaria/membros'                                            },
+        { id: 'departamentos',         label: 'Departamentos',          icon: '🏷️', path: '/secretaria/departamentos',          modulo: 'secretaria_local' },
+        { id: 'apresentacao-criancas', label: 'Apresentação de Crianças', icon: '🧒', path: '/secretaria/apresentacao-criancas', modulo: 'secretaria_local' },
+        { id: 'batismo-aguas',         label: 'Batismo nas Águas',      icon: '✝️', path: '/secretaria/batismo-aguas',          modulo: 'secretaria_local' },
+        { id: 'casamento',             label: 'Casamento',              icon: '💍', path: '/secretaria/casamento',              modulo: 'gestao'           },
+        { id: 'cartas',                label: 'Cartas ministeriais',    icon: '📜', path: '/secretaria/cartas',                 modulo: 'gestao'          },
+        { id: 'cartas-pedidos',        label: 'Pedidos de Cartas',      icon: '✉️', path: '/secretaria/cartas/pedidos',         modulo: 'secretaria_local' },
+        { id: 'certificados',          label: 'Certificados',           icon: '🎓', path: '/secretaria/certificados',           modulo: 'gestao'          },
+        { id: 'relatorios-secretaria', label: 'Relatórios',              icon: '📋', path: '/secretaria/relatorios',             modulo: 'gestao'          },
       ]
     },
     { id: 'tesouraria', label: 'Tesouraria', icon: '💰', path: '/tesouraria', modulo: 'tesouraria' },
@@ -77,21 +90,22 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
       ebdMenu: true,
     },
     { id: 'comissao', label: 'Comissão', icon: '👥', path: '/comissao', modulo: 'comissao', submenu: [
-        { id: 'comissoes',   label: 'Comissões',              icon: '👥', path: '/comissao'                },
+        { id: 'comissoes',   label: 'Comissões',              icon: '👥', path: '/comissao',               modulo: 'gestao' },
         { id: 'consagracao', label: 'Consagração (obreiros)', icon: '🙏', path: '/secretaria/consagracao'  },
       ]
     },
     { id: 'reunioes',         label: 'Reuniões',           icon: '🤝', path: '/reunioes',                   modulo: 'reunioes'   },
     { id: 'missoes',          label: 'Missões',            icon: '✈️', path: '/missoes',                    modulo: 'missoes'    },
     { id: 'eventos',          label: 'Eventos',            icon: '📅', path: '/eventos',                    modulo: 'eventos'    },
-    { id: 'presidencia',      label: 'Presidência',        icon: '👑', path: '/presidencia'                                     },
+    { id: 'presidencia',      label: 'Presidência',        icon: '👑', path: '/presidencia',  modulo: 'presidencia' },
     { id: 'patrimonio',       label: 'Patrimônio',         icon: '🏢', path: '/patrimonio',                 modulo: 'patrimonio' },
-    { id: 'achados-perdidos', label: 'Achados e Perdidos', icon: '🔍', path: '/secretaria/achados-perdidos', modulo: 'secretaria' },
+    { id: 'achados-perdidos', label: 'Achados e Perdidos', icon: '🔍', path: '/secretaria/achados-perdidos', modulo: 'gestao' },
     { id: 'funcionarios',     label: 'Funcionários',       icon: '👔', path: '/secretaria/funcionarios',     modulo: 'gestao'     },
     { id: 'financeiro',       label: 'Financeiro',         icon: '💳', path: '/financeiro',                 modulo: 'financeiro' },
-    { id: 'auditoria',        label: 'Auditoria',          icon: '✅', path: '/auditoria',                  modulo: 'auditoria'  },
-    { id: 'usuarios',         label: 'Usuários',           icon: '👤', path: '/usuarios',                   modulo: 'usuarios'   },
-    { id: 'suporte',          label: 'Suporte',            icon: '🎫', path: '/suporte'                                         },
+    { id: 'auditoria',        label: 'Auditoria',          icon: '✅', path: '/auditoria',                  modulo: 'auditoria'       },
+    { id: 'geolocalizacao',   label: 'Geolocalização',     icon: '📍', path: '/geolocalizacao',              modulo: 'geolocalizacao'  },
+    { id: 'usuarios',         label: 'Usuários',           icon: '👤', path: '/usuarios',                   modulo: 'usuarios'        },
+    { id: 'suporte',          label: 'Suporte',            icon: '🎫', path: '/suporte',       modulo: 'suporte'    },
     {
       id: 'configuracoes',
       label: 'Configurações',
@@ -139,6 +153,22 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
           className="h-16 object-contain"
         />
       </div>
+
+      {/* TRIAL BANNER — exibe apenas durante período de teste com dias restantes */}
+      {trialDaysLeft !== null && trialDaysLeft > 0 && (
+        <div className="mx-3 mt-3 mb-1 p-3 rounded-lg bg-amber-500/20 border border-amber-400/30">
+          <p className="text-amber-300 text-xs font-semibold">🎯 Teste gratuito</p>
+          <p className="text-white/80 text-xs mt-1">
+            {trialDaysLeft === 1 ? 'Último dia!' : `Restam ${trialDaysLeft} dias`}
+          </p>
+          <button
+            onClick={() => router.push('/trial-expirado')}
+            className="mt-2 w-full py-1.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-white text-xs font-bold rounded transition"
+          >
+            Assinar agora →
+          </button>
+        </div>
+      )}
 
       {/* MENU */}
       <nav className="flex-1 px-0 py-4 overflow-y-auto">

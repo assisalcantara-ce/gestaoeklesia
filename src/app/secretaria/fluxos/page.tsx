@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import PageLayout from '@/components/PageLayout';
 import Section from '@/components/Section';
 import Tabs from '@/components/Tabs';
-import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 
 const PENDING_STATUSES = new Set(['pendente', 'aguardando', 'em_analise']);
@@ -43,7 +43,7 @@ function mapBaseRole(role: string | null | undefined): string[] {
 }
 
 export default function FluxosOperacaoPage() {
-  const { loading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('secretaria');
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
@@ -327,7 +327,8 @@ export default function FluxosOperacaoPage() {
     }
   };
 
-  if (loading) return <div className="p-8">Carregando...</div>;
+  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
 
   return (
     <PageLayout

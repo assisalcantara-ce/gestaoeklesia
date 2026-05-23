@@ -7,6 +7,7 @@ import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import InteractiveCanvas from '@/components/InteractiveCanvas';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useUserContext } from '@/hooks/useUserContext';
 import { createClient } from '@/lib/supabase-client';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
@@ -312,6 +313,7 @@ const replacePlaceholders = (html: string, map: Record<string, string>) => {
 
 export default function CartasPage() {
   const { loading } = useRequireSupabaseAuth();
+  const { bloqueado } = useRequireModulo('gestao');
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const userCtx = useUserContext();
@@ -613,7 +615,7 @@ export default function CartasPage() {
   };
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || bloqueado) return;
     const run = async () => {
       const mid = await resolveMinistryId();
       setMinistryId(mid);
@@ -623,7 +625,7 @@ export default function CartasPage() {
     };
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [loading, bloqueado]);
 
   useEffect(() => {
     if (!selectedTemplate) return;
@@ -1069,6 +1071,7 @@ export default function CartasPage() {
   };
 
   if (loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
 
   return (
     <PageLayout

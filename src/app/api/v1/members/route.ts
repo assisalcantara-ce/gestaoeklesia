@@ -8,67 +8,17 @@
  * - Evita depender de `ministry_id` vindo do cliente.
  */
 
-import { createServerClient, createServerClientFromRequest } from '@/lib/supabase-server'
+import { resolveTenantAuth } from '@/lib/tenant-auth'
 import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer'
+import { authTenantErrorResponse } from '@/lib/api-errors'
 import { NextRequest, NextResponse } from 'next/server'
-
-async function resolveMinistryId(supabase: any, userId: string): Promise<string | null> {
-  // 1) Preferencial: ministry_users
-  const { data: mu, error: muErr } = await supabase
-    .from('ministry_users')
-    .select('ministry_id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (!muErr && mu?.ministry_id) return String(mu.ministry_id)
-
-  // 2) Fallback: owner em ministries
-  const { data: m, error: mErr } = await supabase
-    .from('ministries')
-    .select('id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (!mErr && m?.id) return String(m.id)
-
-  const admin = createServerClient()
-
-  const { data: muAdmin } = await admin
-    .from('ministry_users')
-    .select('ministry_id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (muAdmin?.ministry_id) return String(muAdmin.ministry_id)
-
-  const { data: mAdmin } = await admin
-    .from('ministries')
-    .select('id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (mAdmin?.id) return String(mAdmin.id)
-
-  return null
-}
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerClientFromRequest(request)
+    const context = await resolveTenantAuth(request)
+    const { supabase, ministryId } = context
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const ministryId = await resolveMinistryId(supabase, user.id)
+    // ministryId ja foi resolvido pelo contexto multi-tenant central.
     if (!ministryId) {
       return NextResponse.json(
         { error: 'Usuário sem ministério associado', code: 'NO_MINISTRY' },
@@ -77,21 +27,31 @@ export async function GET(request: NextRequest) {
     }
 
     // Resolve escopo do usuário (congregação ou supervisão) a partir de ministry_users
-    const admin = createServerClient()
+    const admin = context.admin
     const { data: muScope } = await admin
       .from('ministry_users')
       .select('role, permissions, congregacao_id, supervisao_id')
-      .eq('user_id', user.id)
+      .eq('user_id', context.userId)
       .maybeSingle()
 
     const permsSet = new Set(
       (Array.isArray(muScope?.permissions) ? muScope.permissions : []).map((p: any) => String(p).toUpperCase())
     )
-    const isAdminLocal  = permsSet.has('ADMIN_LOCAL')
-    const isFinLocal    = permsSet.has('FINANCEIRO_LOCAL')
-    const isSupervisor  = permsSet.has('SUPERVISOR')
-    const scopeCongId   = (isAdminLocal || isFinLocal) ? (muScope?.congregacao_id ?? null) : null
-    const scopeSupId    = isSupervisor ? (muScope?.supervisao_id ?? null) : null
+    const isAdminLocal  = permsSet.has('ADMIN_LOCAL') || context.nivel === 'admin_local'
+    const isFinLocal    = permsSet.has('FINANCEIRO_LOCAL') || context.nivel === 'financeiro_local'
+    const isOperadorLocal = context.nivel === 'operador' || context.nivel === 'coordenador'
+    const isSupervisor  = permsSet.has('SUPERVISOR') || context.nivel === 'supervisor'
+    const scopeCongId   = (isAdminLocal || isFinLocal || isOperadorLocal) ? (muScope?.congregacao_id ?? context.congregacaoId ?? null) : null
+
+    // Supervisor: busca congregações da sua supervisão e filtra membros por elas
+    let scopeSupCongIds: string[] | null = null
+    if (isSupervisor && muScope?.supervisao_id) {
+      const { data: congsDaSup } = await admin
+        .from('congregacoes')
+        .select('id')
+        .eq('supervisao_id', muScope.supervisao_id)
+      scopeSupCongIds = (congsDaSup || []).map((c: any) => c.id)
+    }
 
     // Extrair query params
     const searchParams = request.nextUrl.searchParams
@@ -112,10 +72,14 @@ export async function GET(request: NextRequest) {
     // Aplicar escopo por nível
     if (scopeCongId) {
       query = query.eq('congregacao_id', scopeCongId)
-    } else if (scopeSupId) {
-      query = query.eq('supervisao_id', scopeSupId)
+    } else if (scopeSupCongIds !== null) {
+      if (scopeSupCongIds.length > 0) {
+        query = query.in('congregacao_id', scopeSupCongIds)
+      } else {
+        // Supervisão sem congregações → retorna vazio
+        query = query.eq('id', '00000000-0000-0000-0000-000000000000')
+      }
     }
-    // isAdminScope → sem filtro extra (vê tudo do ministry)
 
     // Aplicar filtros
     if (status) {
@@ -156,6 +120,8 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
+    const authResponse = authTenantErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('GET /api/v1/members:', error)
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
@@ -187,15 +153,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerClientFromRequest(request)
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const context = await resolveTenantAuth(request)
+    const { supabase, ministryId } = context
 
     const body = await request.json()
     const normalizedBody = normalizePayloadToUppercase(body, {
@@ -222,8 +181,8 @@ export async function POST(request: NextRequest) {
       ],
     })
 
-    const ministryId = await resolveMinistryId(supabase, user.id)
-    if (!ministryId) {
+    const resolvedMinistryId = ministryId
+    if (!resolvedMinistryId) {
       return NextResponse.json(
         { error: 'Usuário sem ministério associado', code: 'NO_MINISTRY' },
         { status: 403 }
@@ -346,6 +305,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data[0], { status: 201 })
   } catch (error) {
+    const authResponse = authTenantErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('POST /api/v1/members:', error)
     return NextResponse.json(
       { error: 'Erro interno do servidor' },

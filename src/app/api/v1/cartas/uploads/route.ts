@@ -1,57 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
-import { createServerClient, createServerClientFromRequest } from '@/lib/supabase-server'
+import { createServerClient } from '@/lib/supabase-server'
+import { resolveTenantAuth } from '@/lib/tenant-auth'
+import { authTenantErrorResponse } from '@/lib/api-errors'
 
 const BUCKET = 'cartas-templates'
-const MAX_BYTES = 2 * 1024 * 1024 // 2MB
-
-async function resolveMinistryId(supabase: any, userId: string): Promise<string | null> {
-  const { data: mu, error: muErr } = await supabase
-    .from('ministry_users')
-    .select('ministry_id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (!muErr && mu?.ministry_id) return String(mu.ministry_id)
-
-  const { data: m, error: mErr } = await supabase
-    .from('ministries')
-    .select('id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (!mErr && m?.id) return String(m.id)
-
-  const admin = createServerClient()
-
-  const { data: muAdmin } = await admin
-    .from('ministry_users')
-    .select('ministry_id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (muAdmin?.ministry_id) return String(muAdmin.ministry_id)
-
-  const { data: mAdmin } = await admin
-    .from('ministries')
-    .select('id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (mAdmin?.id) return String(mAdmin.id)
-
-  return null
-}
+const MAX_BYTES = 2 * 1024 * 1024
 
 async function ensureBucket(supabaseAdmin: any) {
   try {
     const { data, error } = await supabaseAdmin.storage.listBuckets()
     if (error) return
-    const exists = Array.isArray(data) && data.some((b: any) => b?.name === BUCKET)
+    const exists = Array.isArray(data) && data.some((bucket: any) => bucket?.name === BUCKET)
     if (exists) return
     await supabaseAdmin.storage.createBucket(BUCKET, {
       public: true,
@@ -65,34 +25,23 @@ async function ensureBucket(supabaseAdmin: any) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabaseUser = createServerClientFromRequest(request)
-    const {
-      data: { user },
-    } = await supabaseUser.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const ministryId = await resolveMinistryId(supabaseUser, user.id)
-    if (!ministryId) {
-      return NextResponse.json({ error: 'Usuário sem ministério associado', code: 'NO_MINISTRY' }, { status: 403 })
-    }
+    const context = await resolveTenantAuth(request)
+    const { ministryId } = context
 
     const form = await request.formData()
     const file = form.get('file')
 
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'Arquivo não enviado' }, { status: 400 })
+      return NextResponse.json({ error: 'Arquivo nao enviado' }, { status: 400 })
     }
 
-    if (!file.type || !file.type.startsWith('image/')) {
-      return NextResponse.json({ error: 'Tipo de arquivo inválido' }, { status: 400 })
+    if (!file.type || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      return NextResponse.json({ error: 'Tipo de arquivo invalido' }, { status: 400 })
     }
 
     if (file.size > MAX_BYTES) {
       return NextResponse.json(
-        { error: `Arquivo muito grande. Máximo ${Math.round(MAX_BYTES / 1024)}KB` },
+        { error: `Arquivo muito grande. Maximo ${Math.round(MAX_BYTES / 1024)}KB` },
         { status: 400 }
       )
     }
@@ -102,7 +51,6 @@ export async function POST(request: NextRequest) {
 
     const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
     const path = `cartas/${ministryId}/${Date.now()}-${randomUUID()}.${ext}`
-
     const buffer = Buffer.from(await file.arrayBuffer())
 
     const { error: uploadError } = await supabaseAdmin.storage.from(BUCKET).upload(path, buffer, {
@@ -121,7 +69,9 @@ export async function POST(request: NextRequest) {
       bucket: BUCKET,
       path,
     })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
+  } catch (error: any) {
+    const authResponse = authTenantErrorResponse(error)
+    if (authResponse) return authResponse
+    return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 })
   }
 }

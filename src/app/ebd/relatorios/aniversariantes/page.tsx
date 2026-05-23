@@ -1,7 +1,12 @@
 'use client';
 import PageLayout from '@/components/PageLayout';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 
 export default function AniversariantesPage() {
+  const { ctx, bloqueado } = useRequireModulo('ebd');
+  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
+
   return (
     <PageLayout title="Aniversariantes EBD" description="Lista de aniversariantes da Escola Bíblica" activeMenu="ebd-relatorios-aniversariantes">
       <div className="p-6">

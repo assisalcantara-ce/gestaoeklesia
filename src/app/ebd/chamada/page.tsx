@@ -1,10 +1,11 @@
 ﻿'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { resolveEbdScope } from '@/lib/cartoes-templates-sync';
 import { CheckCircle2, XCircle, Plus, Trash2, Save, UserPlus, Calendar, AlertCircle, Clock } from 'lucide-react';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -82,9 +83,11 @@ const fmtFone = (v: string): string => {
 
 export default function EbdChamadaPage() {
   const { user } = useRequireSupabaseAuth();
+  const { bloqueado } = useRequireModulo('ebd');
   const supabase  = useMemo(() => createClient(), []);
 
   const [ministryId,   setMinistryId]   = useState<string | null>(null);
+  const churchIdRef = useRef<string | null>(null);
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
   const [turmas,       setTurmas]       = useState<EbdTurma[]>([]);
   const [professores,  setProfessores]  = useState<EbdProfessor[]>([]);
@@ -123,12 +126,17 @@ export default function EbdChamadaPage() {
   // ── Carregar base ────────────────────────────────────────────────────────
 
   const loadBase = useCallback(async (mid: string) => {
+    const cid = churchIdRef.current;
+    let congsQ = supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome');
+    if (cid) congsQ = congsQ.eq('id', cid);
     const [congsR, profsR] = await Promise.all([
-      supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome'),
+      congsQ,
       supabase.from('ebd_professores').select('id, nome').eq('ministry_id', mid).eq('ativo', true).order('nome'),
     ]);
     setCongregacoes(congsR.data ?? []);
     setProfessores(profsR.data ?? []);
+    // Pré-seleciona a congregação quando o usuário é superintendente
+    if (cid) setSelCong(cid);
   }, [supabase]);
 
   const loadTurmas = useCallback(async (mid: string, congId: string) => {
@@ -177,11 +185,16 @@ export default function EbdChamadaPage() {
   }, [supabase]);
 
   useEffect(() => {
-    if (!user) return;
-    resolveMinistryId(supabase).then(mid => {
-      if (mid) { setMinistryId(mid); loadBase(mid); loadTrimestre(mid); }
+    if (!user || bloqueado) return;
+    resolveEbdScope(supabase).then(scope => {
+      if (scope.ministryId) {
+        churchIdRef.current = scope.churchId;
+        setMinistryId(scope.ministryId);
+        loadBase(scope.ministryId);
+        loadTrimestre(scope.ministryId);
+      }
     });
-  }, [user, supabase, loadBase, loadTrimestre]);
+  }, [user, bloqueado, supabase, loadBase, loadTrimestre]);
 
   useEffect(() => {
     if (ministryId && selCong) loadTurmas(ministryId, selCong);
@@ -421,6 +434,8 @@ export default function EbdChamadaPage() {
   const pctPresenca     = freqs.length > 0 ? Math.round((presentes / freqs.length) * 100) : 0;
   const todayStr        = hoje();
   const proximoDom      = !isSunday() ? proximoDomingo() : null;
+
+  if (bloqueado) return null;
 
   return (
     <PageLayout

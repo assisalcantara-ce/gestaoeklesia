@@ -98,11 +98,22 @@ export default function DashboardPage() {
 
       const { data: mu } = await supabase
         .from('ministry_users')
-        .select('role')
+        .select('role, permissions')
         .eq('user_id', authData.user.id)
         .maybeSingle();
 
       const nivel = mu?.role ? String(mu.role) : 'viewer';
+
+      // Redireciona roles sem dashboard geral para a sua tela inicial
+      const perms: string[] = Array.isArray((mu as any)?.permissions) ? (mu as any).permissions : [];
+      const isSuperOrCoord = perms.some((p: string) => ['SUPERINTENDENTE','COORDENADOR'].includes(String(p).toUpperCase()));
+      if (isSuperOrCoord) { router.replace('/ebd/dashboard'); return; }
+      const isFinanceiro = perms.some((p: string) => ['FINANCEIRO','FINANCEIRO_LOCAL'].includes(String(p).toUpperCase()));
+      if (isFinanceiro) { router.replace('/tesouraria'); return; }
+      const isOperador = perms.some((p: string) => String(p).toUpperCase() === 'OPERADOR');
+      if (isOperador) { router.replace('/secretaria/membros'); return; }
+      const isSupervisor = perms.some((p: string) => String(p).toUpperCase() === 'SUPERVISOR');
+      if (isSupervisor) { router.replace('/secretaria/membros'); return; }
       setUsuarioLogado({
         nome: authData.user.user_metadata?.full_name || authData.user.email || 'Usuário',
         email: authData.user.email || '',

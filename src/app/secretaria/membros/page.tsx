@@ -14,6 +14,7 @@ import { createClient } from '@/lib/supabase-client';
 import { loadOrgNomenclaturasFromSupabaseOrMigrate } from '@/lib/org-nomenclaturas';
 import { loadTemplatesForCurrentUser } from '@/lib/cartoes-templates-sync';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { useUserContext } from '@/hooks/useUserContext';
 import { useMembers } from '@/hooks/useMembers';
 import type { Member, CreateMemberRequest, UpdateMemberRequest } from '@/types/supabase';
 
@@ -342,6 +343,9 @@ export default function MembrosPage() {
   const [membroImprimindoCartao, setMembroImprimindoCartao] = useState<Membro | null>(null);
   const [ultimoCadastro, setUltimoCadastro] = useState<Membro | null>(null);
   const [membrosSelecionados, setMembrosSelecionados] = useState<Set<string>>(new Set());
+  const [cpfDuplicado, setCpfDuplicado] = useState(false);
+  const [verificandoCpf, setVerificandoCpf] = useState(false);
+  const cpfInputRef = useRef<HTMLInputElement>(null);
   const [imprimindoLote, setImprimindoLote] = useState(false);
   const [notification, setNotification] = useState<{
     isOpen: boolean;
@@ -457,6 +461,8 @@ export default function MembrosPage() {
 
   // Estado para controlar modo edição (admin only)
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const userCtx = useUserContext();
+  const isSupervisor = userCtx.nivel === 'supervisor';
   const [isEditando, setIsEditando] = useState(false);
 
   // Cargos ministeriais (sincronizados com configurações via localStorage)
@@ -904,6 +910,7 @@ export default function MembrosPage() {
     setDadosCargos({});
     setIsEditando(false);
     setIsDizimista(false);
+    setCpfDuplicado(false);
     setShowForm(true);
     setActiveTab('dados');
   };
@@ -1175,14 +1182,74 @@ export default function MembrosPage() {
     setIsAdminMode(true); // Modo admin ativado para edição
     setIsDizimista(membro.isDizimista ?? false);
     setDizimosHistorico([]);
+    setCpfDuplicado(false);
     setShowForm(true);
     setActiveTab('dados');
   };
 
   // Função para salvar/atualizar membro
+  const verificarCpfDuplicado = async (cpf: string) => {
+    const digits = onlyDigits(cpf);
+    if (digits.length !== 11) return;
+    if (!validarCPF(cpf)) {
+      setCpfDuplicado(false);
+      setDadosPessoais((prev) => ({ ...prev, cpf: '' }));
+      setTimeout(() => cpfInputRef.current?.focus(), 50);
+      setNotification({
+        isOpen: true,
+        title: 'CPF inválido',
+        message: 'O número de CPF informado não é válido. Verifique os dígitos e tente novamente.',
+        type: 'error',
+        autoClose: 6000,
+      });
+      return;
+    }
+    if (membroEditando) return; // edição: CPF não muda
+
+    setVerificandoCpf(true);
+    try {
+      const ministryId = await resolveMinistryId();
+      if (!ministryId) return;
+      const { data } = await supabase
+        .from('members')
+        .select('id')
+        .eq('ministry_id', ministryId)
+        .eq('cpf', digits)
+        .limit(1);
+      if (data && data.length > 0) {
+        setCpfDuplicado(true);
+        setDadosPessoais((prev) => ({ ...prev, cpf: '' }));
+        setTimeout(() => cpfInputRef.current?.focus(), 50);
+        setNotification({
+          isOpen: true,
+          title: 'CPF já cadastrado',
+          message: 'Este CPF já está registrado em outro membro do seu ministério. Verifique o número e tente novamente.',
+          type: 'error',
+          autoClose: 6000,
+        });
+      } else {
+        setCpfDuplicado(false);
+      }
+    } finally {
+      setVerificandoCpf(false);
+    }
+  };
+
   const salvarMembro = async () => {
     console.log('💾 Iniciando salvamento do membro...');
     console.log('Dados Pessoais:', dadosPessoais);
+
+    // Bloquear se CPF duplicado foi detectado
+    if (cpfDuplicado) {
+      setNotification({
+        isOpen: true,
+        title: 'CPF já cadastrado',
+        message: 'Este CPF já está registrado em outro membro. Corrija o CPF antes de continuar.',
+        type: 'error',
+      });
+      setTimeout(() => cpfInputRef.current?.focus(), 50);
+      return;
+    }
 
     // Validar campos obrigatórios
     if (!dadosPessoais.cpf || !dadosPessoais.nome || !dadosPessoais.dataNascimento) {
@@ -2212,6 +2279,7 @@ export default function MembrosPage() {
                   )}
                 </span>
                 <div className="flex gap-2">
+                  {!isSupervisor && (
                   <button
                     onClick={() => {
                       if (limiteMembrosAtingido) {
@@ -2229,6 +2297,7 @@ export default function MembrosPage() {
                   >
                     <span>➕</span> Novo Cadastro
                   </button>
+                  )}
                   <button
                     onClick={async () => {
                       if (ultimoCadastro) {
@@ -2468,6 +2537,7 @@ export default function MembrosPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                             </svg>
                           </button>
+                          {!isSupervisor && (
                           <button
                             onClick={() => abrirEdicao(membro)}
                             className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition"
@@ -2477,6 +2547,8 @@ export default function MembrosPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
+                          )}
+                          {!isSupervisor && (
                           <button
                             onClick={() => abrirConfirmacaoDeletar(membro)}
                             className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition"
@@ -2486,6 +2558,7 @@ export default function MembrosPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                           </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -2682,17 +2755,30 @@ export default function MembrosPage() {
                             )}
                           </label>
                           <input
+                            ref={cpfInputRef}
                             type="text"
                             placeholder="Somente Números"
                             value={dadosPessoais.cpf}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, cpf: formatCpf(e.target.value) })}
+                            onChange={(e) => {
+                              setCpfDuplicado(false);
+                              setDadosPessoais({ ...dadosPessoais, cpf: formatCpf(e.target.value) });
+                            }}
+                            onBlur={(e) => verificarCpfDuplicado(e.target.value)}
                             disabled={false}
                             className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:border-transparent ${
-                              dadosPessoais.cpf && !validarCPF(dadosPessoais.cpf)
+                              cpfDuplicado
+                                ? 'border-red-500 focus:ring-red-500 bg-red-50'
+                                : dadosPessoais.cpf && !validarCPF(dadosPessoais.cpf)
                                 ? 'border-red-500 focus:ring-red-500'
                                 : 'border-gray-300 focus:ring-teal-500'
                             }`}
                           />
+                          {verificandoCpf && (
+                            <p className="mt-1 text-xs text-gray-400">Verificando CPF...</p>
+                          )}
+                          {cpfDuplicado && (
+                            <p className="mt-1 text-xs text-red-600 font-medium">⚠ CPF já cadastrado neste ministério.</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-gray-700 mb-1">Tipo de Cadastro *</label>
@@ -2977,8 +3063,11 @@ export default function MembrosPage() {
 
 
                       {/* Batismo */}
-                      <div className="bg-teal-50 border border-teal-200 p-3 rounded-md">
+                      <div className={`bg-teal-50 border border-teal-200 p-3 rounded-md ${dadosPessoais.tipoCadastro === 'congregado' ? 'opacity-50' : ''}`}>
                         <h4 className="text-xs font-semibold text-teal-800 mb-3">⛪ Dados Eclesiásticos</h4>
+                        {dadosPessoais.tipoCadastro === 'congregado' && (
+                          <p className="text-xs text-teal-700 mb-2 italic">Não disponível para Congregado.</p>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-xs font-semibold text-gray-700 mb-1">Data de Batismo nas Águas</label>
@@ -2986,7 +3075,8 @@ export default function MembrosPage() {
                               type="date"
                               value={dadosMinisteriais.dataBatismoAguas}
                               onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, dataBatismoAguas: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                              disabled={dadosPessoais.tipoCadastro === 'congregado'}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:cursor-not-allowed disabled:bg-gray-100"
                             />
                           </div>
                           <div>
@@ -2995,7 +3085,8 @@ export default function MembrosPage() {
                               type="date"
                               value={dadosMinisteriais.dataBatismoEspiritoSanto}
                               onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, dataBatismoEspiritoSanto: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                              disabled={dadosPessoais.tipoCadastro === 'congregado'}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:cursor-not-allowed disabled:bg-gray-100"
                             />
                           </div>
                         </div>

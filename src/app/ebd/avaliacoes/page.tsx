@@ -1,8 +1,13 @@
 'use client';
 
 import PageLayout from '@/components/PageLayout';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 
 export default function EbdAvaliacoesPage() {
+  const { ctx, bloqueado } = useRequireModulo('ebd');
+  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
+
   return (
     <PageLayout
       title="EBD — Avaliações"

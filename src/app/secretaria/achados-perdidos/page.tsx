@@ -5,7 +5,7 @@ import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
-import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { Pencil, Trash2, Search, CheckCircle2 } from 'lucide-react';
@@ -88,7 +88,7 @@ const formatIsoDate = (value?: string | null) => {
 };
 
 export default function AchadosPerdidosPage() {
-  const { loading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('gestao');
   const supabase = useMemo(() => createClient(), []);
 
   const [activeTab, setActiveTab] = useState('cadastro');
@@ -152,7 +152,7 @@ export default function AchadosPerdidosPage() {
   };
 
   useEffect(() => {
-    if (loading) return;
+    if (ctx.loading || bloqueado) return;
     const run = async () => {
       setLoadingData(true);
       const mid = await resolveMinistryId(supabase);
@@ -163,7 +163,7 @@ export default function AchadosPerdidosPage() {
       setLoadingData(false);
     };
     run();
-  }, [loading, supabase]);
+  }, [ctx.loading, bloqueado, supabase]);
 
   const handleSubmit = async () => {
     if (!ministryId) return;
@@ -279,7 +279,9 @@ export default function AchadosPerdidosPage() {
   const camposLocais = locais.filter((l) => l.tipo === 'campo');
   const congregacoesLocais = locais.filter((l) => l.tipo === 'congregacao');
 
-  if (loading || loadingData) return <div className="p-8">Carregando...</div>;
+  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
+  if (loadingData) return <div className="p-8">Carregando...</div>;
 
   return (
     <PageLayout

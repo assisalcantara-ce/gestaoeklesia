@@ -5,7 +5,7 @@ import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
-import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
@@ -199,7 +199,7 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function MissoesPage() {
-  const { loading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('missoes');
   const supabase = createClient();
 
   const [activeTab, setActiveTab] = useState('projetos');
@@ -249,7 +249,7 @@ export default function MissoesPage() {
   // ── Carregamento inicial ──────────────────────────────────────────────────
 
   useEffect(() => {
-    if (loading) return;
+    if (ctx.loading || bloqueado) return;
     const init = async () => {
       const mid = await resolveMinistryId(supabase);
       setMinistryId(mid);
@@ -268,7 +268,7 @@ export default function MissoesPage() {
     };
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [ctx.loading, bloqueado]);
 
   const loadProjetos = async (mid: string) => {
     const { data, error } = await supabase.from('missoes_projetos').select('*').eq('ministry_id', mid).order('created_at', { ascending: false });
@@ -645,7 +645,8 @@ export default function MissoesPage() {
 
   // ─────────────────────────────────────────────────────────────────────────
 
-  if (loading || loadingData) return <div className="p-8 text-gray-500">Carregando...</div>;
+  if (ctx.loading || loadingData) return <div className="p-8 text-gray-500">Carregando...</div>;
+  if (bloqueado) return null;
 
   return (
     <PageLayout title="Missões" description="Gestão de atividades missionárias" activeMenu="missoes">

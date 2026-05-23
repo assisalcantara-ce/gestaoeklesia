@@ -8,6 +8,10 @@ export interface PlanFeatures {
   has_modulo_financeiro_avancado: boolean;
   has_modulo_eventos: boolean;
   has_modulo_reunioes: boolean;
+  /** Status da assinatura do ministério ('trial', 'active', 'cancelled', etc.) */
+  subscription_status: string | null;
+  /** Data de término da assinatura ou do trial */
+  subscription_end_date: string | null;
   /** true enquanto carrega, false quando resolvido */
   loading: boolean;
 }
@@ -17,6 +21,8 @@ const DEFAULT_FEATURES: PlanFeatures = {
   has_modulo_financeiro_avancado: false,
   has_modulo_eventos: true,
   has_modulo_reunioes: true,
+  subscription_status: null,
+  subscription_end_date: null,
   loading: true,
 };
 
@@ -49,13 +55,13 @@ export function usePlanFeatures(): PlanFeatures {
         const query = ministryId
           ? supabase
               .from('ministries')
-              .select('subscription_plan_id, subscription_plans(has_modulo_financeiro, has_modulo_financeiro_avancado, has_modulo_eventos, has_modulo_reunioes)')
+              .select('subscription_plan_id, subscription_status, subscription_end_date, subscription_plans(has_modulo_financeiro, has_modulo_financeiro_avancado, has_modulo_eventos, has_modulo_reunioes)')
               .eq('id', ministryId)
               .limit(1)
               .maybeSingle()
           : supabase
               .from('ministries')
-              .select('subscription_plan_id, subscription_plans(has_modulo_financeiro, has_modulo_financeiro_avancado, has_modulo_eventos, has_modulo_reunioes)')
+              .select('subscription_plan_id, subscription_status, subscription_end_date, subscription_plans(has_modulo_financeiro, has_modulo_financeiro_avancado, has_modulo_eventos, has_modulo_reunioes)')
               .eq('user_id', user.id)
               .limit(1)
               .maybeSingle();
@@ -70,6 +76,8 @@ export function usePlanFeatures(): PlanFeatures {
             has_modulo_financeiro_avancado: plan?.has_modulo_financeiro_avancado ?? false,
             has_modulo_eventos: plan?.has_modulo_eventos ?? true,
             has_modulo_reunioes: plan?.has_modulo_reunioes ?? true,
+            subscription_status: (ministry as any)?.subscription_status ?? null,
+            subscription_end_date: (ministry as any)?.subscription_end_date ?? null,
             loading: false,
           });
         }

@@ -5,7 +5,7 @@ import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
-import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
@@ -75,7 +75,7 @@ const formatIsoDate = (value?: string | null) => {
 };
 
 export default function ApresentacaoCriancasPage() {
-  const { loading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('secretaria_local');
   const supabase = useMemo(() => createClient(), []);
 
   const [activeTab, setActiveTab] = useState('cadastro');
@@ -186,7 +186,7 @@ export default function ApresentacaoCriancasPage() {
   };
 
   useEffect(() => {
-    if (loading) return;
+    if (ctx.loading || bloqueado) return;
     const run = async () => {
       setLoadingData(true);
       const mid = await resolveMinistryId(supabase);
@@ -199,7 +199,7 @@ export default function ApresentacaoCriancasPage() {
       setLoadingData(false);
     };
     run();
-  }, [loading, supabase]);
+  }, [ctx.loading, bloqueado, supabase]);
 
   const handleSubmit = async () => {
     if (!ministryId) {
@@ -378,32 +378,21 @@ export default function ApresentacaoCriancasPage() {
     const win = window.open('', '_blank');
     if (!win) return;
 
-    // A4 landscape em px a 96dpi: 297mm × 210mm ≈ 1122 × 794
-    // Canvas: 840 × 595 → scale ≈ 1.334 para preencher a folha toda
-    const scaleX = (297 * 3.7795) / CERTIFICADO_CANVAS.largura;
-    const scaleY = (210 * 3.7795) / CERTIFICADO_CANVAS.altura;
+    // A4 landscape com 1cm de margem: área útil 277mm × 190mm
+    const scaleX = (277 * 3.7795) / CERTIFICADO_CANVAS.largura;
+    const scaleY = (190 * 3.7795) / CERTIFICADO_CANVAS.altura;
     const scale = Math.min(scaleX, scaleY).toFixed(4);
 
     win.document.write(`<!DOCTYPE html><html><head><title>Certificado</title>`);
     win.document.write(`<style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      @page { size: A4 landscape; margin: 0; }
-      html, body {
-        width: 297mm; height: 210mm;
-        overflow: hidden;
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
-      }
-      .cert-scale-wrapper {
-        transform-origin: top left;
-        transform: scale(${scale});
-        width: ${CERTIFICADO_CANVAS.largura}px;
-        height: ${CERTIFICADO_CANVAS.altura}px;
-      }
+      @page { size: A4 landscape; margin: 1cm; }
+      html, body { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .cert { zoom: ${scale}; width: ${CERTIFICADO_CANVAS.largura}px; height: ${CERTIFICADO_CANVAS.altura}px; overflow: hidden; flex-shrink: 0; }
       img { display: block; }
     </style>`);
     win.document.write('</head><body>');
-    win.document.write(`<div class="cert-scale-wrapper">${html}</div>`);
+    win.document.write(`<div class="cert">${html}</div>`);
     win.document.write('</body></html>');
     win.document.close();
     win.focus();
@@ -459,7 +448,9 @@ export default function ApresentacaoCriancasPage() {
     setPrintTarget(null);
   };
 
-  if (loading || loadingData) return <div className="p-8">Carregando...</div>;
+  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
+  if (loadingData) return <div className="p-8">Carregando...</div>;
 
   return (
     <PageLayout
@@ -686,74 +677,140 @@ export default function ApresentacaoCriancasPage() {
 
             {activeTab === 'registros' && (
               <Section icon="📑" title="Registros">
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                  {/* Header da tabela */}
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/60">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-700">Total</span>
+                      <span className="inline-flex items-center justify-center rounded-full bg-[#123b63] text-white text-xs font-bold px-2 py-0.5 min-w-[24px]">
+                        {registros.length}
+                      </span>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {STATUS_OPTIONS.map(s => {
+                        const count = registros.filter(r => r.status === s.value).length;
+                        if (count === 0) return null;
+                        const cls = s.value === 'apresentado'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : s.value === 'cancelado'
+                          ? 'bg-red-100 text-red-600'
+                          : 'bg-blue-100 text-blue-700';
+                        return (
+                          <span key={s.value} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
+                            {s.label} <b>{count}</b>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {registros.length === 0 ? (
-                    <p className="text-sm text-gray-500">Nenhum registro cadastrado.</p>
+                    <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                      <span className="text-4xl mb-3">👶</span>
+                      <p className="text-sm font-medium">Nenhum registro cadastrado.</p>
+                    </div>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="text-left text-xs uppercase text-gray-400 border-b">
-                            <th className="py-2 pr-4">Crianca</th>
-                            <th className="py-2 pr-4">Pais/Responsavel</th>
-                            <th className="py-2 pr-4">Apresentacao</th>
-                            <th className="py-2 pr-4">Status</th>
-                            <th className="py-2">Acoes</th>
+                          <tr className="bg-[#123b63] text-white text-xs uppercase tracking-wide">
+                            <th className="py-3 px-4 text-left font-semibold">Criança</th>
+                            <th className="py-3 px-4 text-left font-semibold">Pais / Responsável</th>
+                            <th className="py-3 px-4 text-left font-semibold">Apresentação</th>
+                            <th className="py-3 px-4 text-left font-semibold">Status</th>
+                            <th className="py-3 px-4 text-left font-semibold">Ações</th>
                           </tr>
                         </thead>
-                        <tbody>
-                          {registros.map((r) => (
-                            <tr key={r.id} className="border-b last:border-b-0">
-                              <td className="py-3 pr-4">
-                                <div className="font-semibold text-gray-800">{r.crianca_nome}</div>
-                                <div className="text-xs text-gray-500">{formatDate(r.crianca_data_nascimento)}</div>
+                        <tbody className="divide-y divide-gray-100">
+                          {registros.map((r, idx) => (
+                            <tr key={r.id} className={`group transition-colors hover:bg-blue-50/40 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                              {/* Criança */}
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-shrink-0 w-9 h-9 rounded-full bg-[#123b63]/10 flex items-center justify-center text-[#123b63] font-bold text-sm">
+                                    {r.crianca_nome?.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <div className="font-semibold text-gray-800 leading-tight">{r.crianca_nome}</div>
+                                    <div className="text-xs text-gray-400 mt-0.5">
+                                      {[r.crianca_sexo, r.crianca_data_nascimento ? formatDate(r.crianca_data_nascimento) : null].filter(Boolean).join(' · ')}
+                                    </div>
+                                  </div>
+                                </div>
                               </td>
-                              <td className="py-3 pr-4">
-                                <div className="text-xs text-gray-600">Pai: {r.pai_nome || '-'}</div>
-                                <div className="text-xs text-gray-600">Mae: {r.mae_nome || '-'}</div>
-                                <div className="text-xs text-gray-600">Resp: {r.responsavel_nome || '-'}</div>
+                              {/* Pais */}
+                              <td className="py-3 px-4">
+                                {r.pai_nome && (
+                                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                                    <span className="text-gray-400">Pai:</span> {r.pai_nome}
+                                  </div>
+                                )}
+                                {r.mae_nome && (
+                                  <div className="flex items-center gap-1.5 text-xs text-gray-600 mt-0.5">
+                                    <span className="text-gray-400">Mãe:</span> {r.mae_nome}
+                                  </div>
+                                )}
+                                {r.responsavel_nome && !r.pai_nome && !r.mae_nome && (
+                                  <div className="text-xs text-gray-600">{r.responsavel_nome}</div>
+                                )}
+                                {r.responsavel_telefone && (
+                                  <div className="text-xs text-gray-400 mt-0.5">{r.responsavel_telefone}</div>
+                                )}
                               </td>
-                              <td className="py-3 pr-4">
-                                <div className="text-xs text-gray-600">{formatDate(r.data_apresentacao)}</div>
-                                <div className="text-xs text-gray-500">{r.local_apresentacao || '-'}</div>
+                              {/* Data/Local */}
+                              <td className="py-3 px-4">
+                                <div className="text-sm font-medium text-gray-700">{formatDate(r.data_apresentacao) || '—'}</div>
+                                {r.local_apresentacao && (
+                                  <div className="text-xs text-gray-400 mt-0.5">{r.local_apresentacao}</div>
+                                )}
                               </td>
-                              <td className="py-3 pr-4">
-                                <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                                  {STATUS_OPTIONS.find((s) => s.value === r.status)?.label || r.status || '-'}
+                              {/* Status */}
+                              <td className="py-3 px-4">
+                                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                  r.status === 'apresentado'
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : r.status === 'cancelado'
+                                    ? 'bg-red-100 text-red-600'
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {r.status === 'apresentado' ? '✓ ' : r.status === 'cancelado' ? '✕ ' : '• '}
+                                  {STATUS_OPTIONS.find((s) => s.value === r.status)?.label || r.status || '—'}
                                 </span>
+                                {r.certificado_emitido_em && (
+                                  <div className="flex items-center gap-1 text-[11px] text-emerald-600 mt-1.5">
+                                    <Printer className="h-3 w-3" />
+                                    {formatDate(r.certificado_emitido_em)}
+                                  </div>
+                                )}
                               </td>
-                              <td className="py-3">
-                                <div className="flex items-center gap-2">
+                              {/* Ações */}
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-1.5">
                                   <button
                                     title="Editar"
-                                    className="rounded-md border border-gray-200 p-2 text-gray-600 hover:bg-gray-50"
+                                    className="rounded-lg border border-gray-200 p-2 text-gray-500 hover:bg-[#123b63] hover:text-white hover:border-[#123b63] transition-colors"
                                     onClick={() => handleEdit(r)}
                                   >
-                                    <Pencil className="h-4 w-4" />
+                                    <Pencil className="h-3.5 w-3.5" />
                                   </button>
                                   <button
                                     title="Excluir"
-                                    className="rounded-md border border-gray-200 p-2 text-gray-600 hover:bg-gray-50"
+                                    className="rounded-lg border border-gray-200 p-2 text-gray-500 hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors"
                                     onClick={() => handleDelete(r.id)}
                                   >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2 className="h-3.5 w-3.5" />
                                   </button>
                                   <button
                                     title={templatesApresentacao.length === 0
-                                      ? 'Cadastre um certificado para apresentacao de criancas'
+                                      ? 'Cadastre um certificado para apresentação de crianças'
                                       : 'Imprimir certificado'}
-                                    className="rounded-md border border-gray-200 p-2 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                                    className="rounded-lg border border-gray-200 p-2 text-gray-500 hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                     onClick={() => handlePrintClick(r)}
                                     disabled={templatesApresentacao.length === 0}
                                   >
-                                    <Printer className="h-4 w-4" />
+                                    <Printer className="h-3.5 w-3.5" />
                                   </button>
                                 </div>
-                                {r.certificado_emitido_em && (
-                                  <div className="text-[11px] text-gray-400 mt-1">
-                                    Certificado emitido em {formatDate(r.certificado_emitido_em)}
-                                  </div>
-                                )}
                               </td>
                             </tr>
                           ))}

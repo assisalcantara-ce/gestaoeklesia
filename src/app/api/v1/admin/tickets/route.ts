@@ -85,8 +85,10 @@ export async function GET(request: NextRequest) {
 
     const enriched = (data || []).map((ticket: any) => {
       const lastMessage = lastMessageByTicket[ticket.id]
+      const { ministries, ...rest } = ticket
       return {
-        ...ticket,
+        ...rest,
+        ministry_name: (ministries as any)?.name ?? null,
         last_message_user_id: lastMessage?.user_id || null,
         last_message_at: lastMessage?.created_at || null,
         last_message_sender_role: lastMessage?.sender_role ?? null,

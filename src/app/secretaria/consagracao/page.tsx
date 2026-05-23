@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
-import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useMembers } from '@/hooks/useMembers';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
@@ -68,13 +68,14 @@ const isConsagracaoTableMissing = (error: any) => {
 };
 
 export default function ConsagracaoPage() {
-  const { loading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('gestao');
+  const isSupervisor = ctx.nivel === 'supervisor';
   const supabase = useMemo(() => createClient(), []);
   const { fetchMembers } = useMembers();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const suppressNextSearchRef = useRef(false);
 
-  const [activeTab, setActiveTab] = useState('cadastro');
+  const [activeTab, setActiveTab] = useState(() => isSupervisor ? 'registros' : 'cadastro');
   const [ministryId, setMinistryId] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
 
@@ -137,10 +138,12 @@ export default function ConsagracaoPage() {
     foto_url: ''
   });
 
-  const tabs = [
-    { id: 'cadastro', label: 'Cadastro de Processos', icon: '📝' },
-    { id: 'registros', label: 'Registros', icon: '📑' }
-  ];
+  const tabs = isSupervisor
+    ? [{ id: 'registros', label: 'Registros', icon: '📑' }]
+    : [
+        { id: 'cadastro', label: 'Cadastro de Processos', icon: '📝' },
+        { id: 'registros', label: 'Registros', icon: '📑' }
+      ];
 
   const getNextProcessNumber = async () => {
     if (!ministryId || !consagracaoModuleReady) return '';
@@ -192,10 +195,33 @@ export default function ConsagracaoPage() {
       if (!congRes.error) setCongregacoes((congRes.data as SimpleOption[]) || []);
     }
 
-    const { data, error } = await supabase
+    // Determina IDs de congregações visíveis para o supervisor
+    let scopeCongIds: string[] | null = null;
+    if (isSupervisor && ctx.supervisaoId && resolvedMinistryId) {
+      const { data: congsDaSup } = await supabase
+        .from('congregacoes')
+        .select('id')
+        .eq('ministry_id', resolvedMinistryId)
+        .eq('supervisao_id', ctx.supervisaoId);
+      scopeCongIds = (congsDaSup || []).map((c: any) => c.id);
+    }
+
+    let query = supabase
       .from('consagracao_registros')
       .select('*')
       .order('created_at', { ascending: false });
+    if (scopeCongIds !== null) {
+      if (scopeCongIds.length > 0) {
+        query = query.in('congregacao_id', scopeCongIds);
+      } else {
+        // Supervisor sem congregações vinculadas → lista vazia
+        setConsagracaoModuleReady(true);
+        setRegistros([]);
+        setLoadingData(false);
+        return;
+      }
+    }
+    const { data, error } = await query;
     if (error) {
       if (isConsagracaoTableMissing(error)) {
         setConsagracaoModuleReady(false);
@@ -211,11 +237,11 @@ export default function ConsagracaoPage() {
   };
 
   useEffect(() => {
-    if (!loading) {
+    if (!ctx.loading && !bloqueado) {
       loadInitialData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [ctx.loading, bloqueado]);
 
   useEffect(() => {
     if (formRegistro.tipo_registro !== 'progressao') {
@@ -713,7 +739,9 @@ export default function ConsagracaoPage() {
     setProcessRegistro(null);
   };
 
-  if (loading || loadingData) return <div className="p-8">Carregando...</div>;
+  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
+  if (loadingData) return <div className="p-8">Carregando...</div>;
 
   const labelCongregacao = nomenclaturas?.divisaoPrincipal?.opcao1 || 'Congregação';
   const labelCampo = nomenclaturas?.divisaoSecundaria?.opcao1 || 'Campo';
@@ -765,6 +793,7 @@ export default function ConsagracaoPage() {
           <Section icon="📝" title="Cadastro de Processos">
             <div className="flex items-center justify-between gap-4 mb-6">
               <p className="text-gray-500">Cadastre processos de chegada, progressão e filiação ministerial.</p>
+              {!isSupervisor && (
               <button
                 className={`text-white px-4 py-2 rounded-lg transition shadow-md ${consagracaoModuleReady ? 'bg-teal-500 hover:bg-teal-600' : 'bg-gray-400 cursor-not-allowed'}`}
                 onClick={() => {
@@ -778,6 +807,7 @@ export default function ConsagracaoPage() {
               >
                 + Novo Registro
               </button>
+              )}
             </div>
 
             {showForm && (
@@ -1396,6 +1426,7 @@ export default function ConsagracaoPage() {
                           </span>
                         </td>
                         <td className="py-2 text-right space-x-2">
+                          {!isSupervisor && (
                           <button
                             className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition text-xs font-semibold"
                             onClick={() => {
@@ -1443,12 +1474,16 @@ export default function ConsagracaoPage() {
                           >
                             Editar
                           </button>
+                          )}
+                          {!isSupervisor && (
                           <button
                             className="inline-flex items-center gap-1 px-3 py-1 bg-red-50 text-red-700 rounded hover:bg-red-100 transition text-xs font-semibold"
                             onClick={() => handleDeleteRegistro(reg.id)}
                           >
                             Excluir
                           </button>
+                          )}
+                          {!isSupervisor && (
                           <button
                             className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 transition text-xs font-semibold"
                             onClick={() => {
@@ -1458,6 +1493,7 @@ export default function ConsagracaoPage() {
                           >
                             Processar
                           </button>
+                          )}
                         </td>
                       </tr>
                     ))}

@@ -1,18 +1,6 @@
-/**
- * API ROUTE: Gerenciar Funcionários
- * GET /api/v1/employees - Listar funcionários
- * POST /api/v1/employees - Criar funcionário
- * 
- * Query params:
- * - ministry_id: ID do ministério (requerido)
- * - page: número da página (padrão: 1)
- * - limit: itens por página (padrão: 20)
- * - status: filtrar por status (ATIVO, INATIVO)
- * - grupo: filtrar por grupo
- */
-
-import { createServerClient, createServerClientFromRequest } from '@/lib/supabase-server'
+import { getAccessibleMemberIds, resolveTenantAuth } from '@/lib/tenant-auth'
 import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer'
+import { authTenantErrorResponse, forbiddenResponse } from '@/lib/api-errors'
 import { NextRequest, NextResponse } from 'next/server'
 
 function getSupabaseErrorText(error: any): string {
@@ -25,8 +13,8 @@ function getSupabaseErrorText(error: any): string {
   ].filter(Boolean)
   if (parts.length > 0) return parts.join(' ')
   try {
-    const s = JSON.stringify(error)
-    return s && s !== '{}' ? s : String(error)
+    const text = JSON.stringify(error)
+    return text && text !== '{}' ? text : String(error)
   } catch {
     return String(error)
   }
@@ -47,6 +35,7 @@ async function listEmployeesFallback(
   limit: number,
   status: string | null,
   grupo: string | null,
+  accessibleMemberIds: string[] | null,
 ) {
   const offset = (page - 1) * limit
 
@@ -55,6 +44,11 @@ async function listEmployeesFallback(
     .select('*', { count: 'exact' })
     .eq('ministry_id', ministryId)
 
+  if (accessibleMemberIds !== null) {
+    employeesQuery = accessibleMemberIds.length > 0
+      ? employeesQuery.in('member_id', accessibleMemberIds)
+      : employeesQuery.eq('id', '00000000-0000-0000-0000-000000000000')
+  }
   if (status) employeesQuery = employeesQuery.eq('status', status)
   if (grupo) employeesQuery = employeesQuery.eq('grupo', grupo)
 
@@ -66,7 +60,7 @@ async function listEmployeesFallback(
   if (employeesErr) throw employeesErr
 
   const rows = (employeesRows as any[]) || []
-  const memberIds = Array.from(new Set(rows.map((r: any) => r.member_id).filter(Boolean)))
+  const memberIds = Array.from(new Set(rows.map((row: any) => row.member_id).filter(Boolean)))
 
   let membersMap = new Map<string, any>()
   if (memberIds.length > 0) {
@@ -77,122 +71,61 @@ async function listEmployeesFallback(
       .in('id', memberIds)
 
     if (!membersErr) {
-      membersMap = new Map(((membersRows as any[]) || []).map((m: any) => [String(m.id), m]))
+      membersMap = new Map(((membersRows as any[]) || []).map((member: any) => [String(member.id), member]))
     }
   }
 
-  const enriched = rows.map((r: any) => {
-    const m = membersMap.get(String(r.member_id))
-    return {
-      ...r,
-      member_name: m?.name || null,
-      member_cpf: m?.cpf || null,
-      member_phone: m?.phone || null,
-      member_birth_date: m?.birth_date || null,
-    }
-  })
-
-  return { data: enriched, count: count || 0 }
-}
-
-async function resolveMinistryId(supabase: any, userId: string): Promise<string | null> {
-  const { data: mu, error: muErr } = await supabase
-    .from('ministry_users')
-    .select('ministry_id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (!muErr && mu?.ministry_id) return String(mu.ministry_id)
-
-  const { data: m, error: mErr } = await supabase
-    .from('ministries')
-    .select('id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (!mErr && m?.id) return String(m.id)
-
-  const admin = createServerClient()
-
-  const { data: muAdmin } = await admin
-    .from('ministry_users')
-    .select('ministry_id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (muAdmin?.ministry_id) return String(muAdmin.ministry_id)
-
-  const { data: mAdmin } = await admin
-    .from('ministries')
-    .select('id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (mAdmin?.id) return String(mAdmin.id)
-
-  return null
+  return {
+    data: rows.map((row: any) => {
+      const member = membersMap.get(String(row.member_id))
+      return {
+        ...row,
+        member_name: member?.name || null,
+        member_cpf: member?.cpf || null,
+        member_phone: member?.phone || null,
+        member_birth_date: member?.birth_date || null,
+      }
+    }),
+    count: count || 0,
+  }
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerClientFromRequest(request)
+    const context = await resolveTenantAuth(request)
+    const { supabase, ministryId } = context
+    const accessibleMemberIds = await getAccessibleMemberIds(context)
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const ministryId = await resolveMinistryId(supabase, user.id)
-    if (!ministryId) {
-      return NextResponse.json(
-        { error: 'Usuário sem ministério associado', code: 'NO_MINISTRY' },
-        { status: 403 }
-      )
-    }
-
-    // Extrair query params
     const searchParams = request.nextUrl.searchParams
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const status = searchParams.get('status')
     const grupo = searchParams.get('grupo')
-
     const offset = (page - 1) * limit
 
-    // Construir query
     let query = supabase
       .from('employees_with_member_info')
       .select('*', { count: 'exact' })
       .eq('ministry_id', ministryId)
 
-    // Aplicar filtros
-    if (status) {
-      query = query.eq('status', status)
+    if (accessibleMemberIds !== null) {
+      query = accessibleMemberIds.length > 0
+        ? query.in('member_id', accessibleMemberIds)
+        : query.eq('id', '00000000-0000-0000-0000-000000000000')
     }
+    if (status) query = query.eq('status', status)
+    if (grupo) query = query.eq('grupo', grupo)
 
-    if (grupo) {
-      query = query.eq('grupo', grupo)
-    }
-
-    // Aplicar paginação
-    query = query.range(offset, offset + limit - 1)
-
-    // Ordenar por data de criação
-    query = query.order('created_at', { ascending: false })
+    query = query
+      .range(offset, offset + limit - 1)
+      .order('created_at', { ascending: false })
 
     const { data, error, count } = await query
 
     if (error) {
       if (isMissingEmployeesViewError(error)) {
         try {
-          const fallback = await listEmployeesFallback(supabase, ministryId, page, limit, status, grupo)
+          const fallback = await listEmployeesFallback(supabase, ministryId, page, limit, status, grupo, accessibleMemberIds)
           return NextResponse.json({
             data: fallback.data,
             count: fallback.count,
@@ -202,7 +135,7 @@ export async function GET(request: NextRequest) {
           })
         } catch (fallbackErr: any) {
           return NextResponse.json(
-            { error: getSupabaseErrorText(fallbackErr) || 'Estrutura de funcionários indisponível no Supabase' },
+            { error: getSupabaseErrorText(fallbackErr) || 'Estrutura de funcionarios indisponivel no Supabase' },
             { status: 400 }
           )
         }
@@ -218,41 +151,25 @@ export async function GET(request: NextRequest) {
       count,
       page,
       limit,
-      total_pages: Math.ceil((count || 0) / limit)
+      total_pages: Math.ceil((count || 0) / limit),
     })
   } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
+    const authResponse = authTenantErrorResponse(error)
+    if (authResponse) return authResponse
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerClientFromRequest(request)
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const ministryId = await resolveMinistryId(supabase, user.id)
-    if (!ministryId) {
-      return NextResponse.json(
-        { error: 'Usuário sem ministério associado', code: 'NO_MINISTRY' },
-        { status: 403 }
-      )
-    }
+    const context = await resolveTenantAuth(request)
+    const { supabase, ministryId } = context
 
     const body = await request.json()
     const normalizedBody = normalizePayloadToUppercase(body, {
       preserveKeys: ['data_admissao', 'email', 'member_id'],
     })
-    
+
     const {
       member_id,
       grupo,
@@ -272,61 +189,58 @@ export async function POST(request: NextRequest) {
       conta_corrente,
       pix,
       obs,
-      status = 'ATIVO'
+      status = 'ATIVO',
     } = normalizedBody
 
-    // Validar campos obrigatórios
     if (!member_id || !grupo || !funcao || !data_admissao) {
       return NextResponse.json(
-        { error: 'Campo(s) obrigatório(s) faltando: member_id, grupo, funcao, data_admissao' },
+        { error: 'Campo(s) obrigatorio(s) faltando: member_id, grupo, funcao, data_admissao' },
         { status: 400 }
       )
     }
 
-    // Criar funcionário
+    const accessibleMemberIds = await getAccessibleMemberIds(context)
+    if (accessibleMemberIds !== null && !accessibleMemberIds.includes(String(member_id))) {
+      return forbiddenResponse()
+    }
+
     const { data, error } = await supabase
       .from('employees')
-      .insert([
-        {
-          ministry_id: ministryId,
-          member_id,
-          grupo,
-          funcao,
-          data_admissao,
-          email: typeof email === 'string' ? email.toLowerCase().trim() || null : email,
-          telefone,
-          whatsapp,
-          rg,
-          endereco,
-          cep,
-          bairro,
-          cidade,
-          uf,
-          banco,
-          agencia,
-          conta_corrente,
-          pix,
-          obs,
-          status
-        }
-      ])
+      .insert([{
+        ministry_id: ministryId,
+        member_id,
+        grupo,
+        funcao,
+        data_admissao,
+        email: typeof email === 'string' ? email.toLowerCase().trim() || null : email,
+        telefone,
+        whatsapp,
+        rg,
+        endereco,
+        cep,
+        bairro,
+        cidade,
+        uf,
+        banco,
+        agencia,
+        conta_corrente,
+        pix,
+        obs,
+        status,
+      }])
       .select()
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     return NextResponse.json(
-      { data, message: 'Funcionário criado com sucesso' },
+      { data, message: 'Funcionario criado com sucesso' },
       { status: 201 }
     )
   } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
+    const authResponse = authTenantErrorResponse(error)
+    if (authResponse) return authResponse
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import NotificationModal from '@/components/NotificationModal';
 import { createClient } from '@/lib/supabase-client';
-import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { formatPhone } from '@/lib/mascaras';
 
 interface Membro {
@@ -97,7 +97,7 @@ const normalizeOptionValue = (value: string) =>
 
 export default function GerenciarFuncionarios() {
   const supabase = createClient();
-  const { loading: authLoading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('gestao');
 
   const [membros, setMembros] = useState<Membro[]>([]);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
@@ -510,7 +510,8 @@ export default function GerenciarFuncionarios() {
   const gruposCustom = gruposFuncao.filter(g => !GRUPOS_FUNCAO_BASE.some(base => base.valor === g.valor));
   const funcoesCustom = funcoes.filter(f => !FUNCOES_BASE.some(base => base.valor === f.valor));
 
-  if (authLoading) return <div className="p-8">Carregando...</div>;
+  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
 
   return (
     <div className="flex h-screen bg-gray-100">

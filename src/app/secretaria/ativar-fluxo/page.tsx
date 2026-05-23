@@ -6,10 +6,12 @@ import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 
 export default function AtivarFluxoPage() {
   const { loading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('secretaria');
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('pendentes');
   const [templates, setTemplates] = useState<any[]>([]);
@@ -37,6 +39,7 @@ export default function AtivarFluxoPage() {
   const rolesDisponiveis = ['ADMINISTRADOR', 'FINANCEIRO', 'SUPERVISOR', 'OPERADOR', 'SUPERINTENDENTE', 'COORDENADOR'];
 
   useEffect(() => {
+    if (loading || ctx.loading || bloqueado) return;
     const loadContext = async () => {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
@@ -93,7 +96,7 @@ export default function AtivarFluxoPage() {
     };
 
     loadContext();
-  }, [supabase]);
+  }, [loading, ctx.loading, bloqueado, supabase]);
 
   useEffect(() => {
     const run = async () => {
@@ -294,7 +297,8 @@ export default function AtivarFluxoPage() {
     setConfigModalOpen(false);
   };
 
-  if (loading || !adminChecked) return <div className="p-8">Carregando...</div>;
+  if (loading || ctx.loading || !adminChecked) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-gray-50">

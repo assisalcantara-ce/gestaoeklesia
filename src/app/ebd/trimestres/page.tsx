@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { resolveEbdScope } from '@/lib/cartoes-templates-sync';
 import { Calendar, Plus, Trash2, ToggleLeft, ToggleRight, ChevronDown, ChevronUp } from 'lucide-react';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -57,6 +58,7 @@ const fmtDate = (d: string) =>
 
 export default function EbdTrimestresPage() {
   const { user } = useRequireSupabaseAuth();
+  const { bloqueado } = useRequireModulo('ebd');
   const supabase = useMemo(() => createClient(), []);
 
   const [ministryId, setMinistryId] = useState<string | null>(null);
@@ -94,11 +96,11 @@ export default function EbdTrimestresPage() {
   }, [supabase]);
 
   useEffect(() => {
-    if (!user) return;
-    resolveMinistryId(supabase).then(mid => {
-      if (mid) { setMinistryId(mid); load(mid); }
+    if (!user || bloqueado) return;
+    resolveEbdScope(supabase).then(scope => {
+      if (scope.ministryId) { setMinistryId(scope.ministryId); load(scope.ministryId); }
     });
-  }, [user, supabase, load]);
+  }, [user, bloqueado, supabase, load]);
 
   // Auto-sugere datas ao mudar número ou ano
   useEffect(() => {
@@ -150,6 +152,8 @@ export default function EbdTrimestresPage() {
     form.data_inicio && form.data_fim && form.data_inicio < form.data_fim
       ? getSundays(form.data_inicio, form.data_fim)
       : [];
+
+  if (bloqueado) return null;
 
   return (
     <PageLayout

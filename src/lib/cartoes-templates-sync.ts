@@ -71,6 +71,45 @@ export async function resolveMinistryId(supabase: SupabaseClient): Promise<strin
   }
 }
 
+/**
+ * Resolve o escopo EBD do usuário atual.
+ * Para Superintendentes (permissão SUPERINTENDENTE), retorna também o churchId da sua
+ * congregação, que deve ser usado como filtro obrigatório nas queries EBD.
+ * Para demais papéis, churchId é null (acesso irrestrito ao ministry).
+ */
+export async function resolveEbdScope(supabase: SupabaseClient): Promise<{ ministryId: string | null; churchId: string | null }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ministryId: null, churchId: null };
+
+    const { data: mu } = await supabase
+      .from('ministry_users')
+      .select('ministry_id, congregacao_id, role, permissions')
+      .eq('user_id', user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (mu?.ministry_id) {
+      const perms: string[] = Array.isArray(mu.permissions) ? mu.permissions : [];
+      const role = String(mu.role || '').toLowerCase();
+      const isSuperintendente =
+        role === 'superintendente' ||
+        role === 'superintendent' ||
+        perms.some(p => typeof p === 'string' && p.toUpperCase() === 'SUPERINTENDENTE');
+      return {
+        ministryId: mu.ministry_id,
+        churchId: isSuperintendente ? (mu.congregacao_id ?? null) : null,
+      };
+    }
+
+    // Fallback: dono do ministry
+    const { data: m } = await supabase.from('ministries').select('id').eq('user_id', user.id).limit(1).maybeSingle();
+    return { ministryId: m?.id ?? null, churchId: null };
+  } catch {
+    return { ministryId: null, churchId: null };
+  }
+}
+
 function ensureDefaultActives(templatesInput: any[]): { next: any[]; changed: boolean } {
   const tipos: TipoCartao[] = TIPOS_HABILITADOS;
   let changed = false;

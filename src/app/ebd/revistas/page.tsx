@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { resolveEbdScope } from '@/lib/cartoes-templates-sync';
 import { Plus, Pencil, Trash2, X, BookOpen, ShoppingCart, ChevronDown, ChevronRight } from 'lucide-react';
 import { useAppDialog } from '@/providers/AppDialogProvider';
 
@@ -58,10 +59,12 @@ const anoAtual = () => new Date().getFullYear();
 
 export default function EbdRevistasPage() {
   const { user } = useRequireSupabaseAuth();
+  const { bloqueado } = useRequireModulo('ebd');
   const supabase  = useMemo(() => createClient(), []);
   const dialog    = useAppDialog();
 
   const [ministryId,   setMinistryId]   = useState<string | null>(null);
+  const churchIdRef = useRef<string | null>(null);
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
   const [classes,      setClasses]      = useState<EbdClasse[]>([]);
   const [revistas,     setRevistas]     = useState<EbdRevista[]>([]);
@@ -92,15 +95,20 @@ export default function EbdRevistasPage() {
 
   const load = useCallback(async (mid: string) => {
     setLoading(true);
-    const [congsR, classsR, revsR, pedsR] = await Promise.all([
-      supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome'),
+    const cid = churchIdRef.current;
+    let congsQ = supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome');
+    if (cid) congsQ = congsQ.eq('id', cid);
+    let pedsQ = supabase.from('ebd_pedidos_revistas').select('*').eq('ministry_id', mid).order('created_at', { ascending: false });
+    if (cid) pedsQ = pedsQ.eq('church_id', cid);
+    const [congsR, classesR, revistasR, pedsR] = await Promise.all([
+      congsQ,
       supabase.from('ebd_classes').select('id, nome, cor').eq('ministry_id', mid).order('ordem'),
       supabase.from('ebd_revistas').select('*').eq('ministry_id', mid).order('ano', { ascending: false }),
-      supabase.from('ebd_pedidos_revistas').select('*').eq('ministry_id', mid).order('created_at', { ascending: false }),
+      pedsQ,
     ]);
     setCongregacoes(congsR.data ?? []);
-    setClasses(classsR.data ?? []);
-    setRevistas(revsR.data ?? []);
+    setClasses(classesR.data ?? []);
+    setRevistas(revistasR.data ?? []);
 
     // Enriquece pedidos com nome da congregação
     const congMap = new Map((congsR.data ?? []).map((c: { id: string; nome: string }) => [c.id, c.nome]));
@@ -109,9 +117,15 @@ export default function EbdRevistasPage() {
   }, [supabase]);
 
   useEffect(() => {
-    if (!user) return;
-    resolveMinistryId(supabase).then(mid => { if (mid) { setMinistryId(mid); load(mid); } });
-  }, [user, supabase, load]);
+    if (!user || bloqueado) return;
+    resolveEbdScope(supabase).then(scope => {
+      if (scope.ministryId) {
+        churchIdRef.current = scope.churchId;
+        setMinistryId(scope.ministryId);
+        load(scope.ministryId);
+      }
+    });
+  }, [user, bloqueado, supabase, load]);
 
   const flash = (tipo: 'ok' | 'erro', texto: string) => {
     setMsg({ tipo, texto });
@@ -236,6 +250,8 @@ export default function EbdRevistasPage() {
     { id: 'catalogo'as Aba, label: 'Catálogo de Revistas', icon: <BookOpen className="h-4 w-4" />, count: revistas.length },
     { id: 'pedidos' as Aba, label: 'Pedidos',               icon: <ShoppingCart className="h-4 w-4" />, count: pedidos.length },
   ];
+
+  if (bloqueado) return null;
 
   return (
     <PageLayout title="EBD — Revistas" description="Catálogo de revistas e pedidos trimestrais" activeMenu="ebd-pedidos-revistas">

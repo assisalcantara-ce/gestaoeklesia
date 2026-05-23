@@ -11,10 +11,12 @@ import { formatCnpj, formatPhone } from '@/lib/mascaras';
 import { formatarPreco } from '@/config/plans';
 import type { SubscriptionPlan } from '@/types/admin';
 import { NOMENCLATURAS_SCHEMA_VERSION, NOMENCLATURAS_SCHEMA_VERSION_KEY } from '@/lib/org-nomenclaturas';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 
 export const dynamic = 'force-dynamic';
 
 export default function ConfiguracoesPage() {
+  const { ctx, bloqueado } = useRequireModulo('configuracoes');
   const [activeMenu, setActiveMenu] = useState('configuracoes');
   const [activeTab, setActiveTab] = useState('perfil');
   const [notification, setNotification] = useState<{
@@ -23,6 +25,9 @@ export default function ConfiguracoesPage() {
     message: string;
     type: 'success' | 'error' | 'warning' | 'info';
   }>({ isOpen: false, title: '', message: '', type: 'success' });
+
+  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -88,6 +93,17 @@ export default function ConfiguracoesPage() {
             >
               📝 Nomenclaturas
             </button>
+            {ctx.isAdmin && (
+              <button
+                onClick={() => setActiveTab('gateways')}
+                className={`px-6 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 ${activeTab === 'gateways'
+                  ? 'text-teal-700 border-teal-600'
+                  : 'text-gray-600 border-transparent hover:text-teal-600'
+                  }`}
+              >
+                💳 Gateways de Pagamento
+              </button>
+            )}
           </div>
 
           {/* Conteúdo das Abas */}
@@ -117,6 +133,11 @@ export default function ConfiguracoesPage() {
             {/* Aba: Nomenclaturas */}
             {activeTab === 'nomenclaturas' && (
               <NomenclaturaContent onNotification={(title, message, type) => setNotification({ isOpen: true, title, message, type })} />
+            )}
+
+            {/* Aba: Gateways de Pagamento */}
+            {activeTab === 'gateways' && ctx.isAdmin && (
+              <GatewaysContent onNotification={(title, message, type) => setNotification({ isOpen: true, title, message, type })} />
             )}
           </div>
         </div>
@@ -507,7 +528,7 @@ function FaturasContent() {
         }
 
         // Usar API em vez de acessar Supabase direto (evita RLS issues)
-        const response = await fetch('/api/v1/admin/payments-list', {
+        const response = await fetch('/api/v1/payments', {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
           },
@@ -576,7 +597,7 @@ function FaturasContent() {
         return;
       }
 
-      const response = await fetch(`/api/v1/admin/payments-boleto?id=${fatura.id}`, {
+      const response = await fetch(`/api/v1/payments/boleto?id=${fatura.id}`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
 
@@ -1683,4 +1704,489 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
       )}
     </div>
   );
+}
+
+// =============================================================================
+// Componente: Gateways de Pagamento
+// =============================================================================
+// Exibe cards para ASAAS e EFI. Permite configurar credenciais e ativar/desativar.
+// Apenas ADMINISTRADOR / owner pode ver e editar esta aba.
+// =============================================================================
+
+type GwStatus = 'not_configured' | 'configured' | 'connected' | 'error'
+
+interface GatewayRow {
+  id: string
+  gateway: 'asaas' | 'efi'
+  environment: 'sandbox' | 'production'
+  display_name: string | null
+  is_active: boolean
+  status: GwStatus
+  has_credentials: boolean
+  masked_credentials: Record<string, string | null> | null
+  webhook_token: string
+  webhook_url_hint: string | null
+  last_test_at: string | null
+  last_test_ok: boolean | null
+  last_error: string | null
+  updated_at: string
+}
+
+const GW_LABELS: Record<string, { name: string; color: string; bg: string; description: string }> = {
+  asaas: {
+    name: 'ASAAS',
+    color: 'text-blue-700',
+    bg: 'bg-blue-50 border-blue-200',
+    description: 'Cobrança bancária, PIX, cartão e boleto. Plataforma brasileira mais utilizada por igrejas.',
+  },
+  efi: {
+    name: 'EFI Bank (Gerencianet)',
+    color: 'text-green-700',
+    bg: 'bg-green-50 border-green-200',
+    description: 'PIX, boleto e link de pagamento. Opção econômica com API própria.',
+  },
+}
+
+const STATUS_BADGE: Record<GwStatus, { label: string; cls: string }> = {
+  not_configured: { label: 'Não configurado', cls: 'bg-gray-100 text-gray-600' },
+  configured:     { label: 'Configurado',     cls: 'bg-yellow-100 text-yellow-700' },
+  connected:      { label: 'Conectado',       cls: 'bg-green-100 text-green-700' },
+  error:          { label: 'Erro',            cls: 'bg-red-100 text-red-600' },
+}
+
+interface TestResult {
+  ok: boolean
+  latency_ms?: number
+  message: string
+  tested_at: string
+}
+
+function fmtDatetime(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function GatewaysContent({ onNotification }: { onNotification: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {
+  const supabase = createClient()
+  const [gateways, setGateways] = useState<GatewayRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [savingGw, setSavingGw] = useState<string | null>(null)
+  const [testingGw, setTestingGw] = useState<string | null>(null)
+  const [testResults, setTestResults] = useState<Record<string, TestResult | null>>({})
+  const [modalGw, setModalGw] = useState<'asaas' | 'efi' | null>(null)
+  const [formFields, setFormFields] = useState<Record<string, string>>({})
+  const [envField, setEnvField] = useState<'sandbox' | 'production'>('sandbox')
+
+  async function fetchGateways() {
+    setLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/v1/ministry/gateway', {
+        headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const json = await res.json()
+      setGateways((json.data as GatewayRow[]) || [])
+    } catch (err) {
+      console.error('[GatewaysContent] fetchGateways:', err)
+      onNotification('Erro', 'Não foi possível carregar os gateways de pagamento.', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchGateways()
+    // fetchGateways é estável durante o mount — apenas carregamento inicial
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function openModal(gw: 'asaas' | 'efi') {
+    const existing = gateways.find(g => g.gateway === gw)
+    setEnvField(existing?.environment ?? 'sandbox')
+    setFormFields({})
+    setModalGw(gw)
+  }
+
+  async function handleSave() {
+    if (!modalGw) return
+    setSavingGw(modalGw)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const body: Record<string, any> = {
+        gateway:     modalGw,
+        environment: envField,
+      }
+      if (Object.keys(formFields).length > 0) {
+        body.credentials = formFields
+      }
+      const res = await fetch('/api/v1/ministry/gateway', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token ?? ''}`,
+        },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erro desconhecido')
+      }
+      onNotification('Sucesso', `Gateway ${modalGw.toUpperCase()} salvo com sucesso!`, 'success')
+      setModalGw(null)
+      await fetchGateways()
+    } catch (err: any) {
+      onNotification('Erro', err.message || 'Erro ao salvar gateway.', 'error')
+    } finally {
+      setSavingGw(null)
+    }
+  }
+
+  async function handleToggle(gw: 'asaas' | 'efi', currentActive: boolean) {
+    const row = gateways.find(g => g.gateway === gw)
+    if (!row) return
+    if (!row.has_credentials && !currentActive) {
+      onNotification('Atenção', 'Configure as credenciais antes de ativar o gateway.', 'warning')
+      return
+    }
+    setSavingGw(gw)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/v1/ministry/gateway', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token ?? ''}`,
+        },
+        body: JSON.stringify({ gateway: gw, is_active: !currentActive }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erro desconhecido')
+      }
+      onNotification('Sucesso', `Gateway ${gw.toUpperCase()} ${!currentActive ? 'ativado' : 'desativado'}.`, 'success')
+      await fetchGateways()
+    } catch (err: any) {
+      onNotification('Erro', err.message || 'Erro ao alternar gateway.', 'error')
+    } finally {
+      setSavingGw(null)
+    }
+  }
+
+  async function handleRemove(gw: 'asaas' | 'efi') {
+    setSavingGw(gw)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/v1/ministry/gateway?gateway=${gw}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erro desconhecido')
+      }
+      onNotification('Sucesso', `Credenciais do ${gw.toUpperCase()} removidas.`, 'success')
+      setTestResults(r => ({ ...r, [gw]: null }))
+      await fetchGateways()
+    } catch (err: any) {
+      onNotification('Erro', err.message || 'Erro ao remover credenciais.', 'error')
+    } finally {
+      setSavingGw(null)
+    }
+  }
+
+  async function handleTest(gw: 'asaas' | 'efi') {
+    setTestingGw(gw)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/v1/ministry/gateway/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token ?? ''}`,
+        },
+        body: JSON.stringify({ gateway: gw }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Erro desconhecido')
+      const result: TestResult = {
+        ok:         json.ok,
+        latency_ms: json.latency_ms,
+        message:    json.message,
+        tested_at:  json.tested_at,
+      }
+      setTestResults(r => ({ ...r, [gw]: result }))
+      // Atualiza o status local para refletir o resultado sem recarregar tudo
+      setGateways(gs => gs.map(g =>
+        g.gateway === gw
+          ? { ...g, status: json.status as GwStatus, last_test_at: json.tested_at, last_test_ok: json.ok }
+          : g
+      ))
+    } catch (err: any) {
+      setTestResults(r => ({
+        ...r,
+        [gw]: { ok: false, message: err.message || 'Erro ao testar conexão.', tested_at: new Date().toISOString() },
+      }))
+    } finally {
+      setTestingGw(null)
+    }
+  }
+
+  if (loading) {
+    return <div className="p-8 text-center text-gray-500">Carregando configurações de pagamento...</div>
+  }
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-gray-800 mb-2">💳 Gateways de Pagamento</h2>
+      <p className="text-gray-500 text-sm mb-6">
+        Configure os gateways de pagamento do seu ministério. As credenciais são
+        armazenadas criptografadas e nunca são exibidas em texto claro.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {(['asaas', 'efi'] as const).map(gw => {
+          const meta       = GW_LABELS[gw]
+          const row        = gateways.find(g => g.gateway === gw)
+          const status     = row?.status ?? 'not_configured'
+          const badge      = STATUS_BADGE[status]
+          const masked     = row?.masked_credentials
+          const isBusy     = savingGw === gw
+          const isTesting  = testingGw === gw
+          const isAnyBusy  = isBusy || isTesting
+          const testResult = testResults[gw] ?? null
+
+          return (
+            <div key={gw} className={`border rounded-xl p-5 ${meta.bg}`}>
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className={`text-lg font-bold ${meta.color}`}>{meta.name}</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">{meta.description}</p>
+                </div>
+                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${badge.cls}`}>
+                  {badge.label}
+                </span>
+              </div>
+
+              {/* Ambiente */}
+              {row && (
+                <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                  <span className={`px-2 py-0.5 rounded font-medium ${row.environment === 'production' ? 'bg-green-200 text-green-800' : 'bg-orange-100 text-orange-700'}`}>
+                    {row.environment === 'production' ? 'Produção' : 'Sandbox'}
+                  </span>
+                  {row.is_active && (
+                    <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-medium">Ativo</span>
+                  )}
+                </div>
+              )}
+
+              {/* Credenciais mascaradas */}
+              {masked && row?.has_credentials && (
+                <div className="bg-white bg-opacity-70 rounded-lg p-3 mb-3 text-xs font-mono text-gray-600 space-y-1">
+                  {Object.entries(masked).map(([k, v]) => (
+                    <div key={k} className="flex gap-2">
+                      <span className="text-gray-400 w-28 shrink-0">{k}:</span>
+                      <span>{v ?? '—'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Último teste */}
+              {row && (row.last_test_at || testResult) && (
+                <div className={`rounded-lg px-3 py-2 mb-3 text-xs ${
+                  testResult
+                    ? testResult.ok
+                      ? 'bg-green-50 border border-green-200 text-green-800'
+                      : 'bg-red-50 border border-red-200 text-red-800'
+                    : row.last_test_ok === true
+                      ? 'bg-green-50 border border-green-200 text-green-800'
+                      : 'bg-red-50 border border-red-200 text-red-800'
+                }`}>
+                  <div className="flex items-center gap-1.5 font-semibold mb-0.5">
+                    <span>{testResult ? (testResult.ok ? '✅' : '❌') : (row.last_test_ok ? '✅' : '❌')}</span>
+                    <span>
+                      {testResult
+                        ? (testResult.ok ? 'Conexão OK' : 'Falha na conexão')
+                        : (row.last_test_ok ? 'Último teste: OK' : 'Último teste: falhou')
+                      }
+                      {(testResult?.latency_ms) && (
+                        <span className="font-normal text-gray-500 ml-1">({testResult.latency_ms}ms)</span>
+                      )}
+                    </span>
+                  </div>
+                  <p className="text-gray-600 leading-snug">
+                    {testResult ? testResult.message : (row.last_error ?? 'Conexão verificada com sucesso.')}
+                  </p>
+                  <p className="text-gray-400 mt-0.5">
+                    {fmtDatetime(testResult ? testResult.tested_at : row.last_test_at)}
+                  </p>
+                </div>
+              )}
+
+              {/* Webhook hint */}
+              {row?.webhook_url_hint && (
+                <div className="mb-3">
+                  <p className="text-xs text-gray-400 mb-1">URL de Webhook:</p>
+                  <code className="text-xs bg-white bg-opacity-70 px-2 py-1 rounded block break-all text-gray-500">
+                    {row.webhook_url_hint.replace('{webhook_token}', row.webhook_token)}
+                  </code>
+                </div>
+              )}
+
+              {/* Ações */}
+              <div className="flex gap-2 flex-wrap mt-4">
+                <button
+                  onClick={() => openModal(gw)}
+                  disabled={isAnyBusy}
+                  className="px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+                >
+                  {row?.has_credentials ? '✏️ Editar credenciais' : '⚙️ Configurar'}
+                </button>
+
+                {row && row.has_credentials && (
+                  <button
+                    onClick={() => handleTest(gw)}
+                    disabled={isAnyBusy}
+                    className="px-3 py-1.5 text-xs bg-indigo-50 border border-indigo-200 rounded-lg font-semibold text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-50"
+                  >
+                    {isTesting ? '⏳ Testando...' : '🔌 Testar conexão'}
+                  </button>
+                )}
+
+                {row && row.has_credentials && (
+                  <button
+                    onClick={() => handleToggle(gw, row.is_active)}
+                    disabled={isAnyBusy}
+                    className={`px-3 py-1.5 text-xs rounded-lg font-semibold transition disabled:opacity-50 ${
+                      row.is_active
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                        : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                    }`}
+                  >
+                    {row.is_active ? '⏸ Desativar' : '▶ Ativar'}
+                  </button>
+                )}
+
+                {row && row.has_credentials && (
+                  <button
+                    onClick={() => handleRemove(gw)}
+                    disabled={isAnyBusy}
+                    className="px-3 py-1.5 text-xs bg-red-50 border border-red-200 rounded-lg font-semibold text-red-600 hover:bg-red-100 transition disabled:opacity-50"
+                  >
+                    🗑 Remover credenciais
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Modal de configuração */}
+      {modalGw && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">
+              Configurar {GW_LABELS[modalGw]?.name}
+            </h3>
+
+            {/* Ambiente */}
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Ambiente</label>
+              <select
+                value={envField}
+                onChange={e => setEnvField(e.target.value as 'sandbox' | 'production')}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="sandbox">Sandbox (testes)</option>
+                <option value="production">Produção</option>
+              </select>
+              {envField === 'production' && (
+                <p className="text-xs text-orange-600 mt-1">
+                  ⚠️ Ambiente de produção — cobranças reais serão geradas.
+                </p>
+              )}
+            </div>
+
+            {/* Campos por gateway */}
+            {modalGw === 'asaas' && (
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  API Key <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  value={formFields.api_key ?? ''}
+                  onChange={e => setFormFields(f => ({ ...f, api_key: e.target.value }))}
+                  placeholder="$aac_..."
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                  autoComplete="new-password"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Encontre em: ASAAS Dashboard → Configurações → Chaves de API
+                </p>
+              </div>
+            )}
+
+            {modalGw === 'efi' && (
+              <>
+                <div className="mb-3">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Client ID <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={formFields.client_id ?? ''}
+                    onChange={e => setFormFields(f => ({ ...f, client_id: e.target.value }))}
+                    placeholder="Client_Id_..."
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Client Secret <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={formFields.client_secret ?? ''}
+                    onChange={e => setFormFields(f => ({ ...f, client_secret: e.target.value }))}
+                    placeholder="Client_Secret_..."
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                    autoComplete="new-password"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Encontre em: EFI → API → Credenciais
+                  </p>
+                </div>
+              </>
+            )}
+
+            <p className="text-xs text-gray-400 mb-4">
+              🔒 As credenciais são criptografadas com AES-256-GCM antes de serem armazenadas.
+              Nunca são exibidas em texto claro.
+            </p>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setModalGw(null)}
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={savingGw === modalGw}
+                className="px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition font-semibold disabled:opacity-50"
+              >
+                {savingGw === modalGw ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }

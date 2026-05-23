@@ -5,7 +5,7 @@ import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
-import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -82,7 +82,7 @@ const slugify = (str: string) =>
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DepartamentosPage() {
-  const { loading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('secretaria_local');
   const supabase = useMemo(() => createClient(), []);
 
 
@@ -106,7 +106,7 @@ export default function DepartamentosPage() {
   // ── Carrega dados ──────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (loading) return;
+    if (ctx.loading || bloqueado) return;
     (async () => {
       setLoadingData(true);
       const mid = await resolveMinistryId(supabase);
@@ -121,7 +121,7 @@ export default function DepartamentosPage() {
       setDepartamentos((data as Departamento[]) || []);
       setLoadingData(false);
     })();
-  }, [loading, supabase]);
+  }, [ctx.loading, bloqueado, supabase]);
 
   // ── Form helpers ───────────────────────────────────────────────────────────
 
@@ -252,7 +252,9 @@ export default function DepartamentosPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (loading || loadingData) return <div className="p-8 text-gray-500">Carregando...</div>;
+  if (ctx.loading) return <div className="p-8 text-gray-500">Carregando...</div>;
+  if (bloqueado) return null;
+  if (loadingData) return <div className="p-8 text-gray-500">Carregando...</div>;
 
   return (
     <PageLayout

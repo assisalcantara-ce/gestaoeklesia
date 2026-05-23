@@ -1,4 +1,4 @@
--- ============================================
+﻿-- ============================================
 -- 1. ENABLE EXTENSIONS
 -- ============================================
 
@@ -10,11 +10,11 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- 2. MINISTRIES (Tenants)
 -- ============================================
 
-CREATE TABLE public.ministries (
+CREATE TABLE IF NOT EXISTS public.ministries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   
-  -- Info básico
+  -- Info bÃ¡sico
   name VARCHAR(255) NOT NULL,
   slug VARCHAR(100) UNIQUE NOT NULL,
   email_admin VARCHAR(255) UNIQUE NOT NULL,
@@ -49,26 +49,26 @@ CREATE TABLE public.ministries (
   CONSTRAINT positive_storage CHECK (storage_used_bytes >= 0)
 );
 
-CREATE INDEX idx_ministries_user_id ON public.ministries(user_id);
-CREATE INDEX idx_ministries_slug ON public.ministries(slug);
-CREATE INDEX idx_ministries_status ON public.ministries(subscription_status);
+CREATE INDEX IF NOT EXISTS idx_ministries_user_id ON public.ministries(user_id);
+CREATE INDEX IF NOT EXISTS idx_ministries_slug ON public.ministries(slug);
+CREATE INDEX IF NOT EXISTS idx_ministries_status ON public.ministries(subscription_status);
 
 ALTER TABLE public.ministries ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Usuários podem ver seu próprio ministry"
+DROP POLICY IF EXISTS "UsuÃ¡rios podem ver seu prÃ³prio ministry"
   ON public.ministries FOR SELECT
   USING (user_id = auth.uid());
 
-CREATE POLICY "Usuários podem atualizar seu próprio ministry"
+DROP POLICY IF EXISTS "UsuÃ¡rios podem atualizar seu prÃ³prio ministry"
   ON public.ministries FOR UPDATE
   USING (user_id = auth.uid());
 
 
 -- ============================================
--- 3. MINISTRY_USERS (Usuários do ministério)
+-- 3. MINISTRY_USERS (UsuÃ¡rios do ministÃ©rio)
 -- ============================================
 
-CREATE TABLE public.ministry_users (
+CREATE TABLE IF NOT EXISTS public.ministry_users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ministry_id UUID NOT NULL REFERENCES public.ministries(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -85,13 +85,13 @@ CREATE TABLE public.ministry_users (
   CONSTRAINT valid_role CHECK (role IN ('admin', 'manager', 'operator', 'viewer'))
 );
 
-CREATE INDEX idx_ministry_users_ministry_id ON public.ministry_users(ministry_id);
-CREATE INDEX idx_ministry_users_user_id ON public.ministry_users(user_id);
-CREATE INDEX idx_ministry_users_role ON public.ministry_users(role);
+CREATE INDEX IF NOT EXISTS idx_ministry_users_ministry_id ON public.ministry_users(ministry_id);
+CREATE INDEX IF NOT EXISTS idx_ministry_users_user_id ON public.ministry_users(user_id);
+CREATE INDEX IF NOT EXISTS idx_ministry_users_role ON public.ministry_users(role);
 
 ALTER TABLE public.ministry_users ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Usuários só veem seus ministry_users"
+DROP POLICY IF EXISTS "UsuÃ¡rios sÃ³ veem seus ministry_users"
   ON public.ministry_users FOR SELECT
   USING (
     ministry_id IN (
@@ -104,7 +104,7 @@ CREATE POLICY "Usuários só veem seus ministry_users"
 -- 4. MEMBERS (Membros da comunidade)
 -- ============================================
 
-CREATE TABLE public.members (
+CREATE TABLE IF NOT EXISTS public.members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ministry_id UUID NOT NULL REFERENCES public.ministries(id) ON DELETE CASCADE,
   
@@ -139,14 +139,14 @@ CREATE TABLE public.members (
   CONSTRAINT valid_status CHECK (status IN ('active', 'inactive', 'deceased', 'transferred'))
 );
 
-CREATE INDEX idx_members_ministry_id ON public.members(ministry_id);
-CREATE INDEX idx_members_cpf ON public.members(cpf);
-CREATE INDEX idx_members_status ON public.members(status);
-CREATE INDEX idx_members_name ON public.members USING GIN (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_members_ministry_id ON public.members(ministry_id);
+CREATE INDEX IF NOT EXISTS idx_members_cpf ON public.members(cpf);
+CREATE INDEX IF NOT EXISTS idx_members_status ON public.members(status);
+CREATE INDEX IF NOT EXISTS idx_members_name ON public.members USING GIN (name gin_trgm_ops);
 
 ALTER TABLE public.members ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Membros isolados por ministry"
+DROP POLICY IF EXISTS "Membros isolados por ministry"
   ON public.members FOR SELECT
   USING (
     ministry_id IN (
@@ -154,7 +154,7 @@ CREATE POLICY "Membros isolados por ministry"
     )
   );
 
-CREATE POLICY "Membros podem ser inseridos no seu ministry"
+DROP POLICY IF EXISTS "Membros podem ser inseridos no seu ministry"
   ON public.members FOR INSERT
   WITH CHECK (
     ministry_id IN (
@@ -162,7 +162,7 @@ CREATE POLICY "Membros podem ser inseridos no seu ministry"
     )
   );
 
-CREATE POLICY "Membros podem ser atualizados no seu ministry"
+DROP POLICY IF EXISTS "Membros podem ser atualizados no seu ministry"
   ON public.members FOR UPDATE
   USING (
     ministry_id IN (
@@ -170,7 +170,7 @@ CREATE POLICY "Membros podem ser atualizados no seu ministry"
     )
   );
 
-CREATE POLICY "Membros podem ser deletados no seu ministry"
+DROP POLICY IF EXISTS "Membros podem ser deletados no seu ministry"
   ON public.members FOR DELETE
   USING (
     ministry_id IN (
@@ -183,7 +183,7 @@ CREATE POLICY "Membros podem ser deletados no seu ministry"
 -- 5. AUDIT_LOGS (Auditoria)
 -- ============================================
 
-CREATE TABLE public.audit_logs (
+CREATE TABLE IF NOT EXISTS public.audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ministry_id UUID NOT NULL REFERENCES public.ministries(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -208,15 +208,15 @@ CREATE TABLE public.audit_logs (
   )
 );
 
-CREATE INDEX idx_audit_logs_ministry_id ON public.audit_logs(ministry_id);
-CREATE INDEX idx_audit_logs_user_id ON public.audit_logs(user_id);
-CREATE INDEX idx_audit_logs_resource ON public.audit_logs(resource_type, resource_id);
-CREATE INDEX idx_audit_logs_created_at ON public.audit_logs(created_at DESC);
-CREATE INDEX idx_audit_logs_action ON public.audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_ministry_id ON public.audit_logs(ministry_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON public.audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON public.audit_logs(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON public.audit_logs(action);
 
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Usuários só veem logs do seu ministry"
+DROP POLICY IF EXISTS "UsuÃ¡rios sÃ³ veem logs do seu ministry"
   ON public.audit_logs FOR SELECT
   USING (
     ministry_id IN (
@@ -226,10 +226,10 @@ CREATE POLICY "Usuários só veem logs do seu ministry"
 
 
 -- ============================================
--- 6. CARTOES_TEMPLATES (Templates de cartão)
+-- 6. CARTOES_TEMPLATES (Templates de cartÃ£o)
 -- ============================================
 
-CREATE TABLE public.cartoes_templates (
+CREATE TABLE IF NOT EXISTS public.cartoes_templates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ministry_id UUID NOT NULL REFERENCES public.ministries(id) ON DELETE CASCADE,
   
@@ -246,12 +246,12 @@ CREATE TABLE public.cartoes_templates (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_cartoes_templates_ministry_id ON public.cartoes_templates(ministry_id);
-CREATE INDEX idx_cartoes_templates_default ON public.cartoes_templates(is_default);
+CREATE INDEX IF NOT EXISTS idx_cartoes_templates_ministry_id ON public.cartoes_templates(ministry_id);
+CREATE INDEX IF NOT EXISTS idx_cartoes_templates_default ON public.cartoes_templates(is_default);
 
 ALTER TABLE public.cartoes_templates ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Templates isolados por ministry"
+DROP POLICY IF EXISTS "Templates isolados por ministry"
   ON public.cartoes_templates FOR SELECT
   USING (
     ministry_id IN (
@@ -261,10 +261,10 @@ CREATE POLICY "Templates isolados por ministry"
 
 
 -- ============================================
--- 7. CARTOES_GERADOS (Cartões impressos)
+-- 7. CARTOES_GERADOS (CartÃµes impressos)
 -- ============================================
 
-CREATE TABLE public.cartoes_gerados (
+CREATE TABLE IF NOT EXISTS public.cartoes_gerados (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ministry_id UUID NOT NULL REFERENCES public.ministries(id) ON DELETE CASCADE,
   member_id UUID NOT NULL REFERENCES public.members(id) ON DELETE CASCADE,
@@ -279,13 +279,13 @@ CREATE TABLE public.cartoes_gerados (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_cartoes_gerados_ministry_id ON public.cartoes_gerados(ministry_id);
-CREATE INDEX idx_cartoes_gerados_member_id ON public.cartoes_gerados(member_id);
-CREATE INDEX idx_cartoes_gerados_created_at ON public.cartoes_gerados(created_at);
+CREATE INDEX IF NOT EXISTS idx_cartoes_gerados_ministry_id ON public.cartoes_gerados(ministry_id);
+CREATE INDEX IF NOT EXISTS idx_cartoes_gerados_member_id ON public.cartoes_gerados(member_id);
+CREATE INDEX IF NOT EXISTS idx_cartoes_gerados_created_at ON public.cartoes_gerados(created_at);
 
 ALTER TABLE public.cartoes_gerados ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Cartões isolados por ministry"
+DROP POLICY IF EXISTS "CartÃµes isolados por ministry"
   ON public.cartoes_gerados FOR SELECT
   USING (
     ministry_id IN (
@@ -295,10 +295,10 @@ CREATE POLICY "Cartões isolados por ministry"
 
 
 -- ============================================
--- 8. CONFIGURATIONS (Configurações por ministry)
+-- 8. CONFIGURATIONS (ConfiguraÃ§Ãµes por ministry)
 -- ============================================
 
-CREATE TABLE public.configurations (
+CREATE TABLE IF NOT EXISTS public.configurations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ministry_id UUID NOT NULL UNIQUE REFERENCES public.ministries(id) ON DELETE CASCADE,
   
@@ -307,8 +307,8 @@ CREATE TABLE public.configurations (
     "members": "Membros",
     "role": "Cargo",
     "roles": "Cargos",
-    "division": "Divisão",
-    "divisions": "Divisões"
+    "division": "DivisÃ£o",
+    "divisions": "DivisÃµes"
   }',
   
   notification_settings JSONB DEFAULT '{}',
@@ -323,7 +323,7 @@ CREATE TABLE public.configurations (
 
 ALTER TABLE public.configurations ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Configurações isoladas por ministry"
+DROP POLICY IF EXISTS "ConfiguraÃ§Ãµes isoladas por ministry"
   ON public.configurations FOR SELECT
   USING (
     ministry_id IN (
@@ -331,7 +331,7 @@ CREATE POLICY "Configurações isoladas por ministry"
     )
   );
 
-CREATE POLICY "Configurações podem ser atualizadas pelo ministry"
+DROP POLICY IF EXISTS "ConfiguraÃ§Ãµes podem ser atualizadas pelo ministry"
   ON public.configurations FOR UPDATE
   USING (
     ministry_id IN (
@@ -344,7 +344,7 @@ CREATE POLICY "Configurações podem ser atualizadas pelo ministry"
 -- 9. ARQUIVOS (File storage metadata)
 -- ============================================
 
-CREATE TABLE public.arquivos (
+CREATE TABLE IF NOT EXISTS public.arquivos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ministry_id UUID NOT NULL REFERENCES public.ministries(id) ON DELETE CASCADE,
   
@@ -364,13 +364,13 @@ CREATE TABLE public.arquivos (
   CONSTRAINT positive_size CHECK (size_bytes > 0)
 );
 
-CREATE INDEX idx_arquivos_ministry_id ON public.arquivos(ministry_id);
-CREATE INDEX idx_arquivos_resource ON public.arquivos(resource_type, resource_id);
-CREATE INDEX idx_arquivos_created_at ON public.arquivos(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_arquivos_ministry_id ON public.arquivos(ministry_id);
+CREATE INDEX IF NOT EXISTS idx_arquivos_resource ON public.arquivos(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_arquivos_created_at ON public.arquivos(created_at DESC);
 
 ALTER TABLE public.arquivos ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Arquivos isolados por ministry"
+DROP POLICY IF EXISTS "Arquivos isolados por ministry"
   ON public.arquivos FOR SELECT
   USING (
     ministry_id IN (
@@ -380,7 +380,7 @@ CREATE POLICY "Arquivos isolados por ministry"
 
 
 -- ============================================
--- FUNÇÕES HELPER
+-- FUNÃ‡Ã•ES HELPER
 -- ============================================
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -413,15 +413,15 @@ CREATE TRIGGER trigger_configurations_updated_at
 
 
 -- ============================================
--- 10. EMPLOYEES (Funcionários)
+-- 10. EMPLOYEES (FuncionÃ¡rios)
 -- ============================================
 
-CREATE TABLE public.employees (
+CREATE TABLE IF NOT EXISTS public.employees (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ministry_id UUID NOT NULL REFERENCES public.ministries(id) ON DELETE CASCADE,
   member_id UUID NOT NULL REFERENCES public.members(id) ON DELETE CASCADE,
   
-  -- Informações profissionais
+  -- InformaÃ§Ãµes profissionais
   grupo VARCHAR(100) NOT NULL,
   funcao VARCHAR(100) NOT NULL,
   data_admissao DATE NOT NULL,
@@ -431,10 +431,10 @@ CREATE TABLE public.employees (
   telefone VARCHAR(20),
   whatsapp VARCHAR(20),
   
-  -- Documentação
+  -- DocumentaÃ§Ã£o
   rg VARCHAR(20),
   
-  -- Endereço
+  -- EndereÃ§o
   endereco VARCHAR(500),
   cep VARCHAR(20),
   bairro VARCHAR(100),
@@ -447,7 +447,7 @@ CREATE TABLE public.employees (
   conta_corrente VARCHAR(20),
   pix VARCHAR(255),
   
-  -- Informações adicionais
+  -- InformaÃ§Ãµes adicionais
   obs TEXT,
   status VARCHAR(50) NOT NULL DEFAULT 'ATIVO',
   
@@ -458,14 +458,14 @@ CREATE TABLE public.employees (
   CONSTRAINT valid_status CHECK (status IN ('ATIVO', 'INATIVO'))
 );
 
-CREATE INDEX idx_employees_ministry_id ON public.employees(ministry_id);
-CREATE INDEX idx_employees_member_id ON public.employees(member_id);
-CREATE INDEX idx_employees_status ON public.employees(status);
-CREATE INDEX idx_employees_grupo ON public.employees(grupo);
+CREATE INDEX IF NOT EXISTS idx_employees_ministry_id ON public.employees(ministry_id);
+CREATE INDEX IF NOT EXISTS idx_employees_member_id ON public.employees(member_id);
+CREATE INDEX IF NOT EXISTS idx_employees_status ON public.employees(status);
+CREATE INDEX IF NOT EXISTS idx_employees_grupo ON public.employees(grupo);
 
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Funcionários isolados por ministry"
+DROP POLICY IF EXISTS "FuncionÃ¡rios isolados por ministry"
   ON public.employees FOR SELECT
   USING (
     ministry_id IN (
@@ -473,7 +473,7 @@ CREATE POLICY "Funcionários isolados por ministry"
     )
   );
 
-CREATE POLICY "Funcionários podem ser inseridos no seu ministry"
+DROP POLICY IF EXISTS "FuncionÃ¡rios podem ser inseridos no seu ministry"
   ON public.employees FOR INSERT
   WITH CHECK (
     ministry_id IN (
@@ -481,7 +481,7 @@ CREATE POLICY "Funcionários podem ser inseridos no seu ministry"
     )
   );
 
-CREATE POLICY "Funcionários podem ser atualizados no seu ministry"
+DROP POLICY IF EXISTS "FuncionÃ¡rios podem ser atualizados no seu ministry"
   ON public.employees FOR UPDATE
   USING (
     ministry_id IN (
@@ -489,7 +489,7 @@ CREATE POLICY "Funcionários podem ser atualizados no seu ministry"
     )
   );
 
-CREATE POLICY "Funcionários podem ser deletados no seu ministry"
+DROP POLICY IF EXISTS "FuncionÃ¡rios podem ser deletados no seu ministry"
   ON public.employees FOR DELETE
   USING (
     ministry_id IN (
@@ -499,7 +499,7 @@ CREATE POLICY "Funcionários podem ser deletados no seu ministry"
 
 
 -- ============================================
--- VIEWS ÚTEIS
+-- VIEWS ÃšTEIS
 -- ============================================
 
 CREATE OR REPLACE VIEW public.employees_with_member_info AS
@@ -552,3 +552,4 @@ LEFT JOIN public.members mem ON m.id = mem.ministry_id
 LEFT JOIN public.ministry_users mu ON m.id = mu.ministry_id
 LEFT JOIN public.employees e ON m.id = e.ministry_id
 GROUP BY m.id, m.name, m.slug, m.plan, m.subscription_status, m.storage_used_bytes, m.created_at;
+

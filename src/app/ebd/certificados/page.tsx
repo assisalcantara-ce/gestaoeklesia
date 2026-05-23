@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { resolveEbdScope } from '@/lib/cartoes-templates-sync';
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { substituirPlaceholdersCertificado } from '@/lib/certificados-utils';
@@ -40,6 +41,7 @@ const fmtDate = (v?: string | null) => {
 
 export default function EbdCertificadosPage() {
   const { user } = useRequireSupabaseAuth();
+  const { bloqueado } = useRequireModulo('ebd');
   const supabase = useMemo(() => createClient(), []);
 
   const [loading,     setLoading]     = useState(true);
@@ -60,19 +62,27 @@ export default function EbdCertificadosPage() {
   // ── Carga inicial ────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!user) return;
-    resolveMinistryId(supabase).then(async mid => {
+    if (!user || bloqueado) return;
+    resolveEbdScope(supabase).then(async scope => {
+      const mid = scope.ministryId;
+      const cid = scope.churchId;
       if (!mid) return;
+
+      let turmasQ = supabase.from('ebd_turmas')
+        .select('id, nome, church_id, classe_id, professor_titular_id, congregacoes(nome), ebd_classes(nome), ebd_professores(nome)')
+        .eq('ministry_id', mid)
+        .eq('ativo', true)
+        .order('nome');
+      if (cid) turmasQ = turmasQ.eq('church_id', cid);
+
+      let congsQ = supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome');
+      if (cid) congsQ = congsQ.eq('id', cid);
 
       const [{ templates: all }, config, congsR, turmasR] = await Promise.all([
         loadCertificadosTemplatesForCurrentUser(supabase),
         fetchConfiguracaoIgrejaFromSupabase(supabase),
-        supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome'),
-        supabase.from('ebd_turmas')
-          .select('id, nome, church_id, classe_id, professor_titular_id, congregacoes(nome), ebd_classes(nome), ebd_professores(nome)')
-          .eq('ministry_id', mid)
-          .eq('ativo', true)
-          .order('nome'),
+        congsQ,
+        turmasQ,
       ]);
 
       // Filtra só templates EBD
@@ -96,7 +106,7 @@ export default function EbdCertificadosPage() {
 
       setLoading(false);
     });
-  }, [user, supabase]);
+  }, [user, bloqueado, supabase]);
 
   // ── Carregar alunos da turma ─────────────────────────────────────────────
 
@@ -136,7 +146,11 @@ export default function EbdCertificadosPage() {
       responsavel_nome:      aluno.responsavel_nome ?? '',
       nome_igreja:           configIgreja.nome || '',
       data_emissao:          new Date().toLocaleDateString('pt-BR'),
-      trimestre:             '',
+      trimestre:             (() => {
+        const TRIM = ['1º', '2º', '3º', '4º'];
+        const n = Math.floor(new Date().getMonth() / 3);
+        return `${TRIM[n]} Trimestre ${new Date().getFullYear()}`;
+      })(),
       ano:                   String(new Date().getFullYear()),
     };
 
@@ -189,16 +203,16 @@ export default function EbdCertificadosPage() {
     const html = renderHtml(selTemplate, aluno);
     const win = window.open('', '_blank');
     if (!win) { setImprimindo(null); return; }
-    const scaleX = (297 * 3.7795) / CERTIFICADO_CANVAS.largura;
-    const scaleY = (210 * 3.7795) / CERTIFICADO_CANVAS.altura;
+    const scaleX = (277 * 3.7795) / CERTIFICADO_CANVAS.largura;
+    const scaleY = (190 * 3.7795) / CERTIFICADO_CANVAS.altura;
     const scale  = Math.min(scaleX, scaleY).toFixed(4);
     win.document.write(`<!DOCTYPE html><html><head><title>Certificado EBD</title><style>
       *{box-sizing:border-box;margin:0;padding:0;}
-      @page{size:A4 landscape;margin:0;}
-      html,body{width:297mm;height:210mm;overflow:hidden;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
-      .w{transform-origin:top left;transform:scale(${scale});width:${CERTIFICADO_CANVAS.largura}px;height:${CERTIFICADO_CANVAS.altura}px;}
+      @page{size:A4 landscape;margin:1cm;}
+      html,body{width:100%;height:100%;display:flex;justify-content:center;align-items:center;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+      .cert{zoom:${scale};width:${CERTIFICADO_CANVAS.largura}px;height:${CERTIFICADO_CANVAS.altura}px;overflow:hidden;flex-shrink:0;}
       img{display:block;}
-    </style></head><body><div class="w">${html}</div></body></html>`);
+    </style></head><body><div class="cert">${html}</div></body></html>`);
     win.document.close();
     win.focus();
     setTimeout(() => { win.print(); setImprimindo(null); }, 400);
@@ -209,22 +223,22 @@ export default function EbdCertificadosPage() {
     const selecionados = alunos.filter(a => selAlunos.has(a.id));
     if (selecionados.length === 0) return;
 
-    const scaleX = (297 * 3.7795) / CERTIFICADO_CANVAS.largura;
-    const scaleY = (210 * 3.7795) / CERTIFICADO_CANVAS.altura;
+    const scaleX = (277 * 3.7795) / CERTIFICADO_CANVAS.largura;
+    const scaleY = (190 * 3.7795) / CERTIFICADO_CANVAS.altura;
     const scale  = Math.min(scaleX, scaleY).toFixed(4);
 
     const allHtml = selecionados.map(a =>
-      `<div class="page"><div class="w">${renderHtml(selTemplate, a)}</div></div>`
+      `<div class="page"><div class="cert">${renderHtml(selTemplate, a)}</div></div>`
     ).join('');
 
     const win = window.open('', '_blank');
     if (!win) return;
     win.document.write(`<!DOCTYPE html><html><head><title>Certificados EBD</title><style>
       *{box-sizing:border-box;margin:0;padding:0;}
-      @page{size:A4 landscape;margin:0;}
-      html,body{overflow:hidden;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
-      .page{width:297mm;height:210mm;page-break-after:always;overflow:hidden;}
-      .w{transform-origin:top left;transform:scale(${scale});width:${CERTIFICADO_CANVAS.largura}px;height:${CERTIFICADO_CANVAS.altura}px;}
+      @page{size:A4 landscape;margin:1cm;}
+      html,body{margin:0;padding:0;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+      .page{width:100%;height:100vh;display:flex;justify-content:center;align-items:center;page-break-after:always;}
+      .cert{zoom:${scale};width:${CERTIFICADO_CANVAS.largura}px;height:${CERTIFICADO_CANVAS.altura}px;overflow:hidden;flex-shrink:0;}
       img{display:block;}
     </style></head><body>${allHtml}</body></html>`);
     win.document.close();
@@ -235,6 +249,8 @@ export default function EbdCertificadosPage() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   const turmasFiltradas = selCong ? turmas.filter(t => t.church_id === selCong) : turmas;
+
+  if (bloqueado) return null;
 
   return (
     <PageLayout

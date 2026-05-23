@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { resolveEbdScope } from '@/lib/cartoes-templates-sync';
 import { CalendarDays, Users, UserCheck, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 
@@ -58,9 +59,11 @@ const TRIM_LABEL = ['1º Tri', '2º Tri', '3º Tri', '4º Tri'];
 
 export default function EbdHistoricoPage() {
   const { user }  = useRequireSupabaseAuth();
+  const { bloqueado } = useRequireModulo('ebd');
   const supabase  = useMemo(() => createClient(), []);
 
   const [ministryId,   setMinistryId]   = useState<string | null>(null);
+  const churchIdRef = useRef<string | null>(null);
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
   const [turmas,       setTurmas]       = useState<EbdTurma[]>([]);
   const [aulas,        setAulas]        = useState<Aula[]>([]);
@@ -77,20 +80,27 @@ export default function EbdHistoricoPage() {
   // ── Carregar base ────────────────────────────────────────────────────────
 
   const loadBase = useCallback(async (mid: string) => {
-    const [congsR, turmasR] = await Promise.all([
-      supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome'),
-      supabase.from('ebd_turmas').select('id, nome, church_id').eq('ministry_id', mid).eq('ativo', true).order('nome'),
-    ]);
+    const cid = churchIdRef.current;
+    let congsQ = supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome');
+    if (cid) congsQ = congsQ.eq('id', cid);
+    let turmasQ = supabase.from('ebd_turmas').select('id, nome, church_id').eq('ministry_id', mid).eq('ativo', true).order('nome');
+    if (cid) turmasQ = turmasQ.eq('church_id', cid);
+    const [congsR, turmasR] = await Promise.all([congsQ, turmasQ]);
     setCongregacoes(congsR.data ?? []);
     setTurmas(turmasR.data ?? []);
+    if (cid) setFiltCong(cid);
   }, [supabase]);
 
   useEffect(() => {
-    if (!user) return;
-    resolveMinistryId(supabase).then(mid => {
-      if (mid) { setMinistryId(mid); loadBase(mid); }
+    if (!user || bloqueado) return;
+    resolveEbdScope(supabase).then(scope => {
+      if (scope.ministryId) {
+        churchIdRef.current = scope.churchId;
+        setMinistryId(scope.ministryId);
+        loadBase(scope.ministryId);
+      }
     });
-  }, [user, supabase, loadBase]);
+  }, [user, bloqueado, supabase, loadBase]);
 
   // ── Buscar aulas ─────────────────────────────────────────────────────────
 
@@ -185,6 +195,8 @@ export default function EbdHistoricoPage() {
     : turmas;
 
   // ── Render ───────────────────────────────────────────────────────────────
+
+  if (bloqueado) return null;
 
   return (
     <PageLayout

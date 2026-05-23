@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { resolveEbdScope } from '@/lib/cartoes-templates-sync';
 import { BarChart3, DollarSign, Link2, Cake, FileText, Printer, UserCheck, X } from 'lucide-react';
 import { useAppDialog } from '@/providers/AppDialogProvider';
 
@@ -59,10 +60,12 @@ const anoAtual = () => new Date().getFullYear();
 
 export default function EbdRelatoriosPage() {
   const { user } = useRequireSupabaseAuth();
+  const { bloqueado } = useRequireModulo('ebd');
   const supabase  = useMemo(() => createClient(), []);
   const dialog    = useAppDialog();
 
   const [ministryId,   setMinistryId]   = useState<string | null>(null);
+  const churchIdRef = useRef<string | null>(null);
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
   const [turmas,       setTurmas]       = useState<EbdTurma[]>([]);
 
@@ -108,19 +111,33 @@ export default function EbdRelatoriosPage() {
 
   const loadBase = useCallback(async (mid: string) => {
     setLoading(true);
-    const [congsR, turmasR] = await Promise.all([
-      supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome'),
-      supabase.from('ebd_turmas').select('id, nome, church_id').eq('ministry_id', mid).eq('ativo', true).order('nome'),
-    ]);
+    const cid = churchIdRef.current;
+    let congsQ = supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome');
+    if (cid) congsQ = congsQ.eq('id', cid);
+    let turmasQ = supabase.from('ebd_turmas').select('id, nome, church_id').eq('ministry_id', mid).eq('ativo', true).order('nome');
+    if (cid) turmasQ = turmasQ.eq('church_id', cid);
+    const [congsR, turmasR] = await Promise.all([congsQ, turmasQ]);
     setCongregacoes(congsR.data ?? []);
     setTurmas(turmasR.data ?? []);
+    if (cid) {
+      setFiltFreqCong(cid);
+      setFiltAnivCong(cid);
+      setBoletimCong(cid);
+      setFiltOfCong(cid);
+    }
     setLoading(false);
   }, [supabase]);
 
   useEffect(() => {
-    if (!user) return;
-    resolveMinistryId(supabase).then(mid => { if (mid) { setMinistryId(mid); loadBase(mid); } });
-  }, [user, supabase, loadBase]);
+    if (!user || bloqueado) return;
+    resolveEbdScope(supabase).then(scope => {
+      if (scope.ministryId) {
+        churchIdRef.current = scope.churchId;
+        setMinistryId(scope.ministryId);
+        loadBase(scope.ministryId);
+      }
+    });
+  }, [user, bloqueado, supabase, loadBase]);
 
   const flash = (tipo: 'ok' | 'erro', texto: string) => {
     setMsg({ tipo, texto });
@@ -351,14 +368,14 @@ export default function EbdRelatoriosPage() {
 
     const cong = congregacoes.find(c => c.id === oferta.church_id);
     const { data: lanc, error } = await supabase.from('tesouraria_lancamentos').insert({
-      ministry_id: ministryId,
-      church_id: oferta.church_id,
-      descricao: `Oferta EBD — ${cong?.nome ?? ''} — ${new Date(oferta.data_oferta).toLocaleDateString('pt-BR')}`,
-      valor: oferta.valor,
-      tipo_movimento: 'entrada',
-      forma_pagamento: oferta.forma_pagamento,
-      data_lancamento: oferta.data_oferta,
-      categoria: 'Oferta EBD',
+      ministry_id:      ministryId,
+      congregacao_id:   oferta.church_id,
+      descricao:        `Oferta EBD — ${cong?.nome ?? ''} — ${new Date(oferta.data_oferta).toLocaleDateString('pt-BR')}`,
+      valor:            oferta.valor,
+      tipo_movimento:   'entrada',
+      tipo_recebimento: 'oferta',
+      forma_pagamento:  oferta.forma_pagamento,
+      data_lancamento:  oferta.data_oferta,
     }).select('id').single();
 
     if (error) { flash('erro', error.message); setIntegrandoId(null); return; }
@@ -384,6 +401,8 @@ export default function EbdRelatoriosPage() {
 
   const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const boletimTurmasFiltradas = boletimCong ? turmas.filter(t => t.church_id === boletimCong) : turmas;
+
+  if (bloqueado) return null;
 
   return (
     <PageLayout title="EBD — Relatórios" description="Frequência de alunos e ofertas da Escola Bíblica Dominical" activeMenu="ebd-relatorios">

@@ -5,7 +5,7 @@ import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
-import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
@@ -95,7 +95,7 @@ const EMPTY_FORM = {
 };
 
 export default function BatismoAguasPage() {
-  const { loading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('secretaria_local');
   const supabase = useMemo(() => createClient(), []);
 
   const [activeTab, setActiveTab] = useState('cadastro');
@@ -186,7 +186,7 @@ export default function BatismoAguasPage() {
   };
 
   useEffect(() => {
-    if (loading) return;
+    if (ctx.loading || bloqueado) return;
     const run = async () => {
       setLoadingData(true);
       const mid = await resolveMinistryId(supabase);
@@ -199,7 +199,7 @@ export default function BatismoAguasPage() {
       setLoadingData(false);
     };
     run();
-  }, [loading, supabase]);
+  }, [ctx.loading, bloqueado, supabase]);
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -413,19 +413,19 @@ export default function BatismoAguasPage() {
     const win = window.open('', '_blank');
     if (!win) return;
 
-    const scaleX = (297 * 3.7795) / CERTIFICADO_CANVAS.largura;
-    const scaleY = (210 * 3.7795) / CERTIFICADO_CANVAS.altura;
+    const scaleX = (277 * 3.7795) / CERTIFICADO_CANVAS.largura;
+    const scaleY = (190 * 3.7795) / CERTIFICADO_CANVAS.altura;
     const scale = Math.min(scaleX, scaleY).toFixed(4);
 
     win.document.write(`<!DOCTYPE html><html><head><title>Certificado de Batismo</title>`);
     win.document.write(`<style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      @page { size: A4 landscape; margin: 0; }
-      html, body { width: 297mm; height: 210mm; overflow: hidden; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-      .cert-scale-wrapper { transform-origin: top left; transform: scale(${scale}); width: ${CERTIFICADO_CANVAS.largura}px; height: ${CERTIFICADO_CANVAS.altura}px; }
+      @page { size: A4 landscape; margin: 1cm; }
+      html, body { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .cert { zoom: ${scale}; width: ${CERTIFICADO_CANVAS.largura}px; height: ${CERTIFICADO_CANVAS.altura}px; overflow: hidden; flex-shrink: 0; }
       img { display: block; }
     </style></head><body>`);
-    win.document.write(`<div class="cert-scale-wrapper">${html}</div>`);
+    win.document.write(`<div class="cert">${html}</div>`);
     win.document.write('</body></html>');
     win.document.close();
     win.focus();
@@ -473,7 +473,9 @@ export default function BatismoAguasPage() {
     setPrintTarget(null);
   };
 
-  if (loading || loadingData) return <div className="p-8">Carregando...</div>;
+  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
+  if (loadingData) return <div className="p-8">Carregando...</div>;
 
   return (
     <PageLayout

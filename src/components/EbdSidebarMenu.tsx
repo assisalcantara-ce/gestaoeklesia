@@ -29,7 +29,7 @@
  * │   └─ Material extra            ← nível 2 (folha)
  * ├─ Certificado por classe        ← nível 1 (folha)
  * └─ Caixa                         ← nível 1 (agrupador)
- *     └─ Ofertas                   ← nível 2 (folha)
+ *     └─ Caixa                     ← nível 1 (folha → /ebd/ofertas)
  */
 
 import { useState, useEffect } from 'react';
@@ -60,19 +60,15 @@ export const EBD_TREE: EbdNode[] = [
     label: 'Cadastro',
     children: [
       // Nível 2 — folhas simples
-      { id: 'ebd-cadastro-classes',          label: 'Classes',        path: '/ebd/cadastro/classes'          },
-      { id: 'ebd-cadastro-turmas',           label: 'Turmas',         path: '/ebd/turmas'                    },
+      { id: 'ebd-cadastro-classes',          label: 'Classes',         path: '/ebd/cadastro/classes'          },
       { id: 'ebd-cadastro-superintendente',  label: 'Superintendente', path: '/ebd/cadastro/superintendentes' },
-      { id: 'ebd-cadastro-professores',      label: 'Professores',    path: '/ebd/cadastro/professores'      },
+      { id: 'ebd-cadastro-professores',      label: 'Professores',     path: '/ebd/cadastro/professores'      },
+      { id: 'ebd-cadastro-turmas',           label: 'Turmas',          path: '/ebd/turmas'                    },
       // Nível 2 — agrupador com folha própria
       {
         id: 'ebd-cadastro-alunos',
         label: 'Alunos',
         path: '/ebd/alunos',
-        children: [
-          // Nível 3 — folha
-          { id: 'ebd-cadastro-alunos-carteirinha', label: 'Carteirinha', path: '/ebd/alunos/carteirinha' },
-        ],
       },
     ],
   },
@@ -83,6 +79,7 @@ export const EBD_TREE: EbdNode[] = [
     label: 'Aulas',
     children: [
       // Nível 2 — folhas
+      { id: 'ebd-aulas-trimestres',  label: 'Trimestres',        path: '/ebd/trimestres' },
       { id: 'ebd-aulas-frequencia', label: 'Frequência',        path: '/ebd/chamada'    },
       { id: 'ebd-aulas-avaliacoes', label: 'Avaliações',        path: '/ebd/avaliacoes' },
       { id: 'ebd-aulas-material',   label: 'Material de apoio', path: '/ebd/material'   },
@@ -118,14 +115,7 @@ export const EBD_TREE: EbdNode[] = [
   { id: 'ebd-certificados', label: 'Certificado por classe', path: '/ebd/certificados' },
 
   // ── Nível 1: Caixa ──
-  {
-    id: 'ebd-caixa',
-    label: 'Caixa',
-    children: [
-      // Nível 2 — folha
-      { id: 'ebd-caixa-ofertas', label: 'Ofertas', path: '/ebd/ofertas' },
-    ],
-  },
+  { id: 'ebd-caixa', label: 'Caixa', path: '/ebd/ofertas' },
 ];
 
 // ─── Conjunto de todos os IDs EBD (para uso externo no parentMap) ─────────────

@@ -3,6 +3,7 @@ import './globals.css';
 import { AppDialogProvider } from '@/providers/AppDialogProvider';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { UsuarioProvider } from '@/providers/UsuarioContext';
+import { TrialGuard } from '@/components/TrialGuard';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,9 @@ export default function RootLayout({
         <AuthProvider>
           <UsuarioProvider>
             <AppDialogProvider>
-              {children}
+              <TrialGuard>
+                {children}
+              </TrialGuard>
             </AppDialogProvider>
           </UsuarioProvider>
         </AuthProvider>

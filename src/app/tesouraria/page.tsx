@@ -9,9 +9,10 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
-import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, Printer, Users, CalendarDays, Lock, Unlock, CheckCircle, Search } from 'lucide-react';
+import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, Printer, Users, CalendarDays, Lock, Unlock, CheckCircle, Search, Download } from 'lucide-react';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import type { ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -113,6 +114,43 @@ const MESES_LABEL = [
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
 ];
 
+// ─── Fase 2 — Tipos e helpers ────────────────────────────────────────────────
+
+interface MesDados {
+  mes: string;    // YYYY-MM
+  label: string;  // 'Jan/25'
+  entradas: number;
+  saidas: number;
+  saldo: number;
+}
+
+function exportarCSV(linhas: Lancamento[], nomeArquivo: string) {
+  const header = ['Data', 'Movimento', 'Tipo/Categoria', 'Caixa', 'Departamento', 'Descrição', 'Referência', 'Forma Pagamento', 'Valor (R$)'];
+  const rows = linhas.map(l => [
+    fmtDate(l.data_lancamento),
+    l.tipo_movimento === 'saida' ? 'Saída' : 'Entrada',
+    l.tipo_movimento === 'saida'
+      ? (TIPOS_SAIDA.find(t => t.value === l.tipo_recebimento)?.label ?? l.tipo_recebimento)
+      : tipoLabel(l.tipo_recebimento),
+    l.congregacao_nome ?? 'Caixa Geral (Sede)',
+    l.departamento_nome ?? '—',
+    l.descricao ?? '',
+    l.referencia ?? '',
+    l.forma_pagamento,
+    Number(l.valor).toFixed(2).replace('.', ','),
+  ]);
+  const csv = [header, ...rows]
+    .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';'))
+    .join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `${nomeArquivo}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function MonthPicker({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
   const anoAtual = new Date().getFullYear();
   const anos = Array.from({ length: 6 }, (_, i) => anoAtual - 2 + i); // -2 a +3
@@ -148,6 +186,14 @@ const mesAtual = () => {
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
 };
 
+// Retorna 'YYYY-MM' do mês seguinte — usado para construir date range indexável no banco
+// new Date(y, m, 1): m é 1-based aqui, o construtor JS trata overflow automaticamente (Dez → Jan)
+const mesProximo = (mes: string): string => {
+  const [y, m] = mes.split('-').map(Number);
+  const d = new Date(y, m, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
 type FormLanc = {
   congregacao_id: string;
   departamento_id: string;
@@ -160,6 +206,8 @@ type FormLanc = {
   forma_pagamento: FormaPagamento;
   data_lancamento: string;
   observacoes: string;
+  conta_id: string;
+  categoria_id: string;
 };
 
 const emptyForm = (): FormLanc => ({
@@ -174,7 +222,26 @@ const emptyForm = (): FormLanc => ({
   forma_pagamento:  'dinheiro',
   data_lancamento:  new Date().toISOString().split('T')[0],
   observacoes:      '',
+  conta_id:         '',
+  categoria_id:     '',
 });
+
+// Interfaces para dados financeiros (Fase 1)
+interface FinConta {
+  id: string;
+  nome: string;
+  tipo: string;
+  is_padrao: boolean;
+  congregacao_id: string | null;
+}
+
+interface FinCategoria {
+  id: string;
+  nome: string;
+  tipo_movimento: string;
+  cor: string | null;
+  icone: string | null;
+}
 
 // ─── Role helpers ─────────────────────────────────────────────────────────────
 
@@ -197,6 +264,8 @@ export default function TesourariaPage() {
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [lancamentos, setLancamentos]   = useState<Lancamento[]>([]);
+  const [finContas, setFinContas]       = useState<FinConta[]>([]);
+  const [finCategorias, setFinCategorias] = useState<FinCategoria[]>([]);
   const [scope, setScope] = useState<UserScope>({
     isFinanceiroLocal: false, congregacaoId: null, canWrite: true, canDelete: false,
   });
@@ -249,6 +318,18 @@ export default function TesourariaPage() {
   const [modal, setModal] = useState<{ open: boolean; title: string; message: string; type: 'success'|'error'|'info' }>({
     open: false, title: '', message: '', type: 'success',
   });
+
+  // ── Fase 2 ────────────────────────────────────────────────────────────────
+  const [dadosGrafico,    setDadosGrafico]    = useState<MesDados[]>([]);
+  const [loadingGrafico,  setLoadingGrafico]  = useState(false);
+  const [lancamentosMes,  setLancamentosMes]  = useState<Lancamento[]>([]);
+  const [loadingMes,      setLoadingMes]      = useState(false);
+  const [filtroMovimento, setFiltroMovimento] = useState<'' | 'entrada' | 'saida'>('');
+
+  // ── Relatório — dados diretos do banco (substituem relFiltrado in-memory) ──
+  const [relDadosDB,   setRelDadosDB]   = useState<Lancamento[]>([]);
+  const [relLoadingDB, setRelLoadingDB] = useState(false);
+
   const showModal = (title: string, message: string, type: 'success'|'error'|'info' = 'success') =>
     setModal({ open: true, title, message, type });
 
@@ -269,6 +350,7 @@ export default function TesourariaPage() {
     // Detectar role do usuário atual
     const { data: sessionData } = await supabase.auth.getSession();
     const uid = sessionData.session?.user.id;
+    let scopeCongId: string | null = null;
     if (uid) {
       const { data: mu } = await supabase
         .from('ministry_users')
@@ -281,6 +363,7 @@ export default function TesourariaPage() {
         const isLocal  = perms.includes('FINANCEIRO_LOCAL');
         const isAdmin  = perms.includes('ADMINISTRADOR') || mu.role === 'admin';
         const isFin    = perms.includes('FINANCEIRO');
+        if (isLocal) scopeCongId = mu.congregacao_id ?? null;
         setScope({
           isFinanceiroLocal: isLocal,
           congregacaoId:     mu.congregacao_id ?? null,
@@ -310,12 +393,37 @@ export default function TesourariaPage() {
       .order('ordem');
     setDepartamentos((deps as Departamento[]) || []);
 
-    // Lançamentos
-    const { data: lancs } = await supabase
+    // Contas financeiras (Fase 1 — opcional, pode não existir em instalações antigas)
+    try {
+      const { data: contas } = await supabase
+        .from('fin_contas')
+        .select('id,nome,tipo,is_padrao,congregacao_id')
+        .eq('ministry_id', mid)
+        .eq('is_ativa', true)
+        .order('is_padrao', { ascending: false })
+        .order('nome');
+      setFinContas((contas as FinConta[]) || []);
+    } catch { setFinContas([]); }
+
+    // Categorias financeiras (Fase 1 — sistema + ministério)
+    try {
+      const { data: cats } = await supabase
+        .from('fin_categorias')
+        .select('id,nome,tipo_movimento,cor,icone')
+        .or(`ministry_id.is.null,ministry_id.eq.${mid}`)
+        .eq('is_ativa', true)
+        .order('codigo');
+      setFinCategorias((cats as FinCategoria[]) || []);
+    } catch { setFinCategorias([]); }
+
+    // Lançamentos (financeiro_local: filtro por congregação no servidor)
+    // Limitado a 200 registros mais recentes para evitar carregar todo o histórico
+    let lancsQuery = supabase
       .from('tesouraria_lancamentos')
       .select('*')
-      .eq('ministry_id', mid)
-      .order('data_lancamento', { ascending: false });
+      .eq('ministry_id', mid);
+    if (scopeCongId) lancsQuery = lancsQuery.eq('congregacao_id', scopeCongId);
+    const { data: lancs } = await lancsQuery.order('data_lancamento', { ascending: false }).limit(200);
 
     if (lancs) {
       // Enriquecer com nomes
@@ -344,14 +452,20 @@ export default function TesourariaPage() {
 
   // ── Filtro de lançamentos ─────────────────────────────────────────────────
 
-  const lancsFiltrados = useMemo(() => lancamentos.filter(l => {
+  const lancsFiltrados = useMemo(() => lancamentosMes.filter(l => {
+    if (filtroMovimento && l.tipo_movimento !== filtroMovimento) return false;
     if (filtroTipo && l.tipo_recebimento !== filtroTipo) return false;
     if (filtroCong && l.congregacao_id !== filtroCong) return false;
-    if (filtroMes) {
-      if (!l.data_lancamento.startsWith(filtroMes)) return false;
-    }
     return true;
-  }), [lancamentos, filtroTipo, filtroCong, filtroMes]);
+  }), [lancamentosMes, filtroMovimento, filtroTipo, filtroCong]);
+
+  const entradasFiltradas = useMemo(() =>
+    lancsFiltrados.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0),
+    [lancsFiltrados]);
+
+  const saidasFiltradas = useMemo(() =>
+    lancsFiltrados.filter(l => l.tipo_movimento === 'saida').reduce((s, l) => s + Number(l.valor), 0),
+    [lancsFiltrados]);
 
   const totalFiltrado = useMemo(() =>
     lancsFiltrados.reduce((s, l) => s + Number(l.valor), 0),
@@ -381,6 +495,24 @@ export default function TesourariaPage() {
 
     return { totalGeral, totalMes, totalSaidas, saldoMes, porTipo, porCong };
   }, [lancamentos]);
+
+  // Comparativo mês atual vs mês anterior (usa dados do gráfico 12 meses)
+  const dashComparativo = useMemo(() => {
+    const hoje = new Date();
+    const mesA = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+    const antD  = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+    const mesB  = `${antD.getFullYear()}-${String(antD.getMonth() + 1).padStart(2, '0')}`;
+    const a  = dadosGrafico.find(m => m.mes === mesA) ?? { entradas: 0, saidas: 0, saldo: 0 };
+    const b  = dadosGrafico.find(m => m.mes === mesB) ?? { entradas: 0, saidas: 0, saldo: 0 };
+    const pct = (cur: number, ant: number) =>
+      ant === 0 ? (cur > 0 ? 100 : 0) : ((cur - ant) / ant) * 100;
+    return {
+      mesBLabel: `${MESES_LABEL[antD.getMonth()].slice(0, 3)}/${antD.getFullYear()}`,
+      entradas: { atual: a.entradas, anterior: b.entradas, variacao: pct(a.entradas, b.entradas) },
+      saidas:   { atual: a.saidas,   anterior: b.saidas,   variacao: pct(a.saidas,   b.saidas)   },
+      saldo:    { atual: a.saldo,    anterior: b.saldo,    variacao: pct(a.saldo,     b.saldo)    },
+    };
+  }, [dadosGrafico]);
 
   // ── Busca de dizimista ─────────────────────────────────────────────────────
 
@@ -415,6 +547,117 @@ export default function TesourariaPage() {
     setDizAvulsoNome('');
   };
 
+  // ── Fase 2: Gráfico 12 meses ────────────────────────────────────────────────
+
+  const carregarGrafico12Meses = useCallback(async () => {
+    if (!ministryId) return;
+    setLoadingGrafico(true);
+    const hoje = new Date();
+    const meses: MesDados[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      const mes = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${MESES_LABEL[d.getMonth()].slice(0, 3)}/${String(d.getFullYear()).slice(2)}`;
+      meses.push({ mes, label, entradas: 0, saidas: 0, saldo: 0 });
+    }
+    const oldest = meses[0].mes;
+    let q = supabase
+      .from('tesouraria_lancamentos')
+      .select('data_lancamento, tipo_movimento, valor')
+      .eq('ministry_id', ministryId)
+      .gte('data_lancamento', `${oldest}-01`);
+    if (scope.isFinanceiroLocal && scope.congregacaoId) {
+      q = q.eq('congregacao_id', scope.congregacaoId);
+    }
+    const { data } = await q;
+    if (data) {
+      (data as { data_lancamento: string; tipo_movimento: string; valor: number }[]).forEach(l => {
+        const m = l.data_lancamento.slice(0, 7);
+        const idx = meses.findIndex(x => x.mes === m);
+        if (idx >= 0) {
+          if (l.tipo_movimento === 'entrada') meses[idx].entradas += Number(l.valor);
+          else meses[idx].saidas += Number(l.valor);
+        }
+      });
+      meses.forEach(m => { m.saldo = m.entradas - m.saidas; });
+    }
+    setDadosGrafico(meses);
+    setLoadingGrafico(false);
+  }, [ministryId, supabase, scope]);
+
+  // ── Fase 2: Lançamentos do mês (query direta ao banco) ───────────────────────
+
+  const carregarLancamentosMes = useCallback(async (mes: string) => {
+    if (!ministryId) return;
+    setLoadingMes(true);
+    const congMap = new Map(congregacoes.map(c => [c.id, c.nome]));
+    const depMap  = new Map(departamentos.map(d => [d.id, `${d.sigla} - ${d.nome}`]));
+    let q = supabase
+      .from('tesouraria_lancamentos')
+      .select('*')
+      .eq('ministry_id', ministryId)
+      .gte('data_lancamento', `${mes}-01`)
+      .lt('data_lancamento', `${mesProximo(mes)}-01`)
+      .order('data_lancamento', { ascending: false });
+    if (scope.isFinanceiroLocal && scope.congregacaoId) {
+      q = q.eq('congregacao_id', scope.congregacaoId);
+    }
+    const { data } = await q;
+    setLancamentosMes(((data ?? []) as Lancamento[]).map(l => ({
+      ...l,
+      tipo_movimento:    (l as unknown as { tipo_movimento?: string }).tipo_movimento as TipoMovimento ?? 'entrada',
+      congregacao_nome:  l.congregacao_id  ? (congMap.get(l.congregacao_id)  ?? 'Sede') : 'Caixa Geral (Sede)',
+      departamento_nome: l.departamento_id ? (depMap.get(l.departamento_id)  ?? '—')    : '—',
+    })));
+    setLoadingMes(false);
+  }, [ministryId, supabase, scope, congregacoes, departamentos]);
+
+  // Gráfico 12 meses: carrega após o load inicial completar
+  useEffect(() => {
+    if (!ministryId || loadingData) return;
+    carregarGrafico12Meses();
+  }, [ministryId, loadingData, carregarGrafico12Meses]);
+
+  // Lançamentos do mês: rebusca no banco quando filtroMes muda ou após carga inicial
+  useEffect(() => {
+    if (!ministryId || loadingData) return;
+    carregarLancamentosMes(filtroMes);
+  }, [filtroMes, ministryId, loadingData, carregarLancamentosMes]);
+
+  // ── Fase 2: Relatório — query direta ao banco por período ─────────────────────
+
+  const carregarRelatorio = useCallback(async (mes: string, cong: string) => {
+    if (!ministryId) return;
+    setRelLoadingDB(true);
+    const congMap = new Map(congregacoes.map(c => [c.id, c.nome]));
+    const depMap  = new Map(departamentos.map(d => [d.id, `${d.sigla} - ${d.nome}`]));
+    let q = supabase
+      .from('tesouraria_lancamentos')
+      .select('*')
+      .eq('ministry_id', ministryId)
+      .gte('data_lancamento', `${mes}-01`)
+      .lt('data_lancamento', `${mesProximo(mes)}-01`)
+      .order('data_lancamento', { ascending: false });
+    if (scope.isFinanceiroLocal && scope.congregacaoId) {
+      q = q.eq('congregacao_id', scope.congregacaoId);
+    } else if (cong) {
+      q = q.eq('congregacao_id', cong);
+    }
+    const { data } = await q;
+    setRelDadosDB(((data ?? []) as Lancamento[]).map(l => ({
+      ...l,
+      tipo_movimento:    (l as unknown as { tipo_movimento?: string }).tipo_movimento as TipoMovimento ?? 'entrada',
+      congregacao_nome:  l.congregacao_id  ? (congMap.get(l.congregacao_id)  ?? 'Sede') : 'Caixa Geral (Sede)',
+      departamento_nome: l.departamento_id ? (depMap.get(l.departamento_id)  ?? '—')    : '—',
+    })));
+    setRelLoadingDB(false);
+  }, [ministryId, supabase, scope, congregacoes, departamentos]);
+
+  useEffect(() => {
+    if (!ministryId || loadingData || aba !== 'relatorio') return;
+    carregarRelatorio(relMes, relCong);
+  }, [relMes, relCong, aba, ministryId, loadingData, carregarRelatorio]);
+
   // ── Salvar ────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
@@ -433,6 +676,20 @@ export default function TesourariaPage() {
     if (isNaN(valorNum) || valorNum <= 0) {
       showModal('Valor inválido', 'Informe um valor maior que zero.', 'error'); return;
     }
+
+    // Verificar se o mês do lançamento já está fechado
+    const mesLanc = form.data_lancamento.slice(0, 7);
+    const mestaFechado = fechamentos.some(f => f.mes_referencia === mesLanc && f.status === 'fechado');
+    if (mestaFechado) {
+      const [anoL, monL] = mesLanc.split('-');
+      showModal(
+        'Mês fechado',
+        `O caixa de ${MESES_LABEL[Number(monL) - 1]}/${anoL} já foi encerrado e não aceita novos lançamentos ou edições. Para corrigir dados deste mês, reabasteça o histórico com o administrador.`,
+        'error'
+      );
+      return;
+    }
+
     setSaving(true);
     const now = new Date().toISOString();
     const payload: any = {
@@ -448,6 +705,8 @@ export default function TesourariaPage() {
       forma_pagamento:  form.forma_pagamento,
       data_lancamento:  form.data_lancamento,
       observacoes:      form.observacoes.trim() || null,
+      conta_id:         form.conta_id    || null,
+      categoria_id:     form.categoria_id || null,
       updated_at:       now,
     };
 
@@ -480,7 +739,7 @@ export default function TesourariaPage() {
       }
       showModal('Atualizado!', 'Lançamento atualizado com sucesso.');
     } else {
-      const { error } = await supabase.from('tesouraria_lancamentos').insert({ ...payload, created_at: now });
+      const { error } = await supabase.from('tesouraria_lancamentos').insert({ ...payload, created_at: now, origem_modulo: 'manual' });
       if (error) { showModal('Erro', error.message, 'error'); setSaving(false); return; }
       // Se for dízimo com membro selecionado, registrar pagamento
       if (form.tipo_recebimento === 'dizimo' && dizSelId) {
@@ -501,6 +760,7 @@ export default function TesourariaPage() {
     setShowForm(false);
     resetDizForm();
     load();
+    carregarLancamentosMes(filtroMes);
   };
 
   // ── Editar ────────────────────────────────────────────────────────────────
@@ -521,6 +781,8 @@ export default function TesourariaPage() {
       forma_pagamento:  l.forma_pagamento,
       data_lancamento:  l.data_lancamento,
       observacoes:      l.observacoes ?? '',
+      conta_id:         (l as any).conta_id    ?? '',
+      categoria_id:     (l as any).categoria_id ?? '',
     });
     // Restaurar vínculo de dizimista
     if (l.member_id && l.dizimista_nome) {
@@ -543,6 +805,7 @@ export default function TesourariaPage() {
     setConfirmDel(null);
     showModal('Excluído!', 'Lançamento removido.');
     load();
+    carregarLancamentosMes(filtroMes);
   };
 
   // ── Fechar Mês ───────────────────────────────────────────────────
@@ -550,10 +813,23 @@ export default function TesourariaPage() {
   const handleFecharMes = async () => {
     if (!ministryId) return;
     const saldoIni = parseFloat(fechaSaldoInicial.replace(',', '.')) || 0;
-    const doMes   = lancamentos.filter(l => l.data_lancamento.startsWith(abaFechaMes));
-    const entradas = doMes.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
-    const saidas   = doMes.filter(l => l.tipo_movimento === 'saida').reduce((s, l) => s + Number(l.valor), 0);
+
+    // Buscar totais diretamente do banco para garantir precisão independente do estado local
+    const { data: totaisDb } = await supabase
+      .from('tesouraria_lancamentos')
+      .select('tipo_movimento, valor')
+      .eq('ministry_id', ministryId)
+      .gte('data_lancamento', `${abaFechaMes}-01`)
+      .lt('data_lancamento', `${mesProximo(abaFechaMes)}-01`);
+    const itensDb = (totaisDb ?? []) as Array<{ tipo_movimento: string; valor: number }>;
+    const entradas = itensDb
+      .filter(l => l.tipo_movimento === 'entrada')
+      .reduce((s, l) => s + Number(l.valor), 0);
+    const saidas = itensDb
+      .filter(l => l.tipo_movimento === 'saida')
+      .reduce((s, l) => s + Number(l.valor), 0);
     const saldoFinal = saldoIni + entradas - saidas;
+
     setSalvandoFecha(true);
     const { data: sd } = await supabase.auth.getSession();
     const uid = sd.session?.user.id;
@@ -581,21 +857,16 @@ export default function TesourariaPage() {
 
   // ── Relatório ─────────────────────────────────────────────────────────────
 
-  const relFiltrado = useMemo(() => lancamentos.filter(l => {
-    if (relMes && !l.data_lancamento.startsWith(relMes)) return false;
-    if (relCong && l.congregacao_id !== relCong) return false;
-    return true;
-  }), [lancamentos, relMes, relCong]);
-
-  const relEntradas = useMemo(() => relFiltrado.filter(l => l.tipo_movimento !== 'saida'), [relFiltrado]);
-  const relSaidas   = useMemo(() => relFiltrado.filter(l => l.tipo_movimento === 'saida'),  [relFiltrado]);
+  // ── Relatório — memos derivados dos dados do banco (sem limite de 200) ───────
+  const relEntradas = useMemo(() => relDadosDB.filter(l => l.tipo_movimento !== 'saida'), [relDadosDB]);
+  const relSaidas   = useMemo(() => relDadosDB.filter(l => l.tipo_movimento === 'saida'),  [relDadosDB]);
   const relTotalEntradas = useMemo(() => relEntradas.reduce((s, l) => s + Number(l.valor), 0), [relEntradas]);
   const relTotalSaidas   = useMemo(() => relSaidas.reduce((s, l) => s + Number(l.valor), 0),   [relSaidas]);
 
   const relDados = useMemo(() =>
     relTipoRel === 'entradas' ? relEntradas :
-    relTipoRel === 'saidas'   ? relSaidas   : relFiltrado
-  , [relTipoRel, relEntradas, relSaidas, relFiltrado]);
+    relTipoRel === 'saidas'   ? relSaidas   : relDadosDB
+  , [relTipoRel, relEntradas, relSaidas, relDadosDB]);
 
   const relTotal = useMemo(() => relDados.reduce((s, l) => s + Number(l.valor), 0), [relDados]);
 
@@ -786,9 +1057,112 @@ export default function TesourariaPage() {
               </p>
             </div>
             <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-amber-500 p-5 shadow-md">
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Congregações ativas</p>
-              <p className="text-2xl font-bold text-[#123b63]">{congregacoes.length}</p>
+              {scope.isFinanceiroLocal ? (
+                <>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Sua Congregação</p>
+                  <p className="text-lg font-bold text-[#123b63] leading-tight">
+                    {congregacoes.find(c => c.id === scope.congregacaoId)?.nome ?? '—'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Congregações ativas</p>
+                  <p className="text-2xl font-bold text-[#123b63]">{congregacoes.length}</p>
+                </>
+              )}
             </div>
+          </div>
+
+          {/* ── Comparativo mês atual vs anterior ─────────────────────────────── */}
+          {dadosGrafico.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {([
+                { key: 'entradas', label: 'Entradas', data: dashComparativo.entradas, cor: 'text-green-600', bg: 'border-t-green-500' },
+                { key: 'saidas',   label: 'Saídas',   data: dashComparativo.saidas,   cor: 'text-red-500',   bg: 'border-t-red-500'   },
+                { key: 'saldo',    label: 'Saldo',    data: dashComparativo.saldo,    cor: dashComparativo.saldo.atual >= 0 ? 'text-[#123b63]' : 'text-red-600', bg: 'border-t-[#123b63]' },
+              ] as const).map(item => (
+                <div key={item.key} className={`bg-white rounded-2xl border border-slate-200 border-t-4 ${item.bg} p-4 shadow-md`}>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{item.label} — comparativo</p>
+                  <p className={`text-xl font-bold ${item.cor}`}>{fmtBRL(item.data.atual)}</p>
+                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                    <span className={`text-xs font-semibold ${item.data.variacao >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      {item.data.variacao >= 0 ? '▲' : '▼'} {Math.abs(item.data.variacao).toFixed(1)}%
+                    </span>
+                    <span className="text-xs text-gray-400">vs {fmtBRL(item.data.anterior)} ({dashComparativo.mesBLabel})</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Gráfico Entradas x Saídas — últimos 12 meses ──────────────────── */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-md">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Entradas × Saídas — últimos 12 meses</h3>
+            {loadingGrafico ? (
+              <p className="text-sm text-gray-400 py-6 text-center">Carregando...</p>
+            ) : dadosGrafico.length === 0 ? (
+              <p className="text-sm text-gray-400 py-6 text-center">Nenhum dado disponível.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={dadosGrafico} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis
+                    tickFormatter={(v) => {
+                      const n = Number(v);
+                      return Math.abs(n) >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
+                    }}
+                    tick={{ fontSize: 10 }}
+                    width={48}
+                  />
+                  <ChartTooltip
+                    formatter={(v: unknown) => fmtBRL(Number(v))}
+                    labelStyle={{ fontWeight: 600 }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="entradas" name="Entradas" fill="#22c55e" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="saidas"   name="Saídas"   fill="#ef4444" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* ── Tendência de saldo mensal ──────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-md">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Tendência de saldo — últimos 12 meses</h3>
+            {loadingGrafico ? (
+              <p className="text-sm text-gray-400 py-6 text-center">Carregando...</p>
+            ) : dadosGrafico.length === 0 ? (
+              <p className="text-sm text-gray-400 py-6 text-center">Nenhum dado disponível.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={dadosGrafico} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis
+                    tickFormatter={(v) => {
+                      const n = Number(v);
+                      return Math.abs(n) >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
+                    }}
+                    tick={{ fontSize: 10 }}
+                    width={48}
+                  />
+                  <ChartTooltip
+                    formatter={(v: unknown) => fmtBRL(Number(v))}
+                    labelStyle={{ fontWeight: 600 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="saldo"
+                    name="Saldo"
+                    stroke="#123b63"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: '#123b63' }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           {/* Por tipo de recebimento */}
@@ -859,6 +1233,29 @@ export default function TesourariaPage() {
                 />
               </div>
               <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Movimento</label>
+                <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm h-[38px]">
+                  {([
+                    { v: '' as const,        label: 'Todos'   },
+                    { v: 'entrada' as const, label: '↑ Entr.' },
+                    { v: 'saida' as const,   label: '↓ Saída' },
+                  ]).map(opt => (
+                    <button key={opt.v} type="button"
+                      onClick={() => { setFiltroMovimento(opt.v); setFiltroTipo(''); }}
+                      className={`flex-1 text-xs font-medium transition px-1 ${
+                        filtroMovimento === opt.v
+                          ? opt.v === 'entrada' ? 'bg-green-600 text-white'
+                            : opt.v === 'saida' ? 'bg-red-500 text-white'
+                            : 'bg-[#123b63] text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo</label>
                 <select
                   value={filtroTipo}
@@ -866,7 +1263,10 @@ export default function TesourariaPage() {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                 >
                   <option value="">Todos os tipos</option>
-                  {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  {filtroMovimento === 'saida'
+                    ? TIPOS_SAIDA.map(t => <option key={t.value} value={t.value}>{t.label}</option>)
+                    : TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)
+                  }
                 </select>
               </div>
               {!scope.isFinanceiroLocal && (
@@ -882,23 +1282,44 @@ export default function TesourariaPage() {
                   </select>
                 </div>
               )}
-              <div className="flex items-end">
+            </div>
+
+            {/* Linha de ações */}
+            <div className="mt-3 flex flex-wrap gap-2 items-center justify-between">
+              <div className="flex gap-2">
                 {scope.canWrite && (
                   <button
                     onClick={() => { setForm(emptyForm()); setEditId(null); setShowForm(true); }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition"
+                    className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition"
                   >
                     <Plus className="h-4 w-4" /> Novo
                   </button>
                 )}
+                {lancamentosMes.length > 0 && (
+                  <button
+                    onClick={() => exportarCSV(lancsFiltrados, `lancamentos-${filtroMes}`)}
+                    className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
+                    title="Exportar lançamentos filtrados para CSV"
+                  >
+                    <Download className="h-4 w-4" /> CSV
+                  </button>
+                )}
+              </div>
+              {/* Totalizador */}
+              <div className="flex gap-3 flex-wrap text-sm">
+                <span className="text-gray-400">{lancsFiltrados.length} reg.</span>
+                <span className="text-green-600 font-semibold">↑ {fmtBRL(entradasFiltradas)}</span>
+                <span className="text-red-500 font-semibold">↓ {fmtBRL(saidasFiltradas)}</span>
+                <span className={`font-bold ${entradasFiltradas - saidasFiltradas >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>
+                  = {fmtBRL(entradasFiltradas - saidasFiltradas)}
+                </span>
               </div>
             </div>
 
-            {/* Totalizador */}
-            <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-              <span className="text-xs text-gray-500">{lancsFiltrados.length} lançamento(s)</span>
-              <span className="text-sm font-bold text-[#123b63]">Total: {fmtBRL(totalFiltrado)}</span>
-            </div>
+            {/* Loading do mês */}
+            {loadingMes && (
+              <p className="text-xs text-gray-400 mt-2 text-center">Buscando lançamentos do mês...</p>
+            )}
           </div>
 
           {/* Formulário inline */}
@@ -1122,6 +1543,46 @@ export default function TesourariaPage() {
                     {FORMAS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                   </select>
                 </div>
+
+                {/* Conta / Caixa (opcional — visível apenas quando há contas cadastradas) */}
+                {finContas.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Conta / Caixa</label>
+                    <select
+                      value={form.conta_id}
+                      onChange={e => setForm(p => ({ ...p, conta_id: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="">Padrão do ministério</option>
+                      {finContas.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.nome}{c.is_padrao ? ' ★' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Categoria financeira (opcional — visível apenas quando há categorias) */}
+                {finCategorias.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria financeira</label>
+                    <select
+                      value={form.categoria_id}
+                      onChange={e => setForm(p => ({ ...p, categoria_id: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="">Sem categoria</option>
+                      {finCategorias
+                        .filter(c => c.tipo_movimento === form.tipo_movimento || c.tipo_movimento === 'ambos')
+                        .map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.icone ? `${c.icone} ` : ''}{c.nome}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* Referência */}
                 <div>
@@ -1477,10 +1938,22 @@ export default function TesourariaPage() {
             >
               <Printer className="h-4 w-4" /> Imprimir
             </button>
+            <button
+              onClick={() => exportarCSV(relDados, `relatorio-${relMes || 'geral'}`)}
+              className="no-print flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-50 transition"
+              title="Exportar relatório para CSV"
+            >
+              <Download className="h-4 w-4" /> CSV
+            </button>
           </div>
 
           {/* Resumo por tipo */}
           <div id="relatorio-print" className="bg-white rounded-2xl border border-slate-200 p-6 shadow-md space-y-5">
+
+            {/* Loading indicator */}
+            {relLoadingDB && (
+              <p className="text-sm text-gray-400 py-6 text-center">Buscando dados do período...</p>
+            )}
 
             {/* Timbre (visível apenas na impressão) */}
             <div className="hidden print:block border-b border-gray-300 pb-4 mb-4">
@@ -1698,6 +2171,31 @@ export default function TesourariaPage() {
             >
               <Printer className="h-4 w-4" /> Imprimir
             </button>
+            {filtroStatusDiz !== 'avulso' && dizimistasVisiveis.length > 0 && (
+              <button
+                onClick={() => {
+                  const rows = dizimistasVisiveis.map(d => ({
+                    id: d.id,
+                    congregacao_id: d.congregacao_id,
+                    congregacao_nome: d.congregacao_nome,
+                    data_lancamento: abaDizimistaMes + '-01',
+                    tipo_movimento: 'entrada' as TipoMovimento,
+                    tipo_recebimento: 'dizimo' as TipoRecebimento,
+                    valor: 0,
+                    forma_pagamento: 'dinheiro' as FormaPagamento,
+                    descricao: d.status === 'pago' ? 'Adimplente' : 'Inadimplente',
+                    referencia: null, observacoes: null, dizimista_nome: d.nome,
+                    departamento_id: null, member_id: d.id, ministry_id: ministryId ?? '',
+                    criado_por: null, created_at: '', departamento_nome: '—',
+                  }));
+                  exportarCSV(rows as Lancamento[], `dizimistas-${abaDizimistaMes}`);
+                }}
+                className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
+                title="Exportar lista para CSV"
+              >
+                <Download className="h-4 w-4" /> CSV
+              </button>
+            )}
           </div>
 
           {/* Cards resumo */}

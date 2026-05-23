@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import InteractiveCanvas from '@/components/InteractiveCanvas';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { AlignCenter, AlignLeft, AlignRight, Award, Bold, Clipboard, Copy, Download, Image as ImageIcon, Italic, Shield, Type, Underline } from 'lucide-react';
@@ -19,6 +20,7 @@ import {
   loadCertificadosTemplatesForCurrentUser,
   persistCertificadosTemplatesSnapshotToSupabase,
 } from '@/lib/certificados-templates-sync';
+import { CERTIFICADOS_TEMPLATES_PADRAO } from '@/lib/certificados-templates-padrao';
 import {
   CERTIFICADO_CATEGORIAS,
   getCertificadoPlaceholders,
@@ -83,6 +85,7 @@ const novoTemplateEmBranco = (nome: string, categoria: string): CertificadoTempl
 
 export default function ConfiguracoesCertificadosPage() {
   const { loading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('configuracoes');
   const supabase = useMemo(() => createClient(), []);
 
   const backgroundInputRef = useRef<HTMLInputElement>(null);
@@ -133,7 +136,7 @@ export default function ConfiguracoesCertificadosPage() {
   };
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || ctx.loading || bloqueado) return;
     setLoadingData(true);
     (async () => {
       const mid = await resolveMinistryId(supabase);
@@ -143,7 +146,7 @@ export default function ConfiguracoesCertificadosPage() {
       setTemplateEmEdicao(res.templates[0] as CertificadoTemplate ?? null);
       setLoadingData(false);
     })();
-  }, [loading, supabase]);
+  }, [loading, ctx.loading, bloqueado, supabase]);
 
   /* ---------- mutacoes de template ---------- */
 
@@ -200,6 +203,23 @@ export default function ConfiguracoesCertificadosPage() {
     setTemplateEmEdicao(t);
     setElementoSelecionado(null);
     setElementosSelecionados([]);
+  };
+
+  const templatePadrao = templateEmEdicao
+    ? CERTIFICADOS_TEMPLATES_PADRAO.find((p) => p.chave === templateEmEdicao.chave)
+    : null;
+
+  const handleResetarParaPadrao = async () => {
+    if (!templateEmEdicao || !templatePadrao) return;
+    const restaurado: CertificadoTemplate = {
+      ...templateEmEdicao,
+      elementos: templatePadrao.elementos as CertificadoElemento[],
+      backgroundUrl: templatePadrao.backgroundUrl,
+    };
+    const prox = templates.map((t) => (t.id === templateEmEdicao.id ? restaurado : t));
+    setTemplateEmEdicao(restaurado);
+    await salvarTodos(prox);
+    mostrarStatus('Modelo restaurado para o padrão do sistema.');
   };
 
   const currentCategoria = templateEmEdicao?.categoria || 'ministerial';
@@ -308,13 +328,16 @@ export default function ConfiguracoesCertificadosPage() {
       img.onload = () => {
         const cW = CERTIFICADO_CANVAS.largura;
         const cH = CERTIFICADO_CANVAS.altura;
+        // Salva em 2× resolução para garantir qualidade na impressão
+        // (o CSS escala ~1.334× para A4; com 2× a imagem tem pixels suficientes)
+        const SCALE = 2;
         const canvas = document.createElement('canvas');
-        canvas.width = cW;
-        canvas.height = cH;
+        canvas.width = cW * SCALE;
+        canvas.height = cH * SCALE;
         const ctx = canvas.getContext('2d')!;
         // Estica para preencher o canvas inteiro (sem cortes, sem espaços)
-        ctx.drawImage(img, 0, 0, cW, cH);
-        const resized = canvas.toDataURL('image/jpeg', 0.92);
+        ctx.drawImage(img, 0, 0, cW * SCALE, cH * SCALE);
+        const resized = canvas.toDataURL('image/jpeg', 0.95);
         setTemplateEmEdicao((prev) => prev ? { ...prev, backgroundUrl: resized } : prev);
       };
       img.src = src;
@@ -334,7 +357,9 @@ export default function ConfiguracoesCertificadosPage() {
     e.target.value = '';
   };
 
-  if (loading || loadingData) return <div className="p-8">Carregando...</div>;
+  if (loading || ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
+  if (loadingData) return <div className="p-8">Carregando...</div>;
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -371,9 +396,9 @@ export default function ConfiguracoesCertificadosPage() {
                   onChange={(e) => setNovoNome(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCriarNovo()}
                 />
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-stretch">
                   <select
-                    className="flex-1 border rounded px-2 py-1.5 text-xs"
+                    className="w-[182px] border rounded px-2 py-0 text-xs h-8 leading-8"
                     value={novoCategoria}
                     onChange={(e) => setNovoCategoria(e.target.value)}
                   >
@@ -385,7 +410,7 @@ export default function ConfiguracoesCertificadosPage() {
                   </select>
                   <button
                     onClick={handleCriarNovo}
-                    className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm font-semibold hover:bg-blue-700 transition"
+                    className="w-8 h-8 bg-blue-600 text-white rounded text-sm font-semibold hover:bg-blue-700 transition shrink-0 flex items-center justify-center"
                   >
                     +
                   </button>
@@ -538,6 +563,15 @@ export default function ConfiguracoesCertificadosPage() {
                           onClick={() => setTemplateEmEdicao({ ...templateEmEdicao, backgroundUrl: undefined })}
                         >
                           Remover Fundo
+                        </button>
+                      )}
+                      {templatePadrao && (
+                        <button
+                          title="Restaurar elementos e fundo do modelo nativo do sistema"
+                          className="px-3 py-1.5 border border-amber-300 text-amber-700 rounded hover:bg-amber-50 text-sm font-semibold"
+                          onClick={handleResetarParaPadrao}
+                        >
+                          Restaurar Padrão
                         </button>
                       )}
                       <button

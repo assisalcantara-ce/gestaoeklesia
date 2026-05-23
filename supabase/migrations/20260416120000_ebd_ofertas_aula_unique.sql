@@ -11,5 +11,13 @@ WHERE id NOT IN (
 )
 AND aula_id IS NOT NULL;
 
-ALTER TABLE public.ebd_ofertas
-  ADD CONSTRAINT ebd_oferta_aula_unica UNIQUE (aula_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'ebd_oferta_aula_unica'
+      AND conrelid = 'public.ebd_ofertas'::regclass
+  ) THEN
+    ALTER TABLE public.ebd_ofertas ADD CONSTRAINT ebd_oferta_aula_unica UNIQUE (aula_id);
+  END IF;
+END $$;

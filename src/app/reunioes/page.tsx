@@ -4,13 +4,14 @@ import { useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
-import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 
 export default function ReunioesPage() {
-  const { loading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('reunioes');
   const [activeTab, setActiveTab] = useState('agendadas');
 
-  if (loading) return <div className="p-8">Carregando...</div>;
+  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
 
   const tabs = [
     { id: 'agendadas', label: 'Agendadas', icon: '📅' },

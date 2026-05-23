@@ -1,9 +1,17 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase-client'
 
-// Inicializar cliente Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+/** Normaliza status do banco ('active'/'inactive') para o formato da interface ('ativo'/'inativo') */
+function normalizeStatus(status: string | null | undefined): 'ativo' | 'inativo' {
+  return status === 'active' ? 'ativo' : 'inativo'
+}
+
+/** Normaliza tipo_cadastro para o formato esperado */
+function normalizeTipoCadastro(tipo: string | null | undefined): 'membro' | 'congregado' | 'ministro' | 'crianca' {
+  if (tipo === 'congregado') return 'congregado'
+  if (tipo === 'ministro') return 'ministro'
+  if (tipo === 'crianca') return 'crianca'
+  return 'membro'
+}
 
 export interface Membro {
   id: string;
@@ -29,20 +37,47 @@ export interface Marcador extends Membro {
 
 /**
  * Buscar todos os membros com geolocalização
+ * Usa createClient (anon key) — respeita RLS e ministry_id automaticamente
  */
 export async function buscarMembrosComGeolocalizacao(): Promise<Membro[]> {
+  const supabase = createClient()
   try {
-    // Buscar membros diretamente da tabela (simulado com dados locais)
-    // No banco real, seria uma query SELECT
-    return [];
+    const { data, error } = await supabase
+      .from('members')
+      .select('id, name, email, phone, celular, latitude, longitude, cidade, logradouro, bairro, numero, status, tipo_cadastro, congregacao_id')
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
+      .order('name', { ascending: true })
+
+    if (error) {
+      console.error('Erro ao buscar membros com geolocalização:', error)
+      return []
+    }
+
+    return (data || []).map((row: any): Membro => ({
+      id: row.id,
+      nome: row.name ?? '',
+      email: row.email ?? undefined,
+      celular: row.celular || row.phone || undefined,
+      logradouro: row.logradouro ?? undefined,
+      numero: row.numero ?? undefined,
+      bairro: row.bairro ?? undefined,
+      cidade: row.cidade ?? undefined,
+      latitude: row.latitude ?? undefined,
+      longitude: row.longitude ?? undefined,
+      status: normalizeStatus(row.status),
+      tipoCadastro: normalizeTipoCadastro(row.tipo_cadastro),
+      congregacao: row.congregacao_id ?? undefined,
+    }))
   } catch (error) {
-    console.error('Erro ao buscar membros:', error);
-    throw error;
+    console.error('Erro ao buscar membros com geolocalização:', error)
+    return []
   }
 }
 
 /**
  * Buscar membros filtrados por critérios
+ * Usa createClient (anon key) — respeita RLS e ministry_id automaticamente
  */
 export async function buscarMembrosFiltrados(filtros: {
   nome?: string;
@@ -51,44 +86,59 @@ export async function buscarMembrosFiltrados(filtros: {
   tipoCadastro?: string;
   congregacao?: string;
 }): Promise<Membro[]> {
+  const supabase = createClient()
   try {
-    // Implementar filtros
     let query = supabase
-      .from('membros')
-      .select('*');
+      .from('members')
+      .select('id, name, email, phone, celular, latitude, longitude, cidade, logradouro, bairro, numero, status, tipo_cadastro, congregacao_id')
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
 
     if (filtros.nome) {
-      query = query.ilike('nome', `%${filtros.nome}%`);
+      query = query.ilike('name', `%${filtros.nome}%`)
     }
-
     if (filtros.cidade) {
-      query = query.eq('cidade', filtros.cidade);
+      query = query.ilike('cidade', `%${filtros.cidade}%`)
     }
-
     if (filtros.status) {
-      query = query.eq('status', filtros.status);
+      // Aceita 'ativo'/'inativo' (UI) e 'active'/'inactive' (banco)
+      const dbStatus = filtros.status === 'ativo' ? 'active'
+        : filtros.status === 'inativo' ? 'inactive'
+        : filtros.status
+      query = query.eq('status', dbStatus)
     }
-
     if (filtros.tipoCadastro) {
-      query = query.eq('tipoCadastro', filtros.tipoCadastro);
+      query = query.eq('tipo_cadastro', filtros.tipoCadastro)
     }
-
     if (filtros.congregacao) {
-      query = query.eq('congregacao', filtros.congregacao);
+      query = query.eq('congregacao_id', filtros.congregacao)
     }
 
-    const { data, error } = await query;
+    const { data, error } = await query.order('name', { ascending: true })
 
     if (error) {
-      console.error('Erro ao buscar membros:', error);
-      throw error;
+      console.error('Erro ao buscar membros filtrados:', error)
+      return []
     }
 
-    // Filtrar apenas membros com latitude e longitude
-    return (data || []).filter(m => m.latitude && m.longitude);
+    return (data || []).map((row: any): Membro => ({
+      id: row.id,
+      nome: row.name ?? '',
+      email: row.email ?? undefined,
+      celular: row.celular || row.phone || undefined,
+      logradouro: row.logradouro ?? undefined,
+      numero: row.numero ?? undefined,
+      bairro: row.bairro ?? undefined,
+      cidade: row.cidade ?? undefined,
+      latitude: row.latitude ?? undefined,
+      longitude: row.longitude ?? undefined,
+      status: normalizeStatus(row.status),
+      tipoCadastro: normalizeTipoCadastro(row.tipo_cadastro),
+      congregacao: row.congregacao_id ?? undefined,
+    }))
   } catch (error) {
-    console.error('Erro ao buscar membros filtrados:', error);
-    throw error;
+    console.error('Erro ao buscar membros filtrados:', error)
+    return []
   }
 }
 
@@ -96,6 +146,7 @@ export async function buscarMembrosFiltrados(filtros: {
  * Buscar congregações com geolocalização
  */
 export async function buscarCongregacoes(): Promise<any[]> {
+  const supabase = createClient()
   try {
     const { data, error } = await supabase
       .from('congregacoes')
@@ -116,29 +167,30 @@ export async function buscarCongregacoes(): Promise<any[]> {
 }
 
 /**
- * Buscar cidades únicas de membros
+ * Buscar cidades únicas de membros com coordenadas
  */
 export async function buscarCidades(): Promise<string[]> {
+  const supabase = createClient()
   try {
     const { data, error } = await supabase
-      .from('membros')
+      .from('members')
       .select('cidade')
       .not('latitude', 'is', null)
-      .not('longitude', 'is', null);
+      .not('longitude', 'is', null)
+      .not('cidade', 'is', null)
 
     if (error) {
-      console.error('Erro ao buscar cidades:', error);
-      throw error;
+      console.error('Erro ao buscar cidades:', error)
+      return []
     }
 
-    const cidades = [...new Set((data || [])
-      .map(m => m.cidade)
-      .filter(Boolean))];
+    const raw: string[] = (data || []).map((m: any) => m.cidade as string).filter((c: string | null) => Boolean(c))
+    const cidades: string[] = Array.from(new Set(raw))
 
-    return cidades.sort();
+    return cidades.sort()
   } catch (error) {
-    console.error('Erro ao buscar cidades:', error);
-    throw error;
+    console.error('Erro ao buscar cidades:', error)
+    return []
   }
 }
 
@@ -150,23 +202,20 @@ export async function atualizarCoordenadas(
   latitude: number,
   longitude: number
 ): Promise<void> {
+  const supabase = createClient()
   try {
     const { error } = await supabase
-      .from('membros')
-      .update({
-        latitude: latitude.toString(),
-        longitude: longitude.toString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', membroId);
+      .from('members')
+      .update({ latitude, longitude, updated_at: new Date().toISOString() })
+      .eq('id', membroId)
 
     if (error) {
-      console.error('Erro ao atualizar coordenadas:', error);
-      throw error;
+      console.error('Erro ao atualizar coordenadas:', error)
+      throw error
     }
   } catch (error) {
-    console.error('Erro ao atualizar coordenadas:', error);
-    throw error;
+    console.error('Erro ao atualizar coordenadas:', error)
+    throw error
   }
 }
 

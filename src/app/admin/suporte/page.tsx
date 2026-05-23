@@ -660,7 +660,7 @@ export default function SuportePage() {
                       >
                         <td className="px-6 py-4 font-mono text-xs text-gray-400">{t.ticket_number}</td>
                         <td className="px-6 py-4 font-medium text-gray-200">{t.subject}</td>
-                        <td className="px-6 py-4 text-sm text-gray-400">{t.ministry_id}</td>
+                        <td className="px-6 py-4 text-sm text-gray-200 font-medium">{t.ministry_name || t.ministry_id}</td>
                         <td className="px-6 py-4">
                           <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getPriorityColor(t.priority)}`}>
                             {getPriorityLabel(t.priority)}
@@ -805,7 +805,7 @@ export default function SuportePage() {
                   PRIORIDADE {getPriorityLabel(selectedTicket.priority)}
                 </span>
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white">
-                  MINISTÉRIO {selectedTicket.ministry_id}
+                  {selectedTicket.ministry_name || selectedTicket.ministry_id}
                 </span>
               </div>
             </div>

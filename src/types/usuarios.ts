@@ -2,7 +2,8 @@
  * Tipos consolidados para o sistema de usuários e permissões
  */
 
-export type NivelAcesso = 'administrador' | 'financeiro' | 'operador' | 'supervisor' | 'superintendente' | 'coordenador';
+export type { NivelAcesso } from '@/lib/access-control';
+import type { NivelAcesso } from '@/lib/access-control';
 
 export interface Usuario {
   id: string;

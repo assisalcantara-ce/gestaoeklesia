@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase-client';
 import { useAuth } from '@/providers/AuthProvider';
 import type { NivelAcesso } from '@/hooks/usePermissions';
 import { temAcesso, temAcessoEscrita } from '@/hooks/usePermissions';
+import { resolveNivel } from '@/lib/access-control';
 
 export interface UserContext {
   loading: boolean;
@@ -26,41 +27,6 @@ export interface UserContext {
   podeAcessar: (modulo: string) => boolean;
   /** Verifica se o usuário tem acesso de escrita a um módulo */
   podeEscrever: (modulo: string) => boolean;
-}
-
-// Mapeamento role/permission → NivelAcesso
-function resolveNivel(role: string | null, permissions: string[]): NivelAcesso | null {
-  if (!role && permissions.length === 0) return null;
-
-  const roleNorm = (role ?? '').toLowerCase().trim();
-  const permsUpper = permissions.map(p => (typeof p === 'string' ? p.toUpperCase() : ''));
-
-  // Permissões explícitas têm prioridade sobre o role base
-  if (permsUpper.includes('ADMINISTRADOR')) return 'administrador';
-  if (permsUpper.includes('ADMIN_LOCAL'))   return 'admin_local';
-  if (permsUpper.includes('FINANCEIRO_LOCAL')) return 'financeiro_local';
-  if (permsUpper.includes('FINANCEIRO'))    return 'financeiro';
-  if (permsUpper.includes('SUPERINTENDENTE')) return 'superintendente';
-  if (permsUpper.includes('SUPERVISOR'))    return 'supervisor';
-  if (permsUpper.includes('COORDENADOR'))   return 'coordenador';
-  if (permsUpper.includes('OPERADOR'))      return 'operador';
-
-  // Fallback pelo role base
-  const map: Record<string, NivelAcesso> = {
-    admin:            'administrador',
-    administrador:    'administrador',
-    manager:          'financeiro',     // manager sem permission → financeiro geral
-    financeiro:       'financeiro',
-    financeiro_local: 'financeiro_local',
-    supervisor:       'supervisor',
-    superintendente:  'superintendente',
-    admin_local:      'admin_local',
-    operador:         'operador',
-    operator:         'operador',
-    coordenador:      'coordenador',
-    viewer:           'operador',
-  };
-  return map[roleNorm] ?? null;
 }
 
 export function useUserContext(): UserContext {

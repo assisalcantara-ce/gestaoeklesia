@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildPasswordFingerprint } from '@/lib/password-fingerprint';
 import { createServerClient } from '@/lib/supabase-server';
 import { requireFlowAuth, hasRole } from '@/lib/flows/flow-auth';
+import { mapRoleAndPermissions, resolveNivel, type NivelAcesso } from '@/lib/access-control';
 
 type UsuarioResponse = {
   id: string;
   nome: string;
   email: string;
   email_confirmed: boolean;
-  nivel: 'administrador' | 'financeiro' | 'supervisor' | 'admin_local' | 'financeiro_local';
+  nivel: NivelAcesso;
   congregacao?: string;
   congregacao_id?: string | null;
   supervisao?: string;
@@ -36,22 +37,6 @@ type UsuarioUpdateBody = {
   status?: UsuarioResponse['status'];
   senha?: string | null;
 };
-
-function mapNivel(role: string | null | undefined, permissions: any): UsuarioResponse['nivel'] {
-  const base = String(role || '').toLowerCase();
-  const perms = Array.isArray(permissions) ? permissions : [];
-  const permSet = new Set(perms.map((p: any) => String(p || '').toUpperCase()));
-
-  if (permSet.has('ADMINISTRADOR') || ['admin'].includes(base)) return 'administrador';
-  if (permSet.has('FINANCEIRO') || ['financeiro', 'financial'].includes(base)) return 'financeiro';
-  if (permSet.has('SUPERVISOR') || ['supervisor', 'manager'].includes(base)) return 'supervisor';
-  if (permSet.has('ADMIN_LOCAL') || ['admin_local'].includes(base)) return 'admin_local';
-  if (permSet.has('FINANCEIRO_LOCAL') || ['financeiro_local'].includes(base)) return 'financeiro_local';
-  // legado
-  if (['operator', 'operador', 'viewer'].includes(base)) return 'admin_local';
-
-  return 'admin_local';
-}
 
 function resolveStatus(user: any): 'ativo' | 'inativo' {
   const bannedUntil = user?.banned_until ? new Date(user.banned_until) : null;
@@ -142,7 +127,7 @@ export async function GET(request: NextRequest) {
         nome: resolveNome(user),
         email: String(user?.email || ''),
         email_confirmed: resolveEmailConfirmed(user),
-        nivel: mapNivel(row.role, row.permissions),
+        nivel: resolveNivel(row.role, row.permissions) ?? 'operador',
         congregacao: congregacaoMap.get(congregacaoId) || undefined,
         congregacao_id: row.congregacao_id ?? null,
         supervisao: supervisaoMap.get(supervisaoId) || undefined,
@@ -162,23 +147,6 @@ export async function GET(request: NextRequest) {
     }
     const status = message === 'UNAUTHORIZED' ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
-  }
-}
-
-function mapRoleAndPermissions(nivel: UsuarioResponse['nivel']) {
-  switch (nivel) {
-    case 'administrador':
-      return { role: 'admin', permissions: ['ADMINISTRADOR'] };
-    case 'financeiro':
-      return { role: 'manager', permissions: ['FINANCEIRO'] };
-    case 'supervisor':
-      return { role: 'manager', permissions: ['SUPERVISOR'] };
-    case 'admin_local':
-      return { role: 'operator', permissions: ['ADMIN_LOCAL'] };
-    case 'financeiro_local':
-      return { role: 'operator', permissions: ['FINANCEIRO_LOCAL'] };
-    default:
-      return { role: 'operator', permissions: ['ADMIN_LOCAL'] };
   }
 }
 
@@ -212,7 +180,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Configuracao de senha nao definida' }, { status: 500 });
     }
 
-    if (['admin_local', 'financeiro_local'].includes(nivel) && !congregacaoId) {
+    if (['admin_local', 'financeiro_local', 'superintendente', 'coordenador', 'operador'].includes(nivel) && !congregacaoId) {
       return NextResponse.json({ error: 'Congregacao obrigatoria para este nivel' }, { status: 400 });
     }
 
@@ -340,7 +308,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Senha muito curta' }, { status: 400 });
     }
 
-    if (['admin_local', 'financeiro_local'].includes(nivel) && !congregacaoId) {
+    if (['admin_local', 'financeiro_local', 'superintendente', 'coordenador', 'operador'].includes(nivel) && !congregacaoId) {
       return NextResponse.json({ error: 'Congregacao obrigatoria para este nivel' }, { status: 400 });
     }
 

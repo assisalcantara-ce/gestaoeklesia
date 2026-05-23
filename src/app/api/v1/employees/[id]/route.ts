@@ -1,12 +1,6 @@
-/**
- * API ROUTE: Gerenciar Funcionário por ID
- * GET /api/v1/employees/[id] - Obter funcionário
- * DELETE /api/v1/employees/[id] - Deletar funcionário
- * PATCH /api/v1/employees/[id] - Atualizar funcionário
- */
-
-import { createServerClient, createServerClientFromRequest } from '@/lib/supabase-server'
+import { getAccessibleMemberIds, resolveTenantAuth } from '@/lib/tenant-auth'
 import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer'
+import { authTenantErrorResponse, forbiddenResponse } from '@/lib/api-errors'
 import { NextRequest, NextResponse } from 'next/server'
 
 function getSupabaseErrorText(error: any): string {
@@ -19,8 +13,8 @@ function getSupabaseErrorText(error: any): string {
   ].filter(Boolean)
   if (parts.length > 0) return parts.join(' ')
   try {
-    const s = JSON.stringify(error)
-    return s && s !== '{}' ? s : String(error)
+    const text = JSON.stringify(error)
+    return text && text !== '{}' ? text : String(error)
   } catch {
     return String(error)
   }
@@ -34,46 +28,11 @@ function isMissingEmployeesViewError(error: any): boolean {
   )
 }
 
-async function resolveMinistryId(supabase: any, userId: string): Promise<string | null> {
-  const { data: mu, error: muErr } = await supabase
-    .from('ministry_users')
-    .select('ministry_id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (!muErr && mu?.ministry_id) return String(mu.ministry_id)
-
-  const { data: m, error: mErr } = await supabase
-    .from('ministries')
-    .select('id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (!mErr && m?.id) return String(m.id)
-
-  const admin = createServerClient()
-
-  const { data: muAdmin } = await admin
-    .from('ministry_users')
-    .select('ministry_id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (muAdmin?.ministry_id) return String(muAdmin.ministry_id)
-
-  const { data: mAdmin } = await admin
-    .from('ministries')
-    .select('id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (mAdmin?.id) return String(mAdmin.id)
-
-  return null
+function applyEmployeeMemberScope(query: any, accessibleMemberIds: string[] | null) {
+  if (accessibleMemberIds === null) return query
+  return accessibleMemberIds.length > 0
+    ? query.in('member_id', accessibleMemberIds)
+    : query.eq('id', '00000000-0000-0000-0000-000000000000')
 }
 
 export async function GET(
@@ -82,58 +41,48 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    const context = await resolveTenantAuth(request)
+    const { supabase, ministryId } = context
+    const accessibleMemberIds = await getAccessibleMemberIds(context)
 
-    const supabase = createServerClientFromRequest(request)
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const ministryId = await resolveMinistryId(supabase, user.id)
-    if (!ministryId) {
-      return NextResponse.json(
-        { error: 'Usuário sem ministério associado', code: 'NO_MINISTRY' },
-        { status: 403 }
-      )
-    }
-
-    const { data, error } = await supabase
+    let query = supabase
       .from('employees_with_member_info')
       .select('*')
       .eq('id', id)
       .eq('ministry_id', ministryId)
-      .single()
+
+    query = applyEmployeeMemberScope(query, accessibleMemberIds)
+
+    const { data, error } = await query.single()
 
     if (error) {
       if (isMissingEmployeesViewError(error)) {
-        const { data: employee, error: employeeErr } = await supabase
+        let employeeQuery = supabase
           .from('employees')
           .select('*')
           .eq('id', id)
           .eq('ministry_id', ministryId)
-          .single()
+
+        employeeQuery = applyEmployeeMemberScope(employeeQuery, accessibleMemberIds)
+        const { data: employee, error: employeeErr } = await employeeQuery.single()
 
         if (employeeErr || !employee) {
           return NextResponse.json(
-            { error: getSupabaseErrorText(employeeErr) || 'Funcionário não encontrado' },
+            { error: getSupabaseErrorText(employeeErr) || 'Funcionario nao encontrado' },
             { status: 404 }
           )
         }
 
         let memberData: any = null
         if ((employee as any).member_id) {
-          const { data: m, error: mErr } = await supabase
+          const { data: member, error: memberErr } = await supabase
             .from('members')
             .select('id,name,cpf,phone,birth_date')
             .eq('ministry_id', ministryId)
             .eq('id', (employee as any).member_id)
             .maybeSingle()
 
-          if (!mErr) memberData = m
+          if (!memberErr) memberData = member
         }
 
         return NextResponse.json({
@@ -143,7 +92,7 @@ export async function GET(
             member_cpf: memberData?.cpf || null,
             member_phone: memberData?.phone || null,
             member_birth_date: memberData?.birth_date || null,
-          }
+          },
         })
       }
       return NextResponse.json(
@@ -154,10 +103,9 @@ export async function GET(
 
     return NextResponse.json({ data })
   } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
+    const authResponse = authTenantErrorResponse(error)
+    if (authResponse) return authResponse
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
@@ -167,47 +115,31 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+    const context = await resolveTenantAuth(request)
+    const { supabase, ministryId } = context
+    const accessibleMemberIds = await getAccessibleMemberIds(context)
 
-    const supabase = createServerClientFromRequest(request)
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const ministryId = await resolveMinistryId(supabase, user.id)
-    if (!ministryId) {
-      return NextResponse.json(
-        { error: 'Usuário sem ministério associado', code: 'NO_MINISTRY' },
-        { status: 403 }
-      )
-    }
-
-    const { error } = await supabase
+    let query = supabase
       .from('employees')
       .delete()
       .eq('id', id)
       .eq('ministry_id', ministryId)
 
+    query = applyEmployeeMemberScope(query, accessibleMemberIds)
+    const { error } = await query
+
     if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     return NextResponse.json(
-      { message: 'Funcionário deletado com sucesso' },
+      { message: 'Funcionario deletado com sucesso' },
       { status: 200 }
     )
   } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
+    const authResponse = authTenantErrorResponse(error)
+    if (authResponse) return authResponse
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
@@ -217,6 +149,9 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
+    const context = await resolveTenantAuth(request)
+    const { supabase, ministryId } = context
+
     const body = await request.json()
     const normalizedBody = normalizePayloadToUppercase(body, {
       preserveKeys: ['data_admissao', 'email', 'member_id'],
@@ -226,53 +161,53 @@ export async function PATCH(
       normalizedBody.email = normalizedBody.email.toLowerCase().trim() || undefined
     }
 
-    const supabase = createServerClientFromRequest(request)
+    const accessibleMemberIds = await getAccessibleMemberIds(context)
+    if (accessibleMemberIds !== null) {
+      const targetMemberId = normalizedBody.member_id
+        ? String(normalizedBody.member_id)
+        : await resolveCurrentEmployeeMemberId(supabase, ministryId, id)
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      if (!targetMemberId || !accessibleMemberIds.includes(targetMemberId)) {
+        return forbiddenResponse()
+      }
     }
 
-    const ministryId = await resolveMinistryId(supabase, user.id)
-    if (!ministryId) {
-      return NextResponse.json(
-        { error: 'Usuário sem ministério associado', code: 'NO_MINISTRY' },
-        { status: 403 }
-      )
-    }
-
-    const { data, error } = await supabase
+    let query = supabase
       .from('employees')
       .update(normalizedBody)
       .eq('id', id)
       .eq('ministry_id', ministryId)
       .select()
 
+    query = applyEmployeeMemberScope(query, accessibleMemberIds)
+    const { data, error } = await query
+
     if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     if (!data || data.length === 0) {
-      return NextResponse.json(
-        { error: 'Nenhuma linha atualizada' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Nenhuma linha atualizada' }, { status: 404 })
     }
 
     return NextResponse.json(
-      { data, message: 'Funcionário atualizado com sucesso' },
+      { data, message: 'Funcionario atualizado com sucesso' },
       { status: 200 }
     )
   } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
+    const authResponse = authTenantErrorResponse(error)
+    if (authResponse) return authResponse
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
+}
+
+async function resolveCurrentEmployeeMemberId(supabase: any, ministryId: string, employeeId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('employees')
+    .select('member_id')
+    .eq('id', employeeId)
+    .eq('ministry_id', ministryId)
+    .maybeSingle()
+
+  return data?.member_id ? String(data.member_id) : null
 }

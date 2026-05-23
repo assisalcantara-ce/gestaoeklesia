@@ -5,7 +5,7 @@ import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
-import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
@@ -291,7 +291,7 @@ function imprimirFichaPatrimonio(opts: {
 // ─── Página ────────────────────────────────────────────────────────────────────
 
 export default function PatrimonioPage() {
-  const { loading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('patrimonio');
   const supabase = useMemo(() => createClient(), []);
 
   const [activeTab, setActiveTab] = useState('inventario');
@@ -380,7 +380,7 @@ export default function PatrimonioPage() {
   };
 
   useEffect(() => {
-    if (loading) return;
+    if (ctx.loading || bloqueado) return;
     const run = async () => {
       setLoadingData(true);
       const mid = await resolveMinistryId(supabase);
@@ -396,7 +396,7 @@ export default function PatrimonioPage() {
     };
     run();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [ctx.loading, bloqueado]);
 
   const handleSubmit = async () => {
     if (!ministryId || !validate()) return;
@@ -514,7 +514,8 @@ export default function PatrimonioPage() {
 
   const totalValorFiltrado = itensFiltrados.reduce((acc, i) => acc + (i.valor_aquisicao || 0), 0);
 
-  if (loading || loadingData) return <div className="p-8">Carregando...</div>;
+  if (ctx.loading || loadingData) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
 
   return (
     <PageLayout title="Patrimônio" description="Gestão de bens das congregações e campos" activeMenu="patrimonio">

@@ -4,13 +4,14 @@ import { useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
-import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
 
 export default function DesligamentoPage() {
-  const { loading } = useRequireSupabaseAuth();
+  const { ctx, bloqueado } = useRequireModulo('secretaria');
   const [activeTab, setActiveTab] = useState('pendentes');
 
-  if (loading) return <div className="p-8">Carregando...</div>;
+  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (bloqueado) return null;
 
   const tabs = [
     { id: 'pendentes', label: 'Pendentes', icon: '⏳' },

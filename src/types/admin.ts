@@ -74,6 +74,7 @@ export interface Payment {
 export interface SupportTicket {
   id: string;
   ministry_id: string;
+  ministry_name?: string | null;
   user_id?: string;
   ticket_number: string;
   subject: string;

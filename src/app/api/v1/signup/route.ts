@@ -255,18 +255,18 @@ export async function POST(request: NextRequest) {
     const trialExpiresAt = new Date()
     trialExpiresAt.setDate(trialExpiresAt.getDate() + 7)
 
-    // Busca slugs ativos no banco para validar o plano enviado
+    // Busca planos ativos para validar o plano enviado e obter o ID
     const { data: planosValidos } = await supabaseAdmin
       .from('subscription_plans')
-      .select('slug')
+      .select('id, slug')
       .eq('is_active', true)
-    const slugsValidos = new Set(
-      (planosValidos || []).map((p: any) => (p.slug as string)?.toLowerCase()).filter(Boolean)
-    )
+    const planosList = (planosValidos || []) as { id: string; slug: string }[]
+    const slugsValidos = new Set(planosList.map((p) => p.slug?.toLowerCase()).filter(Boolean))
     const planLower = typeof plan === 'string' ? plan.toLowerCase() : ''
     const planValue = slugsValidos.has(planLower)
       ? planLower
       : (slugsValidos.size > 0 ? [...slugsValidos][0] : 'basic')
+    const planRow = planosList.find((p) => p.slug?.toLowerCase() === planValue) || null
 
     // Salvar pré-cadastro na tabela pre_registrations
     const { data: prescadastro, error: prescadastroError } = await supabaseClient
@@ -321,6 +321,98 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // =========================================================
+    // Criar ministério + vínculo do usuário para acesso imediato
+    // =========================================================
+    const buildSlug = (base: string, suffix?: string) => {
+      const slugBase = String(base || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+        .slice(0, 70)
+      return (slugBase || 'ministerio') + (suffix ? `-${suffix}` : '')
+    }
+
+    // Garante unicidade do slug
+    let ministrySlug = buildSlug(ministryName)
+    const { data: slugConflict } = await supabaseAdmin
+      .from('ministries')
+      .select('id')
+      .eq('slug', ministrySlug)
+      .maybeSingle()
+    if (slugConflict) {
+      ministrySlug = buildSlug(ministryName, Date.now().toString().slice(-6))
+    }
+
+    const { data: ministry, error: ministryError } = await supabaseAdmin
+      .from('ministries')
+      .insert({
+        user_id: signUpData.user.id,
+        name: ministryName,
+        slug: ministrySlug,
+        email_admin: emailValue,
+        cnpj_cpf: cpfCnpj || null,
+        phone: phoneValue,
+        whatsapp: whatsappNumber || null,
+        website: websiteValue,
+        responsible_name: responsibleName,
+        description: descriptionValue,
+        address_street: addressStreet,
+        address_number: addressNumber,
+        address_complement: addressComplement,
+        address_city: addressCity,
+        address_state: addressState,
+        address_zip: addressZip,
+        plan: planValue,
+        subscription_plan_id: planRow?.id || null,
+        subscription_status: 'trial',
+        subscription_start_date: new Date().toISOString(),
+        subscription_end_date: trialExpiresAt.toISOString(),
+        is_active: true,
+      })
+      .select('id')
+      .single()
+
+    if (ministryError || !ministry) {
+      console.error('[SIGNUP] Erro ao criar ministério — executando rollback:', ministryError)
+      try { await supabaseAdmin.from('pre_registrations').delete().eq('id', prescadastro.id) } catch { /* best-effort */ }
+      try { await supabaseAdmin.auth.admin.deleteUser(signUpData.user.id) } catch { /* best-effort */ }
+      return NextResponse.json(
+        { error: 'Erro ao configurar o ministério. Tente novamente.' },
+        { status: 400 }
+      )
+    }
+
+    const { error: muError } = await supabaseAdmin
+      .from('ministry_users')
+      .insert({
+        ministry_id: ministry.id,
+        user_id: signUpData.user.id,
+        role: 'admin',
+        permissions: ['ADMINISTRADOR'],
+        is_active: true,
+      })
+
+    if (muError) {
+      console.error('[SIGNUP] Erro ao criar ministry_users — executando rollback:', muError)
+      try { await supabaseAdmin.from('ministries').delete().eq('id', ministry.id) } catch { /* best-effort */ }
+      try { await supabaseAdmin.from('pre_registrations').delete().eq('id', prescadastro.id) } catch { /* best-effort */ }
+      try { await supabaseAdmin.auth.admin.deleteUser(signUpData.user.id) } catch { /* best-effort */ }
+      return NextResponse.json(
+        { error: 'Erro ao configurar permissões. Tente novamente.' },
+        { status: 400 }
+      )
+    }
+
+    console.log('[SIGNUP] ✅ Ministério e vínculo criados:', {
+      ministry_id: ministry.id,
+      slug: ministrySlug,
+      subscription_status: 'trial',
+      subscription_end_date: trialExpiresAt.toISOString(),
+    })
 
     // Criar notificação para o admin
     const { error: notificationError } = await supabaseClient

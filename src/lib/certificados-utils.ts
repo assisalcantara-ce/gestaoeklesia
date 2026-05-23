@@ -1,9 +1,11 @@
-export type CertificadoCategoria = 'ministerial' | 'apresentacao-criancas' | 'batismo-aguas' | 'ebd';
+export type CertificadoCategoria = 'ministerial' | 'apresentacao-criancas' | 'batismo-aguas' | 'ebd' | 'casamento' | 'consagracao-obreiro';
 
 export const CERTIFICADO_CATEGORIAS: Array<{ value: CertificadoCategoria; label: string }> = [
   { value: 'ministerial', label: 'Ministerial' },
+  { value: 'consagracao-obreiro', label: 'Consagração de Obreiro' },
   { value: 'apresentacao-criancas', label: 'Apresentacao de Criancas' },
   { value: 'batismo-aguas', label: 'Batismo nas Aguas' },
+  { value: 'casamento', label: 'Casamento' },
   { value: 'ebd', label: 'EBD — Escola Bíblica Dominical' },
 ];
 
@@ -40,6 +42,26 @@ const CERTIFICADO_PLACEHOLDERS_POR_CATEGORIA: Record<CertificadoCategoria, Array
     { campo: 'pastor_nome', placeholder: '{pastor_nome}', label: 'Nome do Pastor' },
     { campo: 'data_emissao', placeholder: '{data_emissao}', label: 'Data de Emissao' },
     { campo: 'nome_igreja', placeholder: '{nome_igreja}', label: 'Nome da Igreja' },
+  ],
+  'casamento': [
+    { campo: 'conjuge1_nome', placeholder: '{conjuge1_nome}', label: 'Nome do Cônjuge 1' },
+    { campo: 'conjuge2_nome', placeholder: '{conjuge2_nome}', label: 'Nome do Cônjuge 2' },
+    { campo: 'conjuge1_data_nascimento', placeholder: '{conjuge1_data_nascimento}', label: 'Data de Nascimento (Cônjuge 1)' },
+    { campo: 'conjuge2_data_nascimento', placeholder: '{conjuge2_data_nascimento}', label: 'Data de Nascimento (Cônjuge 2)' },
+    { campo: 'data_casamento', placeholder: '{data_casamento}', label: 'Data do Casamento' },
+    { campo: 'local_casamento', placeholder: '{local_casamento}', label: 'Local do Casamento' },
+    { campo: 'tipo_casamento', placeholder: '{tipo_casamento}', label: 'Tipo de Casamento' },
+    { campo: 'pastor_nome', placeholder: '{pastor_nome}', label: 'Pastor Celebrante' },
+    { campo: 'data_emissao', placeholder: '{data_emissao}', label: 'Data de Emissao' },
+    { campo: 'nome_igreja', placeholder: '{nome_igreja}', label: 'Nome da Igreja' },
+  ],
+  'consagracao-obreiro': [
+    { campo: 'obreiro_nome',      placeholder: '{obreiro_nome}',      label: 'Nome do Obreiro' },
+    { campo: 'cargo',             placeholder: '{cargo}',             label: 'Cargo (Diácono, Presústero...)' },
+    { campo: 'data_consagracao',  placeholder: '{data_consagracao}',  label: 'Data de Consagração' },
+    { campo: 'nome_igreja',       placeholder: '{nome_igreja}',       label: 'Nome da Igreja' },
+    { campo: 'pastor_nome',       placeholder: '{pastor_nome}',       label: 'Pastor Presidente' },
+    { campo: 'data_emissao',      placeholder: '{data_emissao}',      label: 'Data de Emissão' },
   ],
   ebd: [
     { campo: 'aluno_nome',            placeholder: '{aluno_nome}',            label: 'Nome do Aluno' },
@@ -91,9 +113,10 @@ export function substituirPlaceholdersCertificado(
 
   const placeholders = getCertificadoPlaceholders(categoria);
   placeholders.forEach((ph) => {
-    const regex = new RegExp(ph.placeholder.replace(/[{}]/g, '\\$&'), 'g');
-    const valor = base[ph.campo] ?? '';
-    resultado = resultado.replace(regex, String(valor));
+    // 'gi' para aceitar {Trimestre}, {TRIMESTRE}, {trimestre} etc.
+    const regex = new RegExp(ph.placeholder.replace(/[{}]/g, '\\$&'), 'gi');
+    const valor = String(base[ph.campo] ?? '').toUpperCase();
+    resultado = resultado.replace(regex, valor);
   });
 
   return resultado;
