@@ -9,7 +9,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
-import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, Printer, Users, CalendarDays, Lock, Unlock, CheckCircle, Search, Download } from 'lucide-react';
+import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, Printer, Users, CalendarDays, Lock, Unlock, CheckCircle, Search, Download, CreditCard, List, Star, AlertCircle } from 'lucide-react';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import type { ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
@@ -52,7 +52,7 @@ interface Lancamento {
 type TipoRecebimento = 'oferta' | 'dizimo' | 'evento' | 'campanha' | 'contribuicao' | 'outros' | 'missoes';
 type FormaPagamento  = 'dinheiro' | 'pix' | 'cartao' | 'transferencia' | 'cheque';
 type TipoMovimento  = 'entrada' | 'saida';
-type Aba = 'dashboard' | 'lancamentos' | 'caixa' | 'relatorio' | 'dizimistas';
+type Aba = 'dashboard' | 'lancamentos' | 'caixa' | 'relatorio' | 'dizimistas' | 'contas' | 'categorias';
 
 const TIPOS_SAIDA: { value: string; label: string; cor: string }[] = [
   { value: 'aluguel',         label: 'Aluguel',              cor: 'bg-red-100 text-red-800'     },
@@ -133,7 +133,7 @@ function exportarCSV(linhas: Lancamento[], nomeArquivo: string) {
       ? (TIPOS_SAIDA.find(t => t.value === l.tipo_recebimento)?.label ?? l.tipo_recebimento)
       : tipoLabel(l.tipo_recebimento),
     l.congregacao_nome ?? 'Caixa Geral (Sede)',
-    l.departamento_nome ?? '—',
+    l.departamento_nome ?? 'Caixa da Igreja',
     l.descricao ?? '',
     l.referencia ?? '',
     l.forma_pagamento,
@@ -243,6 +243,78 @@ interface FinCategoria {
   icone: string | null;
 }
 
+// Full interfaces for CRUD tabs
+interface FinContaFull {
+  id: string;
+  ministry_id: string;
+  congregacao_id: string | null;
+  nome: string;
+  tipo: 'caixa' | 'conta_corrente' | 'poupanca' | 'pix' | 'fundo' | 'outro';
+  banco: string | null;
+  agencia: string | null;
+  conta: string | null;
+  chave_pix: string | null;
+  saldo_inicial: number;
+  is_ativa: boolean;
+  is_padrao: boolean;
+  created_at: string;
+}
+
+interface FinCategoriaFull {
+  id: string;
+  ministry_id: string | null;
+  nome: string;
+  tipo_movimento: 'entrada' | 'saida' | 'ambos';
+  codigo: string | null;
+  categoria_pai_id: string | null;
+  cor: string | null;
+  icone: string | null;
+  is_sistema: boolean;
+  is_ativa: boolean;
+  modulo_origem: string | null;
+}
+
+type FormConta = {
+  nome: string;
+  tipo: 'caixa' | 'conta_corrente' | 'poupanca' | 'pix' | 'fundo' | 'outro';
+  banco: string;
+  agencia: string;
+  conta: string;
+  chave_pix: string;
+  saldo_inicial: string;
+  congregacao_id: string;
+  is_padrao: boolean;
+  is_ativa: boolean;
+};
+
+const emptyFormConta = (): FormConta => ({
+  nome: '', tipo: 'caixa', banco: '', agencia: '', conta: '',
+  chave_pix: '', saldo_inicial: '0', congregacao_id: '', is_padrao: false, is_ativa: true,
+});
+
+type FormCat = {
+  nome: string;
+  tipo_movimento: 'entrada' | 'saida' | 'ambos';
+  codigo: string;
+  cor: string;
+  icone: string;
+  categoria_pai_id: string;
+  is_ativa: boolean;
+};
+
+const emptyFormCat = (): FormCat => ({
+  nome: '', tipo_movimento: 'entrada', codigo: '', cor: '#6b7280', icone: '', categoria_pai_id: '', is_ativa: true,
+});
+
+const TIPOS_CONTA = [
+  { value: 'caixa',          label: 'Caixa Físico'   },
+  { value: 'conta_corrente', label: 'Conta Corrente' },
+  { value: 'poupanca',       label: 'Poupança'       },
+  { value: 'pix',            label: 'Chave PIX'      },
+  { value: 'fundo',          label: 'Fundo'          },
+  { value: 'outro',          label: 'Outro'          },
+];
+
 // ─── Role helpers ─────────────────────────────────────────────────────────────
 
 interface UserScope {
@@ -298,6 +370,25 @@ export default function TesourariaPage() {
   const [relCong,          setRelCong]          = useState('');
   const [relMostrarDet,    setRelMostrarDet]    = useState(false);
   const [relTipoRel,       setRelTipoRel]       = useState<'entradas' | 'saidas' | 'ambos'>('entradas');
+
+  // ── Contas (CRUD) ──────────────────────────────────────────────────────────
+  const [contasFull,      setContasFull]      = useState<FinContaFull[]>([]);
+  const [loadingContas,   setLoadingContas]   = useState(false);
+  const [showContaModal,  setShowContaModal]  = useState(false);
+  const [contaEditId,     setContaEditId]     = useState<string | null>(null);
+  const [formConta,       setFormConta]       = useState<FormConta>(emptyFormConta());
+  const [savingConta,     setSavingConta]     = useState(false);
+  const [confirmDelConta, setConfirmDelConta] = useState<string | null>(null);
+
+  // ── Categorias (CRUD) ──────────────────────────────────────────────────────
+  const [categoriasFull,  setCategoriasFull]  = useState<FinCategoriaFull[]>([]);
+  const [loadingCats,     setLoadingCats]     = useState(false);
+  const [showCatModal,    setShowCatModal]    = useState(false);
+  const [catEditId,       setCatEditId]       = useState<string | null>(null);
+  const [formCat,         setFormCat]         = useState<FormCat>(emptyFormCat());
+  const [savingCat,       setSavingCat]       = useState(false);
+  const [confirmDelCat,   setConfirmDelCat]   = useState<string | null>(null);
+  const [filtroCatTipo,   setFiltroCatTipo]   = useState<'' | 'entrada' | 'saida' | 'ambos'>('');
 
   // Formulário
   const [showForm,  setShowForm]  = useState(false);
@@ -433,7 +524,7 @@ export default function TesourariaPage() {
         ...l,
         tipo_movimento:    (l as any).tipo_movimento ?? 'entrada',
         congregacao_nome:  l.congregacao_id  ? (congMap.get(l.congregacao_id)  ?? 'Sede') : 'Caixa Geral (Sede)',
-        departamento_nome: l.departamento_id ? (depMap.get(l.departamento_id)  ?? '—')    : '—',
+        departamento_nome: l.departamento_id ? (depMap.get(l.departamento_id)  ?? '—')    : 'Caixa da Igreja',
       })));
     }
 
@@ -607,7 +698,7 @@ export default function TesourariaPage() {
       ...l,
       tipo_movimento:    (l as unknown as { tipo_movimento?: string }).tipo_movimento as TipoMovimento ?? 'entrada',
       congregacao_nome:  l.congregacao_id  ? (congMap.get(l.congregacao_id)  ?? 'Sede') : 'Caixa Geral (Sede)',
-      departamento_nome: l.departamento_id ? (depMap.get(l.departamento_id)  ?? '—')    : '—',
+      departamento_nome: l.departamento_id ? (depMap.get(l.departamento_id)  ?? '—')    : 'Caixa da Igreja',
     })));
     setLoadingMes(false);
   }, [ministryId, supabase, scope, congregacoes, departamentos]);
@@ -648,7 +739,7 @@ export default function TesourariaPage() {
       ...l,
       tipo_movimento:    (l as unknown as { tipo_movimento?: string }).tipo_movimento as TipoMovimento ?? 'entrada',
       congregacao_nome:  l.congregacao_id  ? (congMap.get(l.congregacao_id)  ?? 'Sede') : 'Caixa Geral (Sede)',
-      departamento_nome: l.departamento_id ? (depMap.get(l.departamento_id)  ?? '—')    : '—',
+      departamento_nome: l.departamento_id ? (depMap.get(l.departamento_id)  ?? '—')    : 'Caixa da Igreja',
     })));
     setRelLoadingDB(false);
   }, [ministryId, supabase, scope, congregacoes, departamentos]);
@@ -657,6 +748,159 @@ export default function TesourariaPage() {
     if (!ministryId || loadingData || aba !== 'relatorio') return;
     carregarRelatorio(relMes, relCong);
   }, [relMes, relCong, aba, ministryId, loadingData, carregarRelatorio]);
+
+  // ── Contas: carregar lista completa ──────────────────────────────────────────
+
+  const carregarContasFull = useCallback(async () => {
+    if (!ministryId) return;
+    setLoadingContas(true);
+    const { data } = await supabase
+      .from('fin_contas')
+      .select('*')
+      .eq('ministry_id', ministryId)
+      .order('is_padrao', { ascending: false })
+      .order('nome');
+    setContasFull((data as FinContaFull[]) || []);
+    setLoadingContas(false);
+  }, [ministryId, supabase]);
+
+  useEffect(() => {
+    if (aba === 'contas' && ministryId && !loadingData) carregarContasFull();
+  }, [aba, ministryId, loadingData, carregarContasFull]);
+
+  // ── Categorias: carregar lista completa ──────────────────────────────────────
+
+  const carregarCategoriasFull = useCallback(async () => {
+    if (!ministryId) return;
+    setLoadingCats(true);
+    const { data } = await supabase
+      .from('fin_categorias')
+      .select('*')
+      .or(`ministry_id.is.null,ministry_id.eq.${ministryId}`)
+      .order('codigo', { ascending: true })
+      .order('nome', { ascending: true });
+    setCategoriasFull((data as FinCategoriaFull[]) || []);
+    setLoadingCats(false);
+  }, [ministryId, supabase]);
+
+  useEffect(() => {
+    if (aba === 'categorias' && ministryId && !loadingData) carregarCategoriasFull();
+  }, [aba, ministryId, loadingData, carregarCategoriasFull]);
+
+  // ── Contas: CRUD handlers ─────────────────────────────────────────────────
+
+  const handleSaveConta = async () => {
+    if (!ministryId) return;
+    if (!formConta.nome.trim()) { showModal('Campo obrigatório', 'Informe o nome da conta.', 'error'); return; }
+    setSavingConta(true);
+    const saldoNum = parseFloat(formConta.saldo_inicial.replace(',', '.')) || 0;
+    const now = new Date().toISOString();
+    const payload = {
+      ministry_id:    ministryId,
+      congregacao_id: formConta.congregacao_id || null,
+      nome:           formConta.nome.trim(),
+      tipo:           formConta.tipo,
+      banco:          formConta.banco.trim()     || null,
+      agencia:        formConta.agencia.trim()   || null,
+      conta:          formConta.conta.trim()     || null,
+      chave_pix:      formConta.chave_pix.trim() || null,
+      saldo_inicial:  saldoNum,
+      is_ativa:       formConta.is_ativa,
+      is_padrao:      formConta.is_padrao,
+      updated_at:     now,
+    };
+    const res = contaEditId
+      ? await supabase.from('fin_contas').update(payload).eq('id', contaEditId)
+      : await supabase.from('fin_contas').insert({ ...payload, created_at: now });
+    setSavingConta(false);
+    if (res.error) { showModal('Erro', res.error.message, 'error'); return; }
+    showModal(contaEditId ? 'Atualizado!' : 'Criada!', `Conta "${formConta.nome}" salva.`);
+    setShowContaModal(false);
+    setContaEditId(null);
+    setFormConta(emptyFormConta());
+    carregarContasFull();
+    load();
+  };
+
+  const handleDeleteConta = async (id: string) => {
+    const { error } = await supabase.from('fin_contas').delete().eq('id', id);
+    if (error) { showModal('Erro', error.message, 'error'); return; }
+    setConfirmDelConta(null);
+    showModal('Excluída!', 'Conta removida.');
+    carregarContasFull();
+    load();
+  };
+
+  const handleToggleContaAtiva = async (c: FinContaFull) => {
+    const { error } = await supabase.from('fin_contas')
+      .update({ is_ativa: !c.is_ativa, updated_at: new Date().toISOString() }).eq('id', c.id);
+    if (error) { showModal('Erro', error.message, 'error'); return; }
+    carregarContasFull();
+    load();
+  };
+
+  const handleSetContaPadrao = async (c: FinContaFull) => {
+    if (c.is_padrao) return;
+    const now = new Date().toISOString();
+    const atual = contasFull.find(x => x.is_padrao);
+    if (atual) {
+      await supabase.from('fin_contas').update({ is_padrao: false, updated_at: now }).eq('id', atual.id);
+    }
+    const { error } = await supabase.from('fin_contas').update({ is_padrao: true, updated_at: now }).eq('id', c.id);
+    if (error) { showModal('Erro', error.message, 'error'); return; }
+    showModal('Conta padrão definida!', `"${c.nome}" agora é a conta padrão.`);
+    carregarContasFull();
+    load();
+  };
+
+  // ── Categorias: CRUD handlers ─────────────────────────────────────────────
+
+  const handleSaveCat = async () => {
+    if (!ministryId) return;
+    if (!formCat.nome.trim()) { showModal('Campo obrigatório', 'Informe o nome da categoria.', 'error'); return; }
+    setSavingCat(true);
+    const now = new Date().toISOString();
+    const payload = {
+      ministry_id:      ministryId,
+      nome:             formCat.nome.trim(),
+      tipo_movimento:   formCat.tipo_movimento,
+      codigo:           formCat.codigo.trim()          || null,
+      cor:              formCat.cor                    || null,
+      icone:            formCat.icone.trim()           || null,
+      categoria_pai_id: formCat.categoria_pai_id       || null,
+      is_ativa:         formCat.is_ativa,
+      is_sistema:       false,
+      updated_at:       now,
+    };
+    const res = catEditId
+      ? await supabase.from('fin_categorias').update(payload).eq('id', catEditId)
+      : await supabase.from('fin_categorias').insert({ ...payload, created_at: now });
+    setSavingCat(false);
+    if (res.error) { showModal('Erro', res.error.message, 'error'); return; }
+    showModal(catEditId ? 'Atualizada!' : 'Criada!', `Categoria "${formCat.nome}" salva.`);
+    setShowCatModal(false);
+    setCatEditId(null);
+    setFormCat(emptyFormCat());
+    carregarCategoriasFull();
+    load();
+  };
+
+  const handleDeleteCat = async (id: string) => {
+    const { error } = await supabase.from('fin_categorias').delete().eq('id', id);
+    if (error) { showModal('Erro', error.message, 'error'); return; }
+    setConfirmDelCat(null);
+    showModal('Excluída!', 'Categoria removida.');
+    carregarCategoriasFull();
+    load();
+  };
+
+  const handleToggleCatAtiva = async (c: FinCategoriaFull) => {
+    const { error } = await supabase.from('fin_categorias')
+      .update({ is_ativa: !c.is_ativa, updated_at: new Date().toISOString() }).eq('id', c.id);
+    if (error) { showModal('Erro', error.message, 'error'); return; }
+    carregarCategoriasFull();
+    load();
+  };
 
   // ── Salvar ────────────────────────────────────────────────────────────────
 
@@ -1022,6 +1266,8 @@ export default function TesourariaPage() {
           { id: 'caixa',       icon: <CalendarDays className="h-4 w-4" />,  label: 'Caixa Mensal'  },
           { id: 'relatorio',   icon: <Printer className="h-4 w-4" />,       label: 'Relatório'     },
           { id: 'dizimistas',  icon: <Users className="h-4 w-4" />,         label: 'Dizimistas'    },
+          { id: 'contas',      icon: <CreditCard className="h-4 w-4" />,    label: 'Contas'        },
+          { id: 'categorias',  icon: <List className="h-4 w-4" />,          label: 'Categorias'    },
         ] as const).map(t => (
           <button
             key={t.id}
@@ -1544,10 +1790,15 @@ export default function TesourariaPage() {
                   </select>
                 </div>
 
-                {/* Conta / Caixa (opcional — visível apenas quando há contas cadastradas) */}
-                {finContas.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Conta / Caixa</label>
+                {/* Conta / Caixa */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Conta / Caixa</label>
+                  {finContas.length === 0 ? (
+                    <div className="w-full border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-400 flex items-center justify-between gap-2">
+                      <span>Nenhuma conta cadastrada.</span>
+                      <button type="button" onClick={() => { setShowForm(false); setAba('contas'); }} className="text-[#123b63] font-semibold hover:underline whitespace-nowrap">+ Cadastrar</button>
+                    </div>
+                  ) : (
                     <select
                       value={form.conta_id}
                       onChange={e => setForm(p => ({ ...p, conta_id: e.target.value }))}
@@ -1555,18 +1806,21 @@ export default function TesourariaPage() {
                     >
                       <option value="">Padrão do ministério</option>
                       {finContas.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.nome}{c.is_padrao ? ' ★' : ''}
-                        </option>
+                        <option key={c.id} value={c.id}>{c.nome}{c.is_padrao ? ' ★' : ''}</option>
                       ))}
                     </select>
-                  </div>
-                )}
+                  )}
+                </div>
 
-                {/* Categoria financeira (opcional — visível apenas quando há categorias) */}
-                {finCategorias.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria financeira</label>
+                {/* Categoria financeira */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria financeira</label>
+                  {finCategorias.length === 0 ? (
+                    <div className="w-full border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-400 flex items-center justify-between gap-2">
+                      <span>Sem categorias disponíveis.</span>
+                      <button type="button" onClick={() => { setShowForm(false); setAba('categorias'); }} className="text-[#123b63] font-semibold hover:underline whitespace-nowrap">Configurar</button>
+                    </div>
+                  ) : (
                     <select
                       value={form.categoria_id}
                       onChange={e => setForm(p => ({ ...p, categoria_id: e.target.value }))}
@@ -1581,8 +1835,8 @@ export default function TesourariaPage() {
                           </option>
                         ))}
                     </select>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Referência */}
                 <div>
@@ -2371,6 +2625,606 @@ export default function TesourariaPage() {
               Impresso em: {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          ABA: CONTAS
+      ══════════════════════════════════════════════════════════════════════ */}
+      {aba === 'contas' && (
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="flex flex-wrap gap-3 items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-[#123b63]">Contas e Caixas</h2>
+              <p className="text-sm text-gray-500">Gerencie caixas físicos, contas bancárias e fundos do ministério.</p>
+            </div>
+            {scope.canDelete && (
+              <button
+                onClick={() => { setFormConta(emptyFormConta()); setContaEditId(null); setShowContaModal(true); }}
+                className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition"
+              >
+                <Plus className="h-4 w-4" /> Nova Conta
+              </button>
+            )}
+          </div>
+
+          {/* Alerta quando sem contas */}
+          {!loadingContas && contasFull.length === 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
+              <AlertCircle className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-blue-800">Nenhuma conta cadastrada</p>
+                <p className="text-xs text-blue-600 mt-0.5">
+                  Cadastre caixas e contas bancárias para que apareçam nos formulários de lançamento.
+                  {!scope.canDelete && ' Entre em contato com o Administrador ou Financeiro para cadastrar.'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Lista */}
+          {loadingContas ? (
+            <p className="text-center text-gray-400 py-12">Carregando...</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {contasFull.map(c => (
+                <div
+                  key={c.id}
+                  className={`bg-white rounded-2xl border-2 p-4 shadow-sm transition ${
+                    c.is_padrao ? 'border-[#123b63]' : c.is_ativa ? 'border-slate-200' : 'border-slate-100 opacity-60'
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {c.is_padrao && <Star className="h-3.5 w-3.5 text-amber-500 shrink-0 fill-amber-500" />}
+                        <span className="font-bold text-gray-800 text-sm truncate">{c.nome}</span>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${
+                        c.tipo === 'caixa'          ? 'bg-green-100 text-green-700' :
+                        c.tipo === 'conta_corrente' ? 'bg-blue-100 text-blue-700' :
+                        c.tipo === 'poupanca'       ? 'bg-teal-100 text-teal-700' :
+                        c.tipo === 'pix'            ? 'bg-purple-100 text-purple-700' :
+                        c.tipo === 'fundo'          ? 'bg-orange-100 text-orange-700' :
+                                                     'bg-gray-100 text-gray-600'
+                      }`}>
+                        {TIPOS_CONTA.find(t => t.value === c.tipo)?.label ?? c.tipo}
+                      </span>
+                    </div>
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full shrink-0 ml-2 ${
+                      c.is_ativa ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {c.is_ativa ? 'Ativa' : 'Inativa'}
+                    </span>
+                  </div>
+
+                  <div className="text-xs text-gray-500 space-y-0.5 mb-3">
+                    {c.congregacao_id && (
+                      <p>📍 {congregacoes.find(x => x.id === c.congregacao_id)?.nome ?? '—'}</p>
+                    )}
+                    {c.banco && <p>🏦 {c.banco}{c.agencia ? ` / Ag. ${c.agencia}` : ''}{c.conta ? ` / C. ${c.conta}` : ''}</p>}
+                    {c.chave_pix && <p>⚡ PIX: {c.chave_pix}</p>}
+                    <p>Saldo inicial: <span className="font-semibold text-gray-700">{fmtBRL(Number(c.saldo_inicial))}</span></p>
+                  </div>
+
+                  {scope.canDelete && (
+                    <div className="flex flex-wrap gap-1.5 border-t border-gray-100 pt-3">
+                      <button
+                        onClick={() => {
+                          setFormConta({
+                            nome: c.nome, tipo: c.tipo, banco: c.banco ?? '', agencia: c.agencia ?? '',
+                            conta: c.conta ?? '', chave_pix: c.chave_pix ?? '',
+                            saldo_inicial: String(c.saldo_inicial),
+                            congregacao_id: c.congregacao_id ?? '',
+                            is_padrao: c.is_padrao, is_ativa: c.is_ativa,
+                          });
+                          setContaEditId(c.id);
+                          setShowContaModal(true);
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
+                      >
+                        <Pencil className="h-3 w-3" /> Editar
+                      </button>
+                      {!c.is_padrao && (
+                        <button
+                          onClick={() => handleSetContaPadrao(c)}
+                          className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition"
+                        >
+                          <Star className="h-3 w-3" /> Padrão
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleToggleContaAtiva(c)}
+                        className={`px-2 py-1 text-xs rounded-lg transition ${
+                          c.is_ativa
+                            ? 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                            : 'bg-green-50 text-green-700 hover:bg-green-100'
+                        }`}
+                      >
+                        {c.is_ativa ? 'Desativar' : 'Ativar'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelConta(c.id)}
+                        className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition"
+                      >
+                        <Trash2 className="h-3 w-3" /> Excluir
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Modal: form de conta */}
+          {showContaModal && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 w-full max-w-lg space-y-4 overflow-y-auto max-h-[90vh]">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-base font-bold text-[#123b63]">{contaEditId ? 'Editar Conta' : 'Nova Conta / Caixa'}</h3>
+                  <button onClick={() => { setShowContaModal(false); setContaEditId(null); setFormConta(emptyFormConta()); }}>
+                    <X className="h-5 w-5 text-gray-400 hover:text-gray-700" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Nome <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Caixa Sede, Conta Bradesco..."
+                      value={formConta.nome}
+                      onChange={e => setFormConta(p => ({ ...p, nome: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Tipo</label>
+                    <select
+                      value={formConta.tipo}
+                      onChange={e => setFormConta(p => ({ ...p, tipo: e.target.value as FormConta['tipo'] }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    >
+                      {TIPOS_CONTA.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Congregação (opcional)</label>
+                    <select
+                      value={formConta.congregacao_id}
+                      onChange={e => setFormConta(p => ({ ...p, congregacao_id: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="">Sede / Ministério geral</option>
+                      {congregacoes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Banco</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Bradesco, Itaú..."
+                      value={formConta.banco}
+                      onChange={e => setFormConta(p => ({ ...p, banco: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Agência</label>
+                    <input
+                      type="text"
+                      placeholder="0000-0"
+                      value={formConta.agencia}
+                      onChange={e => setFormConta(p => ({ ...p, agencia: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Número da Conta</label>
+                    <input
+                      type="text"
+                      placeholder="00000-0"
+                      value={formConta.conta}
+                      onChange={e => setFormConta(p => ({ ...p, conta: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Chave PIX</label>
+                    <input
+                      type="text"
+                      placeholder="CNPJ, e-mail, telefone..."
+                      value={formConta.chave_pix}
+                      onChange={e => setFormConta(p => ({ ...p, chave_pix: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Saldo Inicial (R$)</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={formConta.saldo_inicial}
+                      onChange={e => setFormConta(p => ({ ...p, saldo_inicial: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="sm:col-span-2 flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={formConta.is_padrao}
+                        onChange={e => setFormConta(p => ({ ...p, is_padrao: e.target.checked }))}
+                        className="w-4 h-4 accent-[#123b63]"
+                      />
+                      <span className="text-sm text-gray-700">Conta padrão do ministério <span className="text-amber-500">★</span></span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={formConta.is_ativa}
+                        onChange={e => setFormConta(p => ({ ...p, is_ativa: e.target.checked }))}
+                        className="w-4 h-4 accent-[#123b63]"
+                      />
+                      <span className="text-sm text-gray-700">Conta ativa</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={handleSaveConta}
+                    disabled={savingConta}
+                    className="flex-1 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition disabled:opacity-50"
+                  >
+                    {savingConta ? 'Salvando...' : contaEditId ? 'Atualizar' : 'Criar Conta'}
+                  </button>
+                  <button
+                    onClick={() => { setShowContaModal(false); setContaEditId(null); setFormConta(emptyFormConta()); }}
+                    className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Confirm delete conta */}
+          {confirmDelConta && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
+                <h3 className="text-base font-bold text-gray-800 mb-2">Excluir Conta</h3>
+                <p className="text-sm text-gray-600 mb-1">Esta ação não pode ser desfeita.</p>
+                <p className="text-xs text-amber-600 mb-5">Lançamentos vinculados perderão a referência de conta (conta_id → NULL).</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleDeleteConta(confirmDelConta)}
+                    className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition"
+                  >
+                    Excluir
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelConta(null)}
+                    className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          ABA: CATEGORIAS
+      ══════════════════════════════════════════════════════════════════════ */}
+      {aba === 'categorias' && (
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="flex flex-wrap gap-3 items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-[#123b63]">Categorias Financeiras</h2>
+              <p className="text-sm text-gray-500">Categorias do sistema são somente leitura. Crie categorias personalizadas para seu ministério.</p>
+            </div>
+            {scope.canDelete && (
+              <button
+                onClick={() => { setFormCat(emptyFormCat()); setCatEditId(null); setShowCatModal(true); }}
+                className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition"
+              >
+                <Plus className="h-4 w-4" /> Nova Categoria
+              </button>
+            )}
+          </div>
+
+          {/* Filtro tipo */}
+          <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm flex flex-wrap gap-2 items-center">
+            <span className="text-xs font-semibold text-gray-500">Filtrar:</span>
+            {([
+              { v: '' as const,       label: 'Todos'      },
+              { v: 'entrada' as const, label: '↑ Entradas' },
+              { v: 'saida' as const,   label: '↓ Saídas'  },
+              { v: 'ambos' as const,   label: '⇅ Ambos'   },
+            ]).map(opt => (
+              <button
+                key={opt.v}
+                onClick={() => setFiltroCatTipo(opt.v)}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+                  filtroCatTipo === opt.v
+                    ? 'bg-[#123b63] text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {loadingCats ? (
+            <p className="text-center text-gray-400 py-12">Carregando...</p>
+          ) : (
+            <>
+              {/* Categorias do sistema */}
+              {(() => {
+                const sistemaFiltradas = categoriasFull.filter(c =>
+                  c.is_sistema && (!filtroCatTipo || c.tipo_movimento === filtroCatTipo || c.tipo_movimento === 'ambos')
+                );
+                if (sistemaFiltradas.length === 0) return null;
+                return (
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Categorias do Sistema (somente leitura)</h3>
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-gray-100">
+                      {sistemaFiltradas.map(c => (
+                        <div key={c.id} className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="w-6 text-center text-sm">{c.icone}</span>
+                          <span className="flex-1 text-sm text-gray-700">{c.nome}</span>
+                          {c.codigo && <span className="text-xs text-gray-400">{c.codigo}</span>}
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            c.tipo_movimento === 'entrada' ? 'bg-green-100 text-green-700' :
+                            c.tipo_movimento === 'saida'   ? 'bg-red-100 text-red-700' :
+                                                             'bg-gray-100 text-gray-600'
+                          }`}>
+                            {c.tipo_movimento === 'entrada' ? 'Entrada' : c.tipo_movimento === 'saida' ? 'Saída' : 'Ambos'}
+                          </span>
+                          {c.cor && <span className="w-3 h-3 rounded-full border border-gray-200 shrink-0" style={{ backgroundColor: c.cor }} />}
+                          <span className="text-xs text-gray-400 italic">Sistema</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Categorias personalizadas */}
+              {(() => {
+                const customFiltradas = categoriasFull.filter(c =>
+                  !c.is_sistema && (!filtroCatTipo || c.tipo_movimento === filtroCatTipo || c.tipo_movimento === 'ambos')
+                );
+                return (
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Categorias Personalizadas</h3>
+                    {customFiltradas.length === 0 ? (
+                      <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center">
+                        <p className="text-sm text-gray-400">Nenhuma categoria personalizada encontrada.</p>
+                        {scope.canDelete && (
+                          <button
+                            onClick={() => { setFormCat(emptyFormCat()); setCatEditId(null); setShowCatModal(true); }}
+                            className="mt-3 text-sm text-[#123b63] font-semibold hover:underline"
+                          >
+                            + Criar primeira categoria
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-gray-100">
+                        {customFiltradas.map(c => (
+                          <div key={c.id} className={`flex items-center gap-3 px-4 py-2.5 ${!c.is_ativa ? 'opacity-50' : ''}`}>
+                            <span className="w-6 text-center text-sm">{c.icone || '🏷️'}</span>
+                            <span className="flex-1 text-sm text-gray-700 font-medium">{c.nome}</span>
+                            {c.codigo && <span className="text-xs text-gray-400">{c.codigo}</span>}
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              c.tipo_movimento === 'entrada' ? 'bg-green-100 text-green-700' :
+                              c.tipo_movimento === 'saida'   ? 'bg-red-100 text-red-700' :
+                                                               'bg-gray-100 text-gray-600'
+                            }`}>
+                              {c.tipo_movimento === 'entrada' ? 'Entrada' : c.tipo_movimento === 'saida' ? 'Saída' : 'Ambos'}
+                            </span>
+                            {c.cor && <span className="w-3 h-3 rounded-full border border-gray-200 shrink-0" style={{ backgroundColor: c.cor }} />}
+                            <span className={`text-xs font-semibold ${c.is_ativa ? 'text-green-600' : 'text-gray-400'}`}>
+                              {c.is_ativa ? 'Ativa' : 'Inativa'}
+                            </span>
+                            {scope.canDelete && (
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => {
+                                    setFormCat({
+                                      nome: c.nome, tipo_movimento: c.tipo_movimento,
+                                      codigo: c.codigo ?? '', cor: c.cor ?? '#6b7280',
+                                      icone: c.icone ?? '', categoria_pai_id: c.categoria_pai_id ?? '',
+                                      is_ativa: c.is_ativa,
+                                    });
+                                    setCatEditId(c.id);
+                                    setShowCatModal(true);
+                                  }}
+                                  className="p-1 rounded hover:bg-blue-50 text-blue-600 transition"
+                                  title="Editar"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => handleToggleCatAtiva(c)}
+                                  className="p-1 rounded hover:bg-gray-100 text-gray-500 transition text-xs"
+                                  title={c.is_ativa ? 'Desativar' : 'Ativar'}
+                                >
+                                  {c.is_ativa ? '⊙' : '○'}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDelCat(c.id)}
+                                  className="p-1 rounded hover:bg-red-50 text-red-500 transition"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </>
+          )}
+
+          {/* Modal: form de categoria */}
+          {showCatModal && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 w-full max-w-md space-y-4 overflow-y-auto max-h-[90vh]">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-base font-bold text-[#123b63]">{catEditId ? 'Editar Categoria' : 'Nova Categoria'}</h3>
+                  <button onClick={() => { setShowCatModal(false); setCatEditId(null); setFormCat(emptyFormCat()); }}>
+                    <X className="h-5 w-5 text-gray-400 hover:text-gray-700" />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Nome <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Fundo Social, Construção..."
+                      value={formCat.nome}
+                      onChange={e => setFormCat(p => ({ ...p, nome: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Tipo de movimento</label>
+                    <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                      {([
+                        { v: 'entrada' as const, label: '↑ Entrada' },
+                        { v: 'saida' as const,   label: '↓ Saída'  },
+                        { v: 'ambos' as const,   label: '⇅ Ambos'  },
+                      ]).map(opt => (
+                        <button
+                          key={opt.v}
+                          type="button"
+                          onClick={() => setFormCat(p => ({ ...p, tipo_movimento: opt.v }))}
+                          className={`flex-1 py-2 text-sm font-medium transition ${
+                            formCat.tipo_movimento === opt.v ? 'bg-[#123b63] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Código (opcional)</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: 3.1"
+                        value={formCat.codigo}
+                        onChange={e => setFormCat(p => ({ ...p, codigo: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Ícone (emoji)</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: 🏠"
+                        value={formCat.icone}
+                        onChange={e => setFormCat(p => ({ ...p, icone: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Cor</label>
+                      <input
+                        type="color"
+                        value={formCat.cor}
+                        onChange={e => setFormCat(p => ({ ...p, cor: e.target.value }))}
+                        className="w-full h-9 border border-gray-200 rounded-lg px-1 py-1 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria pai (opcional)</label>
+                      <select
+                        value={formCat.categoria_pai_id}
+                        onChange={e => setFormCat(p => ({ ...p, categoria_pai_id: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="">Nenhuma</option>
+                        {categoriasFull
+                          .filter(c => c.id !== catEditId)
+                          .map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.icone ? `${c.icone} ` : ''}{c.nome}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={formCat.is_ativa}
+                      onChange={e => setFormCat(p => ({ ...p, is_ativa: e.target.checked }))}
+                      className="w-4 h-4 accent-[#123b63]"
+                    />
+                    <span className="text-sm text-gray-700">Categoria ativa</span>
+                  </label>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={handleSaveCat}
+                    disabled={savingCat}
+                    className="flex-1 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition disabled:opacity-50"
+                  >
+                    {savingCat ? 'Salvando...' : catEditId ? 'Atualizar' : 'Criar Categoria'}
+                  </button>
+                  <button
+                    onClick={() => { setShowCatModal(false); setCatEditId(null); setFormCat(emptyFormCat()); }}
+                    className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Confirm delete categoria */}
+          {confirmDelCat && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
+                <h3 className="text-base font-bold text-gray-800 mb-2">Excluir Categoria</h3>
+                <p className="text-sm text-gray-600 mb-1">Esta ação não pode ser desfeita.</p>
+                <p className="text-xs text-amber-600 mb-5">Lançamentos vinculados perderão a referência de categoria.</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleDeleteCat(confirmDelCat)}
+                    className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition"
+                  >
+                    Excluir
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelCat(null)}
+                    className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
