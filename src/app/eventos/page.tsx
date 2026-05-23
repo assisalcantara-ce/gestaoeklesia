@@ -163,7 +163,7 @@ const mesProximoEvento = (mes: string): string => {
 };
 
 const exportarCSVInscricoes = (inscricoes: Inscricao[], tituloEvento: string) => {
-  const header = ['Nome', 'E-mail', 'Telefone', 'Status', 'Presente', 'Check-in'];
+  const header = ['Nome', 'E-mail', 'Telefone', 'Status', 'Presente', 'Check-in', 'Observações'];
   const rows = inscricoes.map(i => [
     i.nome_display ?? i.nome_externo ?? '—',
     i.email_externo ?? '—',
@@ -171,6 +171,7 @@ const exportarCSVInscricoes = (inscricoes: Inscricao[], tituloEvento: string) =>
     statusInscricaoLabel(i.status),
     i.presente ? 'Sim' : 'Não',
     i.checkin_em ? fmtDateTime(i.checkin_em) : '—',
+    i.observacoes ?? '—',
   ]);
   const csv = [header, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -450,6 +451,25 @@ export default function EventosPage() {
       showModal('Campo obrigatório', 'Selecione um membro ou informe o nome do participante.', 'error');
       return;
     }
+
+    // Verificar capacidade antes de inserir como "confirmado"
+    let statusFinal = formInsc.status;
+    if (statusFinal === 'confirmado' && eventoSelecionado.capacidade != null) {
+      const { count } = await supabase
+        .from('eventos_inscricoes')
+        .select('id', { count: 'exact', head: true })
+        .eq('evento_id', eventoSelecionado.id)
+        .eq('status', 'confirmado');
+      if ((count ?? 0) >= eventoSelecionado.capacidade) {
+        showModal(
+          'Evento lotado',
+          `O evento atingiu o limite de ${eventoSelecionado.capacidade} vaga(s). A inscrição será colocada na lista de espera.`,
+          'info'
+        );
+        statusFinal = 'lista_espera';
+      }
+    }
+
     const payload = {
       evento_id:     eventoSelecionado.id,
       ministry_id:   ministryId,
@@ -457,7 +477,7 @@ export default function EventosPage() {
       nome_externo:  temExterno ? formInsc.nome_externo.trim() : null,
       email_externo: formInsc.email_externo || null,
       telefone:      formInsc.telefone || null,
-      status:        formInsc.status,
+      status:        statusFinal,
       observacoes:   formInsc.observacoes || null,
       criado_por:    user?.id ?? null,
     };
@@ -749,14 +769,12 @@ export default function EventosPage() {
                           Link público
                         </button>
                       )}
-                      {e.aceita_inscricao && (
-                        <button
-                          onClick={() => { setEventoSelecionado(e); setAba('inscricoes'); }}
-                          className="text-xs px-3 py-1.5 rounded-lg border border-[#123b63] text-[#123b63] hover:bg-[#123b63]/5"
-                        >
-                          Ver inscrições
-                        </button>
-                      )}
+                      <button
+                        onClick={() => { setEventoSelecionado(e); setAba('inscricoes'); }}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-[#123b63] text-[#123b63] hover:bg-[#123b63]/5"
+                      >
+                        Ver inscrições
+                      </button>
                       {scope.canWrite && (
                         <button onClick={() => handleEditEvento(e)}
                           className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100">
