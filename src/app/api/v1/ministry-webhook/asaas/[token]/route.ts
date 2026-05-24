@@ -131,7 +131,7 @@ export async function POST(
           ministry_id:      ministryId,
           congregacao_id:   evento?.congregacao_id ?? null,
           tipo_movimento:   'entrada',
-          tipo_recebimento: 'pix',
+          tipo_recebimento: 'evento',
           valor:            Number(pag.valor),
           descricao:        descricao.slice(0, 300),
           data_lancamento:  (paymentDate ?? now).slice(0, 10),
