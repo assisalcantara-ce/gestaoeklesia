@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 
 type TipoEvento   = 'culto_especial' | 'conferencia' | 'retiro' | 'evangelismo' | 'treinamento' | 'social' | 'outro';
 type StatusEvento = 'programado' | 'em_andamento' | 'realizado' | 'cancelado';
-type StatusInscricao = 'confirmado' | 'cancelado' | 'lista_espera';
+type StatusInscricao = 'confirmado' | 'cancelado' | 'lista_espera' | 'aguardando_pagamento' | 'expirado';
 type AbaEvento = 'eventos' | 'inscricoes';
 
 interface Congregacao { id: string; nome: string; }
@@ -111,9 +111,11 @@ const STATUS_EVENTO: { value: StatusEvento; label: string; cor: string }[] = [
 ];
 
 const STATUS_INSCRICAO: { value: StatusInscricao; label: string; cor: string }[] = [
-  { value: 'confirmado',   label: 'Confirmado',      cor: 'bg-green-100 text-green-700'   },
-  { value: 'cancelado',    label: 'Cancelado',       cor: 'bg-red-100 text-red-700'       },
-  { value: 'lista_espera', label: 'Lista de Espera', cor: 'bg-yellow-100 text-yellow-700' },
+  { value: 'confirmado',          label: 'Confirmado',          cor: 'bg-green-100 text-green-700'   },
+  { value: 'cancelado',           label: 'Cancelado',           cor: 'bg-red-100 text-red-700'       },
+  { value: 'lista_espera',        label: 'Lista de Espera',     cor: 'bg-yellow-100 text-yellow-700' },
+  { value: 'aguardando_pagamento',label: 'Aguard. Pagamento',   cor: 'bg-blue-100 text-blue-700'    },
+  { value: 'expirado',            label: 'Expirado',            cor: 'bg-gray-100 text-gray-500'    },
 ];
 
 const FORM_EVENTO_INICIAL: FormEvento = {
