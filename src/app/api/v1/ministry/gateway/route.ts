@@ -38,8 +38,8 @@ export async function GET(request: NextRequest) {
 
     const hasAccess =
       ctx.isOwner ||
-      (Array.isArray(ctx.permissions) &&
-        (ctx.permissions.includes('ADMINISTRADOR') || ctx.permissions.includes('FINANCEIRO')))
+      ctx.nivel === 'administrador' ||
+      ctx.nivel === 'financeiro'
 
     if (!hasAccess) {
       return NextResponse.json(
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
 
     const isAdmin =
       ctx.isOwner ||
-      (Array.isArray(ctx.permissions) && ctx.permissions.includes('ADMINISTRADOR'))
+      ctx.nivel === 'administrador'
 
     if (!isAdmin) {
       return NextResponse.json(
@@ -279,7 +279,7 @@ export async function DELETE(request: NextRequest) {
 
     const isAdmin =
       ctx.isOwner ||
-      (Array.isArray(ctx.permissions) && ctx.permissions.includes('ADMINISTRADOR'))
+      ctx.nivel === 'administrador'
 
     if (!isAdmin) {
       return NextResponse.json(

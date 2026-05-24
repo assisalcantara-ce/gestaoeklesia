@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     const isAdmin =
       ctx.isOwner ||
-      (Array.isArray(ctx.permissions) && ctx.permissions.includes('ADMINISTRADOR'))
+      ctx.nivel === 'administrador'
 
     if (!isAdmin) {
       return NextResponse.json(
