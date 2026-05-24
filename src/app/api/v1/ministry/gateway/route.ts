@@ -19,6 +19,7 @@ import {
   decryptCredentials,
   maskGatewayCredentials,
 } from '@/lib/ministry-credentials'
+import { ensureAsaasWebhook } from '@/lib/asaas-webhook-manager'
 
 type Gateway = 'asaas' | 'efi'
 const VALID_GATEWAYS: Gateway[] = ['asaas', 'efi']
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await ctx.admin
       .from('ministry_payment_gateways')
       .select(
-        'id, ministry_id, gateway, environment, display_name, is_active, status, encrypted_credentials, webhook_token, webhook_url_hint, last_test_at, last_test_ok, last_error, connection_latency_ms, configured_by, created_at, updated_at'
+        'id, ministry_id, gateway, environment, display_name, is_active, status, encrypted_credentials, webhook_token, webhook_url_hint, last_test_at, last_test_ok, last_error, connection_latency_ms, configured_by, created_at, updated_at, asaas_webhook_status, asaas_webhook_registered_at'
       )
       .eq('ministry_id', ctx.ministryId)
       .order('created_at', { ascending: true })
@@ -76,22 +77,24 @@ export async function GET(request: NextRequest) {
       }
 
       return {
-        id:                    row.id,
-        gateway:               row.gateway,
-        environment:           row.environment,
-        display_name:          row.display_name,
-        is_active:             row.is_active,
-        status:                row.status,
+        id:                         row.id,
+        gateway:                    row.gateway,
+        environment:                row.environment,
+        display_name:               row.display_name,
+        is_active:                  row.is_active,
+        status:                     row.status,
         has_credentials,
         masked_credentials,
-        webhook_token:         row.webhook_token,
-        webhook_url_hint:      row.webhook_url_hint,
-        last_test_at:          row.last_test_at,
-        last_test_ok:          row.last_test_ok,
-        last_error:            row.last_error,
-        connection_latency_ms: row.connection_latency_ms,
-        created_at:            row.created_at,
-        updated_at:            row.updated_at,
+        webhook_token:              row.webhook_token,
+        webhook_url_hint:           row.webhook_url_hint,
+        last_test_at:               row.last_test_at,
+        last_test_ok:               row.last_test_ok,
+        last_error:                 row.last_error,
+        connection_latency_ms:      row.connection_latency_ms,
+        asaas_webhook_status:       row.asaas_webhook_status ?? null,
+        asaas_webhook_registered_at: row.asaas_webhook_registered_at ?? null,
+        created_at:                 row.created_at,
+        updated_at:                 row.updated_at,
       }
     })
 
@@ -168,7 +171,7 @@ export async function POST(request: NextRequest) {
     // Buscar registro existente para saber se há credenciais salvas
     const { data: existing } = await ctx.admin
       .from('ministry_payment_gateways')
-      .select('id, encrypted_credentials')
+      .select('id, encrypted_credentials, webhook_token')
       .eq('ministry_id', ctx.ministryId)
       .eq('gateway', gateway)
       .maybeSingle()
@@ -199,6 +202,13 @@ export async function POST(request: NextRequest) {
       ...(encrypted ? { encrypted_credentials: encrypted } : {}),
     }
 
+    // Quando novas credenciais ASAAS são fornecidas, resetar status para 'pending'
+    if (gateway === 'asaas' && encrypted) {
+      upsertPayload.asaas_webhook_status = 'pending'
+      upsertPayload.asaas_webhook_id = null
+      upsertPayload.asaas_webhook_registered_at = null
+    }
+
     let savedId: string
     if (existing) {
       const { error: updErr } = await ctx.admin
@@ -224,6 +234,63 @@ export async function POST(request: NextRequest) {
       }
       savedId = inserted.id
     }
+
+    // ─── Registro automático de webhook ASAAS ────────────────────────────────
+    // Não-bloqueante: erros aqui não afetam a resposta de sucesso do save.
+    if (gateway === 'asaas') {
+      const hasCredentials = !!(encrypted || existing?.encrypted_credentials)
+      if (hasCredentials) {
+        try {
+          // Buscar webhook_token e credenciais do row salvo (garante valor correto pós-insert)
+          const { data: savedRow } = await ctx.admin
+            .from('ministry_payment_gateways')
+            .select('webhook_token, encrypted_credentials')
+            .eq('id', savedId)
+            .single()
+
+          if (savedRow?.webhook_token && savedRow?.encrypted_credentials) {
+            // Buscar nome do ministério para label legível no painel ASAAS
+            const { data: ministry } = await ctx.admin
+              .from('ministries')
+              .select('name')
+              .eq('id', ctx.ministryId)
+              .single()
+
+            const creds = decryptCredentials(savedRow.encrypted_credentials)
+            const apiKey = creds.api_key
+
+            if (apiKey) {
+              const webhookResult = await ensureAsaasWebhook({
+                apiKey,
+                environment: environment as 'sandbox' | 'production',
+                webhookToken: String(savedRow.webhook_token),
+                ministryName: ministry?.name ?? 'Ministério',
+              })
+
+              // Atualizar status no banco (não falha o request se der erro aqui)
+              await ctx.admin
+                .from('ministry_payment_gateways')
+                .update({
+                  asaas_webhook_status:       webhookResult.success ? 'registered' : 'failed',
+                  asaas_webhook_id:           webhookResult.webhookId ?? null,
+                  asaas_webhook_registered_at: webhookResult.success ? new Date().toISOString() : null,
+                })
+                .eq('id', savedId)
+
+              if (!webhookResult.success) {
+                // Log sem expor apiKey
+                console.warn('[gateway POST] Registro de webhook ASAAS falhou (não-bloqueante):', webhookResult.error)
+              }
+            }
+          }
+        } catch (webhookErr: unknown) {
+          // Qualquer erro no fluxo de webhook é não-bloqueante
+          const msg = webhookErr instanceof Error ? webhookErr.message : 'erro desconhecido'
+          console.warn('[gateway POST] Fluxo de webhook ASAAS abortou (não-bloqueante):', msg)
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     return NextResponse.json({
       success: true,

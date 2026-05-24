@@ -1730,6 +1730,8 @@ interface GatewayRow {
   last_test_ok: boolean | null
   last_error: string | null
   updated_at: string
+  asaas_webhook_status: 'pending' | 'registered' | 'failed' | null
+  asaas_webhook_registered_at: string | null
 }
 
 const GW_LABELS: Record<string, { name: string; color: string; bg: string; description: string }> = {
@@ -2032,6 +2034,33 @@ function GatewaysContent({ onNotification }: { onNotification: (title: string, m
                   <code className="text-xs bg-white bg-opacity-70 px-2 py-1 rounded block break-all text-gray-500">
                     {row.webhook_url_hint.replace('{webhook_token}', row.webhook_token)}
                   </code>
+                </div>
+              )}
+
+              {/* Badge de sincronização automática de webhook (ASAAS) */}
+              {gw === 'asaas' && row && row.has_credentials && (
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xs text-gray-400">Webhook:</span>
+                  {row.asaas_webhook_status === 'registered' && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                      <span>✅</span> Registrado automaticamente
+                    </span>
+                  )}
+                  {row.asaas_webhook_status === 'failed' && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-red-100 text-red-600 px-2 py-0.5 rounded-full" title="Configure o webhook manualmente usando a URL acima">
+                      <span>❌</span> Falha no registro automático
+                    </span>
+                  )}
+                  {row.asaas_webhook_status === 'pending' && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
+                      <span>⏳</span> Registrando...
+                    </span>
+                  )}
+                  {!row.asaas_webhook_status && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full" title="Salve as credenciais para registrar automaticamente">
+                      <span>⚪</span> Não registrado
+                    </span>
+                  )}
                 </div>
               )}
 
