@@ -48,25 +48,28 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { data, error } = await ctx.admin.rpc('get_ministry_gateways', {
-      p_ministry_id: ctx.ministryId,
-    })
+    const { data, error } = await ctx.admin
+      .from('ministry_payment_gateways')
+      .select(
+        'id, ministry_id, gateway, environment, display_name, is_active, status, encrypted_credentials, webhook_token, webhook_url_hint, last_test_at, last_test_ok, last_error, connection_latency_ms, configured_by, created_at, updated_at'
+      )
+      .eq('ministry_id', ctx.ministryId)
+      .order('created_at', { ascending: true })
 
     if (error) {
-      console.error('[gateway GET] RPC error:', error)
+      console.error('[gateway GET] query error:', error)
       return NextResponse.json({ error: 'Erro ao consultar gateways.', code: 'DB_ERROR' }, { status: 500 })
     }
 
-    // Para cada gateway com credenciais, incluir versão mascarada
-    const result = (data ?? []).map((row: any) => {
+    // Para cada gateway com credenciais, incluir versão mascarada (sem expor o valor criptografado)
+    const enriched = (data ?? []).map((row: any) => {
+      const has_credentials = !!row.encrypted_credentials
       let masked_credentials: Record<string, string | null> | null = null
 
-      if (row.has_credentials) {
+      if (has_credentials) {
         try {
-          // Buscamos as credenciais reais para mascarar (não para expor)
-          // Fazemos uma query separada com service_role para obter o campo criptografado
-          // O mascaramento é feito aqui no servidor e só o resultado mascarado vai ao cliente
-          masked_credentials = {} // preenchido abaixo de forma síncrona
+          const plain = decryptCredentials(row.encrypted_credentials)
+          masked_credentials = maskGatewayCredentials(row.gateway as Gateway, plain)
         } catch {
           masked_credentials = null
         }
@@ -79,7 +82,7 @@ export async function GET(request: NextRequest) {
         display_name:          row.display_name,
         is_active:             row.is_active,
         status:                row.status,
-        has_credentials:       row.has_credentials,
+        has_credentials,
         masked_credentials,
         webhook_token:         row.webhook_token,
         webhook_url_hint:      row.webhook_url_hint,
@@ -91,31 +94,6 @@ export async function GET(request: NextRequest) {
         updated_at:            row.updated_at,
       }
     })
-
-    // Enriquece masked_credentials buscando as credenciais reais via admin client
-    const enriched = await Promise.all(
-      result.map(async (row: any) => {
-        if (!row.has_credentials) return row
-
-        const { data: raw } = await ctx.admin
-          .from('ministry_payment_gateways')
-          .select('encrypted_credentials')
-          .eq('ministry_id', ctx.ministryId!)
-          .eq('gateway', row.gateway)
-          .maybeSingle()
-
-        if (raw?.encrypted_credentials) {
-          try {
-            const plain = decryptCredentials(raw.encrypted_credentials)
-            row.masked_credentials = maskGatewayCredentials(row.gateway as Gateway, plain)
-          } catch {
-            row.masked_credentials = null
-          }
-        }
-
-        return row
-      })
-    )
 
     return NextResponse.json({ data: enriched })
   } catch (err: any) {
