@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Verificar duplicidade por email
+  // Permite nova inscrição se a anterior foi expirada ou cancelada (ex: PIX vencido)
   const { data: jaInscrito } = await admin
     .from('eventos_inscricoes')
     .select('id, status')
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
     .eq('email_externo', email)
     .maybeSingle();
 
-  if (jaInscrito) {
+  if (jaInscrito && !['expirado', 'cancelado'].includes(jaInscrito.status)) {
     return NextResponse.json({
       error: 'Este e-mail já possui uma inscrição neste evento.',
       inscricao_id: jaInscrito.id,
@@ -89,11 +90,13 @@ export async function POST(request: NextRequest) {
   let temVaga = true;
 
   if (evento.capacidade != null) {
+    // Conta confirmados + aguardando_pagamento para evitar overbooking
+    // (inscrições pendentes de pagamento reservam a vaga temporariamente)
     const { count } = await admin
       .from('eventos_inscricoes')
       .select('id', { count: 'exact', head: true })
       .eq('evento_id', evento.id)
-      .eq('status', 'confirmado');
+      .in('status', ['confirmado', 'aguardando_pagamento']);
 
     if ((count ?? 0) >= evento.capacidade) {
       temVaga = false;

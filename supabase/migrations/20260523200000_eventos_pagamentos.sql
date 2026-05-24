@@ -14,7 +14,11 @@
 
 BEGIN;
 
--- ─── 1. Adicionar novos status ao CHECK de eventos_inscricoes ─────────────────
+-- ─── 1. Adicionar updated_at em eventos_inscricoes (ausente na migration original) ──
+ALTER TABLE public.eventos_inscricoes
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+
+-- ─── 2. Adicionar novos status ao CHECK de eventos_inscricoes ─────────────────
 ALTER TABLE public.eventos_inscricoes
   DROP CONSTRAINT IF EXISTS inscricao_status_valido;
 
@@ -23,7 +27,7 @@ ALTER TABLE public.eventos_inscricoes
     status IN ('confirmado','cancelado','lista_espera','aguardando_pagamento','expirado')
   );
 
--- ─── 2. Tabela eventos_pagamentos ─────────────────────────────────────────────
+-- ─── 3. Tabela eventos_pagamentos ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.eventos_pagamentos (
   id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ministry_id              UUID NOT NULL REFERENCES public.ministries(id) ON DELETE CASCADE,

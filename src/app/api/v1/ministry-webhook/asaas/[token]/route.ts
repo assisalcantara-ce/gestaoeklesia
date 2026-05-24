@@ -53,12 +53,13 @@ export async function POST(
 
   const admin = createServerClient();
 
-  // Resolve ministério pelo webhook_token
+  // Resolve ministério pelo webhook_token (só gateways ativos)
   const { data: gw } = await admin
     .from('ministry_payment_gateways')
     .select('ministry_id')
     .eq('webhook_token', token)
     .eq('gateway', 'asaas')
+    .eq('is_active', true)
     .maybeSingle();
 
   if (!gw?.ministry_id) {
@@ -134,7 +135,7 @@ export async function POST(
           valor:            Number(pag.valor),
           descricao:        descricao.slice(0, 300),
           data_lancamento:  (paymentDate ?? now).slice(0, 10),
-          origem_modulo:    'eventos_pagamentos',
+          origem_modulo:    'evento',
           origem_id:        pag.id,
         })
         .select('id')
