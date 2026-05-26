@@ -20,6 +20,7 @@ import {
   maskGatewayCredentials,
 } from '@/lib/ministry-credentials'
 import { ensureAsaasWebhook } from '@/lib/asaas-webhook-manager'
+import { ensureEfiWebhook } from '@/lib/efi-webhook-manager'
 
 type Gateway = 'asaas' | 'efi'
 const VALID_GATEWAYS: Gateway[] = ['asaas', 'efi']
@@ -287,6 +288,48 @@ export async function POST(request: NextRequest) {
           // Qualquer erro no fluxo de webhook é não-bloqueante
           const msg = webhookErr instanceof Error ? webhookErr.message : 'erro desconhecido'
           console.warn('[gateway POST] Fluxo de webhook ASAAS abortou (não-bloqueante):', msg)
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ─── Registro automático de webhook EFI ──────────────────────────────────
+    // Não-bloqueante: a pix_key pode ser fornecida depois; erros não bloqueiam o save.
+    if (gateway === 'efi') {
+      const hasCredentials = !!(encrypted || existing?.encrypted_credentials)
+      if (hasCredentials) {
+        try {
+          const { data: savedRow } = await ctx.admin
+            .from('ministry_payment_gateways')
+            .select('webhook_token, encrypted_credentials')
+            .eq('id', savedId)
+            .single()
+
+          if (savedRow?.webhook_token && savedRow?.encrypted_credentials) {
+            const { data: ministry } = await ctx.admin
+              .from('ministries')
+              .select('name')
+              .eq('id', ctx.ministryId)
+              .single()
+
+            const creds = decryptCredentials(savedRow.encrypted_credentials)
+
+            if (creds.client_id && creds.client_secret && creds.pix_key) {
+              const webhookResult = await ensureEfiWebhook({
+                credentials:  creds,
+                environment,
+                webhookToken: String(savedRow.webhook_token),
+                ministryName: ministry?.name ?? 'Ministério',
+              })
+
+              if (!webhookResult.success) {
+                console.warn('[gateway POST] Registro de webhook EFI falhou (não-bloqueante):', webhookResult.error)
+              }
+            }
+          }
+        } catch (webhookErr: unknown) {
+          const msg = webhookErr instanceof Error ? webhookErr.message : 'erro desconhecido'
+          console.warn('[gateway POST] Fluxo de webhook EFI abortou (não-bloqueante):', msg)
         }
       }
     }

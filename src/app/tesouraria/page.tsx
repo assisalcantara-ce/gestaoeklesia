@@ -9,7 +9,8 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
-import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, Printer, Users, CalendarDays, Lock, Unlock, CheckCircle, Search, Download, CreditCard, List, Star, AlertCircle } from 'lucide-react';
+import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, Printer, Users, CalendarDays, Lock, Unlock, CheckCircle, Search, Download, CreditCard, List, Star, AlertCircle, QrCode, Copy, ExternalLink, Settings, RefreshCw } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import type { ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
@@ -52,7 +53,8 @@ interface Lancamento {
 type TipoRecebimento = 'oferta' | 'dizimo' | 'evento' | 'campanha' | 'contribuicao' | 'outros' | 'missoes';
 type FormaPagamento  = 'dinheiro' | 'pix' | 'cartao' | 'transferencia' | 'cheque';
 type TipoMovimento  = 'entrada' | 'saida';
-type Aba = 'dashboard' | 'lancamentos' | 'caixa' | 'relatorio' | 'dizimistas' | 'contas' | 'categorias';
+type Aba = 'dashboard' | 'lancamentos' | 'caixa' | 'relatorio' | 'dizimistas' | 'contas' | 'categorias' | 'arrecadacao';
+type SubAbaArrecadacao = 'destinos' | 'cobrancas' | 'webhooks';
 
 const TIPOS_SAIDA: { value: string; label: string; cor: string }[] = [
   { value: 'aluguel',         label: 'Aluguel',              cor: 'bg-red-100 text-red-800'     },
@@ -68,6 +70,7 @@ const TIPOS_SAIDA: { value: string; label: string; cor: string }[] = [
 interface Fechamento {
   id: string;
   ministry_id: string;
+  congregacao_id: string | null;
   mes_referencia: string;
   saldo_inicial: number;
   total_entradas: number;
@@ -77,6 +80,7 @@ interface Fechamento {
   observacoes: string | null;
   fechado_por: string | null;
   fechado_em: string | null;
+  status_conselho_fiscal?: string;
 }
 
 const TIPOS: { value: TipoRecebimento; label: string; cor: string }[] = [
@@ -306,6 +310,80 @@ const emptyFormCat = (): FormCat => ({
   nome: '', tipo_movimento: 'entrada', codigo: '', cor: '#6b7280', icone: '', categoria_pai_id: '', is_ativa: true,
 });
 
+// ── Arrecadação Digital ───────────────────────────────────────────────────────
+
+interface PaymentDestino {
+  id: string;
+  congregacao_id: string | null;
+  tipo_recebimento: string;
+  label: string;
+  descricao: string | null;
+  public_token: string;
+  valor_fixo: number | null;
+  is_ativo: boolean;
+  expires_at: string | null;
+  created_at: string;
+  total_arrecadado: number;
+  congregacoes?: { nome: string } | null;
+}
+
+type FormDestino = {
+  label: string;
+  tipo_recebimento: string;
+  congregacao_id: string;
+  conta_id: string;
+  categoria_id: string;
+  valor_fixo: string;
+  descricao: string;
+  expires_at: string;
+};
+
+// ── Cobranças PIX ───────────────────────────────────────────────────────────────────────
+interface FinCobranca {
+  id: string;
+  destination_id: string;
+  gateway_charge_id: string;
+  status: 'pendente' | 'pago' | 'cancelado' | 'expirado' | 'estornado';
+  payer_name: string | null;
+  payer_document: string | null;
+  payer_email: string | null;
+  valor_solicitado: number;
+  valor_pago: number | null;
+  invoice_url: string | null;
+  tesouraria_lancamento_id: string | null;
+  expires_at: string | null;
+  paid_at: string | null;
+  created_at: string;
+  // campos computados
+  dest_label?: string;
+  congregacao_nome?: string;
+}
+
+// ── Webhook Events ────────────────────────────────────────────────────────────────────
+interface FinWebhookEvent {
+  id: string;
+  event_type: string;
+  gateway_event_id: string;
+  processed: boolean;
+  processing_error: string | null;
+  payload: Record<string, unknown>;
+  received_at: string;
+}
+
+const TIPOS_DESTINO = [
+  { value: 'dizimo',         label: 'Dízimo',    cor: 'bg-green-100 text-green-800'  },
+  { value: 'oferta',         label: 'Oferta',    cor: 'bg-blue-100 text-blue-800'    },
+  { value: 'missoes',        label: 'Missões',   cor: 'bg-teal-100 text-teal-800'    },
+  { value: 'doacao',         label: 'Doação',    cor: 'bg-pink-100 text-pink-800'    },
+  { value: 'campanha_local', label: 'Campanha',  cor: 'bg-orange-100 text-orange-800'},
+  { value: 'evento_local',   label: 'Evento',    cor: 'bg-purple-100 text-purple-800'},
+];
+
+const emptyFormDestino = (): FormDestino => ({
+  label: '', tipo_recebimento: 'oferta', congregacao_id: '',
+  conta_id: '', categoria_id: '', valor_fixo: '', descricao: '', expires_at: '',
+});
+
 const TIPOS_CONTA = [
   { value: 'caixa',          label: 'Caixa Físico'   },
   { value: 'conta_corrente', label: 'Conta Corrente' },
@@ -352,6 +430,7 @@ export default function TesourariaPage() {
   const [fechaObs, setFechaObs] = useState('');
   const [fechaSaldoInicial, setFechaSaldoInicial] = useState('');
   const [salvandoFecha, setSalvandoFecha] = useState(false);
+  const [fechaCongId, setFechaCongId] = useState<string | null>(null);
 
   // Dizimistas
   const [dizimistas, setDizimistas] = useState<Dizimista[]>([]);
@@ -409,6 +488,35 @@ export default function TesourariaPage() {
   const [modal, setModal] = useState<{ open: boolean; title: string; message: string; type: 'success'|'error'|'info' }>({
     open: false, title: '', message: '', type: 'success',
   });
+
+  // ── Arrecadação Digital (CRUD) ────────────────────────────────────────────
+  const [destinos,             setDestinos]             = useState<PaymentDestino[]>([]);
+  const [loadingDestinos,      setLoadingDestinos]      = useState(false);
+  const [showDestinoModal,     setShowDestinoModal]     = useState(false);
+  const [destinoEditId,        setDestinoEditId]        = useState<string | null>(null);
+  const [formDestino,          setFormDestino]          = useState<FormDestino>(emptyFormDestino());
+  const [savingDestino,        setSavingDestino]        = useState(false);
+  const [showQrModal,          setShowQrModal]          = useState(false);
+  const [qrDestino,            setQrDestino]            = useState<{ token: string; label: string } | null>(null);
+  const [filtroDestinoStatus,  setFiltroDestinoStatus]  = useState<'' | 'ativo' | 'inativo'>('');
+  const [filtroDestinoTipo,    setFiltroDestinoTipo]    = useState('');
+  const [filtroDestinoCong,    setFiltroDestinoCong]    = useState('');
+  const [qrCopied,             setQrCopied]             = useState(false);
+  const [confirmDelDestino,    setConfirmDelDestino]    = useState<string | null>(null);
+
+  // ── Arrecadação — sub-abas e cobranças/webhooks ───────────────────────────
+  const [subAbaArr,              setSubAbaArr]              = useState<SubAbaArrecadacao>('destinos');
+  const [gatewayAtivo,           setGatewayAtivo]           = useState<boolean | null>(null);
+  const [cobrancas,              setCobrancas]              = useState<FinCobranca[]>([]);
+  const [loadingCobrancas,       setLoadingCobrancas]       = useState(false);
+  const [cobrFiltroStatus,       setCobrFiltroStatus]       = useState('');
+  const [cobrFiltroDestino,      setCobrFiltroDestino]      = useState('');
+  const [cobrFiltroCong,         setCobrFiltroCong]         = useState('');
+  const [cobrFiltroStart,        setCobrFiltroStart]        = useState('');
+  const [cobrFiltroEnd,          setCobrFiltroEnd]          = useState('');
+  const [webhookEvents,          setWebhookEvents]          = useState<FinWebhookEvent[]>([]);
+  const [loadingWebhooks,        setLoadingWebhooks]        = useState(false);
+  const [webhookFiltroProcessado, setWebhookFiltroProcessado] = useState<'' | 'sim' | 'nao'>('' );
 
   // ── Fase 2 ────────────────────────────────────────────────────────────────
   const [dadosGrafico,    setDadosGrafico]    = useState<MesDados[]>([]);
@@ -787,7 +895,200 @@ export default function TesourariaPage() {
     if (aba === 'categorias' && ministryId && !loadingData) carregarCategoriasFull();
   }, [aba, ministryId, loadingData, carregarCategoriasFull]);
 
-  // ── Contas: CRUD handlers ─────────────────────────────────────────────────
+  // ── Arrecadação Digital: carregar destinos ────────────────────────────────
+
+  const carregarDestinos = useCallback(async () => {
+    setLoadingDestinos(true);
+    try {
+      const res  = await fetch('/api/v1/ministry/payment-destinations');
+      const json = await res.json() as { data?: PaymentDestino[] };
+      setDestinos(json.data ?? []);
+    } catch {
+      setDestinos([]);
+    } finally {
+      setLoadingDestinos(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (aba === 'arrecadacao' && ministryId && !loadingData) {
+      void carregarDestinos();
+      void carregarGatewayStatus();
+      if (contasFull.length === 0) carregarContasFull();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aba, ministryId, loadingData, carregarDestinos, carregarContasFull]);
+
+  useEffect(() => {
+    if (aba === 'arrecadacao' && ministryId && !loadingData) {
+      if (subAbaArr === 'cobrancas') void carregarCobrancas();
+      else if (subAbaArr === 'webhooks') void carregarWebhookEvents();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subAbaArr, aba, ministryId, loadingData]);
+
+  const handleSaveDestino = async () => {
+    if (!formDestino.label.trim()) {
+      showModal('Campo obrigatório', 'Informe o label do destino.', 'error');
+      return;
+    }
+    setSavingDestino(true);
+    try {
+      const body: Record<string, unknown> = {
+        label:            formDestino.label.trim(),
+        tipo_recebimento: formDestino.tipo_recebimento,
+        congregacao_id:   formDestino.congregacao_id || undefined,
+        conta_id:         formDestino.conta_id || undefined,
+        categoria_id:     formDestino.categoria_id || undefined,
+        descricao:        formDestino.descricao.trim() || undefined,
+        expires_at:       formDestino.expires_at ? new Date(formDestino.expires_at).toISOString() : null,
+        valor_fixo:       formDestino.valor_fixo
+          ? parseFloat(formDestino.valor_fixo.replace(',', '.'))
+          : null,
+      };
+      let res: Response;
+      if (destinoEditId) {
+        res = await fetch(`/api/v1/ministry/payment-destinations/${destinoEditId}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+      } else {
+        res = await fetch('/api/v1/ministry/payment-destinations', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+      }
+      const json = await res.json() as { error?: string };
+      if (!res.ok) { showModal('Erro', json.error ?? 'Erro ao salvar.', 'error'); return; }
+      showModal('Sucesso', destinoEditId ? 'Destino atualizado!' : 'Destino criado!', 'success');
+      setShowDestinoModal(false);
+      setDestinoEditId(null);
+      setFormDestino(emptyFormDestino());
+      void carregarDestinos();
+    } finally {
+      setSavingDestino(false);
+    }
+  };
+
+  const handleToggleDestino = async (dest: PaymentDestino) => {
+    const res = await fetch(`/api/v1/ministry/payment-destinations/${dest.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_ativo: !dest.is_ativo }),
+    });
+    if (res.ok) void carregarDestinos();
+  };
+
+  const handleDeleteDestino = async (id: string) => {
+    const res = await fetch(`/api/v1/ministry/payment-destinations/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setConfirmDelDestino(null);
+      void carregarDestinos();
+    } else {
+      const data = await res.json().catch(() => ({})) as { error?: string };
+      showModal('Erro', data.error ?? 'Não foi possível excluir o destino.', 'error');
+      setConfirmDelDestino(null);
+    }
+  };
+
+  // ── Arrecadção: funcionários de suporte (gateway, cobranças, webhooks) ──────
+  const carregarGatewayStatus = useCallback(async () => {
+    if (!ministryId) return;
+    try {
+      const { data } = await supabase
+        .from('ministry_payment_gateways')
+        .select('id')
+        .eq('ministry_id', ministryId)
+        .eq('gateway', 'asaas')
+        .eq('is_active', true)
+        .maybeSingle();
+      setGatewayAtivo(!!data);
+    } catch {
+      setGatewayAtivo(false);
+    }
+  }, [ministryId, supabase]);
+
+  const carregarCobrancas = useCallback(async () => {
+    if (!ministryId) return;
+    setLoadingCobrancas(true);
+    try {
+      // Busca destinos para mapear label/congregção
+      const { data: destData } = await supabase
+        .from('fin_payment_destinations')
+        .select('id, label, congregacoes(nome)')
+        .eq('ministry_id', ministryId);
+      type DestRow = { id: string; label: string; congregacoes: { nome: string } | null };
+      const destMap = new Map(
+        ((destData ?? []) as DestRow[]).map(d => [d.id, { label: d.label, cong: d.congregacoes?.nome ?? '' }])
+      );
+      const destIds = [...destMap.keys()];
+      if (destIds.length === 0) { setCobrancas([]); return; }
+      const { data } = await supabase
+        .from('fin_payment_charges')
+        .select('id, destination_id, gateway_charge_id, status, payer_name, payer_document, payer_email, valor_solicitado, valor_pago, invoice_url, tesouraria_lancamento_id, expires_at, paid_at, created_at')
+        .in('destination_id', destIds)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      setCobrancas(((data ?? []) as FinCobranca[]).map(c => ({
+        ...c,
+        dest_label:      destMap.get(c.destination_id)?.label ?? '—',
+        congregacao_nome: destMap.get(c.destination_id)?.cong  ?? '',
+      })));
+    } catch {
+      setCobrancas([]);
+    } finally {
+      setLoadingCobrancas(false);
+    }
+  }, [ministryId, supabase]);
+
+  const carregarWebhookEvents = useCallback(async () => {
+    if (!ministryId) return;
+    setLoadingWebhooks(true);
+    try {
+      const { data: gws } = await supabase
+        .from('ministry_payment_gateways')
+        .select('id')
+        .eq('ministry_id', ministryId);
+      const gwIds = ((gws ?? []) as { id: string }[]).map(g => g.id);
+      if (gwIds.length === 0) { setWebhookEvents([]); return; }
+      const { data } = await supabase
+        .from('fin_webhook_events')
+        .select('id, event_type, gateway_event_id, processed, processing_error, payload, received_at')
+        .in('gateway_id', gwIds)
+        .order('received_at', { ascending: false })
+        .limit(200);
+      setWebhookEvents((data ?? []) as FinWebhookEvent[]);
+    } catch {
+      setWebhookEvents([]);
+    } finally {
+      setLoadingWebhooks(false);
+    }
+  }, [ministryId, supabase]);
+
+  function exportarCSVCobrancas(rows: FinCobranca[]) {
+    const header = ['ID', 'Destino', 'Congregação', 'Pagador', 'CPF/CNPJ', 'E-mail', 'Valor Solicitado (R$)', 'Valor Pago (R$)', 'Status', 'Data Pagamento', 'Gateway Charge ID', 'Lançamento ID'];
+    const rows2d = rows.map(c => [
+      c.id,
+      c.dest_label ?? '',
+      c.congregacao_nome ?? '',
+      c.payer_name ?? '',
+      c.payer_document ?? '',
+      c.payer_email ?? '',
+      Number(c.valor_solicitado).toFixed(2).replace('.', ','),
+      c.valor_pago != null ? Number(c.valor_pago).toFixed(2).replace('.', ',') : '',
+      c.status,
+      c.paid_at ? fmtDate(c.paid_at.split('T')[0]) : '',
+      c.gateway_charge_id ?? '',
+      c.tesouraria_lancamento_id ?? '',
+    ]);
+    const csv = [header, ...rows2d]
+      .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';'))
+      .join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cobrancas-pix-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   const handleSaveConta = async () => {
     if (!ministryId) return;
@@ -1052,19 +1353,30 @@ export default function TesourariaPage() {
     carregarLancamentosMes(filtroMes);
   };
 
-  // ── Fechar Mês ───────────────────────────────────────────────────
+  // ── Fechar Mês (por congregação) ────────────────────────────────
 
   const handleFecharMes = async () => {
     if (!ministryId) return;
+
+    // Impedir fechamento de mês futuro
+    const mesAtualStr = new Date().toISOString().slice(0, 7);
+    if (abaFechaMes > mesAtualStr) {
+      showModal('Erro', 'Não é possível fechar um mês futuro.', 'error');
+      return;
+    }
+
     const saldoIni = parseFloat(fechaSaldoInicial.replace(',', '.')) || 0;
 
-    // Buscar totais diretamente do banco para garantir precisão independente do estado local
-    const { data: totaisDb } = await supabase
+    // Buscar totais do banco filtrado pela congregação específica
+    let totaisQ = supabase
       .from('tesouraria_lancamentos')
       .select('tipo_movimento, valor')
       .eq('ministry_id', ministryId)
       .gte('data_lancamento', `${abaFechaMes}-01`)
       .lt('data_lancamento', `${mesProximo(abaFechaMes)}-01`);
+    if (fechaCongId === null) totaisQ = totaisQ.is('congregacao_id', null);
+    else totaisQ = totaisQ.eq('congregacao_id', fechaCongId);
+    const { data: totaisDb } = await totaisQ;
     const itensDb = (totaisDb ?? []) as Array<{ tipo_movimento: string; valor: number }>;
     const entradas = itensDb
       .filter(l => l.tipo_movimento === 'entrada')
@@ -1077,8 +1389,20 @@ export default function TesourariaPage() {
     setSalvandoFecha(true);
     const { data: sd } = await supabase.auth.getSession();
     const uid = sd.session?.user.id;
-    const { error } = await supabase.from('tesouraria_fechamentos').upsert({
+
+    // Verificar se já existe fechamento (SELECT → INSERT ou UPDATE)
+    let existQ = supabase
+      .from('tesouraria_fechamentos')
+      .select('id')
+      .eq('ministry_id', ministryId)
+      .eq('mes_referencia', abaFechaMes);
+    if (fechaCongId === null) existQ = existQ.is('congregacao_id', null);
+    else existQ = existQ.eq('congregacao_id', fechaCongId);
+    const { data: existing } = await existQ.maybeSingle();
+
+    const payload = {
       ministry_id:    ministryId,
+      congregacao_id: fechaCongId,
       mes_referencia: abaFechaMes,
       saldo_inicial:  saldoIni,
       total_entradas: entradas,
@@ -1088,14 +1412,44 @@ export default function TesourariaPage() {
       observacoes:    fechaObs || null,
       fechado_por:    uid ?? null,
       fechado_em:     new Date().toISOString(),
-    }, { onConflict: 'ministry_id,mes_referencia' });
+    };
+
+    let errorMsg: string | null = null;
+    let fechamentoId: string | null = null;
+    if (existing?.id) {
+      const { error: upErr } = await supabase.from('tesouraria_fechamentos').update(payload).eq('id', existing.id);
+      if (upErr) errorMsg = upErr.message;
+      fechamentoId = existing.id;
+    } else {
+      const { data: insData, error: insErr } = await supabase.from('tesouraria_fechamentos').insert(payload).select('id').single();
+      if (insErr) errorMsg = insErr.message;
+      fechamentoId = insData?.id ?? null;
+    }
+
     setSalvandoFecha(false);
-    if (error) { showModal('Erro', error.message, 'error'); return; }
+    if (errorMsg) { showModal('Erro', errorMsg, 'error'); return; }
+
+    // Registrar log (ignora silenciosamente se a tabela ainda não existir)
+    if (fechamentoId) {
+      try {
+        await supabase.from('tesouraria_fechamento_logs').insert({
+          fechamento_id:  fechamentoId,
+          congregacao_id: fechaCongId,
+          usuario_id:     uid ?? null,
+          acao:           'fechamento',
+        });
+      } catch { /* tabela pode não existir em ambientes sem a migration */ }
+    }
+
+    const congNome = fechaCongId === null
+      ? 'Sede / Caixa Geral'
+      : (congregacoes.find(c => c.id === fechaCongId)?.nome ?? 'Congregação');
     const [ano, mon] = abaFechaMes.split('-');
-    showModal('Mês fechado!', `Caixa de ${MESES_LABEL[Number(mon) - 1]}/${ano} fechado. Saldo: ${fmtBRL(saldoFinal)}.`);
+    showModal('Caixa fechado!', `${congNome} — ${MESES_LABEL[Number(mon) - 1]}/${ano} fechado. Saldo: ${fmtBRL(saldoFinal)}.`);
     setShowFechaModal(false);
     setFechaObs('');
     setFechaSaldoInicial('');
+    setFechaCongId(null);
     load();
   };
 
@@ -1268,6 +1622,7 @@ export default function TesourariaPage() {
           { id: 'dizimistas',  icon: <Users className="h-4 w-4" />,         label: 'Dizimistas'    },
           { id: 'contas',      icon: <CreditCard className="h-4 w-4" />,    label: 'Contas'        },
           { id: 'categorias',  icon: <List className="h-4 w-4" />,          label: 'Categorias'    },
+          { id: 'arrecadacao', icon: <QrCode className="h-4 w-4" />,        label: 'Arrecadação Digital' },
         ] as const).map(t => (
           <button
             key={t.id}
@@ -1970,126 +2325,212 @@ export default function TesourariaPage() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
-          ABA: CAIXA MENSAL
+          ABA: CAIXA MENSAL (por congregação)
       ══════════════════════════════════════════════════════════════════════ */}
       {aba === 'caixa' && (() => {
-        const doMesSel   = lancamentos.filter(l => l.data_lancamento.startsWith(abaFechaMes));
-        const entMes     = doMesSel.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
-        const saiMes     = doMesSel.filter(l => l.tipo_movimento === 'saida').reduce((s, l)   => s + Number(l.valor), 0);
-        const fechAtual  = fechamentos.find(f => f.mes_referencia === abaFechaMes);
-        const isFechado  = fechAtual?.status === 'fechado';
-        // Sugerir saldo_inicial = último fechamento anterior
-        const fechAnterior = fechamentos
-          .filter(f => f.mes_referencia < abaFechaMes && f.status === 'fechado')
-          .sort((a, b) => b.mes_referencia.localeCompare(a.mes_referencia))[0];
-        const saldoInicial = fechAtual?.saldo_inicial ?? fechAnterior?.saldo_final ?? 0;
-        const saldoFinal   = fechAtual?.saldo_final   ?? (saldoInicial + entMes - saiMes);
-        const [ano, mon]   = abaFechaMes.split('-');
+        const todasCaixas: Array<{ id: string | null; nome: string }> = [
+          { id: null, nome: 'Sede / Caixa Geral' },
+          ...congregacoes.map(c => ({ id: c.id, nome: c.nome })),
+        ];
+        const caixasVisiveis = scope.isFinanceiroLocal && scope.congregacaoId
+          ? todasCaixas.filter(cx => cx.id === scope.congregacaoId)
+          : todasCaixas;
+
+        const statusMes = caixasVisiveis.map(cx => {
+          const fec = fechamentos.find(f =>
+            f.mes_referencia === abaFechaMes &&
+            (cx.id === null ? f.congregacao_id === null : f.congregacao_id === cx.id),
+          );
+          const fechAnt = fechamentos
+            .filter(f =>
+              f.mes_referencia < abaFechaMes &&
+              f.status === 'fechado' &&
+              (cx.id === null ? f.congregacao_id === null : f.congregacao_id === cx.id),
+            )
+            .sort((a, b) => b.mes_referencia.localeCompare(a.mes_referencia))[0];
+          const doMes = lancamentos.filter(l =>
+            l.data_lancamento.startsWith(abaFechaMes) &&
+            (cx.id === null ? l.congregacao_id === null : l.congregacao_id === cx.id),
+          );
+          const entLive = doMes.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
+          const saiLive = doMes.filter(l => l.tipo_movimento === 'saida').reduce((s, l) => s + Number(l.valor), 0);
+          const saldoInicial  = fec?.saldo_inicial  ?? (fechAnt?.saldo_final ?? 0);
+          const totalEntradas = fec?.total_entradas ?? entLive;
+          const totalSaidas   = fec?.total_saidas   ?? saiLive;
+          const saldoFinal    = fec?.saldo_final    ?? (saldoInicial + entLive - saiLive);
+          const isFechado     = fec?.status === 'fechado';
+          return { ...cx, fec, fechAnt, entLive, saiLive, saldoInicial, totalEntradas, totalSaidas, saldoFinal, isFechado };
+        });
+
+        const totalFechadas  = statusMes.filter(s => s.isFechado).length;
+        const totalPendentes = statusMes.filter(s => !s.isFechado).length;
+        const pctFechamento  = statusMes.length > 0 ? Math.round((totalFechadas / statusMes.length) * 100) : 0;
+        const [ano, mon]     = abaFechaMes.split('-');
+
         return (
           <div className="space-y-6">
             {/* Seletor de mês */}
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Mês / Ano</label>
                 <MonthPicker value={abaFechaMes} onChange={setAbaFechaMes} />
               </div>
-              {!isFechado && scope.canWrite && (
-                <button
-                  onClick={() => { setFechaSaldoInicial(String(saldoInicial)); setFechaObs(''); setShowFechaModal(true); }}
-                  className="flex items-center gap-2 px-5 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition mt-4"
-                >
-                  <Lock className="h-4 w-4" /> Fechar Mês
-                </button>
-              )}
-              {isFechado && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm font-semibold mt-4">
-                  <Lock className="h-4 w-4" /> Mês fechado em {fechAtual!.fechado_em ? fmtDate(fechAtual!.fechado_em.slice(0,10)) : '—'}
-                </div>
-              )}
             </div>
 
-            {/* Cards do mês */}
+            {/* KPIs de fechamento */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-slate-400 p-4 shadow-md">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Saldo Inicial</p>
-                <p className="text-xl font-bold text-gray-700">{fmtBRL(saldoInicial)}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{fechAnterior ? `do fechamento de ${fechAnterior.mes_referencia.split('-').reverse().join('/')}` : 'não há fechamento anterior'}</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Caixas</p>
+                <p className="text-2xl font-bold text-gray-700">{statusMes.length}</p>
               </div>
               <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-green-500 p-4 shadow-md">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Entradas</p>
-                <p className="text-xl font-bold text-green-600">{fmtBRL(fechAtual?.total_entradas ?? entMes)}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{doMesSel.filter(l => l.tipo_movimento === 'entrada').length} lançamentos</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Fechadas</p>
+                <p className="text-2xl font-bold text-green-600">{totalFechadas}</p>
               </div>
-              <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-red-500 p-4 shadow-md">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Saídas</p>
-                <p className="text-xl font-bold text-red-500">{fmtBRL(fechAtual?.total_saidas ?? saiMes)}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{doMesSel.filter(l => l.tipo_movimento === 'saida').length} lançamentos</p>
+              <div className="bg-white rounded-2xl border border-slate-200 border-t-4 border-t-yellow-500 p-4 shadow-md">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Pendentes</p>
+                <p className="text-2xl font-bold text-yellow-600">{totalPendentes}</p>
               </div>
-              <div className={`rounded-2xl border-2 p-4 shadow-md ${isFechado ? 'bg-green-50 border-green-500' : 'bg-white border-[#123b63]'}`}>
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Saldo Final</p>
-                <p className={`text-xl font-bold ${saldoFinal >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>{fmtBRL(saldoFinal)}</p>
-                {isFechado && <p className="text-xs text-green-600 mt-0.5 font-semibold">✓ Fechado</p>}
+              <div className={`rounded-2xl border-2 p-4 shadow-md ${pctFechamento === 100 ? 'bg-green-50 border-green-500' : pctFechamento >= 50 ? 'bg-yellow-50 border-yellow-400' : 'bg-white border-[#123b63]'}`}>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">% Fechamento</p>
+                <p className={`text-2xl font-bold ${pctFechamento === 100 ? 'text-green-600' : pctFechamento >= 50 ? 'text-yellow-600' : 'text-[#123b63]'}`}>{pctFechamento}%</p>
+                <p className="text-xs text-gray-400 mt-0.5">{MESES_LABEL[Number(mon) - 1]}/{ano}</p>
               </div>
             </div>
 
-            {/* Modal de fechamento */}
-            {showFechaModal && (
-              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 w-full max-w-md space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-base font-bold text-[#123b63]">Fechar Caixa — {MESES_LABEL[Number(mon) - 1]}/{ano}</h3>
-                    <button onClick={() => setShowFechaModal(false)}><X className="h-5 w-5 text-gray-400" /></button>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Saldo inicial do mês (R$)</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0,00"
-                      value={fechaSaldoInicial}
-                      onChange={e => setFechaSaldoInicial(e.target.value)}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                    />
-                    {fechAnterior && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Sugerido: {fmtBRL(fechAnterior.saldo_final)} (saldo de {fechAnterior.mes_referencia.split('-').reverse().join('/')})
-                      </p>
-                    )}
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-                    <div className="flex justify-between"><span className="text-gray-500">Entradas do mês:</span><span className="font-semibold text-green-600">{fmtBRL(entMes)}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">Saídas do mês:</span><span className="font-semibold text-red-500">{fmtBRL(saiMes)}</span></div>
-                    <div className="flex justify-between border-t pt-1 mt-1">
-                      <span className="text-gray-700 font-semibold">Saldo final:</span>
-                      <span className={`font-bold ${(parseFloat(fechaSaldoInicial.replace(',', '.')) || 0) + entMes - saiMes >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>
-                        {fmtBRL((parseFloat(fechaSaldoInicial.replace(',', '.')) || 0) + entMes - saiMes)}
-                      </span>
+            {/* Tabela de caixas por congregação */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-md">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4">
+                Situação de Caixa — {MESES_LABEL[Number(mon) - 1]}/{ano}
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b-2 border-slate-200">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Congregação</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Saldo Inicial</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-green-600">Entradas</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-red-500">Saídas</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Saldo Final</th>
+                      <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">Status</th>
+                      {scope.canWrite && <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">Ação</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {statusMes.map(cx => (
+                      <tr key={cx.id ?? '__sede__'} className="hover:bg-gray-50 transition">
+                        <td className="px-4 py-3 font-medium text-gray-700">{cx.nome}</td>
+                        <td className="px-4 py-3 text-right text-gray-600">{fmtBRL(cx.saldoInicial)}</td>
+                        <td className="px-4 py-3 text-right text-green-600 font-semibold">{fmtBRL(cx.totalEntradas)}</td>
+                        <td className="px-4 py-3 text-right text-red-500 font-semibold">{fmtBRL(cx.totalSaidas)}</td>
+                        <td className={`px-4 py-3 text-right font-bold ${cx.saldoFinal >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>{fmtBRL(cx.saldoFinal)}</td>
+                        <td className="px-4 py-3 text-center">
+                          {cx.isFechado
+                            ? <span className="flex items-center justify-center gap-1 text-green-700 text-xs font-semibold"><Lock className="h-3 w-3" /> Fechado</span>
+                            : <span className="flex items-center justify-center gap-1 text-yellow-600 text-xs font-semibold"><Unlock className="h-3 w-3" /> Aberto</span>
+                          }
+                        </td>
+                        {scope.canWrite && (
+                          <td className="px-4 py-3 text-center">
+                            {!cx.isFechado ? (
+                              <button
+                                onClick={() => {
+                                  setFechaCongId(cx.id);
+                                  setFechaSaldoInicial(String(cx.saldoInicial));
+                                  setFechaObs('');
+                                  setShowFechaModal(true);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#123b63] text-white rounded-lg text-xs font-semibold hover:bg-[#0f2a45] transition mx-auto"
+                              >
+                                <Lock className="h-3 w-3" /> Fechar
+                              </button>
+                            ) : cx.fec?.fechado_em ? (
+                              <span className="text-xs text-gray-400">{fmtDate(cx.fec.fechado_em.slice(0, 10))}</span>
+                            ) : null}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal de fechamento por congregação */}
+            {showFechaModal && (() => {
+              const cxModal = statusMes.find(cx => cx.id === fechaCongId) ?? statusMes[0];
+              const saldoIniNum = parseFloat(fechaSaldoInicial.replace(',', '.')) || 0;
+              const saldoFinalModal = saldoIniNum + (cxModal?.entLive ?? 0) - (cxModal?.saiLive ?? 0);
+              return (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 w-full max-w-md space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="text-base font-bold text-[#123b63]">Fechar Caixa</h3>
+                        <p className="text-sm text-gray-500">{cxModal?.nome} — {MESES_LABEL[Number(mon) - 1]}/{ano}</p>
+                      </div>
+                      <button onClick={() => { setShowFechaModal(false); setFechaCongId(null); }}><X className="h-5 w-5 text-gray-400" /></button>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Saldo inicial do mês (R$)</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        value={fechaSaldoInicial}
+                        onChange={e => setFechaSaldoInicial(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      />
+                      {cxModal?.fechAnt && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Sugerido: {fmtBRL(cxModal.fechAnt.saldo_final)} (saldo de {cxModal.fechAnt.mes_referencia.split('-').reverse().join('/')})
+                        </p>
+                      )}
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Entradas do mês:</span>
+                        <span className="font-semibold text-green-600">{fmtBRL(cxModal?.entLive ?? 0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Saídas do mês:</span>
+                        <span className="font-semibold text-red-500">{fmtBRL(cxModal?.saiLive ?? 0)}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-1 mt-1">
+                        <span className="text-gray-700 font-semibold">Saldo final:</span>
+                        <span className={`font-bold ${saldoFinalModal >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>
+                          {fmtBRL(saldoFinalModal)}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Observações</label>
+                      <textarea
+                        rows={2}
+                        value={fechaObs}
+                        onChange={e => setFechaObs(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none"
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleFecharMes}
+                        disabled={salvandoFecha}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition disabled:opacity-50"
+                      >
+                        <Lock className="h-4 w-4" /> {salvandoFecha ? 'Fechando...' : 'Confirmar Fechamento'}
+                      </button>
+                      <button
+                        onClick={() => { setShowFechaModal(false); setFechaCongId(null); }}
+                        className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
+                      >
+                        Cancelar
+                      </button>
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Observações</label>
-                    <textarea
-                      rows={2}
-                      value={fechaObs}
-                      onChange={e => setFechaObs(e.target.value)}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none"
-                    />
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleFecharMes}
-                      disabled={salvandoFecha}
-                      className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition disabled:opacity-50"
-                    >
-                      <Lock className="h-4 w-4" /> {salvandoFecha ? 'Fechando...' : 'Confirmar Fechamento'}
-                    </button>
-                    <button onClick={() => setShowFechaModal(false)} className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition">
-                      Cancelar
-                    </button>
-                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Histórico de fechamentos */}
             <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-md">
@@ -2102,6 +2543,7 @@ export default function TesourariaPage() {
                     <thead className="bg-slate-50 border-b-2 border-slate-200">
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Mês</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Congregação</th>
                         <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Saldo Inicial</th>
                         <th className="px-4 py-2 text-right text-xs font-semibold text-green-600">Entradas</th>
                         <th className="px-4 py-2 text-right text-xs font-semibold text-red-500">Saídas</th>
@@ -2110,24 +2552,34 @@ export default function TesourariaPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {fechamentos.map(f => {
-                        const [fy, fm] = f.mes_referencia.split('-');
-                        return (
-                          <tr key={f.id} className="hover:bg-gray-50 transition">
-                            <td className="px-4 py-3 font-semibold text-gray-700">{MESES_LABEL[Number(fm) - 1]}/{fy}</td>
-                            <td className="px-4 py-3 text-right text-gray-600">{fmtBRL(f.saldo_inicial)}</td>
-                            <td className="px-4 py-3 text-right text-green-600 font-semibold">{fmtBRL(f.total_entradas)}</td>
-                            <td className="px-4 py-3 text-right text-red-500 font-semibold">{fmtBRL(f.total_saidas)}</td>
-                            <td className={`px-4 py-3 text-right font-bold ${f.saldo_final >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>{fmtBRL(f.saldo_final)}</td>
-                            <td className="px-4 py-3 text-center">
-                              {f.status === 'fechado'
-                                ? <span className="flex items-center justify-center gap-1 text-green-700 text-xs font-semibold"><Lock className="h-3 w-3" /> Fechado</span>
-                                : <span className="flex items-center justify-center gap-1 text-yellow-600 text-xs font-semibold"><Unlock className="h-3 w-3" /> Aberto</span>
-                              }
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {fechamentos
+                        .slice()
+                        .sort((a, b) =>
+                          b.mes_referencia.localeCompare(a.mes_referencia) ||
+                          (a.congregacao_id ?? '').localeCompare(b.congregacao_id ?? ''),
+                        )
+                        .map(f => {
+                          const [fy, fm] = f.mes_referencia.split('-');
+                          const cxNome = f.congregacao_id
+                            ? (congregacoes.find(c => c.id === f.congregacao_id)?.nome ?? '—')
+                            : 'Sede / Caixa Geral';
+                          return (
+                            <tr key={f.id} className="hover:bg-gray-50 transition">
+                              <td className="px-4 py-3 font-semibold text-gray-700">{MESES_LABEL[Number(fm) - 1]}/{fy}</td>
+                              <td className="px-4 py-3 text-gray-600">{cxNome}</td>
+                              <td className="px-4 py-3 text-right text-gray-600">{fmtBRL(f.saldo_inicial)}</td>
+                              <td className="px-4 py-3 text-right text-green-600 font-semibold">{fmtBRL(f.total_entradas)}</td>
+                              <td className="px-4 py-3 text-right text-red-500 font-semibold">{fmtBRL(f.total_saidas)}</td>
+                              <td className={`px-4 py-3 text-right font-bold ${f.saldo_final >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>{fmtBRL(f.saldo_final)}</td>
+                              <td className="px-4 py-3 text-center">
+                                {f.status === 'fechado'
+                                  ? <span className="flex items-center justify-center gap-1 text-green-700 text-xs font-semibold"><Lock className="h-3 w-3" /> Fechado</span>
+                                  : <span className="flex items-center justify-center gap-1 text-yellow-600 text-xs font-semibold"><Unlock className="h-3 w-3" /> Aberto</span>
+                                }
+                              </td>
+                            </tr>
+                          );
+                        })}
                     </tbody>
                   </table>
                 </div>
@@ -2998,11 +3450,75 @@ export default function TesourariaPage() {
                 );
               })()}
 
-              {/* Categorias personalizadas */}
+              {/* Categorias personalizadas — hierarquia pai/filha */}
               {(() => {
-                const customFiltradas = categoriasFull.filter(c =>
-                  !c.is_sistema && (!filtroCatTipo || c.tipo_movimento === filtroCatTipo || c.tipo_movimento === 'ambos')
+                const customAll = categoriasFull.filter(c => !c.is_sistema);
+                const customFiltradas = customAll.filter(c =>
+                  !filtroCatTipo || c.tipo_movimento === filtroCatTipo || c.tipo_movimento === 'ambos'
                 );
+                // Separa pais e filhas
+                const pais  = customFiltradas.filter(c => !c.categoria_pai_id);
+                const filhas = customFiltradas.filter(c =>  c.categoria_pai_id);
+                // Filhas órfãs (pai não aparece na lista filtrada) — exibir sem indentação
+                const filhasOrfas = filhas.filter(f => !customFiltradas.some(p => p.id === f.categoria_pai_id));
+                const todasRaiz = [...pais, ...filhasOrfas];
+
+                const renderCat = (c: FinCategoriaFull, isChild = false) => (
+                  <div key={c.id} className={`flex items-center gap-3 px-4 py-2.5 ${!c.is_ativa ? 'opacity-50' : ''} ${isChild ? 'pl-10 border-l-2 border-gray-100 ml-4' : ''}`}>
+                    <span className="w-6 text-center text-sm">{c.icone || '🏷️'}</span>
+                    <span className="flex-1 text-sm text-gray-700 font-medium">
+                      {isChild && <span className="text-gray-400 mr-1">└</span>}
+                      {c.nome}
+                    </span>
+                    {c.codigo && <span className="text-xs text-gray-400">{c.codigo}</span>}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      c.tipo_movimento === 'entrada' ? 'bg-green-100 text-green-700' :
+                      c.tipo_movimento === 'saida'   ? 'bg-red-100 text-red-700'     :
+                                                       'bg-gray-100 text-gray-600'
+                    }`}>
+                      {c.tipo_movimento === 'entrada' ? 'Entrada' : c.tipo_movimento === 'saida' ? 'Saída' : 'Ambos'}
+                    </span>
+                    {c.cor && <span className="w-3 h-3 rounded-full border border-gray-200 shrink-0" style={{ backgroundColor: c.cor }} />}
+                    <span className={`text-xs font-semibold ${c.is_ativa ? 'text-green-600' : 'text-gray-400'}`}>
+                      {c.is_ativa ? 'Ativa' : 'Inativa'}
+                    </span>
+                    {scope.canDelete && (
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            setFormCat({
+                              nome: c.nome, tipo_movimento: c.tipo_movimento,
+                              codigo: c.codigo ?? '', cor: c.cor ?? '#6b7280',
+                              icone: c.icone ?? '', categoria_pai_id: c.categoria_pai_id ?? '',
+                              is_ativa: c.is_ativa,
+                            });
+                            setCatEditId(c.id);
+                            setShowCatModal(true);
+                          }}
+                          className="p-1 rounded hover:bg-blue-50 text-blue-600 transition"
+                          title="Editar"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleCatAtiva(c)}
+                          className="p-1 rounded hover:bg-gray-100 text-gray-500 transition text-xs"
+                          title={c.is_ativa ? 'Desativar' : 'Ativar'}
+                        >
+                          {c.is_ativa ? '⊙' : '○'}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelCat(c.id)}
+                          className="p-1 rounded hover:bg-red-50 text-red-500 transition"
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+
                 return (
                   <div>
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Categorias Personalizadas</h3>
@@ -3020,56 +3536,13 @@ export default function TesourariaPage() {
                       </div>
                     ) : (
                       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-gray-100">
-                        {customFiltradas.map(c => (
-                          <div key={c.id} className={`flex items-center gap-3 px-4 py-2.5 ${!c.is_ativa ? 'opacity-50' : ''}`}>
-                            <span className="w-6 text-center text-sm">{c.icone || '🏷️'}</span>
-                            <span className="flex-1 text-sm text-gray-700 font-medium">{c.nome}</span>
-                            {c.codigo && <span className="text-xs text-gray-400">{c.codigo}</span>}
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                              c.tipo_movimento === 'entrada' ? 'bg-green-100 text-green-700' :
-                              c.tipo_movimento === 'saida'   ? 'bg-red-100 text-red-700' :
-                                                               'bg-gray-100 text-gray-600'
-                            }`}>
-                              {c.tipo_movimento === 'entrada' ? 'Entrada' : c.tipo_movimento === 'saida' ? 'Saída' : 'Ambos'}
-                            </span>
-                            {c.cor && <span className="w-3 h-3 rounded-full border border-gray-200 shrink-0" style={{ backgroundColor: c.cor }} />}
-                            <span className={`text-xs font-semibold ${c.is_ativa ? 'text-green-600' : 'text-gray-400'}`}>
-                              {c.is_ativa ? 'Ativa' : 'Inativa'}
-                            </span>
-                            {scope.canDelete && (
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={() => {
-                                    setFormCat({
-                                      nome: c.nome, tipo_movimento: c.tipo_movimento,
-                                      codigo: c.codigo ?? '', cor: c.cor ?? '#6b7280',
-                                      icone: c.icone ?? '', categoria_pai_id: c.categoria_pai_id ?? '',
-                                      is_ativa: c.is_ativa,
-                                    });
-                                    setCatEditId(c.id);
-                                    setShowCatModal(true);
-                                  }}
-                                  className="p-1 rounded hover:bg-blue-50 text-blue-600 transition"
-                                  title="Editar"
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </button>
-                                <button
-                                  onClick={() => handleToggleCatAtiva(c)}
-                                  className="p-1 rounded hover:bg-gray-100 text-gray-500 transition text-xs"
-                                  title={c.is_ativa ? 'Desativar' : 'Ativar'}
-                                >
-                                  {c.is_ativa ? '⊙' : '○'}
-                                </button>
-                                <button
-                                  onClick={() => setConfirmDelCat(c.id)}
-                                  className="p-1 rounded hover:bg-red-50 text-red-500 transition"
-                                  title="Excluir"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
-                              </div>
-                            )}
+                        {todasRaiz.map(pai => (
+                          <div key={pai.id}>
+                            {renderCat(pai, false)}
+                            {filhas
+                              .filter(f => f.categoria_pai_id === pai.id)
+                              .map(filha => renderCat(filha, true))
+                            }
                           </div>
                         ))}
                       </div>
@@ -3225,6 +3698,641 @@ export default function TesourariaPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          ABA: ARRECADAÇÃO DIGITAL
+      ══════════════════════════════════════════════════════════════════════ */}
+      {aba === 'arrecadacao' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">Arrecadação Digital</h2>
+              <p className="text-sm text-gray-500">Links PIX, cobranças e webhooks</p>
+            </div>
+            {scope.canWrite && subAbaArr === 'destinos' && (
+              <button
+                onClick={() => { setFormDestino(emptyFormDestino()); setDestinoEditId(null); setShowDestinoModal(true); }}
+                className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-xl text-sm font-semibold hover:bg-[#1a4f85] transition"
+              >
+                <Plus className="h-4 w-4" /> Novo Destino
+              </button>
+            )}
+          </div>
+
+          {/* Sub-tabs */}
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+            {(['destinos', 'cobrancas', 'webhooks'] as SubAbaArrecadacao[]).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setSubAbaArr(tab)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+                  subAbaArr === tab ? 'bg-white shadow text-[#123b63]' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab === 'destinos' ? 'Destinos' : tab === 'cobrancas' ? 'Cobranças PIX' : 'Log Webhooks'}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Sub-aba: Destinos ────────────────────────────────── */}
+          {subAbaArr === 'destinos' && (<>
+
+          {/* Alerta de Gateway */}
+          {gatewayAtivo === false && (
+            <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800">Gateway ASAAS não configurado</p>
+                <p className="text-xs text-amber-600">Configure um gateway ativo para que os links PIX possam aceitar pagamentos.</p>
+              </div>
+              <a
+                href="/configuracoes"
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition"
+              >
+                <Settings className="h-3.5 w-3.5" /> Configurar Gateway
+              </a>
+            </div>
+          )}
+
+          {/* Filtros */}
+          <div className="flex flex-wrap gap-3">
+            <select
+              value={filtroDestinoStatus}
+              onChange={e => setFiltroDestinoStatus(e.target.value as '' | 'ativo' | 'inativo')}
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
+            >
+              <option value="">Todos os status</option>
+              <option value="ativo">Ativos</option>
+              <option value="inativo">Inativos</option>
+            </select>
+            <select
+              value={filtroDestinoTipo}
+              onChange={e => setFiltroDestinoTipo(e.target.value)}
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
+            >
+              <option value="">Todos os tipos</option>
+              {TIPOS_DESTINO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+            {congregacoes.length > 0 && !scope.isFinanceiroLocal && (
+              <select
+                value={filtroDestinoCong}
+                onChange={e => setFiltroDestinoCong(e.target.value)}
+                className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
+              >
+                <option value="">Todas as congregações</option>
+                {congregacoes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </select>
+            )}
+          </div>
+
+          {/* Lista */}
+          {loadingDestinos ? (
+            <div className="text-center py-12 text-gray-400 text-sm">Carregando destinos...</div>
+          ) : (() => {
+            const filtrados = destinos.filter(d => {
+              if (filtroDestinoStatus === 'ativo'   && !d.is_ativo) return false;
+              if (filtroDestinoStatus === 'inativo' && d.is_ativo)  return false;
+              if (filtroDestinoTipo && d.tipo_recebimento !== filtroDestinoTipo) return false;
+              if (filtroDestinoCong && d.congregacao_id !== filtroDestinoCong) return false;
+              return true;
+            });
+
+            if (filtrados.length === 0) {
+              return (
+                <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
+                  <QrCode className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 font-medium">Nenhum destino de arrecadação encontrado</p>
+                  {scope.canWrite && (
+                    <button
+                      onClick={() => { setFormDestino(emptyFormDestino()); setDestinoEditId(null); setShowDestinoModal(true); }}
+                      className="mt-3 text-sm text-[#123b63] font-semibold hover:underline"
+                    >
+                      + Criar primeiro destino
+                    </button>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {filtrados.map(dest => {
+                  const tipoInfo = TIPOS_DESTINO.find(t => t.value === dest.tipo_recebimento);
+                  const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/pagar/${dest.public_token}`;
+                  return (
+                    <div
+                      key={dest.id}
+                      className={`bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col gap-3 ${!dest.is_ativo ? 'opacity-60' : ''}`}
+                    >
+                      {/* Cabeçalho do card */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-gray-800 truncate">{dest.label}</p>
+                          {dest.congregacoes?.nome && (
+                            <p className="text-xs text-gray-400 truncate">{dest.congregacoes.nome}</p>
+                          )}
+                        </div>
+                        <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${tipoInfo?.cor ?? 'bg-gray-100 text-gray-700'}`}>
+                          {tipoInfo?.label ?? dest.tipo_recebimento}
+                        </span>
+                      </div>
+
+                      {/* Valor + arrecadado */}
+                      <div className="flex gap-4 text-sm flex-wrap">
+                        <div>
+                          <p className="text-xs text-gray-400">Valor</p>
+                          <p className="font-semibold text-gray-700">
+                            {dest.valor_fixo != null ? fmtBRL(dest.valor_fixo) : 'Aberto'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400">Arrecadado</p>
+                          <p className="font-semibold text-green-700">{fmtBRL(dest.total_arrecadado)}</p>
+                        </div>
+                        <div className="ml-auto flex flex-col items-end gap-1">
+                          <span className={`text-xs font-semibold ${dest.is_ativo ? 'text-green-600' : 'text-gray-400'}`}>
+                            {dest.is_ativo ? '● Ativo' : '○ Inativo'}
+                          </span>
+                          {dest.expires_at && (
+                            new Date(dest.expires_at) < new Date()
+                              ? <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">Expirado</span>
+                              : <span className="text-xs text-amber-600">Expira: {fmtDate(dest.expires_at.split('T')[0])}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Ações */}
+                      <div className="flex gap-2 flex-wrap pt-1 border-t border-gray-100">
+                        <button
+                          onClick={() => { setQrDestino({ token: dest.public_token, label: dest.label }); setShowQrModal(true); }}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-[#123b63] text-white rounded-lg text-xs font-semibold hover:bg-[#1a4f85] transition"
+                          title="Ver QR Code"
+                        >
+                          <QrCode className="h-3 w-3" /> QR Code
+                        </button>
+                        <button
+                          onClick={() => { void navigator.clipboard.writeText(link); showModal('Copiado!', 'Link copiado para a área de transferência.', 'success'); }}
+                          className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 text-gray-600 rounded-lg text-xs hover:bg-gray-50 transition"
+                          title="Copiar link"
+                        >
+                          <Copy className="h-3 w-3" /> Copiar Link
+                        </button>
+                        <a
+                          href={link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 text-gray-600 rounded-lg text-xs hover:bg-gray-50 transition"
+                          title="Abrir link"
+                        >
+                          <ExternalLink className="h-3 w-3" /> Abrir
+                        </a>
+                        {scope.canWrite && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setFormDestino({
+                                  label:            dest.label,
+                                  tipo_recebimento: dest.tipo_recebimento,
+                                  congregacao_id:   dest.congregacao_id ?? '',
+                                  conta_id:         '',
+                                  categoria_id:     '',
+                                  valor_fixo:       dest.valor_fixo != null ? String(dest.valor_fixo) : '',
+                                  descricao:        dest.descricao ?? '',
+                                  expires_at:       dest.expires_at ? new Date(dest.expires_at).toISOString().slice(0, 16) : '',
+                                });
+                                setDestinoEditId(dest.id);
+                                setShowDestinoModal(true);
+                              }}
+                              className="flex items-center gap-1 px-3 py-1.5 border border-blue-200 text-blue-600 rounded-lg text-xs hover:bg-blue-50 transition"
+                              title="Editar"
+                            >
+                              <Pencil className="h-3 w-3" /> Editar
+                            </button>
+                            <button
+                              onClick={() => void handleToggleDestino(dest)}
+                              className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 text-gray-500 rounded-lg text-xs hover:bg-gray-50 transition"
+                              title={dest.is_ativo ? 'Pausar' : 'Reativar'}
+                            >
+                              {dest.is_ativo ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+                              {dest.is_ativo ? 'Pausar' : 'Reativar'}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDelDestino(dest.id)}
+                              className="flex items-center gap-1 px-3 py-1.5 border border-red-200 text-red-500 rounded-lg text-xs hover:bg-red-50 transition"
+                              title="Excluir destino"
+                            >
+                              <Trash2 className="h-3 w-3" /> Excluir
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          </>)}
+
+          {/* ── Sub-aba: Cobranças PIX ─────────────────────────────────── */}
+          {subAbaArr === 'cobrancas' && (() => {
+            const cobrancasFiltradas = cobrancas.filter(c => {
+              if (cobrFiltroStatus && c.status !== cobrFiltroStatus) return false;
+              if (cobrFiltroDestino && c.destination_id !== cobrFiltroDestino) return false;
+              if (cobrFiltroCong && c.congregacao_nome !== congregacoes.find(cg => cg.id === cobrFiltroCong)?.nome) return false;
+              if (cobrFiltroStart && c.created_at.split('T')[0] < cobrFiltroStart) return false;
+              if (cobrFiltroEnd   && c.created_at.split('T')[0] > cobrFiltroEnd)   return false;
+              return true;
+            });
+            const statusColors: Record<string, string> = {
+              pendente: 'bg-yellow-100 text-yellow-800', pago: 'bg-green-100 text-green-800',
+              cancelado: 'bg-gray-100 text-gray-600',   expirado: 'bg-red-100 text-red-700',
+              estornado: 'bg-orange-100 text-orange-700',
+            };
+            return (
+              <div className="space-y-4">
+                {/* Filtros */}
+                <div className="flex flex-wrap gap-3">
+                  <select value={cobrFiltroStatus} onChange={e => setCobrFiltroStatus(e.target.value)} className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]">
+                    <option value="">Todos os status</option>
+                    <option value="pendente">Pendente</option>
+                    <option value="pago">Pago</option>
+                    <option value="cancelado">Cancelado</option>
+                    <option value="expirado">Expirado</option>
+                    <option value="estornado">Estornado</option>
+                  </select>
+                  <select value={cobrFiltroDestino} onChange={e => setCobrFiltroDestino(e.target.value)} className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]">
+                    <option value="">Todos os destinos</option>
+                    {destinos.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+                  </select>
+                  {congregacoes.length > 0 && !scope.isFinanceiroLocal && (
+                    <select value={cobrFiltroCong} onChange={e => setCobrFiltroCong(e.target.value)} className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]">
+                      <option value="">Todas as congregações</option>
+                      {congregacoes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                    </select>
+                  )}
+                  <input type="date" value={cobrFiltroStart} onChange={e => setCobrFiltroStart(e.target.value)} className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]" title="De" />
+                  <input type="date" value={cobrFiltroEnd}   onChange={e => setCobrFiltroEnd(e.target.value)}   className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]" title="Até" />
+                  <button onClick={() => void carregarCobrancas()} className="flex items-center gap-1 px-4 py-2 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition">
+                    <RefreshCw className="h-4 w-4" /> Atualizar
+                  </button>
+                </div>
+                {/* Resumo por congregação */}
+                {(() => {
+                  const pagas = cobrancasFiltradas.filter(c => c.status === 'pago');
+                  if (pagas.length === 0 || congregacoes.length === 0) return null;
+                  const porCong = congregacoes.map(cg => ({
+                    nome: cg.nome,
+                    total: pagas.filter(c => c.congregacao_nome === cg.nome)
+                      .reduce((s, c) => s + (c.valor_pago ?? c.valor_solicitado), 0),
+                    qtd: pagas.filter(c => c.congregacao_nome === cg.nome).length,
+                  })).filter(r => r.qtd > 0);
+                  const semCong = pagas.filter(c => !c.congregacao_nome);
+                  if (semCong.length > 0) porCong.push({
+                    nome: 'Caixa Geral',
+                    total: semCong.reduce((s, c) => s + (c.valor_pago ?? c.valor_solicitado), 0),
+                    qtd: semCong.length,
+                  });
+                  if (porCong.length < 2) return null;
+                  return (
+                    <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+                      <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-3">Resumo por Congregação (cobranças pagas)</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {porCong.sort((a, b) => b.total - a.total).map(r => (
+                          <div key={r.nome} className="bg-white rounded-xl p-3 border border-blue-100 shadow-sm">
+                            <p className="text-xs text-gray-500 font-medium truncate" title={r.nome}>{r.nome}</p>
+                            <p className="text-base font-bold text-green-700 mt-0.5">{fmtBRL(r.total)}</p>
+                            <p className="text-[10px] text-gray-400">{r.qtd} cobrança{r.qtd !== 1 ? 's' : ''}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Exportar */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => exportarCSVCobrancas(cobrancasFiltradas)}
+                    disabled={cobrancasFiltradas.length === 0}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 transition disabled:opacity-50"
+                  >
+                    <Download className="h-4 w-4" /> Exportar CSV ({cobrancasFiltradas.length})
+                  </button>
+                </div>
+                {/* Tabela */}
+                {loadingCobrancas ? (
+                  <div className="text-center py-12 text-gray-400 text-sm">Carregando cobranças...</div>
+                ) : cobrancasFiltradas.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
+                    <p className="text-gray-500 font-medium">Nenhuma cobrança encontrada</p>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-2xl border border-slate-200 overflow-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-600 text-left">
+                          <th className="px-4 py-3 font-semibold">Destino</th>
+                          <th className="px-4 py-3 font-semibold">Pagador</th>
+                          <th className="px-4 py-3 font-semibold">CPF/CNPJ</th>
+                          <th className="px-4 py-3 font-semibold">E-mail</th>
+                          <th className="px-4 py-3 font-semibold text-right">Valor</th>
+                          <th className="px-4 py-3 font-semibold text-center">Status</th>
+                          <th className="px-4 py-3 font-semibold text-right">Pgto.</th>
+                          <th className="px-4 py-3 font-semibold text-right">Criado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cobrancasFiltradas.map(c => (
+                          <tr key={c.id} className="border-t border-gray-100 hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <p className="font-medium truncate max-w-[140px]">{c.dest_label}</p>
+                              {c.congregacao_nome && <p className="text-xs text-gray-400">{c.congregacao_nome}</p>}
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">{c.payer_name ?? '—'}</td>
+                            <td className="px-4 py-3 text-gray-500 font-mono text-xs">{c.payer_document ?? '—'}</td>
+                            <td className="px-4 py-3 text-gray-500 text-xs">{c.payer_email ?? '—'}</td>
+                            <td className="px-4 py-3 text-right font-semibold">{fmtBRL(c.valor_pago ?? c.valor_solicitado)}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                {c.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-500 text-xs">{c.paid_at ? fmtDate(c.paid_at.split('T')[0]) : '—'}</td>
+                            <td className="px-4 py-3 text-right text-gray-400 text-xs">{fmtDate(c.created_at.split('T')[0])}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── Sub-aba: Log Webhooks ──────────────────────────────────── */}
+          {subAbaArr === 'webhooks' && (() => {
+            const webhooksFiltrados = webhookEvents.filter(w => {
+              if (webhookFiltroProcessado === 'sim' && !w.processed)                         return false;
+              if (webhookFiltroProcessado === 'nao' && (w.processed && !w.processing_error)) return false;
+              return true;
+            });
+            return (
+              <div className="space-y-4">
+                {/* Filtros */}
+                <div className="flex flex-wrap gap-3">
+                  <select value={webhookFiltroProcessado} onChange={e => setWebhookFiltroProcessado(e.target.value as '' | 'sim' | 'nao')} className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]">
+                    <option value="">Todos</option>
+                    <option value="sim">Processados com sucesso</option>
+                    <option value="nao">Não processados / Erro</option>
+                  </select>
+                  <button onClick={() => void carregarWebhookEvents()} className="flex items-center gap-1 px-4 py-2 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition">
+                    <RefreshCw className="h-4 w-4" /> Atualizar
+                  </button>
+                </div>
+                {/* Tabela */}
+                {loadingWebhooks ? (
+                  <div className="text-center py-12 text-gray-400 text-sm">Carregando webhooks...</div>
+                ) : webhooksFiltrados.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
+                    <p className="text-gray-500 font-medium">Nenhum evento de webhook encontrado</p>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-2xl border border-slate-200 overflow-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-600 text-left">
+                          <th className="px-4 py-3 font-semibold">Evento</th>
+                          <th className="px-4 py-3 font-semibold">Gateway Event ID</th>
+                          <th className="px-4 py-3 font-semibold text-center">Processado</th>
+                          <th className="px-4 py-3 font-semibold">Erro</th>
+                          <th className="px-4 py-3 font-semibold text-right">Recebido</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {webhooksFiltrados.map(w => (
+                          <tr key={w.id} className="border-t border-gray-100 hover:bg-gray-50">
+                            <td className="px-4 py-3 font-mono text-xs text-gray-700">{w.event_type}</td>
+                            <td className="px-4 py-3 font-mono text-xs text-gray-500">{w.gateway_event_id}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${w.processed && !w.processing_error ? 'bg-green-100 text-green-700' : w.processing_error ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                {w.processed && !w.processing_error ? 'OK' : w.processing_error ? 'Erro' : 'Pendente'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-red-600 max-w-[200px] truncate" title={w.processing_error ?? ''}>
+                              {w.processing_error ?? '—'}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-400 text-xs">{fmtDate(w.received_at.split('T')[0])}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── Modal: QR Code ─────────────────────────────────────────── */}
+          {showQrModal && qrDestino && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-gray-800">QR Code — {qrDestino.label}</h3>
+                  <button onClick={() => { setShowQrModal(false); setQrCopied(false); }} className="p-1 rounded hover:bg-gray-100">
+                    <X className="h-4 w-4 text-gray-500" />
+                  </button>
+                </div>
+
+                <div className="flex justify-center">
+                  <QRCodeSVG
+                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/pagar/${qrDestino.token}`}
+                    size={208}
+                    className="rounded-xl border border-gray-200 p-2"
+                  />
+                </div>
+
+                <div className="mt-4 flex gap-2">
+                  <input
+                    readOnly
+                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/pagar/${qrDestino.token}`}
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 truncate"
+                  />
+                  <button
+                    onClick={async () => {
+                      const link = `${window.location.origin}/pagar/${qrDestino.token}`;
+                      await navigator.clipboard.writeText(link);
+                      setQrCopied(true);
+                      setTimeout(() => setQrCopied(false), 2000);
+                    }}
+                    className="px-3 py-2 bg-[#123b63] text-white rounded-lg text-xs font-semibold hover:bg-[#1a4f85] transition"
+                  >
+                    {qrCopied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Modal: Criar / Editar Destino ──────────────────────────── */}
+          {showDestinoModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="font-bold text-gray-800">
+                    {destinoEditId ? 'Editar Destino' : 'Novo Destino de Arrecadação'}
+                  </h3>
+                  <button onClick={() => { setShowDestinoModal(false); setDestinoEditId(null); }} className="p-1 rounded hover:bg-gray-100">
+                    <X className="h-4 w-4 text-gray-500" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Label */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Nome/Label <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formDestino.label}
+                      onChange={e => setFormDestino(p => ({ ...p, label: e.target.value }))}
+                      placeholder="Ex.: Dízimo — Sede"
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
+                    />
+                  </div>
+
+                  {/* Tipo */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo de Recebimento <span className="text-red-500">*</span></label>
+                    <select
+                      value={formDestino.tipo_recebimento}
+                      onChange={e => setFormDestino(p => ({ ...p, tipo_recebimento: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
+                    >
+                      {TIPOS_DESTINO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Congregação */}
+                  {congregacoes.length > 0 && !scope.isFinanceiroLocal && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Congregação</label>
+                      <select
+                        value={formDestino.congregacao_id}
+                        onChange={e => setFormDestino(p => ({ ...p, congregacao_id: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
+                      >
+                        <option value="">Sem congregação específica</option>
+                        {congregacoes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Conta destino */}
+                  {contasFull.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Conta Destino</label>
+                      <select
+                        value={formDestino.conta_id}
+                        onChange={e => setFormDestino(p => ({ ...p, conta_id: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
+                      >
+                        <option value="">Conta padrão</option>
+                        {contasFull.filter(c => c.is_ativa).map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Valor */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Valor Fixo (R$)</label>
+                    <input
+                      type="number"
+                      value={formDestino.valor_fixo}
+                      onChange={e => setFormDestino(p => ({ ...p, valor_fixo: e.target.value }))}
+                      placeholder="Deixe vazio para valor aberto"
+                      min="0.01"
+                      step="0.01"
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Se vazio, o pagador informa o valor.</p>
+                  </div>
+
+                  {/* Descrição */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Descrição (opcional)</label>
+                    <textarea
+                      value={formDestino.descricao}
+                      onChange={e => setFormDestino(p => ({ ...p, descricao: e.target.value }))}
+                      rows={2}
+                      placeholder="Informações adicionais para o pagador"
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
+                    />
+                  </div>
+
+                  {/* Data de Expiração */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Data de Expiração (opcional)</label>
+                    <input
+                      type="datetime-local"
+                      value={formDestino.expires_at}
+                      onChange={e => setFormDestino(p => ({ ...p, expires_at: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Se preenchida, o link será bloqueado após essa data.</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => void handleSaveDestino()}
+                    disabled={savingDestino}
+                    className="flex-1 py-2.5 bg-[#123b63] text-white rounded-xl text-sm font-semibold hover:bg-[#1a4f85] transition disabled:opacity-60"
+                  >
+                    {savingDestino ? 'Salvando...' : destinoEditId ? 'Salvar alterações' : 'Criar destino'}
+                  </button>
+                  <button
+                    onClick={() => { setShowDestinoModal(false); setDestinoEditId(null); }}
+                    className="flex-1 py-2.5 border border-gray-300 text-gray-600 rounded-xl text-sm hover:bg-gray-50 transition"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Confirm Delete Destino ────────────────────────────────────────── */}
+      {confirmDelDestino && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
+            <h3 className="text-base font-bold text-gray-800 mb-2">Excluir Destino de Arrecadação</h3>
+            <p className="text-sm text-gray-600 mb-2">Esta ação não pode ser desfeita.</p>
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-5">
+              ⚠️ Cobranças PIX já geradas por este destino não serão afetadas, mas novos pagamentos não serão aceitos.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => void handleDeleteDestino(confirmDelDestino)}
+                className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition"
+              >
+                Excluir
+              </button>
+              <button
+                onClick={() => setConfirmDelDestino(null)}
+                className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

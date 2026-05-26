@@ -172,6 +172,7 @@ export default function FinanceiroPage() {
   const [contas, setContas] = useState<FinConta[]>([]);
   const [categorias, setCategorias] = useState<FinCategoria[]>([]);
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
+  const [lancamentosHistorico, setLancamentosHistorico] = useState<Lancamento[]>([]);
   const [grafico12m, setGrafico12m] = useState<MesDados[]>([]);
   const [fechamentos, setFechamentos] = useState<Fechamento[]>([]);
 
@@ -241,6 +242,25 @@ export default function FinanceiroPage() {
     }
   }, [ministryId, supabase, isFinanceiroLocal, congregacaoId]);
 
+  // ── Load histórico de lançamentos até o mês selecionado (para saldo acumulado) ──
+  const loadContasHistorico = useCallback(async (mes: string) => {
+    if (!ministryId) return;
+    try {
+      let q = supabase
+        .from('tesouraria_lancamentos')
+        .select('tipo_movimento, valor, tipo_recebimento, conta_id, categoria_id, congregacao_id')
+        .eq('ministry_id', ministryId)
+        .lt('data_lancamento', `${mesProximo(mes)}-01`);
+      if (isFinanceiroLocal && congregacaoId) {
+        q = q.eq('congregacao_id', congregacaoId);
+      }
+      const { data } = await q;
+      setLancamentosHistorico((data ?? []) as Lancamento[]);
+    } catch {
+      // silencioso — contasSaldo usará os dados que tiver
+    }
+  }, [ministryId, supabase, isFinanceiroLocal, congregacaoId]);
+
   // ── Load gráfico 12 meses ─────────────────────────────────────────────────
   const loadGrafico = useCallback(async () => {
     if (!ministryId) return;
@@ -283,6 +303,7 @@ export default function FinanceiroPage() {
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => { if (ministryId) { loadBase(); loadGrafico(); } }, [ministryId, loadBase, loadGrafico]);
   useEffect(() => { if (ministryId) loadLancamentos(filtroMes); }, [filtroMes, ministryId, loadLancamentos]);
+  useEffect(() => { if (ministryId) loadContasHistorico(filtroMes); }, [filtroMes, ministryId, loadContasHistorico]);
 
   // ── Derivados ─────────────────────────────────────────────────────────────
   const resumo = useMemo(() => {
@@ -301,7 +322,7 @@ export default function FinanceiroPage() {
 
   const contasSaldo = useMemo((): ContaSaldo[] => {
     const map = new Map<string | null, ContaSaldo>();
-    // Inicializa contas cadastradas
+    // Inicializa contas com saldo_inicial como base do saldo acumulado
     contas.forEach(c => {
       map.set(c.id, {
         id: c.id,
@@ -310,26 +331,33 @@ export default function FinanceiroPage() {
         saldo_inicial: Number(c.saldo_inicial),
         entradas: 0,
         saidas: 0,
-        saldo_estimado: Number(c.saldo_inicial),
+        saldo_estimado: Number(c.saldo_inicial), // base = saldo_inicial; será acumulado abaixo
         is_ativa: c.is_ativa,
       });
     });
     // Bucket "sem conta"
     map.set(null, { id: null, nome: 'Sem conta vinculada', tipo: '—', saldo_inicial: 0, entradas: 0, saidas: 0, saldo_estimado: 0, is_ativa: true });
-    // Acumula lançamentos do mês
+    // Saldo acumulado histórico (todos os lançamentos até o fim do mês selecionado)
+    lancamentosHistorico.forEach(l => {
+      const key = l.conta_id ?? null;
+      const entry = map.get(key) ?? map.get(null)!;
+      const v = Number(l.valor);
+      if (l.tipo_movimento === 'entrada') entry.saldo_estimado += v;
+      else entry.saldo_estimado -= v;
+    });
+    // Entradas e saídas do MÊS selecionado (para referência no período)
     lancamentos.forEach(l => {
       const key = l.conta_id ?? null;
       const entry = map.get(key) ?? map.get(null)!;
       const v = Number(l.valor);
       if (l.tipo_movimento === 'entrada') entry.entradas += v;
       else entry.saidas += v;
-      entry.saldo_estimado = entry.saldo_inicial + entry.entradas - entry.saidas;
     });
     // Remove "sem conta" se vazio
     const semConta = map.get(null)!;
-    if (semConta.entradas === 0 && semConta.saidas === 0) map.delete(null);
+    if (semConta.entradas === 0 && semConta.saidas === 0 && semConta.saldo_estimado === 0) map.delete(null);
     return Array.from(map.values());
-  }, [contas, lancamentos]);
+  }, [contas, lancamentos, lancamentosHistorico]);
 
   const categoriasEntrada = useMemo((): CategoriaTotal[] => {
     const map = new Map<string | null, CategoriaTotal>();
@@ -566,7 +594,7 @@ export default function FinanceiroPage() {
                   <th className="text-right pb-2 pr-4">Saldo inicial</th>
                   <th className="text-right pb-2 pr-4 text-green-700">Entradas</th>
                   <th className="text-right pb-2 pr-4 text-red-700">Saídas</th>
-                  <th className="text-right pb-2">Saldo estimado</th>
+                  <th className="text-right pb-2">Saldo acumulado</th>
                 </tr>
               </thead>
               <tbody>

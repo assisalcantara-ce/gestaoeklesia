@@ -68,12 +68,25 @@ export async function getOrCreateAsaasCustomer(
   cpfCnpj?: string | null
 ): Promise<string> {
   // Busca por e-mail primeiro
-  const search = await asaasRequest<{ data: Array<{ id: string }> }>(
+  const search = await asaasRequest<{ data: Array<{ id: string; cpfCnpj?: string | null }> }>(
     apiKey,
     `/customers?email=${encodeURIComponent(email)}&limit=1`,
     { method: 'GET' }
   );
-  if (search.data?.[0]?.id) return search.data[0].id;
+  if (search.data?.[0]?.id) {
+    const existing = search.data[0];
+    // Se temos CPF e o customer não tem, atualiza
+    if (cpfCnpj && !existing.cpfCnpj) {
+      const clean = cpfCnpj.replace(/\D/g, '');
+      if (clean.length >= 11) {
+        await asaasRequest(apiKey, `/customers/${existing.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ cpfCnpj: clean }),
+        }).catch(() => { /* ignora erro de atualização — tenta mesmo assim */ });
+      }
+    }
+    return existing.id;
+  }
 
   // Se tem CPF/CNPJ, tenta por documento
   if (cpfCnpj) {

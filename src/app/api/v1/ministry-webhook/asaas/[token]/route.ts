@@ -69,6 +69,157 @@ export async function POST(
 
   const ministryId = gw.ministry_id as string;
 
+  // ── Fase A: Arrecadação Digital — verificar fin_payment_charges ────────────
+  const { data: digitalCharge } = await admin
+    .from('fin_payment_charges')
+    .select('id, status, destination_id, valor_solicitado, valor_pago, tesouraria_lancamento_id')
+    .eq('gateway_charge_id', chargeId)
+    .eq('ministry_id', ministryId)
+    .maybeSingle();
+
+  if (digitalCharge) {
+    const now = new Date().toISOString();
+
+    // Log do evento (idempotência: UNIQUE(gateway, gateway_event_id))
+    const gatewayEventId = `${event}_${chargeId}`;
+    await admin
+      .from('fin_webhook_events')
+      .upsert(
+        {
+          ministry_id:      ministryId,
+          gateway:          'asaas',
+          event_type:       event,
+          gateway_event_id: gatewayEventId,
+          charge_id:        chargeId,
+          external_ref:     String((payload?.payment as Record<string, unknown>)?.externalReference ?? ''),
+          payload,
+          processed:        false,
+          destination_id:   digitalCharge.destination_id,
+          received_at:      now,
+        },
+        { onConflict: 'gateway,gateway_event_id', ignoreDuplicates: true }
+      )
+      .select('id')
+      .maybeSingle();
+
+    // ── Pagamento confirmado ────────────────────────────────────────────────
+    if (PAID_EVENTS.has(event)) {
+      // Idempotência: já processado e lançamento criado com sucesso
+      if (digitalCharge.status === 'pago' && digitalCharge.tesouraria_lancamento_id) {
+        return NextResponse.json({ received: true, skipped: 'already_paid' });
+      }
+
+      const valorPago = Number(
+        (payload?.payment as Record<string, unknown>)?.value ?? digitalCharge.valor_solicitado
+      );
+      const paidAt = String(
+        (payload?.payment as Record<string, unknown>)?.paymentDate ??
+        (payload?.payment as Record<string, unknown>)?.confirmedDate ??
+        now
+      );
+
+      // 1. Atualiza cobrança
+      await admin
+        .from('fin_payment_charges')
+        .update({
+          status:           'pago',
+          valor_pago:        valorPago,
+          paid_at:           paidAt,
+          gateway_response:  payload,
+          updated_at:        now,
+        })
+        .eq('id', digitalCharge.id);
+
+      // 2. Lança na tesouraria (idempotente)
+      let lancamentoId: string | null = digitalCharge.tesouraria_lancamento_id ?? null;
+
+      if (!lancamentoId) {
+        const { data: dest } = await admin
+          .from('fin_payment_destinations')
+          .select('congregacao_id, conta_id, categoria_id, tipo_recebimento, label')
+          .eq('id', digitalCharge.destination_id)
+          .single();
+
+        if (dest) {
+          // Mapeamento de tipos para valores válidos na constraint de tesouraria_lancamentos
+          const TIPO_MAP: Record<string, string> = {
+            dizimo:         'dizimo',
+            oferta:         'oferta',
+            missoes:        'missoes',
+            doacao:         'contribuicao',
+            campanha_local: 'campanha',
+            evento_local:   'evento',
+          };
+
+          const { data: lanc } = await admin
+            .from('tesouraria_lancamentos')
+            .insert({
+              ministry_id:      ministryId,
+              congregacao_id:   dest.congregacao_id ?? null,
+              conta_id:         dest.conta_id ?? null,
+              categoria_id:     dest.categoria_id ?? null,
+              tipo_movimento:   'entrada',
+              tipo_recebimento: TIPO_MAP[dest.tipo_recebimento] ?? 'contribuicao',
+              forma_pagamento:  'pix',
+              valor:            valorPago,
+              descricao:        `PIX — ${dest.label}`,
+              data_lancamento:  paidAt.slice(0, 10),
+              origem_modulo:    'gateway',
+              origem_id:        digitalCharge.id,
+            })
+            .select('id')
+            .single();
+
+          if (lanc?.id) {
+            lancamentoId = lanc.id;
+            await admin
+              .from('fin_payment_charges')
+              .update({ tesouraria_lancamento_id: lanc.id, updated_at: now })
+              .eq('id', digitalCharge.id);
+          }
+        }
+      }
+
+      // 3. Marca evento como processado
+      await admin
+        .from('fin_webhook_events')
+        .update({ processed: true, processed_at: now, lancamento_id: lancamentoId })
+        .eq('gateway', 'asaas')
+        .eq('gateway_event_id', gatewayEventId);
+
+      return NextResponse.json({ received: true, processed: 'digital_payment_paid' });
+    }
+
+    // ── Pagamento cancelado/expirado ────────────────────────────────────────
+    const CANCELLED_EVENTS = new Set([
+      'PAYMENT_DELETED',
+      'PAYMENT_CANCELED',
+      'PAYMENT_OVERDUE',
+      'PAYMENT_REFUNDED',
+    ]);
+
+    if (CANCELLED_EVENTS.has(event) && digitalCharge.status === 'pendente') {
+      const newStatus = event === 'PAYMENT_OVERDUE'  ? 'expirado'  :
+                        event === 'PAYMENT_REFUNDED'  ? 'estornado' : 'cancelado';
+
+      await admin
+        .from('fin_payment_charges')
+        .update({ status: newStatus, gateway_response: payload, updated_at: now })
+        .eq('id', digitalCharge.id);
+
+      await admin
+        .from('fin_webhook_events')
+        .update({ processed: true, processed_at: now })
+        .eq('gateway', 'asaas')
+        .eq('gateway_event_id', gatewayEventId);
+
+      return NextResponse.json({ received: true, processed: `digital_payment_${newStatus}` });
+    }
+
+    return NextResponse.json({ received: true, skipped: 'unhandled_digital_event' });
+  }
+  // ── Fim: Arrecadação Digital ────────────────────────────────────────────────
+
   // Busca o pagamento de evento pelo charge_id
   const { data: pag } = await admin
     .from('eventos_pagamentos')

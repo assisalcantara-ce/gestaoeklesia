@@ -52,6 +52,9 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
     'ebd-historico': 'ebd',
     'ebd-trimestres': 'ebd',
     'ebd-chamada': 'ebd',
+    // Presidência subpages
+    'conselho-fiscal':          'presidencia',
+    'prestacao-contas-oficial': 'presidencia',
   };
   useEffect(() => {
     if (parentMap[activeMenu]) setExpandedMenu(parentMap[activeMenu]);
@@ -97,7 +100,21 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
     { id: 'reunioes',         label: 'Reuniões',           icon: '🤝', path: '/reunioes',                   modulo: 'reunioes'   },
     { id: 'missoes',          label: 'Missões',            icon: '✈️', path: '/missoes',                    modulo: 'missoes'    },
     { id: 'eventos',          label: 'Eventos',            icon: '📅', path: '/eventos',                    modulo: 'eventos'    },
-    { id: 'presidencia',      label: 'Presidência',        icon: '👑', path: '/presidencia',  modulo: 'presidencia' },
+    {
+      id: 'presidencia',
+      label: 'Presidência',
+      icon: '👑',
+      path: '/presidencia',
+      modulo: 'presidencia',
+      submenu: [
+        { id: 'presidencia-geral',        label: 'Visão Geral',             icon: '📋', path: '/presidencia',                     modulo: 'presidencia'           },
+        { id: 'consolidado-financeiro',   label: 'Consolidado Financeiro',  icon: '🏛️', path: '/presidencia/consolidado',        modulo: 'consolidado_financeiro' },
+        { id: 'prestacao-contas',          label: 'Prestação de Contas',        icon: '📄', path: '/presidencia/prestacao-contas',          modulo: 'consolidado_financeiro' },
+        { id: 'prestacao-contas-oficial', label: 'Prestação de Contas Oficial', icon: '📋', path: '/presidencia/prestacao-contas-oficial', modulo: 'consolidado_financeiro' },
+        { id: 'auditoria-financeira',     label: 'Auditoria Financeira',       icon: '🔍', path: '/presidencia/auditoria',                modulo: 'consolidado_financeiro' },
+        { id: 'conselho-fiscal',          label: 'Conselho Fiscal',         icon: '⚖️', path: '/presidencia/conselho-fiscal',   modulo: 'conselho_fiscal'        },
+      ]
+    },
     { id: 'patrimonio',       label: 'Patrimônio',         icon: '🏢', path: '/patrimonio',                 modulo: 'patrimonio' },
     { id: 'achados-perdidos', label: 'Achados e Perdidos', icon: '🔍', path: '/secretaria/achados-perdidos', modulo: 'gestao' },
     { id: 'funcionarios',     label: 'Funcionários',       icon: '👔', path: '/secretaria/funcionarios',     modulo: 'gestao'     },

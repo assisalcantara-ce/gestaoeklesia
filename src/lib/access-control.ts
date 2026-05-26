@@ -6,7 +6,9 @@ export type NivelAcesso =
   | 'financeiro_local'
   | 'superintendente'
   | 'coordenador'
-  | 'operador';
+  | 'operador'
+  | 'presidencia'
+  | 'conselho_fiscal';
 
 export type RoleConfig = {
   role: 'admin' | 'manager' | 'operator';
@@ -29,6 +31,8 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'missoes',
     'patrimonio',
     'presidencia',
+    'consolidado_financeiro',
+    'conselho_fiscal',
     'suporte',
     'geolocalizacao',
     'comissao',
@@ -38,6 +42,9 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'financeiro',
     'tesouraria',
     'suporte',
+    'presidencia',
+    'consolidado_financeiro',
+    'conselho_fiscal',
   ],
   supervisor: [
     'secretaria',
@@ -64,6 +71,17 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
   operador: [
     'secretaria',
     'secretaria_local',
+  ],
+  presidencia: [
+    'dashboard',
+    'presidencia',
+    'consolidado_financeiro',
+    'conselho_fiscal',
+  ],
+  conselho_fiscal: [
+    'presidencia',
+    'consolidado_financeiro',
+    'conselho_fiscal',
   ],
 };
 
@@ -82,12 +100,15 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'missoes',
     'patrimonio',
     'presidencia',
+    'consolidado_financeiro',
+    'conselho_fiscal',
     'suporte',
     'geolocalizacao',
   ],
   financeiro: [
     'financeiro',
     'tesouraria',
+    'consolidado_financeiro',
   ],
   supervisor: [
     'secretaria',
@@ -107,6 +128,10 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
   ],
   operador: [
     'secretaria',
+  ],
+  presidencia: [],
+  conselho_fiscal: [
+    'conselho_fiscal',
   ],
 };
 
@@ -131,6 +156,8 @@ export function resolveNivel(role: string | null | undefined, permissions: unkno
   if (perms.includes('SUPERVISOR')) return 'supervisor';
   if (perms.includes('COORDENADOR')) return 'coordenador';
   if (perms.includes('OPERADOR')) return 'operador';
+  if (perms.includes('PRESIDENCIA')) return 'presidencia';
+  if (perms.includes('CONSELHO_FISCAL')) return 'conselho_fiscal';
 
   const map: Record<string, NivelAcesso> = {
     admin: 'administrador',
@@ -148,6 +175,8 @@ export function resolveNivel(role: string | null | undefined, permissions: unkno
     coordenador: 'coordenador',
     coordinator: 'coordenador',
     viewer: 'operador',
+    presidencia: 'presidencia',
+    conselho_fiscal: 'conselho_fiscal',
   };
 
   return map[roleNorm] ?? null;
@@ -179,6 +208,10 @@ export function mapRoleAndPermissions(nivel: NivelAcesso): RoleConfig {
       return { role: 'operator', permissions: ['COORDENADOR'] };
     case 'operador':
       return { role: 'operator', permissions: ['OPERADOR'] };
+    case 'presidencia':
+      return { role: 'operator', permissions: ['PRESIDENCIA'] };
+    case 'conselho_fiscal':
+      return { role: 'operator', permissions: ['CONSELHO_FISCAL'] };
   }
 }
 

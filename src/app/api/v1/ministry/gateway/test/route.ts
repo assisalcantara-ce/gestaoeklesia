@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveTenantAuth } from '@/lib/tenant-auth'
 import { decryptCredentials } from '@/lib/ministry-credentials'
+import { testEfiConnection } from '@/lib/efi-pay'
 
 type Gateway = 'asaas' | 'efi'
 const VALID_GATEWAYS: Gateway[] = ['asaas', 'efi']
@@ -124,10 +125,10 @@ export async function POST(request: NextRequest) {
       lastError = result.error ?? null
       newStatus = result.ok ? 'connected' : 'error'
     } else if (gateway === 'efi') {
-      // EFI: placeholder seguro — não marca como "connected" falsamente
-      testOk    = false
-      lastError = 'Teste de conexão EFI ainda não implementado. As credenciais foram salvas mas não foram verificadas contra a API.'
-      newStatus = gwRow.status ?? 'configured' // Não altera o status atual
+      const result = await testEfiConnection(credentials, gwRow.environment ?? 'sandbox')
+      testOk    = result.ok
+      lastError = result.error ?? null
+      newStatus = result.ok ? 'connected' : 'error'
     }
 
     const latencyMs = Date.now() - startedAt
@@ -139,12 +140,8 @@ export async function POST(request: NextRequest) {
       last_test_ok:          testOk,
       connection_latency_ms: latencyMs,
       last_error:            lastError,
+      status:                newStatus,
       updated_at:            testedAt,
-    }
-
-    // Status só é atualizado para ASAAS (EFI preserva o status existente)
-    if (gateway === 'asaas') {
-      updatePayload.status = newStatus
     }
 
     const { error: updateErr } = await ctx.admin

@@ -93,8 +93,8 @@ VALUES
   false, -- has_priority_support
   false, -- has_white_label
   false, -- has_automation
-  true,  -- has_modulo_financeiro (Tesouraria)
-  false, -- has_modulo_eventos
+  true,  -- has_modulo_financeiro
+  true,  -- has_modulo_eventos
   false, -- has_modulo_reunioes
   true,
   2
@@ -119,9 +119,9 @@ VALUES
   false, -- has_priority_support
   false, -- has_white_label
   false, -- has_automation
-  true,  -- has_modulo_financeiro (Tesouraria)
-  false, -- has_modulo_eventos
-  false, -- has_modulo_reunioes
+  true,  -- has_modulo_financeiro
+  true,  -- has_modulo_eventos
+  true,  -- has_modulo_reunioes
   true,
   3
 ),
@@ -146,8 +146,8 @@ VALUES
   false, -- has_white_label
   false, -- has_automation
   true,  -- has_modulo_financeiro (Tesouraria + futuro Financeiro avançado)
-  false, -- has_modulo_eventos
-  false, -- has_modulo_reunioes
+  true,  -- has_modulo_eventos
+  true,  -- has_modulo_reunioes
   true,
   4
 )
