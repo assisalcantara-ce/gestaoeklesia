@@ -6,6 +6,49 @@ import { getClientIp } from '@/lib/public-request'
 import { logPublicApiEvent } from '@/lib/public-api-audit'
 import { consumeRateLimit } from '@/lib/rate-limit-db'
 
+// ─── Helpers de log e erro ───────────────────────────────────────────────────
+
+/** Mascara email para logs: joao@exemplo.com → j***@exemplo.com */
+function maskEmail(email: string): string {
+  const [user, domain] = email.split('@')
+  if (!domain) return '***'
+  return `${user.slice(0, 1)}***@${domain}`
+}
+
+/**
+ * Mapeia erros do Supabase Auth para mensagens amigáveis em pt-BR.
+ * Nunca expõe detalhes internos sensíveis ao cliente.
+ */
+function mapAuthError(message: string): string {
+  const m = message.toLowerCase()
+  if (m.includes('already registered') || m.includes('already been registered') || m.includes('user already exists'))
+    return 'Este e-mail já possui uma conta. Tente fazer login ou recupere sua senha.'
+  if (m.includes('invalid email') || m.includes('unable to validate email'))
+    return 'E-mail inválido. Verifique e tente novamente.'
+  if (m.includes('password should be') || m.includes('password is too short') || m.includes('weak password'))
+    return 'Senha fraca. Use pelo menos 8 caracteres com letras e números.'
+  if (m.includes('rate limit') || m.includes('too many requests'))
+    return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
+  if (m.includes('network') || m.includes('fetch'))
+    return 'Erro de conexão. Verifique sua internet e tente novamente.'
+  if (m.includes('signup is disabled') || m.includes('signups not allowed'))
+    return 'Cadastros temporariamente desativados. Entre em contato com o suporte.'
+  // Retorna mensagem original sanitizada (sem stack trace — sem 's' flag para compatibilidade)
+  return message.split('\n')[0].slice(0, 200)
+}
+
+/** Loga etapa do signup sem dados sensíveis */
+function logStep(
+  step: string,
+  level: 'info' | 'warn' | 'error',
+  meta: Record<string, unknown>,
+) {
+  const entry = { '[SIGNUP]': step, ...meta, ts: new Date().toISOString() }
+  if (level === 'error') console.error(entry)
+  else if (level === 'warn')  console.warn(entry)
+  else                        console.log(entry)
+}
+
 export async function POST(request: NextRequest) {
   try {
     const upperText = (value?: string | null) => value?.trim().toUpperCase() || ''
@@ -223,21 +266,16 @@ export async function POST(request: NextRequest) {
     })
 
     if (signUpError || !signUpData.user) {
-      console.error('[SIGNUP] Erro no signup:', signUpError)
-
-      // Tratamento específico para email já registrado
-      const message = signUpError?.message || 'Erro ao criar usuário'
-      if (message.toLowerCase().includes('already') || message.toLowerCase().includes('registered')) {
-        return NextResponse.json(
-          { error: 'Este email já foi registrado. Faça login ou use outro email.' },
-          { status: 400 }
-        )
-      }
-
-      return NextResponse.json(
-        { error: message },
-        { status: 400 }
-      )
+      const rawMsg = signUpError?.message || 'Erro ao criar usuário'
+      logStep('auth.signUp falhou', 'error', {
+        email: maskEmail(emailValue),
+        plan: plan ?? 'N/A',
+        trial: trial,  // variável bruta do body (planLower/isTrialFlow ainda não declarados aqui)
+        errorCode: (signUpError as any)?.code,
+        errorStatus: (signUpError as any)?.status,
+        errorMessage: rawMsg,
+      })
+      return NextResponse.json({ error: mapAuthError(rawMsg) }, { status: 400 })
     }
 
     const { error: fingerprintError } = await supabaseAdmin
@@ -245,11 +283,21 @@ export async function POST(request: NextRequest) {
       .insert({ user_id: signUpData.user.id, fingerprint: passwordFingerprint })
 
     if (fingerprintError) {
-      await supabaseAdmin.auth.admin.deleteUser(signUpData.user.id)
-      return NextResponse.json(
-        { error: 'Nao foi possivel registrar a senha. Tente novamente.' },
-        { status: 400 }
-      )
+      // ⚠️ Registro de fingerprint é best-effort.
+      // A verificação de duplicidade já foi feita ANTES do signup.
+      // Se a tabela estiver indisponível ou com RLS, logamos e continuamos
+      // para não bloquear o cadastro por falha em sistema auxiliar de segurança.
+      logStep('fingerprint.insert falhou (non-fatal)', 'warn', {
+        email: maskEmail(emailValue),
+        plan: plan ?? 'N/A',
+        trial: trial,  // planValue/isTrialFlow ainda não declarados neste ponto
+        userId: signUpData.user.id,
+        errorCode: (fingerprintError as any)?.code,
+        errorMessage: fingerprintError?.message,
+        hint: (fingerprintError as any)?.hint,
+        details: (fingerprintError as any)?.details,
+      })
+      // Não aborta — segue para criar ministério
     }
 
     // Calcular data de expiração do trial (7 dias)
@@ -306,25 +354,27 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (prescadastroError) {
-      console.error('[SIGNUP] Erro ao salvar pré-cadastro:', prescadastroError)
+      logStep('pre_registrations.insert falhou', 'error', {
+        email: maskEmail(emailValue),
+        plan: planValue,
+        trial: isTrialFlow,
+        userId: signUpData.user?.id,
+        errorCode: (prescadastroError as any)?.code,
+        errorMessage: prescadastroError?.message,
+      })
 
-      // Se o banco bloqueou por duplicidade, tentar limpar o user recém-criado
       const pgCode = (prescadastroError as any)?.code
       if (pgCode === '23505' && signUpData.user?.id) {
-        try {
-          await supabaseAdmin.auth.admin.deleteUser(signUpData.user.id)
-        } catch {
-          // best-effort
-        }
-
+        try { await supabaseAdmin.auth.admin.deleteUser(signUpData.user.id) } catch { /* best-effort */ }
         return NextResponse.json(
-          { error: 'Já existe um pré-cadastro em andamento com este email/CPF/CNPJ.' },
+          { error: 'Já existe um pré-cadastro em andamento com este e-mail ou CPF/CNPJ. Verifique seu e-mail ou entre em contato com o suporte.' },
           { status: 409 }
         )
       }
 
+      try { await supabaseAdmin.auth.admin.deleteUser(signUpData.user.id) } catch { /* best-effort */ }
       return NextResponse.json(
-        { error: 'Erro ao completar cadastro: ' + (prescadastroError?.message || 'desconhecido') },
+        { error: `Erro ao salvar pré-cadastro (PRECAD_SAVE_FAILED). ${prescadastroError?.message || ''}`.trim() },
         { status: 400 }
       )
     }
@@ -384,11 +434,18 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (ministryError || !ministry) {
-      console.error('[SIGNUP] Erro ao criar ministério — executando rollback:', ministryError)
+      logStep('ministries.insert falhou — rollback iniciado', 'error', {
+        email: maskEmail(emailValue),
+        plan: planValue,
+        trial: isTrialFlow,
+        userId: signUpData.user?.id,
+        errorCode: (ministryError as any)?.code,
+        errorMessage: ministryError?.message,
+      })
       try { await supabaseAdmin.from('pre_registrations').delete().eq('id', prescadastro.id) } catch { /* best-effort */ }
       try { await supabaseAdmin.auth.admin.deleteUser(signUpData.user.id) } catch { /* best-effort */ }
       return NextResponse.json(
-        { error: 'Erro ao configurar o ministério. Tente novamente.' },
+        { error: 'Não foi possível configurar o ambiente da sua igreja (MINISTRY_CREATE_FAILED). Tente novamente ou entre em contato com o suporte.' },
         { status: 400 }
       )
     }
@@ -404,12 +461,20 @@ export async function POST(request: NextRequest) {
       })
 
     if (muError) {
-      console.error('[SIGNUP] Erro ao criar ministry_users — executando rollback:', muError)
+      logStep('ministry_users.insert falhou — rollback iniciado', 'error', {
+        email: maskEmail(emailValue),
+        plan: planValue,
+        trial: isTrialFlow,
+        userId: signUpData.user?.id,
+        ministryId: ministry.id,
+        errorCode: (muError as any)?.code,
+        errorMessage: muError?.message,
+      })
       try { await supabaseAdmin.from('ministries').delete().eq('id', ministry.id) } catch { /* best-effort */ }
       try { await supabaseAdmin.from('pre_registrations').delete().eq('id', prescadastro.id) } catch { /* best-effort */ }
       try { await supabaseAdmin.auth.admin.deleteUser(signUpData.user.id) } catch { /* best-effort */ }
       return NextResponse.json(
-        { error: 'Erro ao configurar permissões. Tente novamente.' },
+        { error: 'Não foi possível configurar as permissões de acesso (PERM_CREATE_FAILED). Tente novamente ou entre em contato com o suporte.' },
         { status: 400 }
       )
     }

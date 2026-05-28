@@ -116,6 +116,7 @@ export default function PreCadastroPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const successMessageRef = useRef<HTMLDivElement>(null);
+  const errorMessageRef = useRef<HTMLDivElement>(null);
   const [cepLoading, setCepLoading] = useState(false);
   const [cepError, setCepError] = useState('');
   const lastCepLookup = useRef('');
@@ -209,6 +210,13 @@ export default function PreCadastroPage() {
     }
   }, [success]);
 
+  useEffect(() => {
+    if (error && errorMessageRef.current) {
+      errorMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      errorMessageRef.current.focus();
+    }
+  }, [error]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -267,8 +275,8 @@ export default function PreCadastroPage() {
       return;
     }
 
-    if (!formData.password.trim() || formData.password.length < 6) {
-      setError('Senha deve ter no mínimo 6 caracteres.');
+    if (!formData.password.trim() || formData.password.length < 8) {
+      setError('Senha deve ter no mínimo 8 caracteres.');
       return;
     }
 
@@ -303,7 +311,16 @@ export default function PreCadastroPage() {
 
       const data = await response.json();
       if (!response.ok) {
-        setError(data?.error || 'Erro ao enviar. Tente novamente.');
+        const rawError: string = data?.error || 'Erro ao enviar. Tente novamente.'
+        // Mapeia mensagens da API para textos mais amigáveis
+        let friendlyError = rawError
+        if (rawError.includes('MINISTRY_CREATE_FAILED'))
+          friendlyError = 'Não foi possível criar o ambiente da sua igreja. Aguarde alguns minutos e tente novamente, ou fale com o suporte.'
+        else if (rawError.includes('PERM_CREATE_FAILED'))
+          friendlyError = 'Não foi possível configurar o acesso. Aguarde alguns minutos e tente novamente, ou fale com o suporte.'
+        else if (rawError.includes('PRECAD_SAVE_FAILED'))
+          friendlyError = 'Erro ao salvar os dados do pré-cadastro. Verifique os campos e tente novamente.'
+        setError(friendlyError);
         setLoading(false);
         return;
       }
@@ -466,7 +483,12 @@ export default function PreCadastroPage() {
             </div>
 
             {error && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div
+                ref={errorMessageRef}
+                role="alert"
+                tabIndex={-1}
+                className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 outline-none"
+              >
                 {error}
               </div>
             )}
@@ -553,7 +575,7 @@ export default function PreCadastroPage() {
                   value={formData.password}
                   onChange={handleChange}
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
-                  placeholder="Crie uma senha segura"
+                  placeholder="Mínimo 8 caracteres"
                 />
                 <p className="text-xs text-slate-500 mt-1">Senha do acesso expira em 7 dias se o plano nao for ativado.</p>
               </div>
