@@ -203,7 +203,6 @@ export default function MembrosPage() {
       (cf as any).cargoMinisterial ||
       (cf as any).cargo_ministerial ||
       member.cargo_ministerial ||
-      member.profissao ||
       ''
     );
     const stableUniqueId =
@@ -1042,7 +1041,7 @@ export default function MembrosPage() {
       membro.matricula,
       membro.nome,
       membro.cpf,
-      membro.cargoMinisterial || '-',
+      membro.cargoMinisterial || '',
       (membro as any).dadosCargos?.dataConsagracao
         ? new Date((membro as any).dadosCargos.dataConsagracao).toLocaleDateString('pt-BR')
         : (membro as any).dataConsagracao
@@ -2491,7 +2490,7 @@ export default function MembrosPage() {
                       </td>
                       <td className="border border-gray-300 px-4 py-3 text-gray-700">{membro.nome}</td>
                       <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.cpf}</td>
-                      <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.cargoMinisterial || '-'}</td>
+                      <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.cargoMinisterial || ''}</td>
                       <td className="border border-gray-300 px-4 py-3 text-gray-600">
                         {membro.dataConsagracao
                           ? new Date(membro.dataConsagracao + 'T00:00:00').toLocaleDateString('pt-BR')

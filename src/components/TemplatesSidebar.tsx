@@ -199,9 +199,19 @@ export function TemplatesSidebar({
                                                     ativo: true
                                                 };
 
-                                                const novosTemplates = [...templates, templateEditavel];
-                                                setTemplates(novosTemplates); // Page.tsx dispara o salvar no LocalStorage
-                                                ativarTemplate(templateEditavel.id); // Ajusta o Ativo
+                                                // Desativar outros templates do mesmo tipo para evitar múltiplos ativos
+                                                const novosTemplates = [
+                                                    ...templates.map((t: any) => {
+                                                        if ((t.tipoCadastro || t.tipo) === tipoCadastroAtivo) {
+                                                            return { ...t, ativo: false };
+                                                        }
+                                                        return t;
+                                                    }),
+                                                    templateEditavel
+                                                ];
+                                                setTemplates(novosTemplates);
+                                                // Definir diretamente sem usar ativarTemplate (evita stale closure)
+                                                setTemplateEmEdicao(templateEditavel);
 
                                                 setModalSucesso({
                                                     isOpen: true,

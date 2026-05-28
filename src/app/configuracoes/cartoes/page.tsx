@@ -668,7 +668,7 @@ export default function ConfiguracaoCartoesPage() {
     const indexExistente = novasTemplates.findIndex(t => t.id === templateCorrigido.id);
 
     // Se for um ID de template oficial/editável (podem ser salvos como branco), remover qualquer versão antiga antes de adicionar a nova
-    const TEMPLATES_EDITABLE = ['membro-01', 'membro-02', 'membro-classico', 'congregado-01', 'congregado-02', 'congregado-branco', 'congregado-moderno', 'ministro-classico', 'ministro-02'];
+    const TEMPLATES_EDITABLE = ['membro-01', 'membro-02', 'membro-classico', 'membro-branco', 'congregado-01', 'congregado-02', 'congregado-branco', 'congregado-moderno', 'ministro-classico', 'ministro-02', 'ministro-branco', 'funcionario-branco'];
     if (TEMPLATES_EDITABLE.includes(templateCorrigido.id)) {
       if (indexExistente >= 0) {
         console.log('🧹 Removendo versão antiga do template para garantir integridade...');
