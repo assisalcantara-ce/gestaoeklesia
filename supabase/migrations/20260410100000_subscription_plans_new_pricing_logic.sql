@@ -94,7 +94,7 @@ VALUES
   false, -- has_white_label
   false, -- has_automation
   true,  -- has_modulo_financeiro
-  true,  -- has_modulo_eventos
+  false, -- has_modulo_eventos (somente Profissional)
   false, -- has_modulo_reunioes
   true,
   2
@@ -120,7 +120,7 @@ VALUES
   false, -- has_white_label
   false, -- has_automation
   true,  -- has_modulo_financeiro
-  true,  -- has_modulo_eventos
+  false, -- has_modulo_eventos (somente Profissional)
   true,  -- has_modulo_reunioes
   true,
   3

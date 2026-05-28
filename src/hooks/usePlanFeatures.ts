@@ -19,7 +19,7 @@ export interface PlanFeatures {
 const DEFAULT_FEATURES: PlanFeatures = {
   has_modulo_financeiro: true,
   has_modulo_financeiro_avancado: false,
-  has_modulo_eventos: true,
+  has_modulo_eventos: false, // somente Profissional
   has_modulo_reunioes: true,
   subscription_status: null,
   subscription_end_date: null,
@@ -74,7 +74,7 @@ export function usePlanFeatures(): PlanFeatures {
           setFeatures({
             has_modulo_financeiro: plan?.has_modulo_financeiro ?? true,
             has_modulo_financeiro_avancado: plan?.has_modulo_financeiro_avancado ?? false,
-            has_modulo_eventos: plan?.has_modulo_eventos ?? true,
+            has_modulo_eventos: plan?.has_modulo_eventos ?? false, // fail-closed
             has_modulo_reunioes: plan?.has_modulo_reunioes ?? true,
             subscription_status: (ministry as any)?.subscription_status ?? null,
             subscription_end_date: (ministry as any)?.subscription_end_date ?? null,

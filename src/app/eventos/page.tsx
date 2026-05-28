@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import PageLayout from '@/components/PageLayout';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import {
@@ -243,7 +245,17 @@ const exportarCSVInscricoes = (inscricoes: Inscricao[], tituloEvento: string) =>
 export default function EventosPage() {
   const { user }           = useRequireSupabaseAuth();
   const { ctx, bloqueado } = useRequireModulo('eventos');
+  const planFeatures       = usePlanFeatures();
+  const router             = useRouter();
   const supabase           = createClient();
+
+  // Guard de plano: módulo Eventos é exclusivo do plano Profissional.
+  // Protege contra acesso direto pela URL mesmo que o menu esteja oculto.
+  useEffect(() => {
+    if (!planFeatures.loading && !planFeatures.has_modulo_eventos) {
+      router.replace('/acesso-negado');
+    }
+  }, [planFeatures.loading, planFeatures.has_modulo_eventos, router]);
 
   // ── Estado global ─────────────────────────────────────────────────────────
   const [ministryId,   setMinistryId]   = useState<string | null>(null);
@@ -639,8 +651,8 @@ export default function EventosPage() {
   };
 
   // ── Guard ──────────────────────────────────────────────────────────────────
-  if (ctx.loading || loadingData) return <div className="p-8 text-gray-500">Carregando...</div>;
-  if (bloqueado) return null;
+  if (ctx.loading || planFeatures.loading || loadingData) return <div className="p-8 text-gray-500">Carregando...</div>;
+  if (bloqueado || !planFeatures.has_modulo_eventos) return null;
 
   // ─── JSX ───────────────────────────────────────────────────────────────────
 
