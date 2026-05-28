@@ -658,6 +658,12 @@ export default function ConfiguracaoCartoesPage() {
       }
     }
 
+    // --- MINIATURA DO MODELO PERSONALIZADO ---
+    // Para templates com background enviado pelo usuário (data URL), usar como miniatura na sidebar
+    if (templateCorrigido.backgroundUrl && templateCorrigido.backgroundUrl.startsWith('data:')) {
+      templateCorrigido = { ...templateCorrigido, previewImage: templateCorrigido.backgroundUrl };
+    }
+
     console.log('💾 Salvando template:', templateCorrigido);
 
     let templateParaSalvarId = templateCorrigido.id;
