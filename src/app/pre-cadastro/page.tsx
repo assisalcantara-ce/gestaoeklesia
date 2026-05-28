@@ -65,8 +65,11 @@ const formatCep = (value: string) => {
 
 export default function PreCadastroPage() {
   const searchParams = useSearchParams();
-  const planParam = useMemo(() => (searchParams.get('plan') || '').toLowerCase().trim(), [searchParams]);
-  const supabase = useMemo(() => createClient(), []);
+  const planParam  = useMemo(() => (searchParams.get('plan')  || '').toLowerCase().trim(), [searchParams]);
+  // isTrial: fluxo originado pelo botão "Teste grátis" da home.
+  // Quando true, o plano é fixado em Starter e não pode ser alterado pelo usuário.
+  const isTrial    = useMemo(() => searchParams.get('trial') === 'true', [searchParams]);
+  const supabase   = useMemo(() => createClient(), []);
 
   const [planos, setPlanos] = useState<PlanoDB[]>([]);
   const [planoAtivo, setPlanoAtivo] = useState<PlanoDB | null>(null);
@@ -128,14 +131,16 @@ export default function PreCadastroPage() {
       .then(({ data }: { data: PlanoDB[] | null }) => {
         if (!data?.length) return;
         setPlanos(data);
+        // Fluxo de teste grátis: plano sempre Starter, independente do parâmetro da URL.
+        const targetSlug = isTrial ? 'starter' : planParam;
         const matched =
-          data.find((p) => p.slug?.toLowerCase() === planParam) ||
-          data.find((p) => p.name?.toLowerCase() === planParam) ||
+          data.find((p) => p.slug?.toLowerCase() === targetSlug) ||
+          data.find((p) => p.name?.toLowerCase() === targetSlug) ||
           data[0];
         setPlanoAtivo(matched);
         setFormData((prev) => ({ ...prev, plan: matched?.slug || matched?.name || prev.plan }));
       });
-  }, [supabase, planParam]);
+  }, [supabase, planParam, isTrial]);
 
   // Sincroniza planoAtivo ao mudar select
   useEffect(() => {
@@ -291,7 +296,8 @@ export default function PreCadastroPage() {
           address_city: formData.address_city,
           address_state: formData.address_state,
           description: formData.description,
-          plan: formData.plan
+          plan: isTrial ? 'starter' : formData.plan,
+          trial: isTrial,
         })
       });
 
@@ -388,7 +394,7 @@ export default function PreCadastroPage() {
             <div className="rounded-2xl bg-white/90 border border-[#e7e0d6] p-6 space-y-4 shadow-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm uppercase tracking-[0.3em] text-emerald-700">Plano escolhido</span>
-                <span className="text-sm text-slate-500">07 dias grátis</span>
+                <span className="text-sm text-slate-500">{isTrial ? '🔒 Teste grátis — Starter' : '07 dias grátis'}</span>
               </div>
               <p className="text-3xl font-bold text-slate-900">
                 {planoAtivo?.name || 'Carregando...'}
@@ -494,18 +500,25 @@ export default function PreCadastroPage() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Plano</label>
-                <select
-                  name="plan"
-                  value={formData.plan}
-                  onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
-                >
-                  {planos.map((p) => (
-                    <option key={p.id} value={p.slug || p.name.toLowerCase()}>
-                      {p.name} — {formatarPreco(p.price_monthly)}/mês
-                    </option>
-                  ))}
-                </select>
+                {isTrial ? (
+                  <div className="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span><strong>Starter</strong> — plano fixo para o período de teste grátis</span>
+                  </div>
+                ) : (
+                  <select
+                    name="plan"
+                    value={formData.plan}
+                    onChange={handleChange}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
+                  >
+                    {planos.map((p) => (
+                      <option key={p.id} value={p.slug || p.name.toLowerCase()}>
+                        {p.name} — {formatarPreco(p.price_monthly)}/mês
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 

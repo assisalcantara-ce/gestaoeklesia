@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
       address_state,
       description,
       plan,
+      trial,
     } = body
 
     const ministryName = upperText(ministerio)
@@ -263,9 +264,15 @@ export async function POST(request: NextRequest) {
     const planosList = (planosValidos || []) as { id: string; slug: string }[]
     const slugsValidos = new Set(planosList.map((p) => p.slug?.toLowerCase()).filter(Boolean))
     const planLower = typeof plan === 'string' ? plan.toLowerCase() : ''
-    const planValue = slugsValidos.has(planLower)
-      ? planLower
-      : (slugsValidos.size > 0 ? [...slugsValidos][0] : 'basic')
+    const isTrialFlow = trial === true || trial === 'true'
+
+    // Segurança: fluxo de teste gratuito (trial=true) sempre usa Starter.
+    // Impede manipulação de ?plan=profissional no fluxo de teste grátis.
+    const planValue = isTrialFlow
+      ? 'starter'
+      : (slugsValidos.has(planLower)
+          ? planLower
+          : (slugsValidos.size > 0 ? [...slugsValidos][0] : 'basic'))
     const planRow = planosList.find((p) => p.slug?.toLowerCase() === planValue) || null
 
     // Salvar pré-cadastro na tabela pre_registrations

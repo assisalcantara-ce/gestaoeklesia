@@ -552,7 +552,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-wrap gap-4">
               <a
-                href="#planos"
+                href="/pre-cadastro?plan=starter&trial=true"
                 className="px-6 py-3 bg-emerald-700 text-white rounded-full font-bold hover:bg-emerald-800 transition"
               >
                 Teste grátis por 7 dias — sem compromisso
