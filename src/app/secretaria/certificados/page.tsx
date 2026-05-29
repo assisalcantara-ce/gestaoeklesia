@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Sidebar from '@/components/Sidebar';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
@@ -23,7 +22,6 @@ export default function SecretariaCertificadosPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
-  const [activeMenu, setActiveMenu] = useState('certificados');
   const [templates, setTemplates] = useState<CertificadoTemplate[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
@@ -41,10 +39,7 @@ export default function SecretariaCertificadosPage() {
   if (loadingData) return <div className="p-8">Carregando...</div>;
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-
-      <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden">
         <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Certificados</h1>
@@ -117,6 +112,6 @@ export default function SecretariaCertificadosPage() {
           )}
         </div>
       </div>
-    </div>
+
   );
 }

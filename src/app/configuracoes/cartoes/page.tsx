@@ -3,7 +3,6 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useRef, useEffect } from 'react';
-import Sidebar from '@/components/Sidebar';
 import { TemplatesSidebar } from '@/components/TemplatesSidebar';
 import InteractiveCanvas from '@/components/InteractiveCanvas';
 import { RichTextEditor } from '@/components/RichTextEditor';
@@ -123,7 +122,6 @@ const PLACEHOLDERS_DISPONIVEIS = [
 export default function ConfiguracaoCartoesPage() {
   const supabase = createClient();
 
-  const [activeMenu, setActiveMenu] = useState('cartoes');
   const [tipoCadastroAtivo, setTipoCadastroAtivo] = useState<'membro' | 'congregado' | 'ministro' | 'funcionario'>('membro');
   const [_nomenclaturas, setNomenclaturasState] = useState<any>(null);
   const [placeholdersDisponiveis, setPlaceholdersDisponiveis] = useState(PLACEHOLDERS_DISPONIVEIS);
@@ -984,10 +982,7 @@ export default function ConfiguracaoCartoesPage() {
   // };
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-
-      <div className="flex-1 overflow-hidden flex flex-col">
+    <div className="flex-1 overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 p-6">
           <h1 className="text-3xl font-bold text-gray-800">⚙️ Configuração de Cartões</h1>
@@ -1686,7 +1681,6 @@ export default function ConfiguracaoCartoesPage() {
             </div>
           )}
         </div>
-      </div>
 
       {/* Modal de Sucesso Customizado */}
       {

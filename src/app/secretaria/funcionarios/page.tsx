@@ -3,7 +3,6 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import Sidebar from '@/components/Sidebar';
 import NotificationModal from '@/components/NotificationModal';
 import { createClient } from '@/lib/supabase-client';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
@@ -108,7 +107,6 @@ export default function GerenciarFuncionarios() {
   const [filtroStatus, setFiltroStatus] = useState('ATIVO');
   const [modalSucesso, setModalSucesso] = useState<{ isOpen: boolean; title: string; message: string; type: 'success' | 'error' | 'warning' | 'info' }>({ isOpen: false, title: '', message: '', type: 'success' });
   const [abaAtiva, setAbaAtiva] = useState<'cadastro' | 'lista'>('cadastro');
-  const [activeMenu, setActiveMenu] = useState<string>('funcionarios');
   const [gruposFuncao, setGruposFuncao] = useState(GRUPOS_FUNCAO_BASE);
   const [funcoes, setFuncoes] = useState(FUNCOES_BASE);
   const [novoGrupo, setNovoGrupo] = useState('');
@@ -514,10 +512,7 @@ export default function GerenciarFuncionarios() {
   if (bloqueado) return null;
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-
-      <div className="flex-1 overflow-auto">
+    <div className="flex-1 overflow-auto">
         <div className="p-6 max-w-7xl mx-auto">
           {/* Cabeçalho */}
           <div className="mb-6">
@@ -1131,7 +1126,6 @@ export default function GerenciarFuncionarios() {
             </div>
           )}
         </div>
-      </div>
 
       <NotificationModal
         isOpen={modalSucesso.isOpen}

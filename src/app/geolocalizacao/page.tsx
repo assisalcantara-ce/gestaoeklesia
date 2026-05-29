@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import nextDynamic from 'next/dynamic';
-import Sidebar from '@/components/Sidebar';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { buscarMembrosFiltrados, buscarCidades } from '@/lib/geolocation-utils';
 import type { Membro, Marcador } from '@/lib/geolocation-utils';
@@ -79,32 +78,26 @@ export default function GeolocalizacaoPage() {
   // Chave ausente: exibe aviso mas não quebra
   if (!GOOGLE_MAPS_KEY) {
     return (
-      <div className="flex h-screen bg-gray-50">
-        <Sidebar activeMenu="geolocalizacao" setActiveMenu={() => {}} />
-        <main className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center max-w-md bg-white rounded-xl shadow p-8">
-            <div className="text-5xl mb-4">🗺️</div>
-            <h2 className="text-xl font-bold text-gray-800 mb-2">Mapa indisponível</h2>
-            <p className="text-gray-600 text-sm leading-relaxed">
-              A variável{' '}
-              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">
-                NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-              </code>{' '}
-              não está configurada. Adicione-a ao arquivo{' '}
-              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">.env.local</code>{' '}
-              para habilitar o mapa interativo.
-            </p>
-          </div>
-        </main>
-      </div>
+      <main className="flex-1 flex items-center justify-center p-8">
+        <div className="text-center max-w-md bg-white rounded-xl shadow p-8">
+          <div className="text-5xl mb-4">🗺️</div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Mapa indisponível</h2>
+          <p className="text-gray-600 text-sm leading-relaxed">
+            A variável{' '}
+            <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">
+              NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+            </code>{' '}
+            não está configurada. Adicione-a ao arquivo{' '}
+            <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">.env.local</code>{' '}
+            para habilitar o mapa interativo.
+          </p>
+        </div>
+      </main>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar activeMenu="geolocalizacao" setActiveMenu={() => {}} />
-
-      <main className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden">
         {/* CABEÇALHO */}
         <div className="bg-white border-b px-6 py-4 flex-shrink-0">
           <h1 className="text-xl font-bold text-gray-800">📍 Geolocalização</h1>
@@ -238,7 +231,7 @@ export default function GeolocalizacaoPage() {
             </div>
           </div>
         </div>
-      </main>
+
     </div>
   );
 }

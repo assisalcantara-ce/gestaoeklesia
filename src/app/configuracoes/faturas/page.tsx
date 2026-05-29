@@ -3,10 +3,9 @@
 export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
-import Sidebar from '@/components/Sidebar';
 
 export default function FaturasPage() {
-  const [activeMenu, setActiveMenu] = useState('faturas');
+
   const [filterStatus, setFilterStatus] = useState('TODAS');
 
   const faturas = [
@@ -84,10 +83,7 @@ export default function FaturasPage() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-
-      <div className="flex-1 overflow-auto">
+    <div className="flex-1 overflow-auto">
         <div className="p-6">
           {/* Header */}
           <h1 className="text-3xl font-bold text-gray-800 mb-6">📄 Faturas</h1>
@@ -173,6 +169,5 @@ export default function FaturasPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

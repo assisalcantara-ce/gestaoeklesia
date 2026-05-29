@@ -3,12 +3,11 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import Sidebar from '@/components/Sidebar';
 import { createClient } from '@/lib/supabase-client';
 import { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase } from '@/lib/igreja-config-utils';
 
 export default function BrandingPage() {
-  const [activeMenu, setActiveMenu] = useState('branding');
+
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const supabase = createClient();
 
@@ -47,10 +46,7 @@ export default function BrandingPage() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-
-      <div className="flex-1 overflow-auto">
+    <div className="flex-1 overflow-auto">
         <div className="p-6">
           {/* Header */}
           <h1 className="text-3xl font-bold text-gray-800 mb-6">🎨 Branding - Logomarca</h1>
@@ -138,6 +134,5 @@ export default function BrandingPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

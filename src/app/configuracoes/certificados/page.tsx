@@ -3,7 +3,6 @@
 export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Sidebar from '@/components/Sidebar';
 import InteractiveCanvas from '@/components/InteractiveCanvas';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
@@ -114,7 +113,6 @@ export default function ConfiguracoesCertificadosPage() {
     };
   }, []);
 
-  const [activeMenu, setActiveMenu]       = useState('config-certificados');
   const [loadingData, setLoadingData]     = useState(true);
   const [ministryId, setMinistryId]       = useState<string | null>(null);
 
@@ -362,10 +360,7 @@ export default function ConfiguracoesCertificadosPage() {
   if (loadingData) return <div className="p-8">Carregando...</div>;
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-
-      <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div>
@@ -866,7 +861,6 @@ export default function ConfiguracoesCertificadosPage() {
             </div>
           </div>
         </div>
-      </div>
 
       <input ref={backgroundInputRef} type="file" accept="image/*" className="hidden" onChange={handleBgUpload} />
       <input ref={imagemInputRef} type="file" accept="image/*" className="hidden" onChange={handleImgUpload} />

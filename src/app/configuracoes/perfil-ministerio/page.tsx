@@ -3,13 +3,12 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import Sidebar from '@/components/Sidebar';
 import { createClient } from '@/lib/supabase-client';
 import { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase } from '@/lib/igreja-config-utils';
 import { formatCnpj, formatPhone } from '@/lib/mascaras';
 
 export default function PerfilMinisterioPage() {
-  const [activeMenu, setActiveMenu] = useState('perfil-ministerio');
+
   const [formData, setFormData] = useState({
     nomeMinisterio: '',
     cnpj: '',
@@ -71,10 +70,7 @@ export default function PerfilMinisterioPage() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-
-      <div className="flex-1 overflow-auto">
+    <div className="flex-1 overflow-auto">
         <div className="p-6">
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
@@ -211,6 +207,5 @@ export default function PerfilMinisterioPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

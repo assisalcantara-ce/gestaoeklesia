@@ -3,7 +3,6 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
-import Sidebar from '@/components/Sidebar';
 import { createClient } from '@/lib/supabase-client';
 import { PLANOS_DISPONIBLES, formatarPreco } from '@/config/plans';
 import type { PlanType } from '@/types/ministry';
@@ -11,7 +10,7 @@ import { useAppDialog } from '@/providers/AppDialogProvider';
 import { useAuditLog } from '@/hooks/useAuditLog';
 
 export default function PlanoPage() {
-  const [activeMenu, setActiveMenu] = useState('plano');
+
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [planoSelecionado, setPlanoSelecionado] = useState<PlanType | null>(null);
   const [criandoTicket, setCriandoTicket] = useState(false);
@@ -226,10 +225,7 @@ export default function PlanoPage() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-
-      <div className="flex-1 overflow-auto">
+    <div className="flex-1 overflow-auto">
         <div className="p-6">
           {/* Header */}
           <h1 className="text-3xl font-bold text-gray-800 mb-6">📋 Plano de Assinatura</h1>
@@ -372,6 +368,5 @@ export default function PlanoPage() {
           )}
         </div>
       </div>
-    </div>
   );
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Sidebar from '@/components/Sidebar';
 import NotificationModal from '@/components/NotificationModal';
 import { getCargosMinisteriais, saveCargosMinisteriais, type CargoMinisterial } from '@/lib/cargos-utils';
 import { useAppDialog } from '@/providers/AppDialogProvider'
@@ -17,7 +16,6 @@ export const dynamic = 'force-dynamic';
 
 export default function ConfiguracoesPage() {
   const { ctx, bloqueado } = useRequireModulo('configuracoes');
-  const [activeMenu, setActiveMenu] = useState('configuracoes');
   const [activeTab, setActiveTab] = useState('perfil');
   const [notification, setNotification] = useState<{
     isOpen: boolean;
@@ -30,9 +28,7 @@ export default function ConfiguracoesPage() {
   if (bloqueado) return null;
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-
+    <>
       <NotificationModal
         title={notification.title}
         message={notification.message}
@@ -142,7 +138,7 @@ export default function ConfiguracoesPage() {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

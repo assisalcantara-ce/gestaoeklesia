@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Sidebar from '@/components/Sidebar';
 import NotificationModal from '@/components/NotificationModal';
 import FichaMembro from '@/components/FichaMembro';
 import CartãoMembro from '@/components/CartãoMembro';
@@ -140,7 +139,6 @@ export default function MembrosPage() {
   const supabase = createClient();
 
   const [dashboardView, setDashboardView] = useState<'overview' | 'list'>('overview');
-  const [activeMenu, setActiveMenu] = useState('membros');
   const [activeTab, setActiveTab] = useState<MembrosFormTab>('dados');
   const [isDizimista, setIsDizimista] = useState(false);
   const [dizimosHistorico, setDizimosHistorico] = useState<Array<{mes_referencia: string; status: string; valor: number | null; data_pagamento: string | null}>>([]);
@@ -1766,9 +1764,7 @@ export default function MembrosPage() {
   if (bloqueado) return null;
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-
+    <>
       <NotificationModal
         isOpen={notification.isOpen}
         title={notification.title}
@@ -3698,6 +3694,6 @@ export default function MembrosPage() {
             </div>
           )}        </div>
       </div>
-    </div>
+    </>
   );
 }

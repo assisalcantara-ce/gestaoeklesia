@@ -1,24 +1,68 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import EbdSidebarMenu, { ALL_EBD_IDS } from '@/components/EbdSidebarMenu';
 import { useUserContext } from '@/hooks/useUserContext';
 
-interface SidebarProps {
-  activeMenu: string;
-  setActiveMenu: (id: string) => void;
-}
+// Mapa estático path → id de menu (mais específico primeiro)
+const PATH_TO_MENU_ID: { path: string; id: string }[] = [
+  { path: '/secretaria/estrutura-hierarquica', id: 'estrutura-hierarquica' },
+  { path: '/secretaria/apresentacao-criancas', id: 'apresentacao-criancas' },
+  { path: '/secretaria/batismo-aguas',         id: 'batismo-aguas'        },
+  { path: '/secretaria/cartas/pedidos',        id: 'cartas-pedidos'       },
+  { path: '/secretaria/achados-perdidos',      id: 'achados-perdidos'     },
+  { path: '/secretaria/ativar-fluxo',          id: 'ativar-fluxo'         },
+  { path: '/secretaria/funcionarios',          id: 'funcionarios'         },
+  { path: '/secretaria/consagracao',           id: 'consagracao'          },
+  { path: '/secretaria/certificados',          id: 'certificados'         },
+  { path: '/secretaria/departamentos',         id: 'departamentos'        },
+  { path: '/secretaria/casamento',             id: 'casamento'            },
+  { path: '/secretaria/relatorios',            id: 'relatorios-secretaria'},
+  { path: '/secretaria/cartas',                id: 'cartas'               },
+  { path: '/secretaria/membros',               id: 'membros'              },
+  { path: '/presidencia/prestacao-contas-oficial', id: 'prestacao-contas-oficial' },
+  { path: '/presidencia/prestacao-contas',         id: 'prestacao-contas'         },
+  { path: '/presidencia/consolidado',              id: 'consolidado-financeiro'   },
+  { path: '/presidencia/auditoria',                id: 'auditoria-financeira'     },
+  { path: '/presidencia/conselho-fiscal',          id: 'conselho-fiscal'          },
+  { path: '/configuracoes/cartoes',            id: 'config-cartoes'       },
+  { path: '/configuracoes',                    id: 'config-geral'         },
+  { path: '/secretaria',                       id: 'secretaria'           },
+  { path: '/presidencia',                      id: 'presidencia-geral'    },
+  { path: '/dashboard',                        id: 'dashboard'            },
+  { path: '/tesouraria',                       id: 'tesouraria'           },
+  { path: '/ebd',                              id: 'ebd'                  },
+  { path: '/comissao',                         id: 'comissoes'            },
+  { path: '/reunioes',                         id: 'reunioes'             },
+  { path: '/missoes',                          id: 'missoes'              },
+  { path: '/eventos',                          id: 'eventos'              },
+  { path: '/patrimonio',                       id: 'patrimonio'           },
+  { path: '/financeiro',                       id: 'financeiro'           },
+  { path: '/auditoria',                        id: 'auditoria'            },
+  { path: '/geolocalizacao',                   id: 'geolocalizacao'       },
+  { path: '/usuarios',                         id: 'usuarios'             },
+  { path: '/suporte',                          id: 'suporte'              },
+];
 
-export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
+export default function Sidebar() {
   const router = useRouter();
+  const pathname = usePathname();
   const supabase = createClient();
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const planFeatures = usePlanFeatures();
   const userCtx = useUserContext();
+
+  // Deriva o menu ativo a partir da URL atual
+  const activeMenu = useMemo(() => {
+    for (const { path, id } of PATH_TO_MENU_ID) {
+      if (pathname === path || pathname.startsWith(path + '/')) return id;
+    }
+    return 'dashboard';
+  }, [pathname]);
 
   // Calcula dias restantes do trial usando dias calendário (sem influência de hora/fuso)
   // Equivalente ao differenceInCalendarDays() do date-fns:
@@ -165,8 +209,7 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
     return true;
   });
 
-  const handleNavigate = (id: string, path: string) => {
-    setActiveMenu(id);
+  const handleNavigate = (_id: string, path: string) => {
     router.push(path);
     setIsMobileMenuOpen(false);
   };

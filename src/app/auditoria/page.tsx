@@ -6,7 +6,6 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth'
 import { useRequireModulo } from '@/hooks/useRequireModulo'
-import Sidebar from '@/components/Sidebar'
 
 type AuditLog = {
   id: string
@@ -26,7 +25,6 @@ export default function AuditoriaPage() {
   const { loading: authLoading } = useRequireSupabaseAuth()
   const { bloqueado } = useRequireModulo('auditoria')
 
-  const [activeMenu, setActiveMenu] = useState('auditoria')
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -180,10 +178,7 @@ export default function AuditoriaPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-[#f8f9fa] to-[#e9ecef]">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-
-      <div className="flex-1 p-6">
+    <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
           {/* HEADER */}
           <div className="mb-8">
@@ -369,6 +364,5 @@ export default function AuditoriaPage() {
           )}
         </div>
       </div>
-    </div>
   )
 }

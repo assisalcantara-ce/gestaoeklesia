@@ -3,11 +3,10 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import Sidebar from '@/components/Sidebar';
 import { createClient } from '@/lib/supabase-client';
 
 export default function NomenclaturaPage() {
-  const [activeMenu, setActiveMenu] = useState('nomenclaturas');
+
   const [isEditing, setIsEditing] = useState(false);
 
   const supabase = createClient();
@@ -349,10 +348,7 @@ export default function NomenclaturaPage() {
   if (!loaded) return null;
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-
-      <div className="flex-1 overflow-auto">
+    <div className="flex-1 overflow-auto">
         <div className="p-6">
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
@@ -630,6 +626,5 @@ export default function NomenclaturaPage() {
           )}
         </div>
       </div>
-    </div>
   );
 }

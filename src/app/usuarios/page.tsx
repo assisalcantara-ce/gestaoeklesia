@@ -3,7 +3,6 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState } from 'react';
-import Sidebar from '@/components/Sidebar';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
@@ -42,7 +41,6 @@ interface SupervisaoOption {
 }
 
 export default function UsuariosPage() {
-  const [activeMenu, setActiveMenu] = useState('usuarios');
   const { loading: authLoading } = useRequireSupabaseAuth();
   const { bloqueado } = useRequireModulo('usuarios');
   const supabase = useMemo(() => createClient(), []);
@@ -600,11 +598,8 @@ export default function UsuariosPage() {
   if (bloqueado) return null;
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-
+    <div className="flex-1 overflow-auto">
       {/* MAIN CONTENT */}
-      <div className="flex-1 overflow-auto">
         <div className="p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
@@ -1195,6 +1190,5 @@ export default function UsuariosPage() {
           </div>
         )}
       </div>
-    </div>
   );
 }
