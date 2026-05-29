@@ -20,13 +20,24 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
   const planFeatures = usePlanFeatures();
   const userCtx = useUserContext();
 
-  // Calcula dias restantes do trial de forma segura
+  // Calcula dias restantes do trial usando dias calendário (sem influência de hora/fuso)
+  // Equivalente ao differenceInCalendarDays() do date-fns:
+  // normaliza ambas as datas para meia-noite UTC antes de subtrair.
+  // Math.ceil era usado antes e resultava em +1 dia quando subscription_end_date
+  // tinha componente de hora ligeiramente adiantado em relação ao momento da checagem.
   const trialDaysLeft: number | null = (() => {
     if (planFeatures.loading) return null;
     if (planFeatures.subscription_status !== 'trial') return null;
     if (!planFeatures.subscription_end_date) return null;
-    const msLeft = new Date(planFeatures.subscription_end_date).getTime() - Date.now();
-    return Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+
+    const end = new Date(planFeatures.subscription_end_date);
+    const now = new Date();
+
+    // Zera o componente de hora comparando apenas a data calendário em UTC
+    const endDay = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+    const nowDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+
+    return Math.round((endDay - nowDay) / (1000 * 60 * 60 * 24));
   })();
 
   // Auto-expande o menu pai quando um filho está ativo
@@ -171,12 +182,14 @@ export default function Sidebar({ activeMenu, setActiveMenu }: SidebarProps) {
         />
       </div>
 
-      {/* TRIAL BANNER — exibe apenas durante período de teste com dias restantes */}
-      {trialDaysLeft !== null && trialDaysLeft > 0 && (
+      {/* TRIAL BANNER — exibe durante período de teste, incluindo o dia de expiração */}
+      {trialDaysLeft !== null && trialDaysLeft >= 0 && (
         <div className="mx-3 mt-3 mb-1 p-3 rounded-lg bg-amber-500/20 border border-amber-400/30">
           <p className="text-amber-300 text-xs font-semibold">🎯 Teste gratuito</p>
           <p className="text-white/80 text-xs mt-1">
-            {trialDaysLeft === 1 ? 'Último dia!' : `Restam ${trialDaysLeft} dias`}
+            {trialDaysLeft === 0
+              ? 'Último dia!'
+              : `Restam ${trialDaysLeft} ${trialDaysLeft === 1 ? 'dia' : 'dias'}`}
           </p>
           <button
             onClick={() => router.push('/trial-expirado')}
