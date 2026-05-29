@@ -256,21 +256,44 @@ export async function POST(request: NextRequest) {
       // Se RPC não existir (rollout) ou falhar, seguimos e deixamos o banco validar.
     }
 
-    // Criar usuário no Supabase Auth via signup (sem service_role)
-    const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
-      email: emailValue,
-      password: senha,
-      options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`,
-      },
-    })
+    // isTrialEarly: precisamos saber antes do signup para escolher o método correto.
+    // Para trial=true usamos admin.createUser com email_confirm:true → login imediato.
+    // Para fluxo comercial usamos signUp normal (sujeito à config "Confirm email" do projeto).
+    const isTrialEarly = trial === true || trial === 'true'
+
+    let signUpData: { user: import('@supabase/supabase-js').User | null }
+    let signUpError: import('@supabase/supabase-js').AuthError | null = null
+
+    if (isTrialEarly) {
+      // OPÇÃO A — Trial: cria com email confirmado automaticamente (service_role)
+      // Garante login imediato sem depender do "Confirm email" do projeto Supabase.
+      const { data: adminData, error: adminError } = await supabaseAdmin.auth.admin.createUser({
+        email: emailValue,
+        password: senha,
+        email_confirm: true,
+      })
+      signUpData = { user: adminData.user }
+      signUpError = adminError as typeof signUpError
+    } else {
+      // Fluxo comercial: signup normal via anon key
+      const { data: anonData, error: anonError } = await supabaseClient.auth.signUp({
+        email: emailValue,
+        password: senha,
+        options: {
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`,
+        },
+      })
+      signUpData = { user: anonData.user }
+      signUpError = anonError
+    }
 
     if (signUpError || !signUpData.user) {
       const rawMsg = signUpError?.message || 'Erro ao criar usuário'
       logStep('auth.signUp falhou', 'error', {
         email: maskEmail(emailValue),
         plan: plan ?? 'N/A',
-        trial: trial,  // variável bruta do body (planLower/isTrialFlow ainda não declarados aqui)
+        trial,
+        method: isTrialEarly ? 'admin.createUser' : 'anon.signUp',
         errorCode: (signUpError as any)?.code,
         errorStatus: (signUpError as any)?.status,
         errorMessage: rawMsg,
