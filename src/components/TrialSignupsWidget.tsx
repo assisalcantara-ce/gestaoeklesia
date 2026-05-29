@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { Eye, X, CheckCircle, Trash2, XCircle } from 'lucide-react'
@@ -220,7 +220,7 @@ export default function TrialSignupsWidget() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1.5 justify-center flex-wrap">
-                      {/* Ver detalhes â€” ambas as abas */}
+                      {/* Ver detalhes — ambas as abas */}
                       <button
                         onClick={() => { setSelectedSignup(signup); setShowDetailModal(true) }}
                         className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500 text-white text-xs font-medium rounded hover:bg-blue-600 transition"
@@ -241,7 +241,7 @@ export default function TrialSignupsWidget() {
                         </button>
                       )}
 
-                      {/* Efetivar + Deletar â€” só na aba Expirado */}
+                      {/* Efetivar + Deletar — só na aba Expirado */}
                       {activeTab === 'encerrado' && (
                         <>
                           <button
@@ -313,7 +313,7 @@ export default function TrialSignupsWidget() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 font-semibold uppercase">Plano</p>
-                  <p className="text-sm capitalize text-gray-100">{selectedSignup.plan || 'â€”'}</p>
+                  <p className="text-sm capitalize text-gray-100">{selectedSignup.plan || '—'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 font-semibold uppercase">Cadastrado em</p>

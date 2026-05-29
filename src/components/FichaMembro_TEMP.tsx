@@ -79,7 +79,7 @@ export default function FichaMembro({ membro }: { membro: DadosMembro }) {
 
   const gerarPDF = async () => {
     if (!fichaRef.current) {
-      alert('Erro: Ficha nÃ£o encontrada.');
+      alert('Erro: Ficha não encontrada.');
       return;
     }
 
@@ -145,7 +145,7 @@ export default function FichaMembro({ membro }: { membro: DadosMembro }) {
             fontSize: '14px'
           }}
         >
-          ðŸ“¥ Baixar PDF
+          📥 Baixar PDF
         </button>
         <button
           onClick={imprimirFicha}
@@ -160,7 +160,7 @@ export default function FichaMembro({ membro }: { membro: DadosMembro }) {
             fontSize: '14px'
           }}
         >
-          ðŸ–¨ï¸ Imprimir Ficha
+          🖨️ Imprimir Ficha
         </button>
       </div>
 

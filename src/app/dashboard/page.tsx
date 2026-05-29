@@ -488,16 +488,16 @@ export default function DashboardPage() {
     administrador: 'Administrador', financeiro: 'Financeiro',
     admin_local: 'Admin Local', financeiro_local: 'Fin. Local',
     supervisor: 'Supervisor', viewer: 'Visualizador',
-    presidencia: 'PresidÃªncia', conselho_fiscal: 'Conselho Fiscal',
+    presidencia: 'Presidência', conselho_fiscal: 'Conselho Fiscal',
   };
 
   const QUICK_ACTIONS = [
-    { label: 'Cadastrar\nMembro', icon: 'ðŸ‘¤', href: '/secretaria/membros',     modulo: 'secretaria' },
-    { label: 'LanÃ§ar\nEntrada',   icon: 'ðŸ’°', href: '/tesouraria',             modulo: 'tesouraria' },
-    { label: 'Emitir\nCarta',     icon: 'ðŸ“„', href: '/secretaria/cartas',      modulo: 'secretaria' },
-    { label: 'Chamada\nEBD',      icon: 'ðŸ“š', href: '/secretaria/ebd/chamada', modulo: 'ebd'        },
-    { label: 'Novo\nUsuÃ¡rio',     icon: 'ðŸ”‘', href: '/usuarios',               modulo: 'usuarios'   },
-    { label: 'ConfiguraÃ§Ãµes',     icon: 'âš™ï¸',  href: '/configuracoes',          modulo: 'configuracoes' },
+    { label: 'Cadastrar\nMembro', icon: '👤', href: '/secretaria/membros',     modulo: 'secretaria' },
+    { label: 'Lançar\nEntrada',   icon: '💰', href: '/tesouraria',             modulo: 'tesouraria' },
+    { label: 'Emitir\nCarta',     icon: '📄', href: '/secretaria/cartas',      modulo: 'secretaria' },
+    { label: 'Chamada\nEBD',      icon: '📚', href: '/secretaria/ebd/chamada', modulo: 'ebd'        },
+    { label: 'Novo\nUsuário',     icon: '🔑', href: '/usuarios',               modulo: 'usuarios'   },
+    { label: 'Configurações',     icon: '⚙️',  href: '/configuracoes',          modulo: 'configuracoes' },
   ].filter(a => userCtx.podeAcessar(a.modulo));
 
   const statusPie = [
@@ -510,19 +510,19 @@ export default function DashboardPage() {
     .sort((a, b) => b.membrosAtivos - a.membrosAtivos)
     .slice(0, 8)
     .map(c => ({
-      nome: c.nome.length > 14 ? c.nome.slice(0, 13) + 'â€¦' : c.nome,
+      nome: c.nome.length > 14 ? c.nome.slice(0, 13) + '…' : c.nome,
       total: c.membrosAtivos,
     }));
 
   return (
     <div className="flex-1 overflow-auto">
 
-        {/* â”€â”€ HEADER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── HEADER ─────────────────────────────────────────────────────── */}
         <div className="sticky top-0 z-10 px-6 py-4 shadow-md" style={{ background: 'linear-gradient(to right, #1E3A5F, #2563EB)' }}>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <p className="text-[11px] font-semibold text-blue-200 uppercase tracking-widest">Seja bem-vindo(a)</p>
-              <h1 className="text-lg font-bold text-white leading-tight">"{dash.nomeMinisterio || 'MinistÃ©rio'}"</h1>
+              <h1 className="text-lg font-bold text-white leading-tight">"{dash.nomeMinisterio || 'Ministério'}"</h1>
               <p className="text-xs text-blue-200">{dataAtual}</p>
             </div>
             {usuarioLogado && (
@@ -547,7 +547,7 @@ export default function DashboardPage() {
 
         <div className="p-5 space-y-5">
 
-          {/* â”€â”€ ATALHOS RÃPIDOS (centralizados) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── ATALHOS RÁPIDOS (centralizados) ──────────────────────────── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
             <div className="flex items-center justify-center gap-1 flex-wrap">
               {QUICK_ACTIONS.map(a => (
@@ -563,17 +563,17 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* â”€â”€ KPIs PRINCIPAIS (4 cards coloridos) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── KPIs PRINCIPAIS (4 cards coloridos) ──────────────────────── */}
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
 
-            {/* CongregaÃ§Ãµes â€” navy */}
+            {/* Congregações — navy */}
             <div
               className="rounded-2xl p-5 text-white cursor-pointer hover:opacity-90 transition"
               style={{ background: '#1E3A5F' }}
               onClick={() => router.push('/secretaria/congregacoes')}
             >
               <div className="flex items-start justify-between mb-3">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-blue-200 leading-tight">Total de CongregaÃ§Ãµes</p>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-blue-200 leading-tight">Total de Congregações</p>
                 <Building2 size={28} className="text-white/30 shrink-0" />
               </div>
               {loadingDash
@@ -582,7 +582,7 @@ export default function DashboardPage() {
               <p className="text-xs text-blue-200 mt-1">{dash.totalDepartamentos} departamentos</p>
             </div>
 
-            {/* Membros Ativos â€” blue */}
+            {/* Membros Ativos — blue */}
             <div
               className="rounded-2xl p-5 text-white cursor-pointer hover:opacity-90 transition"
               style={{ background: 'linear-gradient(135deg,#1a4f8a,#2563EB)' }}
@@ -602,7 +602,7 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            {/* Batizados â€” golden */}
+            {/* Batizados — golden */}
             <div
               className="rounded-2xl p-5 text-white cursor-pointer hover:opacity-90 transition"
               style={{ background: 'linear-gradient(135deg,#D97706,#F59E0B)' }}
@@ -622,7 +622,7 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            {/* Turmas EBD â€” teal */}
+            {/* Turmas EBD — teal */}
             <div
               className="rounded-2xl p-5 text-white cursor-pointer hover:opacity-90 transition"
               style={{ background: '#0D9488' }}
@@ -636,12 +636,12 @@ export default function DashboardPage() {
                 ? <div className="h-10 w-16 bg-white/20 rounded animate-pulse" />
                 : <p className="text-4xl font-bold">{dash.ebdTurmas}</p>}
               <p className="text-xs text-teal-100 mt-1">
-                {dash.ebdMediaPresenca !== null ? `MÃ©dia ${dash.ebdMediaPresenca} presentes` : 'turmas ativas'}
+                {dash.ebdMediaPresenca !== null ? `Média ${dash.ebdMediaPresenca} presentes` : 'turmas ativas'}
               </p>
             </div>
           </div>
 
-          {/* â”€â”€ RESUMO INSTITUCIONAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── RESUMO INSTITUCIONAL ──────────────────────────────────────── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
             <div className="flex items-center justify-between mb-1">
               <div>
@@ -656,16 +656,16 @@ export default function DashboardPage() {
               </button>
             </div>
             <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mt-4 mb-3">
-              Secretaria Â· Indicadores institucionais
+              Secretaria · Indicadores institucionais
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {([
-                { label: 'Cartas emitidas',  value: dash.cartasEmitidas,         icon: 'ðŸ“„' },
-                { label: 'Fluxos pendentes', value: dash.fluxosPendentes,        icon: 'â³' },
-                { label: 'Pedidos carta',    value: dash.pendencias.cartasP,     icon: 'ðŸ“‹' },
-                { label: 'Visitantes',       value: dash.membrosVisitantes,      icon: 'ðŸ‘¥' },
-                { label: 'UsuÃ¡rios ativos',  value: dash.totalUsuarios,          icon: 'ðŸ”‘' },
-                { label: 'Eventos prÃ³ximos', value: dash.pendencias.eventosProx, icon: 'ðŸ“…' },
+                { label: 'Cartas emitidas',  value: dash.cartasEmitidas,         icon: '📄' },
+                { label: 'Fluxos pendentes', value: dash.fluxosPendentes,        icon: '⏳' },
+                { label: 'Pedidos carta',    value: dash.pendencias.cartasP,     icon: '📋' },
+                { label: 'Visitantes',       value: dash.membrosVisitantes,      icon: '👥' },
+                { label: 'Usuários ativos',  value: dash.totalUsuarios,          icon: '🔑' },
+                { label: 'Eventos próximos', value: dash.pendencias.eventosProx, icon: '📅' },
               ] as const).map(item => (
                 <div key={item.label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                   <div className="flex items-center justify-between mb-1">
@@ -680,13 +680,13 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* â”€â”€ GRÃFICOS: FATIA + BARRAS + BARRAS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── GRÁFICOS: FATIA + BARRAS + BARRAS ────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-            {/* Pie: SituaÃ§Ã£o dos Membros */}
+            {/* Pie: Situação dos Membros */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h3 className="text-sm font-bold text-[#1E3A5F]">SituaÃ§Ã£o dos Membros</h3>
-              <p className="text-xs text-gray-400 mt-0.5">DistribuiÃ§Ã£o geral</p>
+              <h3 className="text-sm font-bold text-[#1E3A5F]">Situação dos Membros</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Distribuição geral</p>
               {loadingDash ? (
                 <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
               ) : statusPie.length === 0 ? (
@@ -713,10 +713,10 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Bar: Top CongregaÃ§Ãµes por membros */}
+            {/* Bar: Top Congregações por membros */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h3 className="text-sm font-bold text-[#1E3A5F]">Membros por congregaÃ§Ã£o</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Top congregaÃ§Ãµes</p>
+              <h3 className="text-sm font-bold text-[#1E3A5F]">Membros por congregação</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Top congregações</p>
               {loadingDash ? (
                 <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
               ) : congBarData.length === 0 ? (
@@ -737,7 +737,7 @@ export default function DashboardPage() {
             {/* Bar: Crescimento mensal */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
               <h3 className="text-sm font-bold text-[#1E3A5F]">Crescimento mensal</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Ãšltimos 12 meses</p>
+              <p className="text-xs text-gray-400 mt-0.5">Últimos 12 meses</p>
               {loadingDash ? (
                 <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
               ) : dash.crescimentoMembros.length < 2 ? (
@@ -756,7 +756,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* â”€â”€ SEÃ‡ÃƒO FINANCEIRA (somente para temFinanceiro) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* -- SEÇÃO FINANCEIRA (somente para temFinanceiro) -------------- */}
           {temFinanceiro && (
             <>
               {/* KPIs Financeiros */}
@@ -764,7 +764,7 @@ export default function DashboardPage() {
 
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Receita do MÃªs</p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Receita do Mês</p>
                     <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center">
                       <TrendingUp size={18} className="text-green-600" />
                     </div>
@@ -773,7 +773,7 @@ export default function DashboardPage() {
                     <>
                       <p className="text-2xl font-bold text-green-600">{fmtBRL(dash.entradasMes)}</p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {dash.variacao >= 0 ? `â–² +${dash.variacao}%` : `â–¼ ${dash.variacao}%`} vs mÃªs anterior
+                        {dash.variacao >= 0 ? `▲ +${dash.variacao}%` : `▼ ${dash.variacao}%`} vs mês anterior
                       </p>
                     </>
                   )}
@@ -781,7 +781,7 @@ export default function DashboardPage() {
 
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Despesa do MÃªs</p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Despesa do Mês</p>
                     <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center">
                       <TrendingDown size={18} className="text-red-500" />
                     </div>
@@ -789,14 +789,14 @@ export default function DashboardPage() {
                   {loadingDash ? <div className="h-8 w-28 bg-gray-100 rounded animate-pulse" /> : (
                     <>
                       <p className="text-2xl font-bold text-red-500">{fmtBRL(dash.saidasMes)}</p>
-                      <p className="text-xs text-gray-400 mt-1">Registradas no mÃªs</p>
+                      <p className="text-xs text-gray-400 mt-1">Registradas no mês</p>
                     </>
                   )}
                 </div>
 
                 <div className={`bg-white rounded-2xl shadow-sm border p-5 ${dash.saldoMes >= 0 ? 'border-green-200' : 'border-red-200'}`}>
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Saldo do MÃªs</p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Saldo do Mês</p>
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${dash.saldoMes >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
                       <Wallet size={18} className={dash.saldoMes >= 0 ? 'text-green-600' : 'text-red-500'} />
                     </div>
@@ -807,24 +807,24 @@ export default function DashboardPage() {
                         {fmtBRL(dash.saldoMes)}
                       </p>
                       <span className={`text-xs font-semibold mt-1 inline-block px-2 py-0.5 rounded-full ${dash.saldoMes >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {dash.saldoMes >= 0 ? 'â— SuperÃ¡vit' : 'â— DÃ©ficit'}
+                        {dash.saldoMes >= 0 ? '● Superávit' : '● Déficit'}
                       </span>
                     </>
                   )}
                 </div>
               </div>
 
-              {/* GrÃ¡ficos Financeiros */}
+              {/* Gráficos Financeiros */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-                {/* Bar grouped: Receitas Ã— Despesas */}
+                {/* Bar grouped: Receitas × Despesas */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                  <h3 className="text-sm font-bold text-[#1E3A5F]">Receitas Ã— Despesas</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Ãšltimos 6 meses</p>
+                  <h3 className="text-sm font-bold text-[#1E3A5F]">Receitas × Despesas</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Últimos 6 meses</p>
                   {loadingDash ? (
                     <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
                   ) : dash.historico6m.every(m => m.entradas === 0 && m.saidas === 0) ? (
-                    <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Sem lanÃ§amentos</div>
+                    <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Sem lançamentos</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart data={dash.historico6m} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
@@ -844,7 +844,7 @@ export default function DashboardPage() {
                           iconType="circle"
                           iconSize={8}
                           wrapperStyle={{ fontSize: 11, color: '#6b7280' }}
-                          formatter={(v: string) => v === 'entradas' ? 'Entradas' : 'SaÃ­das'}
+                          formatter={(v: string) => v === 'entradas' ? 'Entradas' : 'Saídas'}
                         />
                         <Bar dataKey="entradas" fill="#16A34A" radius={[3, 3, 0, 0]} name="entradas" />
                         <Bar dataKey="saidas"   fill="#EF4444" radius={[3, 3, 0, 0]} name="saidas"   />
@@ -853,14 +853,14 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                {/* Pie: ArrecadaÃ§Ã£o por tipo */}
+                {/* Pie: Arrecadação por tipo */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                  <h3 className="text-sm font-bold text-[#1E3A5F]">ArrecadaÃ§Ã£o por tipo</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Entradas do mÃªs atual</p>
+                  <h3 className="text-sm font-bold text-[#1E3A5F]">Arrecadação por tipo</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Entradas do mês atual</p>
                   {loadingDash ? (
                     <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
                   ) : dash.porTipo.length === 0 ? (
-                    <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Sem lanÃ§amentos no mÃªs</div>
+                    <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Sem lançamentos no mês</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <PieChart>
