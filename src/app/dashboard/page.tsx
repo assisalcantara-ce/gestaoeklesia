@@ -9,24 +9,17 @@ import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { useUserContext } from '@/hooks/useUserContext';
 import {
-  AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import {
-  FileText, TrendingUp, TrendingDown, DollarSign, Wallet,
-  Building2, ArrowRight, AlertCircle, CheckCircle,
-  ChevronUp, ChevronDown, Users, BarChart2, QrCode, Bell,
-  Clock, CalendarDays, MessageSquare, Award, Activity, Shield, Star, ChevronRight,
+  TrendingUp, TrendingDown, Wallet,
+  Building2, Users, Award, CalendarDays,
 } from 'lucide-react';
 
 // helpers
 const fmtBRL = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-const extractYoutubeId = (url: string): string => {
-  const m = url.match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/);
-  return m ? m[1] : '';
-};
 
 const MESES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -483,151 +476,72 @@ export default function DashboardPage() {
 
   const handleLogout = () => supabase.auth.signOut().finally(() => router.push('/'));
 
+
   if (authLoading || userCtx.loading) return (
-    <div className="flex h-screen items-center justify-center bg-[#0F172A] text-white font-semibold">
+    <div className="flex h-screen items-center justify-center bg-[#f4f6f9] text-[#1E3A5F] font-semibold">
       Carregando...
     </div>
   );
 
   const temFinanceiro = userCtx.podeAcessar('tesouraria');
   const nivel = usuarioLogado?.nivel ?? 'viewer';
-  const isPresidencia = nivel === 'presidencia';
-  const isAdmin = nivel === 'administrador';
-
-  const healthClass = (s: number) =>
-    s >= 90 ? { label: 'Excelente', color: '#2563EB', bg: 'bg-blue-900/40', text: 'text-blue-300' }
-    : s >= 80 ? { label: 'Saudável', color: '#16A34A', bg: 'bg-green-900/40', text: 'text-green-400' }
-    : s >= 60 ? { label: 'Atenção', color: '#D97706', bg: 'bg-amber-900/40', text: 'text-amber-400' }
-    : { label: 'Crítica', color: '#DC2626', bg: 'bg-red-900/40', text: 'text-red-400' };
 
   const NIVEL_LABEL: Record<string, string> = {
     administrador: 'Administrador', financeiro: 'Financeiro',
     admin_local: 'Admin Local', financeiro_local: 'Fin. Local',
     supervisor: 'Supervisor', viewer: 'Visualizador',
-    presidencia: 'Presidência', conselho_fiscal: 'Conselho Fiscal',
+    presidencia: 'PresidÃªncia', conselho_fiscal: 'Conselho Fiscal',
   };
 
   const QUICK_ACTIONS = [
-    { label: 'Cadastrar Membro', icon: '👤', href: '/secretaria/membros',     modulo: 'secretaria' },
-    { label: 'Lançar Entrada',   icon: '💰', href: '/tesouraria',             modulo: 'tesouraria' },
-    { label: 'Lançar Saída',     icon: '💸', href: '/tesouraria',             modulo: 'tesouraria' },
-    { label: 'Emitir Carta',     icon: '📄', href: '/secretaria/cartas',      modulo: 'secretaria' },
-    { label: 'Chamada EBD',      icon: '📚', href: '/secretaria/ebd/chamada', modulo: 'ebd'        },
-    { label: 'Novo Usuário',     icon: '🔑', href: '/usuarios',               modulo: 'usuarios'   },
-    { label: 'Configurações',    icon: '⚙️',  href: '/configuracoes',          modulo: 'configuracoes' },
+    { label: 'Cadastrar\nMembro', icon: 'ðŸ‘¤', href: '/secretaria/membros',     modulo: 'secretaria' },
+    { label: 'LanÃ§ar\nEntrada',   icon: 'ðŸ’°', href: '/tesouraria',             modulo: 'tesouraria' },
+    { label: 'Emitir\nCarta',     icon: 'ðŸ“„', href: '/secretaria/cartas',      modulo: 'secretaria' },
+    { label: 'Chamada\nEBD',      icon: 'ðŸ“š', href: '/secretaria/ebd/chamada', modulo: 'ebd'        },
+    { label: 'Novo\nUsuÃ¡rio',     icon: 'ðŸ”‘', href: '/usuarios',               modulo: 'usuarios'   },
+    { label: 'ConfiguraÃ§Ãµes',     icon: 'âš™ï¸',  href: '/configuracoes',          modulo: 'configuracoes' },
   ].filter(a => userCtx.podeAcessar(a.modulo));
 
-  const excelentes = dash.healthScores.filter(h => h.classificacao === 'excelente');
-  const saudaveis  = dash.healthScores.filter(h => h.classificacao === 'saudavel');
-  const atencao    = dash.healthScores.filter(h => h.classificacao === 'atencao');
-  const criticas   = dash.healthScores.filter(h => h.classificacao === 'critica');
+  const statusPie = [
+    { name: 'Ativos',     value: dash.membrosAtivos,                                                          color: '#16A34A' },
+    { name: 'Inativos',   value: Math.max(0, dash.totalMembros - dash.membrosAtivos - dash.membrosVisitantes), color: '#6B7280' },
+    { name: 'Visitantes', value: dash.membrosVisitantes,                                                      color: '#2563EB' },
+  ].filter(d => d.value > 0);
 
-  const rankingMembros     = [...dash.congregacoesData].sort((a, b) => b.membrosAtivos - a.membrosAtivos).slice(0, 8);
-  const rankingHealthSorted = [...dash.healthScores].sort((a, b) => b.scoreFinal - a.scoreFinal).slice(0, 8);
-  const maxMembros         = rankingMembros[0]?.membrosAtivos ?? 1;
-
-  // ── Ranking por Membros Ativos ────────────────────────────────────────
-  const RankingMembros = () => (
-    <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <Award size={16} className="text-[#2563EB]" />
-        <h3 className="text-sm font-bold text-white">Ranking — Membros Ativos</h3>
-      </div>
-      {loadingDash ? (
-        <div className="space-y-2">{[1,2,3,4,5].map(i => <div key={i} className="h-8 bg-white/5 rounded animate-pulse" />)}</div>
-      ) : rankingMembros.length === 0 ? (
-        <div className="py-8 text-center text-white/20 text-xs">Sem dados de congregações</div>
-      ) : (
-        <div className="space-y-3">
-          {rankingMembros.map((c, idx) => (
-            <div key={c.id} className="flex items-center gap-3">
-              <span className="w-5 text-xs font-bold text-white/30 text-center shrink-0">#{idx + 1}</span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-white/80 truncate">{c.nome}</span>
-                  <span className="text-xs font-bold text-[#2563EB] ml-2 shrink-0">{c.membrosAtivos}</span>
-                </div>
-                <div className="w-full bg-white/10 rounded-full h-1.5">
-                  <div className="h-1.5 rounded-full bg-[#2563EB] transition-all"
-                    style={{ width: `${maxMembros > 0 ? (c.membrosAtivos / maxMembros) * 100 : 0}%` }} />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  // ── Ranking por Saúde Ministerial ─────────────────────────────────────
-  const RankingSaude = () => (
-    <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <Shield size={16} className="text-[#D4A017]" />
-        <h3 className="text-sm font-bold text-white">Ranking — Saúde Ministerial</h3>
-      </div>
-      {loadingDash ? (
-        <div className="space-y-2">{[1,2,3,4,5].map(i => <div key={i} className="h-8 bg-white/5 rounded animate-pulse" />)}</div>
-      ) : rankingHealthSorted.length === 0 ? (
-        <div className="py-8 text-center text-white/20 text-xs">Sem dados de congregações</div>
-      ) : (
-        <div className="space-y-3">
-          {rankingHealthSorted.map((h, idx) => {
-            const cls = healthClass(h.scoreFinal);
-            return (
-              <div key={h.congregacaoId} className="flex items-center gap-3">
-                <span className="w-5 text-xs font-bold text-white/30 text-center shrink-0">#{idx + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-white/80 truncate">{h.congregacaoNome}</span>
-                    <span className={`text-xs font-bold ml-2 shrink-0 ${cls.text}`}>{h.scoreFinal}</span>
-                  </div>
-                  <div className="w-full bg-white/10 rounded-full h-1.5">
-                    <div className="h-1.5 rounded-full transition-all"
-                      style={{ width: `${h.scoreFinal}%`, backgroundColor: cls.color }} />
-                  </div>
-                </div>
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${cls.bg} ${cls.text}`}>{cls.label}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+  const congBarData = [...dash.congregacoesData]
+    .sort((a, b) => b.membrosAtivos - a.membrosAtivos)
+    .slice(0, 8)
+    .map(c => ({
+      nome: c.nome.length > 14 ? c.nome.slice(0, 13) + 'â€¦' : c.nome,
+      total: c.membrosAtivos,
+    }));
 
   return (
-    <div className="flex h-screen bg-[#0F172A]">
+    <div className="flex h-screen bg-[#f4f6f9]">
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
 
       <div className="flex-1 overflow-auto">
 
-        {/* ── CABEÇALHO EXECUTIVO INSTITUCIONAL ───────────────────────── */}
-        <div className="sticky top-0 z-10 bg-gradient-to-r from-[#1E3A5F] via-[#1a4577] to-[#2563EB] px-6 py-4 shadow-xl">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                <Building2 size={20} className="text-white" />
-              </div>
-              <div>
-                <h1 className="text-base font-bold text-white leading-tight">
-                  {dash.nomeMinisterio || 'Painel Executivo'}
-                </h1>
-                <p className="text-xs text-blue-200 mt-0.5">{dataAtual}</p>
-              </div>
+        {/* â”€â”€ HEADER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        <div className="sticky top-0 z-10 px-6 py-4 shadow-md" style={{ background: 'linear-gradient(to right, #1E3A5F, #2563EB)' }}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-semibold text-blue-200 uppercase tracking-widest">Seja bem-vindo(a)</p>
+              <h1 className="text-lg font-bold text-white leading-tight">"{dash.nomeMinisterio || 'MinistÃ©rio'}"</h1>
+              <p className="text-xs text-blue-200">{dataAtual}</p>
             </div>
             {usuarioLogado && (
               <div className="flex items-center gap-3">
                 <div className="text-right hidden sm:block">
-                  <p className="text-sm font-semibold text-white leading-none">{usuarioLogado.nome}</p>
-                  <p className="text-xs text-blue-200 mt-0.5">{usuarioLogado.email}</p>
+                  <p className="text-sm font-bold text-white">{usuarioLogado.nome}</p>
+                  <p className="text-xs text-blue-200">{usuarioLogado.email}</p>
                 </div>
-                <span className="text-xs font-bold px-3 py-1 rounded-full bg-white/20 text-white border border-white/30">
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-400 text-amber-900 shrink-0">
                   {NIVEL_LABEL[nivel] ?? nivel}
                 </span>
                 <button
                   onClick={handleLogout}
-                  className="px-3 py-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-lg text-xs font-semibold transition"
+                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-semibold transition"
                 >
                   Sair
                 </button>
@@ -638,555 +552,348 @@ export default function DashboardPage() {
 
         <div className="p-5 space-y-5">
 
-          {/* ── ATALHOS RÁPIDOS ──────────────────────────────────────────── */}
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {QUICK_ACTIONS.map(a => (
-              <button
-                key={a.href + a.label}
-                onClick={() => router.push(a.href)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E293B] border border-white/10 hover:border-[#2563EB]/60 hover:bg-[#253047] transition shrink-0 text-white/70 hover:text-white text-sm font-medium"
-              >
-                <span>{a.icon}</span>
-                <span className="whitespace-nowrap">{a.label}</span>
-              </button>
-            ))}
+          {/* â”€â”€ ATALHOS RÃPIDOS (centralizados) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center justify-center gap-1 flex-wrap">
+              {QUICK_ACTIONS.map(a => (
+                <button
+                  key={a.href + a.label}
+                  onClick={() => router.push(a.href)}
+                  className="flex flex-col items-center gap-1.5 px-5 py-3 rounded-xl hover:bg-gray-50 transition min-w-[72px]"
+                >
+                  <span className="text-2xl">{a.icon}</span>
+                  <span className="text-[11px] font-medium text-gray-500 text-center leading-tight whitespace-pre-line">{a.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* ── MENSAGEM DA PRESIDÊNCIA ───────────────────────────────────── */}
-          {dash.mensagemPresidencia && (isAdmin || isPresidencia) && (
-            <div className="bg-[#1E293B] border border-[#D4A017]/30 rounded-2xl p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <MessageSquare size={16} className="text-[#D4A017]" />
-                <span className="text-sm font-bold text-[#D4A017]">Mensagem da Presidência</span>
-              </div>
-              {dash.mensagemPresidencia.video_tipo === 'youtube' && dash.mensagemPresidencia.video_url ? (
-                <div className="aspect-video w-full max-w-2xl rounded-xl overflow-hidden bg-black">
-                  <iframe
-                    src={`https://www.youtube.com/embed/${extractYoutubeId(dash.mensagemPresidencia.video_url)}`}
-                    className="w-full h-full"
-                    allowFullScreen
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    title={dash.mensagemPresidencia.titulo}
-                  />
-                </div>
-              ) : dash.mensagemPresidencia.video_tipo === 'upload' && dash.mensagemPresidencia.video_url ? (
-                // eslint-disable-next-line jsx-a11y/media-has-caption
-                <video src={dash.mensagemPresidencia.video_url} controls className="w-full max-w-2xl rounded-xl" />
-              ) : (
-                <div>
-                  <h3 className="text-white font-semibold mb-1">{dash.mensagemPresidencia.titulo}</h3>
-                  {dash.mensagemPresidencia.conteudo_texto && (
-                    <p className="text-white/70 text-sm leading-relaxed">{dash.mensagemPresidencia.conteudo_texto}</p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── KPIs ROW 1 (4 cards) ─────────────────────────────────────── */}
+          {/* â”€â”€ KPIs PRINCIPAIS (4 cards coloridos) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
 
-            {/* Congregações */}
+            {/* CongregaÃ§Ãµes â€” navy */}
             <div
-              className="bg-[#1E293B] border border-white/10 rounded-2xl p-5 hover:border-[#0D9488]/50 transition cursor-pointer"
+              className="rounded-2xl p-5 text-white cursor-pointer hover:opacity-90 transition"
+              style={{ background: '#1E3A5F' }}
               onClick={() => router.push('/secretaria/congregacoes')}
             >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Congregações</span>
-                <div className="w-9 h-9 rounded-xl bg-[#0D9488]/20 flex items-center justify-center">
-                  <Building2 size={18} className="text-[#0D9488]" />
-                </div>
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-blue-200 leading-tight">Total de CongregaÃ§Ãµes</p>
+                <Building2 size={28} className="text-white/30 shrink-0" />
               </div>
-              {loadingDash ? <div className="h-8 w-20 bg-white/10 rounded animate-pulse" /> : (
-                <>
-                  <p className="text-3xl font-bold text-white">{dash.totalCongregacoes}</p>
-                  <p className="text-xs text-[#0D9488] mt-1 font-medium">{dash.totalDepartamentos} departamentos</p>
-                </>
-              )}
+              {loadingDash
+                ? <div className="h-10 w-16 bg-white/20 rounded animate-pulse" />
+                : <p className="text-4xl font-bold">{dash.totalCongregacoes}</p>}
+              <p className="text-xs text-blue-200 mt-1">{dash.totalDepartamentos} departamentos</p>
             </div>
 
-            {/* Membros Ativos */}
+            {/* Membros Ativos â€” blue */}
             <div
-              className="bg-[#1E293B] border border-white/10 rounded-2xl p-5 hover:border-[#2563EB]/50 transition cursor-pointer"
+              className="rounded-2xl p-5 text-white cursor-pointer hover:opacity-90 transition"
+              style={{ background: 'linear-gradient(135deg,#1a4f8a,#2563EB)' }}
               onClick={() => router.push('/secretaria/membros')}
             >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Membros Ativos</span>
-                <div className="w-9 h-9 rounded-xl bg-[#2563EB]/20 flex items-center justify-center">
-                  <Users size={18} className="text-[#2563EB]" />
-                </div>
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-blue-100 leading-tight">Total de Membros</p>
+                <Users size={28} className="text-white/30 shrink-0" />
               </div>
-              {loadingDash ? <div className="h-8 w-20 bg-white/10 rounded animate-pulse" /> : (
-                <>
-                  <p className="text-3xl font-bold text-white">{dash.membrosAtivos}</p>
-                  <p className="text-xs text-[#2563EB] mt-1 font-medium">
-                    {dash.totalMembros > 0 ? Math.round((dash.membrosAtivos / dash.totalMembros) * 100) : 0}% do total
-                  </p>
-                </>
-              )}
+              {loadingDash
+                ? <div className="h-10 w-16 bg-white/20 rounded animate-pulse" />
+                : <p className="text-4xl font-bold">{dash.membrosAtivos}</p>}
+              <p className="text-xs text-blue-100 mt-1">
+                {dash.totalMembros > 0
+                  ? `${Math.round((dash.membrosAtivos / dash.totalMembros) * 100)}% do total cadastrado`
+                  : 'membros ativos'}
+              </p>
             </div>
 
-            {/* Receita ou Crescimento (sem financeiro) */}
-            {temFinanceiro ? (
-              <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-5 hover:border-green-500/50 transition">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Receita Mês</span>
-                  <div className="w-9 h-9 rounded-xl bg-green-900/40 flex items-center justify-center">
-                    <TrendingUp size={18} className="text-green-400" />
-                  </div>
-                </div>
-                {loadingDash ? <div className="h-8 w-24 bg-white/10 rounded animate-pulse" /> : (
-                  <>
-                    <p className="text-2xl font-bold text-green-400">{fmtBRL(dash.entradasMes)}</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      {dash.variacao >= 0
-                        ? <ChevronUp size={12} className="text-green-400" />
-                        : <ChevronDown size={12} className="text-red-400" />}
-                      <span className={`text-xs font-medium ${dash.variacao >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {dash.variacao >= 0 ? '+' : ''}{dash.variacao}% vs mês ant.
-                      </span>
-                    </div>
-                  </>
-                )}
+            {/* Batizados â€” golden */}
+            <div
+              className="rounded-2xl p-5 text-white cursor-pointer hover:opacity-90 transition"
+              style={{ background: 'linear-gradient(135deg,#D97706,#F59E0B)' }}
+              onClick={() => router.push('/secretaria/membros')}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-100 leading-tight">Batizados</p>
+                <Award size={28} className="text-white/30 shrink-0" />
               </div>
-            ) : (
-              <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-5 hover:border-[#D4A017]/50 transition cursor-pointer" onClick={() => router.push('/secretaria/membros')}>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Crescimento</span>
-                  <div className="w-9 h-9 rounded-xl bg-[#D4A017]/20 flex items-center justify-center">
-                    <BarChart2 size={18} className="text-[#D4A017]" />
-                  </div>
-                </div>
-                {loadingDash ? <div className="h-8 w-20 bg-white/10 rounded animate-pulse" /> : (
-                  <>
-                    <p className="text-3xl font-bold text-[#D4A017]">
-                      {dash.crescimentoMembros.length > 1
-                        ? (() => {
-                            const last = dash.crescimentoMembros[dash.crescimentoMembros.length - 1]?.total ?? 0;
-                            const prev = dash.crescimentoMembros[dash.crescimentoMembros.length - 2]?.total ?? last;
-                            const pct = prev > 0 ? Math.round(((last - prev) / prev) * 100) : 0;
-                            return `${pct > 0 ? '+' : ''}${pct}%`;
-                          })()
-                        : '—'}
-                    </p>
-                    <p className="text-xs text-white/40 mt-1">vs mês anterior</p>
-                  </>
-                )}
-              </div>
-            )}
+              {loadingDash
+                ? <div className="h-10 w-16 bg-white/20 rounded animate-pulse" />
+                : <p className="text-4xl font-bold">{dash.membrosBatizados}</p>}
+              <p className="text-xs text-amber-100 mt-1">
+                {dash.totalMembros > 0
+                  ? `${Math.round((dash.membrosBatizados / dash.totalMembros) * 100)}% do total`
+                  : 'registrados'}
+              </p>
+            </div>
 
-            {/* Despesa ou Batizados (sem financeiro) */}
-            {temFinanceiro ? (
-              <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-5 hover:border-red-500/50 transition">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Despesa Mês</span>
-                  <div className="w-9 h-9 rounded-xl bg-red-900/40 flex items-center justify-center">
-                    <TrendingDown size={18} className="text-red-400" />
-                  </div>
-                </div>
-                {loadingDash ? <div className="h-8 w-24 bg-white/10 rounded animate-pulse" /> : (
-                  <>
-                    <p className="text-2xl font-bold text-red-400">{fmtBRL(dash.saidasMes)}</p>
-                    <p className="text-xs text-white/40 mt-1">Despesas registradas</p>
-                  </>
-                )}
+            {/* Turmas EBD â€” teal */}
+            <div
+              className="rounded-2xl p-5 text-white cursor-pointer hover:opacity-90 transition"
+              style={{ background: '#0D9488' }}
+              onClick={() => router.push('/secretaria/ebd')}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-teal-100 leading-tight">Turmas EBD</p>
+                <CalendarDays size={28} className="text-white/30 shrink-0" />
               </div>
-            ) : (
-              <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-5 hover:border-purple-500/50 transition">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Batizados</span>
-                  <div className="w-9 h-9 rounded-xl bg-purple-900/40 flex items-center justify-center">
-                    <Star size={18} className="text-purple-400" />
-                  </div>
-                </div>
-                {loadingDash ? <div className="h-8 w-20 bg-white/10 rounded animate-pulse" /> : (
-                  <>
-                    <p className="text-3xl font-bold text-white">{dash.membrosBatizados}</p>
-                    <p className="text-xs text-purple-400 mt-1 font-medium">
-                      {dash.totalMembros > 0 ? Math.round((dash.membrosBatizados / dash.totalMembros) * 100) : 0}% do total
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
+              {loadingDash
+                ? <div className="h-10 w-16 bg-white/20 rounded animate-pulse" />
+                : <p className="text-4xl font-bold">{dash.ebdTurmas}</p>}
+              <p className="text-xs text-teal-100 mt-1">
+                {dash.ebdMediaPresenca !== null ? `MÃ©dia ${dash.ebdMediaPresenca} presentes` : 'turmas ativas'}
+              </p>
+            </div>
           </div>
 
-          {/* ── KPIs ROW 2 (3 cards — somente financeiro) ───────────────── */}
-          {temFinanceiro && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
-              {/* Saldo */}
-              <div className={`rounded-2xl p-5 border ${dash.saldoMes >= 0 ? 'bg-green-900/20 border-green-500/30' : 'bg-red-900/20 border-red-500/30'}`}>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Saldo Mês</span>
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${dash.saldoMes >= 0 ? 'bg-green-900/50' : 'bg-red-900/50'}`}>
-                    <Wallet size={18} className={dash.saldoMes >= 0 ? 'text-green-400' : 'text-red-400'} />
-                  </div>
-                </div>
-                {loadingDash ? <div className="h-8 w-24 bg-white/10 rounded animate-pulse" /> : (
-                  <>
-                    <p className={`text-2xl font-bold ${dash.saldoMes >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmtBRL(dash.saldoMes)}</p>
-                    <span className={`text-xs font-semibold mt-1 inline-block px-2 py-0.5 rounded-full ${dash.saldoMes >= 0 ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>
-                      {dash.saldoMes >= 0 ? '● Superávit' : '● Déficit'}
-                    </span>
-                  </>
-                )}
+          {/* â”€â”€ RESUMO INSTITUCIONAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <div className="flex items-center justify-between mb-1">
+              <div>
+                <h3 className="text-sm font-bold text-[#1E3A5F]">Resumo institucional</h3>
+                <p className="text-xs text-gray-400">Secretaria e indicadores</p>
               </div>
-
-              {/* Crescimento de receita */}
-              <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-5 hover:border-[#D4A017]/50 transition">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Crescimento</span>
-                  <div className="w-9 h-9 rounded-xl bg-[#D4A017]/20 flex items-center justify-center">
-                    <BarChart2 size={18} className="text-[#D4A017]" />
-                  </div>
-                </div>
-                {loadingDash ? <div className="h-8 w-20 bg-white/10 rounded animate-pulse" /> : (
-                  <>
-                    <p className={`text-3xl font-bold ${dash.variacao >= 0 ? 'text-[#D4A017]' : 'text-red-400'}`}>
-                      {dash.variacao >= 0 ? '+' : ''}{dash.variacao}%
-                    </p>
-                    <p className="text-xs text-white/40 mt-1">vs mês anterior</p>
-                  </>
-                )}
-              </div>
-
-              {/* Arrecadação PIX */}
-              <div
-                className="bg-[#1E293B] border border-white/10 rounded-2xl p-5 hover:border-[#0D9488]/50 transition cursor-pointer"
-                onClick={() => router.push('/tesouraria')}
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-1.5 bg-[#1E3A5F] text-white rounded-lg text-xs font-semibold hover:bg-[#16305a] transition"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Arrecadação PIX</span>
-                  <div className="w-9 h-9 rounded-xl bg-[#0D9488]/20 flex items-center justify-center">
-                    <QrCode size={18} className="text-[#0D9488]" />
-                  </div>
-                </div>
-                {loadingDash ? <div className="h-8 w-24 bg-white/10 rounded animate-pulse" /> : (
-                  <>
-                    <p className="text-2xl font-bold text-[#0D9488]">{fmtBRL(dash.pixMes)}</p>
-                    <p className="text-xs text-white/40 mt-1">
-                      {dash.entradasMes > 0 ? `${Math.round((dash.pixMes / dash.entradasMes) * 100)}% do total` : 'Mês atual'}
-                    </p>
-                  </>
-                )}
-              </div>
+                Atualizar
+              </button>
             </div>
-          )}
-
-          {/* ── CENTRAL DE PENDÊNCIAS ────────────────────────────────────── */}
-          <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Bell size={16} className="text-amber-400" />
-              <h3 className="text-sm font-bold text-white">Central de Pendências</h3>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mt-4 mb-3">
+              Secretaria Â· Indicadores institucionais
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {([
-                { label: 'Sem Fechamento', value: dash.pendencias.semFechamento, Icon: Building2,    href: '/tesouraria',                          isAlert: true  },
-                { label: 'Pareceres',      value: dash.pendencias.pareceresP,    Icon: FileText,     href: '/presidencia/prestacao-contas-oficial', isAlert: true  },
-                { label: 'Cartas',         value: dash.pendencias.cartasP,       Icon: FileText,     href: '/secretaria/cartas/pedidos',            isAlert: true  },
-                { label: 'Eventos Próx.',  value: dash.pendencias.eventosProx,   Icon: CalendarDays, href: '/eventos',                             isAlert: false },
-                { label: 'PIX Vencidos',   value: dash.pendencias.pixVencidos,   Icon: QrCode,       href: '/tesouraria',                          isAlert: true  },
-              ] as const).map(({ label, value, Icon, href, isAlert }) => {
-                const hasAlert = isAlert && value > 0;
-                const hasInfo  = !isAlert && value > 0;
-                return (
-                  <button
-                    key={label}
-                    onClick={() => router.push(href)}
-                    className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition hover:scale-[1.02] ${
-                      hasAlert ? 'bg-red-900/20 border-red-500/30 hover:border-red-500/60'
-                      : hasInfo ? 'bg-[#2563EB]/10 border-[#2563EB]/30 hover:border-[#2563EB]/60'
-                      : 'bg-[#253047] border-white/5 hover:border-white/20'
-                    }`}
-                  >
-                    <Icon size={20} className={hasAlert ? 'text-red-400' : hasInfo ? 'text-[#2563EB]' : 'text-white/30'} />
-                    <span className={`text-xs font-medium ${hasAlert ? 'text-red-300' : hasInfo ? 'text-blue-300' : 'text-white/50'}`}>{label}</span>
-                    <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${
-                      hasAlert ? 'bg-red-900/60 text-red-400'
-                      : hasInfo ? 'bg-[#2563EB]/20 text-blue-300'
-                      : 'bg-green-900/30 text-green-400'
-                    }`}>
-                      {loadingDash ? '…' : !isAlert && value === 0 ? '✓ 0' : value}
-                    </span>
-                  </button>
-                );
-              })}
+                { label: 'Cartas emitidas',  value: dash.cartasEmitidas,         icon: 'ðŸ“„' },
+                { label: 'Fluxos pendentes', value: dash.fluxosPendentes,        icon: 'â³' },
+                { label: 'Pedidos carta',    value: dash.pendencias.cartasP,     icon: 'ðŸ“‹' },
+                { label: 'Visitantes',       value: dash.membrosVisitantes,      icon: 'ðŸ‘¥' },
+                { label: 'UsuÃ¡rios ativos',  value: dash.totalUsuarios,          icon: 'ðŸ”‘' },
+                { label: 'Eventos prÃ³ximos', value: dash.pendencias.eventosProx, icon: 'ðŸ“…' },
+              ] as const).map(item => (
+                <div key={item.label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide leading-tight">{item.label}</p>
+                    <span className="text-base">{item.icon}</span>
+                  </div>
+                  {loadingDash
+                    ? <div className="h-7 w-10 bg-gray-200 rounded animate-pulse mt-1" />
+                    : <p className="text-2xl font-bold text-[#1E3A5F] mt-0.5">{item.value}</p>}
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* ── SAÚDE MINISTERIAL + ATIVIDADES RECENTES ──────────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          {/* â”€â”€ GRÃFICOS: FATIA + BARRAS + BARRAS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-            {/* Saúde Ministerial */}
-            <div className="lg:col-span-2 bg-[#1E293B] border border-white/10 rounded-2xl p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <Activity size={16} className="text-[#0D9488]" />
-                <h3 className="text-sm font-bold text-white">Saúde Ministerial</h3>
-                {!loadingDash && dash.healthScores.length > 0 && (
-                  <span className="ml-auto text-xs text-white/40">
-                    Média: {Math.round(dash.healthScores.reduce((s, h) => s + h.scoreFinal, 0) / dash.healthScores.length)}/100
-                  </span>
-                )}
-              </div>
+            {/* Pie: SituaÃ§Ã£o dos Membros */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h3 className="text-sm font-bold text-[#1E3A5F]">SituaÃ§Ã£o dos Membros</h3>
+              <p className="text-xs text-gray-400 mt-0.5">DistribuiÃ§Ã£o geral</p>
               {loadingDash ? (
-                <div className="space-y-2">{[1,2,3,4].map(i => <div key={i} className="h-10 bg-white/5 rounded animate-pulse" />)}</div>
-              ) : dash.healthScores.length === 0 ? (
-                <div className="py-8 flex flex-col items-center justify-center text-white/20 gap-2">
-                  <Activity size={24} />
-                  <span className="text-xs">Sem dados de congregações</span>
-                </div>
+                <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
+              ) : statusPie.length === 0 ? (
+                <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Sem dados</div>
               ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-2 mb-4">
-                    {[
-                      { label: 'Excelente', list: excelentes, dot: 'bg-blue-400',  text: 'text-blue-300'  },
-                      { label: 'Saudável',  list: saudaveis,  dot: 'bg-green-400', text: 'text-green-400' },
-                      { label: 'Atenção',   list: atencao,    dot: 'bg-amber-400', text: 'text-amber-400' },
-                      { label: 'Crítica',   list: criticas,   dot: 'bg-red-400',   text: 'text-red-400'   },
-                    ].map(s => (
-                      <div key={s.label} className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
-                        <span className={`w-2 h-2 rounded-full ${s.dot} shrink-0`} />
-                        <span className={`text-xs font-semibold ${s.text}`}>{s.label}</span>
-                        <span className="ml-auto text-xs font-bold text-white">{s.list.length}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="space-y-2 max-h-52 overflow-y-auto">
-                    {[...dash.healthScores].sort((a, b) => b.scoreFinal - a.scoreFinal).slice(0, 8).map(h => {
-                      const cls = healthClass(h.scoreFinal);
-                      return (
-                        <div key={h.congregacaoId} className="flex items-center gap-3 p-2 rounded-lg bg-white/5">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-white/80 truncate">{h.congregacaoNome}</p>
-                          </div>
-                          <div className="w-14 bg-white/10 rounded-full h-1.5">
-                            <div className="h-1.5 rounded-full transition-all"
-                              style={{ width: `${h.scoreFinal}%`, backgroundColor: cls.color }} />
-                          </div>
-                          <span className={`text-xs font-bold w-7 text-right ${cls.text}`}>{h.scoreFinal}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <button
-                    onClick={() => router.push('/secretaria/congregacoes')}
-                    className="mt-3 w-full text-xs text-[#0D9488] font-semibold hover:underline flex items-center justify-center gap-1"
-                  >
-                    Ver congregações <ChevronRight size={12} />
-                  </button>
-                </>
+                <ResponsiveContainer width="100%" height={210}>
+                  <PieChart>
+                    <Pie
+                      data={statusPie}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={52}
+                      outerRadius={80}
+                      paddingAngle={3}
+                    >
+                      {statusPie.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#6b7280' }} />
+                  </PieChart>
+                </ResponsiveContainer>
               )}
             </div>
 
-            {/* Atividades Recentes */}
-            <div className="lg:col-span-3 bg-[#1E293B] border border-white/10 rounded-2xl p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <Clock size={16} className="text-white/40" />
-                <h3 className="text-sm font-bold text-white">Atividades Recentes</h3>
-              </div>
-              <div className="flex gap-2 mb-3 flex-wrap">
-                {[
-                  { label: 'Cartas',  count: dash.ultimasCartas.length,          href: '/secretaria/cartas' },
-                  { label: 'Fluxos',  count: dash.ultimosFluxos.length,          href: '/secretaria/fluxos' },
-                  { label: 'Pedidos', count: dash.cartaPedidosPendentes.length,  href: '/secretaria/cartas/pedidos' },
-                ].map(tab => (
-                  <button
-                    key={tab.label}
-                    onClick={() => router.push(tab.href)}
-                    className="px-3 py-1 rounded-lg text-xs font-semibold bg-white/10 text-white/60 hover:bg-white/15 hover:text-white transition"
-                  >
-                    {tab.label}
-                    {tab.count > 0 && (
-                      <span className="ml-1.5 bg-[#2563EB] text-white text-[10px] px-1.5 py-0.5 rounded-full">{tab.count}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
+            {/* Bar: Top CongregaÃ§Ãµes por membros */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h3 className="text-sm font-bold text-[#1E3A5F]">Membros por congregaÃ§Ã£o</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Top congregaÃ§Ãµes</p>
               {loadingDash ? (
-                <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-10 bg-white/5 rounded animate-pulse" />)}</div>
+                <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
+              ) : congBarData.length === 0 ? (
+                <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Sem dados</div>
               ) : (
-                <div className="space-y-2">
-                  {dash.ultimasCartas.slice(0, 2).map(c => (
-                    <div key={c.id} className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 cursor-pointer transition"
-                      onClick={() => router.push('/secretaria/cartas')}>
-                      <FileText size={14} className="text-[#2563EB] shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-white/80 truncate">{c.membro_nome}</p>
-                        <p className="text-xs text-white/40 capitalize">{c.tipo}</p>
-                      </div>
-                      <span className="text-xs text-white/30 shrink-0">
-                        {new Date(c.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
-                      </span>
+                <ResponsiveContainer width="100%" height={210}>
+                  <BarChart data={congBarData} margin={{ top: 4, right: 4, left: -20, bottom: 42 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="nome" tick={{ fontSize: 10, fill: '#9ca3af' }} angle={-40} textAnchor="end" interval={0} />
+                    <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                    <Bar dataKey="total" fill="#1E3A5F" radius={[4, 4, 0, 0]} name="Membros" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* Bar: Crescimento mensal */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h3 className="text-sm font-bold text-[#1E3A5F]">Crescimento mensal</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Ãšltimos 12 meses</p>
+              {loadingDash ? (
+                <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
+              ) : dash.crescimentoMembros.length < 2 ? (
+                <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Sem dados suficientes</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={210}>
+                  <BarChart data={dash.crescimentoMembros} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="mes" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                    <Bar dataKey="total" fill="#2563EB" radius={[4, 4, 0, 0]} name="Membros" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+
+          {/* â”€â”€ SEÃ‡ÃƒO FINANCEIRA (somente para temFinanceiro) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {temFinanceiro && (
+            <>
+              {/* KPIs Financeiros */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Receita do MÃªs</p>
+                    <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center">
+                      <TrendingUp size={18} className="text-green-600" />
                     </div>
-                  ))}
-                  {dash.ultimosFluxos.slice(0, 2).map(f => (
-                    <div key={f.id} className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 cursor-pointer transition"
-                      onClick={() => router.push('/secretaria/fluxos')}>
-                      <AlertCircle size={14} className={f.status === 'pendente' ? 'text-amber-400 shrink-0' : 'text-blue-400 shrink-0'} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-white/80 truncate capitalize">{f.tipo_fluxo}</p>
-                        <p className="text-xs text-white/40">{f.status}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {dash.cartaPedidosPendentes.slice(0, 2).map(p => (
-                    <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 cursor-pointer transition"
-                      onClick={() => router.push('/secretaria/cartas/pedidos')}>
-                      <FileText size={14} className="text-[#0D9488] shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-white/80 truncate capitalize">{p.tipo_carta}</p>
-                        <p className="text-xs text-white/40">Pedido {p.status}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {dash.ultimasCartas.length === 0 && dash.ultimosFluxos.length === 0 && dash.cartaPedidosPendentes.length === 0 && (
-                    <div className="py-8 flex flex-col items-center justify-center text-white/20 gap-2">
-                      <CheckCircle size={24} />
-                      <span className="text-xs">Sem atividades recentes</span>
-                    </div>
+                  </div>
+                  {loadingDash ? <div className="h-8 w-28 bg-gray-100 rounded animate-pulse" /> : (
+                    <>
+                      <p className="text-2xl font-bold text-green-600">{fmtBRL(dash.entradasMes)}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {dash.variacao >= 0 ? `â–² +${dash.variacao}%` : `â–¼ ${dash.variacao}%`} vs mÃªs anterior
+                      </p>
+                    </>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* ── GRÁFICOS FINANCEIROS ──────────────────────────────────────── */}
-          {temFinanceiro && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
-              {/* AreaChart — Receitas × Despesas */}
-              <div className="lg:col-span-2 bg-[#1E293B] border border-white/10 rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-sm font-bold text-white">Receitas × Despesas</h3>
-                    <p className="text-xs text-white/40 mt-0.5">Últimos 6 meses</p>
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Despesa do MÃªs</p>
+                    <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center">
+                      <TrendingDown size={18} className="text-red-500" />
+                    </div>
                   </div>
-                  <button
-                    onClick={() => router.push('/tesouraria')}
-                    className="flex items-center gap-1 text-xs text-[#2563EB] font-semibold hover:underline"
-                  >
-                    Detalhes <ArrowRight size={12} />
-                  </button>
+                  {loadingDash ? <div className="h-8 w-28 bg-gray-100 rounded animate-pulse" /> : (
+                    <>
+                      <p className="text-2xl font-bold text-red-500">{fmtBRL(dash.saidasMes)}</p>
+                      <p className="text-xs text-gray-400 mt-1">Registradas no mÃªs</p>
+                    </>
+                  )}
                 </div>
-                {loadingDash ? (
-                  <div className="h-48 flex items-center justify-center text-white/20 text-sm">Carregando...</div>
-                ) : dash.historico6m.length === 0 ? (
-                  <div className="h-48 flex flex-col items-center justify-center text-white/20 gap-2">
-                    <DollarSign size={32} />
-                    <span className="text-sm">Sem lançamentos</span>
+
+                <div className={`bg-white rounded-2xl shadow-sm border p-5 ${dash.saldoMes >= 0 ? 'border-green-200' : 'border-red-200'}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Saldo do MÃªs</p>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${dash.saldoMes >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+                      <Wallet size={18} className={dash.saldoMes >= 0 ? 'text-green-600' : 'text-red-500'} />
+                    </div>
                   </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <AreaChart data={dash.historico6m} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="gEnt2" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} />
-                          <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="gSai2" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                      <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#ffffff50' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#ffffff40' }} axisLine={false} tickLine={false}
-                        tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip
-                        formatter={(v: number | undefined, name: string | undefined) => [fmtBRL(v ?? 0), name === 'entradas' ? 'Entradas' : 'Saídas']}
-                        contentStyle={{ fontSize: 12, borderRadius: 8, background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
-                      />
-                      <Legend iconType="circle" iconSize={8}
-                        formatter={(v) => (v === 'entradas' ? 'Entradas' : 'Saídas')}
-                        wrapperStyle={{ fontSize: 11, color: '#ffffff80' }}
-                      />
-                      <Area type="monotone" dataKey="entradas" stroke="#22c55e" strokeWidth={2} fill="url(#gEnt2)" />
-                      <Area type="monotone" dataKey="saidas"   stroke="#ef4444" strokeWidth={2} fill="url(#gSai2)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
+                  {loadingDash ? <div className="h-8 w-28 bg-gray-100 rounded animate-pulse" /> : (
+                    <>
+                      <p className={`text-2xl font-bold ${dash.saldoMes >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {fmtBRL(dash.saldoMes)}
+                      </p>
+                      <span className={`text-xs font-semibold mt-1 inline-block px-2 py-0.5 rounded-full ${dash.saldoMes >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {dash.saldoMes >= 0 ? 'â— SuperÃ¡vit' : 'â— DÃ©ficit'}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
 
-              {/* Donut — Arrecadação por forma de pagamento */}
-              <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-5">
-                <div className="mb-4">
-                  <h3 className="text-sm font-bold text-white">Arrecadação Digital</h3>
-                  <p className="text-xs text-white/40 mt-0.5">Por forma de pagamento</p>
-                </div>
-                {loadingDash ? (
-                  <div className="h-48 flex items-center justify-center text-white/20 text-sm">Carregando...</div>
-                ) : dash.porForma.length === 0 ? (
-                  <div className="h-48 flex flex-col items-center justify-center text-white/20 gap-2">
-                    <QrCode size={28} />
-                    <span className="text-sm">Sem lançamentos no mês</span>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie data={dash.porForma} dataKey="value" nameKey="name"
-                        cx="50%" cy="50%" innerRadius={50} outerRadius={78} paddingAngle={3}>
-                        {dash.porForma.map((_, i) => (
-                          <Cell key={i} fill={['#0D9488','#2563EB','#D4A017','#16A34A','#DC2626'][i % 5]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(v: number | undefined) => fmtBRL(v ?? 0)}
-                        contentStyle={{ fontSize: 12, borderRadius: 8, background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
-                      />
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#ffffff80' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
-          )}
+              {/* GrÃ¡ficos Financeiros */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-          {/* ── RANKINGS ─────────────────────────────────────────────────── */}
-          {(dash.congregacoesData.length > 0 || loadingDash) && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {isPresidencia || isAdmin ? (
-                <>
-                  <RankingSaude />
-                  <RankingMembros />
-                </>
-              ) : (
-                <>
-                  <RankingMembros />
-                  <RankingSaude />
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ── CRESCIMENTO DE MEMBROS (12 meses) ───────────────────────── */}
-          {dash.crescimentoMembros.length > 2 && (
-            <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-sm font-bold text-white">Crescimento de Membros</h3>
-                  <p className="text-xs text-white/40 mt-0.5">Últimos 12 meses</p>
+                {/* Bar grouped: Receitas Ã— Despesas */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                  <h3 className="text-sm font-bold text-[#1E3A5F]">Receitas Ã— Despesas</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Ãšltimos 6 meses</p>
+                  {loadingDash ? (
+                    <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
+                  ) : dash.historico6m.every(m => m.entradas === 0 && m.saidas === 0) ? (
+                    <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Sem lanÃ§amentos</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={dash.historico6m} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                        <YAxis
+                          tick={{ fontSize: 10, fill: '#9ca3af' }}
+                          axisLine={false}
+                          tickLine={false}
+                          tickFormatter={(v: number) => `R$${(v / 1000).toFixed(0)}k`}
+                        />
+                        <Tooltip
+                          formatter={(v: number | undefined) => fmtBRL(v ?? 0)}
+                          contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                        />
+                        <Legend
+                          iconType="circle"
+                          iconSize={8}
+                          wrapperStyle={{ fontSize: 11, color: '#6b7280' }}
+                          formatter={(v: string) => v === 'entradas' ? 'Entradas' : 'SaÃ­das'}
+                        />
+                        <Bar dataKey="entradas" fill="#16A34A" radius={[3, 3, 0, 0]} name="entradas" />
+                        <Bar dataKey="saidas"   fill="#EF4444" radius={[3, 3, 0, 0]} name="saidas"   />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
-                <button
-                  onClick={() => router.push('/secretaria/membros')}
-                  className="flex items-center gap-1 text-xs text-[#2563EB] font-semibold hover:underline"
-                >
-                  Ver membros <ArrowRight size={12} />
-                </button>
+
+                {/* Pie: ArrecadaÃ§Ã£o por tipo */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                  <h3 className="text-sm font-bold text-[#1E3A5F]">ArrecadaÃ§Ã£o por tipo</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Entradas do mÃªs atual</p>
+                  {loadingDash ? (
+                    <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
+                  ) : dash.porTipo.length === 0 ? (
+                    <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Sem lanÃ§amentos no mÃªs</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie
+                          data={dash.porTipo}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={55}
+                          outerRadius={88}
+                          paddingAngle={3}
+                        >
+                          {dash.porTipo.map((_, i) => (
+                            <Cell key={i} fill={['#1E3A5F','#2563EB','#D97706','#16A34A','#DC2626','#0D9488','#6B7280'][i % 7]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(v: number | undefined) => fmtBRL(v ?? 0)}
+                          contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                        />
+                        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#6b7280' }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
               </div>
-              <ResponsiveContainer width="100%" height={180}>
-                <LineChart data={dash.crescimentoMembros} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#ffffff50' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#ffffff40' }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ fontSize: 12, borderRadius: 8, background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
-                  />
-                  <Line type="monotone" dataKey="total" stroke="#2563EB" strokeWidth={2.5}
-                    dot={{ fill: '#2563EB', r: 3 }} activeDot={{ r: 5 }} name="Membros" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            </>
           )}
 
         </div>
@@ -1194,3 +901,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
