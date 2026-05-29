@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { CheckCircle2, Lock } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { formatCpfOrCnpj, formatPhone, onlyDigits } from '@/lib/mascaras';
 import { formatarPreco } from '@/config/plans';
@@ -115,6 +116,12 @@ export default function PreCadastroPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [successInfo, setSuccessInfo] = useState<{
+    isTrial: boolean;
+    emailSent: boolean;
+    trialExpiresAt: string | null;
+    plan: string;
+  } | null>(null);
   const successMessageRef = useRef<HTMLDivElement>(null);
   const errorMessageRef = useRef<HTMLDivElement>(null);
   const [cepLoading, setCepLoading] = useState(false);
@@ -205,8 +212,9 @@ export default function PreCadastroPage() {
   }, [formData.address_zip]);
 
   useEffect(() => {
-    if (success && successMessageRef.current) {
-      successMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (success) {
+      // Vai ao topo da página para que o bloco de sucesso não fique cortado
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
     }
   }, [success]);
 
@@ -326,6 +334,12 @@ export default function PreCadastroPage() {
       }
 
       setSuccess(true);
+      setSuccessInfo({
+        isTrial,
+        emailSent: data?.data?.email_sent ?? false,
+        trialExpiresAt: data?.data?.trial_expires_at ?? null,
+        plan: data?.data?.plan ?? 'starter',
+      });
       setFormData((prev) => ({
         ...prev,
         ministry_name: '',
@@ -493,11 +507,66 @@ export default function PreCadastroPage() {
               </div>
             )}
 
-            {success && (
-              <div ref={successMessageRef} className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                Dados enviados com sucesso! Nosso time vai entrar em contato.
+            {success && successInfo && (
+              <div ref={successMessageRef} className="space-y-5 py-2">
+                {/* ─── Cabeçalho ─── */}
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-0.5 h-7 w-7 shrink-0 text-emerald-600" />
+                  <div>
+                    <p className="text-lg font-bold text-slate-900">
+                      {successInfo.isTrial
+                        ? 'Teste grátis criado com sucesso!'
+                        : 'Dados enviados com sucesso!'}
+                    </p>
+                    <p className="text-sm text-slate-600 mt-0.5">
+                      {successInfo.isTrial
+                        ? 'Enviamos as instruções de acesso para o seu e-mail.'
+                        : 'Nosso time vai entrar em contato em breve.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* ─── Detalhes do trial ─── */}
+                {successInfo.isTrial && (
+                  <>
+                    <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 space-y-2 text-sm">
+                      <div className="flex items-center gap-2 text-slate-700">
+                        <Lock className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        <span className="font-semibold text-slate-900">Plano Starter</span>
+                        <span className="ml-auto text-emerald-700 font-semibold">7 dias grátis</span>
+                      </div>
+                      {successInfo.trialExpiresAt && (
+                        <p className="text-slate-500 text-xs">
+                          Acesso expira em{' '}
+                          <strong className="text-slate-700">
+                            {new Date(successInfo.trialExpiresAt).toLocaleDateString('pt-BR')}
+                          </strong>
+                        </p>
+                      )}
+                    </div>
+
+                    {!successInfo.emailSent && (
+                      <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
+                        O e-mail de boas-vindas não pôde ser enviado neste momento. Use seu e-mail e a senha cadastrada para fazer login diretamente.
+                      </div>
+                    )}
+
+                    <a
+                      href="/login"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-6 py-3.5 text-sm font-bold text-white hover:bg-emerald-800 transition"
+                    >
+                      Acessar meu painel →
+                    </a>
+
+                    <p className="text-xs text-center text-slate-400">
+                      Se o e-mail não chegar, verifique a pasta de spam ou entre em contato com o suporte.
+                    </p>
+                  </>
+                )}
               </div>
             )}
+
+            {!success && (<>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
@@ -745,6 +814,7 @@ export default function PreCadastroPage() {
             >
               {loading ? 'Enviando...' : 'Enviar pré-cadastro'}
             </button>
+            </>)}
           </form>
         </div>
       </div>

@@ -479,11 +479,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('[SIGNUP] ✅ Ministério e vínculo criados:', {
-      ministry_id: ministry.id,
+    logStep('trial_created', 'info', {
+      email: maskEmail(emailValue),
+      ministryId: ministry.id,
       slug: ministrySlug,
-      subscription_status: 'trial',
-      subscription_end_date: trialExpiresAt.toISOString(),
+      plan: planValue,
+      trial: isTrialFlow,
+      trialExpiresAt: trialExpiresAt.toISOString(),
+    })
+    logStep('admin_user_created', 'info', {
+      email: maskEmail(emailValue),
+      ministryId: ministry.id,
+      userId: signUpData.user.id,
     })
 
     // Criar notificação para o admin
@@ -510,14 +517,24 @@ export async function POST(request: NextRequest) {
       // Não falhar se notificação não funcionar
     }
 
-    const loginUrl = 'https://www.gestaoeklesia.com.br/'
+    const loginUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.gestaoeklesia.com.br'
     const resendKey = process.env.RESEND_API_KEY
     const resendFrom = process.env.RESEND_FROM || 'noreply@gestaoeklesia.com.br'
+    let emailSent = false
 
     if (resendKey) {
       try {
         const resend = new Resend(resendKey)
         const planLabel = planValue.charAt(0).toUpperCase() + planValue.slice(1)
+        const emailSubject = isTrialFlow
+          ? 'Gestão Eklesia | Seu teste grátis está ativo!'
+          : 'Gestão Eklesia | Pré-cadastro confirmado'
+        const emailHeadline = isTrialFlow
+          ? 'Teste grátis ativo — acesse agora!'
+          : 'Pré-cadastro confirmado'
+        const emailSubheadline = isTrialFlow
+          ? 'Seu painel já está disponível. Use o e-mail e a senha cadastrados.'
+          : 'Recebemos seus dados e entraremos em contato em breve.'
         const html = `
           <!DOCTYPE html>
           <html lang="pt-BR">
@@ -539,8 +556,8 @@ export async function POST(request: NextRequest) {
                                 <img src="https://www.gestaoeklesia.com.br/img/logo-eklesia.png" alt="Gestao Eklesia" width="40" height="40" style="display:block;border-radius:8px;" />
                               </td>
                               <td>
-                                <h1 style="margin:0;font-size:22px;">Pré-cadastro confirmado</h1>
-                                <p style="margin:8px 0 0;font-size:14px;color:#d1fae5;">Seu acesso de teste já está ativo.</p>
+                                <h1 style="margin:0;font-size:22px;">${emailHeadline}</h1>
+                                <p style="margin:8px 0 0;font-size:14px;color:#d1fae5;">${emailSubheadline}</p>
                               </td>
                             </tr>
                           </table>
@@ -550,7 +567,7 @@ export async function POST(request: NextRequest) {
                         <td style="padding:32px;color:#1f1b16;">
                           <p style="margin:0 0 12px;font-size:16px;">Olá, ${pastorName}!</p>
                           <p style="margin:0 0 16px;color:#5f6b66;">
-                            Recebemos o pré-cadastro da igreja/ministério <strong>${ministryName}</strong> no plano <strong>${planLabel}</strong>.
+                            ${isTrialFlow ? `Seu acesso trial da igreja/ministério <strong>${ministryName}</strong> no plano <strong>${planLabel}</strong> está ativo!` : `Recebemos o pré-cadastro da igreja/ministério <strong>${ministryName}</strong> no plano <strong>${planLabel}</strong>.`}
                           </p>
                           <div style="background:#f3f4f1;border-radius:12px;padding:16px;margin-bottom:16px;">
                             <p style="margin:0 0 8px;font-size:14px;color:#1f1b16;"><strong>Período de teste:</strong> 7 dias</p>
@@ -581,28 +598,41 @@ export async function POST(request: NextRequest) {
         await resend.emails.send({
           from: resendFrom,
           to: emailValue,
-          subject: 'Gestão Eklesia | Pré-cadastro confirmado',
+          subject: emailSubject,
           html,
         })
-        console.log('[SIGNUP] ✅ Email enviado para:', emailValue)
+        emailSent = true
+        logStep('welcome_email_sent', 'info', {
+          email: maskEmail(emailValue),
+          plan: planValue,
+          trial: isTrialFlow,
+          subject: emailSubject,
+        })
       } catch (emailError: any) {
-        console.warn('[SIGNUP] Falha ao enviar email de boas-vindas:', {
-          message: emailError?.message,
-          statusCode: emailError?.statusCode,
-          name: emailError?.name,
+        logStep('welcome_email_failed', 'warn', {
+          email: maskEmail(emailValue),
+          plan: planValue,
+          trial: isTrialFlow,
+          errorMessage: emailError?.message,
+          errorStatus: emailError?.statusCode,
           from: resendFrom,
-          to: emailValue,
         })
       }
     } else {
-      console.warn('[SIGNUP] RESEND_API_KEY não configurado — email não enviado.')
+      logStep('welcome_email_failed', 'warn', {
+        reason: 'RESEND_API_KEY_NOT_SET',
+        plan: planValue,
+        trial: isTrialFlow,
+      })
     }
 
-    console.log('[SIGNUP] ✅ Pré-cadastro criado com sucesso:', {
-      user_id: signUpData.user.id,
-      email: emailValue,
-      ministry_name: ministryName,
-      trial_expires_at: trialExpiresAt.toISOString(),
+    logStep('signup_success', 'info', {
+      email: maskEmail(emailValue),
+      ministryId: ministry.id,
+      plan: planValue,
+      trial: isTrialFlow,
+      emailSent,
+      trialExpiresAt: trialExpiresAt.toISOString(),
     })
 
     await logPublicApiEvent({
@@ -612,17 +642,25 @@ export async function POST(request: NextRequest) {
       email: emailValue,
       meta: {
         prescadastro_id: prescadastro.id,
+        is_trial: isTrialFlow,
+        email_sent: emailSent,
       },
     })
 
     return NextResponse.json({
       success: true,
-      message: 'Cadastro realizado com sucesso! Verifique seu email para confirmar.',
+      message: isTrialFlow
+        ? 'Teste grátis ativado! Acesse o sistema com o e-mail e senha cadastrados.'
+        : 'Cadastro realizado com sucesso! Nosso time entrará em contato.',
       data: {
         user_id: signUpData.user.id,
         email: emailValue,
         trial_expires_at: trialExpiresAt.toISOString(),
         trial_days: 7,
+        is_trial: isTrialFlow,
+        email_sent: emailSent,
+        plan: planValue,
+        login_url: loginUrl,
       },
     }, { status: 201 })
 
