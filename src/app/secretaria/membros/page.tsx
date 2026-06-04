@@ -2197,8 +2197,8 @@ export default function MembrosPage() {
             <div>
           {/* Filtro de Busca */}
           <div className="bg-white rounded-lg p-4 shadow-md mb-6">
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end">
+              <div className="w-full md:flex-1">
                 <label className="block text-sm font-semibold text-teal-700 mb-2">Filtro de Busca</label>
                 <input
                   type="text"
@@ -2211,7 +2211,7 @@ export default function MembrosPage() {
                   className="w-full px-4 py-2 border-2 border-teal-300 rounded-lg focus:outline-none focus:border-teal-500"
                 />
               </div>
-              <div className="w-48">
+              <div className="w-full md:w-48">
                 <label className="block text-sm font-semibold text-teal-700 mb-2">CARGO</label>
                 <select
                   value={cargoFilter}
@@ -2227,7 +2227,7 @@ export default function MembrosPage() {
                   ))}
                 </select>
               </div>
-              <div className="w-48">
+              <div className="w-full md:w-48">
                 <label className="block text-sm font-semibold text-teal-700 mb-2">STATUS</label>
                 <select
                   value={statusFilter}
@@ -2249,7 +2249,7 @@ export default function MembrosPage() {
                     setCargoFilter('TODOS');
                     setCurrentPage(1);
                   }}
-                  className="mt-[26px] px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition font-semibold text-sm h-[42px]"
+                  className="w-full md:w-auto mt-0 md:mt-[26px] px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition font-semibold text-sm h-[42px]"
                 >
                   LIMPAR
                 </button>
@@ -2258,12 +2258,12 @@ export default function MembrosPage() {
 
           {/* Header da Tabela */}
           <div className="bg-white rounded-t-lg shadow-md">
-            <div className="flex items-center justify-between p-4 border-b-2 border-teal-500">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between p-4 border-b-2 border-teal-500">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">☰</span>
                 <h2 className="text-lg font-bold text-teal-700">Listagem de Membros</h2>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
                 <span className="text-sm text-gray-600">
                   Quantidade de Membros:
                   <span className="ml-2 px-2 py-0.5 bg-teal-100 text-teal-700 font-bold rounded-full text-sm">
@@ -2273,7 +2273,7 @@ export default function MembrosPage() {
                     <span className="ml-1 text-xs text-gray-400">de {membros.length}</span>
                   )}
                 </span>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
                   {!isSupervisor && (
                   <button
                     onClick={() => {
@@ -2283,7 +2283,7 @@ export default function MembrosPage() {
                       }
                       abrirNovoCadastro();
                     }}
-                    className={`px-4 py-2 rounded-lg transition font-semibold text-sm flex items-center gap-2 ${
+                    className={`px-4 py-2 rounded-lg transition font-semibold text-sm flex items-center gap-2 w-full sm:w-auto ${
                       limiteMembrosAtingido
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         : 'bg-green-600 text-white hover:bg-green-700'
@@ -2363,7 +2363,7 @@ export default function MembrosPage() {
                       }
                     }}
                     disabled={!ultimoCadastro}
-                    className={`px-4 py-2 rounded-lg transition font-semibold text-sm ${ultimoCadastro
+                    className={`px-4 py-2 rounded-lg transition font-semibold text-sm w-full sm:w-auto ${ultimoCadastro
                       ? 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
@@ -2372,7 +2372,7 @@ export default function MembrosPage() {
                   </button>
                   <button
                     onClick={gerarPDFListagem}
-                    className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition font-semibold text-sm"
+                    className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition font-semibold text-sm w-full sm:w-auto"
                   >
                     🖨️ IMPRIMIR
                   </button>
@@ -2410,7 +2410,7 @@ export default function MembrosPage() {
                       setImprimindoLote(true);
                     }}
                     disabled={membrosSelecionados.size === 0}
-                    className={`px-4 py-2 rounded-lg transition font-semibold text-sm ${membrosSelecionados.size > 0
+                    className={`px-4 py-2 rounded-lg transition font-semibold text-sm w-full sm:w-auto ${membrosSelecionados.size > 0
                       ? 'bg-purple-600 text-white hover:bg-purple-700 cursor-pointer'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
@@ -2424,7 +2424,7 @@ export default function MembrosPage() {
             {/* Tabela */}
             <div className="px-4 pt-3 pb-2">
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+                <table className="w-full min-w-[960px] border-collapse">
                 <thead>
                   <tr className="bg-gray-100">
                     <th className="border-2 border-gray-300 px-4 py-3 text-center font-semibold text-gray-700 w-12">
