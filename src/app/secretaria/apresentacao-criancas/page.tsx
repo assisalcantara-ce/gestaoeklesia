@@ -710,8 +710,58 @@ export default function ApresentacaoCriancasPage() {
                       <p className="text-sm font-medium">Nenhum registro cadastrado.</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                    <>
+                      {/* CARDS MOBILE */}
+                      <div className="md:hidden divide-y divide-gray-100">
+                        {registros.map((r) => (
+                          <div key={r.id} className="p-4 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-semibold text-gray-800 text-sm">{r.crianca_nome}</p>
+                                <p className="text-xs text-gray-400">{r.crianca_sexo} · {formatDate(r.crianca_data_nascimento)}</p>
+                              </div>
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold flex-shrink-0 ${
+                                r.status === 'apresentado' ? 'bg-emerald-100 text-emerald-700'
+                                  : r.status === 'cancelado' ? 'bg-red-100 text-red-600'
+                                  : 'bg-blue-100 text-blue-700'
+                              }`}>
+                                {STATUS_OPTIONS.find((s) => s.value === r.status)?.label || r.status}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-600 space-y-0.5">
+                              {r.pai_nome && <p><span className="text-gray-400">Pai:</span> {r.pai_nome}</p>}
+                              {r.mae_nome && <p><span className="text-gray-400">Mãe:</span> {r.mae_nome}</p>}
+                              {r.responsavel_nome && <p><span className="text-gray-400">Resp.:</span> {r.responsavel_nome} {r.responsavel_telefone && `· ${r.responsavel_telefone}`}</p>}
+                              <p><span className="text-gray-400">Data:</span> {formatDate(r.data_apresentacao) || '—'} {r.local_apresentacao && `· ${r.local_apresentacao}`}</p>
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                className="flex-1 rounded-lg border border-gray-200 py-2 text-xs font-semibold text-gray-600 hover:bg-[#123b63] hover:text-white hover:border-[#123b63] transition-colors"
+                                onClick={() => handleEdit(r)}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                className="flex-1 rounded-lg border border-gray-200 py-2 text-xs font-semibold text-gray-600 hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors"
+                                onClick={() => handleDelete(r.id)}
+                              >
+                                Excluir
+                              </button>
+                              <button
+                                disabled={templatesApresentacao.length === 0}
+                                className="flex-1 rounded-lg border border-gray-200 py-2 text-xs font-semibold text-gray-600 hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                onClick={() => handlePrintClick(r)}
+                              >
+                                Certificado
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* TABELA DESKTOP */}
+                      <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full min-w-[640px] text-sm">
                         <thead>
                           <tr className="bg-[#123b63] text-white text-xs uppercase tracking-wide">
                             <th className="py-3 px-4 text-left font-semibold">Criança</th>
@@ -816,7 +866,8 @@ export default function ApresentacaoCriancasPage() {
                           ))}
                         </tbody>
                       </table>
-                    </div>
+                      </div> {/* fecha hidden md:block overflow-x-auto */}
+                    </>
                   )}
                 </div>
               </Section>

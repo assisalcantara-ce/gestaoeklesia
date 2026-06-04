@@ -2284,7 +2284,7 @@ export default function CongregacoesPage() {
 
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="bg-gray-200 text-gray-800">
                       <th className="px-4 py-3 text-left font-semibold">SETOR</th>
@@ -2644,7 +2644,7 @@ export default function CongregacoesPage() {
 
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">REGIONAL</th>
@@ -2869,7 +2869,7 @@ export default function CongregacoesPage() {
 
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[540px] text-sm">
                 <thead>
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">NOME</th>

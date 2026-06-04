@@ -2421,8 +2421,68 @@ export default function MembrosPage() {
               </div>
             </div>
 
-            {/* Tabela */}
-            <div className="px-4 pt-3 pb-2">
+            {/* CARDS MOBILE — visíveis apenas em telas < md */}
+            <div className="md:hidden space-y-3 px-4 pt-3 pb-2">
+              {membrosPaginados.length === 0 && (
+                <div className="text-center py-8 text-gray-400 text-sm">Nenhum membro encontrado.</div>
+              )}
+              {membrosPaginados.map((membro) => (
+                <div key={membro.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-14 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center border border-gray-200 flex-shrink-0">
+                      {membro.fotoUrl ? (
+                        <img src={membro.fotoUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-2xl text-gray-400">👤</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-800 text-sm truncate">{membro.nome}</p>
+                      <p className="text-xs text-gray-500">Matrícula: <span className="font-semibold">{membro.matricula}</span></p>
+                      <p className="text-xs text-gray-500">CPF: {membro.cpf ? membro.cpf.replace(/(\d{3})\.\d{3}\.\d{3}/, '$1.***.***') : '-'}</p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-bold self-start flex-shrink-0 ${
+                      membro.status === 'ativo' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    }`}>
+                      {membro.status.toUpperCase()}
+                    </span>
+                  </div>
+                  {(membro.cargoMinisterial || membro.congregacao) && (
+                    <div className="mb-3 space-y-1">
+                      {membro.cargoMinisterial && <p className="text-xs text-gray-600"><span className="font-semibold">Cargo:</span> {membro.cargoMinisterial}</p>}
+                      {membro.congregacao && <p className="text-xs text-gray-600"><span className="font-semibold">Congregação:</span> {membro.congregacao}</p>}
+                    </div>
+                  )}
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => setMembroImprimindo(membro)}
+                      className="flex-1 min-w-[60px] px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200 transition"
+                    >
+                      🖨️ Ficha
+                    </button>
+                    {!isSupervisor && (
+                      <button
+                        onClick={() => abrirEdicao(membro)}
+                        className="flex-1 min-w-[60px] px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition"
+                      >
+                        ✏️ Editar
+                      </button>
+                    )}
+                    {!isSupervisor && (
+                      <button
+                        onClick={() => abrirConfirmacaoDeletar(membro)}
+                        className="flex-1 min-w-[60px] px-3 py-2 bg-red-50 text-red-700 rounded-lg text-xs font-semibold hover:bg-red-100 transition"
+                      >
+                        🗑️ Excluir
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* TABELA DESKTOP — visível apenas em md+ */}
+            <div className="hidden md:block px-4 pt-3 pb-2">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[960px] border-collapse">
                 <thead>
@@ -2566,11 +2626,11 @@ export default function MembrosPage() {
 
           {/* Rodapé da Tabela */}
           <div className="bg-white rounded-b-lg shadow-md p-4 border-t border-gray-300">
-            <div className="flex justify-between items-center">
-              <div className="text-sm text-gray-600">
+            <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-center">
+              <div className="text-sm text-gray-600 text-center md:text-left">
                 Mostrando {startIndex + 1} até {Math.min(endIndex, membrosFiltrados.length)} de {membrosFiltrados.length} registros
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center justify-center gap-1 flex-wrap">
                 {/* Anterior */}
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
