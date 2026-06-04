@@ -27,6 +27,8 @@ export default function SuportePage() {
   const [success, setSuccess] = useState('')
   const [page, setPage] = useState(1)
   const [landingPage, setLandingPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [landingTotalPages, setLandingTotalPages] = useState(1)
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null)
   const [selectedLandingTicket, setSelectedLandingTicket] = useState<SupportTicketLanding | null>(null)
   const [messages, setMessages] = useState<SupportTicketMessage[]>([])
@@ -101,6 +103,7 @@ export default function SuportePage() {
 
       const data = await response.json()
       setTickets(data.data)
+      setTotalPages(data.total_pages || 1)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -128,6 +131,7 @@ export default function SuportePage() {
 
       const data = await response.json()
       setLandingTickets(data.data || [])
+      setLandingTotalPages(data.total_pages || 1)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -764,6 +768,41 @@ export default function SuportePage() {
                 </table>
               )
             )}
+          </div>
+
+          {/* Paginação */}
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-400">
+              Página {ticketView === 'tenant' ? page : landingPage} de {ticketView === 'tenant' ? totalPages : landingTotalPages}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (ticketView === 'tenant') {
+                    setPage(Math.max(1, page - 1))
+                  } else {
+                    setLandingPage(Math.max(1, landingPage - 1))
+                  }
+                }}
+                disabled={ticketView === 'tenant' ? page === 1 : landingPage === 1}
+                className="px-4 py-2 bg-gray-800 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm font-medium"
+              >
+                ← Anterior
+              </button>
+              <button
+                onClick={() => {
+                  if (ticketView === 'tenant') {
+                    setPage(Math.min(totalPages, page + 1))
+                  } else {
+                    setLandingPage(Math.min(landingTotalPages, landingPage + 1))
+                  }
+                }}
+                disabled={ticketView === 'tenant' ? page === totalPages : landingPage === landingTotalPages}
+                className="px-4 py-2 bg-gray-800 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm font-medium"
+              >
+                Próxima →
+              </button>
+            </div>
           </div>
         </div>
       </main>

@@ -129,7 +129,6 @@ export async function createAdminUser(userData: AdminUserForm): Promise<AdminUse
     .from('admin_users')
     .insert([
       {
-        user_id: authData.user.id,
         email: userData.email,
         password_hash: await bcrypt.hash(userData.password, 10),
         role: userData.role,
@@ -157,6 +156,7 @@ export async function createAdminUser(userData: AdminUserForm): Promise<AdminUse
         obs: userData.obs,
         funcao: userData.funcao,
         grupo: userData.grupo,
+        criado_por: authData.user.id,
       },
     ])
     .select()
