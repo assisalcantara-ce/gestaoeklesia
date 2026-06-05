@@ -1862,7 +1862,7 @@ export default function CongregacoesPage() {
       }
       activeMenu="estrutura-hierarquica"
     >
-      <div className="w-full max-w-7xl mx-auto px-1 sm:px-2 lg:px-4">
+      <div className="w-full max-w-7xl mx-auto px-1 sm:px-2 lg:px-4 overflow-x-hidden">
       {/* Abas */}
       <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab}>
         {tabs.length === 0 && (
@@ -2274,7 +2274,8 @@ export default function CongregacoesPage() {
                     : 'bg-teal-500 text-white hover:bg-teal-600'
                 }`}
               >
-                + Adicionar {nomeD1}
+                <span className="md:hidden">+ {nomeD1}</span>
+                <span className="hidden md:inline">+ Adicionar {nomeD1}</span>
                 {planLimits.max_divisao3 > 0 && (
                   <span className="text-xs opacity-80">({divisoes3.length}/{planLimits.max_divisao3})</span>
                 )}
@@ -2282,7 +2283,99 @@ export default function CongregacoesPage() {
               </button>
             )}
 
-            <div className="bg-white rounded-lg shadow-md p-6">
+            {/* Cards mobile */}
+            <div className="md:hidden space-y-3 mb-6">
+              {divisoes3.length === 0 ? (
+                <div className="bg-white border border-gray-200 rounded-lg p-4 text-center text-gray-500">
+                  Nenhuma {nomeD1} cadastrada
+                </div>
+              ) : (
+                divisoes3.map(cg => {
+                  const campo = d2Enabled && cg.campo_id
+                    ? divisoes2.find(c => c.id === cg.campo_id) || null
+                    : null;
+                  const supervisao = campo?.supervisao_id
+                    ? divisoes1.find(s => s.id === campo.supervisao_id) || null
+                    : (!d2Enabled && cg.supervisao_id
+                      ? divisoes1.find(s => s.id === cg.supervisao_id) || null
+                      : null);
+                  const statusImovel = cg.status_imovel === 'PROPRIO'
+                    ? 'Própria'
+                    : cg.status_imovel === 'ALUGADO'
+                      ? 'Alugada'
+                      : cg.status_imovel === 'CEDIDO'
+                        ? 'Cedida'
+                        : '-';
+                  const statusAtivo = cg.is_active ? 'Ativo' : 'Inativo';
+                  return (
+                    <div key={cg.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm border-l-4 border-teal-500">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-800 break-words">{cg.nome}</p>
+                          <p className="text-xs text-gray-500">Setor: {campo ? formatCampoLabel(campo) : (supervisao ? formatSupervisaoLabel(supervisao) : '-')}</p>
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold flex-shrink-0 ${
+                          cg.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {statusAtivo}
+                        </span>
+                      </div>
+                      <div className="mt-2 space-y-1 text-xs text-gray-600">
+                        <p><span className="font-semibold">Dirigente:</span> {String((cg as any).dirigente || '').trim() || '-'}</p>
+                        <p><span className="font-semibold">Campo:</span> {campo?.nome || '-'}</p>
+                        <p><span className="font-semibold">Supervisão:</span> {supervisao?.nome || '-'}</p>
+                        <p><span className="font-semibold">Status:</span> {statusImovel}</p>
+                      </div>
+                      <div className="mt-3 flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => {
+                            setEditingD3(cg);
+                            setShowFormD3(true);
+                            setGeoPreview(null);
+                            setDirigenteResults([]);
+                            setDirigenteStatus('idle');
+                            setDirigenteMsg('');
+                            setFormD3({
+                              supervisao_id: (cg.supervisao_id as any) || '',
+                              campo_id: (cg.campo_id as any) || '',
+                              nome: cg.nome || '',
+                              dirigente: (cg as any).dirigente || '',
+                              dirigente_cpf: (cg as any).dirigente_cpf || '',
+                              dirigente_cargo: (cg as any).dirigente_cargo || '',
+                              dirigente_matricula: (cg as any).dirigente_matricula || '',
+                              endereco: (cg.endereco as any) || '',
+                              cep: (cg.cep as any) || '',
+                              municipio: (cg.cidade as any) || '',
+                              uf: (cg.uf as any) || '',
+                              status_imovel: (cg.status_imovel as any) || '',
+                              is_active: !!cg.is_active,
+                            });
+                            const existingDirigente = String((cg as any).dirigente || '').trim();
+                            setDirigenteSelected(existingDirigente ? { id: 'existing', name: existingDirigente } : null);
+                            if (fotoIgrejaChange.kind === 'file') {
+                              try { URL.revokeObjectURL(fotoIgrejaChange.previewUrl); } catch { /* noop */ }
+                            }
+                            setFotoIgrejaChange({ kind: 'none' });
+                            setFotoIgrejaUrlInput('');
+                          }}
+                          className="flex-1 min-w-[90px] px-3 py-2 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteD3(cg.id)}
+                          className="flex-1 min-w-[90px] px-3 py-2 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition"
+                        >
+                          Deletar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="hidden md:block bg-white rounded-lg shadow-md p-6">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] text-sm">
                   <thead>
@@ -2633,7 +2726,8 @@ export default function CongregacoesPage() {
                         : 'bg-teal-500 text-white hover:bg-teal-600'
                     }`}
                   >
-                    + Adicionar {nomeD2}
+                    <span className="md:hidden">+ {nomeD2}</span>
+                    <span className="hidden md:inline">+ Adicionar {nomeD2}</span>
                     {planLimits.max_divisao2 > 0 && (
                       <span className="text-xs opacity-80">({divisoes2.length}/{planLimits.max_divisao2})</span>
                     )}
@@ -2642,7 +2736,77 @@ export default function CongregacoesPage() {
                 )}
             </>
 
-            <div className="bg-white rounded-lg shadow-md p-6">
+            {/* Cards mobile */}
+            <div className="md:hidden space-y-3 mb-6">
+              {divisoes2.length === 0 ? (
+                <div className="bg-white border border-gray-200 rounded-lg p-4 text-center text-gray-500">
+                  Nenhum {nomeD2} cadastrado
+                </div>
+              ) : (
+                divisoes2.map(c => {
+                  const sup = d3Enabled && c.supervisao_id
+                    ? divisoes1.find(s => s.id === c.supervisao_id) || null
+                    : null;
+                  const qtdCongregacoes = divisoes3.filter(cg => cg.campo_id === c.id).length;
+                  return (
+                    <div key={c.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm border-l-4 border-blue-500">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-800 break-words">{c.nome}</p>
+                          <p className="text-xs text-gray-500">Supervisão: {sup ? formatSupervisaoLabel(sup) : '-'}</p>
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold flex-shrink-0 ${
+                          c.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {c.is_active ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </div>
+                      <div className="mt-2 space-y-1 text-xs text-gray-600">
+                        <p><span className="font-semibold">Responsável:</span> {c.pastor_nome || '-'}</p>
+                        <p><span className="font-semibold">Congregações:</span> {qtdCongregacoes}</p>
+                        <p><span className="font-semibold">Sede:</span> {c.is_sede ? 'Sim' : 'Não'}</p>
+                      </div>
+                      <div className="mt-3 flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => {
+                            setEditingD2(c);
+                            setShowFormD2(true);
+                            setFormD2({
+                              supervisao_id: (c.supervisao_id as any) || '',
+                              nome: c.nome || '',
+                              is_sede: !!c.is_sede,
+                              informar_pastor: !!c.pastor_member_id,
+                              pastor_nome_input: c.pastor_nome || '',
+                              pastor_member_id: c.pastor_member_id || '',
+                              pastor_nome: c.pastor_nome || '',
+                              pastor_data_posse: (c.pastor_data_posse as any) || '',
+                              cep: '',
+                              municipio: (c.municipio as any) || '',
+                              uf: ''
+                            });
+                            setSelectedD1IdsForD2(divisoes3.filter(cg => cg.campo_id === c.id).map(cg => cg.id));
+                            setPastorResults([]);
+                            setPastorStatus(c.pastor_member_id ? 'selected' : 'idle');
+                            setPastorMsg(c.pastor_member_id ? 'Pastor selecionado.' : '');
+                          }}
+                          className="flex-1 min-w-[90px] px-3 py-2 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteD2(c.id)}
+                          className="flex-1 min-w-[90px] px-3 py-2 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition"
+                        >
+                          Deletar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="hidden md:block bg-white rounded-lg shadow-md p-6">
               <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
@@ -2863,11 +3027,80 @@ export default function CongregacoesPage() {
                 onClick={openNewD1}
                 className="mb-6 w-full px-6 py-3 font-bold rounded-lg transition shadow-md flex items-center justify-center gap-2 bg-teal-500 text-white hover:bg-teal-600"
               >
-                + Adicionar {nomeD3}
+                <span className="md:hidden">+ {nomeD3}</span>
+                <span className="hidden md:inline">+ Adicionar {nomeD3}</span>
               </button>
             )}
 
-            <div className="bg-white rounded-lg shadow-md p-6">
+            {/* Cards mobile */}
+            <div className="md:hidden space-y-3 mb-6">
+              {divisoes1.length === 0 ? (
+                <div className="bg-white border border-gray-200 rounded-lg p-4 text-center text-gray-500">
+                  Nenhuma {nomeD3} cadastrada
+                </div>
+              ) : (
+                divisoes1.map(d => {
+                  const campos = divisoes2.filter(c => c.supervisao_id === d.id);
+                  const camposIds = new Set(campos.map(c => c.id));
+                  const qtdCongregacoes = divisoes3.filter(cg => (cg.campo_id && camposIds.has(cg.campo_id)) || (!cg.campo_id && cg.supervisao_id === d.id)).length;
+                  return (
+                    <div key={d.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm border-l-4 border-purple-500">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-800 break-words">{d.nome}</p>
+                          <p className="text-xs text-gray-500">Responsável: {d.supervisor_nome || '-'}</p>
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold flex-shrink-0 ${
+                          d.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {d.is_active ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </div>
+                      <div className="mt-2 space-y-1 text-xs text-gray-600">
+                        <p><span className="font-semibold">Campos:</span> {campos.length}</p>
+                        <p><span className="font-semibold">Congregações:</span> {qtdCongregacoes}</p>
+                      </div>
+                      <div className="mt-3 flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => {
+                            setEditingD1(d);
+                            setFormD1({
+                              codigo: d.codigo ? String(d.codigo) : '',
+                              nome: d.nome || '',
+                              uf: '',
+                              informar_supervisor: !!(d.supervisor_nome || d.supervisor_member_id),
+                              supervisor_cpf_input: '',
+                              supervisor_member_id: '',
+                              supervisor_matricula: '',
+                              supervisor_nome: d.supervisor_nome || '',
+                              supervisor_cpf: '',
+                              supervisor_data_nascimento: '',
+                              supervisor_cargo: '',
+                              supervisor_celular: ''
+                            });
+                            setSelectedD2IdsForD3(divisoes2.filter(c => c.supervisao_id === d.id).map(c => c.id));
+                            setSupervisorStatus('idle');
+                            setSupervisorMsg('');
+                            setShowFormD1(true);
+                          }}
+                          className="flex-1 min-w-[90px] px-3 py-2 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteD1(d.id)}
+                          className="flex-1 min-w-[90px] px-3 py-2 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition"
+                        >
+                          Deletar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="hidden md:block bg-white rounded-lg shadow-md p-6">
               <div className="overflow-x-auto">
               <table className="w-full min-w-[540px] text-sm">
                 <thead>

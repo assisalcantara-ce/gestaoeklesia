@@ -174,6 +174,13 @@ export default function MembrosPage() {
     return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
   };
 
+  const maskCpf = (cpf: string) => {
+    const digits = onlyDigits(cpf).slice(0, 11);
+    if (!digits) return '-';
+    if (digits.length < 11) return formatCpf(digits).replace(/\d/g, '*');
+    return formatCpf(digits).replace(/^(\d{3})\.\d{3}\.\d{3}-(\d{2})$/, '$1.***.***-$2');
+  };
+
   const formatPhone = (value: string) => {
     const digits = onlyDigits(value).slice(0, 11);
     if (!digits) return '';
@@ -1184,6 +1191,21 @@ export default function MembrosPage() {
     setActiveTab('dados');
   };
 
+  const abrirDocumentosMembro = async (membro: Membro) => {
+    const templatesBase = await ensureTemplatesSnapshot();
+    if (!hasActiveTemplate(membro.tipoCadastro, templatesBase)) {
+      setNotification({
+        isOpen: true,
+        title: 'Template Ausente',
+        message: getMensagemSemTemplate(membro.tipoCadastro),
+        type: 'warning'
+      });
+      return;
+    }
+
+    setMembroImprimindoCartao(membro);
+  };
+
   // Função para salvar/atualizar membro
   const verificarCpfDuplicado = async (cpf: string) => {
     const digits = onlyDigits(cpf);
@@ -2142,7 +2164,7 @@ export default function MembrosPage() {
         </div>
       )}
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="p-6 max-w-[96rem] mx-auto w-full">
           {/* Navegação de Abas - Dashboard vs Dados de Ministros */}
           <div className="bg-white rounded-lg shadow-md mb-6 border-b-4 border-teal-500">
@@ -2290,7 +2312,9 @@ export default function MembrosPage() {
                     }`}
                     title={limiteMembrosAtingido ? `Limite de ${maxMembros} cadastros atingido` : 'Novo Cadastro'}
                   >
-                    <span>➕</span> Novo Cadastro
+                    <span>➕</span>
+                    <span className="md:hidden">+ Membro</span>
+                    <span className="hidden md:inline">Novo Cadastro</span>
                   </button>
                   )}
                   <button
@@ -2428,7 +2452,7 @@ export default function MembrosPage() {
               )}
               {membrosPaginados.map((membro) => (
                 <div key={membro.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-start gap-3">
                     <div className="w-12 h-14 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center border border-gray-200 flex-shrink-0">
                       {membro.fotoUrl ? (
                         <img src={membro.fotoUrl} alt="" className="w-full h-full object-cover" />
@@ -2437,9 +2461,11 @@ export default function MembrosPage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-gray-800 text-sm truncate">{membro.nome}</p>
-                      <p className="text-xs text-gray-500">Matrícula: <span className="font-semibold">{membro.matricula}</span></p>
-                      <p className="text-xs text-gray-500">CPF: {membro.cpf ? membro.cpf.replace(/(\d{3})\.\d{3}\.\d{3}/, '$1.***.***') : '-'}</p>
+                      <p className="font-bold text-gray-800 text-sm break-words">{membro.nome}</p>
+                      <div className="text-xs text-gray-500 mt-1 space-y-0.5">
+                        <p>Matrícula: <span className="font-semibold">{membro.matricula}</span></p>
+                        <p>CPF: {maskCpf(membro.cpf)}</p>
+                      </div>
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs font-bold self-start flex-shrink-0 ${
                       membro.status === 'ativo' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -2447,35 +2473,31 @@ export default function MembrosPage() {
                       {membro.status.toUpperCase()}
                     </span>
                   </div>
-                  {(membro.cargoMinisterial || membro.congregacao) && (
-                    <div className="mb-3 space-y-1">
-                      {membro.cargoMinisterial && <p className="text-xs text-gray-600"><span className="font-semibold">Cargo:</span> {membro.cargoMinisterial}</p>}
-                      {membro.congregacao && <p className="text-xs text-gray-600"><span className="font-semibold">Congregação:</span> {membro.congregacao}</p>}
-                    </div>
-                  )}
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="mt-3 space-y-1 text-xs text-gray-600">
+                    <p><span className="font-semibold">Congregação:</span> {membro.congregacao || '-'}</p>
+                    <p><span className="font-semibold">Cargo/Função:</span> {membro.cargoMinisterial || '-'}</p>
+                  </div>
+                  <div className="mt-3 flex gap-2 flex-wrap">
                     <button
                       onClick={() => setMembroImprimindo(membro)}
-                      className="flex-1 min-w-[60px] px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200 transition"
+                      className="flex-1 min-w-[70px] px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200 transition"
                     >
-                      🖨️ Ficha
+                      Ver
                     </button>
                     {!isSupervisor && (
                       <button
                         onClick={() => abrirEdicao(membro)}
-                        className="flex-1 min-w-[60px] px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition"
+                        className="flex-1 min-w-[70px] px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition"
                       >
-                        ✏️ Editar
+                        Editar
                       </button>
                     )}
-                    {!isSupervisor && (
-                      <button
-                        onClick={() => abrirConfirmacaoDeletar(membro)}
-                        className="flex-1 min-w-[60px] px-3 py-2 bg-red-50 text-red-700 rounded-lg text-xs font-semibold hover:bg-red-100 transition"
-                      >
-                        🗑️ Excluir
-                      </button>
-                    )}
+                    <button
+                      onClick={() => { void abrirDocumentosMembro(membro); }}
+                      className="flex-1 min-w-[90px] px-3 py-2 bg-purple-50 text-purple-700 rounded-lg text-xs font-semibold hover:bg-purple-100 transition"
+                    >
+                      Documentos
+                    </button>
                   </div>
                 </div>
               ))}

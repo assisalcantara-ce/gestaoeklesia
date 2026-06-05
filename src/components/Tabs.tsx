@@ -20,12 +20,12 @@ export default function Tabs({ tabs, activeTab, onTabChange, children }: TabsPro
     <div>
       {/* TAB BUTTONS */}
       <div className="mb-6 border-b border-gray-300">
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-2 max-w-full">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`px-6 py-3 font-semibold border-b-2 transition ${
+            className={`px-3 md:px-6 py-2 md:py-3 text-sm md:text-base font-semibold border-b-2 transition break-words ${
               activeTab === tab.id
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-gray-600 hover:text-gray-800'
