@@ -20,7 +20,7 @@ export default function Tabs({ tabs, activeTab, onTabChange, children }: TabsPro
     <div>
       {/* TAB BUTTONS */}
       <div className="mb-6 border-b border-gray-300">
-        <div className="flex flex-wrap gap-2 max-w-full">
+        <div className="flex flex-wrap gap-2 max-w-full min-w-0">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -39,7 +39,7 @@ export default function Tabs({ tabs, activeTab, onTabChange, children }: TabsPro
       </div>
 
       {/* TAB CONTENT */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-md p-6 max-w-full overflow-x-hidden">
         {children}
       </div>
     </div>

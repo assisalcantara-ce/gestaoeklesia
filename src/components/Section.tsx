@@ -11,9 +11,9 @@ interface SectionProps {
 export default function Section({ icon, title, children }: SectionProps) {
   return (
     <div className="mb-8">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 min-w-0">
         {icon && <span className="text-2xl">{icon}</span>}
-        <h2 className="text-lg font-bold text-gray-800">{title}</h2>
+        <h2 className="text-lg font-bold text-gray-800 break-words">{title}</h2>
       </div>
       <div>
         {children}

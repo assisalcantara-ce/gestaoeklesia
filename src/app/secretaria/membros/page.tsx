@@ -2446,7 +2446,7 @@ export default function MembrosPage() {
             </div>
 
             {/* CARDS MOBILE — visíveis apenas em telas < md */}
-            <div className="md:hidden space-y-3 px-4 pt-3 pb-2">
+            <div className="md:hidden space-y-3 px-4 pt-3 pb-2 max-w-full">
               {membrosPaginados.length === 0 && (
                 <div className="text-center py-8 text-gray-400 text-sm">Nenhum membro encontrado.</div>
               )}
@@ -2473,7 +2473,7 @@ export default function MembrosPage() {
                       {membro.status.toUpperCase()}
                     </span>
                   </div>
-                  <div className="mt-3 space-y-1 text-xs text-gray-600">
+                  <div className="mt-3 space-y-1 text-xs text-gray-600 break-words">
                     <p><span className="font-semibold">Congregação:</span> {membro.congregacao || '-'}</p>
                     <p><span className="font-semibold">Cargo/Função:</span> {membro.cargoMinisterial || '-'}</p>
                   </div>

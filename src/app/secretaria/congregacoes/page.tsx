@@ -2320,7 +2320,7 @@ export default function CongregacoesPage() {
                           {statusAtivo}
                         </span>
                       </div>
-                      <div className="mt-2 space-y-1 text-xs text-gray-600">
+                      <div className="mt-2 space-y-1 text-xs text-gray-600 break-words">
                         <p><span className="font-semibold">Dirigente:</span> {String((cg as any).dirigente || '').trim() || '-'}</p>
                         <p><span className="font-semibold">Campo:</span> {campo?.nome || '-'}</p>
                         <p><span className="font-semibold">Supervisão:</span> {supervisao?.nome || '-'}</p>
@@ -2761,7 +2761,7 @@ export default function CongregacoesPage() {
                           {c.is_active ? 'Ativo' : 'Inativo'}
                         </span>
                       </div>
-                      <div className="mt-2 space-y-1 text-xs text-gray-600">
+                      <div className="mt-2 space-y-1 text-xs text-gray-600 break-words">
                         <p><span className="font-semibold">Responsável:</span> {c.pastor_nome || '-'}</p>
                         <p><span className="font-semibold">Congregações:</span> {qtdCongregacoes}</p>
                         <p><span className="font-semibold">Sede:</span> {c.is_sede ? 'Sim' : 'Não'}</p>
@@ -3056,7 +3056,7 @@ export default function CongregacoesPage() {
                           {d.is_active ? 'Ativo' : 'Inativo'}
                         </span>
                       </div>
-                      <div className="mt-2 space-y-1 text-xs text-gray-600">
+                      <div className="mt-2 space-y-1 text-xs text-gray-600 break-words">
                         <p><span className="font-semibold">Campos:</span> {campos.length}</p>
                         <p><span className="font-semibold">Congregações:</span> {qtdCongregacoes}</p>
                       </div>
