@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import { formatarPreco } from '@/config/plans'
 
@@ -48,8 +49,18 @@ function buildHighlights(plan: PlanoDB): string[] {
 }
 
 export default function TrialExpiradoPage() {
+  const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const [planos, setPlanos] = useState<PlanoDB[]>([])
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      router.push('/')
+    } catch {
+      window.location.href = '/'
+    }
+  }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
@@ -168,6 +179,19 @@ export default function TrialExpiradoPage() {
 
       <div className="landing-orb orb-a" />
       <div className="landing-orb orb-b" />
+
+      <div className="absolute top-6 right-6 z-10">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="inline-flex items-center gap-2 rounded-lg border border-[#e7e0d6] bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition cursor-pointer"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          Sair
+        </button>
+      </div>
 
       <div className="max-w-6xl mx-auto px-6 py-16 relative">
         <div className="max-w-3xl">
@@ -291,7 +315,7 @@ export default function TrialExpiradoPage() {
           )}
         </div>
 
-        <div className="mt-10">
+        <div className="mt-10 flex flex-wrap gap-4">
           <a
             href="https://wa.me/5591981755021"
             target="_blank"
@@ -300,6 +324,16 @@ export default function TrialExpiradoPage() {
           >
             Falar com a equipe comercial
           </a>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="inline-flex items-center gap-2 rounded-xl border border-[#e7e0d6] bg-white/80 px-4 py-3 text-sm text-slate-700 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Sair da conta e voltar ao início
+          </button>
         </div>
       </div>
     </div>

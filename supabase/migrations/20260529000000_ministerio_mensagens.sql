@@ -28,6 +28,11 @@ CREATE INDEX IF NOT EXISTS idx_ministerio_mensagens_ministry
 -- RLS
 ALTER TABLE ministerio_mensagens ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "mensagens_select" ON public.ministerio_mensagens;
+DROP POLICY IF EXISTS "mensagens_insert" ON public.ministerio_mensagens;
+DROP POLICY IF EXISTS "mensagens_update" ON public.ministerio_mensagens;
+DROP POLICY IF EXISTS "mensagens_delete" ON public.ministerio_mensagens;
+
 -- Leitura: usuário pertence ao mesmo ministério
 -- e a data atual está dentro do período de exibição
 CREATE POLICY "mensagens_select"

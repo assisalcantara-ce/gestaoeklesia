@@ -22,6 +22,7 @@ CREATE INDEX IF NOT EXISTS idx_flog_created_at  ON public.tesouraria_fechamento_
 ALTER TABLE public.tesouraria_fechamento_logs ENABLE ROW LEVEL SECURITY;
 
 -- SELECT: ADMINISTRADOR, FINANCEIRO ou dono do ministério
+DROP POLICY IF EXISTS "tesouraria_flog_select" ON public.tesouraria_fechamento_logs;
 CREATE POLICY "tesouraria_flog_select"
   ON public.tesouraria_fechamento_logs FOR SELECT
   USING (
@@ -46,6 +47,7 @@ CREATE POLICY "tesouraria_flog_select"
   );
 
 -- INSERT: mesmos critérios do SELECT
+DROP POLICY IF EXISTS "tesouraria_flog_insert" ON public.tesouraria_fechamento_logs;
 CREATE POLICY "tesouraria_flog_insert"
   ON public.tesouraria_fechamento_logs FOR INSERT
   WITH CHECK (

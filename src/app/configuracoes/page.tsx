@@ -54,33 +54,6 @@ export default function ConfiguracoesPage() {
               🏛️ Perfil do Ministério
             </button>
             <button
-              onClick={() => setActiveTab('identidade')}
-              className={`px-6 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 ${activeTab === 'identidade'
-                ? 'text-teal-700 border-teal-600'
-                : 'text-gray-600 border-transparent hover:text-teal-600'
-                }`}
-            >
-              🎨 Identidade Visual
-            </button>
-            <button
-              onClick={() => setActiveTab('faturas')}
-              className={`px-6 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 ${activeTab === 'faturas'
-                ? 'text-teal-700 border-teal-600'
-                : 'text-gray-600 border-transparent hover:text-teal-600'
-                }`}
-            >
-              📄 Faturas
-            </button>
-            <button
-              onClick={() => setActiveTab('plano')}
-              className={`px-6 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 ${activeTab === 'plano'
-                ? 'text-teal-700 border-teal-600'
-                : 'text-gray-600 border-transparent hover:text-teal-600'
-                }`}
-            >
-              📋 Plano
-            </button>
-            <button
               onClick={() => setActiveTab('nomenclaturas')}
               className={`px-6 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 ${activeTab === 'nomenclaturas'
                 ? 'text-teal-700 border-teal-600'
@@ -88,6 +61,15 @@ export default function ConfiguracoesPage() {
                 }`}
             >
               📝 Nomenclaturas
+            </button>
+            <button
+              onClick={() => setActiveTab('identidade')}
+              className={`px-6 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 ${activeTab === 'identidade'
+                ? 'text-teal-700 border-teal-600'
+                : 'text-gray-600 border-transparent hover:text-teal-600'
+                }`}
+            >
+              🎨 Identidade Visual
             </button>
             {ctx.isAdmin && (
               <button
@@ -100,6 +82,24 @@ export default function ConfiguracoesPage() {
                 💳 Gateways de Pagamento
               </button>
             )}
+            <button
+              onClick={() => setActiveTab('plano')}
+              className={`px-6 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 ${activeTab === 'plano'
+                ? 'text-teal-700 border-teal-600'
+                : 'text-gray-600 border-transparent hover:text-teal-600'
+                }`}
+            >
+              📋 Plano
+            </button>
+            <button
+              onClick={() => setActiveTab('faturas')}
+              className={`px-6 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 ${activeTab === 'faturas'
+                ? 'text-teal-700 border-teal-600'
+                : 'text-gray-600 border-transparent hover:text-teal-600'
+                }`}
+            >
+              📄 Faturas
+            </button>
           </div>
 
           {/* Conteúdo das Abas */}
@@ -109,16 +109,19 @@ export default function ConfiguracoesPage() {
               <PerfilContent onNotification={(title, message, type) => setNotification({ isOpen: true, title, message, type })} />
             )}
 
+            {/* Aba: Nomenclaturas */}
+            {activeTab === 'nomenclaturas' && (
+              <NomenclaturaContent onNotification={(title, message, type) => setNotification({ isOpen: true, title, message, type })} />
+            )}
+
             {/* Aba: Identidade Visual */}
             {activeTab === 'identidade' && (
               <BrandingContent onNotification={(title, message, type) => setNotification({ isOpen: true, title, message, type })} />
             )}
 
-
-
-            {/* Aba: Faturas */}
-            {activeTab === 'faturas' && (
-              <FaturasContent />
+            {/* Aba: Gateways de Pagamento */}
+            {activeTab === 'gateways' && ctx.isAdmin && (
+              <GatewaysContent onNotification={(title, message, type) => setNotification({ isOpen: true, title, message, type })} />
             )}
 
             {/* Aba: Plano */}
@@ -126,14 +129,9 @@ export default function ConfiguracoesPage() {
               <PlanoContent onNotification={(title, message, type) => setNotification({ isOpen: true, title, message, type })} />
             )}
 
-            {/* Aba: Nomenclaturas */}
-            {activeTab === 'nomenclaturas' && (
-              <NomenclaturaContent onNotification={(title, message, type) => setNotification({ isOpen: true, title, message, type })} />
-            )}
-
-            {/* Aba: Gateways de Pagamento */}
-            {activeTab === 'gateways' && ctx.isAdmin && (
-              <GatewaysContent onNotification={(title, message, type) => setNotification({ isOpen: true, title, message, type })} />
+            {/* Aba: Faturas */}
+            {activeTab === 'faturas' && (
+              <FaturasContent />
             )}
           </div>
         </div>

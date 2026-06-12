@@ -66,6 +66,10 @@ CREATE INDEX IF NOT EXISTS idx_ffs_signed_at ON public.financial_fiscal_signatur
 
 ALTER TABLE public.financial_fiscal_signatures ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "ffs_select" ON public.financial_fiscal_signatures;
+DROP POLICY IF EXISTS "ffs_insert" ON public.financial_fiscal_signatures;
+DROP POLICY IF EXISTS "ffs_delete" ON public.financial_fiscal_signatures;
+
 -- SELECT: ADMINISTRADOR, FINANCEIRO, PRESIDENCIA, CONSELHO_FISCAL, dono
 CREATE POLICY "ffs_select" ON public.financial_fiscal_signatures FOR SELECT
   USING (

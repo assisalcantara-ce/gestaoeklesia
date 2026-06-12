@@ -550,36 +550,60 @@ export default function InteractiveCanvas({
                 );
                 break;
 
-            case 'imagem':
+            case 'imagem': {
+                const isTransparentBg = !elemento.backgroundColor || elemento.backgroundColor === 'transparent';
                 conteudo = elemento.imagemUrl ? (
-                    <img
-                        src={elemento.imagemUrl}
-                        alt="Imagem"
+                    <div
+                        className={isTransparentBg ? "image-checkerboard" : ""}
                         style={{
                             width: '100%',
                             height: '100%',
-                            objectFit: 'contain',
-                            opacity: elemento.transparencia || 1
+                            backgroundColor: isTransparentBg ? 'transparent' : elemento.backgroundColor,
+                            backgroundImage: isTransparentBg
+                                ? 'linear-gradient(45deg, #e5e7eb 25%, transparent 25%, transparent 75%, #e5e7eb 75%), linear-gradient(45deg, #e5e7eb 25%, #ffffff 25%, #ffffff 75%, #e5e7eb 75%)'
+                                : 'none',
+                            backgroundSize: isTransparentBg ? '12px 12px' : 'auto',
+                            backgroundPosition: isTransparentBg ? '0 0, 6px 6px' : '0 0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: `${elemento.borderRadius || 0}px`,
+                            overflow: 'hidden'
                         }}
-                    />
+                    >
+                        <img
+                            src={elemento.imagemUrl}
+                            alt="Imagem"
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'contain',
+                                opacity: elemento.transparencia || 1
+                            }}
+                        />
+                    </div>
                 ) : (
                     <div
                         style={{
                             width: '100%',
                             height: '100%',
-                            backgroundColor: 'rgba(200,200,200,0.3)',
+                            backgroundColor: isTransparentBg ? 'rgba(200,200,200,0.3)' : elemento.backgroundColor,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontSize: '10px',
                             color: '#666',
-                            opacity: elemento.transparencia || 1
+                            opacity: elemento.transparencia || 1,
+                            borderRadius: `${elemento.borderRadius || 0}px`,
+                            border: isTransparentBg ? 'none' : '1px solid #ddd',
+                            overflow: 'hidden'
                         }}
                     >
                         🖼️ Imagem
                     </div>
                 );
                 break;
+            }
 
             case 'linha':
                 conteudo = (

@@ -180,7 +180,9 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
         if (el.tipo === 'imagem') {
           const opacity = (el.transparencia ?? 1);
           const radius = (el.borderRadius ?? 0);
-          const style = `position: absolute; left: ${el.x}px; top: ${el.y}px; width: ${el.largura}px; height: ${el.altura}px; opacity: ${opacity}; border-radius: ${radius}px; overflow: hidden; background: ${el.imagemUrl ? 'transparent' : '#f3f4f6'}; ${el.imagemUrl ? '' : 'border: 1px dashed #d1d5db;'} display: flex; align-items: center; justify-content: center;`;
+          const isTransparentBg = !el.backgroundColor || el.backgroundColor === 'transparent';
+          const bg = isTransparentBg ? (el.imagemUrl ? 'transparent' : '#f3f4f6') : el.backgroundColor;
+          const style = `position: absolute; left: ${el.x}px; top: ${el.y}px; width: ${el.largura}px; height: ${el.altura}px; opacity: ${opacity}; border-radius: ${radius}px; overflow: hidden; background: ${bg}; ${el.imagemUrl ? '' : 'border: 1px dashed #d1d5db;'} display: flex; align-items: center; justify-content: center;`;
           if (el.imagemUrl) {
             return `<div style="${style}"><img src="${el.imagemUrl}" style="width: 100%; height: 100%; object-fit: contain; display: block;" /></div>`;
           }

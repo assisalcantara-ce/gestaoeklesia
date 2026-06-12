@@ -734,7 +734,8 @@ export default function ConfiguracaoCartoesPage() {
     setTimeout(() => setMensagemSucesso(''), 3000);
   };
 
-  const copiarJSON = () => {
+  /*
+  const _copiarJSON = () => {
     if (!templateEmEdicao) return;
 
     let templateAtualizado = { ...templateEmEdicao };
@@ -785,6 +786,7 @@ export default function ConfiguracaoCartoesPage() {
       }
     }
   };
+  */
 
   const duplicarTemplate = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
@@ -1017,6 +1019,7 @@ export default function ConfiguracaoCartoesPage() {
                 <div className="bg-white rounded-lg border border-gray-200 p-4">
                   <div className="flex justify-between items-center mb-4">
                     <h2 className="text-lg font-bold text-gray-800">Editar Template</h2>
+                    {/* Ocultado a pedido do usuário
                     <button
                       onClick={copiarJSON}
                       className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold flex items-center gap-2 border border-gray-300"
@@ -1024,6 +1027,7 @@ export default function ConfiguracaoCartoesPage() {
                     >
                       📋 Copiar JSON
                     </button>
+                    */}
                   </div>
 
                   <div className="grid grid-cols-4 gap-4 items-end">
@@ -1536,14 +1540,31 @@ export default function ConfiguracaoCartoesPage() {
                   </label>
 
                   {elementoSelecionado.imagemUrl ? (
-                    <div className="space-y-2">
+                    <div className="space-y-2 mb-4">
                       {/* Preview da imagem */}
-                      <div className="w-full h-32 rounded border-2 border-gray-300 overflow-hidden bg-gray-100 flex items-center justify-center">
+                      <div
+                        className="w-full h-32 rounded border-2 border-gray-300 overflow-hidden flex items-center justify-center"
+                        style={{
+                          backgroundColor: (!elementoSelecionado.backgroundColor || elementoSelecionado.backgroundColor === 'transparent')
+                            ? 'transparent'
+                            : elementoSelecionado.backgroundColor,
+                          backgroundImage: (!elementoSelecionado.backgroundColor || elementoSelecionado.backgroundColor === 'transparent')
+                            ? 'linear-gradient(45deg, #e5e7eb 25%, transparent 25%, transparent 75%, #e5e7eb 75%), linear-gradient(45deg, #e5e7eb 25%, #ffffff 25%, #ffffff 75%, #e5e7eb 75%)'
+                            : 'none',
+                          backgroundSize: (!elementoSelecionado.backgroundColor || elementoSelecionado.backgroundColor === 'transparent')
+                            ? '12px 12px'
+                            : 'auto',
+                          backgroundPosition: '0 0, 6px 6px'
+                        }}
+                      >
                         <img
                           src={elementoSelecionado.imagemUrl}
                           alt="Preview"
                           className="max-w-full max-h-full object-contain"
-                          style={{ opacity: elementoSelecionado.transparencia || 1 }}
+                          style={{
+                            opacity: elementoSelecionado.transparencia || 1,
+                            borderRadius: `${elementoSelecionado.borderRadius || 0}px`
+                          }}
                         />
                       </div>
 
@@ -1598,13 +1619,84 @@ export default function ConfiguracaoCartoesPage() {
                         };
                         input.click();
                       }}
-                      className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50 cursor-pointer hover:bg-gray-100 transition"
+                      className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50 cursor-pointer hover:bg-gray-100 transition mb-4"
                     >
                       <div className="text-4xl mb-2">📤</div>
                       <div className="text-sm font-semibold text-gray-700">Fazer Upload</div>
                       <p className="text-xs text-gray-500 mt-1">Clique para selecionar uma imagem</p>
                     </div>
                   )}
+
+                  {/* Fundo da Imagem */}
+                  <div className="mb-4 border-t pt-4">
+                    <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wider">
+                      Fundo da Imagem
+                    </label>
+                    <div className="flex gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => atualizarElemento(elementoSelecionado.id, { backgroundColor: 'transparent' })}
+                        className={`flex-1 py-1.5 px-2 rounded text-xs font-semibold border transition ${
+                          (!elementoSelecionado.backgroundColor || elementoSelecionado.backgroundColor === 'transparent')
+                            ? 'bg-blue-50 border-blue-500 text-blue-700'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        🏁 Transparente
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currentBg = elementoSelecionado.backgroundColor;
+                          const nextBg = (!currentBg || currentBg === 'transparent') ? '#ffffff' : currentBg;
+                          atualizarElemento(elementoSelecionado.id, { backgroundColor: nextBg });
+                        }}
+                        className={`flex-1 py-1.5 px-2 rounded text-xs font-semibold border transition ${
+                          (elementoSelecionado.backgroundColor && elementoSelecionado.backgroundColor !== 'transparent')
+                            ? 'bg-blue-50 border-blue-500 text-blue-700'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        ⬜ Sólido
+                      </button>
+                    </div>
+
+                    {/* Se for Sólido, exibir cor */}
+                    {elementoSelecionado.backgroundColor && elementoSelecionado.backgroundColor !== 'transparent' && (
+                      <div className="flex gap-2 mt-2">
+                        <input
+                          type="color"
+                          value={elementoSelecionado.backgroundColor.startsWith('#') ? elementoSelecionado.backgroundColor : '#ffffff'}
+                          onChange={(e) => atualizarElemento(elementoSelecionado.id, { backgroundColor: e.target.value })}
+                          className="h-8 w-12 border border-gray-300 rounded cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={elementoSelecionado.backgroundColor}
+                          onChange={(e) => atualizarElemento(elementoSelecionado.id, { backgroundColor: e.target.value })}
+                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs"
+                          placeholder="#ffffff"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Cantos Arredondados */}
+                  <div className="mb-4 border-t pt-4">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Cantos Arredondados: {elementoSelecionado.borderRadius || 0}px
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={elementoSelecionado.borderRadius || 0}
+                      onChange={(e) => atualizarElemento(elementoSelecionado.id, { borderRadius: parseInt(e.target.value) })}
+                      className="w-full accent-blue-600 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">0px = Quadrado, 100px = Totalmente Arredondado</p>
+                  </div>
                 </div>
               )}
 

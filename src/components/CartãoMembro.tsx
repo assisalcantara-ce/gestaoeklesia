@@ -275,12 +275,14 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
         );
 
       case 'imagem': {
+        const isTransparentBg = !elemento.backgroundColor || elemento.backgroundColor === 'transparent';
+        const bg = isTransparentBg ? (elemento.imagemUrl ? 'transparent' : '#f3f4f6') : elemento.backgroundColor;
         const styleContainer: React.CSSProperties = {
           ...estilo,
           overflow: 'hidden',
           borderRadius: `${elemento.borderRadius || 0}px`,
           opacity: elemento.transparencia ?? 1,
-          backgroundColor: '#f3f4f6',
+          backgroundColor: bg,
           border: elemento.imagemUrl ? undefined : '1px dashed #d1d5db',
           alignItems: 'center',
           justifyContent: 'center',

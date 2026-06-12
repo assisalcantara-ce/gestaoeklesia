@@ -14,6 +14,9 @@ ALTER TABLE public.tesouraria_fechamentos
   ADD COLUMN IF NOT EXISTS status_conselho_fiscal VARCHAR(30) NOT NULL DEFAULT 'pendente';
 
 ALTER TABLE public.tesouraria_fechamentos
+  DROP CONSTRAINT IF EXISTS tesouraria_fechamentos_cf_status_check;
+
+ALTER TABLE public.tesouraria_fechamentos
   ADD CONSTRAINT tesouraria_fechamentos_cf_status_check
     CHECK (status_conselho_fiscal IN ('pendente','em_analise','aprovado','aprovado_com_ressalva','rejeitado'));
 

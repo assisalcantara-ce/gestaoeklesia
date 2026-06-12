@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase-client'
  * /admin usa AdminAuthProvider separado — não está sujeito ao guard.
  */
 const BYPASS_PATHS = [
+  '/',
   '/trial-expirado',
   '/login',
   '/pre-cadastro',
