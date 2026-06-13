@@ -1,142 +1,243 @@
-﻿'use client';
+'use client'
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase-client';
-import NotificationModal from '@/components/NotificationModal';
-import { formatCpfOrCnpj, formatPhone } from '@/lib/mascaras';
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase-client'
+import NotificationModal from '@/components/NotificationModal'
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
 
 export default function LoginPage() {
-  const router = useRouter();
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [showSignup, setShowSignup] = useState(false);
-  const [successModal, setSuccessModal] = useState<any>({ isOpen: false, email: '' });
-  const [errorModal, setErrorModal] = useState<any>({ isOpen: false, email: '' });
-  const [loginErrorModal, setLoginErrorModal] = useState({ isOpen: false });
-  const [contactData, setContactData] = useState({ ministerio: '', pastor: '', cpf: '', whatsapp: '', email: '' });
+  const router = useRouter()
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [loginErrorModal, setLoginErrorModal] = useState({ isOpen: false })
 
-  useEffect(() => { if (error) { const t = setTimeout(() => setError(''), 3000); return () => clearTimeout(t); } }, [error]);
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.gestaoeklesia.com.br'
 
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    if (loading) return;
-    setLoading(true);
-    setError('');
+  // Carrega e-mail salvo se "Lembrar acesso" estiver ativo
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('ge_remembered_email')
+    if (savedEmail) {
+      setEmail(savedEmail)
+      setRememberMe(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (error) {
+      const t = setTimeout(() => setError(''), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [error])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (loading) return
+    setLoading(true)
+    setError('')
+
     try {
-      if (!email || !password) { setError('Preencha todos os campos'); setLoading(false); return; }
-      if (!supabaseRef.current) supabaseRef.current = createClient();
-      const { data, error: err } = await supabaseRef.current!.auth.signInWithPassword({ email, password });
+      if (!email || !password) {
+        setError('Preencha todos os campos')
+        setLoading(false)
+        return
+      }
+
+      if (!supabaseRef.current) {
+        supabaseRef.current = createClient()
+      }
+
+      const { data, error: err } = await supabaseRef.current.auth.signInWithPassword({
+        email,
+        password,
+      })
+
       if (!err && data?.user) {
-        // Mantém loading=true durante a navegação para o botão ficar como "Entrando..."
-        const token = data.session?.access_token;
+        // Salva ou remove o e-mail no localStorage com base no checkbox
+        if (rememberMe) {
+          localStorage.setItem('ge_remembered_email', email)
+        } else {
+          localStorage.removeItem('ge_remembered_email')
+        }
+
+        const token = data.session?.access_token
         if (token) {
           try {
-            const res = await fetch('/api/v1/trial/status', { headers: { Authorization: `Bearer ${token}` } });
-            if (res.ok) { const trial = await res.json(); if (trial?.expired) { router.push('/trial-expirado'); return; } }
-          } catch {}
+            const res = await fetch('/api/v1/trial/status', {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            if (res.ok) {
+              const trial = await res.json()
+              if (trial?.expired) {
+                router.push('/trial-expirado')
+                return
+              }
+            }
+          } catch (e) {
+            console.error('Erro ao verificar status do trial:', e)
+          }
         }
-        router.push('/dashboard');
-        return;
+        router.push('/dashboard')
+        return
       }
-      setLoginErrorModal({ isOpen: true });
-      setLoading(false);
-    } catch (e) { setError('Erro ao fazer login'); setLoading(false); }
-  };
 
-  const handleContactChange = (e: any) => {
-    const { name, value } = e.target;
-    const v = name === 'cpf' ? formatCpfOrCnpj(value) : name === 'whatsapp' ? formatPhone(value) : value;
-    setContactData(p => ({ ...p, [name]: v }));
-  };
-
-  const handleContactSubmit = async (e: any) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    try {
-      if (!contactData.ministerio || !contactData.pastor || !contactData.cpf || !contactData.whatsapp || !contactData.email) { setError('Preencha todos os campos'); return; }
-      const resp = await fetch('/api/v1/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(contactData) });
-      const r = await resp.json();
-      if (!resp.ok) { if (r.error?.includes('existe')) { setErrorModal({ isOpen: true, email: contactData.email }); return; } setError(r.error); return; }
-      setSuccessModal({ isOpen: true, email: contactData.email });
-      setShowSignup(false);
-      setContactData({ ministerio: '', pastor: '', cpf: '', whatsapp: '', email: '' });
-    } catch (e) { setError('Erro ao registrar'); } finally { setLoading(false); }
-  };
+      setLoginErrorModal({ isOpen: true })
+      setLoading(false)
+    } catch (e) {
+      setError('Erro ao fazer login. Tente novamente.')
+      setLoading(false)
+    }
+  }
 
   return (
-    <div 
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
-      style={{
-        backgroundImage: 'url(/img/login2-bg.jpg)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed'
-      }}
-    >
-      <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Serif+Display&display=swap');
-      `}</style>
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-slate-950">
+      {/* Background institucional: gradiente azul moderno com formas abstratas */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-[#021526] via-[#03346E] to-[#6EACDA] z-0"></div>
+      
+      {/* Formas abstratas com desfoque suave para estética premium */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-[#03346E] opacity-40 blur-[120px] pointer-events-none z-0"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-[#6EACDA] opacity-35 blur-[130px] pointer-events-none z-0"></div>
+      <div className="absolute top-[30%] right-[10%] w-[25vw] h-[25vw] rounded-full bg-[#0284c7] opacity-25 blur-[100px] pointer-events-none z-0"></div>
 
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-black/5"></div>
+      <NotificationModal
+        isOpen={loginErrorModal.isOpen}
+        type="error"
+        title="Credenciais incorretas"
+        message="E-mail ou senha inválidos. Verifique os dados inseridos e tente novamente."
+        onClose={() => setLoginErrorModal({ isOpen: false })}
+        showButton
+        autoClose={4000}
+      />
 
-      <NotificationModal isOpen={successModal.isOpen} type="success" title="Sucesso!" message={`Email: ${successModal.email}`} onClose={() => { setSuccessModal({ isOpen: false, email: '' }); router.push('/'); }} autoClose={5000} />
-      <NotificationModal isOpen={errorModal.isOpen} type="error" title="Email já registrado" message={errorModal.email} onClose={() => setErrorModal({ isOpen: false, email: '' })} showButton autoClose={4000} />
-      <NotificationModal isOpen={loginErrorModal.isOpen} type="error" title="Credenciais incorretas" message="Email ou senha inválidos" onClose={() => setLoginErrorModal({ isOpen: false })} showButton autoClose={3500} />
+      {/* Card central moderno */}
+      <div className="w-full max-w-md relative z-10 mx-auto transition-all duration-300">
+        <div className="bg-white/90 backdrop-blur-md rounded-3xl border border-white/20 p-8 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.4)]">
+          
+          {/* Logo e cabeçalho */}
+          <div className="flex flex-col items-center mb-6">
+            <img src="/img/logo_modal.png" alt="Gestão Eklésia" className="h-14 mb-2 object-contain select-none" />
+            <span className="text-[11px] tracking-[0.25em] font-bold text-[#03346E] uppercase select-none">
+              Gestão Eklésia
+            </span>
+            <p className="text-sm text-slate-500 font-medium mt-1 text-center">
+              Administração Ministerial Inteligente
+            </p>
+          </div>
 
-      {/* Container do formulário */}
-      <div className="w-full max-w-md relative z-10">
-        {/* Logo */}
-        <div className="flex justify-center mb-8">
-          <img src="/img/logo_modal.png" alt="Gestão Eklesia" className="h-16" />
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold text-center">
+                {error}
+              </div>
+            )}
+
+            {/* Campo de e-mail */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 ml-1">
+                E-mail
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                  <Mail className="w-4 h-4" />
+                </span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="exemplo@igreja.com"
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-white focus:border-[#03346E] focus:ring-2 focus:ring-blue-100 outline-none transition text-sm text-slate-900 placeholder-slate-400"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Campo de senha */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 ml-1">
+                Senha
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                  <Lock className="w-4 h-4" />
+                </span>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Digite sua senha"
+                  className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl bg-white focus:border-[#03346E] focus:ring-2 focus:ring-blue-100 outline-none transition text-sm text-slate-900 placeholder-slate-400"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition"
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Checkbox lembrar e link de recuperação */}
+            <div className="flex items-center justify-between text-xs pt-1">
+              <label className="flex items-center gap-2 text-slate-600 hover:text-slate-800 transition cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded border-slate-300 text-[#03346E] focus:ring-[#03346E] cursor-pointer"
+                />
+                <span>Lembrar acesso</span>
+              </label>
+              <a
+                href={`${siteUrl}/login#recuperar`}
+                className="font-semibold text-[#03346E] hover:underline transition"
+              >
+                Esqueci minha senha
+              </a>
+            </div>
+
+            {/* Botão de envio */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-[#03346E] text-white rounded-xl font-bold text-sm hover:bg-[#02244f] active:scale-[0.98] transition disabled:opacity-50 disabled:pointer-events-none mt-2 shadow-[0_4px_12px_rgba(3,52,110,0.25)]"
+            >
+              {loading ? 'Entrando no sistema...' : 'Entrar no sistema'}
+            </button>
+          </form>
+
+          {/* Links adicionais */}
+          <div className="mt-6 pt-5 border-t border-slate-200/60 flex items-center justify-between text-xs">
+            <a
+              href={siteUrl}
+              className="font-semibold text-slate-600 hover:text-[#03346E] transition flex items-center gap-1"
+            >
+              <span>←</span> Voltar ao site
+            </a>
+            <a
+              href={`${siteUrl}/pre-cadastro?plan=starter&trial=true`}
+              className="font-bold text-[#03346E] hover:underline transition"
+            >
+              Criar Teste Grátis
+            </a>
+          </div>
+
         </div>
 
-        {!showSignup && (
-          <div className="rounded-3xl shadow-xl w-full bg-white/95 border border-slate-200 p-8">
-            <h2 className="text-center text-xl font-bold mb-2 text-slate-900">ACESSO AO SISTEMA</h2>
-            <p className="text-center text-sm text-slate-500 mb-6">Use suas credenciais cadastradas</p>
-            <form onSubmit={handleSubmit}>
-              {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Email</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" className="w-full px-4 py-3 border border-slate-200 rounded-lg bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 outline-none transition" />
-              </div>
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Senha</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="*****" className="w-full px-4 py-3 border border-slate-200 rounded-lg bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 outline-none transition" />
-              </div>
-              <button type="submit" disabled={loading} className="w-full py-3 bg-emerald-700 text-white rounded-lg font-bold hover:bg-emerald-800 transition disabled:opacity-50">{loading ? 'Entrando...' : 'Entrar'}</button>
-              <button type="button" onClick={() => router.push('/')} className="w-full mt-3 text-emerald-700 text-sm font-semibold hover:text-emerald-800">Voltar à Página Inicial</button>
-            </form>
-          </div>
-        )}
-
-        {showSignup && (
-          <div className="rounded-3xl shadow-xl w-full bg-white/95 border border-slate-200 p-8">
-            <h2 className="text-center text-xl font-bold mb-2 text-slate-900">SOLICITAR CONTATO</h2>
-            <p className="text-center text-emerald-700 text-sm font-semibold mb-6">Apresentação + Teste Gratuito</p>
-            <form onSubmit={handleContactSubmit}>
-              {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
-              <input type="text" name="ministerio" value={contactData.ministerio} onChange={handleContactChange} placeholder="Nome da Instituição" className="w-full px-4 py-2 mb-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-200 outline-none text-sm" />
-              <input type="text" name="pastor" value={contactData.pastor} onChange={handleContactChange} placeholder="Seu Nome Completo" className="w-full px-4 py-2 mb-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-200 outline-none text-sm" />
-              <input type="text" name="cpf" value={contactData.cpf} onChange={handleContactChange} placeholder="CPF / CNPJ" className="w-full px-4 py-2 mb-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-200 outline-none text-sm" />
-              <input type="text" name="whatsapp" value={contactData.whatsapp} onChange={handleContactChange} placeholder="WhatsApp (com DDD)" className="w-full px-4 py-2 mb-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-200 outline-none text-sm" />
-              <input type="email" name="email" value={contactData.email} onChange={handleContactChange} placeholder="Email para contato" className="w-full px-4 py-2 mb-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-200 outline-none text-sm" />
-              <div className="flex gap-3">
-                <button type="submit" disabled={loading} className="flex-1 py-3 bg-emerald-700 text-white rounded-lg font-bold hover:bg-emerald-800 text-sm transition disabled:opacity-50">{loading ? 'Enviando...' : 'ENVIAR'}</button>
-                <button type="button" onClick={() => { setShowSignup(false); setContactData({ ministerio: '', pastor: '', cpf: '', whatsapp: '', email: '' }); }} className="flex-1 py-3 border border-emerald-700 text-emerald-700 rounded-lg font-bold text-sm hover:bg-emerald-50 transition">VOLTAR</button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        <button type="button" onClick={() => router.push('/admin/login')} className="w-full mt-6 py-3 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold transition">Acessar Área Admin</button>
+        {/* Rodapé institucional */}
+        <div className="mt-8 text-center text-[10px] text-white/60 tracking-wider space-y-1 select-none pointer-events-none">
+          <p>© Gestão Eklésia. Todos os direitos reservados.</p>
+          <p>Tecnologia Alcântara Sistemas</p>
+        </div>
       </div>
     </div>
-  );
+  )
 }

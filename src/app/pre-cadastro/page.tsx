@@ -552,7 +552,7 @@ export default function PreCadastroPage() {
                     )}
 
                     <a
-                      href="/login"
+                      href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.gestaoeklesia.com.br'}/login`}
                       className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-6 py-3.5 text-sm font-bold text-white hover:bg-emerald-800 transition"
                     >
                       Acessar meu painel →

@@ -4,108 +4,125 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const { pathname, search } = request.nextUrl
+  const hostname = request.headers.get('host') || ''
 
-  // Rotas públicas que NÃO requerem autenticação
-  const adminPublicRoutes = ['/admin/login']
+  // 1. Redirecionamento de domínio institucional (Landing) para a aplicação (App)
+  const redirectPaths = [
+    '/login',
+    '/auth/callback',
+    '/reset-password',
+    '/recuperar-senha',
+  ]
 
-  // Rotas que não são /admin passam direto
-  if (!pathname.startsWith('/admin')) {
-    return NextResponse.next()
+  const isInstitutionalDomain = hostname.includes('www.gestaoeklesia.com.br') || hostname === 'gestaoeklesia.com.br'
+  const isTargetRedirectPath = redirectPaths.some(
+    path => pathname === path || pathname.startsWith(path + '/')
+  )
+
+  if (isInstitutionalDomain && isTargetRedirectPath) {
+    const destinationUrl = `https://app.gestaoeklesia.com.br${pathname}${search}`
+    // Usando redirect temporário 307 durante fase de validação (será alterado para 301 futuramente)
+    return NextResponse.redirect(destinationUrl, 307)
   }
 
-  // Se é rota pública de admin (login), deixar passar
-  if (adminPublicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))) {
-    return NextResponse.next()
-  }
+  // 2. Proteção de rotas /admin via proxy herdado
+  if (pathname.startsWith('/admin')) {
+    // Rotas públicas de admin que NÃO requerem autenticação
+    const adminPublicRoutes = ['/admin/login']
 
-  try {
-    // Obter cookies
-    const cookieStore = await cookies()
+    // Se é rota pública de admin (login), deixar passar
+    if (!adminPublicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))) {
+      try {
+        const cookieStore = await cookies()
+        const supabase = createServerClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+          {
+            cookies: {
+              getAll() {
+                return cookieStore.getAll()
+              },
+              setAll(cookiesToSet) {
+                try {
+                  cookiesToSet.forEach(({ name, value, options }) => {
+                    cookieStore.set(name, value, options as CookieOptions)
+                  })
+                } catch {
+                  // Silenciar erros de cookies
+                }
+              },
+            },
+          }
+        )
 
-    // Criar cliente Supabase no servidor
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) => {
-                cookieStore.set(name, value, options as CookieOptions)
-              })
-            } catch {
-              // Silenciar erros de cookies durante proxy
-            }
-          },
-        },
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser()
+
+        if (userError || !user) {
+          const loginUrl = new URL('/admin/login', request.url)
+          return NextResponse.redirect(loginUrl)
+        }
+
+        if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          const loginUrl = new URL('/admin/login', request.url)
+          return NextResponse.redirect(loginUrl)
+        }
+
+        const adminDb = createServiceRoleClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+          process.env.SUPABASE_SERVICE_ROLE_KEY,
+          {
+            auth: {
+              autoRefreshToken: false,
+              persistSession: false,
+            },
+          }
+        )
+
+        const { data: adminUser, error: adminError } = await adminDb
+          .from('admin_users')
+          .select('*')
+          .eq('email', user.email)
+          .single()
+
+        const isActive =
+          (typeof adminUser?.is_active === 'boolean'
+            ? adminUser.is_active === true
+            : typeof adminUser?.status === 'string'
+              ? adminUser.status === 'ATIVO'
+              : typeof adminUser?.ativo === 'boolean'
+                ? adminUser.ativo === true
+                : false)
+
+        if (adminError || !adminUser || !isActive) {
+          const loginUrl = new URL('/admin/login', request.url)
+          return NextResponse.redirect(loginUrl)
+        }
+      } catch (error) {
+        console.error('[PROXY] Erro ao validar autenticação admin:', error)
+        const loginUrl = new URL('/admin/login', request.url)
+        return NextResponse.redirect(loginUrl)
       }
-    )
-
-    // Verificar se há usuário autenticado (usando getUser() - seguro)
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    // Se não há usuário autenticado, redirecionar para login
-    if (userError || !user) {
-      const loginUrl = new URL('/admin/login', request.url)
-      return NextResponse.redirect(loginUrl)
     }
-
-    // Verificar se é um admin válido consultando o banco de dados.
-    // Usa service role para evitar depender de RLS em admin_users (e evitar recursion/policies frágeis).
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const loginUrl = new URL('/admin/login', request.url)
-      return NextResponse.redirect(loginUrl)
-    }
-
-    const adminDb = createServiceRoleClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
-
-    const { data: adminUser, error: adminError } = await adminDb
-      .from('admin_users')
-      .select('*')
-      .eq('email', user.email)
-      .single()
-
-    const isActive =
-      (typeof adminUser?.is_active === 'boolean'
-        ? adminUser.is_active === true
-        : typeof adminUser?.status === 'string'
-          ? adminUser.status === 'ATIVO'
-          : typeof adminUser?.ativo === 'boolean'
-            ? adminUser.ativo === true
-            : false)
-
-    // Se não encontrou admin ou está inativo, redirecionar para login
-    if (adminError || !adminUser || !isActive) {
-      const loginUrl = new URL('/admin/login', request.url)
-      return NextResponse.redirect(loginUrl)
-    }
-
-    // Admin válido - deixar passar
-    return NextResponse.next()
-  } catch (error) {
-    console.error('[PROXY] Erro ao validar autenticação:', error)
-    // Em caso de erro, redirecionar para login por segurança
-    const loginUrl = new URL('/admin/login', request.url)
-    return NextResponse.redirect(loginUrl)
   }
+
+  // 3. SEO: Adicionar cabeçalho X-Robots-Tag: noindex, nofollow no domínio da aplicação
+  const response = NextResponse.next()
+  if (hostname.includes('app.gestaoeklesia.com.br')) {
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+  }
+
+  return response
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: [
+    /*
+     * Intercepta todas as rotas de páginas exceto arquivos estáticos e de otimização
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico|img|.*\\.png|.*\\.jpg|.*\\.jpeg).*)',
+  ],
 }

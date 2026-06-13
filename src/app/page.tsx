@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import NotificationModal from '@/components/NotificationModal';
 import { formatCpfOrCnpj, formatPhone } from '@/lib/mascaras';
 import { createClient } from '@/lib/supabase-client';
@@ -520,12 +519,12 @@ export default function LandingPage() {
             <a href="#faq" className="hover:text-slate-900 transition">FAQ</a>
             <a href="#contato" className="hover:text-slate-900 transition">Contato</a>
           </nav>
-          <Link
-            href="/login"
+          <a
+            href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.gestaoeklesia.com.br'}/login`}
             className="px-4 py-2 bg-emerald-700 text-white rounded-lg font-semibold hover:bg-emerald-800 transition"
           >
             Acesso ao Sistema
-          </Link>
+          </a>
         </div>
       </header>
 

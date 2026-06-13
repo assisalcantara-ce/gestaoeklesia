@@ -540,7 +540,7 @@ export async function POST(request: NextRequest) {
       // Não falhar se notificação não funcionar
     }
 
-    const loginUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.gestaoeklesia.com.br'
+    const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.gestaoeklesia.com.br'}/login`
     const resendKey = process.env.RESEND_API_KEY
     const resendFrom = process.env.RESEND_FROM || 'noreply@gestaoeklesia.com.br'
     let emailSent = false
