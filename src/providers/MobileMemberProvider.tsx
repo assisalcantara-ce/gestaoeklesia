@@ -154,10 +154,28 @@ export function MobileMemberProvider({ children }: { children: React.ReactNode }
   }, [user, doFetch]);
 
   const isLoading = authLoading || memberLoading || !initialized;
+  const isPublic = PUBLIC_MOBILE_PATHS.some((p) => pathname === p) || pathname === '/app';
 
   return (
     <MobileMemberContext.Provider value={{ member, isLoading, isLinked, refresh }}>
-      {children}
+      {isLoading && !isPublic ? (
+        <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
+          <div className="flex flex-col items-center gap-3">
+            <img src="/img/logo_modal.png" alt="Gestão Eklésia" className="h-12 animate-pulse select-none animate-duration-1000" />
+            <div className="w-16 h-1 bg-slate-200 rounded-full overflow-hidden relative">
+              <div className="w-1/2 h-full bg-[#03346E] rounded-full absolute left-0 top-0 animate-[loading_1s_infinite_ease-in-out]"></div>
+            </div>
+            <style jsx>{`
+              @keyframes loading {
+                0% { left: -50%; }
+                100% { left: 100%; }
+              }
+            `}</style>
+          </div>
+        </div>
+      ) : (
+        children
+      )}
     </MobileMemberContext.Provider>
   );
 }
