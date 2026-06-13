@@ -4,6 +4,7 @@ import { AppDialogProvider } from '@/providers/AppDialogProvider';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { UsuarioProvider } from '@/providers/UsuarioContext';
 import { TrialGuard } from '@/components/TrialGuard';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import AppShell from '@/components/AppShell';
 
 export const dynamic = 'force-dynamic';
@@ -27,9 +28,11 @@ export default function RootLayout({
           <UsuarioProvider>
             <AppDialogProvider>
               <TrialGuard>
-                <AppShell>
-                  {children}
-                </AppShell>
+                <ProtectedRoute>
+                  <AppShell>
+                    {children}
+                  </AppShell>
+                </ProtectedRoute>
               </TrialGuard>
             </AppDialogProvider>
           </UsuarioProvider>
