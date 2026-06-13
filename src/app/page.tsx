@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import NotificationModal from '@/components/NotificationModal';
 import { formatCpfOrCnpj, formatPhone } from '@/lib/mascaras';
 import { createClient } from '@/lib/supabase-client';
@@ -507,7 +508,15 @@ export default function LandingPage() {
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/img/logo_modal.png" alt="Gestão Eklesia" className="h-12" />
+            <Image
+              src="/img/logoh.png"
+              alt="Gestão Eklésia"
+              width={180}
+              height={52}
+              priority
+              sizes="180px"
+              className="h-[52px] w-auto object-contain"
+            />
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
             <a href="#visao" className="hover:text-slate-900 transition">Visão</a>

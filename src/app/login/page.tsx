@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase-client'
 import NotificationModal from '@/components/NotificationModal'
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
@@ -121,10 +122,15 @@ export default function LoginPage() {
           
           {/* Logo e cabeçalho */}
           <div className="flex flex-col items-center mb-6">
-            <img src="/img/logo_modal.png" alt="Gestão Eklésia" className="h-14 mb-2 object-contain select-none" />
-            <span className="text-[11px] tracking-[0.25em] font-bold text-[#03346E] uppercase select-none">
-              Gestão Eklésia
-            </span>
+            <Image
+              src="/img/logoh.png"
+              alt="Gestão Eklésia"
+              width={220}
+              height={64}
+              priority
+              sizes="220px"
+              className="h-[64px] w-auto object-contain select-none mb-1"
+            />
             <p className="text-sm text-slate-500 font-medium mt-1 text-center">
               Administração Ministerial Inteligente
             </p>

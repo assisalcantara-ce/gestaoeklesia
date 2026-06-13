@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import Image from 'next/image';
 
 interface NotificationModalProps {
   title: string;
@@ -136,10 +137,14 @@ export default function NotificationModal({
       >
         {/* Logo */}
         <div className="flex justify-center mb-4">
-          <img
-            src="/img/logo_modal.png"
-            alt="Gestão Eklesia"
-            className="h-24 object-contain"
+          <Image
+            src="/img/logoh.png"
+            alt="Gestão Eklésia"
+            width={220}
+            height={64}
+            priority
+            sizes="220px"
+            className="h-[64px] w-auto object-contain"
           />
         </div>
 

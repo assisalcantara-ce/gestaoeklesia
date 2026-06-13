@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import Image from 'next/image'
 import { useAuth } from '@/providers/AuthProvider'
 import { useUserContext } from '@/hooks/useUserContext'
 
@@ -64,7 +65,15 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     return (
       <div className="min-h-screen w-screen flex items-center justify-center bg-[#f4f6f9]">
         <div className="flex flex-col items-center gap-3">
-          <img src="/img/logo_modal.png" alt="Gestão Eklésia" className="h-12 animate-pulse select-none" />
+          <Image
+            src="/img/logoh.png"
+            alt="Gestão Eklésia"
+            width={280}
+            height={80}
+            priority
+            sizes="280px"
+            className="h-[80px] w-auto object-contain animate-pulse select-none"
+          />
           <div className="w-16 h-1 bg-slate-200 rounded-full overflow-hidden relative">
             <div className="w-1/2 h-full bg-[#03346E] rounded-full absolute left-0 top-0 animate-[loading_1s_infinite_ease-in-out]"></div>
           </div>

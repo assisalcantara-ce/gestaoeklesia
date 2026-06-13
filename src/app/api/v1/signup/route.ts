@@ -575,8 +575,8 @@ export async function POST(request: NextRequest) {
                         <td style="background:#0f766e;color:#ffffff;padding:28px 32px;">
                           <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                             <tr>
-                              <td style="width:48px;padding-right:12px;">
-                                <img src="https://www.gestaoeklesia.com.br/img/logo-eklesia.png" alt="Gestao Eklesia" width="40" height="40" style="display:block;border-radius:8px;" />
+                              <td style="padding-right:12px;">
+                                <img src="https://www.gestaoeklesia.com.br/img/logoh.png" alt="Gestão Eklésia" height="32" style="display:block;height:32px;width:auto;" />
                               </td>
                               <td>
                                 <h1 style="margin:0;font-size:22px;">${emailHeadline}</h1>

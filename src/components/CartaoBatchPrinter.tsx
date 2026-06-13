@@ -174,7 +174,7 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
         }
         if (el.tipo === 'logo') {
           const style = `position: absolute; left: ${el.x}px; top: ${el.y}px; width: ${el.largura}px; height: ${el.altura}px; opacity: ${el.transparencia || 1};`;
-          const logoUrl = configIgreja?.logo || '/img/logo_menu.png';
+          const logoUrl = configIgreja?.logo || '/img/logoh.png';
           return `<div style="${style}"><img src="${logoUrl}" style="width: 100%; height: 100%; object-fit: contain;" /></div>`;
         }
         if (el.tipo === 'imagem') {

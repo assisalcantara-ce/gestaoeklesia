@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useRef } from 'react'
 import {
@@ -59,10 +60,14 @@ export default function AdminSidebar() {
         } border-r border-gray-800 flex flex-col`}
       >
         <div className="flex items-center justify-center p-4 border-b border-gray-800">
-          <img
-            src="/img/logo_menu.png"
-            alt="Gestão Eklesia"
-            className="h-[56px] w-auto object-contain"
+          <Image
+            src="/img/logoh.png"
+            alt="Gestão Eklésia"
+            width={150}
+            height={42}
+            priority
+            sizes="150px"
+            className="h-[42px] w-auto object-contain"
           />
         </div>
 

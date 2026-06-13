@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase-client';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import EbdSidebarMenu, { ALL_EBD_IDS } from '@/components/EbdSidebarMenu';
@@ -218,10 +219,14 @@ export default function Sidebar() {
     <div className="w-64 bg-[#123b63] text-white shadow-lg flex flex-col h-full">
       {/* LOGO */}
       <div className="p-6 border-b border-white/20 flex items-center justify-center">
-        <img
-          src="/img/logo_menu.png"
-          alt="Gestão Eklesia"
-          className="h-16 object-contain"
+        <Image
+          src="/img/logoh.png"
+          alt="Gestão Eklésia"
+          width={150}
+          height={42}
+          priority
+          sizes="150px"
+          className="h-[42px] w-auto object-contain"
         />
       </div>
 

@@ -314,7 +314,7 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
         );
       }
       case 'logo':
-        const logoUrl = configIgreja?.logo || '/img/logo_menu.png';
+        const logoUrl = configIgreja?.logo || '/img/logoh.png';
         return (
           <div
             key={elemento.id}
