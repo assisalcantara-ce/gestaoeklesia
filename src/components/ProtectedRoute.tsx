@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
+import { GRADIENTS } from '@/config/tokens'
 import { useAuth } from '@/providers/AuthProvider'
 import { useUserContext } from '@/hooks/useUserContext'
 
@@ -63,19 +64,19 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   // Se a autenticação ou o perfil estiver carregando, renderiza carregamento neutro
   if (authLoading || contextLoading || !user) {
     return (
-      <div className="min-h-screen w-screen flex items-center justify-center bg-[#f4f6f9]">
-        <div className="flex flex-col items-center gap-3">
+      <div className="min-h-screen w-screen flex items-center justify-center" style={{ background: GRADIENTS.APP_BACKGROUND }}>
+        <div className="flex flex-col items-center gap-4">
           <Image
             src="/img/logoh.png"
             alt="Gestão Eklésia"
-            width={280}
-            height={80}
+            width={290}
+            height={83}
             priority
-            sizes="280px"
-            className="h-[80px] w-auto object-contain animate-pulse select-none"
+            sizes="290px"
+            className="h-[83px] w-auto object-contain animate-pulse select-none"
           />
-          <div className="w-16 h-1 bg-slate-200 rounded-full overflow-hidden relative">
-            <div className="w-1/2 h-full bg-[#03346E] rounded-full absolute left-0 top-0 animate-[loading_1s_infinite_ease-in-out]"></div>
+          <div className="w-24 h-1 bg-white/20 rounded-full overflow-hidden relative">
+            <div className="w-1/2 h-full bg-[#5A9DDC] rounded-full absolute left-0 top-0 animate-[loading_1s_infinite_ease-in-out]"></div>
           </div>
           <style jsx>{`
             @keyframes loading {

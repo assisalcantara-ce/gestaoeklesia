@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { BRAND } from '@/config/brand';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -314,7 +315,7 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
         );
       }
       case 'logo':
-        const logoUrl = configIgreja?.logo || '/img/logoh.png';
+        const logoUrl = configIgreja?.logo || BRAND.logoHorizontal;
         return (
           <div
             key={elemento.id}

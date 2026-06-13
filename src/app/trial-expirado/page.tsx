@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import { formatarPreco } from '@/config/plans'
+import PremiumCard from '@/components/ui/PremiumCard'
+import PremiumButton from '@/components/ui/PremiumButton'
 
 type PlanoDB = {
   id: string
@@ -224,69 +226,75 @@ export default function TrialExpiradoPage() {
               {planos.map((plan) => {
                 const isSelected = selectedPlanId === plan.id
                 return (
-                  <div
+                  <PremiumCard
                     key={plan.id}
-                    className={`rounded-2xl border p-6 shadow-lg transition ${isSelected ? 'border-emerald-500 bg-emerald-50/70' : 'border-[#e7e0d6] bg-white/90'}`}
+                    hoverable
+                    onClick={() => {
+                      setSelectedPlanId(plan.id)
+                      setCheckoutInfo(null)
+                      setCheckoutError('')
+                    }}
+                    className={`p-6 border transition-all ${isSelected ? 'border-emerald-500 bg-emerald-50/10' : 'border-slate-100 bg-white'}`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="text-sm uppercase tracking-[0.3em] text-emerald-700">Plano</p>
-                        <h2 className="text-2xl font-bold text-slate-900 mt-2">{plan.name}</h2>
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Plano</p>
+                        <h2 className="text-xl font-bold text-slate-800 mt-2">{plan.name}</h2>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-slate-500">Mensal</p>
-                        <p className="text-xl font-bold text-slate-900">{formatarPreco(plan.price_monthly)}/mes</p>
+                        <p className="text-xs font-bold text-slate-400">Mensal</p>
+                        <p className="text-lg font-bold text-[#062E6F]">{formatarPreco(plan.price_monthly)}/mês</p>
                       </div>
                     </div>
 
-                    <p className="text-sm text-slate-600 mt-3">{plan.description || ''}</p>
+                    <p className="text-xs text-slate-500 mt-3 font-medium">{plan.description || ''}</p>
 
                     <ul className="space-y-2 text-xs text-slate-600 mt-4">
                       {buildHighlights(plan).map((item) => (
-                        <li key={item} className="flex items-center gap-2">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                        <li key={item} className="flex items-center gap-2 font-medium">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                           {item}
                         </li>
                       ))}
                     </ul>
 
-                    <button
-                      type="button"
-                      onClick={() => {
+                    <PremiumButton
+                      variant={isSelected ? 'success' : 'secondary'}
+                      className="mt-6 w-full text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setSelectedPlanId(plan.id)
                         setCheckoutInfo(null)
                         setCheckoutError('')
                       }}
-                      className="mt-6 w-full rounded-xl bg-emerald-700 px-4 py-3 text-white font-semibold hover:bg-emerald-800 transition"
                     >
-                      Selecionar plano
-                    </button>
-                  </div>
+                      {isSelected ? '✓ Plano Selecionado' : 'Selecionar Plano'}
+                    </PremiumButton>
+                  </PremiumCard>
                 )
               })}
             </div>
           )}
 
           {!loading && !error && selectedPlanId && (
-            <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-800 space-y-3">
-              <p className="text-sm">
+            <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5 text-emerald-950 space-y-3">
+              <p className="text-sm font-semibold">
                 Plano selecionado: <strong>{selectedPlan?.name || 'Plano'}</strong>. Gere o boleto para concluir a assinatura.
               </p>
-              <button
-                type="button"
+              <PremiumButton
                 onClick={handleCheckout}
                 disabled={checkoutLoading}
-                className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-white font-semibold hover:bg-emerald-800 transition disabled:opacity-60"
+                className="w-full text-xs"
               >
-                {checkoutLoading ? 'Gerando boleto...' : 'Gerar boleto e enviar por email'}
-              </button>
+                {checkoutLoading ? 'Gerando boleto...' : 'Gerar boleto e enviar por e-mail'}
+              </PremiumButton>
               {checkoutError && (
-                <p className="text-sm text-red-700">{checkoutError}</p>
+                <p className="text-xs text-red-600 font-semibold mt-1">{checkoutError}</p>
               )}
               {checkoutInfo && (
-                <div className="rounded-xl border border-emerald-200 bg-white/80 p-4 text-emerald-900">
-                  <p className="text-sm font-semibold">Boleto gerado e enviado por email.</p>
-                  <p className="text-xs text-emerald-800 mt-1">
+                <PremiumCard hoverable={false} className="p-4 bg-white border border-emerald-100">
+                  <p className="text-sm font-bold text-emerald-800">Boleto gerado e enviado por e-mail.</p>
+                  <p className="text-xs text-slate-500 font-semibold mt-1">
                     Vencimento: {new Date(checkoutInfo.due_date).toLocaleDateString('pt-BR')} · Valor: {formatarPreco(checkoutInfo.amount)}
                   </p>
                   {checkoutInfo.bank_slip_url && (
@@ -294,7 +302,7 @@ export default function TrialExpiradoPage() {
                       href={checkoutInfo.bank_slip_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex mt-3 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+                      className="inline-flex mt-3 text-xs font-bold text-emerald-600 hover:text-emerald-700 underline"
                     >
                       Abrir boleto
                     </a>
@@ -304,12 +312,12 @@ export default function TrialExpiradoPage() {
                       href={checkoutInfo.invoice_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex mt-3 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+                      className="inline-flex mt-3 text-xs font-bold text-emerald-600 hover:text-emerald-700 underline"
                     >
                       Abrir fatura
                     </a>
                   )}
-                </div>
+                </PremiumCard>
               )}
             </div>
           )}
@@ -320,20 +328,18 @@ export default function TrialExpiradoPage() {
             href="https://wa.me/5591981755021"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl border border-[#e7e0d6] bg-white/80 px-4 py-3 text-sm text-slate-700 hover:bg-emerald-50/60 transition"
           >
-            Falar com a equipe comercial
+            <PremiumButton variant="secondary" className="text-xs border-none bg-white shadow-md">
+              💬 Falar com a equipe comercial
+            </PremiumButton>
           </a>
-          <button
-            type="button"
+          <PremiumButton
+            variant="danger"
             onClick={handleLogout}
-            className="inline-flex items-center gap-2 rounded-xl border border-[#e7e0d6] bg-white/80 px-4 py-3 text-sm text-slate-700 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition cursor-pointer"
+            className="text-xs shadow-md"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
             Sair da conta e voltar ao início
-          </button>
+          </PremiumButton>
         </div>
       </div>
     </div>

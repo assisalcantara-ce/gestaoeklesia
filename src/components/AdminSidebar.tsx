@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { BRAND } from '@/config/brand'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useRef } from 'react'
 import {
@@ -61,7 +62,7 @@ export default function AdminSidebar() {
       >
         <div className="flex items-center justify-center p-4 border-b border-gray-800">
           <Image
-            src="/img/logoh.png"
+            src={BRAND.logoHorizontal}
             alt="Gestão Eklésia"
             width={150}
             height={42}

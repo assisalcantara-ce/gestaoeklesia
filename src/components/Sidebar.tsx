@@ -222,11 +222,11 @@ export default function Sidebar() {
         <Image
           src="/img/logoh.png"
           alt="Gestão Eklésia"
-          width={150}
-          height={42}
+          width={190}
+          height={53}
           priority
-          sizes="150px"
-          className="h-[42px] w-auto object-contain"
+          sizes="190px"
+          className="h-[53px] w-auto object-contain"
         />
       </div>
 

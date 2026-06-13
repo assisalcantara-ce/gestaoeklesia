@@ -2,6 +2,9 @@
 
 import { useEffect } from 'react';
 import Image from 'next/image';
+import { BRAND } from '@/config/brand';
+import PremiumButton from '@/components/ui/PremiumButton';
+import { TOKENS } from '@/config/tokens';
 
 interface NotificationModalProps {
   title: string;
@@ -132,13 +135,14 @@ export default function NotificationModal({
       tabIndex={-1}
     >
       <div
-        className={`${colors.bg} ${colors.border} border-2 rounded-lg shadow-2xl max-w-md w-full p-6 max-h-screen overflow-y-auto`}
+        className={`${colors.bg} ${colors.border} border shadow-2xl max-w-md w-full p-6 max-h-screen overflow-y-auto`}
+        style={{ borderRadius: TOKENS.radius.card }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Logo */}
         <div className="flex justify-center mb-4">
           <Image
-            src="/img/logoh.png"
+            src={BRAND.logoHorizontal}
             alt="Gestão Eklésia"
             width={220}
             height={64}
@@ -165,21 +169,23 @@ export default function NotificationModal({
 
         {/* Botão (Opcional) */}
         {showButton && (
-          <div className={secondaryLabel ? 'flex gap-3' : ''}>
+          <div className={secondaryLabel ? 'flex gap-3' : 'w-full flex justify-center'}>
             {secondaryLabel && (
-              <button
+              <PremiumButton
+                variant="secondary"
                 onClick={onSecondary}
-                className="w-full px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg transition font-bold text-sm"
+                className="w-full"
               >
                 {secondaryLabel}
-              </button>
+              </PremiumButton>
             )}
-            <button
+            <PremiumButton
+              variant={type === 'error' ? 'danger' : type === 'success' ? 'success' : 'primary'}
               onClick={onClose}
-              className={`w-full px-6 py-3 ${colors.button} text-white rounded-lg transition font-bold text-sm`}
+              className="w-full"
             >
               {primaryLabel}
-            </button>
+            </PremiumButton>
           </div>
         )}
       </div>

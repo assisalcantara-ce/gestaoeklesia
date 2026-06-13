@@ -22,6 +22,8 @@ import React, {
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
+import { BRAND } from '@/config/brand';
+import { GRADIENTS } from '@/config/tokens';
 import { useAuth } from '@/providers/AuthProvider';
 import { createClient } from '@/lib/supabase-client';
 
@@ -160,10 +162,10 @@ export function MobileMemberProvider({ children }: { children: React.ReactNode }
   return (
     <MobileMemberContext.Provider value={{ member, isLoading, isLinked, refresh }}>
       {isLoading && !isPublic ? (
-        <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-          <div className="flex flex-col items-center gap-3">
+        <div className="min-h-screen w-full flex items-center justify-center" style={{ background: GRADIENTS.APP_BACKGROUND }}>
+          <div className="flex flex-col items-center gap-4">
             <Image
-              src="/img/logoh.png"
+              src={BRAND.logoWhite}
               alt="Gestão Eklésia"
               width={280}
               height={80}
@@ -171,8 +173,8 @@ export function MobileMemberProvider({ children }: { children: React.ReactNode }
               sizes="280px"
               className="h-[80px] w-auto object-contain animate-pulse select-none"
             />
-            <div className="w-16 h-1 bg-slate-200 rounded-full overflow-hidden relative">
-              <div className="w-1/2 h-full bg-[#03346E] rounded-full absolute left-0 top-0 animate-[loading_1s_infinite_ease-in-out]"></div>
+            <div className="w-24 h-1 bg-white/20 rounded-full overflow-hidden relative">
+              <div className="w-1/2 h-full bg-[#5A9DDC] rounded-full absolute left-0 top-0 animate-[loading_1s_infinite_ease-in-out]"></div>
             </div>
             <style jsx>{`
               @keyframes loading {

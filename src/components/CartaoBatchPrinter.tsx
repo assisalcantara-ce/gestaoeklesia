@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
+import { BRAND } from '@/config/brand';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
@@ -174,7 +175,7 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
         }
         if (el.tipo === 'logo') {
           const style = `position: absolute; left: ${el.x}px; top: ${el.y}px; width: ${el.largura}px; height: ${el.altura}px; opacity: ${el.transparencia || 1};`;
-          const logoUrl = configIgreja?.logo || '/img/logoh.png';
+          const logoUrl = configIgreja?.logo || BRAND.logoHorizontal;
           return `<div style="${style}"><img src="${logoUrl}" style="width: 100%; height: 100%; object-fit: contain;" /></div>`;
         }
         if (el.tipo === 'imagem') {

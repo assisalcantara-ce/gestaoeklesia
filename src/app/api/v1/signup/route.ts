@@ -5,6 +5,7 @@ import { buildPasswordFingerprint } from '@/lib/password-fingerprint'
 import { getClientIp } from '@/lib/public-request'
 import { logPublicApiEvent } from '@/lib/public-api-audit'
 import { consumeRateLimit } from '@/lib/rate-limit-db'
+import { BRAND } from '@/config/brand'
 
 // ─── Helpers de log e erro ───────────────────────────────────────────────────
 
@@ -576,7 +577,7 @@ export async function POST(request: NextRequest) {
                           <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                             <tr>
                               <td style="padding-right:12px;">
-                                <img src="https://www.gestaoeklesia.com.br/img/logoh.png" alt="Gestão Eklésia" height="32" style="display:block;height:32px;width:auto;" />
+                                <img src="${BRAND.siteUrl}/brand/logo-horizontal.png" alt="Gestão Eklésia" height="32" style="display:block;height:32px;width:auto;" />
                               </td>
                               <td>
                                 <h1 style="margin:0;font-size:22px;">${emailHeadline}</h1>

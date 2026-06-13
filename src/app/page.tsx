@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { BRAND } from '@/config/brand';
 import NotificationModal from '@/components/NotificationModal';
 import { formatCpfOrCnpj, formatPhone } from '@/lib/mascaras';
 import { createClient } from '@/lib/supabase-client';
@@ -509,7 +510,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Image
-              src="/img/logoh.png"
+              src={BRAND.logoHorizontal}
               alt="Gestão Eklésia"
               width={180}
               height={52}
