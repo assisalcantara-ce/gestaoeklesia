@@ -7,6 +7,11 @@ export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl
   const hostname = request.headers.get('host') || ''
 
+  // 0. Redirecionamento de raiz do subdomínio app para /login
+  if (hostname.includes('app.gestaoeklesia.com.br') && pathname === '/') {
+    return NextResponse.redirect(`https://app.gestaoeklesia.com.br/login${search}`, 307)
+  }
+
   // 1. Redirecionamento de domínio institucional (Landing) para a aplicação (App)
   const redirectPaths = [
     '/login',
