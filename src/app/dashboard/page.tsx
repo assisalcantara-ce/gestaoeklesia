@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 export const dynamic = 'force-dynamic';
 
@@ -521,7 +521,9 @@ export default function DashboardPage() {
         <div className="sticky top-0 z-10 px-6 py-4 shadow-md" style={{ background: 'linear-gradient(to right, #1E3A5F, #2563EB)' }}>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
-              <p className="text-[11px] font-semibold text-blue-200 uppercase tracking-widest">Seja bem-vindo(a)</p>
+              <p className="text-[11px] font-semibold text-blue-200 uppercase tracking-widest">
+                Seja bem-vindo(a){usuarioLogado ? `, ${usuarioLogado.nome}` : ''}
+              </p>
               <h1 className="text-lg font-bold text-white leading-tight">"{dash.nomeMinisterio || 'Ministério'}"</h1>
               <p className="text-xs text-blue-200">{dataAtual}</p>
             </div>
