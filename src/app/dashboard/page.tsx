@@ -313,7 +313,7 @@ export default function DashboardPage() {
         supabase.from('members').select('created_at').eq('ministry_id', ministryId).gte('created_at', twelveMonthsAgo).limit(5000),
         supabase.from('carta_pedidos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'pendente'),
         supabase.from('flow_instances').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).in('status', ['pendente', 'em_analise']),
-        supabase.from('ministries').select('nome').eq('id', ministryId).maybeSingle(),
+        supabase.from('ministries').select('name').eq('id', ministryId).maybeSingle(),
       ]);
 
       // PIX vencidos (best-effort — campo status pode não existir)
@@ -464,7 +464,7 @@ export default function DashboardPage() {
         pendencias,
         mensagemPresidencia,
         crescimentoMembros,
-        nomeMinisterio: (ministerioRes.data as any)?.nome ?? '',
+        nomeMinisterio: (ministerioRes.data as any)?.name ?? '',
       });
       setLoadingDash(false);
     };
