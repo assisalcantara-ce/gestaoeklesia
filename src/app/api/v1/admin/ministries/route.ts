@@ -144,6 +144,7 @@ export async function POST(request: NextRequest) {
       user_metadata: {
         created_by: 'admin_panel',
         ministry_name: name,
+        full_name: responsibleName || 'Administrador',
       },
     })
 

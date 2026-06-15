@@ -272,6 +272,9 @@ export async function POST(request: NextRequest) {
         email: emailValue,
         password: senha,
         email_confirm: true,
+        user_metadata: {
+          full_name: responsibleName || pastorName || 'Administrador',
+        },
       })
       signUpData = { user: adminData.user }
       signUpError = adminError as typeof signUpError
@@ -282,6 +285,9 @@ export async function POST(request: NextRequest) {
         password: senha,
         options: {
           emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`,
+          data: {
+            full_name: responsibleName || pastorName || 'Administrador',
+          },
         },
       })
       signUpData = { user: anonData.user }

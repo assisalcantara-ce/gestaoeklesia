@@ -664,10 +664,10 @@ export default function UsuariosPage() {
               {/* Dados básicos */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-semibold text-[#123b63] mb-1">Nome completo *</label>
+                  <label className="block text-sm font-semibold text-[#123b63] mb-1">Nome / Responsável *</label>
                   <input
                     type="text"
-                    placeholder="Nome completo"
+                    placeholder="Nome / Responsável"
                     value={formData.nome}
                     onChange={(e) => handleFormChange('nome', e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
@@ -987,7 +987,7 @@ export default function UsuariosPage() {
               <div className="p-6 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-[#123b63] mb-2">Nome</label>
+                    <label className="block text-sm font-semibold text-[#123b63] mb-2">Nome / Responsável</label>
                     <input
                       value={editData.nome}
                       onChange={(e) => handleEditChange('nome', e.target.value)}
