@@ -2,172 +2,303 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase-client';
+import { ExternalLink, Copy, Check, Filter, RefreshCw, AlertCircle, FileText, Calendar } from 'lucide-react';
+
+interface BillingInvoice {
+  id: string;
+  ministry_id: string;
+  subscription_plan_id: string | null;
+  plano_slug: string;
+  status: string;
+  amount: number;
+  due_date: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  asaas_invoice_url: string | null;
+  created_at: string;
+}
 
 export default function FaturasPage() {
+  const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const supabase = createClient();
 
-  const [filterStatus, setFilterStatus] = useState('TODAS');
+  const resolveMinistryId = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return null;
 
-  const faturas = [
-    {
-      id: 1,
-      numero: 'FAT-2024-001',
-      data: '2024-01-15',
-      vencimento: '2024-02-15',
-      valor: 599.90,
-      status: 'paga',
-      dataPagamento: '2024-02-10'
-    },
-    {
-      id: 2,
-      numero: 'FAT-2024-002',
-      data: '2024-02-15',
-      vencimento: '2024-03-15',
-      valor: 599.90,
-      status: 'paga',
-      dataPagamento: '2024-03-12'
-    },
-    {
-      id: 3,
-      numero: 'FAT-2024-003',
-      data: '2024-03-15',
-      vencimento: '2024-04-15',
-      valor: 599.90,
-      status: 'vencida',
-      dataPagamento: null
-    },
-    {
-      id: 4,
-      numero: 'FAT-2024-004',
-      data: '2024-11-15',
-      vencimento: '2024-12-15',
-      valor: 599.90,
-      status: 'vencer',
-      dataPagamento: null
-    },
-    {
-      id: 5,
-      numero: 'FAT-2024-005',
-      data: '2024-11-20',
-      vencimento: '2024-12-20',
-      valor: 799.90,
-      status: 'vencer',
-      dataPagamento: null
-    }
-  ];
+      const mu = await supabase
+        .from('ministry_users')
+        .select('ministry_id')
+        .eq('user_id', user.id)
+        .limit(1);
 
-  const faturasFiltered = filterStatus === 'TODAS' 
-    ? faturas 
-    : faturas.filter(f => f.status === filterStatus.toLowerCase());
+      const ministryIdFromMu = (mu.data as any)?.[0]?.ministry_id as string | undefined;
+      if (ministryIdFromMu) return ministryIdFromMu;
 
-  const totalPago = faturas.filter(f => f.status === 'paga').reduce((sum, f) => sum + f.valor, 0);
-  const totalVencida = faturas.filter(f => f.status === 'vencida').reduce((sum, f) => sum + f.valor, 0);
-  const totalVencer = faturas.filter(f => f.status === 'vencer').reduce((sum, f) => sum + f.valor, 0);
-
-  const getStatusColor = (status: string) => {
-    switch(status) {
-      case 'paga': return 'bg-green-100 text-green-800';
-      case 'vencida': return 'bg-red-100 text-red-800';
-      case 'vencer': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      const m = await supabase.from('ministries').select('id').eq('user_id', user.id).limit(1);
+      const ministryIdFromOwner = (m.data as any)?.[0]?.id as string | undefined;
+      return ministryIdFromOwner || null;
+    } catch {
+      return null;
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch(status) {
-      case 'paga': return '✓ Paga';
-      case 'vencida': return '✕ Vencida';
-      case 'vencer': return '⏰ A Vencer';
-      default: return status;
+  const loadInvoices = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const ministryId = await resolveMinistryId();
+      if (!ministryId) {
+        setError('Não foi possível identificar o seu ministério. Faça login novamente.');
+        return;
+      }
+
+      let query = supabase
+        .from('platform_billing_invoices')
+        .select('*')
+        .eq('ministry_id', ministryId)
+        .order('created_at', { ascending: false });
+
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+
+      const { data, error: qError } = await query;
+      if (qError) throw qError;
+
+      setInvoices(data || []);
+    } catch (err: any) {
+      setError(err.message || 'Erro ao carregar as faturas.');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    loadInvoices();
+  }, [statusFilter]);
+
+  const handleCopyLink = async (url: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // Ignora falhas de clipboard
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const s = status.toLowerCase();
+    switch (s) {
+      case 'paid':
+      case 'paga':
+      case 'pago':
+        return (
+          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 border border-green-200">
+            Pago
+          </span>
+        );
+      case 'pending':
+      case 'pendente':
+        return (
+          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+            Pendente
+          </span>
+        );
+      case 'overdue':
+      case 'vencida':
+      case 'vencido':
+        return (
+          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-200">
+            Vencido
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800 border border-gray-200">
+            {status}
+          </span>
+        );
+    }
+  };
+
+  const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    // Se for formato AAAA-MM-DD
+    if (dateStr.length <= 10) {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+    }
+    return new Date(dateStr).toLocaleDateString('pt-BR');
   };
 
   return (
-    <div className="flex-1 overflow-auto">
-        <div className="p-6">
-          {/* Header */}
-          <h1 className="text-3xl font-bold text-gray-800 mb-6">📄 Faturas</h1>
-
-          {/* Cards de Resumo */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-600">
-              <p className="text-gray-600 text-sm font-semibold mb-1">FATURAS PAGAS</p>
-              <p className="text-3xl font-bold text-green-600">R$ {totalPago.toFixed(2).replace('.', ',')}</p>
-              <p className="text-xs text-gray-500 mt-2">{faturas.filter(f => f.status === 'paga').length} faturas</p>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-600">
-              <p className="text-gray-600 text-sm font-semibold mb-1">FATURAS VENCIDAS</p>
-              <p className="text-3xl font-bold text-red-600">R$ {totalVencida.toFixed(2).replace('.', ',')}</p>
-              <p className="text-xs text-gray-500 mt-2">{faturas.filter(f => f.status === 'vencida').length} faturas</p>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-600">
-              <p className="text-gray-600 text-sm font-semibold mb-1">FATURAS A VENCER</p>
-              <p className="text-3xl font-bold text-yellow-600">R$ {totalVencer.toFixed(2).replace('.', ',')}</p>
-              <p className="text-xs text-gray-500 mt-2">{faturas.filter(f => f.status === 'vencer').length} faturas</p>
-            </div>
+    <div className="flex-1 overflow-auto bg-[#f8fafc]">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-950 flex items-center gap-2">
+              <FileText className="text-teal-600 h-8 w-8" />
+              Minhas Faturas de Assinatura
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Visualize seu histórico de faturas e acesse links de pagamento da sua assinatura.
+            </p>
           </div>
+          <button
+            onClick={loadInvoices}
+            disabled={loading}
+            className="self-start md:self-auto p-2.5 text-gray-600 hover:text-gray-900 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg shadow-sm transition disabled:opacity-50"
+          >
+            <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
 
-          {/* Filtros */}
-          <div className="bg-white rounded-lg shadow-md p-4 mb-6 flex gap-2">
-            {['TODAS', 'paga', 'vencida', 'vencer'].map(status => (
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 shrink-0" />
+            <p className="text-sm font-medium">{error}</p>
+          </div>
+        )}
+
+        {/* Filtros */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-2 text-gray-700 font-medium text-sm">
+            <Filter className="h-4 w-4 text-teal-600" />
+            Filtrar por Status:
+          </div>
+          <div className="flex gap-2">
+            {[
+              { id: 'all', label: 'Todas' },
+              { id: 'pending', label: 'Pendente' },
+              { id: 'paid', label: 'Pago' },
+              { id: 'overdue', label: 'Vencido' },
+            ].map((st) => (
               <button
-                key={status}
-                onClick={() => setFilterStatus(status === 'TODAS' ? 'TODAS' : status)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
-                  filterStatus === (status === 'TODAS' ? 'TODAS' : status)
-                    ? 'bg-teal-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                key={st.id}
+                onClick={() => setStatusFilter(st.id)}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition ${
+                  statusFilter === st.id
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
                 }`}
               >
-                {status === 'TODAS' ? 'Todas' : status === 'paga' ? 'Pagas' : status === 'vencida' ? 'Vencidas' : 'A Vencer'}
+                {st.label}
               </button>
             ))}
           </div>
+        </div>
 
-          {/* Tabela */}
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-100 border-b border-gray-300">
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Número</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Emissão</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Vencimento</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Valor</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {faturasFiltered.map((fatura) => (
-                  <tr key={fatura.id} className="border-b border-gray-200 hover:bg-gray-50">
-                    <td className="px-6 py-3 text-sm text-gray-900 font-semibold">{fatura.numero}</td>
-                    <td className="px-6 py-3 text-sm text-gray-600">
-                      {new Date(fatura.data).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-gray-600">
-                      {new Date(fatura.vencimento).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-gray-900 font-semibold">
-                      R$ {fatura.valor.toFixed(2).replace('.', ',')}
-                    </td>
-                    <td className="px-6 py-3">
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(fatura.status)}`}>
-                        {getStatusLabel(fatura.status)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 text-sm">
-                      <button className="text-teal-600 hover:text-teal-800 font-semibold">
-                        📥 Baixar
-                      </button>
-                    </td>
+        {/* Lista/Tabela */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <RefreshCw className="h-8 w-8 animate-spin text-teal-600" />
+              <p className="text-sm text-gray-500">Carregando histórico de faturas...</p>
+            </div>
+          ) : invoices.length === 0 ? (
+            <div className="text-center py-20 text-gray-500 space-y-2">
+              <p className="text-lg font-semibold text-gray-800">Nenhuma fatura encontrada</p>
+              <p className="text-sm">Não há cobranças geradas para o seu ministério com o filtro selecionado.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4">Plano</th>
+                    <th className="px-6 py-4">Período</th>
+                    <th className="px-6 py-4">Valor</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Vencimento</th>
+                    <th className="px-6 py-4 text-right">Ações</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200 text-sm text-gray-700">
+                  {invoices.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-gray-50/50 transition">
+                      <td className="px-6 py-4 font-semibold text-gray-900">
+                        {inv.plano_slug.toUpperCase()}
+                      </td>
+                      <td className="px-6 py-4 text-xs text-gray-500">
+                        {inv.period_start || inv.period_end ? (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5" />
+                            {formatDate(inv.period_start)} até {formatDate(inv.period_end)}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-gray-900">
+                        {formatCurrency(inv.amount)}
+                      </td>
+                      <td className="px-6 py-4">
+                        {getStatusBadge(inv.status)}
+                      </td>
+                      <td className="px-6 py-4 font-medium">
+                        {formatDate(inv.due_date)}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end items-center gap-2">
+                          {inv.asaas_invoice_url ? (
+                            <>
+                              <a
+                                href={inv.asaas_invoice_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+                              >
+                                Abrir fatura
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                              <button
+                                onClick={() => handleCopyLink(inv.asaas_invoice_url!, inv.id)}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-semibold border border-gray-300 shadow-sm transition"
+                              >
+                                {copiedId === inv.id ? (
+                                  <>
+                                    Copiado!
+                                    <Check className="h-3.5 w-3.5 text-green-600" />
+                                  </>
+                                ) : (
+                                  <>
+                                    Copiar link
+                                    <Copy className="h-3.5 w-3.5" />
+                                  </>
+                                )}
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">Processando pagamento</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
+    </div>
   );
 }

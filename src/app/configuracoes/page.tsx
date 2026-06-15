@@ -506,48 +506,56 @@ function FaturasContent() {
   const [filterStatus, setFilterStatus] = useState('TODAS');
   const [faturas, setFaturas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [baixandoId, setBaixandoId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     const carregarFaturas = async () => {
       try {
         const supabase = createClient();
         const {
-          data: { session },
-        } = await supabase.auth.getSession();
+          data: { user },
+        } = await supabase.auth.getUser();
 
-        if (!session?.access_token) {
+        if (!user) {
           setFaturas([]);
           return;
         }
 
-        // Usar API em vez de acessar Supabase direto (evita RLS issues)
-        const response = await fetch('/api/v1/payments', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        });
+        const mu = await supabase
+          .from('ministry_users')
+          .select('ministry_id')
+          .eq('user_id', user.id)
+          .limit(1);
+        let ministryId = (mu.data as any)?.[0]?.ministry_id;
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.warn('Falha ao carregar faturas:', errorData.error);
+        if (!ministryId) {
+          const m = await supabase.from('ministries').select('id').eq('user_id', user.id).limit(1);
+          ministryId = (m.data as any)?.[0]?.id;
+        }
+
+        if (!ministryId) {
           setFaturas([]);
           return;
         }
 
-        const { payments } = await response.json();
+        const { data, error } = await supabase
+          .from('platform_billing_invoices')
+          .select('*')
+          .eq('ministry_id', ministryId)
+          .order('created_at', { ascending: false });
 
-        // Mapear dados
-        const faturasFormatadas = (payments || []).map((payment: any, index: number) => ({
-          id: payment.id,
-          asaas_payment_id: payment.asaas_payment_id ?? null,
-          payment_method: payment.payment_method ?? null,
-          numero: `FAT-${new Date(payment.created_at).getFullYear()}-${String(index + 1).padStart(3, '0')}`,
-          data: payment.created_at,
-          vencimento: payment.due_date,
-          valor: parseFloat(payment.amount),
-          status: mapearStatusPagamento(payment.status),
-          description: payment.description ?? '',
+        if (error) throw error;
+
+        const faturasFormatadas = (data || []).map((inv: any) => ({
+          id: inv.id,
+          plano_slug: inv.plano_slug,
+          valor: parseFloat(inv.amount),
+          status: inv.status.toLowerCase(),
+          vencimento: inv.due_date,
+          period_start: inv.period_start,
+          period_end: inv.period_end,
+          asaas_invoice_url: inv.asaas_invoice_url ?? null,
+          data: inv.created_at,
         }));
 
         setFaturas(faturasFormatadas);
@@ -562,112 +570,74 @@ function FaturasContent() {
     carregarFaturas();
   }, []);
 
-  const mapearStatusPagamento = (status: string) => {
-    switch (status) {
-      case 'paid':
-        return 'paga';
-      case 'overdue':
-        return 'vencida';
-      case 'pending':
-        return 'vencer';
-      case 'cancelled':
-      case 'failed':
-        return 'cancelada';
-      default:
-        return 'vencer';
-    }
-  };
-
-  const faturasFiltered = filterStatus === 'TODAS' ? faturas : faturas.filter(f => f.status === filterStatus.toLowerCase());
-
-  const handleBaixar = async (fatura: any) => {
-    setBaixandoId(fatura.id);
-    try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        alert('Sessão expirada. Faça login novamente.');
-        return;
-      }
-
-      const response = await fetch(`/api/v1/payments/boleto?id=${fatura.id}`, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
-      });
-
-      if (!response.ok) {
-        console.error('Erro ao buscar boleto:', await response.text());
-        alert('Não foi possível obter o link do boleto. Tente novamente.');
-        return;
-      }
-
-      const data = await response.json();
-
-      // Abrir link ASAAS se disponível
-      if (data.bankSlipUrl) {
-        window.open(data.bankSlipUrl, '_blank', 'noopener,noreferrer');
-        return;
-      }
-      if (data.invoiceUrl) {
-        window.open(data.invoiceUrl, '_blank', 'noopener,noreferrer');
-        return;
-      }
-      if (data.pixQrCodeUrl) {
-        window.open(data.pixQrCodeUrl, '_blank', 'noopener,noreferrer');
-        return;
-      }
-
-      // Fallback: comprovante local imprimível
-      const win = window.open('', '_blank');
-      if (win) {
-        win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Fatura ${fatura.numero}</title>
-        <style>body{font-family:sans-serif;padding:32px;max-width:600px;margin:0 auto}
-        h2{color:#0d9488}table{width:100%;border-collapse:collapse;margin-top:16px}
-        td{padding:8px 0;border-bottom:1px solid #eee}td:first-child{color:#666;width:140px}
-        .valor{font-size:1.5rem;font-weight:700;color:#0d9488;margin:16px 0}
-        .rodape{margin-top:32px;font-size:0.75rem;color:#999;border-top:1px solid #eee;padding-top:12px}
-        </style></head><body>
-        <h2>Fatura ${fatura.numero}</h2>
-        <table>
-          <tr><td>Descrição</td><td>${fatura.description || 'Assinatura'}</td></tr>
-          <tr><td>Emissão</td><td>${new Date(fatura.data).toLocaleDateString('pt-BR')}</td></tr>
-          <tr><td>Vencimento</td><td>${new Date(fatura.vencimento).toLocaleDateString('pt-BR')}</td></tr>
-          <tr><td>Forma</td><td>${fatura.payment_method || '-'}</td></tr>
-        </table>
-        <div class="valor">R$ ${fatura.valor.toFixed(2).replace('.', ',')}</div>
-        <div class="rodape">Gerado em ${new Date().toLocaleString('pt-BR')}</div>
-        <script>window.print();</script>
-        </body></html>`);
-        win.document.close();
-      }
-    } catch (err) {
-      console.error('Erro ao baixar fatura:', err);
-      alert('Erro ao baixar fatura. Tente novamente.');
-    } finally {
-      setBaixandoId(null);
-    }
-  };
-
-  const totalPago = faturas.filter(f => f.status === 'paga').reduce((sum, f) => sum + f.valor, 0);
-  const totalVencida = faturas.filter(f => f.status === 'vencida').reduce((sum, f) => sum + f.valor, 0);
-  const totalVencer = faturas.filter(f => f.status === 'vencer').reduce((sum, f) => sum + f.valor, 0);
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'paga': return 'bg-green-100 text-green-800';
-      case 'vencida': return 'bg-red-100 text-red-800';
-      case 'vencer': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'paid':
+      case 'paga':
+      case 'pago':
+        return 'bg-green-100 text-green-800';
+      case 'overdue':
+      case 'vencida':
+      case 'vencido':
+        return 'bg-red-100 text-red-800';
+      case 'pending':
+      case 'pendente':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'paga': return '✓ Paga';
-      case 'vencida': return '✕ Vencida';
-      case 'vencer': return '⏰ A Vencer';
-      default: return status;
+      case 'paid':
+      case 'paga':
+      case 'pago':
+        return '✓ Pago';
+      case 'overdue':
+      case 'vencida':
+      case 'vencido':
+        return '✕ Vencido';
+      case 'pending':
+      case 'pendente':
+        return '⏰ Pendente';
+      default:
+        return status;
     }
+  };
+
+  const faturasFiltered = filterStatus === 'TODAS'
+    ? faturas
+    : faturas.filter(f => {
+        if (filterStatus === 'paga') return f.status === 'paid' || f.status === 'paga' || f.status === 'pago';
+        if (filterStatus === 'vencida') return f.status === 'overdue' || f.status === 'vencida' || f.status === 'vencido';
+        if (filterStatus === 'vencer') return f.status === 'pending' || f.status === 'pendente';
+        return f.status === filterStatus.toLowerCase();
+      });
+
+  const totalPago = faturas.filter(f => f.status === 'paid' || f.status === 'paga' || f.status === 'pago').reduce((sum, f) => sum + f.valor, 0);
+  const totalVencida = faturas.filter(f => f.status === 'overdue' || f.status === 'vencida' || f.status === 'vencido').reduce((sum, f) => sum + f.valor, 0);
+  const totalVencer = faturas.filter(f => f.status === 'pending' || f.status === 'pendente').reduce((sum, f) => sum + f.valor, 0);
+
+  const handleCopyLink = async (url: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // Ignora falhas de clipboard
+    }
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    if (dateStr.length <= 10) {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+    }
+    return new Date(dateStr).toLocaleDateString('pt-BR');
   };
 
   return (
@@ -679,85 +649,107 @@ function FaturasContent() {
       ) : faturas.length === 0 ? (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
           <p className="text-gray-700 mb-2">Nenhuma fatura encontrada</p>
-          <p className="text-sm text-gray-500">Quando houver faturas lançadas, elas aparecerão aqui.</p>
+          <p className="text-sm text-gray-500">Quando houver faturas de assinatura lançadas, elas aparecerão aqui.</p>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-600">
-          <p className="text-gray-600 text-sm font-semibold mb-1">FATURAS PAGAS</p>
-          <p className="text-3xl font-bold text-green-600">R$ {totalPago.toFixed(2).replace('.', ',')}</p>
-        </div>
+            <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-600">
+              <p className="text-gray-600 text-sm font-semibold mb-1">FATURAS PAGAS</p>
+              <p className="text-3xl font-bold text-green-600">R$ {totalPago.toFixed(2).replace('.', ',')}</p>
+            </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-600">
-          <p className="text-gray-600 text-sm font-semibold mb-1">FATURAS VENCIDAS</p>
-          <p className="text-3xl font-bold text-red-600">R$ {totalVencida.toFixed(2).replace('.', ',')}</p>
-        </div>
+            <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-600">
+              <p className="text-gray-600 text-sm font-semibold mb-1">FATURAS VENCIDAS</p>
+              <p className="text-3xl font-bold text-red-600">R$ {totalVencida.toFixed(2).replace('.', ',')}</p>
+            </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-600">
-          <p className="text-gray-600 text-sm font-semibold mb-1">FATURAS A VENCER</p>
-          <p className="text-3xl font-bold text-yellow-600">R$ {totalVencer.toFixed(2).replace('.', ',')}</p>
-        </div>
-      </div>
+            <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-600">
+              <p className="text-gray-600 text-sm font-semibold mb-1">FATURAS A VENCER</p>
+              <p className="text-3xl font-bold text-yellow-600">R$ {totalVencer.toFixed(2).replace('.', ',')}</p>
+            </div>
+          </div>
 
-      <div className="flex gap-2 mb-6">
-        {['TODAS', 'paga', 'vencida', 'vencer'].map(status => (
-          <button
-            key={status}
-            onClick={() => setFilterStatus(status === 'TODAS' ? 'TODAS' : status)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${filterStatus === (status === 'TODAS' ? 'TODAS' : status)
-              ? 'bg-teal-600 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-          >
-            {status === 'TODAS' ? 'Todas' : status === 'paga' ? 'Pagas' : status === 'vencida' ? 'Vencidas' : 'A Vencer'}
-          </button>
-        ))}
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-100 border-b border-gray-300">
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Número</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Emissão</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Vencimento</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Valor</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {faturasFiltered.map((fatura) => (
-              <tr key={fatura.id} className="border-b border-gray-200 hover:bg-gray-50">
-                <td className="px-6 py-3 text-sm text-gray-900 font-semibold">{fatura.numero}</td>
-                <td className="px-6 py-3 text-sm text-gray-600">{new Date(fatura.data).toLocaleDateString('pt-BR')}</td>
-                <td className="px-6 py-3 text-sm text-gray-600">{new Date(fatura.vencimento).toLocaleDateString('pt-BR')}</td>
-                <td className="px-6 py-3 text-sm text-gray-900 font-semibold">R$ {fatura.valor.toFixed(2).replace('.', ',')}</td>
-                <td className="px-6 py-3">
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(fatura.status)}`}>
-                    {getStatusLabel(fatura.status)}
-                  </span>
-                </td>
-                <td className="px-6 py-3 text-sm">
-                  <button
-                    onClick={() => handleBaixar(fatura)}
-                    disabled={baixandoId === fatura.id}
-                    className="text-teal-600 hover:text-teal-800 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {baixandoId === fatura.id ? '⏳ Aguarde...' : '📥 Baixar'}
-                  </button>
-                </td>
-              </tr>
+          <div className="flex gap-2 mb-6">
+            {['TODAS', 'paga', 'vencida', 'vencer'].map(status => (
+              <button
+                key={status}
+                onClick={() => setFilterStatus(status === 'TODAS' ? 'TODAS' : status)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${filterStatus === (status === 'TODAS' ? 'TODAS' : status)
+                  ? 'bg-teal-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+              >
+                {status === 'TODAS' ? 'Todas' : status === 'paga' ? 'Pagas' : status === 'vencida' ? 'Vencidas' : 'A Vencer'}
+              </button>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-100 border-b border-gray-300">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Plano</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Período</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Vencimento</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Valor</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {faturasFiltered.map((fatura) => (
+                  <tr key={fatura.id} className="border-b border-gray-200 hover:bg-gray-50">
+                    <td className="px-6 py-3 text-sm text-gray-900 font-semibold">{fatura.plano_slug.toUpperCase()}</td>
+                    <td className="px-6 py-3 text-sm text-gray-600">
+                      {fatura.period_start || fatura.period_end ? (
+                        <span>
+                          {formatDate(fatura.period_start)} até {formatDate(fatura.period_end)}
+                        </span>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                    <td className="px-6 py-3 text-sm text-gray-600">{formatDate(fatura.vencimento)}</td>
+                    <td className="px-6 py-3 text-sm text-gray-900 font-semibold">R$ {fatura.valor.toFixed(2).replace('.', ',')}</td>
+                    <td className="px-6 py-3">
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(fatura.status)}`}>
+                        {getStatusLabel(fatura.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 text-sm">
+                      {fatura.asaas_invoice_url ? (
+                        <div className="flex items-center gap-3">
+                          <a
+                            href={fatura.asaas_invoice_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-teal-600 hover:text-teal-800 font-semibold"
+                          >
+                            Abrir fatura
+                          </a>
+                          <button
+                            onClick={() => handleCopyLink(fatura.asaas_invoice_url, fatura.id)}
+                            className="text-gray-500 hover:text-gray-700 font-semibold"
+                          >
+                            {copiedId === fatura.id ? 'Copiado!' : 'Copiar link'}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">Pendente</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>
   );
 }
+
 
 // Componente Plano
 function PlanoContent({ onNotification }: { onNotification: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {
