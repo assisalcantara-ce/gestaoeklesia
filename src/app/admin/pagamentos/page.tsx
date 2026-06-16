@@ -87,6 +87,32 @@ export default function PagamentosPage() {
     }
   }
 
+  const handleMarkAsPaid = async (invoiceId: string) => {
+    if (!window.confirm('Tem certeza que deseja marcar esta fatura como paga manualmente? Esta ação irá ativar o ministério correspondente.')) {
+      return
+    }
+    try {
+      setLoading(true)
+      setError('')
+      const response = await authenticatedFetch('/api/v1/admin/billing-invoices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ invoice_id: invoiceId }),
+      })
+      if (!response.ok) {
+        const errData = await response.json()
+        throw new Error(errData.error || 'Erro ao marcar fatura como paga')
+      }
+      await fetchInvoices()
+    } catch (err: any) {
+      setError(err.message || 'Erro ao processar pagamento.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex h-screen bg-gray-900">
@@ -278,6 +304,15 @@ export default function PagamentosPage() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end items-center gap-2">
+                            {inv.status !== 'paid' && (
+                              <button
+                                onClick={() => handleMarkAsPaid(inv.id)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                                Marcar como pago
+                              </button>
+                            )}
                             {inv.asaas_invoice_url ? (
                               <>
                                 <a
