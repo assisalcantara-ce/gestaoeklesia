@@ -479,7 +479,7 @@ export default function CongregacoesPage() {
             try {
               const { data: ministryRow } = await supabase
                 .from('ministries')
-                .select('subscription_plan_id, plan_id')
+                .select('subscription_plan_id, plan')
                 .eq('id', resolvedMinistryId)
                 .maybeSingle();
 
@@ -499,10 +499,10 @@ export default function CongregacoesPage() {
                   };
                   planName = (planRow as any).name || '';
                 }
-              } else if ((ministryRow as any)?.plan_id) {
-                const slug = String((ministryRow as any).plan_id).toLowerCase();
+              } else if ((ministryRow as any)?.plan) {
+                const slug = String((ministryRow as any).plan).toLowerCase();
                 const fb = FALLBACK_LIMITS[slug];
-                if (fb) { limits = fb; planName = (ministryRow as any).plan_id; }
+                if (fb) { limits = fb; planName = (ministryRow as any).plan; }
               }
 
               setPlanLimits({ ...limits, planName });

@@ -20,7 +20,7 @@ export const ministeriiosSimulados: Ministry[] = [
     subscription: {
       id: 'sub001',
       ministry_id: 'min001',
-      plan_id: 'profissional',
+      plan: 'profissional',
       status: 'ativo',
       data_inicio: '2025-01-15',
       data_vencimento: '2026-01-15',
@@ -48,7 +48,7 @@ export const ministeriiosSimulados: Ministry[] = [
     subscription: {
       id: 'sub002',
       ministry_id: 'min002',
-      plan_id: 'starter',
+      plan: 'starter',
       status: 'ativo',
       data_inicio: '2025-02-20',
       data_vencimento: '2025-12-20',
@@ -76,7 +76,7 @@ export const ministeriiosSimulados: Ministry[] = [
     subscription: {
       id: 'sub003',
       ministry_id: 'min003',
-      plan_id: 'expert',
+      plan: 'expert',
       status: 'ativo',
       data_inicio: '2024-06-10',
       data_vencimento: '2026-06-10',
@@ -103,7 +103,7 @@ export const ministeriiosSimulados: Ministry[] = [
     subscription: {
       id: 'sub004',
       ministry_id: 'min004',
-      plan_id: 'profissional',
+      plan: 'profissional',
       status: 'pendente',
       data_inicio: '2025-09-05',
       data_vencimento: '2026-09-05',
@@ -130,7 +130,7 @@ export const ministeriiosSimulados: Ministry[] = [
     subscription: {
       id: 'sub005',
       ministry_id: 'min005',
-      plan_id: 'starter',
+      plan: 'starter',
       status: 'expirado',
       data_inicio: '2025-11-15',
       data_vencimento: '2025-11-20',

@@ -18,7 +18,8 @@ export interface Plan {
 export interface Subscription {
   id: string;
   ministry_id: string;
-  plan_id: PlanType;
+  plan: PlanType;
+  subscription_plan_id?: string | null;
   status: SubscriptionStatus;
   data_inicio: string;
   data_vencimento: string;
