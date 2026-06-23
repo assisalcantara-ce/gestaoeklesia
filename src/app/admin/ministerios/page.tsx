@@ -709,29 +709,29 @@ export default function MinisteriosPage() {
               width: 85mm;
               height: 30mm;
               margin: 0;
-              padding: 2.5mm 3.5mm;
+              padding: 2mm 3.5mm;
               box-sizing: border-box;
               font-family: Arial, sans-serif;
               font-size: 10px;
-              line-height: 1.25;
+              line-height: 1.2;
               color: #000;
               display: flex;
               flex-direction: column;
               justify-content: center;
             }
             .title {
-              font-size: 13px;
+              font-size: 12px;
               font-weight: bold;
               border-bottom: 0.5px solid #000;
-              padding-bottom: 2px;
-              margin-bottom: 3px;
+              padding-bottom: 1.5px;
+              margin-bottom: 2px;
               text-transform: uppercase;
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
             }
             .info {
-              margin-bottom: 1.5px;
+              margin-bottom: 1px;
             }
             .bold {
               font-weight: bold;
@@ -746,9 +746,10 @@ export default function MinisteriosPage() {
         </head>
         <body>
           <div class="title">${m.name}</div>
-          <div class="info"><span class="bold">Link de Acesso:</span> app.gestaoeklesia.com.br/login</div>
+          <div class="info"><span class="bold">Link de Acesso:</span> app.gestaoeklesia.com.br</div>
           <div class="info"><span class="bold">E-mail:</span> ${m.email_admin || '-'}</div>
           ${password ? `<div class="info"><span class="bold">Senha:</span> ${password}</div>` : ''}
+          <div class="info"><span class="bold">Plano:</span> <span style="text-transform: uppercase;">${m.plan || 'Starter'}</span></div>
           <div class="info"><span class="bold">Telefone:</span> ${m.phone ? formatPhone(m.phone) : '-'}</div>
           <div class="footer">Gestão Eklésia</div>
           <script>
