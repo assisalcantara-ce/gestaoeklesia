@@ -764,10 +764,16 @@ export default function ImportarMembrosPage() {
     let finalRemaining = 0;
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       let hasMore = true;
       while (hasMore) {
         const res = await fetch('/api/v1/secretaria/membros/migrate-photos', {
           method: 'POST',
+          headers: token ? {
+            'Authorization': `Bearer ${token}`
+          } : {},
         });
         if (!res.ok) {
           const errData = await res.json();
