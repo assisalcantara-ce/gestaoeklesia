@@ -130,10 +130,52 @@ export async function loadCertificadosTemplatesForCurrentUser(
 
     const fromDb = await fetchCertificadosTemplatesFromSupabase(supabase, ministryId);
 
+    // Mapa de template_id -> cargo_key e backgroundUrl para fallback em templates antigos no banco
+    const padraoMap = new Map(
+      CERTIFICADOS_TEMPLATES_PADRAO.map((p) => [
+        p.id,
+        { cargo_key: (p as any).cargo_key as string | undefined, backgroundUrl: p.backgroundUrl },
+      ])
+    );
+
+    // Carregar cargos ministeriais ativos do tenant
+    let cargosAtivos: string[] = [];
+    try {
+      const { data: configRow } = await supabase
+        .from('configurations')
+        .select('nomenclaturas')
+        .eq('ministry_id', ministryId)
+        .maybeSingle();
+      const rawNomenclaturas = (configRow as any)?.nomenclaturas || {};
+      const cargos: any[] = rawNomenclaturas?.cargos_ministeriais || [];
+      // Se houver cargos configurados, usar os ativos; se não houver, liberar todos
+      if (Array.isArray(cargos) && cargos.length > 0) {
+        cargosAtivos = cargos
+          .filter((c: any) => c.ativo !== false)
+          .map((c: any) => (c.nome || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+      }
+    } catch {
+      // sem configuracao: liberar todos
+    }
+
+    // Normaliza nome para comparação insensível a acento e case
+    const normalizeStr = (s: string) =>
+      (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
     // Auto-seed: para cada template padrão, verifica se o ministério já tem esse template pelo ID/chave
     for (const padrao of CERTIFICADOS_TEMPLATES_PADRAO) {
-      const jaTemTemplate = fromDb.some((t: any) => t.template_key === padrao.id || t.id === padrao.id);
-      if (!jaTemTemplate) {
+      // Filtro de cargos: se o template tem cargo_key e o tenant tem cargos configurados,
+      // verificar se esse cargo está ativo
+      const cargoKey = (padrao as any).cargo_key as string | undefined;
+      if (cargoKey && cargosAtivos.length > 0) {
+        const cargoNorm = normalizeStr(cargoKey);
+        const cargoPermitido = cargosAtivos.some((c) => c === cargoNorm);
+        if (!cargoPermitido) continue; // pular templates cujo cargo não está ativo
+      }
+
+      const existente = fromDb.find((t: any) => t.template_key === padrao.id || t.id === padrao.id);
+      if (!existente) {
+        // Novo template — inserir
         const row = {
           ministry_id: ministryId,
           template_key: padrao.id,
@@ -148,10 +190,33 @@ export async function loadCertificadosTemplatesForCurrentUser(
           .from('certificados_templates')
           .upsert(row as any, { onConflict: 'ministry_id,template_key' });
         if (!error) fromDb.push({ ...padrao, ativo: true });
+      } else if (!existente.backgroundUrl && padrao.backgroundUrl) {
+        // Template existente sem background — atualizar apenas backgroundUrl e cargo_key
+        const updatedData = { ...existente, backgroundUrl: padrao.backgroundUrl, cargo_key: cargoKey };
+        await supabase
+          .from('certificados_templates')
+          .update({ template_data: updatedData })
+          .eq('ministry_id', ministryId)
+          .eq('template_key', padrao.id);
+        // Atualizar localmente também
+        const idx = fromDb.indexOf(existente);
+        if (idx >= 0) fromDb[idx] = updatedData;
       }
     }
 
-    return { templates: fromDb, ministryId };
+    // Filtrar templates retornados: remover templates ministeriais de cargos inativos/removidos
+    const filtered = cargosAtivos.length === 0
+      ? fromDb
+      : fromDb.filter((t: any) => {
+          // Tentar cargo_key do próprio template, ou fazer lookup pelo ID no padraoMap
+          const cargoKey: string | undefined =
+            t.cargo_key ?? padraoMap.get(t.id ?? t.template_key)?.cargo_key;
+          if (!cargoKey) return true; // sem cargo_key, sempre mostrar
+          const cargoNorm = normalizeStr(cargoKey);
+          return cargosAtivos.some((c) => c === cargoNorm);
+        });
+
+    return { templates: filtered, ministryId };
   } catch {
     return { templates: [], ministryId: null };
   }

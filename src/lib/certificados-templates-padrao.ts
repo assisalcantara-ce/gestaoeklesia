@@ -4,12 +4,14 @@
  * A imagem de fundo é referenciada como caminho público (/img/...) para não inflar o banco com base64.
  */
 
+// cargo_key: chave para filtrar templates ministeriais pelas nomenclaturas/cargos do tenant
 export const CERTIFICADOS_TEMPLATES_PADRAO = [
   {
     id: 'ministerial-pastor-padrao',
     nome: 'Consagração Pastor(a)',
     chave: 'ministerial-pastor-padrao',
     categoria: 'ministerial' as const,
+    cargo_key: 'Pastor',
     ativo: true,
     backgroundUrl: '/img/cert_pastor.jpg',
     elementos: [
@@ -75,6 +77,7 @@ export const CERTIFICADOS_TEMPLATES_PADRAO = [
     nome: 'Consagração Evangelista',
     chave: 'ministerial-evangelista-padrao',
     categoria: 'ministerial' as const,
+    cargo_key: 'Evangelista',
     ativo: true,
     backgroundUrl: '/img/cert_evangelista.jpg',
     elementos: [
@@ -140,8 +143,9 @@ export const CERTIFICADOS_TEMPLATES_PADRAO = [
     nome: 'Consagração Missionário(a)',
     chave: 'ministerial-missionario-padrao',
     categoria: 'ministerial' as const,
+    cargo_key: 'Missionário',
     ativo: true,
-    backgroundUrl: undefined as any,
+    backgroundUrl: '/img/cert_missionario.jpg',
     elementos: [
       {
         id: 'b9268db5-9e61-48fc-ae7e-9f016afb0e23',
@@ -205,8 +209,9 @@ export const CERTIFICADOS_TEMPLATES_PADRAO = [
     nome: 'Consagração Presbítero',
     chave: 'ministerial-presbitero-padrao',
     categoria: 'ministerial' as const,
+    cargo_key: 'Presbítero',
     ativo: true,
-    backgroundUrl: undefined as any,
+    backgroundUrl: '/img/cert_presbitero.jpg',
     elementos: [
       {
         id: 'e5390d5e-9d43-4ea4-9aa5-25cae1ea19cb',
@@ -270,8 +275,9 @@ export const CERTIFICADOS_TEMPLATES_PADRAO = [
     nome: 'Consagração Diaconisa',
     chave: 'ministerial-diaconiza-padrao',
     categoria: 'ministerial' as const,
+    cargo_key: 'Diaconisa',
     ativo: true,
-    backgroundUrl: undefined as any,
+    backgroundUrl: '/img/cert_diaconisa.jpg',
     elementos: [
       {
         id: 'f06e1232-1ebb-45a5-9a95-969b79f72915',
@@ -495,7 +501,7 @@ export const CERTIFICADOS_TEMPLATES_PADRAO = [
     chave: 'batismo-aguas-padrao',
     categoria: 'batismo-aguas' as const,
     ativo: true,
-    backgroundUrl: undefined as any,
+    backgroundUrl: '/img/cert_batismo.jpg',
     elementos: [
       {
         id: '921cf954-f87e-49ae-914d-b8c3f574e56a',
@@ -575,7 +581,7 @@ export const CERTIFICADOS_TEMPLATES_PADRAO = [
     chave: 'casamento-padrao',
     categoria: 'casamento' as const,
     ativo: true,
-    backgroundUrl: undefined as any,
+    backgroundUrl: '/img/cert_casamento.jpg',
     elementos: [
       {
         id: '9234a664-4f9a-4c7d-9ddd-490c0dbb4a76',
