@@ -130,10 +130,10 @@ export async function loadCertificadosTemplatesForCurrentUser(
 
     const fromDb = await fetchCertificadosTemplatesFromSupabase(supabase, ministryId);
 
-    // Auto-seed: para cada template padrão, verifica se o ministério já tem essa categoria
+    // Auto-seed: para cada template padrão, verifica se o ministério já tem esse template pelo ID/chave
     for (const padrao of CERTIFICADOS_TEMPLATES_PADRAO) {
-      const jaTemCategoria = fromDb.some((t: any) => t.categoria === padrao.categoria);
-      if (!jaTemCategoria) {
+      const jaTemTemplate = fromDb.some((t: any) => t.template_key === padrao.id || t.id === padrao.id);
+      if (!jaTemTemplate) {
         const row = {
           ministry_id: ministryId,
           template_key: padrao.id,
