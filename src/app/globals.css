@@ -127,3 +127,57 @@
     margin-top: 48px;
   }
 }
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* Forçar o conteúdo a ocupar a largura total do papel */
+  main, .main-content, #relatorio-print {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Garantir que tabelas não quebrem e apareçam inteiras */
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  table {
+    width: 100% !important;
+    table-layout: auto !important;
+    border-collapse: collapse !important;
+  }
+
+  th, td {
+    padding: 6px 4px !important;
+    font-size: 11px !important;
+    word-break: break-word !important;
+  }
+
+  th {
+    background-color: #f3f4f6 !important;
+    color: #374151 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  tr {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  tr, img {
+    page-break-inside: avoid !important;
+  }
+}
