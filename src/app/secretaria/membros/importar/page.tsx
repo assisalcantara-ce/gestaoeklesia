@@ -60,7 +60,7 @@ export default function ImportarMembrosPage() {
 
   // Mapeamento das 59 colunas para campos internos em formato snake_case
   const columnMappings: Record<string, string> = {
-    'NOME': 'name',
+    'NOME': 'nome',
     'CPF': 'cpf',
     'CONGREGACAO': 'congregacao_nome',
     'CAMPO': 'campo',
@@ -366,6 +366,9 @@ export default function ImportarMembrosPage() {
 
             if (mappedField) {
               data[mappedField] = val;
+              if (mappedField === 'nome') {
+                console.log(`[Audit NOME] Header usado: "${h}" | Valor bruto: "${val}" | Atribuído a data['nome']: "${data['nome']}"`);
+              }
             } else {
               metadata[h] = val;
             }
@@ -572,7 +575,7 @@ export default function ImportarMembrosPage() {
 
         insertPayloads.push({
           ministry_id: ministryId,
-          name: row.data['name'],
+          name: row.data['nome'],
           cpf: cpfClean || null,
           email: row.data['email'] || null,
           phone: row.data['celular'] || row.data['whatsapp'] || null,
