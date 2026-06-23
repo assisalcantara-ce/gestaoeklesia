@@ -2,12 +2,12 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import AdminSidebar from '@/components/AdminSidebar'
-import { ExternalLink, Copy, Check, Filter, RefreshCw, AlertCircle, Coins, Plus, Search } from 'lucide-react'
+import { ExternalLink, Copy, Check, Filter, RefreshCw, AlertCircle, Coins, Plus, Search, ChevronDown, ChevronRight } from 'lucide-react'
 
 interface BillingInvoice {
   id: string
@@ -36,6 +36,7 @@ export default function PagamentosPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   
   // === Faturas Avulsas ===
   const [ministries, setMinistries] = useState<any[]>([])
@@ -284,6 +285,33 @@ export default function PagamentosPage() {
     })
   }
 
+  // Agrupar faturas por ministério/tenant
+  const groupedInvoices = useMemo(() => {
+    const groups: Record<string, { ministryName: string; invoices: BillingInvoice[] }> = {}
+    for (const inv of invoices) {
+      const mId = inv.ministry_id
+      const mName = inv.ministries?.name || 'Ministério Removido'
+      if (!groups[mId]) {
+        groups[mId] = {
+          ministryName: mName,
+          invoices: [],
+        }
+      }
+      groups[mId].invoices.push(inv)
+    }
+    return Object.entries(groups).map(([ministryId, data]) => ({
+      ministryId,
+      ...data,
+    }))
+  }, [invoices])
+
+  const toggleGroup = (id: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [id]: !prev[id],
+    }))
+  }
+
   return (
     <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden">
       <AdminSidebar />
@@ -352,106 +380,150 @@ export default function PagamentosPage() {
             </div>
           </div>
 
-          {/* Tabela de Faturas */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-2xl">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
-                <p className="text-sm text-gray-400">Carregando faturas...</p>
-              </div>
-            ) : invoices.length === 0 ? (
-              <div className="text-center py-20 text-gray-500 space-y-2">
-                <p className="text-lg font-medium">Nenhuma fatura encontrada</p>
-                <p className="text-sm">Não há registros correspondentes aos critérios de filtro aplicados.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-800 bg-gray-950/40 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                      <th className="px-6 py-4">Ministério</th>
-                      <th className="px-6 py-4">Plano</th>
-                      <th className="px-6 py-4">Valor</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4">Vencimento</th>
-                      <th className="px-6 py-4">Criado em</th>
-                      <th className="px-6 py-4 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-800/60 text-sm">
-                    {invoices.map((inv) => (
-                      <tr key={inv.id} className="hover:bg-gray-800/30 transition">
-                        <td className="px-6 py-4 font-medium text-white">
-                          {inv.ministries?.name || 'Ministério Removido'}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="px-2 py-0.5 text-xs font-mono rounded bg-gray-800 text-gray-300 border border-gray-700">
-                            {inv.plano_slug}
+          {/* Tabela/Lista de Faturas */}
+          {loading ? (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl flex flex-col items-center justify-center py-20 gap-3 shadow-2xl">
+              <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
+              <p className="text-sm text-gray-400">Carregando faturas...</p>
+            </div>
+          ) : invoices.length === 0 ? (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl text-center py-20 text-gray-500 space-y-2 shadow-2xl">
+              <p className="text-lg font-medium">Nenhuma fatura encontrada</p>
+              <p className="text-sm">Não há registros correspondentes aos critérios de filtro aplicados.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {groupedInvoices.map((group) => {
+                const isExpanded = !!expandedGroups[group.ministryId];
+                const pendingCount = group.invoices.filter((i) => i.status === 'pending' || i.status === 'pendente').length;
+                const overdueCount = group.invoices.filter((i) => i.status === 'overdue' || i.status === 'vencido').length;
+                const totalValue = group.invoices.reduce((sum, i) => sum + i.amount, 0);
+
+                return (
+                  <div
+                    key={group.ministryId}
+                    className="border border-gray-800 rounded-xl overflow-hidden bg-gray-900/50 backdrop-blur shadow-xl transition-all"
+                  >
+                    <div
+                      onClick={() => toggleGroup(group.ministryId)}
+                      className="flex items-center justify-between p-5 hover:bg-gray-800/40 cursor-pointer transition select-none"
+                    >
+                      <div className="flex items-center gap-3">
+                        {isExpanded ? (
+                          <ChevronDown className="h-5 w-5 text-gray-400 shrink-0" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5 text-gray-400 shrink-0" />
+                        )}
+                        <div>
+                          <h3 className="font-semibold text-base text-white">{group.ministryName}</h3>
+                          <span className="text-xs text-gray-400 font-mono block mt-0.5">
+                            {group.invoices.length} fatura{group.invoices.length !== 1 ? 's' : ''} • Total:{' '}
+                            {formatCurrency(totalValue)}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 font-semibold text-white">
-                          {formatCurrency(inv.amount)}
-                        </td>
-                        <td className="px-6 py-4">
-                          {getStatusBadge(inv.status)}
-                        </td>
-                        <td className="px-6 py-4 text-gray-300">
-                          {formatDate(inv.due_date)}
-                        </td>
-                        <td className="px-6 py-4 text-gray-400 text-xs">
-                          {formatDateTime(inv.created_at)}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end items-center gap-2">
-                            {inv.status !== 'paid' && (
-                              <button
-                                onClick={() => handleMarkAsPaid(inv.id)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap"
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                                Marcar como pago
-                              </button>
-                            )}
-                            {inv.asaas_invoice_url ? (
-                              <>
-                                <a
-                                  href={inv.asaas_invoice_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition cursor-pointer"
-                                >
-                                  Abrir fatura
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                </a>
-                                <button
-                                  onClick={() => handleCopyLink(inv.asaas_invoice_url!, inv.id)}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-750 text-gray-300 hover:text-white rounded-lg text-xs font-medium border border-gray-700 hover:border-gray-650 transition cursor-pointer"
-                                >
-                                  {copiedId === inv.id ? (
-                                    <>
-                                      Copiado!
-                                      <Check className="h-3.5 w-3.5 text-emerald-400" />
-                                    </>
-                                  ) : (
-                                    <>
-                                      Copiar link
-                                      <Copy className="h-3.5 w-3.5" />
-                                    </>
-                                  )}
-                                </button>
-                              </>
-                            ) : (
-                              <span className="text-xs text-gray-500 italic">Sem link disponível</span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {pendingCount > 0 && (
+                          <span className="px-2.5 py-0.5 text-xs font-semibold rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            {pendingCount} Pendente{pendingCount !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {overdueCount > 0 && (
+                          <span className="px-2.5 py-0.5 text-xs font-semibold rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse">
+                            {overdueCount} Vencida{overdueCount !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {pendingCount === 0 && overdueCount === 0 && (
+                          <span className="px-2.5 py-0.5 text-xs font-semibold rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            Em dia
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="overflow-x-auto bg-gray-950/30 border-t border-gray-800/40">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-gray-800 bg-gray-950/40 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                              <th className="px-6 py-3">Plano / Serviço</th>
+                              <th className="px-6 py-3">Valor</th>
+                              <th className="px-6 py-3">Status</th>
+                              <th className="px-6 py-3">Vencimento</th>
+                              <th className="px-6 py-3">Criado em</th>
+                              <th className="px-6 py-3 text-right">Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-800/30 text-xs">
+                            {group.invoices.map((inv) => (
+                              <tr key={inv.id} className="hover:bg-gray-800/20 transition">
+                                <td className="px-6 py-3.5">
+                                  <span className="px-2 py-0.5 text-[11px] font-mono rounded bg-gray-800 text-gray-300 border border-gray-700 uppercase">
+                                    {inv.plano_slug}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-3.5 font-semibold text-white">
+                                  {formatCurrency(inv.amount)}
+                                </td>
+                                <td className="px-6 py-3.5">{getStatusBadge(inv.status)}</td>
+                                <td className="px-6 py-3.5 text-gray-300">{formatDate(inv.due_date)}</td>
+                                <td className="px-6 py-3.5 text-gray-400">{formatDateTime(inv.created_at)}</td>
+                                <td className="px-6 py-3.5 text-right">
+                                  <div className="flex justify-end items-center gap-1.5">
+                                    {inv.status !== 'paid' && (
+                                      <button
+                                        onClick={() => handleMarkAsPaid(inv.id)}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-semibold transition cursor-pointer whitespace-nowrap"
+                                      >
+                                        <Check className="h-3 w-3" />
+                                        Marcar pago
+                                      </button>
+                                    )}
+                                    {inv.asaas_invoice_url ? (
+                                      <>
+                                        <a
+                                          href={inv.asaas_invoice_url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-medium transition cursor-pointer"
+                                        >
+                                          Abrir
+                                          <ExternalLink className="h-3 w-3" />
+                                        </a>
+                                        <button
+                                          onClick={() => handleCopyLink(inv.asaas_invoice_url!, inv.id)}
+                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-gray-800 hover:bg-gray-755 text-gray-300 hover:text-white rounded text-[11px] font-medium border border-gray-700 hover:border-gray-650 transition cursor-pointer"
+                                        >
+                                          {copiedId === inv.id ? (
+                                            <>
+                                              Copiado
+                                              <Check className="h-3 w-3 text-emerald-400" />
+                                            </>
+                                          ) : (
+                                            <>
+                                              Copiar
+                                              <Copy className="h-3 w-3" />
+                                            </>
+                                          )}
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <span className="text-[11px] text-gray-500 italic pr-2">Sem link</span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </main>
 
