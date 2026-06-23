@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import NotificationModal from '@/components/NotificationModal';
 import FichaMembro from '@/components/FichaMembro';
 import CartãoMembro from '@/components/CartãoMembro';
@@ -2297,25 +2298,34 @@ export default function MembrosPage() {
                 </span>
                 <div className="flex flex-wrap gap-2 w-full md:w-auto">
                   {!isSupervisor && (
-                  <button
-                    onClick={() => {
-                      if (limiteMembrosAtingido) {
-                        setNotification({ isOpen: true, title: 'Limite atingido', message: `Seu plano permite no máximo ${maxMembros} cadastros. Faça upgrade para adicionar mais.`, type: 'warning', showButton: true });
-                        return;
-                      }
-                      abrirNovoCadastro();
-                    }}
-                    className={`px-4 py-2 rounded-lg transition font-semibold text-sm flex items-center gap-2 w-full sm:w-auto ${
-                      limiteMembrosAtingido
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-green-600 text-white hover:bg-green-700'
-                    }`}
-                    title={limiteMembrosAtingido ? `Limite de ${maxMembros} cadastros atingido` : 'Novo Cadastro'}
-                  >
-                    <span>➕</span>
-                    <span className="md:hidden">+ Membro</span>
-                    <span className="hidden md:inline">Novo Cadastro</span>
-                  </button>
+                    <>
+                      <Link
+                        href="/secretaria/membros/importar"
+                        className="px-4 py-2 bg-teal-600 text-white hover:bg-teal-700 rounded-lg transition font-semibold text-sm flex items-center gap-2 w-full sm:w-auto cursor-pointer"
+                      >
+                        <span>📥</span>
+                        <span>Importar CSV</span>
+                      </Link>
+                      <button
+                        onClick={() => {
+                          if (limiteMembrosAtingido) {
+                            setNotification({ isOpen: true, title: 'Limite atingido', message: `Seu plano permite no máximo ${maxMembros} cadastros. Faça upgrade para adicionar mais.`, type: 'warning', showButton: true });
+                            return;
+                          }
+                          abrirNovoCadastro();
+                        }}
+                        className={`px-4 py-2 rounded-lg transition font-semibold text-sm flex items-center gap-2 w-full sm:w-auto ${
+                          limiteMembrosAtingido
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            : 'bg-green-600 text-white hover:bg-green-700'
+                        }`}
+                        title={limiteMembrosAtingido ? `Limite de ${maxMembros} cadastros atingido` : 'Novo Cadastro'}
+                      >
+                        <span>➕</span>
+                        <span className="md:hidden">+ Membro</span>
+                        <span className="hidden md:inline">Novo Cadastro</span>
+                      </button>
+                    </>
                   )}
                   <button
                     onClick={async () => {
