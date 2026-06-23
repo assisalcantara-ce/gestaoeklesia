@@ -66,6 +66,7 @@ export default function ImportarMembrosPage() {
     erro: number;
     restantes: number;
   } | null>(null);
+  const [migrationError, setMigrationError] = useState('');
 
   const fetchPendingPhotosCount = async () => {
     try {
@@ -752,8 +753,10 @@ export default function ImportarMembrosPage() {
   };
 
   const handleMigratePhotos = async () => {
+    console.log("MIGRATE_PHOTOS_CLICKED");
     setMigrating(true);
     setErrorMessage('');
+    setMigrationError('');
     setMigrationSummary(null);
     let totalMigradas = 0;
     let totalIgnoradas = 0;
@@ -771,6 +774,7 @@ export default function ImportarMembrosPage() {
           throw new Error(errData.error || 'Erro na migração');
         }
         const data = await res.json();
+        console.log("MIGRATE_PHOTOS_RESPONSE", data);
         totalMigradas += data.migradas || 0;
         totalIgnoradas += data.ignoradas || 0;
         totalErro += data.erro || 0;
@@ -791,7 +795,8 @@ export default function ImportarMembrosPage() {
       });
       await fetchPendingPhotosCount();
     } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao migrar fotos.');
+      console.error("[Migration Error] failed:", err);
+      setMigrationError(err.message || 'Erro ao migrar fotos.');
     } finally {
       setMigrating(false);
     }
@@ -1126,7 +1131,11 @@ export default function ImportarMembrosPage() {
                     </p>
                   </div>
                   <button
-                    onClick={handleMigratePhotos}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleMigratePhotos();
+                    }}
                     disabled={migrating || pendingPhotosCount === null || pendingPhotosCount === 0}
                     className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-sm transition shadow-md disabled:opacity-50 cursor-pointer"
                   >
@@ -1143,6 +1152,16 @@ export default function ImportarMembrosPage() {
                     )}
                   </button>
                 </div>
+
+                {migrationError && (
+                  <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-4 flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="font-semibold text-sm">Erro na Migração de Fotos</h3>
+                      <p className="text-xs text-red-700 mt-1">{migrationError}</p>
+                    </div>
+                  </div>
+                )}
 
                 {migrationSummary && (
                   <div className="bg-purple-50 border border-purple-200 rounded-xl p-6 text-purple-900 space-y-3">
