@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import PageLayout from '@/components/PageLayout';
-import { ArrowLeft, Download, UploadCloud, AlertTriangle, CheckCircle2, FileText, AlertCircle, Info, Settings, Image, FileImage, ShieldAlert } from 'lucide-react';
+import { createClient } from '@/lib/supabase-client';
+import { ArrowLeft, Download, UploadCloud, AlertTriangle, CheckCircle2, FileText, AlertCircle, Info, Settings, Image, FileImage, ShieldAlert, Play, RefreshCw } from 'lucide-react';
 
 interface RowError {
   line: number;
@@ -22,8 +23,10 @@ interface ParsedRow {
 }
 
 export default function ImportarMembrosPage() {
+  const supabase = createClient();
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [mappedColumns, setMappedColumns] = useState<string[]>([]);
   const [unmappedColumns, setUnmappedColumns] = useState<string[]>([]);
   const [rows, setRows] = useState<ParsedRow[]>([]);
@@ -37,61 +40,91 @@ export default function ImportarMembrosPage() {
     urlsBubble: 0,
     urlsInvalidasFoto: 0,
   });
+  const [importSummary, setImportSummary] = useState<{
+    imported: number;
+    ignored: number;
+    errors: number;
+    duplicates: number;
+  } | null>(null);
   const [missingRequired, setMissingRequired] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
   // 5 colunas obrigatórias conforme especificação
   const requiredFields = ['NOME', 'CPF', 'CONGREGAÇÃO', 'CAMPO', 'SUPERVISAO'];
 
-  // Mapeamento das 59 colunas para campos internos
+  // Mapeamento das 59 colunas para campos internos em formato snake_case
   const columnMappings: Record<string, string> = {
-    'NOME': 'nome',
+    'NOME': 'name',
     'CPF': 'cpf',
-    'CONGREGAÇÃO': 'congregacao',
+    'CONGREGAÇÃO': 'congregacao_nome',
     'CAMPO': 'campo',
     'SUPERVISAO': 'supervisao',
     'BAIRRO': 'bairro',
-    'CARGO': 'cargoMinisterial',
+    'CARGO': 'cargo_ministerial',
     'CELULAR': 'celular',
     'CEP': 'cep',
     'CIDADE': 'cidade',
     'COMPLEMENTO': 'complemento',
-    'CONJUJE CPF': 'cpfConjuge',
-    'CONJUJE DNASCIMENTO': 'dataNascimentoConjuge',
-    'CURSO TEOLOGICO': 'cursoTeologico',
-    'DBATISMO AGUAS': 'dataBatismoAguas',
-    'DBATISMO ES': 'dataBatismoEspiritoSanto',
-    'DEPARTAMENTO': 'setorDepartamento',
-    'DIZIMISTA?': 'isDizimista',
-    'DNASCIMENTO': 'dataNascimento',
+    'CONJUJE CPF': 'cpf_conjuge',
+    'CONJUJE DNASCIMENTO': 'data_nascimento_conjuge',
+    'CURSO TEOLOGICO': 'curso_teologico',
+    'DBATISMO AGUAS': 'data_batismo_aguas',
+    'DBATISMO ES': 'data_batismo_espirito_santo',
+    'DEPARTAMENTO': 'setor_departamento',
+    'DIZIMISTA?': 'is_dizimista',
+    'DNASCIMENTO': 'data_nascimento',
     'EMAIL01': 'email',
-    'ENDEREÇO': 'endereco',
+    'ENDEREÇO': 'logradouro',
     'ESCOLARIDADE': 'escolaridade',
-    'ESTADO CIVIL': 'estadoCivil',
+    'ESTADO CIVIL': 'estado_civil',
     'FOTO 3X4': 'fotoUrl',
-    'FUNÇÃO IGREJA': 'qualFuncao',
-    'MAE': 'nomeMae',
+    'FUNÇÃO IGREJA': 'qual_funcao',
+    'MAE': 'nome_mae',
     'MATRICULA': 'matricula',
     'MUNICIPIO': 'cidade',
     'NACIONALIDADE': 'nacionalidade',
     'NATURALIDADE': 'naturalidade',
-    'NOME CONJUGE': 'nomeConjuge',
+    'NOME CONJUGE': 'nome_conjuge',
     'NUMERO': 'numero',
     'OBS MEMBRO': 'observacoes',
-    'PAI': 'nomePai',
+    'PAI': 'nome_pai',
     'PROCEDENCIA': 'procedencia',
-    'PROCEDENCIA LOCAL': 'procedenciaLocal',
+    'PROCEDENCIA LOCAL': 'procedencia_local',
     'PROFISSÃO': 'profissao',
     'RG': 'rg',
     'SEXO': 'sexo',
     'STATUS': 'status',
-    'TITULO ELEITOR': 'tituloEleitoral',
-    'TSANGUE': 'tipoSanguineo',
-    'UF ENDEREÇO': 'uf',
+    'TITULO ELEITOR': 'titulo_eleitoral',
+    'TSANGUE': 'tipo_sanguineo',
+    'UF ENDEREÇO': 'estado',
     'WHATSAPP': 'whatsapp',
-    'ZONA': 'zonaEleitoral',
-    'SEÇÃO': 'secaoEleitoral',
-    'CONVERSÃO': 'dataConversao',
+    'ZONA': 'zona_eleitoral',
+    'SEÇÃO': 'secao_eleitoral',
+    'CONVERSÃO': 'data_conversao',
+  };
+
+  const resolveMinistryId = async (): Promise<string | null> => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const mu = await supabase
+        .from('ministry_users')
+        .select('ministry_id')
+        .eq('user_id', user.id)
+        .limit(1);
+
+      const ministryIdFromMu = (mu.data as any)?.[0]?.ministry_id as string | undefined;
+      if (ministryIdFromMu) return ministryIdFromMu;
+
+      const m = await supabase.from('ministries').select('id').eq('user_id', user.id).limit(1);
+      const ministryIdFromOwner = (m.data as any)?.[0]?.id as string | undefined;
+      return ministryIdFromOwner || null;
+    } catch {
+      return null;
+    }
   };
 
   const normalizeHeaderName = (h: string): string => {
@@ -120,6 +153,28 @@ export default function ImportarMembrosPage() {
       // Ignora erro
     }
     return 'url_invalida';
+  };
+
+  const parseLegacyDate = (val: string): string | null => {
+    const trimmed = (val || '').trim();
+    if (!trimmed) return null;
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+      const [d, m, y] = trimmed.split('/');
+      return `${y}-${m}-${d}`;
+    }
+
+    try {
+      const parsed = Date.parse(trimmed);
+      if (!isNaN(parsed)) {
+        return new Date(parsed).toISOString().split('T')[0];
+      }
+    } catch {
+      // Ignora erro
+    }
+    return null;
   };
 
   const isValidCPF = (cpfStr: string): boolean => {
@@ -223,6 +278,7 @@ export default function ImportarMembrosPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setErrorMessage('');
+    setImportSummary(null);
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
@@ -258,11 +314,9 @@ export default function ImportarMembrosPage() {
           return;
         }
 
-        // 1. Extrair headers
         const rawHeaders = rawLines[0];
         const normalizedHeaders = rawHeaders.map(h => normalizeHeaderName(h));
 
-        // Identificar colunas mapeadas e não mapeadas
         const mapped: string[] = [];
         const unmapped: string[] = [];
 
@@ -277,7 +331,6 @@ export default function ImportarMembrosPage() {
         setMappedColumns(mapped);
         setUnmappedColumns(unmapped);
 
-        // Validar colunas obrigatórias ausentes
         const missing = requiredFields.filter(req => {
           return !normalizedHeaders.some(h => h === req);
         });
@@ -288,7 +341,6 @@ export default function ImportarMembrosPage() {
           return;
         }
 
-        // 2. Processar linhas
         const dataRows = rawLines.slice(1);
         const parsed: ParsedRow[] = [];
         const cpfCounts: Record<string, number[]> = {};
@@ -310,7 +362,6 @@ export default function ImportarMembrosPage() {
             }
           });
 
-          // Rastrear CPFs
           const cpfRaw = (data['cpf'] || '').replace(/\D/g, '');
           if (cpfRaw) {
             if (!cpfCounts[cpfRaw]) {
@@ -328,7 +379,6 @@ export default function ImportarMembrosPage() {
           });
         });
 
-        // 3. Validar linhas individualmente
         let validCount = 0;
         let errorCount = 0;
         let duplicateCount = 0;
@@ -340,31 +390,26 @@ export default function ImportarMembrosPage() {
         parsed.forEach(row => {
           const errors: RowError[] = [];
 
-          // NOME vazio
           const nomeVal = (row.data['nome'] || '').trim();
           if (!nomeVal) {
-            errors.push({ line: row.line, field: 'nome', message: 'O NOME é obrigatório e está vazio.' });
+            errors.push({ line: row.line, field: 'nome', message: 'O NOME é obrigatória e está vazio.' });
           }
 
-          // CONGREGAÇÃO vazia
-          const congVal = (row.data['congregacao'] || '').trim();
+          const congVal = (row.metadata['CONGREGAÇÃO'] || row.data['congregacao_nome'] || '').trim();
           if (!congVal) {
             errors.push({ line: row.line, field: 'congregacao', message: 'A CONGREGAÇÃO é obrigatória e está vazia.' });
           }
 
-          // CAMPO vazio
-          const campoVal = (row.data['campo'] || '').trim();
+          const campoVal = (row.metadata['CAMPO'] || row.data['campo'] || '').trim();
           if (!campoVal) {
             errors.push({ line: row.line, field: 'campo', message: 'O CAMPO é obrigatório e está vazio.' });
           }
 
-          // SUPERVISAO vazia
-          const supVal = (row.data['supervisao'] || '').trim();
+          const supVal = (row.metadata['SUPERVISAO'] || row.data['supervisao'] || '').trim();
           if (!supVal) {
             errors.push({ line: row.line, field: 'supervisao', message: 'A SUPERVISAO é obrigatória e está vazia.' });
           }
 
-          // CPF vazio, inválido ou duplicado
           const cpfRaw = (row.data['cpf'] || '').replace(/\D/g, '');
           if (!cpfRaw) {
             errors.push({ line: row.line, field: 'cpf', message: 'O CPF é obrigatório e está vazio.' });
@@ -382,7 +427,6 @@ export default function ImportarMembrosPage() {
             }
           }
 
-          // Tratamento de fotos do Bubble/Externas
           const fotoUrl = row.data['fotoUrl'] || '';
           const fotoStatus = getFotoStatus(fotoUrl);
           row.foto_url_origem = fotoUrl;
@@ -409,7 +453,6 @@ export default function ImportarMembrosPage() {
           }
         });
 
-        // Atualizar estados
         setRows(parsed);
         setSummary({
           total: parsed.length,
@@ -431,10 +474,183 @@ export default function ImportarMembrosPage() {
     reader.readAsText(file, 'UTF-8');
   };
 
+  const handleImport = async () => {
+    if (rows.length === 0) return;
+    setImporting(true);
+    setErrorMessage('');
+    setImportSummary(null);
+
+    try {
+      const ministryId = await resolveMinistryId();
+      if (!ministryId) {
+        setErrorMessage('Não foi possível identificar o ministério do usuário logado.');
+        setImporting(false);
+        return;
+      }
+
+      // 1. Carregar congregações existentes
+      const { data: congregacoes } = await supabase
+        .from('congregacoes')
+        .select('id, nome')
+        .eq('ministry_id', ministryId);
+      const congregacaoMap = new Map(
+        (congregacoes || []).map((c: any) => [c.nome.toUpperCase().trim(), c.id])
+      );
+
+      // 2. Carregar CPFs existentes
+      const { data: existingMembers } = await supabase
+        .from('members')
+        .select('cpf')
+        .eq('ministry_id', ministryId);
+      const existingCpfs = new Set(
+        (existingMembers || [])
+          .map((m: any) => (m.cpf || '').replace(/\D/g, ''))
+          .filter(Boolean)
+      );
+
+      // 3. Processar linhas válidas
+      let importedCount = 0;
+      let ignoredCount = 0;
+      let dbErrorCount = 0;
+      let duplicateDbCount = 0;
+
+      const validRows = rows.filter(r => r.isValid);
+      const insertPayloads = [];
+
+      for (const row of validRows) {
+        const cpfClean = (row.data['cpf'] || '').replace(/\D/g, '');
+
+        if (cpfClean && existingCpfs.has(cpfClean)) {
+          duplicateDbCount++;
+          continue;
+        }
+
+        const congNome = (row.metadata['CONGREGAÇÃO'] || row.data['congregacao_nome'] || '').toUpperCase().trim();
+        const congregacaoId = congregacaoMap.get(congNome) || null;
+
+        // Construir custom_fields
+        const importacaoCsv: Record<string, string> = {};
+        Object.entries(row.metadata).forEach(([k, v]) => {
+          if (v) {
+            importacaoCsv[k] = v;
+          }
+        });
+
+        // Adicionar campos extras (CAMPO e SUPERVISAO) que vão para custom_fields
+        if (row.data['campo']) importacaoCsv['CAMPO'] = row.data['campo'];
+        if (row.data['supervisao']) importacaoCsv['SUPERVISAO'] = row.data['supervisao'];
+
+        const customFields = {
+          importacao_csv: importacaoCsv,
+          foto_origem_bubble: row.foto_url_origem || '',
+        };
+
+        const formattedBirth = parseLegacyDate(row.data['data_nascimento']);
+        const formattedBirthConj = parseLegacyDate(row.data['data_nascimento_conjuge']);
+        const formattedBaptism = parseLegacyDate(row.data['data_batismo_aguas']);
+        const formattedBaptismEs = parseLegacyDate(row.data['data_batismo_espirito_santo']);
+        const formattedCons = parseLegacyDate(row.data['data_consagracao']);
+        const formattedEmissao = parseLegacyDate(row.data['data_emissao']);
+        const formattedValidade = parseLegacyDate(row.data['data_validade_credencial']);
+
+        let status = 'active';
+        const rawStatus = (row.data['status'] || '').toLowerCase();
+        if (rawStatus.includes('inativ')) status = 'inactive';
+        else if (rawStatus.includes('exclui')) status = 'inactive';
+
+        const matricula = row.data['matricula'] || String(Date.now() + Math.floor(Math.random() * 1000));
+        const uniqueId = row.data['unique_id'] || String(Date.now() + Math.floor(Math.random() * 1000));
+
+        insertPayloads.push({
+          ministry_id: ministryId,
+          name: row.data['name'],
+          cpf: cpfClean || null,
+          email: row.data['email'] || null,
+          phone: row.data['celular'] || row.data['whatsapp'] || null,
+          celular: row.data['celular'] || null,
+          whatsapp: row.data['whatsapp'] || null,
+          matricula,
+          unique_id: uniqueId,
+          tipo_cadastro: 'membro',
+          rg: row.data['rg'] || null,
+          orgao_emissor: row.data['orgao_emissor'] || null,
+          nacionalidade: row.data['nacionalidade'] || 'BRASILEIRA',
+          naturalidade: row.data['naturalidade'] || null,
+          uf_naturalidade: row.data['uf_naturalidade'] || null,
+          titulo_eleitoral: row.data['titulo_eleitoral'] || null,
+          zona_eleitoral: row.data['zona_eleitoral'] || null,
+          secao_eleitoral: row.data['secao_eleitoral'] || null,
+          profissao: row.data['profissao'] || null,
+          cep: row.data['cep'] || null,
+          logradouro: row.data['logradouro'] || null,
+          numero: row.data['numero'] || null,
+          bairro: row.data['bairro'] || null,
+          complemento: row.data['complemento'] || null,
+          cidade: row.data['cidade'] || null,
+          estado: row.data['estado'] || null,
+          curso_teologico: row.data['curso_teologico'] || null,
+          instituicao_teologica: row.data['instituicao_teologica'] || null,
+          procedencia: row.data['procedencia'] || null,
+          procedencia_local: row.data['procedencia_local'] || null,
+          cargo_ministerial: row.data['cargo_ministerial'] || null,
+          qual_funcao: row.data['qual_funcao'] || null,
+          setor_departamento: row.data['setor_departamento'] || null,
+          observacoes_ministeriais: row.data['observacoes_ministeriais'] || null,
+          observacoes: row.data['observacoes'] || null,
+          sexo: row.data['sexo'] || null,
+          tipo_sanguineo: row.data['tipo_sanguineo'] || null,
+          estado_civil: row.data['estado_civil'] || null,
+          nome_conjuge: row.data['nome_conjuge'] || null,
+          cpf_conjuge: row.data['cpf_conjuge'] || null,
+          nome_pai: row.data['nome_pai'] || null,
+          nome_mae: row.data['nome_mae'] || null,
+          pastor_auxiliar: ['sim', 's', '1', 'true'].includes((row.data['pastor_auxiliar'] || '').toLowerCase()),
+          tem_funcao_igreja: ['sim', 's', '1', 'true'].includes((row.data['tem_funcao_igreja'] || '').toLowerCase()),
+          is_dizimista: ['sim', 's', '1', 'true'].includes((row.data['is_dizimista'] || '').toLowerCase()),
+          data_nascimento: formattedBirth,
+          data_nascimento_conjuge: formattedBirthConj,
+          data_batismo_aguas: formattedBaptism,
+          data_batismo_espirito_santo: formattedBaptismEs,
+          data_consagracao: formattedCons,
+          data_emissao: formattedEmissao,
+          data_validade_credencial: formattedValidade,
+          status,
+          custom_fields: customFields,
+          foto_url: null, // NÃO importar fotos ainda nesta etapa
+          congregacao_id: congregacaoId,
+        });
+      }
+
+      // Inserir registros em batches de 50
+      const batchSize = 50;
+      for (let i = 0; i < insertPayloads.length; i += batchSize) {
+        const batch = insertPayloads.slice(i, i + batchSize);
+        const { error } = await supabase.from('members').insert(batch);
+        if (error) {
+          dbErrorCount += batch.length;
+        } else {
+          importedCount += batch.length;
+        }
+      }
+
+      setImportSummary({
+        imported: importedCount,
+        ignored: ignoredCount,
+        errors: dbErrorCount + rows.filter(r => !r.isValid).length,
+        duplicates: duplicateDbCount,
+      });
+
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Ocorreu um erro durante a importação.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <PageLayout
       title="Importador Planilha Legada — AD Rocha"
-      description="Tratamento e análise de foto Bubble.io e colunas para o ministério AD Rocha Eterna de Marituba."
+      description="Tratamento e importação de membros do arquivo CSV no padrão AD Rocha Eterna."
       headerExtra={
         <Link
           href="/secretaria/membros"
@@ -548,7 +764,7 @@ export default function ImportarMembrosPage() {
                 <span className="text-2xl font-extrabold text-red-600 block mt-1">{summary.errors}</span>
               </div>
               <div className="bg-white border border-amber-100 rounded-xl p-4 shadow-sm text-center">
-                <span className="text-xs font-bold text-amber-500 uppercase tracking-wider block">CPFs Duplicados</span>
+                <span className="text-xs font-bold text-amber-500 uppercase tracking-wider block">Planilha Duplicados</span>
                 <span className="text-2xl font-extrabold text-amber-600 block mt-1">{summary.duplicates}</span>
               </div>
             </div>
@@ -607,21 +823,59 @@ export default function ImportarMembrosPage() {
               </div>
             </div>
 
-            {/* Plano de Implementação Técnica (Próxima Etapa) */}
-            <div className="bg-[#123b63]/5 border border-[#123b63]/20 text-[#123b63] rounded-xl p-6 space-y-3">
-              <h3 className="font-bold text-sm flex items-center gap-2 text-[#123b63]">
-                📋 Plano Técnico — Importação de Fotos (AD ROCHA ETERNA DE MARITUBA)
-              </h3>
-              <p className="text-xs leading-relaxed text-[#123b63]/85">
-                Para as URLs da coluna <strong>FOTO 3X4</strong> (especialmente as hospedadas na Bubble.io detectadas no preview), o fluxo seguinte consistirá em:
-              </p>
-              <ul className="list-disc list-inside text-xs space-y-1.5 pl-2 text-[#123b63]/90">
-                <li><strong>Download Assíncrono:</strong> Baixar a imagem original via backend (tratando URLs relativas <code>//</code> como <code>https://</code>).</li>
-                <li><strong>Armazenamento no Supabase:</strong> Enviar o arquivo para o bucket de fotos do tenant atual, criando a estrutura <code>/membros/foto_[cpf].jpg</code>.</li>
-                <li><strong>Salvamento dos Registros:</strong> Inserir o membro com a URL final do Supabase Storage no campo <code>foto_url</code>.</li>
-                <li><strong>Histórico/Auditoria:</strong> Preservar a URL do Bubble.io original no campo <code>custom_fields.foto_origem_bubble</code> como rastreabilidade.</li>
-              </ul>
+            {/* Botão de Importar Real (Novidade) */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-gray-800">Gravar Registros no Banco de Dados</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Gravar apenas os registros de membros válidos da planilha. Evita duplicações de CPF no banco de dados. Fotos serão gravadas como referências nulas.
+                </p>
+              </div>
+              <button
+                onClick={handleImport}
+                disabled={importing || summary.valid === 0}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg text-sm transition shadow-md disabled:opacity-50 cursor-pointer"
+              >
+                {importing ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Importando...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4" />
+                    Iniciar Importação Real
+                  </>
+                )}
+              </button>
             </div>
+
+            {/* Resultado da Importação Real */}
+            {importSummary && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-green-900 space-y-3">
+                <h3 className="font-bold text-sm flex items-center gap-2 text-green-800">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" /> Importação Real Concluída com Sucesso!
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                  <div className="bg-white border border-green-100 rounded-lg p-3 text-center">
+                    <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider block">Importados</span>
+                    <span className="text-xl font-extrabold text-green-700 block mt-1">{importSummary.imported}</span>
+                  </div>
+                  <div className="bg-white border border-gray-100 rounded-lg p-3 text-center">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Ignorados / Já Existem</span>
+                    <span className="text-xl font-extrabold text-gray-700 block mt-1">{importSummary.duplicates}</span>
+                  </div>
+                  <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
+                    <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">Erros Planilha</span>
+                    <span className="text-xl font-extrabold text-red-600 block mt-1">{importSummary.errors}</span>
+                  </div>
+                  <div className="bg-white border border-amber-100 rounded-lg p-3 text-center">
+                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">Total Processado</span>
+                    <span className="text-xl font-extrabold text-amber-700 block mt-1">{importSummary.imported + importSummary.duplicates}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Detalhes dos erros */}
             {summary.errors > 0 && (
@@ -684,7 +938,7 @@ export default function ImportarMembrosPage() {
                             {row.data['cpf'] || <span className="text-red-500 italic font-normal">Ausente</span>}
                           </td>
                           <td className={`px-4 py-3 ${hasCongError ? 'bg-red-50 text-red-900 font-semibold' : 'text-gray-700'}`}>
-                            {row.data['congregacao'] || <span className="text-red-500 italic font-normal">Ausente</span>}
+                            {row.metadata['CONGREGAÇÃO'] || row.data['congregacao_nome'] || <span className="text-red-500 italic font-normal">Ausente</span>}
                           </td>
                           <td className="px-4 py-3 max-w-xs truncate text-gray-500 font-mono text-[10px]" title={row.foto_url_origem}>
                             {row.foto_url_origem || '-'}
