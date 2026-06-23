@@ -51,9 +51,11 @@ export default function ImportarMembrosPage() {
   const [importSummary, setImportSummary] = useState<{
     imported: number;
     ignored: number;
-    errors: number;
+    errorsPlanilha: number;
+    errorsBanco: number;
     duplicates: number;
   } | null>(null);
+  const [dbError, setDbError] = useState<{ message: string; code?: string; details?: string } | null>(null);
   const [missingRequired, setMissingRequired] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [migrating, setMigrating] = useState(false);
@@ -559,12 +561,12 @@ export default function ImportarMembrosPage() {
       let ignoredCount = 0;
       let dbErrorCount = 0;
       let duplicateDbCount = 0;
-
+      setDbError(null);
       const validRows = rows.filter(r => r.isValid);
       const insertPayloads = [];
 
       for (const row of validRows) {
-        const cpfClean = (row.data['cpf'] || '').replace(/\D/g, '');
+        const cpfClean = (row.data['cpf'] || '').replace(/\D/g, '') || null;
 
         if (cpfClean && existingCpfs.has(cpfClean)) {
           duplicateDbCount++;
@@ -604,52 +606,52 @@ export default function ImportarMembrosPage() {
         if (rawStatus.includes('inativ')) status = 'inactive';
         else if (rawStatus.includes('exclui')) status = 'inactive';
 
-        const matricula = row.data['matricula'] || String(Date.now() + Math.floor(Math.random() * 1000));
-        const uniqueId = row.data['unique_id'] || String(Date.now() + Math.floor(Math.random() * 1000));
+        const matricula = (row.data['matricula'] || '').trim() || null;
+        const uniqueId = (row.data['unique_id'] || '').trim() || null;
 
-        insertPayloads.push({
+        const payload: Record<string, any> = {
           ministry_id: ministryId,
-          name: row.data['nome'],
-          cpf: cpfClean || null,
-          email: row.data['email'] || null,
-          phone: row.data['celular'] || row.data['whatsapp'] || null,
-          celular: row.data['celular'] || null,
-          whatsapp: row.data['whatsapp'] || null,
+          name: (row.data['nome'] || '').trim() || null,
+          cpf: cpfClean,
+          email: (row.data['email'] || '').trim().toLowerCase() || null,
+          phone: (row.data['celular'] || row.data['whatsapp'] || '').trim() || null,
+          celular: (row.data['celular'] || '').trim() || null,
+          whatsapp: (row.data['whatsapp'] || '').trim() || null,
           matricula,
           unique_id: uniqueId,
           tipo_cadastro: 'membro',
-          rg: row.data['rg'] || null,
-          orgao_emissor: row.data['orgao_emissor'] || null,
-          nacionalidade: row.data['nacionalidade'] || 'BRASILEIRA',
-          naturalidade: row.data['naturalidade'] || null,
-          uf_naturalidade: row.data['uf_naturalidade'] || null,
-          titulo_eleitoral: row.data['titulo_eleitoral'] || null,
-          zona_eleitoral: row.data['zona_eleitoral'] || null,
-          secao_eleitoral: row.data['secao_eleitoral'] || null,
-          profissao: row.data['profissao'] || null,
-          cep: row.data['cep'] || null,
-          logradouro: row.data['logradouro'] || null,
-          numero: row.data['numero'] || null,
-          bairro: row.data['bairro'] || null,
-          complemento: row.data['complemento'] || null,
-          cidade: row.data['cidade'] || null,
-          estado: row.data['estado'] || null,
-          curso_teologico: row.data['curso_teologico'] || null,
-          instituicao_teologica: row.data['instituicao_teologica'] || null,
-          procedencia: row.data['procedencia'] || null,
-          procedencia_local: row.data['procedencia_local'] || null,
-          cargo_ministerial: row.data['cargo_ministerial'] || null,
-          qual_funcao: row.data['qual_funcao'] || null,
-          setor_departamento: row.data['setor_departamento'] || null,
-          observacoes_ministeriais: row.data['observacoes_ministeriais'] || null,
-          observacoes: row.data['observacoes'] || null,
-          sexo: row.data['sexo'] || null,
-          tipo_sanguineo: row.data['tipo_sanguineo'] || null,
-          estado_civil: row.data['estado_civil'] || null,
-          nome_conjuge: row.data['nome_conjuge'] || null,
-          cpf_conjuge: row.data['cpf_conjuge'] || null,
-          nome_pai: row.data['nome_pai'] || null,
-          nome_mae: row.data['nome_mae'] || null,
+          rg: (row.data['rg'] || '').trim() || null,
+          orgao_emissor: (row.data['orgao_emissor'] || '').trim() || null,
+          nacionalidade: (row.data['nacionalidade'] || '').trim() || 'BRASILEIRA',
+          naturalidade: (row.data['naturalidade'] || '').trim() || null,
+          uf_naturalidade: (row.data['uf_naturalidade'] || '').trim() || null,
+          titulo_eleitoral: (row.data['titulo_eleitoral'] || '').trim() || null,
+          zona_eleitoral: (row.data['zona_eleitoral'] || '').trim() || null,
+          secao_eleitoral: (row.data['secao_eleitoral'] || '').trim() || null,
+          profissao: (row.data['profissao'] || '').trim() || null,
+          cep: (row.data['cep'] || '').trim() || null,
+          logradouro: (row.data['logradouro'] || '').trim() || null,
+          numero: (row.data['numero'] || '').trim() || null,
+          bairro: (row.data['bairro'] || '').trim() || null,
+          complemento: (row.data['complemento'] || '').trim() || null,
+          cidade: (row.data['cidade'] || '').trim() || null,
+          estado: (row.data['estado'] || '').trim() || null,
+          curso_teologico: (row.data['curso_teologico'] || '').trim() || null,
+          instituicao_teologica: (row.data['instituicao_teologica'] || '').trim() || null,
+          procedencia: (row.data['procedencia'] || '').trim() || null,
+          procedencia_local: (row.data['procedencia_local'] || '').trim() || null,
+          cargo_ministerial: (row.data['cargo_ministerial'] || '').trim() || null,
+          qual_funcao: (row.data['qual_funcao'] || '').trim() || null,
+          setor_departamento: (row.data['setor_departamento'] || '').trim() || null,
+          observacoes_ministeriais: (row.data['observacoes_ministeriais'] || '').trim() || null,
+          observacoes: (row.data['observacoes'] || '').trim() || null,
+          sexo: (row.data['sexo'] || '').trim() || null,
+          tipo_sanguineo: (row.data['tipo_sanguineo'] || '').trim() || null,
+          estado_civil: (row.data['estado_civil'] || '').trim() || null,
+          nome_conjuge: (row.data['nome_conjuge'] || '').trim() || null,
+          cpf_conjuge: (row.data['cpf_conjuge'] || '').replace(/\D/g, '') || null,
+          nome_pai: (row.data['nome_pai'] || '').trim() || null,
+          nome_mae: (row.data['nome_mae'] || '').trim() || null,
           pastor_auxiliar: ['sim', 's', '1', 'true'].includes((row.data['pastor_auxiliar'] || '').toLowerCase()),
           tem_funcao_igreja: ['sim', 's', '1', 'true'].includes((row.data['tem_funcao_igreja'] || '').toLowerCase()),
           is_dizimista: ['sim', 's', '1', 'true'].includes((row.data['is_dizimista'] || '').toLowerCase()),
@@ -662,10 +664,23 @@ export default function ImportarMembrosPage() {
           data_validade_credencial: formattedValidade,
           status,
           custom_fields: customFields,
-          foto_url: null, // NÃO importar fotos ainda nesta etapa
+          foto_url: null,
           congregacao_id: congregacaoId,
-        });
+        };
+
+        // Remover propriedades undefined
+        const cleanPayload = Object.fromEntries(
+          Object.entries(payload).filter(([_, v]) => v !== undefined)
+        );
+
+        insertPayloads.push(cleanPayload);
       }
+
+      // Log temporário solicitado
+      console.log("[Audit Import] totalRows:", rows.length);
+      console.log("[Audit Import] validRows.length:", validRows.length);
+      console.log("[Audit Import] invalidRows.length:", rows.filter(r => !r.isValid).length);
+      console.log("[Audit Import] Registros enviados ao insert (payloads):", insertPayloads);
 
       // Inserir registros em batches de 50
       const batchSize = 50;
@@ -673,6 +688,12 @@ export default function ImportarMembrosPage() {
         const batch = insertPayloads.slice(i, i + batchSize);
         const { error } = await supabase.from('members').insert(batch);
         if (error) {
+          console.error("[Audit Import] Erro retornado pelo Supabase:", error);
+          setDbError({
+            message: error.message,
+            code: error.code,
+            details: error.details || '',
+          });
           dbErrorCount += batch.length;
         } else {
           importedCount += batch.length;
@@ -682,11 +703,13 @@ export default function ImportarMembrosPage() {
       setImportSummary({
         imported: importedCount,
         ignored: ignoredCount,
-        errors: dbErrorCount + rows.filter(r => !r.isValid).length,
+        errorsPlanilha: rows.filter(r => !r.isValid).length,
+        errorsBanco: dbErrorCount,
         duplicates: duplicateDbCount,
       });
 
     } catch (err: any) {
+      console.error("[Audit Import] Erro capturado no catch:", err);
       setErrorMessage(err.message || 'Ocorreu um erro durante a importação.');
     } finally {
       setImporting(false);
@@ -953,6 +976,10 @@ export default function ImportarMembrosPage() {
                 <p className="text-xs text-gray-500 mt-1">
                   Gravar apenas os registros de membros válidos da planilha. Evita duplicações de CPF no banco de dados. Fotos serão gravadas como referências nulas.
                 </p>
+                <div className="flex gap-4 mt-2 text-xs font-semibold">
+                  <span className="text-green-600">✓ Linhas válidas para importação: {summary.valid}</span>
+                  <span className="text-red-500">✗ Linhas inválidas: {summary.errors}</span>
+                </div>
               </div>
               <button
                 onClick={handleImport}
@@ -981,7 +1008,7 @@ export default function ImportarMembrosPage() {
                     <h3 className="font-bold text-sm flex items-center gap-2 text-green-800">
                       <CheckCircle2 className="h-5 w-5 text-green-600" /> Importação Real Concluída com Sucesso!
                     </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-2">
                       <div className="bg-white border border-green-100 rounded-lg p-3 text-center">
                         <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider block">Importados</span>
                         <span className="text-xl font-extrabold text-green-700 block mt-1">{importSummary.imported}</span>
@@ -992,7 +1019,11 @@ export default function ImportarMembrosPage() {
                       </div>
                       <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
                         <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">Erros Planilha</span>
-                        <span className="text-xl font-extrabold text-red-600 block mt-1">{importSummary.errors}</span>
+                        <span className="text-xl font-extrabold text-red-600 block mt-1">{importSummary.errorsPlanilha}</span>
+                      </div>
+                      <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">Erros Banco</span>
+                        <span className="text-xl font-extrabold text-red-600 block mt-1">{importSummary.errorsBanco}</span>
                       </div>
                       <div className="bg-white border border-amber-100 rounded-lg p-3 text-center">
                         <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">Total Processado</span>
@@ -1005,7 +1036,7 @@ export default function ImportarMembrosPage() {
                     <h3 className="font-bold text-sm flex items-center gap-2 text-red-800">
                       <AlertCircle className="h-5 w-5 text-red-600" /> Nenhum membro foi importado. Corrija os erros da planilha.
                     </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-2">
                       <div className="bg-white border border-green-100 rounded-lg p-3 text-center">
                         <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider block">Importados</span>
                         <span className="text-xl font-extrabold text-green-700 block mt-1">{importSummary.imported}</span>
@@ -1016,12 +1047,29 @@ export default function ImportarMembrosPage() {
                       </div>
                       <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
                         <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">Erros Planilha</span>
-                        <span className="text-xl font-extrabold text-red-600 block mt-1">{importSummary.errors}</span>
+                        <span className="text-xl font-extrabold text-red-600 block mt-1">{importSummary.errorsPlanilha}</span>
+                      </div>
+                      <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">Erros Banco</span>
+                        <span className="text-xl font-extrabold text-red-600 block mt-1">{importSummary.errorsBanco}</span>
                       </div>
                       <div className="bg-white border border-amber-100 rounded-lg p-3 text-center">
                         <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">Total Processado</span>
                         <span className="text-xl font-extrabold text-amber-700 block mt-1">{importSummary.imported + importSummary.duplicates}</span>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {dbError && (
+                  <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-6 space-y-3 shadow-md">
+                    <h3 className="font-bold text-sm flex items-center gap-2 text-red-800">
+                      <AlertCircle className="h-5 w-5 text-red-600" /> Existem {summary.valid} linhas válidas, mas o banco recusou a gravação.
+                    </h3>
+                    <div className="bg-white border border-red-100 rounded-lg p-4 font-mono text-xs text-red-700 space-y-1">
+                      <p><strong>Erro:</strong> {dbError.message}</p>
+                      {dbError.code && <p><strong>Código de Erro Supabase:</strong> {dbError.code}</p>}
+                      {dbError.details && <p><strong>Detalhes:</strong> {dbError.details}</p>}
                     </div>
                   </div>
                 )}
