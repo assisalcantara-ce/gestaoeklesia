@@ -56,13 +56,13 @@ export default function ImportarMembrosPage() {
   } | null>(null);
 
   // 5 colunas obrigatórias conforme especificação
-  const requiredFields = ['NOME', 'CPF', 'CONGREGAÇÃO', 'CAMPO', 'SUPERVISAO'];
+  const requiredFields = ['NOME', 'CPF', 'CONGREGACAO', 'CAMPO', 'SUPERVISAO'];
 
   // Mapeamento das 59 colunas para campos internos em formato snake_case
   const columnMappings: Record<string, string> = {
     'NOME': 'name',
     'CPF': 'cpf',
-    'CONGREGAÇÃO': 'congregacao_nome',
+    'CONGREGACAO': 'congregacao_nome',
     'CAMPO': 'campo',
     'SUPERVISAO': 'supervisao',
     'BAIRRO': 'bairro',
@@ -80,11 +80,11 @@ export default function ImportarMembrosPage() {
     'DIZIMISTA?': 'is_dizimista',
     'DNASCIMENTO': 'data_nascimento',
     'EMAIL01': 'email',
-    'ENDEREÇO': 'logradouro',
+    'ENDERECO': 'logradouro',
     'ESCOLARIDADE': 'escolaridade',
     'ESTADO CIVIL': 'estado_civil',
     'FOTO 3X4': 'fotoUrl',
-    'FUNÇÃO IGREJA': 'qual_funcao',
+    'FUNCAO IGREJA': 'qual_funcao',
     'MAE': 'nome_mae',
     'MATRICULA': 'matricula',
     'MUNICIPIO': 'cidade',
@@ -96,17 +96,17 @@ export default function ImportarMembrosPage() {
     'PAI': 'nome_pai',
     'PROCEDENCIA': 'procedencia',
     'PROCEDENCIA LOCAL': 'procedencia_local',
-    'PROFISSÃO': 'profissao',
+    'PROFISSAO': 'profissao',
     'RG': 'rg',
     'SEXO': 'sexo',
     'STATUS': 'status',
     'TITULO ELEITOR': 'titulo_eleitoral',
     'TSANGUE': 'tipo_sanguineo',
-    'UF ENDEREÇO': 'estado',
+    'UF ENDERECO': 'estado',
     'WHATSAPP': 'whatsapp',
     'ZONA': 'zona_eleitoral',
-    'SEÇÃO': 'secao_eleitoral',
-    'CONVERSÃO': 'data_conversao',
+    'SECAO': 'secao_eleitoral',
+    'CONVERSAO': 'data_conversao',
   };
 
   const resolveMinistryId = async (): Promise<string | null> => {
@@ -134,11 +134,13 @@ export default function ImportarMembrosPage() {
   };
 
   const normalizeHeaderName = (h: string): string => {
-    return h
-      .toUpperCase()
+    return (h || '')
+      .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
-      .trim();
+      .toUpperCase()
+      .trim()
+      .replace(/\s+/g, ' ');
   };
 
   const getFotoStatus = (url: string): 'sem_foto' | 'bubble_url_detectada' | 'url_valida' | 'url_invalida' => {
@@ -322,6 +324,7 @@ export default function ImportarMembrosPage() {
 
         const rawHeaders = rawLines[0];
         const normalizedHeaders = rawHeaders.map(h => normalizeHeaderName(h));
+        console.log("Cabeçalhos encontrados:", normalizedHeaders);
 
         const mapped: string[] = [];
         const unmapped: string[] = [];
