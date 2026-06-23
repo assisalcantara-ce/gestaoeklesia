@@ -5,20 +5,7 @@ export const dynamic = 'force-dynamic';
 
 const BUCKET = 'member-photos';
 
-async function ensureBucket(supabaseAdmin: any) {
-  try {
-    const { data, error } = await supabaseAdmin.storage.listBuckets();
-    if (error) return;
-    const exists = Array.isArray(data) && data.some((bucket: any) => bucket?.name === BUCKET);
-    if (exists) return;
-    await supabaseAdmin.storage.createBucket(BUCKET, {
-      public: true,
-      allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
-    });
-  } catch {
-    // best-effort
-  }
-}
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,16 +13,24 @@ export async function POST(request: NextRequest) {
     const { admin, ministryId } = auth;
 
     // 1. Garantir que o bucket existe
-    await ensureBucket(admin);
+    const { data: buckets, error: bucketError } = await admin.storage.listBuckets();
+    if (bucketError) {
+      return NextResponse.json({ error: `Erro ao verificar buckets: ${bucketError.message}` }, { status: 500 });
+    }
+    const bucketExists = Array.isArray(buckets) && buckets.some((b: any) => b?.name === BUCKET);
+    if (!bucketExists) {
+      return NextResponse.json({ error: "Bucket member-photos não encontrado." }, { status: 400 });
+    }
 
     // 2. Buscar membros pendentes de migração de foto
-    // Filtro: custom_fields -> 'foto_origem_bubble' não nulo nem vazio, e foto_url nula
+    // Filtro: custom_fields->>'foto_origem_bubble' preenchido, e foto_url nula
     const { data: pendingMembers, error: fetchError } = await admin
       .from('members')
       .select('id, custom_fields, foto_url')
       .eq('ministry_id', ministryId)
       .is('foto_url', null)
-      .not('custom_fields', 'eq', '{}')
+      .not('custom_fields->>foto_origem_bubble', 'is', null)
+      .neq('custom_fields->>foto_origem_bubble', '')
       .limit(10); // Processar em lotes pequenos de 10 por vez
 
     if (fetchError) {
@@ -122,7 +117,8 @@ export async function POST(request: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .eq('ministry_id', ministryId)
       .is('foto_url', null)
-      .not('custom_fields', 'eq', '{}');
+      .not('custom_fields->>foto_origem_bubble', 'is', null)
+      .neq('custom_fields->>foto_origem_bubble', '');
 
     return NextResponse.json({
       migradas,

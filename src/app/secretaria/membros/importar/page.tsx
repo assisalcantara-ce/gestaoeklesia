@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import PageLayout from '@/components/PageLayout';
 import { createClient } from '@/lib/supabase-client';
@@ -59,11 +59,34 @@ export default function ImportarMembrosPage() {
   const [missingRequired, setMissingRequired] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [migrating, setMigrating] = useState(false);
+  const [pendingPhotosCount, setPendingPhotosCount] = useState<number | null>(null);
   const [migrationSummary, setMigrationSummary] = useState<{
     migradas: number;
     ignoradas: number;
     erro: number;
+    restantes: number;
   } | null>(null);
+
+  const fetchPendingPhotosCount = async () => {
+    try {
+      const ministryId = await resolveMinistryId();
+      if (!ministryId) return;
+      const { count } = await supabase
+        .from('members')
+        .select('*', { count: 'exact', head: true })
+        .eq('ministry_id', ministryId)
+        .is('foto_url', null)
+        .not('custom_fields->>foto_origem_bubble', 'is', null)
+        .neq('custom_fields->>foto_origem_bubble', '');
+      setPendingPhotosCount(count || 0);
+    } catch (err) {
+      console.error('Error fetching pending photos count:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPendingPhotosCount();
+  }, []);
 
   // 5 colunas obrigatórias conforme especificação
   const requiredFields = ['NOME', 'CPF', 'CONGREGACAO', 'CAMPO', 'SUPERVISAO'];
@@ -708,6 +731,8 @@ export default function ImportarMembrosPage() {
         duplicates: duplicateDbCount,
       });
 
+      await fetchPendingPhotosCount();
+
     } catch (err: any) {
       console.error("[Audit Import] Erro capturado no catch:", err);
       setErrorMessage(err.message || 'Ocorreu um erro durante a importação.');
@@ -723,6 +748,7 @@ export default function ImportarMembrosPage() {
     let totalMigradas = 0;
     let totalIgnoradas = 0;
     let totalErro = 0;
+    let finalRemaining = 0;
 
     try {
       let hasMore = true;
@@ -738,6 +764,7 @@ export default function ImportarMembrosPage() {
         totalMigradas += data.migradas || 0;
         totalIgnoradas += data.ignoradas || 0;
         totalErro += data.erro || 0;
+        finalRemaining = data.remaining || 0;
 
         if ((data.migradas || 0) === 0 && (data.erro || 0) === 0) {
           hasMore = false;
@@ -750,7 +777,9 @@ export default function ImportarMembrosPage() {
         migradas: totalMigradas,
         ignoradas: totalIgnoradas,
         erro: totalErro,
+        restantes: finalRemaining,
       });
+      await fetchPendingPhotosCount();
     } catch (err: any) {
       setErrorMessage(err.message || 'Erro ao migrar fotos.');
     } finally {
@@ -1079,11 +1108,16 @@ export default function ImportarMembrosPage() {
                     <h3 className="text-sm font-bold text-gray-800">Migrar Fotos das URLs Bubble.io</h3>
                     <p className="text-xs text-gray-500 mt-1">
                       Baixa as fotos de membros que vieram do Bubble e armazena de forma segura no Supabase Storage.
+                      {pendingPhotosCount !== null && (
+                        <span className="block font-semibold text-purple-700 mt-1">
+                          Fotos pendentes no banco de dados: {pendingPhotosCount}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <button
                     onClick={handleMigratePhotos}
-                    disabled={migrating}
+                    disabled={migrating || pendingPhotosCount === null || pendingPhotosCount === 0}
                     className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-sm transition shadow-md disabled:opacity-50 cursor-pointer"
                   >
                     {migrating ? (
@@ -1105,7 +1139,7 @@ export default function ImportarMembrosPage() {
                     <h3 className="font-bold text-sm flex items-center gap-2 text-purple-800">
                       <CheckCircle2 className="h-5 w-5 text-purple-600" /> Migração de Fotos Concluída!
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
                       <div className="bg-white border border-purple-100 rounded-lg p-3 text-center">
                         <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider block">Migradas</span>
                         <span className="text-xl font-extrabold text-purple-700 block mt-1">{migrationSummary.migradas}</span>
@@ -1117,6 +1151,10 @@ export default function ImportarMembrosPage() {
                       <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
                         <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">Erro</span>
                         <span className="text-xl font-extrabold text-red-600 block mt-1">{migrationSummary.erro}</span>
+                      </div>
+                      <div className="bg-white border border-blue-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">Restantes</span>
+                        <span className="text-xl font-extrabold text-blue-700 block mt-1">{migrationSummary.restantes}</span>
                       </div>
                     </div>
                   </div>
