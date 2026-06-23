@@ -11,7 +11,7 @@ import AdminSidebar from '@/components/AdminSidebar'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 import type { SubscriptionPlan } from '@/types/admin'
 import { onlyDigits, formatCnpj, formatPhone, validarCnpj } from '@/lib/mascaras'
-import { CheckCircle2, ExternalLink, Copy } from 'lucide-react'
+import { CheckCircle2, ExternalLink, Copy, Pencil, Trash2, Play, Tag } from 'lucide-react'
 
 export default function MinisteriosPage() {
   const { isLoading, isAuthenticated } = useAdminAuth()
@@ -683,6 +683,75 @@ export default function MinisteriosPage() {
       setImportLoading(false)
     }
   }
+  const handlePrintLabel = (m: SupabaseMinistry) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Etiqueta de Acesso - ${m.name}</title>
+          <style>
+            @page {
+              size: 85mm 30mm;
+              margin: 0;
+            }
+            body {
+              width: 85mm;
+              height: 30mm;
+              margin: 0;
+              padding: 2mm 3mm;
+              box-sizing: border-box;
+              font-family: Arial, sans-serif;
+              font-size: 8px;
+              line-height: 1.2;
+              color: #000;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+            }
+            .title {
+              font-size: 10px;
+              font-weight: bold;
+              border-bottom: 0.5px solid #000;
+              padding-bottom: 1px;
+              margin-bottom: 2px;
+              text-transform: uppercase;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .info {
+              margin-bottom: 1px;
+            }
+            .bold {
+              font-weight: bold;
+            }
+            .footer {
+              margin-top: auto;
+              font-size: 7px;
+              color: #555;
+              text-align: right;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="title">${m.name}</div>
+          <div class="info"><span class="bold">Link de Acesso:</span> app.gestaoeklesia.com.br/login</div>
+          <div class="info"><span class="bold">E-mail:</span> ${m.email_admin || '-'}</div>
+          <div class="info"><span class="bold">Telefone:</span> ${m.phone ? formatPhone(m.phone) : '-'}</div>
+          <div class="footer">Gestão Eklésia</div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
   return (
     <div className="flex h-screen bg-gray-900">
@@ -1243,26 +1312,36 @@ export default function MinisteriosPage() {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-sm">
+                          <td className="px-6 py-4 text-sm flex items-center gap-2">
                             <button
                               onClick={() => handleEdit(ministerio)}
-                              className="text-blue-400 hover:text-blue-300 mr-2 font-medium"
+                              className="p-1.5 bg-blue-900/40 text-blue-400 hover:text-blue-300 hover:bg-blue-900/60 rounded transition flex items-center justify-center"
+                              title="Editar"
                             >
-                              Editar
+                              <Pencil className="h-4 w-4" />
                             </button>
                             {(statusDetail.type === 'TRIAL_ATIVO' || statusDetail.type === 'TRIAL_EXPIRADO' || statusDetail.type === 'SUSPENSO') && (
                               <button
                                 onClick={() => handleOpenActivate(ministerio)}
-                                className="text-yellow-400 hover:text-yellow-300 mr-2 font-semibold"
+                                className="p-1.5 bg-yellow-900/40 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/60 rounded transition flex items-center justify-center"
+                                title="Ativar"
                               >
-                                Ativar
+                                <Play className="h-4 w-4" />
                               </button>
                             )}
                             <button
-                              onClick={() => handleDelete(ministerio)}
-                              className="text-red-400 hover:text-red-300 font-medium"
+                              onClick={() => handlePrintLabel(ministerio)}
+                              className="p-1.5 bg-purple-900/40 text-purple-400 hover:text-purple-300 hover:bg-purple-900/60 rounded transition flex items-center justify-center"
+                              title="Imprimir Etiqueta"
                             >
-                              Remover
+                              <Tag className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(ministerio)}
+                              className="p-1.5 bg-red-900/40 text-red-400 hover:text-red-300 hover:bg-red-900/60 rounded transition flex items-center justify-center"
+                              title="Remover"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </td>
                         </tr>
