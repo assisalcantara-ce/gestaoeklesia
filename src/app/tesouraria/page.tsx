@@ -724,7 +724,7 @@ export default function TesourariaPage() {
       .eq('ministry_id', ministryId)
       .eq('is_dizimista', true)
       .eq('status', 'active')
-      .ilike('name', `${q.trim()}%`)
+      .ilike('name', `%${q.trim()}%`)
       .limit(8);
     const results = (data || []).map((m: any) => ({ id: m.id, nome: m.name }));
     setDizBuscaRes(results);

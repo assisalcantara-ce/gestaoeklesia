@@ -178,6 +178,7 @@ export async function POST(request: NextRequest) {
         'role',
         'status',
         'email',
+        'is_dizimista',
       ],
     })
 
@@ -289,7 +290,8 @@ export async function POST(request: NextRequest) {
           observacoes_ministeriais: normalizedBody.observacoes_ministeriais || null,
           // Aba Foto
           foto_url: normalizedBody.foto_url || null,
-          // Sistema
+           // Sistema
+          is_dizimista: normalizedBody.is_dizimista ?? false,
           member_since: normalizedBody.member_since || new Date(),
           role: normalizedBody.role || null,
           status: normalizedBody.status || 'active',

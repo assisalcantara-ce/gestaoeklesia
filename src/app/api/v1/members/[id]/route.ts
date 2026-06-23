@@ -65,6 +65,7 @@ function buildMemberPayload(normalizedBody: Record<string, any>) {
     status: normalizedBody.status ?? undefined,
     custom_fields: normalizedBody.custom_fields ?? {},
     observacoes: normalizedBody.observacoes ?? null,
+    is_dizimista: normalizedBody.is_dizimista ?? undefined,
     updated_at: new Date().toISOString(),
   }
 }
@@ -89,6 +90,7 @@ function normalizeMemberBody(body: unknown) {
       'role',
       'status',
       'email',
+      'is_dizimista',
     ],
   }) as Record<string, any>
 }
