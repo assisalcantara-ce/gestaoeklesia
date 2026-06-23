@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import PageLayout from '@/components/PageLayout';
-import { ArrowLeft, Download, UploadCloud, AlertTriangle, CheckCircle2, FileText, AlertCircle, Info } from 'lucide-react';
+import { ArrowLeft, Download, UploadCloud, AlertTriangle, CheckCircle2, FileText, AlertCircle, Info, Settings } from 'lucide-react';
 
 interface RowError {
   line: number;
@@ -14,6 +14,7 @@ interface RowError {
 interface ParsedRow {
   line: number;
   data: Record<string, string>;
+  metadata: Record<string, string>;
   errors: RowError[];
   isValid: boolean;
 }
@@ -21,6 +22,8 @@ interface ParsedRow {
 export default function ImportarMembrosPage() {
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
+  const [mappedColumns, setMappedColumns] = useState<string[]>([]);
+  const [unmappedColumns, setUnmappedColumns] = useState<string[]>([]);
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [summary, setSummary] = useState({
     total: 0,
@@ -31,24 +34,70 @@ export default function ImportarMembrosPage() {
   const [missingRequired, setMissingRequired] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const requiredFields = ['nome', 'cpf', 'telefone', 'congregacao'];
-  const optionalFields = [
-    'email', 'data_nascimento', 'sexo', 'estado_civil', 'cargo_ministerial',
-    'endereco', 'bairro', 'cidade', 'estado', 'cep', 'status'
-  ];
+  // 5 colunas obrigatórias conforme especificação
+  const requiredFields = ['NOME', 'CPF', 'CONGREGAÇÃO', 'CAMPO', 'SUPERVISAO'];
 
-  // Helper de normalização de header
-  const normalizeHeader = (h: string): string => {
+  // Mapeamento das 59 colunas para campos internos
+  const columnMappings: Record<string, string> = {
+    'NOME': 'nome',
+    'CPF': 'cpf',
+    'CONGREGAÇÃO': 'congregacao',
+    'CAMPO': 'campo',
+    'SUPERVISAO': 'supervisao',
+    'BAIRRO': 'bairro',
+    'CARGO': 'cargoMinisterial',
+    'CELULAR': 'celular',
+    'CEP': 'cep',
+    'CIDADE': 'cidade',
+    'COMPLEMENTO': 'complemento',
+    'CONJUJE CPF': 'cpfConjuge',
+    'CONJUJE DNASCIMENTO': 'dataNascimentoConjuge',
+    'CURSO TEOLOGICO': 'cursoTeologico',
+    'DBATISMO AGUAS': 'dataBatismoAguas',
+    'DBATISMO ES': 'dataBatismoEspiritoSanto',
+    'DEPARTAMENTO': 'setorDepartamento',
+    'DIZIMISTA?': 'isDizimista',
+    'DNASCIMENTO': 'dataNascimento',
+    'EMAIL01': 'email',
+    'ENDEREÇO': 'endereco',
+    'ESCOLARIDADE': 'escolaridade',
+    'ESTADO CIVIL': 'estadoCivil',
+    'FOTO 3X4': 'fotoUrl',
+    'FUNÇÃO IGREJA': 'qualFuncao',
+    'MAE': 'nomeMae',
+    'MATRICULA': 'matricula',
+    'MUNICIPIO': 'cidade',
+    'NACIONALIDADE': 'nacionalidade',
+    'NATURALIDADE': 'naturalidade',
+    'NOME CONJUGE': 'nomeConjuge',
+    'NUMERO': 'numero',
+    'OBS MEMBRO': 'observacoes',
+    'PAI': 'nomePai',
+    'PROCEDENCIA': 'procedencia',
+    'PROCEDENCIA LOCAL': 'procedenciaLocal',
+    'PROFISSÃO': 'profissao',
+    'RG': 'rg',
+    'SEXO': 'sexo',
+    'STATUS': 'status',
+    'TITULO ELEITOR': 'tituloEleitoral',
+    'TSANGUE': 'tipoSanguineo',
+    'UF ENDEREÇO': 'uf',
+    'WHATSAPP': 'whatsapp',
+    'ZONA': 'zonaEleitoral',
+    'SEÇÃO': 'secaoEleitoral',
+    'CONVERSÃO': 'dataConversao',
+  };
+
+  // Normalização de cabeçalho mantendo maiúsculas para correspondência exata das especificadas
+  const normalizeHeaderName = (h: string): string => {
     return h
-      .toLowerCase()
+      .toUpperCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9_]/g, '_')
-      .replace(/_+/g, '_')
+      .replace(/[\u0300-\u036f]/g, '') // remove acentos
       .trim();
   };
 
-  // Validador oficial de CPF
+  // Validador de CPF
   const isValidCPF = (cpfStr: string): boolean => {
     const cpf = cpfStr.replace(/\D/g, '');
     if (cpf.length !== 11) return false;
@@ -75,13 +124,12 @@ export default function ImportarMembrosPage() {
     return true;
   };
 
-  // Parser robusto de CSV
+  // Parser robusto de CSV para delimitador ";"
   const parseCSV = (text: string): string[][] => {
     const lines: string[][] = [];
     let row: string[] = [];
     let inQuotes = false;
     let entry = '';
-    const delimiter = text.split('\n')[0].includes(';') ? ';' : ',';
 
     for (let i = 0; i < text.length; i++) {
       const c = text[i];
@@ -94,7 +142,7 @@ export default function ImportarMembrosPage() {
         } else {
           inQuotes = !inQuotes;
         }
-      } else if (c === delimiter && !inQuotes) {
+      } else if (c === ';' && !inQuotes) {
         row.push(entry.trim());
         entry = '';
       } else if ((c === '\r' || c === '\n') && !inQuotes) {
@@ -117,18 +165,33 @@ export default function ImportarMembrosPage() {
   };
 
   const handleDownloadTemplate = () => {
-    const headersLine = [...requiredFields, ...optionalFields].join(';');
-    const sampleRow = [
-      'José da Silva', '45829671040', '(11) 98765-4321', 'Sede',
-      'jose@email.com', '1990-05-15', 'Masculino', 'Casado', 'Membro',
-      'Rua Principal, 123', 'Centro', 'São Paulo', 'SP', '01001-000', 'Ativo'
-    ].join(';');
-    const csvContent = '\uFEFF' + [headersLine, sampleRow].join('\n');
+    // Cabeçalhos de 59 colunas simulados
+    const headersList = [
+      'BAIRRO', 'CAMPO', 'CARGO', 'CELULAR', 'CEP', 'CIDADE', 'COMIEADEPA REG', 'COMPLEMENTO',
+      'CONGREGAÇÃO', 'CONJUJE CPF', 'CONJUJE DNASCIMENTO', 'CONVERSÃO', 'CPF', 'CURSO TEOLOGICO',
+      'DBATISMO AGUAS', 'DBATISMO ES', 'DEPARTAMENTO', 'DIRETORIA?', 'DIRIGENTE?', 'DIZIMISTA?',
+      'DNASCIMENTO', 'EMAIL01', 'ENDEREÇO', 'ESCOLARIDADE', 'ESTADO CIVIL', 'FOTO 3X4',
+      'FUNÇÃO IGREJA', 'GRUPO', 'INSTITUIÇÃO', 'LOCAL BATISMO', 'MAE', 'MATRICULA', 'MINISTERIAL?',
+      'MUNICIOPIO ELEITOR', 'MUNICIPIO', 'NACIONALIDADE', 'NATURALIDADE', 'NOME', 'NOME CONJUGE',
+      'NUMERO', 'OBS MEMBRO', 'PAI', 'PROCEDENCIA', 'PROCEDENCIA LOCAL', 'PROFISSÃO', 'QTD FILHOS',
+      'REG NASCIMENTO', 'RG', 'SEXO', 'SEÇÃO', 'STATUS', 'SUPERVISAO', 'TIPO MEMBRO', 'TITULO ELEITOR',
+      'TSANGUE', 'UF ENDEREÇO', 'UF RG', 'WHATSAPP', 'ZONA'
+    ];
+    const sampleRow = Array(59).fill('');
+    sampleRow[headersList.indexOf('NOME')] = 'José da Rocha';
+    sampleRow[headersList.indexOf('CPF')] = '01037113250';
+    sampleRow[headersList.indexOf('CONGREGAÇÃO')] = 'Templo Central';
+    sampleRow[headersList.indexOf('CAMPO')] = 'ROCHA ETERNA DE MARITUBA';
+    sampleRow[headersList.indexOf('SUPERVISAO')] = 'COMIEADEPA';
+    sampleRow[headersList.indexOf('SEXO')] = 'MASCULINO';
+    sampleRow[headersList.indexOf('STATUS')] = 'ATIVO';
+
+    const csvContent = '\uFEFF' + [headersList.join(';'), sampleRow.join(';')].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'modelo_importacao_membros.csv');
+    link.setAttribute('download', 'membros_adrocha_modelo.csv');
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -140,13 +203,11 @@ export default function ImportarMembrosPage() {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    // Apenas .csv
     if (!selectedFile.name.endsWith('.csv') && selectedFile.type !== 'text/csv') {
       setErrorMessage('Formato inválido. Por favor, envie apenas arquivos com extensão .csv.');
       return;
     }
 
-    // Limite de 5MB
     if (selectedFile.size > 5 * 1024 * 1024) {
       setErrorMessage('O tamanho do arquivo excede o limite de 5MB.');
       return;
@@ -161,9 +222,14 @@ export default function ImportarMembrosPage() {
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const text = event.target?.result as string;
-        const rawLines = parseCSV(text);
+        let text = event.target?.result as string;
 
+        // Tratar UTF-8-SIG (remover BOM)
+        if (text.startsWith('\uFEFF')) {
+          text = text.slice(1);
+        }
+
+        const rawLines = parseCSV(text);
         if (rawLines.length < 2) {
           setErrorMessage('O arquivo CSV deve conter no mínimo o cabeçalho e uma linha de dados.');
           setParsing(false);
@@ -172,10 +238,27 @@ export default function ImportarMembrosPage() {
 
         // 1. Extrair e normalizar headers
         const rawHeaders = rawLines[0];
-        const normalizedHeaders = rawHeaders.map(h => normalizeHeader(h));
+        const normalizedHeaders = rawHeaders.map(h => normalizeHeaderName(h));
 
-        // Validar colunas ausentes
-        const missing = requiredFields.filter(field => !normalizedHeaders.includes(field));
+        // Identificar colunas mapeadas e não mapeadas
+        const mapped: string[] = [];
+        const unmapped: string[] = [];
+
+        rawHeaders.forEach(h => {
+          const norm = normalizeHeaderName(h);
+          if (columnMappings[norm]) {
+            mapped.push(h);
+          } else {
+            unmapped.push(h);
+          }
+        });
+        setMappedColumns(mapped);
+        setUnmappedColumns(unmapped);
+
+        // Validar colunas obrigatórias ausentes
+        const missing = requiredFields.filter(req => {
+          return !normalizedHeaders.some(h => h === req);
+        });
         setMissingRequired(missing);
 
         if (missing.length > 0) {
@@ -189,16 +272,23 @@ export default function ImportarMembrosPage() {
         const cpfCounts: Record<string, number[]> = {};
 
         dataRows.forEach((rawRow, idx) => {
-          const lineNum = idx + 2; // Linha 1 é o header, 1-based index
+          const lineNum = idx + 2;
           const data: Record<string, string> = {};
+          const metadata: Record<string, string> = {};
 
-          normalizedHeaders.forEach((h, hIdx) => {
-            if (h) {
-              data[h] = rawRow[hIdx] || '';
+          rawHeaders.forEach((h, hIdx) => {
+            const norm = normalizeHeaderName(h);
+            const val = rawRow[hIdx] || '';
+            const mappedField = columnMappings[norm];
+
+            if (mappedField) {
+              data[mappedField] = val;
+            } else {
+              metadata[h] = val;
             }
           });
 
-          // Rastrear CPFs para validação de duplicidade
+          // Rastrear CPFs
           const cpfRaw = (data['cpf'] || '').replace(/\D/g, '');
           if (cpfRaw) {
             if (!cpfCounts[cpfRaw]) {
@@ -210,6 +300,7 @@ export default function ImportarMembrosPage() {
           parsed.push({
             line: lineNum,
             data,
+            metadata,
             errors: [],
             isValid: true,
           });
@@ -223,32 +314,37 @@ export default function ImportarMembrosPage() {
         parsed.forEach(row => {
           const errors: RowError[] = [];
 
-          // Validação: Nome ausente
+          // NOME vazio
           const nomeVal = (row.data['nome'] || '').trim();
           if (!nomeVal) {
-            errors.push({
-              line: row.line,
-              field: 'nome',
-              message: 'O nome é obrigatório.',
-            });
+            errors.push({ line: row.line, field: 'nome', message: 'O NOME é obrigatório e está vazio.' });
           }
 
-          // Validação: CPF
+          // CONGREGAÇÃO vazia
+          const congVal = (row.data['congregacao'] || '').trim();
+          if (!congVal) {
+            errors.push({ line: row.line, field: 'congregacao', message: 'A CONGREGAÇÃO é obrigatória e está vazia.' });
+          }
+
+          // CAMPO vazio
+          const campoVal = (row.data['campo'] || '').trim();
+          if (!campoVal) {
+            errors.push({ line: row.line, field: 'campo', message: 'O CAMPO é obrigatório e está vazio.' });
+          }
+
+          // SUPERVISAO vazia
+          const supVal = (row.data['supervisao'] || '').trim();
+          if (!supVal) {
+            errors.push({ line: row.line, field: 'supervisao', message: 'A SUPERVISAO é obrigatória e está vazia.' });
+          }
+
+          // CPF vazio, inválido ou duplicado
           const cpfRaw = (row.data['cpf'] || '').replace(/\D/g, '');
           if (!cpfRaw) {
-            errors.push({
-              line: row.line,
-              field: 'cpf',
-              message: 'O CPF é obrigatório.',
-            });
+            errors.push({ line: row.line, field: 'cpf', message: 'O CPF é obrigatório e está vazio.' });
           } else if (!isValidCPF(cpfRaw)) {
-            errors.push({
-              line: row.line,
-              field: 'cpf',
-              message: `CPF inválido: ${row.data['cpf']}`,
-            });
+            errors.push({ line: row.line, field: 'cpf', message: `CPF inválido: ${row.data['cpf']}` });
           } else {
-            // Se o CPF for estruturalmente válido, checar duplicidade no arquivo
             const linesWithCpf = cpfCounts[cpfRaw] || [];
             if (linesWithCpf.length > 1) {
               errors.push({
@@ -258,26 +354,6 @@ export default function ImportarMembrosPage() {
               });
               duplicateCount++;
             }
-          }
-
-          // Validação: Congregação ausente
-          const congVal = (row.data['congregacao'] || '').trim();
-          if (!congVal) {
-            errors.push({
-              line: row.line,
-              field: 'congregacao',
-              message: 'A congregação é obrigatória.',
-            });
-          }
-
-          // Validação: Telefone ausente
-          const telVal = (row.data['telefone'] || '').trim();
-          if (!telVal) {
-            errors.push({
-              line: row.line,
-              field: 'telefone',
-              message: 'O telefone é obrigatório.',
-            });
           }
 
           row.errors = errors;
@@ -296,7 +372,7 @@ export default function ImportarMembrosPage() {
           total: parsed.length,
           valid: validCount,
           errors: errorCount,
-          duplicates: Math.ceil(duplicateCount / 2), // dividir por 2 para não inflacionar duplicidades de pares
+          duplicates: Math.ceil(duplicateCount / 2),
         });
 
       } catch (err) {
@@ -310,8 +386,8 @@ export default function ImportarMembrosPage() {
 
   return (
     <PageLayout
-      title="Importar Membros via CSV"
-      description="Faça a validação prévia de membros por planilha antes da gravação definitiva."
+      title="Importador Planilha Legada (59 Colunas)"
+      description="Processamento e visualização de arquivos de dados legados no padrão AD Rocha."
       headerExtra={
         <Link
           href="/secretaria/membros"
@@ -323,21 +399,20 @@ export default function ImportarMembrosPage() {
       }
     >
       <div className="max-w-6xl mx-auto space-y-6">
-        
-        {/* Painel Inicial: Instruções e Upload */}
+
+        {/* Instruções */}
         <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
           <h2 className="text-lg font-bold text-teal-800 mb-4 flex items-center gap-2">
-            <Info className="h-5 w-5" /> Instruções de Importação
+            <Info className="h-5 w-5" /> Importador de Planilha Ad Rocha
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
             <div className="space-y-4">
               <p className="text-sm text-gray-600">
-                O arquivo de importação deve ser no formato <strong>CSV (separado por vírgula ou ponto-e-vírgula)</strong>.
-                Utilize codificação <strong>UTF-8</strong> para preservar acentos e caracteres especiais.
+                O arquivo de importação deve utilizar delimitador ponto-e-vírgula (<strong>;</strong>) e codificação <strong>UTF-8-SIG</strong>.
               </p>
               <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 text-xs text-teal-800 space-y-2">
-                <p><strong>Colunas obrigatórias mínimas:</strong> nome, cpf, telefone, congregacao</p>
-                <p><strong>Colunas opcionais suportadas:</strong> email, data_nascimento, sexo, estado_civil, cargo_ministerial, endereco, bairro, cidade, estado, cep, status</p>
+                <p><strong>Colunas obrigatórias:</strong> NOME, CPF, CONGREGAÇÃO, CAMPO, SUPERVISAO</p>
+                <p>Mapeia até 59 colunas legadas e direciona dados desconhecidos para campos customizados.</p>
               </div>
               <button
                 type="button"
@@ -345,7 +420,7 @@ export default function ImportarMembrosPage() {
                 className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg text-sm transition cursor-pointer"
               >
                 <Download className="h-4 w-4" />
-                Baixar Modelo CSV
+                Baixar Modelo CSV (59 colunas)
               </button>
             </div>
 
@@ -353,13 +428,13 @@ export default function ImportarMembrosPage() {
             <div className="border-2 border-dashed border-teal-300 rounded-xl p-8 flex flex-col items-center justify-center bg-teal-50/20 hover:bg-teal-50/50 transition">
               <input
                 type="file"
-                id="csv-file-input"
+                id="legacy-csv-input"
                 accept=".csv"
                 className="hidden"
                 onChange={handleFileChange}
               />
               <label
-                htmlFor="csv-file-input"
+                htmlFor="legacy-csv-input"
                 className="flex flex-col items-center justify-center cursor-pointer space-y-3"
               >
                 <div className="p-3 bg-teal-100 rounded-full text-teal-700">
@@ -367,10 +442,10 @@ export default function ImportarMembrosPage() {
                 </div>
                 <div className="text-center">
                   <span className="text-sm font-semibold text-teal-700 block">
-                    {file ? file.name : 'Selecionar Arquivo CSV'}
+                    {file ? file.name : 'Selecionar Planilha Legada'}
                   </span>
                   <span className="text-xs text-gray-500 block mt-1">
-                    Arraste ou clique para selecionar. Máx 5MB.
+                    Delimitador: Ponto e Vírgula (;). Máx 5MB.
                   </span>
                 </div>
               </label>
@@ -383,7 +458,7 @@ export default function ImportarMembrosPage() {
           <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-4 flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold text-sm">Erro de Arquivo</h3>
+              <h3 className="font-semibold text-sm">Erro Crítico</h3>
               <p className="text-xs text-red-700 mt-1">{errorMessage}</p>
             </div>
           </div>
@@ -394,9 +469,9 @@ export default function ImportarMembrosPage() {
           <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold text-sm">Colunas Obrigatórias Ausentes</h3>
+              <h3 className="font-semibold text-sm">Colunas Requeridas não Encontradas</h3>
               <p className="text-xs text-amber-800 mt-1">
-                O cabeçalho do seu arquivo não contém as seguintes colunas essenciais:
+                O cabeçalho do seu arquivo não contém as seguintes colunas obrigatórias:
               </p>
               <div className="flex gap-2 mt-2">
                 {missingRequired.map(field => (
@@ -426,8 +501,36 @@ export default function ImportarMembrosPage() {
                 <span className="text-2xl font-extrabold text-red-600 block mt-1">{summary.errors}</span>
               </div>
               <div className="bg-white border border-amber-100 rounded-xl p-4 shadow-sm text-center">
-                <span className="text-xs font-bold text-amber-500 uppercase tracking-wider block">Duplicados</span>
+                <span className="text-xs font-bold text-amber-500 uppercase tracking-wider block">CPFs Duplicados</span>
                 <span className="text-2xl font-extrabold text-amber-600 block mt-1">{summary.duplicates}</span>
+              </div>
+            </div>
+
+            {/* Mapeamento de Colunas */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-sm font-bold text-green-700 mb-3 flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" /> Colunas Reconhecidas ({mappedColumns.length})
+                </h3>
+                <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-2">
+                  {mappedColumns.map(col => (
+                    <span key={col} className="px-2 py-1 bg-green-50 text-green-800 border border-green-200 rounded text-[10px] font-mono">
+                      {col}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-600 mb-3 flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-gray-500" /> Colunas Customizadas / Metadata ({unmappedColumns.length})
+                </h3>
+                <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-2">
+                  {unmappedColumns.map(col => (
+                    <span key={col} className="px-2 py-1 bg-gray-50 text-gray-600 border border-gray-200 rounded text-[10px] font-mono">
+                      {col}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -435,18 +538,18 @@ export default function ImportarMembrosPage() {
             <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-4 flex items-start gap-3">
               <CheckCircle2 className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-semibold text-sm">Simulação Concluída</h3>
+                <h3 className="font-semibold text-sm">Visualização e Validação Estática</h3>
                 <p className="text-xs text-blue-700 mt-1">
-                  Nenhum registro foi salvo no banco de dados. Esta visualização serve para validar os dados e as regras de consistência da importação.
+                  Nenhum registro foi salvo no banco de dados. Os campos legados foram mapeados temporariamente para validação prévia.
                 </p>
               </div>
             </div>
 
-            {/* Listagem de erros detalhados por linha */}
+            {/* Detalhes dos erros */}
             {summary.errors > 0 && (
               <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
                 <h3 className="text-md font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <AlertTriangle className="text-red-500 h-5 w-5" /> Detalhes dos Erros Encontrados
+                  <AlertTriangle className="text-red-500 h-5 w-5" /> Erros de Validação por Linha
                 </h3>
                 <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 pr-2">
                   {rows.filter(r => !r.isValid).map(row => (
@@ -472,7 +575,7 @@ export default function ImportarMembrosPage() {
                 <h3 className="text-md font-bold text-gray-800 flex items-center gap-2">
                   <FileText className="h-5 w-5 text-teal-600" /> Preview dos Dados (Primeiras 20 linhas)
                 </h3>
-                <span className="text-xs font-semibold text-gray-500">Exibindo no máximo 20 registros</span>
+                <span className="text-xs font-semibold text-gray-500">Separador: Semicolon (;)</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
@@ -483,16 +586,18 @@ export default function ImportarMembrosPage() {
                       <th className="px-4 py-3">CPF</th>
                       <th className="px-4 py-3">Telefone</th>
                       <th className="px-4 py-3">Congregação</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-center">Status de Validação</th>
+                      <th className="px-4 py-3">Campo</th>
+                      <th className="px-4 py-3">Supervisão</th>
+                      <th className="px-4 py-3 text-center">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {rows.slice(0, 20).map(row => {
                       const hasNameError = row.errors.some(e => e.field === 'nome');
                       const hasCpfError = row.errors.some(e => e.field === 'cpf');
-                      const hasTelError = row.errors.some(e => e.field === 'telefone');
                       const hasCongError = row.errors.some(e => e.field === 'congregacao');
+                      const hasCampoError = row.errors.some(e => e.field === 'campo');
+                      const hasSupError = row.errors.some(e => e.field === 'supervisao');
 
                       return (
                         <tr key={row.line} className="hover:bg-gray-50/50">
@@ -503,13 +608,16 @@ export default function ImportarMembrosPage() {
                           <td className={`px-4 py-3 ${hasCpfError ? 'bg-red-50 text-red-900 font-semibold' : 'text-gray-700'}`}>
                             {row.data['cpf'] || <span className="text-red-500 italic font-normal">Ausente</span>}
                           </td>
-                          <td className={`px-4 py-3 ${hasTelError ? 'bg-red-50 text-red-900 font-semibold' : 'text-gray-700'}`}>
-                            {row.data['telefone'] || <span className="text-red-500 italic font-normal">Ausente</span>}
-                          </td>
+                          <td className="px-4 py-3 text-gray-700">{row.data['celular'] || row.data['whatsapp'] || '-'}</td>
                           <td className={`px-4 py-3 ${hasCongError ? 'bg-red-50 text-red-900 font-semibold' : 'text-gray-700'}`}>
                             {row.data['congregacao'] || <span className="text-red-500 italic font-normal">Ausente</span>}
                           </td>
-                          <td className="px-4 py-3 text-gray-600">{row.data['status'] || '-'}</td>
+                          <td className={`px-4 py-3 ${hasCampoError ? 'bg-red-50 text-red-900 font-semibold' : 'text-gray-700'}`}>
+                            {row.data['campo'] || <span className="text-red-500 italic font-normal">Ausente</span>}
+                          </td>
+                          <td className={`px-4 py-3 ${hasSupError ? 'bg-red-50 text-red-900 font-semibold' : 'text-gray-700'}`}>
+                            {row.data['supervisao'] || <span className="text-red-500 italic font-normal">Ausente</span>}
+                          </td>
                           <td className="px-4 py-3 text-center">
                             {row.isValid ? (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">
@@ -517,7 +625,7 @@ export default function ImportarMembrosPage() {
                               </span>
                             ) : (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
-                                Invalido
+                                Inválido
                               </span>
                             )}
                           </td>
