@@ -23,6 +23,7 @@ export default function MinisteriosPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [tempPasswords, setTempPasswords] = useState<Record<string, string>>({})
   const errorRef = useRef<HTMLDivElement>(null)
 
   const friendlyError = (msg: string): string => {
@@ -538,6 +539,11 @@ export default function MinisteriosPage() {
 
       const payload = await response.json()
       const creds = payload?.credentials
+      if (payload?.data?.id && creds?.password) {
+        setTempPasswords(prev => ({ ...prev, [payload.data.id]: creds.password }))
+      } else if (payload?.data?.id && formData.access_password?.trim()) {
+        setTempPasswords(prev => ({ ...prev, [payload.data.id]: formData.access_password.trim() }))
+      }
       setSuccess(
         editingId
           ? 'Ministério atualizado com sucesso!'
@@ -684,6 +690,9 @@ export default function MinisteriosPage() {
     }
   }
   const handlePrintLabel = (m: SupabaseMinistry) => {
+    const password = prompt('Digite a senha do tenant para a etiqueta (deixe em branco se não quiser exibir):', tempPasswords[m.id] || '');
+    if (password === null) return; // Cancelado
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
@@ -700,36 +709,36 @@ export default function MinisteriosPage() {
               width: 85mm;
               height: 30mm;
               margin: 0;
-              padding: 2mm 3mm;
+              padding: 2.5mm 3.5mm;
               box-sizing: border-box;
               font-family: Arial, sans-serif;
-              font-size: 8px;
-              line-height: 1.2;
+              font-size: 10px;
+              line-height: 1.25;
               color: #000;
               display: flex;
               flex-direction: column;
               justify-content: center;
             }
             .title {
-              font-size: 10px;
+              font-size: 13px;
               font-weight: bold;
               border-bottom: 0.5px solid #000;
-              padding-bottom: 1px;
-              margin-bottom: 2px;
+              padding-bottom: 2px;
+              margin-bottom: 3px;
               text-transform: uppercase;
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
             }
             .info {
-              margin-bottom: 1px;
+              margin-bottom: 1.5px;
             }
             .bold {
               font-weight: bold;
             }
             .footer {
               margin-top: auto;
-              font-size: 7px;
+              font-size: 8px;
               color: #555;
               text-align: right;
             }
@@ -739,6 +748,7 @@ export default function MinisteriosPage() {
           <div class="title">${m.name}</div>
           <div class="info"><span class="bold">Link de Acesso:</span> app.gestaoeklesia.com.br/login</div>
           <div class="info"><span class="bold">E-mail:</span> ${m.email_admin || '-'}</div>
+          ${password ? `<div class="info"><span class="bold">Senha:</span> ${password}</div>` : ''}
           <div class="info"><span class="bold">Telefone:</span> ${m.phone ? formatPhone(m.phone) : '-'}</div>
           <div class="footer">Gestão Eklésia</div>
           <script>
