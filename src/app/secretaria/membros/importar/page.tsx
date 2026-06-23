@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import PageLayout from '@/components/PageLayout';
-import { ArrowLeft, Download, UploadCloud, AlertTriangle, CheckCircle2, FileText, AlertCircle, Info, Settings } from 'lucide-react';
+import { ArrowLeft, Download, UploadCloud, AlertTriangle, CheckCircle2, FileText, AlertCircle, Info, Settings, Image, FileImage, ShieldAlert } from 'lucide-react';
 
 interface RowError {
   line: number;
@@ -17,6 +17,8 @@ interface ParsedRow {
   metadata: Record<string, string>;
   errors: RowError[];
   isValid: boolean;
+  foto_url_origem?: string;
+  status_foto?: 'sem_foto' | 'url_valida' | 'url_invalida' | 'bubble_url_detectada';
 }
 
 export default function ImportarMembrosPage() {
@@ -30,6 +32,10 @@ export default function ImportarMembrosPage() {
     valid: 0,
     errors: 0,
     duplicates: 0,
+    comFoto: 0,
+    semFoto: 0,
+    urlsBubble: 0,
+    urlsInvalidasFoto: 0,
   });
   const [missingRequired, setMissingRequired] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
@@ -88,16 +94,34 @@ export default function ImportarMembrosPage() {
     'CONVERSÃO': 'dataConversao',
   };
 
-  // Normalização de cabeçalho mantendo maiúsculas para correspondência exata das especificadas
   const normalizeHeaderName = (h: string): string => {
     return h
       .toUpperCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // remove acentos
+      .replace(/[\u0300-\u036f]/g, '')
       .trim();
   };
 
-  // Validador de CPF
+  const getFotoStatus = (url: string): 'sem_foto' | 'bubble_url_detectada' | 'url_valida' | 'url_invalida' => {
+    const trimmed = (url || '').trim();
+    if (!trimmed) return 'sem_foto';
+
+    if (trimmed.includes('bubble.io')) {
+      return 'bubble_url_detectada';
+    }
+
+    try {
+      const absoluteUrl = trimmed.startsWith('//') ? 'https:' + trimmed : trimmed;
+      const u = new URL(absoluteUrl);
+      if (u.protocol === 'http:' || u.protocol === 'https:') {
+        return 'url_valida';
+      }
+    } catch {
+      // Ignora erro
+    }
+    return 'url_invalida';
+  };
+
   const isValidCPF = (cpfStr: string): boolean => {
     const cpf = cpfStr.replace(/\D/g, '');
     if (cpf.length !== 11) return false;
@@ -124,7 +148,6 @@ export default function ImportarMembrosPage() {
     return true;
   };
 
-  // Parser robusto de CSV para delimitador ";"
   const parseCSV = (text: string): string[][] => {
     const lines: string[][] = [];
     let row: string[] = [];
@@ -165,7 +188,6 @@ export default function ImportarMembrosPage() {
   };
 
   const handleDownloadTemplate = () => {
-    // Cabeçalhos de 59 colunas simulados
     const headersList = [
       'BAIRRO', 'CAMPO', 'CARGO', 'CELULAR', 'CEP', 'CIDADE', 'COMIEADEPA REG', 'COMPLEMENTO',
       'CONGREGAÇÃO', 'CONJUJE CPF', 'CONJUJE DNASCIMENTO', 'CONVERSÃO', 'CPF', 'CURSO TEOLOGICO',
@@ -185,6 +207,7 @@ export default function ImportarMembrosPage() {
     sampleRow[headersList.indexOf('SUPERVISAO')] = 'COMIEADEPA';
     sampleRow[headersList.indexOf('SEXO')] = 'MASCULINO';
     sampleRow[headersList.indexOf('STATUS')] = 'ATIVO';
+    sampleRow[headersList.indexOf('FOTO 3X4')] = '//3edb25f4485125198951bb914b00eb7d.cdn.bubble.io/f1736978893722x748753810295790100/1-01037113250.jpg';
 
     const csvContent = '\uFEFF' + [headersList.join(';'), sampleRow.join(';')].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -224,7 +247,6 @@ export default function ImportarMembrosPage() {
       try {
         let text = event.target?.result as string;
 
-        // Tratar UTF-8-SIG (remover BOM)
         if (text.startsWith('\uFEFF')) {
           text = text.slice(1);
         }
@@ -236,7 +258,7 @@ export default function ImportarMembrosPage() {
           return;
         }
 
-        // 1. Extrair e normalizar headers
+        // 1. Extrair headers
         const rawHeaders = rawLines[0];
         const normalizedHeaders = rawHeaders.map(h => normalizeHeaderName(h));
 
@@ -310,6 +332,10 @@ export default function ImportarMembrosPage() {
         let validCount = 0;
         let errorCount = 0;
         let duplicateCount = 0;
+        let comFoto = 0;
+        let semFoto = 0;
+        let urlsBubble = 0;
+        let urlsInvalidasFoto = 0;
 
         parsed.forEach(row => {
           const errors: RowError[] = [];
@@ -356,6 +382,23 @@ export default function ImportarMembrosPage() {
             }
           }
 
+          // Tratamento de fotos do Bubble/Externas
+          const fotoUrl = row.data['fotoUrl'] || '';
+          const fotoStatus = getFotoStatus(fotoUrl);
+          row.foto_url_origem = fotoUrl;
+          row.status_foto = fotoStatus;
+
+          if (fotoStatus === 'sem_foto') {
+            semFoto++;
+          } else {
+            comFoto++;
+            if (fotoStatus === 'bubble_url_detectada') {
+              urlsBubble++;
+            } else if (fotoStatus === 'url_invalida') {
+              urlsInvalidasFoto++;
+            }
+          }
+
           row.errors = errors;
           row.isValid = errors.length === 0;
 
@@ -373,6 +416,10 @@ export default function ImportarMembrosPage() {
           valid: validCount,
           errors: errorCount,
           duplicates: Math.ceil(duplicateCount / 2),
+          comFoto,
+          semFoto,
+          urlsBubble,
+          urlsInvalidasFoto,
         });
 
       } catch (err) {
@@ -386,8 +433,8 @@ export default function ImportarMembrosPage() {
 
   return (
     <PageLayout
-      title="Importador Planilha Legada (59 Colunas)"
-      description="Processamento e visualização de arquivos de dados legados no padrão AD Rocha."
+      title="Importador Planilha Legada — AD Rocha"
+      description="Tratamento e análise de foto Bubble.io e colunas para o ministério AD Rocha Eterna de Marituba."
       headerExtra={
         <Link
           href="/secretaria/membros"
@@ -484,7 +531,7 @@ export default function ImportarMembrosPage() {
           </div>
         )}
 
-        {/* Resumo da Validação */}
+        {/* Resumo Geral */}
         {file && !parsing && missingRequired.length === 0 && (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -506,11 +553,37 @@ export default function ImportarMembrosPage() {
               </div>
             </div>
 
+            {/* Resumo de Fotos */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white border border-teal-100 rounded-xl p-4 shadow-sm text-center">
+                <span className="text-xs font-bold text-teal-600 uppercase tracking-wider block flex items-center justify-center gap-1">
+                  <Image className="h-3.5 w-3.5" /> Total Com Foto
+                </span>
+                <span className="text-2xl font-extrabold text-teal-700 block mt-1">{summary.comFoto}</span>
+              </div>
+              <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm text-center">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block flex items-center justify-center gap-1">
+                  <FileImage className="h-3.5 w-3.5" /> Total Sem Foto
+                </span>
+                <span className="text-2xl font-extrabold text-gray-500 block mt-1">{summary.semFoto}</span>
+              </div>
+              <div className="bg-white border border-purple-100 rounded-xl p-4 shadow-sm text-center font-semibold">
+                <span className="text-xs font-bold text-purple-600 uppercase tracking-wider block">Fotos no Bubble.io</span>
+                <span className="text-2xl font-extrabold text-purple-700 block mt-1">{summary.urlsBubble}</span>
+              </div>
+              <div className="bg-white border border-red-100 rounded-xl p-4 shadow-sm text-center">
+                <span className="text-xs font-bold text-red-500 uppercase tracking-wider block flex items-center justify-center gap-1">
+                  <ShieldAlert className="h-3.5 w-3.5" /> URLs Inválidas
+                </span>
+                <span className="text-2xl font-extrabold text-red-600 block mt-1">{summary.urlsInvalidasFoto}</span>
+              </div>
+            </div>
+
             {/* Mapeamento de Colunas */}
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="text-sm font-bold text-green-700 mb-3 flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" /> Colunas Reconhecidas ({mappedColumns.length})
+                  <CheckCircle2 className="h-4 w-4 text-green-600" /> Colunas Mapeadas ({mappedColumns.length})
                 </h3>
                 <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-2">
                   {mappedColumns.map(col => (
@@ -522,7 +595,7 @@ export default function ImportarMembrosPage() {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-gray-600 mb-3 flex items-center gap-2">
-                  <Settings className="h-4 w-4 text-gray-500" /> Colunas Customizadas / Metadata ({unmappedColumns.length})
+                  <Settings className="h-4 w-4 text-gray-500" /> Colunas de Metadados / Customizadas ({unmappedColumns.length})
                 </h3>
                 <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-2">
                   {unmappedColumns.map(col => (
@@ -534,15 +607,20 @@ export default function ImportarMembrosPage() {
               </div>
             </div>
 
-            {/* Aviso de que não grava no banco */}
-            <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-4 flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-semibold text-sm">Visualização e Validação Estática</h3>
-                <p className="text-xs text-blue-700 mt-1">
-                  Nenhum registro foi salvo no banco de dados. Os campos legados foram mapeados temporariamente para validação prévia.
-                </p>
-              </div>
+            {/* Plano de Implementação Técnica (Próxima Etapa) */}
+            <div className="bg-[#123b63]/5 border border-[#123b63]/20 text-[#123b63] rounded-xl p-6 space-y-3">
+              <h3 className="font-bold text-sm flex items-center gap-2 text-[#123b63]">
+                📋 Plano Técnico — Importação de Fotos (AD ROCHA ETERNA DE MARITUBA)
+              </h3>
+              <p className="text-xs leading-relaxed text-[#123b63]/85">
+                Para as URLs da coluna <strong>FOTO 3X4</strong> (especialmente as hospedadas na Bubble.io detectadas no preview), o fluxo seguinte consistirá em:
+              </p>
+              <ul className="list-disc list-inside text-xs space-y-1.5 pl-2 text-[#123b63]/90">
+                <li><strong>Download Assíncrono:</strong> Baixar a imagem original via backend (tratando URLs relativas <code>//</code> como <code>https://</code>).</li>
+                <li><strong>Armazenamento no Supabase:</strong> Enviar o arquivo para o bucket de fotos do tenant atual, criando a estrutura <code>/membros/foto_[cpf].jpg</code>.</li>
+                <li><strong>Salvamento dos Registros:</strong> Inserir o membro com a URL final do Supabase Storage no campo <code>foto_url</code>.</li>
+                <li><strong>Histórico/Auditoria:</strong> Preservar a URL do Bubble.io original no campo <code>custom_fields.foto_origem_bubble</code> como rastreabilidade.</li>
+              </ul>
             </div>
 
             {/* Detalhes dos erros */}
@@ -573,9 +651,9 @@ export default function ImportarMembrosPage() {
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                 <h3 className="text-md font-bold text-gray-800 flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-teal-600" /> Preview dos Dados (Primeiras 20 linhas)
+                  <FileText className="h-5 w-5 text-teal-600" /> Preview dos Dados com Validação de Fotos (Primeiras 20 linhas)
                 </h3>
-                <span className="text-xs font-semibold text-gray-500">Separador: Semicolon (;)</span>
+                <span className="text-xs font-semibold text-gray-500">Exibindo no máximo 20 registros</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
@@ -584,11 +662,10 @@ export default function ImportarMembrosPage() {
                       <th className="px-4 py-3 text-center w-12">Linha</th>
                       <th className="px-4 py-3">Nome</th>
                       <th className="px-4 py-3">CPF</th>
-                      <th className="px-4 py-3">Telefone</th>
                       <th className="px-4 py-3">Congregação</th>
-                      <th className="px-4 py-3">Campo</th>
-                      <th className="px-4 py-3">Supervisão</th>
-                      <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3">Foto (Preview Original)</th>
+                      <th className="px-4 py-3">Status Foto</th>
+                      <th className="px-4 py-3 text-center">Status Linha</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -596,8 +673,6 @@ export default function ImportarMembrosPage() {
                       const hasNameError = row.errors.some(e => e.field === 'nome');
                       const hasCpfError = row.errors.some(e => e.field === 'cpf');
                       const hasCongError = row.errors.some(e => e.field === 'congregacao');
-                      const hasCampoError = row.errors.some(e => e.field === 'campo');
-                      const hasSupError = row.errors.some(e => e.field === 'supervisao');
 
                       return (
                         <tr key={row.line} className="hover:bg-gray-50/50">
@@ -608,15 +683,25 @@ export default function ImportarMembrosPage() {
                           <td className={`px-4 py-3 ${hasCpfError ? 'bg-red-50 text-red-900 font-semibold' : 'text-gray-700'}`}>
                             {row.data['cpf'] || <span className="text-red-500 italic font-normal">Ausente</span>}
                           </td>
-                          <td className="px-4 py-3 text-gray-700">{row.data['celular'] || row.data['whatsapp'] || '-'}</td>
                           <td className={`px-4 py-3 ${hasCongError ? 'bg-red-50 text-red-900 font-semibold' : 'text-gray-700'}`}>
                             {row.data['congregacao'] || <span className="text-red-500 italic font-normal">Ausente</span>}
                           </td>
-                          <td className={`px-4 py-3 ${hasCampoError ? 'bg-red-50 text-red-900 font-semibold' : 'text-gray-700'}`}>
-                            {row.data['campo'] || <span className="text-red-500 italic font-normal">Ausente</span>}
+                          <td className="px-4 py-3 max-w-xs truncate text-gray-500 font-mono text-[10px]" title={row.foto_url_origem}>
+                            {row.foto_url_origem || '-'}
                           </td>
-                          <td className={`px-4 py-3 ${hasSupError ? 'bg-red-50 text-red-900 font-semibold' : 'text-gray-700'}`}>
-                            {row.data['supervisao'] || <span className="text-red-500 italic font-normal">Ausente</span>}
+                          <td className="px-4 py-3">
+                            {row.status_foto === 'sem_foto' && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">Sem Foto</span>
+                            )}
+                            {row.status_foto === 'bubble_url_detectada' && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200">Link Bubble</span>
+                            )}
+                            {row.status_foto === 'url_valida' && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">Link Externo</span>
+                            )}
+                            {row.status_foto === 'url_invalida' && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">Link Inválido</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-center">
                             {row.isValid ? (
