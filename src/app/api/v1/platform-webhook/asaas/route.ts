@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   try {
     // Validar token
     const receivedToken = request.headers.get('asaas-access-token') || request.nextUrl.searchParams.get('token')
-    const expectedToken = process.env.PLATFORM_ASAAS_WEBHOOK_TOKEN
+    const expectedToken = process.env.PLATFORM_ASAAS_WEBHOOK_TOKEN || process.env.ASAAS_WEBHOOK_TOKEN
 
     if (!expectedToken || receivedToken !== expectedToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

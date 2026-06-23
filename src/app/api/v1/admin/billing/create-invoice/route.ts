@@ -4,11 +4,11 @@ import { requireAdmin } from '@/lib/admin-guard'
 export const dynamic = 'force-dynamic';
 
 const platformAsaasFetch = async (path: string, init: RequestInit) => {
-  const apiKey = process.env.PLATFORM_ASAAS_API_KEY?.replace(/^\\/, '')
-  const apiUrl = process.env.PLATFORM_ASAAS_API_URL || 'https://api.asaas.com/v3'
+  const apiKey = (process.env.PLATFORM_ASAAS_API_KEY || process.env.ASAAS_API_KEY)?.replace(/^\\/, '')
+  const apiUrl = process.env.PLATFORM_ASAAS_API_URL || process.env.ASAAS_API_URL || 'https://api.asaas.com/v3'
 
   if (!apiKey) {
-    throw new Error('PLATFORM_ASAAS_API_KEY não configurada')
+    throw new Error('PLATFORM_ASAAS_API_KEY / ASAAS_API_KEY não configurada')
   }
 
   const response = await fetch(`${apiUrl}${path}`, {
