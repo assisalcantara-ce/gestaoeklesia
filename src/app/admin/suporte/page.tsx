@@ -94,8 +94,12 @@ export default function SuportePage() {
 
       const response = await authenticatedFetch(`/api/v1/admin/tickets?${params}`)
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
           router.push('/admin/login')
+          return
+        }
+        if (response.status === 403) {
+          setError('Acesso negado para este recurso.')
           return
         }
         throw new Error('Erro ao carregar tickets')
@@ -122,8 +126,12 @@ export default function SuportePage() {
 
       const response = await authenticatedFetch(`/api/v1/admin/tickets-landing?${params}`)
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
           router.push('/admin/login')
+          return
+        }
+        if (response.status === 403) {
+          setError('Acesso negado para este recurso.')
           return
         }
         throw new Error('Erro ao carregar tickets do site')

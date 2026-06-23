@@ -29,7 +29,7 @@ const getMonthKey = (value: string | Date) => {
 
 export async function GET(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    const result = await requireAdmin(request, { requiredCapability: 'can_view_analytics' })
     if (!result.ok) return result.response
     const { supabaseAdmin: supabase } = result.ctx
 

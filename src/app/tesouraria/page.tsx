@@ -778,7 +778,11 @@ export default function TesourariaPage() {
   // ── Busca de dizimista ─────────────────────────────────────────────────────
 
   const buscarMembDizimista = useCallback(async (q: string) => {
-    if (!ministryId || q.trim().length < 3) { setDizBuscaRes([]); return; }
+    if (!ministryId) return;
+    if (q.trim().length < 3) {
+      setDizBuscaRes([]);
+      return;
+    }
     setDizBuscando(true);
     const { data } = await supabase
       .from('members')
@@ -790,7 +794,7 @@ export default function TesourariaPage() {
       .limit(8);
     const results = (data || []).map((m: any) => ({ id: m.id, nome: m.name }));
     setDizBuscaRes(results);
-    // Se não encontrou ninguém, ativa automaticamente o modo avulso
+    // Se não encontrou ninguém e a busca tem tamanho suficiente, ativa automaticamente o modo avulso
     if (results.length === 0) {
       setDizIsAvulso(true);
       setDizAvulsoNome(q.trim());
@@ -1699,12 +1703,22 @@ export default function TesourariaPage() {
           body * { visibility: hidden !important; }
           #relatorio-print, #relatorio-print *, #dizimistas-print, #dizimistas-print * { visibility: visible !important; }
           #relatorio-print, #dizimistas-print {
-            position: fixed !important;
-            inset: 0 !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
             width: 100% !important;
-            padding: 24px 32px !important;
+            padding: 0 !important;
+            margin: 0 !important;
             background: white !important;
-            font-size: 11pt !important;
+            font-size: 10pt !important;
+            box-shadow: none !important;
+            border: none !important;
+          }
+          .print-section {
+            page-break-inside: avoid !important;
+            margin-bottom: 24px !important;
+            display: block !important;
+            width: 100% !important;
           }
           .no-print { display: none !important; }
         }
@@ -2856,6 +2870,7 @@ export default function TesourariaPage() {
           </div>
 
           {/* Resumo por tipo */}
+          {/* Resumo por tipo */}
           <div id="relatorio-print" className="bg-white rounded-2xl border border-slate-200 p-6 shadow-md space-y-5">
 
             {/* Loading indicator */}
@@ -2863,169 +2878,228 @@ export default function TesourariaPage() {
               <p className="text-sm text-gray-400 py-6 text-center">Buscando dados do período...</p>
             )}
 
-            {/* Timbre (visível apenas na impressão) */}
-            <div className="hidden print:block border-b border-gray-300 pb-4 mb-4">
-              <div className="flex items-center gap-4">
-                {ministerio?.logo && (
-                  <img src={ministerio.logo} alt="Logo" className="h-16 w-16 object-contain" />
-                )}
-                <div className="flex-1 text-center">
-                  <p className="text-xl font-bold text-gray-900">{ministerio?.nome}</p>
-                  {ministerio?.endereco && <p className="text-xs text-gray-600 mt-0.5">{ministerio.endereco}</p>}
-                  <p className="text-xs text-gray-600 mt-0.5">
-                    {ministerio?.telefone && `Tel: ${ministerio.telefone}`}
-                    {ministerio?.telefone && ministerio?.email && ' | '}
-                    {ministerio?.email && `Email: ${ministerio.email}`}
-                  </p>
-                </div>
-                {ministerio?.logo && <div className="w-16" />}
-              </div>
-            </div>
-            <div className="flex justify-between items-start flex-wrap gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-[#123b63]">
-                  {relTipoRel === 'entradas' ? 'Relatório de Entradas' : relTipoRel === 'saidas' ? 'Relatório de Saídas' : 'Relatório Financeiro'}
-                </h2>
-                <p className="text-sm text-gray-500">
-                  {relFiltroPeriodo === 'mes'
-                    ? (relMes ? `Período: ${relMes.split('-')[1]}/${relMes.split('-')[0]}` : 'Todos os períodos')
-                    : `Período: ${relDataInicio ? fmtDate(relDataInicio) : 'Início'} até ${relDataFim ? fmtDate(relDataFim) : 'Fim'}`
-                  }
-                  {relCong ? ` • ${congNome(relCong)}` : ' • Todas as congregações'}
-                </p>
-              </div>
-              {relTipoRel === 'ambos' ? (
-                <div className="flex gap-3">
-                  <div className="bg-green-50 rounded-lg px-4 py-2 text-center">
-                    <p className="text-xs text-green-600 font-semibold">Entradas</p>
-                    <p className="text-base font-bold text-green-700">{fmtBRL(relTotalEntradas)}</p>
-                  </div>
-                  <div className="bg-red-50 rounded-lg px-4 py-2 text-center">
-                    <p className="text-xs text-red-500 font-semibold">Saídas</p>
-                    <p className="text-base font-bold text-red-600">{fmtBRL(relTotalSaidas)}</p>
-                  </div>
-                  <div className="bg-blue-50 rounded-lg px-4 py-2 text-center">
-                    <p className="text-xs text-[#123b63] font-semibold">Saldo</p>
-                    <p className={`text-base font-bold ${relTotalEntradas - relTotalSaidas >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>
-                      {fmtBRL(relTotalEntradas - relTotalSaidas)}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <p className={`text-xl font-bold ${relTipoRel === 'saidas' ? 'text-red-600' : 'text-[#123b63]'}`}>{fmtBRL(relTotal)}</p>
-              )}
+            {/* Timbre (visível apenas na impressão) - Bloco Próprio robusto com tabela */}
+            <div className="hidden print:block border-b border-gray-300 pb-4 mb-6 print-section">
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <tbody>
+                  <tr>
+                    {ministerio?.logo && (
+                      <td style={{ width: '80px', verticalAlign: 'middle', padding: '0 10px 0 0' }}>
+                        <img src={ministerio.logo} alt="Logo" style={{ maxHeight: '70px', maxWidth: '70px', objectFit: 'contain' }} />
+                      </td>
+                    )}
+                    <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                      <p style={{ fontSize: '16pt', fontWeight: 'bold', margin: '0 0 5px 0', color: '#111' }}>{ministerio?.nome}</p>
+                      {ministerio?.endereco && <p style={{ fontSize: '9pt', color: '#444', margin: '0 0 3px 0' }}>{ministerio.endereco}</p>}
+                      <p style={{ fontSize: '9pt', color: '#444', margin: 0 }}>
+                        {ministerio?.telefone && `Tel: ${ministerio.telefone}`}
+                        {ministerio?.telefone && ministerio?.email && ' | '}
+                        {ministerio?.email && `Email: ${ministerio.email}`}
+                      </p>
+                    </td>
+                    {ministerio?.logo && <td style={{ width: '80px' }} />}
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
-            {/* Por tipo — Entradas */}
-            {(relTipoRel === 'entradas' || relTipoRel === 'ambos') && (
-              <div>
-                <h3 className="text-sm font-semibold text-gray-600 mb-2">Resumo de Entradas por tipo</h3>
-                <div className="divide-y divide-gray-100">
-                  {TIPOS.map(t => {
-                    const val = relPorTipo[t.value] ?? 0;
-                    const base = relTotalEntradas > 0 ? relTotalEntradas : 1;
-                    const pct = ((val / base) * 100).toFixed(1);
-                    return (
-                      <div key={t.value} className="flex items-center justify-between py-2 text-sm">
-                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${t.cor}`}>{t.label}</span>
-                        <div className="flex gap-4 items-center">
-                          <span className="text-gray-400 text-xs">{pct}%</span>
-                          <span className="font-semibold text-gray-800 w-28 text-right">{fmtBRL(val)}</span>
+            {/* Cabeçalho do Relatório e Resumo Geral (Cards) */}
+            <div className="print-section" style={{ marginBottom: '24px' }}>
+              <div className="flex justify-between items-start flex-wrap gap-3 print:block print:w-full">
+                <div className="print:w-full print:mb-4">
+                  <h2 className="text-lg font-bold text-[#123b63] print:text-base print:font-bold">
+                    {relTipoRel === 'entradas' ? 'Relatório de Entradas' : relTipoRel === 'saidas' ? 'Relatório de Saídas' : 'Relatório Financeiro'}
+                  </h2>
+                  <p className="text-sm text-gray-500 print:text-xs">
+                    {relFiltroPeriodo === 'mes'
+                      ? (relMes ? `Período: ${relMes.split('-')[1]}/${relMes.split('-')[0]}` : 'Todos os períodos')
+                      : `Período: ${relDataInicio ? fmtDate(relDataInicio) : 'Início'} até ${relDataFim ? fmtDate(relDataFim) : 'Fim'}`
+                    }
+                    {relCong ? ` • ${congNome(relCong)}` : ' • Todas as congregações'}
+                  </p>
+                </div>
+
+                <div className="print:w-full">
+                  {relTipoRel === 'ambos' ? (
+                    <>
+                      {/* Flex na tela */}
+                      <div className="flex gap-3 print:hidden">
+                        <div className="bg-green-50 rounded-lg px-4 py-2 text-center">
+                          <p className="text-xs text-green-600 font-semibold">Entradas</p>
+                          <p className="text-base font-bold text-green-700">{fmtBRL(relTotalEntradas)}</p>
+                        </div>
+                        <div className="bg-red-50 rounded-lg px-4 py-2 text-center">
+                          <p className="text-xs text-red-500 font-semibold">Saídas</p>
+                          <p className="text-base font-bold text-red-600">{fmtBRL(relTotalSaidas)}</p>
+                        </div>
+                        <div className="bg-blue-50 rounded-lg px-4 py-2 text-center">
+                          <p className="text-xs text-[#123b63] font-semibold">Saldo</p>
+                          <p className={`text-base font-bold ${relTotalEntradas - relTotalSaidas >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>
+                            {fmtBRL(relTotalEntradas - relTotalSaidas)}
+                          </p>
                         </div>
                       </div>
-                    );
-                  })}
-                  {relTipoRel === 'ambos' && (
-                    <div className="flex items-center justify-between py-2 text-sm border-t border-gray-200">
-                      <span className="text-xs font-bold text-gray-600">TOTAL ENTRADAS</span>
-                      <span className="font-bold text-green-700 w-28 text-right">{fmtBRL(relTotalEntradas)}</span>
+                      
+                      {/* Tabela simples na impressão */}
+                      <table className="hidden print:table" style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
+                        <tbody>
+                          <tr>
+                            <td style={{ width: '33.33%', paddingRight: '10px' }}>
+                              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #dcfce7', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '8pt', color: '#16a34a', fontWeight: 'bold', margin: '0 0 2px 0', textTransform: 'uppercase' }}>Entradas</p>
+                                <p style={{ fontSize: '11pt', fontWeight: 'bold', color: '#15803d', margin: 0 }}>{fmtBRL(relTotalEntradas)}</p>
+                              </div>
+                            </td>
+                            <td style={{ width: '33.33%', paddingRight: '10px', paddingLeft: '10px' }}>
+                              <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '8pt', color: '#dc2626', fontWeight: 'bold', margin: '0 0 2px 0', textTransform: 'uppercase' }}>Saídas</p>
+                                <p style={{ fontSize: '11pt', fontWeight: 'bold', color: '#b91c1c', margin: 0 }}>{fmtBRL(relTotalSaidas)}</p>
+                              </div>
+                            </td>
+                            <td style={{ width: '33.33%', paddingLeft: '10px' }}>
+                              <div style={{ backgroundColor: '#eff6ff', border: '1px solid #dbeafe', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '8pt', color: '#2563eb', fontWeight: 'bold', margin: '0 0 2px 0', textTransform: 'uppercase' }}>Saldo</p>
+                                <p style={{ fontSize: '11pt', fontWeight: 'bold', color: relTotalEntradas - relTotalSaidas >= 0 ? '#1d4ed8' : '#b91c1c', margin: 0 }}>
+                                  {fmtBRL(relTotalEntradas - relTotalSaidas)}
+                                </p>
+                              </div>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </>
+                  ) : (
+                    <div className="bg-slate-50 rounded-lg px-4 py-2 text-right print:text-left print:border print:border-slate-200 print:bg-slate-50/50" style={{ minWidth: '150px' }}>
+                      <p className="text-xs text-gray-500 font-semibold print:text-[8pt]">Total {relTipoRel === 'saidas' ? 'Saídas' : 'Entradas'}</p>
+                      <p className={`text-xl font-bold print:text-sm print:mt-1 ${relTipoRel === 'saidas' ? 'text-red-600' : 'text-[#123b63]'}`}>{fmtBRL(relTotal)}</p>
                     </div>
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Por tipo — Entradas (Tabela Limpa) */}
+            {(relTipoRel === 'entradas' || relTipoRel === 'ambos') && (
+              <div className="print-section" style={{ marginBottom: '24px' }}>
+                <h3 className="text-sm font-semibold text-gray-600 mb-3 print:text-xs print:font-bold">Resumo de Entradas por tipo</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-none">
+                    <tbody className="divide-y divide-gray-100">
+                      {TIPOS.map(t => {
+                        const val = relPorTipo[t.value] ?? 0;
+                        const base = relTotalEntradas > 0 ? relTotalEntradas : 1;
+                        const pct = ((val / base) * 100).toFixed(1);
+                        return (
+                          <tr key={t.value}>
+                            <td className="py-2 text-left">
+                              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${t.cor}`}>{t.label}</span>
+                            </td>
+                            <td className="py-2 text-right text-gray-400 text-xs print:text-[9px]" style={{ width: '60px' }}>{pct}%</td>
+                            <td className="py-2 text-right font-semibold text-gray-800 print:text-xs" style={{ width: '120px' }}>{fmtBRL(val)}</td>
+                          </tr>
+                        );
+                      })}
+                      {relTipoRel === 'ambos' && (
+                        <tr className="border-t border-gray-300 font-bold" style={{ pageBreakInside: 'avoid' }}>
+                          <td className="py-2 text-left text-xs font-bold text-gray-600 uppercase">TOTAL ENTRADAS</td>
+                          <td className="py-2"></td>
+                          <td className="py-2 text-right font-bold text-green-700 print:text-xs">{fmtBRL(relTotalEntradas)}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
 
-            {/* Por tipo — Saídas */}
+            {/* Por tipo — Saídas (Tabela Limpa) */}
             {(relTipoRel === 'saidas' || relTipoRel === 'ambos') && (
-              <div>
-                <h3 className="text-sm font-semibold text-gray-600 mb-2">Resumo de Saídas por categoria</h3>
-                <div className="divide-y divide-gray-100">
-                  {TIPOS_SAIDA.map(t => {
-                    const val = relPorTipoSaida[t.value] ?? 0;
-                    const base = relTotalSaidas > 0 ? relTotalSaidas : 1;
-                    const pct = ((val / base) * 100).toFixed(1);
-                    return (
-                      <div key={t.value} className="flex items-center justify-between py-2 text-sm">
-                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${t.cor}`}>{t.label}</span>
-                        <div className="flex gap-4 items-center">
-                          <span className="text-gray-400 text-xs">{pct}%</span>
-                          <span className="font-semibold text-red-700 w-28 text-right">{fmtBRL(val)}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div className="flex items-center justify-between py-2 text-sm border-t border-gray-200">
-                    <span className="text-xs font-bold text-gray-600">{relTipoRel === 'ambos' ? 'TOTAL SAÍDAS' : 'TOTAL'}</span>
-                    <span className="font-bold text-red-600 w-28 text-right">{fmtBRL(relTotalSaidas)}</span>
-                  </div>
+              <div className="print-section" style={{ marginBottom: '24px' }}>
+                <h3 className="text-sm font-semibold text-gray-600 mb-3 print:text-xs print:font-bold">Resumo de Saídas por categoria</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-none">
+                    <tbody className="divide-y divide-gray-100">
+                      {TIPOS_SAIDA.map(t => {
+                        const val = relPorTipoSaida[t.value] ?? 0;
+                        const base = relTotalSaidas > 0 ? relTotalSaidas : 1;
+                        const pct = ((val / base) * 100).toFixed(1);
+                        return (
+                          <tr key={t.value}>
+                            <td className="py-2 text-left">
+                              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${t.cor}`}>{t.label}</span>
+                            </td>
+                            <td className="py-2 text-right text-gray-400 text-xs print:text-[9px]" style={{ width: '60px' }}>{pct}%</td>
+                            <td className="py-2 text-right font-semibold text-red-700 print:text-xs" style={{ width: '120px' }}>{fmtBRL(val)}</td>
+                          </tr>
+                        );
+                      })}
+                      <tr className="border-t border-gray-300 font-bold" style={{ pageBreakInside: 'avoid' }}>
+                        <td className="py-2 text-left text-xs font-bold text-gray-600 uppercase">
+                          {relTipoRel === 'ambos' ? 'TOTAL SAÍDAS' : 'TOTAL'}
+                        </td>
+                        <td className="py-2"></td>
+                        <td className="py-2 text-right font-bold text-red-600 print:text-xs">{fmtBRL(relTotalSaidas)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
 
             {/* Detalhado */}
-            <div className={relMostrarDet ? '' : 'no-print'}>
-              <h3 className="text-sm font-semibold text-gray-600 mb-2">Lançamentos detalhados</h3>
+            <div className={relMostrarDet ? 'print-section' : 'no-print'} style={{ marginTop: '10px' }}>
+              <h3 className="text-sm font-semibold text-gray-600 mb-3 print:text-xs print:font-bold">Lançamentos detalhados</h3>
               {relDados.length === 0 ? (
                 <p className="text-sm text-gray-400">Nenhum lançamento no período.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm border border-gray-100 rounded-lg overflow-hidden">
+                  <table className="w-full text-sm border border-gray-100 rounded-lg overflow-hidden print:border-collapse print:border print:border-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Data</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Caixa</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Departamento</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Tipo</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Referência</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Forma</th>
-                        <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">Valor</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">Data</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">Caixa</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">Departamento</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">Tipo</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">Referência</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">Forma</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">Valor</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-gray-50 print:divide-y print:divide-gray-200">
                       {relDados.map(l => (
-                        <tr key={l.id} className={l.tipo_movimento === 'saida' ? 'bg-red-50/30' : ''}>
-                          <td className="px-3 py-2 text-gray-600">{fmtDate(l.data_lancamento)}</td>
-                          <td className="px-3 py-2 text-gray-700">{l.congregacao_nome}</td>
-                          <td className="px-3 py-2 text-gray-500 text-xs">{l.departamento_nome}</td>
-                          <td className="px-3 py-2">
-                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${tipoCor(l.tipo_recebimento)}`}>
+                        <tr key={l.id} className={l.tipo_movimento === 'saida' ? 'bg-red-50/30 print:bg-red-50/10' : ''} style={{ pageBreakInside: 'avoid' }}>
+                          <td className="px-3 py-2 text-gray-600 print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">{fmtDate(l.data_lancamento)}</td>
+                          <td className="px-3 py-2 text-gray-700 print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">{l.congregacao_nome}</td>
+                          <td className="px-3 py-2 text-gray-500 text-xs print:text-[8px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">{l.departamento_nome}</td>
+                          <td className="px-3 py-2 print:py-1.5 print:px-2 print:border-b print:border-gray-200">
+                            <span className={`px-2 py-0.5 rounded text-xs font-semibold print:text-[8px] ${tipoCor(l.tipo_recebimento)}`}>
                               {tipoLabel(l.tipo_recebimento)}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-gray-500">{l.referencia || l.descricao || '—'}</td>
-                          <td className="px-3 py-2 text-gray-500 capitalize">{l.forma_pagamento}</td>
-                          <td className={`px-3 py-2 text-right font-semibold ${l.tipo_movimento === 'saida' ? 'text-red-600' : 'text-[#123b63]'}`}>
+                          <td className="px-3 py-2 text-gray-500 print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">{l.referencia || l.descricao || '—'}</td>
+                          <td className="px-3 py-2 text-gray-500 capitalize print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">{l.forma_pagamento}</td>
+                          <td className={`px-3 py-2 text-right font-semibold print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200 ${l.tipo_movimento === 'saida' ? 'text-red-600' : 'text-[#123b63]'}`}>
                             {l.tipo_movimento === 'saida' ? '−' : ''}{fmtBRL(Number(l.valor))}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="bg-[#123b63]/5 border-t border-gray-200">
-                        <td colSpan={6} className="px-3 py-2 text-xs font-bold text-gray-600 text-right">TOTAL</td>
-                        <td className={`px-3 py-2 text-right font-bold ${relTipoRel === 'saidas' ? 'text-red-600' : 'text-[#123b63]'}`}>{fmtBRL(relTotal)}</td>
+                      <tr className="bg-[#123b63]/5 border-t border-gray-200 print:bg-gray-50" style={{ pageBreakInside: 'avoid' }}>
+                        <td colSpan={6} className="px-3 py-2 text-xs font-bold text-gray-600 text-right print:text-[9px] print:py-1.5 print:px-2 print:border-t print:border-gray-300">TOTAL</td>
+                        <td className={`px-3 py-2 text-right font-bold print:text-[9px] print:py-1.5 print:px-2 print:border-t print:border-gray-300 ${relTipoRel === 'saidas' ? 'text-red-600' : 'text-[#123b63]'}`}>{fmtBRL(relTotal)}</td>
                       </tr>
                     </tfoot>
                   </table>
                 </div>
               )}
+            </div>
 
             {/* Rodapé de impressão */}
-            <div className="hidden print:block border-t border-gray-200 pt-3 mt-4 text-right text-xs text-gray-400">
+            <div className="hidden print:block border-t border-gray-200 pt-3 mt-6 text-right text-xs text-gray-400">
               Impresso em: {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             </div>
 
-            </div>
           </div>
         </div>
       )}

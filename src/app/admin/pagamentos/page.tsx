@@ -50,6 +50,7 @@ export default function PagamentosPage() {
   const [avulsaInstallments, setAvulsaInstallments] = useState('1')
   const [avulsaLoading, setAvulsaLoading] = useState(false)
   const [avulsaSuccessData, setAvulsaSuccessData] = useState<any>(null)
+  const [hasMinistriesAccess, setHasMinistriesAccess] = useState(true)
 
   const router = useRouter()
 
@@ -70,8 +71,12 @@ export default function PagamentosPage() {
 
       const response = await authenticatedFetch(`/api/v1/admin/billing-invoices?${params}`)
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
           router.push('/admin/login')
+          return
+        }
+        if (response.status === 403) {
+          setError('Acesso negado para este recurso.')
           return
         }
         throw new Error('Erro ao carregar faturas de cobrança')
@@ -91,6 +96,12 @@ export default function PagamentosPage() {
       fetchInvoices()
     }
   }, [statusFilter, isAuthenticated, isAdmin])
+
+  useEffect(() => {
+    if (isAuthenticated && isAdmin) {
+      fetchMinistries()
+    }
+  }, [isAuthenticated, isAdmin])
 
   const handleCopyLink = async (url: string, id: string) => {
     try {
@@ -133,13 +144,19 @@ export default function PagamentosPage() {
     try {
       setLoadingMinistries(true)
       const response = await authenticatedFetch('/api/v1/admin/ministries?limit=200')
+      if (response.status === 403) {
+        setHasMinistriesAccess(false)
+        setMinistries([])
+        return
+      }
       if (!response.ok) {
         throw new Error('Erro ao carregar ministérios')
       }
       const data = await response.json()
       setMinistries(data.data || [])
+      setHasMinistriesAccess(true)
     } catch (err: any) {
-      setError(err.message || 'Erro ao buscar ministérios')
+      console.warn('Erro ao carregar ministérios auxiliares:', err)
     } finally {
       setLoadingMinistries(false)
     }
@@ -328,13 +345,15 @@ export default function PagamentosPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleOpenAvulsaModal}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition"
-            >
-              <Plus className="h-4 w-4" />
-              Lançar Fatura Avulsa
-            </button>
+            {hasMinistriesAccess && (
+              <button
+                onClick={handleOpenAvulsaModal}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition"
+              >
+                <Plus className="h-4 w-4" />
+                Lançar Fatura Avulsa
+              </button>
+            )}
             <button
               onClick={fetchInvoices}
               disabled={loading}

@@ -527,8 +527,12 @@ export default function MinisteriosPage() {
         signal: controller.signal,
       })
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
           router.push('/admin/login')
+          return
+        }
+        if (response.status === 403) {
+          setError('Acesso negado para este recurso.')
           return
         }
         throw new Error('Erro ao carregar ministérios')
