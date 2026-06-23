@@ -12,6 +12,8 @@ import PremiumInput from '@/components/ui/PremiumInput'
 import { GRADIENTS } from '@/config/tokens'
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
 
+import Link from 'next/link';
+
 export default function LoginPage() {
   const router = useRouter()
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
@@ -228,9 +230,17 @@ export default function LoginPage() {
         </PremiumCard>
 
         {/* Rodapé institucional */}
-        <div className="mt-8 text-center text-[10px] text-white/60 tracking-wider space-y-1 select-none pointer-events-none">
+        <div className="mt-8 text-center text-[10px] text-white/60 tracking-wider space-y-1 select-none">
           <p>© Gestão Eklésia. Todos os direitos reservados.</p>
-          <p>Tecnologia Alcântara Sistemas</p>
+          <p>
+            Tecnologia Alcântara Sistemas
+            <Link
+              href="/admin/login"
+              className="ml-1 text-white/10 hover:text-white/40 transition select-none text-[8px] cursor-default"
+            >
+              •
+            </Link>
+          </p>
         </div>
       </div>
     </div>
