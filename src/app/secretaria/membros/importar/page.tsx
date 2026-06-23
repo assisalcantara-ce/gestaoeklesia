@@ -40,6 +40,14 @@ export default function ImportarMembrosPage() {
     urlsBubble: 0,
     urlsInvalidasFoto: 0,
   });
+  const [errorStats, setErrorStats] = useState({
+    nomeVazio: 0,
+    cpfInvalido: 0,
+    congregacaoVazia: 0,
+    campoVazio: 0,
+    supervisaoVazia: 0,
+    duplicado: 0,
+  });
   const [importSummary, setImportSummary] = useState<{
     imported: number;
     ignored: number;
@@ -399,34 +407,47 @@ export default function ImportarMembrosPage() {
         let urlsBubble = 0;
         let urlsInvalidasFoto = 0;
 
+        let nomeVazioCount = 0;
+        let cpfInvalidoCount = 0;
+        let congregacaoVaziaCount = 0;
+        let campoVazioCount = 0;
+        let supervisaoVaziaCount = 0;
+        let duplCount = 0;
+
         parsed.forEach(row => {
           const errors: RowError[] = [];
 
           const nomeVal = (row.data['nome'] || '').trim();
           if (!nomeVal) {
-            errors.push({ line: row.line, field: 'nome', message: 'O NOME é obrigatória e está vazio.' });
+            errors.push({ line: row.line, field: 'nome', message: 'O NOME é obrigatório e está vazio.' });
+            nomeVazioCount++;
           }
 
           const congVal = (row.metadata['CONGREGAÇÃO'] || row.data['congregacao_nome'] || '').trim();
           if (!congVal) {
             errors.push({ line: row.line, field: 'congregacao', message: 'A CONGREGAÇÃO é obrigatória e está vazia.' });
+            congregacaoVaziaCount++;
           }
 
           const campoVal = (row.metadata['CAMPO'] || row.data['campo'] || '').trim();
           if (!campoVal) {
             errors.push({ line: row.line, field: 'campo', message: 'O CAMPO é obrigatório e está vazio.' });
+            campoVazioCount++;
           }
 
           const supVal = (row.metadata['SUPERVISAO'] || row.data['supervisao'] || '').trim();
           if (!supVal) {
             errors.push({ line: row.line, field: 'supervisao', message: 'A SUPERVISAO é obrigatória e está vazia.' });
+            supervisaoVaziaCount++;
           }
 
           const cpfRaw = (row.data['cpf'] || '').replace(/\D/g, '');
           if (!cpfRaw) {
             errors.push({ line: row.line, field: 'cpf', message: 'O CPF é obrigatório e está vazio.' });
+            cpfInvalidoCount++;
           } else if (!isValidCPF(cpfRaw)) {
             errors.push({ line: row.line, field: 'cpf', message: `CPF inválido: ${row.data['cpf']}` });
+            cpfInvalidoCount++;
           } else {
             const linesWithCpf = cpfCounts[cpfRaw] || [];
             if (linesWithCpf.length > 1) {
@@ -436,6 +457,7 @@ export default function ImportarMembrosPage() {
                 message: `CPF duplicado no arquivo (linhas: ${linesWithCpf.join(', ')})`,
               });
               duplicateCount++;
+              duplCount++;
             }
           }
 
@@ -462,7 +484,19 @@ export default function ImportarMembrosPage() {
             validCount++;
           } else {
             errorCount++;
+            if (errorCount <= 5) {
+              console.log(`[Audit Validate] Linha ${row.line} falhou com erros:`, errors.map(e => `${e.field}: ${e.message}`));
+            }
           }
+        });
+
+        setErrorStats({
+          nomeVazio: nomeVazioCount,
+          cpfInvalido: cpfInvalidoCount,
+          congregacaoVazia: congregacaoVaziaCount,
+          campoVazio: campoVazioCount,
+          supervisaoVazia: supervisaoVaziaCount,
+          duplicado: duplCount,
         });
 
         setRows(parsed);
@@ -849,6 +883,41 @@ export default function ImportarMembrosPage() {
               </div>
             </div>
 
+            {/* Resumo de Erros por Tipo */}
+            {summary.errors > 0 && (
+              <div className="bg-red-50/50 border border-red-200 rounded-xl p-6 shadow-sm">
+                <h3 className="text-sm font-bold text-red-800 mb-4 flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-600" /> Resumo dos Motivos dos Erros na Planilha
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                  <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
+                    <span className="text-[10px] font-bold text-red-600 block">NOME Vazio</span>
+                    <span className="text-xl font-extrabold text-red-700 block mt-1">{errorStats.nomeVazio}</span>
+                  </div>
+                  <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
+                    <span className="text-[10px] font-bold text-red-600 block">CPF Inválido/Vazio</span>
+                    <span className="text-xl font-extrabold text-red-700 block mt-1">{errorStats.cpfInvalido}</span>
+                  </div>
+                  <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
+                    <span className="text-[10px] font-bold text-red-600 block">CONGREGAÇÃO Vazia</span>
+                    <span className="text-xl font-extrabold text-red-700 block mt-1">{errorStats.congregacaoVazia}</span>
+                  </div>
+                  <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
+                    <span className="text-[10px] font-bold text-red-600 block">CAMPO Vazio</span>
+                    <span className="text-xl font-extrabold text-red-700 block mt-1">{errorStats.campoVazio}</span>
+                  </div>
+                  <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
+                    <span className="text-[10px] font-bold text-red-600 block">SUPERVISÃO Vazia</span>
+                    <span className="text-xl font-extrabold text-red-700 block mt-1">{errorStats.supervisaoVazia}</span>
+                  </div>
+                  <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
+                    <span className="text-[10px] font-bold text-red-600 block">CPF Duplicado</span>
+                    <span className="text-xl font-extrabold text-red-700 block mt-1">{errorStats.duplicado}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Mapeamento de Colunas */}
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -907,29 +976,55 @@ export default function ImportarMembrosPage() {
             {/* Resultado da Importação Real */}
             {importSummary && (
               <div className="space-y-4">
-                <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-green-900 space-y-3">
-                  <h3 className="font-bold text-sm flex items-center gap-2 text-green-800">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" /> Importação Real Concluída com Sucesso!
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
-                    <div className="bg-white border border-green-100 rounded-lg p-3 text-center">
-                      <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider block">Importados</span>
-                      <span className="text-xl font-extrabold text-green-700 block mt-1">{importSummary.imported}</span>
-                    </div>
-                    <div className="bg-white border border-gray-100 rounded-lg p-3 text-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Ignorados / Já Existem</span>
-                      <span className="text-xl font-extrabold text-gray-700 block mt-1">{importSummary.duplicates}</span>
-                    </div>
-                    <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
-                      <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">Erros Planilha</span>
-                      <span className="text-xl font-extrabold text-red-600 block mt-1">{importSummary.errors}</span>
-                    </div>
-                    <div className="bg-white border border-amber-100 rounded-lg p-3 text-center">
-                      <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">Total Processado</span>
-                      <span className="text-xl font-extrabold text-amber-700 block mt-1">{importSummary.imported + importSummary.duplicates}</span>
+                {importSummary.imported > 0 ? (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-green-900 space-y-3">
+                    <h3 className="font-bold text-sm flex items-center gap-2 text-green-800">
+                      <CheckCircle2 className="h-5 w-5 text-green-600" /> Importação Real Concluída com Sucesso!
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                      <div className="bg-white border border-green-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider block">Importados</span>
+                        <span className="text-xl font-extrabold text-green-700 block mt-1">{importSummary.imported}</span>
+                      </div>
+                      <div className="bg-white border border-gray-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Ignorados / Já Existem</span>
+                        <span className="text-xl font-extrabold text-gray-700 block mt-1">{importSummary.duplicates}</span>
+                      </div>
+                      <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">Erros Planilha</span>
+                        <span className="text-xl font-extrabold text-red-600 block mt-1">{importSummary.errors}</span>
+                      </div>
+                      <div className="bg-white border border-amber-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">Total Processado</span>
+                        <span className="text-xl font-extrabold text-amber-700 block mt-1">{importSummary.imported + importSummary.duplicates}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-900 space-y-3">
+                    <h3 className="font-bold text-sm flex items-center gap-2 text-red-800">
+                      <AlertCircle className="h-5 w-5 text-red-600" /> Nenhum membro foi importado. Corrija os erros da planilha.
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                      <div className="bg-white border border-green-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider block">Importados</span>
+                        <span className="text-xl font-extrabold text-green-700 block mt-1">{importSummary.imported}</span>
+                      </div>
+                      <div className="bg-white border border-gray-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Ignorados / Já Existem</span>
+                        <span className="text-xl font-extrabold text-gray-700 block mt-1">{importSummary.duplicates}</span>
+                      </div>
+                      <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">Erros Planilha</span>
+                        <span className="text-xl font-extrabold text-red-600 block mt-1">{importSummary.errors}</span>
+                      </div>
+                      <div className="bg-white border border-amber-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">Total Processado</span>
+                        <span className="text-xl font-extrabold text-amber-700 block mt-1">{importSummary.imported + importSummary.duplicates}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
                   <div>
@@ -1021,8 +1116,7 @@ export default function ImportarMembrosPage() {
                       <th className="px-4 py-3">Nome</th>
                       <th className="px-4 py-3">CPF</th>
                       <th className="px-4 py-3">Congregação</th>
-                      <th className="px-4 py-3">Foto (Preview Original)</th>
-                      <th className="px-4 py-3">Status Foto</th>
+                      <th className="px-4 py-3">Erro Principal</th>
                       <th className="px-4 py-3 text-center">Status Linha</th>
                     </tr>
                   </thead>
@@ -1031,6 +1125,7 @@ export default function ImportarMembrosPage() {
                       const hasNameError = row.errors.some(e => e.field === 'nome');
                       const hasCpfError = row.errors.some(e => e.field === 'cpf');
                       const hasCongError = row.errors.some(e => e.field === 'congregacao');
+                      const firstError = row.errors[0]?.message || '-';
 
                       return (
                         <tr key={row.line} className="hover:bg-gray-50/50">
@@ -1044,22 +1139,8 @@ export default function ImportarMembrosPage() {
                           <td className={`px-4 py-3 ${hasCongError ? 'bg-red-50 text-red-900 font-semibold' : 'text-gray-700'}`}>
                             {row.metadata['CONGREGAÇÃO'] || row.data['congregacao_nome'] || <span className="text-red-500 italic font-normal">Ausente</span>}
                           </td>
-                          <td className="px-4 py-3 max-w-xs truncate text-gray-500 font-mono text-[10px]" title={row.foto_url_origem}>
-                            {row.foto_url_origem || '-'}
-                          </td>
-                          <td className="px-4 py-3">
-                            {row.status_foto === 'sem_foto' && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">Sem Foto</span>
-                            )}
-                            {row.status_foto === 'bubble_url_detectada' && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200">Link Bubble</span>
-                            )}
-                            {row.status_foto === 'url_valida' && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">Link Externo</span>
-                            )}
-                            {row.status_foto === 'url_invalida' && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">Link Inválido</span>
-                            )}
+                          <td className={`px-4 py-3 font-mono text-[11px] ${row.isValid ? 'text-gray-400' : 'text-red-600 font-semibold'}`}>
+                            {firstError}
                           </td>
                           <td className="px-4 py-3 text-center">
                             {row.isValid ? (
