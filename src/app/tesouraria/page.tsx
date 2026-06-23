@@ -81,6 +81,8 @@ interface Fechamento {
   fechado_por: string | null;
   fechado_em: string | null;
   status_conselho_fiscal?: string;
+  data_inicio?: string;
+  data_fim?: string;
 }
 
 const TIPOS: { value: TipoRecebimento; label: string; cor: string }[] = [
@@ -196,6 +198,61 @@ const mesProximo = (mes: string): string => {
   const [y, m] = mes.split('-').map(Number);
   const d = new Date(y, m, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const obterPeriodoFechamento = (f: Fechamento) => {
+  const data_inicio = f.data_inicio || `${f.mes_referencia}-01`;
+  let data_fim = f.data_fim;
+  if (!data_fim) {
+    const [y, m] = f.mes_referencia.split('-').map(Number);
+    const d = new Date(y, m, 0);
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mon = String(d.getMonth() + 1).padStart(2, '0');
+    data_fim = `${d.getFullYear()}-${mon}-${dia}`;
+  }
+  return { data_inicio, data_fim };
+};
+
+const obterFiltroDatasParaMes = (
+  mes: string,
+  congregacaoId: string | null,
+  fechamentos: Fechamento[]
+) => {
+  const [ano, mon] = mes.split('-').map(Number);
+  const dataPrev = new Date(ano, mon - 2, 1);
+  const mesAnterior = `${dataPrev.getFullYear()}-${String(dataPrev.getMonth() + 1).padStart(2, '0')}`;
+  
+  const fechAnt = fechamentos.find(f => 
+    f.mes_referencia === mesAnterior && 
+    (congregacaoId === null ? f.congregacao_id === null : f.congregacao_id === congregacaoId) &&
+    f.status === 'fechado'
+  );
+  
+  let data_inicio = `${mes}-01`;
+  if (fechAnt) {
+    const { data_fim: prevFim } = obterPeriodoFechamento(fechAnt);
+    const d = new Date(prevFim + 'T12:00:00');
+    d.setDate(d.getDate() + 1);
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mStr = String(d.getMonth() + 1).padStart(2, '0');
+    data_inicio = `${d.getFullYear()}-${mStr}-${dia}`;
+  }
+  
+  const fechAtual = fechamentos.find(f => 
+    f.mes_referencia === mes && 
+    (congregacaoId === null ? f.congregacao_id === null : f.congregacao_id === congregacaoId) &&
+    f.status === 'fechado'
+  );
+  
+  let data_fim = `${mesProximo(mes)}-01`;
+  let data_fim_inclusive = false;
+  if (fechAtual) {
+    const { data_fim: atualFim } = obterPeriodoFechamento(fechAtual);
+    data_fim = atualFim;
+    data_fim_inclusive = true;
+  }
+  
+  return { data_inicio, data_fim, data_fim_inclusive };
 };
 
 type FormLanc = {
@@ -429,6 +486,8 @@ export default function TesourariaPage() {
   const [showFechaModal, setShowFechaModal] = useState(false);
   const [fechaObs, setFechaObs] = useState('');
   const [fechaSaldoInicial, setFechaSaldoInicial] = useState('');
+  const [fechaDataInicio, setFechaDataInicio] = useState('');
+  const [fechaDataFim, setFechaDataFim] = useState('');
   const [salvandoFecha, setSalvandoFecha] = useState(false);
   const [fechaCongId, setFechaCongId] = useState<string | null>(null);
 
@@ -794,13 +853,27 @@ export default function TesourariaPage() {
     setLoadingMes(true);
     const congMap = new Map(congregacoes.map(c => [c.id, c.nome]));
     const depMap  = new Map(departamentos.map(d => [d.id, `${d.sigla} - ${d.nome}`]));
+    
+    const activeCongId = scope.isFinanceiroLocal && scope.congregacaoId 
+      ? scope.congregacaoId 
+      : (filtroCong || null);
+
+    const { data_inicio, data_fim, data_fim_inclusive } = obterFiltroDatasParaMes(mes, activeCongId, fechamentos);
+
     let q = supabase
       .from('tesouraria_lancamentos')
       .select('*')
       .eq('ministry_id', ministryId)
-      .gte('data_lancamento', `${mes}-01`)
-      .lt('data_lancamento', `${mesProximo(mes)}-01`)
-      .order('data_lancamento', { ascending: false });
+      .gte('data_lancamento', data_inicio);
+
+    if (data_fim_inclusive) {
+      q = q.lte('data_lancamento', data_fim);
+    } else {
+      q = q.lt('data_lancamento', data_fim);
+    }
+
+    q = q.order('data_lancamento', { ascending: false });
+
     if (scope.isFinanceiroLocal && scope.congregacaoId) {
       q = q.eq('congregacao_id', scope.congregacaoId);
     }
@@ -812,7 +885,7 @@ export default function TesourariaPage() {
       departamento_nome: l.departamento_id ? (depMap.get(l.departamento_id)  ?? '—')    : 'Caixa da Igreja',
     })));
     setLoadingMes(false);
-  }, [ministryId, supabase, scope, congregacoes, departamentos]);
+  }, [ministryId, supabase, scope, congregacoes, departamentos, filtroCong, fechamentos]);
 
   // Gráfico 12 meses: carrega após o load inicial completar
   useEffect(() => {
@@ -820,11 +893,11 @@ export default function TesourariaPage() {
     carregarGrafico12Meses();
   }, [ministryId, loadingData, carregarGrafico12Meses]);
 
-  // Lançamentos do mês: rebusca no banco quando filtroMes muda ou após carga inicial
+  // Lançamentos do mês: rebusca no banco quando filtroMes, filtroCong ou fechamentos mudam
   useEffect(() => {
     if (!ministryId || loadingData) return;
     carregarLancamentosMes(filtroMes);
-  }, [filtroMes, ministryId, loadingData, carregarLancamentosMes]);
+  }, [filtroMes, filtroCong, fechamentos, ministryId, loadingData, carregarLancamentosMes]);
 
   // ── Fase 2: Relatório — query direta ao banco por período ─────────────────────
 
@@ -1239,14 +1312,20 @@ export default function TesourariaPage() {
       showModal('Valor inválido', 'Informe um valor maior que zero.', 'error'); return;
     }
 
-    // Verificar se o mês do lançamento já está fechado
-    const mesLanc = form.data_lancamento.slice(0, 7);
-    const mestaFechado = fechamentos.some(f => f.mes_referencia === mesLanc && f.status === 'fechado');
+    // Verificar se o lançamento cai em algum período já fechado da respectiva congregação
+    const dataL = form.data_lancamento;
+    const congId = form.congregacao_id || null;
+    const mestaFechado = fechamentos.some(f => {
+      if (f.status !== 'fechado') return false;
+      const fCongId = f.congregacao_id || null;
+      if (fCongId !== congId) return false;
+      const { data_inicio, data_fim } = obterPeriodoFechamento(f);
+      return dataL >= data_inicio && dataL <= data_fim;
+    });
     if (mestaFechado) {
-      const [anoL, monL] = mesLanc.split('-');
       showModal(
-        'Mês fechado',
-        `O caixa de ${MESES_LABEL[Number(monL) - 1]}/${anoL} já foi encerrado e não aceita novos lançamentos ou edições. Para corrigir dados deste mês, reabasteça o histórico com o administrador.`,
+        'Período Fechado',
+        `A data do lançamento (${fmtDate(dataL)}) pertence a um caixa/período já encerrado para esta congregação e não aceita novos lançamentos ou edições.`,
         'error'
       );
       return;
@@ -1384,13 +1463,13 @@ export default function TesourariaPage() {
 
     const saldoIni = parseFloat(fechaSaldoInicial.replace(',', '.')) || 0;
 
-    // Buscar totais do banco filtrado pela congregação específica
+    // Buscar totais do banco filtrado pela congregação e período específicos
     let totaisQ = supabase
       .from('tesouraria_lancamentos')
       .select('tipo_movimento, valor')
       .eq('ministry_id', ministryId)
-      .gte('data_lancamento', `${abaFechaMes}-01`)
-      .lt('data_lancamento', `${mesProximo(abaFechaMes)}-01`);
+      .gte('data_lancamento', fechaDataInicio)
+      .lte('data_lancamento', fechaDataFim);
     if (fechaCongId === null) totaisQ = totaisQ.is('congregacao_id', null);
     else totaisQ = totaisQ.eq('congregacao_id', fechaCongId);
     const { data: totaisDb } = await totaisQ;
@@ -1429,6 +1508,8 @@ export default function TesourariaPage() {
       observacoes:    fechaObs || null,
       fechado_por:    uid ?? null,
       fechado_em:     new Date().toISOString(),
+      data_inicio:    fechaDataInicio,
+      data_fim:       fechaDataFim,
     };
 
     let errorMsg: string | null = null;
@@ -2455,6 +2536,34 @@ export default function TesourariaPage() {
                                   setFechaCongId(cx.id);
                                   setFechaSaldoInicial(String(cx.saldoInicial));
                                   setFechaObs('');
+                                  
+                                  const startData = (() => {
+                                    if (cx.fechAnt) {
+                                      const { data_fim: prevFim } = obterPeriodoFechamento(cx.fechAnt);
+                                      const d = new Date(prevFim + 'T12:00:00');
+                                      d.setDate(d.getDate() + 1);
+                                      const dia = String(d.getDate()).padStart(2, '0');
+                                      const mStr = String(d.getMonth() + 1).padStart(2, '0');
+                                      return `${d.getFullYear()}-${mStr}-${dia}`;
+                                    }
+                                    return `${abaFechaMes}-01`;
+                                  })();
+                                  setFechaDataInicio(startData);
+                                  
+                                  const defaultEndData = (() => {
+                                    const todayStr = new Date().toISOString().split('T')[0];
+                                    const [y, m] = abaFechaMes.split('-').map(Number);
+                                    const dLast = new Date(y, m, 0);
+                                    const dia = String(dLast.getDate()).padStart(2, '0');
+                                    const mon = String(dLast.getMonth() + 1).padStart(2, '0');
+                                    const lastDayStr = `${dLast.getFullYear()}-${mon}-${dia}`;
+                                    if (todayStr <= lastDayStr && todayStr.startsWith(abaFechaMes)) {
+                                      return todayStr;
+                                    }
+                                    return lastDayStr;
+                                  })();
+                                  setFechaDataFim(defaultEndData);
+
                                   setShowFechaModal(true);
                                 }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[#123b63] text-white rounded-lg text-xs font-semibold hover:bg-[#0f2a45] transition mx-auto"
@@ -2477,19 +2586,51 @@ export default function TesourariaPage() {
             {showFechaModal && (() => {
               const cxModal = statusMes.find(cx => cx.id === fechaCongId) ?? statusMes[0];
               const saldoIniNum = parseFloat(fechaSaldoInicial.replace(',', '.')) || 0;
-              const saldoFinalModal = saldoIniNum + (cxModal?.entLive ?? 0) - (cxModal?.saiLive ?? 0);
+              
+              // Calcular entradas e saídas dinâmicas do período [fechaDataInicio, fechaDataFim]
+              const doPeriodo = lancamentos.filter(l =>
+                l.data_lancamento >= fechaDataInicio &&
+                l.data_lancamento <= fechaDataFim &&
+                (cxModal.id === null ? l.congregacao_id === null : l.congregacao_id === cxModal.id)
+              );
+              const entLivePeriodo = doPeriodo.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
+              const saiLivePeriodo = doPeriodo.filter(l => l.tipo_movimento === 'saida').reduce((s, l) => s + Number(l.valor), 0);
+              const saldoFinalModal = saldoIniNum + entLivePeriodo - saiLivePeriodo;
+
               return (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                   <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 w-full max-w-md space-y-4">
                     <div className="flex justify-between items-center">
                       <div>
                         <h3 className="text-base font-bold text-[#123b63]">Fechar Caixa</h3>
-                        <p className="text-sm text-gray-500">{cxModal?.nome} — {MESES_LABEL[Number(mon) - 1]}/{ano}</p>
+                        <p className="text-sm text-gray-500">{cxModal?.nome}</p>
                       </div>
                       <button onClick={() => { setShowFechaModal(false); setFechaCongId(null); }}><X className="h-5 w-5 text-gray-400" /></button>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Data Inicial</label>
+                        <input
+                          type="date"
+                          value={fechaDataInicio}
+                          disabled
+                          className="w-full border border-gray-100 bg-gray-50 text-gray-500 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Data Final (Fechamento)</label>
+                        <input
+                          type="date"
+                          value={fechaDataFim}
+                          onChange={e => setFechaDataFim(e.target.value)}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#123b63]"
+                        />
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Saldo inicial do mês (R$)</label>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Saldo inicial do período (R$)</label>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -2506,12 +2647,12 @@ export default function TesourariaPage() {
                     </div>
                     <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
                       <div className="flex justify-between">
-                        <span className="text-gray-500">Entradas do mês:</span>
-                        <span className="font-semibold text-green-600">{fmtBRL(cxModal?.entLive ?? 0)}</span>
+                        <span className="text-gray-500">Entradas do período:</span>
+                        <span className="font-semibold text-green-600">{fmtBRL(entLivePeriodo)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-500">Saídas do mês:</span>
-                        <span className="font-semibold text-red-500">{fmtBRL(cxModal?.saiLive ?? 0)}</span>
+                        <span className="text-gray-500">Saídas do período:</span>
+                        <span className="font-semibold text-red-500">{fmtBRL(saiLivePeriodo)}</span>
                       </div>
                       <div className="flex justify-between border-t pt-1 mt-1">
                         <span className="text-gray-700 font-semibold">Saldo final:</span>
