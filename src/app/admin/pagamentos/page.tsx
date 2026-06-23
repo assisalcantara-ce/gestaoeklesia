@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import AdminSidebar from '@/components/AdminSidebar'
-import { ExternalLink, Copy, Check, Filter, RefreshCw, AlertCircle, Coins } from 'lucide-react'
+import { ExternalLink, Copy, Check, Filter, RefreshCw, AlertCircle, Coins, Plus, Search } from 'lucide-react'
 
 interface BillingInvoice {
   id: string
@@ -36,6 +36,20 @@ export default function PagamentosPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  
+  // === Faturas Avulsas ===
+  const [ministries, setMinistries] = useState<any[]>([])
+  const [loadingMinistries, setLoadingMinistries] = useState(false)
+  const [showAvulsaModal, setShowAvulsaModal] = useState(false)
+  const [avulsaSearch, setAvulsaSearch] = useState('')
+  const [selectedMinistryId, setSelectedMinistryId] = useState('')
+  const [avulsaAmount, setAvulsaAmount] = useState('')
+  const [avulsaDescription, setAvulsaDescription] = useState('')
+  const [avulsaDueDate, setAvulsaDueDate] = useState('')
+  const [avulsaInstallments, setAvulsaInstallments] = useState('1')
+  const [avulsaLoading, setAvulsaLoading] = useState(false)
+  const [avulsaSuccessData, setAvulsaSuccessData] = useState<any>(null)
+
   const router = useRouter()
 
   useEffect(() => {
@@ -110,6 +124,82 @@ export default function PagamentosPage() {
       setError(err.message || 'Erro ao processar pagamento.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // === Faturas Avulsas ===
+  const fetchMinistries = async () => {
+    try {
+      setLoadingMinistries(true)
+      const response = await authenticatedFetch('/api/v1/admin/ministries?limit=200')
+      if (!response.ok) {
+        throw new Error('Erro ao carregar ministérios')
+      }
+      const data = await response.json()
+      setMinistries(data.data || [])
+    } catch (err: any) {
+      setError(err.message || 'Erro ao buscar ministérios')
+    } finally {
+      setLoadingMinistries(false)
+    }
+  }
+
+  const handleOpenAvulsaModal = () => {
+    setShowAvulsaModal(true)
+    setAvulsaSearch('')
+    setSelectedMinistryId('')
+    setAvulsaAmount('')
+    setAvulsaDescription('')
+    setAvulsaDueDate('')
+    setAvulsaInstallments('1')
+    setAvulsaSuccessData(null)
+    fetchMinistries()
+  }
+
+  const handleCreateAvulsaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedMinistryId) return
+
+    try {
+      setAvulsaLoading(true)
+      setError('')
+
+      if (!avulsaDueDate) {
+        throw new Error('A data de vencimento é obrigatória')
+      }
+      if (!avulsaAmount || Number(avulsaAmount) <= 0) {
+        throw new Error('O valor da fatura deve ser maior que zero')
+      }
+      if (!avulsaDescription.trim()) {
+        throw new Error('A descrição é obrigatória')
+      }
+
+      const response = await authenticatedFetch('/api/v1/admin/billing/create-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ministry_id: selectedMinistryId,
+          due_date: avulsaDueDate,
+          installments: Number(avulsaInstallments),
+          amount: Number(avulsaAmount),
+          description: avulsaDescription,
+        }),
+      })
+
+      const resData = await response.json()
+      if (!response.ok) {
+        throw new Error(resData.error || 'Erro ao gerar fatura avulsa')
+      }
+
+      setAvulsaSuccessData({
+        id: resData.data.id,
+        invoiceUrl: resData.data.asaas_invoice_url,
+      })
+      fetchInvoices()
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setAvulsaLoading(false)
     }
   }
 
@@ -209,14 +299,23 @@ export default function PagamentosPage() {
               Gerencie e visualize as faturas de cobranças geradas para os ministérios.
             </p>
           </div>
-          <button
-            onClick={fetchInvoices}
-            disabled={loading}
-            className="p-2 text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition disabled:opacity-50"
-            title="Atualizar lista"
-          >
-            <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleOpenAvulsaModal}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition"
+            >
+              <Plus className="h-4 w-4" />
+              Lançar Fatura Avulsa
+            </button>
+            <button
+              onClick={fetchInvoices}
+              disabled={loading}
+              className="p-2.5 text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition disabled:opacity-50"
+              title="Atualizar lista"
+            >
+              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </header>
 
         <div className="p-8 max-w-7xl w-full mx-auto space-y-6">
@@ -355,6 +454,262 @@ export default function PagamentosPage() {
           </div>
         </div>
       </main>
+
+      {/* Modal: Lançar Fatura Avulsa */}
+      {showAvulsaModal && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 text-gray-100 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-800">
+              <h2 className="text-xl font-bold text-white">Lançar Fatura Avulsa</h2>
+              <button
+                type="button"
+                onClick={() => setShowAvulsaModal(false)}
+                className="text-gray-400 hover:text-white transition text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+              {avulsaSuccessData ? (
+                <div className="space-y-6 py-4">
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-xl flex items-start gap-3">
+                    <Check className="h-6 w-6 text-emerald-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-sm">Fatura(s) Avulsa(s) Gerada(s) com Sucesso!</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        A(s) cobrança(s) já constará(ão) na lista de faturamento do ministério.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    {avulsaSuccessData.invoiceUrl && (
+                      <>
+                        <a
+                          href={avulsaSuccessData.invoiceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-center font-semibold text-sm transition flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          Abrir 1ª fatura
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(avulsaSuccessData.invoiceUrl)
+                            alert('Link copiado!')
+                          }}
+                          className="w-full py-3 bg-gray-800 hover:bg-gray-750 text-gray-100 rounded-lg text-center font-semibold text-sm transition border border-gray-700 flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          Copiar link da 1ª fatura
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAvulsaModal(false)
+                      setAvulsaSuccessData(null)
+                    }}
+                    className="w-full py-2.5 bg-gray-800 hover:bg-gray-750 text-gray-300 rounded-lg text-center font-medium text-sm transition"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleCreateAvulsaSubmit} className="space-y-4">
+                  {/* Busca do Ministério */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
+                      Ministério Destinatário (Tenant) *
+                    </label>
+
+                    {selectedMinistryId ? (
+                      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex items-center justify-between">
+                        <div>
+                          <span className="font-semibold text-white block text-sm">
+                            {ministries.find((m) => m.id === selectedMinistryId)?.name}
+                          </span>
+                          <span className="text-xs text-gray-400 block">
+                            {ministries.find((m) => m.id === selectedMinistryId)?.email_admin}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMinistryId('')}
+                          className="text-xs text-rose-400 hover:text-rose-300 font-semibold transition"
+                        >
+                          Alterar
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                          <input
+                            type="text"
+                            placeholder="Buscar por nome ou e-mail..."
+                            value={avulsaSearch}
+                            onChange={(e) => setAvulsaSearch(e.target.value)}
+                            className="w-full bg-gray-850 border border-gray-700 rounded-lg pl-9 pr-4 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+
+                        <div className="bg-gray-850 border border-gray-700 rounded-lg max-h-40 overflow-y-auto divide-y divide-gray-800">
+                          {loadingMinistries ? (
+                            <div className="p-3 text-center text-xs text-gray-500">Carregando ministérios...</div>
+                          ) : ministries.length === 0 ? (
+                            <div className="p-3 text-center text-xs text-gray-500">Nenhum ministério encontrado.</div>
+                          ) : (
+                            ministries
+                              .filter(
+                                (m) =>
+                                  m.name.toLowerCase().includes(avulsaSearch.toLowerCase()) ||
+                                  m.email_admin?.toLowerCase().includes(avulsaSearch.toLowerCase())
+                              )
+                              .slice(0, 15)
+                              .map((m) => (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => setSelectedMinistryId(m.id)}
+                                  className="w-full p-3 text-left hover:bg-gray-800 transition flex flex-col cursor-pointer"
+                                >
+                                  <span className="font-medium text-gray-200 text-sm">{m.name}</span>
+                                  <span className="text-[10px] text-gray-400 uppercase tracking-wider">
+                                    {m.email_admin}
+                                  </span>
+                                </button>
+                              ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedMinistryId && (
+                    <>
+                      {/* Descrição */}
+                      <div>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
+                          Descrição da Cobrança *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: Consultoria de Configurações, Migração Manual..."
+                          value={avulsaDescription}
+                          onChange={(e) => setAvulsaDescription(e.target.value)}
+                          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      {/* Valor Total */}
+                      <div>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
+                          Valor Total da Cobrança (R$) *
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          step="0.01"
+                          min="1"
+                          placeholder="0,00"
+                          value={avulsaAmount}
+                          onChange={(e) => setAvulsaAmount(e.target.value)}
+                          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      {/* Data de Vencimento */}
+                      <div>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
+                          Data de Vencimento da 1ª Parcela *
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={avulsaDueDate}
+                          onChange={(e) => setAvulsaDueDate(e.target.value)}
+                          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      {/* Parcelas */}
+                      <div>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
+                          Quantidade de Parcelas
+                        </label>
+                        <select
+                          value={avulsaInstallments}
+                          onChange={(e) => setAvulsaInstallments(e.target.value)}
+                          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+                        >
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                            <option key={n} value={String(n)}>
+                              {n === 1 ? '1x (À vista)' : `${n}x`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Resumo Financeiro */}
+                      {avulsaAmount && Number(avulsaAmount) > 0 && (
+                        <div className="bg-gray-800/60 border border-gray-700/50 rounded-xl p-4 text-xs space-y-1">
+                          <span className="font-semibold text-white block mb-1 text-[10px] uppercase tracking-wider">
+                            Resumo das Parcelas
+                          </span>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Total da Cobrança:</span>
+                            <span className="text-gray-200 font-medium">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                Number(avulsaAmount)
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between border-t border-gray-700/50 pt-2 text-sm">
+                            <span className="text-gray-300 font-medium">
+                              Valor por Parcela ({avulsaInstallments}x):
+                            </span>
+                            <span className="text-emerald-400 font-bold">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                Number(avulsaAmount) / Math.max(1, Number(avulsaInstallments))
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowAvulsaModal(false)}
+                          disabled={avulsaLoading}
+                          className="flex-1 px-4 py-2.5 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-755 transition text-sm font-medium disabled:opacity-50"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={avulsaLoading}
+                          className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          {avulsaLoading ? 'Processando...' : 'Lançar Cobrança'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

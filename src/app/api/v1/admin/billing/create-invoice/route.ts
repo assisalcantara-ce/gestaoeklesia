@@ -37,11 +37,20 @@ export async function POST(request: NextRequest) {
     const { supabaseAdmin: supabase } = result.ctx
 
     const body = await request.json()
-    const { ministry_id, plano_slug, due_date } = body
+    const { ministry_id, plano_slug, due_date, installments, amount, description: customDescription } = body
 
-    if (!ministry_id || !plano_slug || !due_date) {
+    const installmentCount = Math.max(1, Number(installments || 1))
+
+    if (!ministry_id || !due_date) {
       return NextResponse.json(
-        { error: 'Campos obrigatórios: ministry_id, plano_slug, due_date' },
+        { error: 'Campos obrigatórios: ministry_id, due_date' },
+        { status: 400 }
+      )
+    }
+
+    if (!plano_slug && (!amount || !customDescription)) {
+      return NextResponse.json(
+        { error: 'É necessário fornecer o plano_slug OU o valor (amount) e a descrição para faturas avulsas' },
         { status: 400 }
       )
     }
@@ -60,22 +69,41 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Buscar subscription_plan
-    const { data: plan, error: planError } = await supabase
-      .from('subscription_plans')
-      .select('*')
-      .eq('slug', plano_slug.toLowerCase())
-      .maybeSingle()
+    let planId: string | null = null
+    let planSlug = 'avulsa'
+    let totalAmount = 0
+    let descriptionBase = ''
 
-    if (planError || !plan) {
-      return NextResponse.json(
-        { error: `Plano com o slug '${plano_slug}' não encontrado` },
-        { status: 404 }
-      )
+    if (plano_slug) {
+      // Buscar subscription_plan
+      const { data: plan, error: planError } = await supabase
+        .from('subscription_plans')
+        .select('*')
+        .eq('slug', plano_slug.toLowerCase())
+        .maybeSingle()
+
+      if (planError || !plan) {
+        return NextResponse.json(
+          { error: `Plano com o slug '${plano_slug}' não encontrado` },
+          { status: 404 }
+        )
+      }
+      planId = plan.id
+      planSlug = plan.slug
+      totalAmount = Number(plan.price_monthly) * 12
+      descriptionBase = `Assinatura Anual Gestão Eklesia - Plano ${plan.name}`
+    } else {
+      totalAmount = Number(amount)
+      if (Number.isNaN(totalAmount) || totalAmount <= 0) {
+        return NextResponse.json(
+          { error: 'Valor inválido para fatura avulsa' },
+          { status: 400 }
+        )
+      }
+      descriptionBase = String(customDescription).trim()
     }
 
-    // 3. Calcular valor anual = price_monthly * 12
-    const amount = Number(plan.price_monthly) * 12
+    const amountPerInstallment = Number((totalAmount / installmentCount).toFixed(2))
 
     // 4. Resolver asaas_customer_id e criar cobrança ASAAS
     let customerId = ministry.asaas_customer_id || ''
@@ -123,55 +151,74 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Criar pagamento no ASAAS da plataforma
-    const paymentPayload = {
-      customer: customerId,
-      billingType: 'UNDEFINED',
-      value: amount,
-      dueDate: due_date,
-      description: `Assinatura Anual Gestão Eklesia - Plano ${plan.name}`,
-    }
-
-    const paymentRes = await platformAsaasFetch('/payments', {
-      method: 'POST',
-      body: JSON.stringify(paymentPayload),
-    })
-
-    const asaas_payment_id = paymentRes.id
-    const asaas_invoice_url = paymentRes.invoiceUrl || paymentRes.bankSlipUrl
-    const asaas_customer_id = customerId
-
-    // 5. Salvar em platform_billing_invoices
+    // Criar faturas e registros
     const periodStart = new Date()
     const periodEnd = new Date()
     periodEnd.setMonth(periodEnd.getMonth() + 12)
 
-    const { data: invoice, error: insertError } = await supabase
-      .from('platform_billing_invoices')
-      .insert({
-        ministry_id,
-        subscription_plan_id: plan.id,
-        plano_slug: plan.slug,
-        amount,
-        due_date,
-        period_start: periodStart.toISOString(),
-        period_end: periodEnd.toISOString(),
-        status: 'pending',
-        asaas_payment_id,
-        asaas_invoice_url,
-        asaas_customer_id,
-      })
-      .select('*')
-      .single()
+    const baseDate = new Date(`${due_date}T00:00:00`)
+    const createdInvoices = []
 
-    if (insertError) {
-      return NextResponse.json(
-        { error: `Erro ao salvar fatura: ${insertError.message}` },
-        { status: 400 }
-      )
+    for (let i = 0; i < installmentCount; i++) {
+      const isLast = i === installmentCount - 1
+      const currentAmount = isLast
+        ? Number((totalAmount - amountPerInstallment * (installmentCount - 1)).toFixed(2))
+        : amountPerInstallment
+
+      const currentDueDate = new Date(baseDate)
+      currentDueDate.setMonth(baseDate.getMonth() + i)
+      const currentDueDateStr = currentDueDate.toISOString().slice(0, 10)
+
+      const description = installmentCount > 1
+        ? `${descriptionBase} (${i + 1}/${installmentCount})`
+        : descriptionBase
+
+      const paymentPayload = {
+        customer: customerId,
+        billingType: 'UNDEFINED',
+        value: currentAmount,
+        dueDate: currentDueDateStr,
+        description,
+      }
+
+      const paymentRes = await platformAsaasFetch('/payments', {
+        method: 'POST',
+        body: JSON.stringify(paymentPayload),
+      })
+
+      const asaas_payment_id = paymentRes.id
+      const asaas_invoice_url = paymentRes.invoiceUrl || paymentRes.bankSlipUrl
+      const asaas_customer_id = customerId
+
+      const { data: invoice, error: insertError } = await supabase
+        .from('platform_billing_invoices')
+        .insert({
+          ministry_id,
+          subscription_plan_id: planId,
+          plano_slug: planSlug,
+          amount: currentAmount,
+          due_date: currentDueDateStr,
+          period_start: periodStart.toISOString(),
+          period_end: periodEnd.toISOString(),
+          status: 'pending',
+          asaas_payment_id,
+          asaas_invoice_url,
+          asaas_customer_id,
+        })
+        .select('*')
+        .single()
+
+      if (insertError) {
+        return NextResponse.json(
+          { error: `Erro ao salvar fatura ${i + 1}: ${insertError.message}` },
+          { status: 400 }
+        )
+      }
+
+      createdInvoices.push(invoice)
     }
 
-    return NextResponse.json({ success: true, data: invoice })
+    return NextResponse.json({ success: true, data: createdInvoices[0], all_invoices: createdInvoices })
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Erro interno do servidor' }, { status: 500 })
   }
