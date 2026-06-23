@@ -86,6 +86,16 @@ export default function ImportarMembrosPage() {
 
   useEffect(() => {
     fetchPendingPhotosCount();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+      if (session) {
+        fetchPendingPhotosCount();
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   // 5 colunas obrigatórias conforme especificação
