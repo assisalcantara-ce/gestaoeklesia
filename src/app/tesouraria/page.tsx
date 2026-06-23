@@ -449,6 +449,9 @@ export default function TesourariaPage() {
   const [relCong,          setRelCong]          = useState('');
   const [relMostrarDet,    setRelMostrarDet]    = useState(false);
   const [relTipoRel,       setRelTipoRel]       = useState<'entradas' | 'saidas' | 'ambos'>('entradas');
+  const [relFiltroPeriodo, setRelFiltroPeriodo] = useState<'mes' | 'custom'>('mes');
+  const [relDataInicio,    setRelDataInicio]    = useState('');
+  const [relDataFim,       setRelDataFim]       = useState('');
 
   // ── Contas (CRUD) ──────────────────────────────────────────────────────────
   const [contasFull,      setContasFull]      = useState<FinContaFull[]>([]);
@@ -833,10 +836,24 @@ export default function TesourariaPage() {
     let q = supabase
       .from('tesouraria_lancamentos')
       .select('*')
-      .eq('ministry_id', ministryId)
-      .gte('data_lancamento', `${mes}-01`)
-      .lt('data_lancamento', `${mesProximo(mes)}-01`)
-      .order('data_lancamento', { ascending: false });
+      .eq('ministry_id', ministryId);
+
+    if (relFiltroPeriodo === 'mes') {
+      if (mes) {
+        q = q.gte('data_lancamento', `${mes}-01`)
+             .lt('data_lancamento', `${mesProximo(mes)}-01`);
+      }
+    } else {
+      if (relDataInicio) {
+        q = q.gte('data_lancamento', relDataInicio);
+      }
+      if (relDataFim) {
+        q = q.lte('data_lancamento', relDataFim);
+      }
+    }
+
+    q = q.order('data_lancamento', { ascending: false });
+
     if (scope.isFinanceiroLocal && scope.congregacaoId) {
       q = q.eq('congregacao_id', scope.congregacaoId);
     } else if (cong) {
@@ -850,12 +867,12 @@ export default function TesourariaPage() {
       departamento_nome: l.departamento_id ? (depMap.get(l.departamento_id)  ?? '—')    : 'Caixa da Igreja',
     })));
     setRelLoadingDB(false);
-  }, [ministryId, supabase, scope, congregacoes, departamentos]);
+  }, [ministryId, supabase, scope, congregacoes, departamentos, relFiltroPeriodo, relDataInicio, relDataFim]);
 
   useEffect(() => {
     if (!ministryId || loadingData || aba !== 'relatorio') return;
     carregarRelatorio(relMes, relCong);
-  }, [relMes, relCong, aba, ministryId, loadingData, carregarRelatorio]);
+  }, [relMes, relCong, relFiltroPeriodo, relDataInicio, relDataFim, aba, ministryId, loadingData, carregarRelatorio]);
 
   // ── Contas: carregar lista completa ──────────────────────────────────────────
 
@@ -2610,12 +2627,56 @@ export default function TesourariaPage() {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Mês de referência</label>
-              <MonthPicker
-                value={relMes}
-                onChange={setRelMes}
-              />
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Filtrar por</label>
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+                <button
+                  onClick={() => setRelFiltroPeriodo('mes')}
+                  className={`px-3 py-1.5 font-medium transition ${
+                    relFiltroPeriodo === 'mes' ? 'bg-[#123b63] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Mês
+                </button>
+                <button
+                  onClick={() => setRelFiltroPeriodo('custom')}
+                  className={`px-3 py-1.5 font-medium transition ${
+                    relFiltroPeriodo === 'custom' ? 'bg-[#123b63] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Período
+                </button>
+              </div>
             </div>
+            {relFiltroPeriodo === 'mes' ? (
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Mês de referência</label>
+                <MonthPicker
+                  value={relMes}
+                  onChange={setRelMes}
+                />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Data inicial</label>
+                  <input
+                    type="date"
+                    value={relDataInicio}
+                    onChange={e => setRelDataInicio(e.target.value)}
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm h-[34px] focus:outline-none focus:ring-1 focus:ring-[#123b63]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Data final</label>
+                  <input
+                    type="date"
+                    value={relDataFim}
+                    onChange={e => setRelDataFim(e.target.value)}
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm h-[34px] focus:outline-none focus:ring-1 focus:ring-[#123b63]"
+                  />
+                </div>
+              </>
+            )}
             {!scope.isFinanceiroLocal && (
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Caixa</label>
@@ -2645,7 +2706,7 @@ export default function TesourariaPage() {
               <Printer className="h-4 w-4" /> Imprimir
             </button>
             <button
-              onClick={() => exportarCSV(relDados, `relatorio-${relMes || 'geral'}`)}
+              onClick={() => exportarCSV(relDados, `relatorio-${relFiltroPeriodo === 'mes' ? (relMes || 'geral') : `${relDataInicio}_a_${relDataFim}`}`)}
               className="no-print flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-50 transition"
               title="Exportar relatório para CSV"
             >
@@ -2685,7 +2746,10 @@ export default function TesourariaPage() {
                   {relTipoRel === 'entradas' ? 'Relatório de Entradas' : relTipoRel === 'saidas' ? 'Relatório de Saídas' : 'Relatório Financeiro'}
                 </h2>
                 <p className="text-sm text-gray-500">
-                  {relMes ? `Período: ${relMes.split('-')[1]}/${relMes.split('-')[0]}` : 'Todos os períodos'}
+                  {relFiltroPeriodo === 'mes'
+                    ? (relMes ? `Período: ${relMes.split('-')[1]}/${relMes.split('-')[0]}` : 'Todos os períodos')
+                    : `Período: ${relDataInicio ? fmtDate(relDataInicio) : 'Início'} até ${relDataFim ? fmtDate(relDataFim) : 'Fim'}`
+                  }
                   {relCong ? ` • ${congNome(relCong)}` : ' • Todas as congregações'}
                 </p>
               </div>
