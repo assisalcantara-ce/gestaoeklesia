@@ -48,6 +48,12 @@ export default function ImportarMembrosPage() {
   } | null>(null);
   const [missingRequired, setMissingRequired] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
+  const [migrating, setMigrating] = useState(false);
+  const [migrationSummary, setMigrationSummary] = useState<{
+    migradas: number;
+    ignoradas: number;
+    erro: number;
+  } | null>(null);
 
   // 5 colunas obrigatórias conforme especificação
   const requiredFields = ['NOME', 'CPF', 'CONGREGAÇÃO', 'CAMPO', 'SUPERVISAO'];
@@ -647,6 +653,48 @@ export default function ImportarMembrosPage() {
     }
   };
 
+  const handleMigratePhotos = async () => {
+    setMigrating(true);
+    setErrorMessage('');
+    setMigrationSummary(null);
+    let totalMigradas = 0;
+    let totalIgnoradas = 0;
+    let totalErro = 0;
+
+    try {
+      let hasMore = true;
+      while (hasMore) {
+        const res = await fetch('/api/v1/secretaria/membros/migrate-photos', {
+          method: 'POST',
+        });
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || 'Erro na migração');
+        }
+        const data = await res.json();
+        totalMigradas += data.migradas || 0;
+        totalIgnoradas += data.ignoradas || 0;
+        totalErro += data.erro || 0;
+
+        if ((data.migradas || 0) === 0 && (data.erro || 0) === 0) {
+          hasMore = false;
+        }
+        if ((data.remaining || 0) === 0) {
+          hasMore = false;
+        }
+      }
+      setMigrationSummary({
+        migradas: totalMigradas,
+        ignoradas: totalIgnoradas,
+        erro: totalErro,
+      });
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Erro ao migrar fotos.');
+    } finally {
+      setMigrating(false);
+    }
+  };
+
   return (
     <PageLayout
       title="Importador Planilha Legada — AD Rocha"
@@ -852,28 +900,78 @@ export default function ImportarMembrosPage() {
 
             {/* Resultado da Importação Real */}
             {importSummary && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-green-900 space-y-3">
-                <h3 className="font-bold text-sm flex items-center gap-2 text-green-800">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" /> Importação Real Concluída com Sucesso!
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
-                  <div className="bg-white border border-green-100 rounded-lg p-3 text-center">
-                    <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider block">Importados</span>
-                    <span className="text-xl font-extrabold text-green-700 block mt-1">{importSummary.imported}</span>
-                  </div>
-                  <div className="bg-white border border-gray-100 rounded-lg p-3 text-center">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Ignorados / Já Existem</span>
-                    <span className="text-xl font-extrabold text-gray-700 block mt-1">{importSummary.duplicates}</span>
-                  </div>
-                  <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
-                    <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">Erros Planilha</span>
-                    <span className="text-xl font-extrabold text-red-600 block mt-1">{importSummary.errors}</span>
-                  </div>
-                  <div className="bg-white border border-amber-100 rounded-lg p-3 text-center">
-                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">Total Processado</span>
-                    <span className="text-xl font-extrabold text-amber-700 block mt-1">{importSummary.imported + importSummary.duplicates}</span>
+              <div className="space-y-4">
+                <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-green-900 space-y-3">
+                  <h3 className="font-bold text-sm flex items-center gap-2 text-green-800">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" /> Importação Real Concluída com Sucesso!
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                    <div className="bg-white border border-green-100 rounded-lg p-3 text-center">
+                      <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider block">Importados</span>
+                      <span className="text-xl font-extrabold text-green-700 block mt-1">{importSummary.imported}</span>
+                    </div>
+                    <div className="bg-white border border-gray-100 rounded-lg p-3 text-center">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Ignorados / Já Existem</span>
+                      <span className="text-xl font-extrabold text-gray-700 block mt-1">{importSummary.duplicates}</span>
+                    </div>
+                    <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
+                      <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">Erros Planilha</span>
+                      <span className="text-xl font-extrabold text-red-600 block mt-1">{importSummary.errors}</span>
+                    </div>
+                    <div className="bg-white border border-amber-100 rounded-lg p-3 text-center">
+                      <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">Total Processado</span>
+                      <span className="text-xl font-extrabold text-amber-700 block mt-1">{importSummary.imported + importSummary.duplicates}</span>
+                    </div>
                   </div>
                 </div>
+
+                <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-800">Migrar Fotos das URLs Bubble.io</h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Baixa as fotos de membros que vieram do Bubble e armazena de forma segura no Supabase Storage.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleMigratePhotos}
+                    disabled={migrating}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-sm transition shadow-md disabled:opacity-50 cursor-pointer"
+                  >
+                    {migrating ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Migrando Fotos...
+                      </>
+                    ) : (
+                      <>
+                        <Image className="h-4 w-4" />
+                        Migrar fotos
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {migrationSummary && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-xl p-6 text-purple-900 space-y-3">
+                    <h3 className="font-bold text-sm flex items-center gap-2 text-purple-800">
+                      <CheckCircle2 className="h-5 w-5 text-purple-600" /> Migração de Fotos Concluída!
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                      <div className="bg-white border border-purple-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider block">Migradas</span>
+                        <span className="text-xl font-extrabold text-purple-700 block mt-1">{migrationSummary.migradas}</span>
+                      </div>
+                      <div className="bg-white border border-gray-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Ignoradas</span>
+                        <span className="text-xl font-extrabold text-gray-700 block mt-1">{migrationSummary.ignoradas}</span>
+                      </div>
+                      <div className="bg-white border border-red-100 rounded-lg p-3 text-center">
+                        <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">Erro</span>
+                        <span className="text-xl font-extrabold text-red-600 block mt-1">{migrationSummary.erro}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
