@@ -74,6 +74,7 @@ interface Inscricao {
   criado_por: string | null;
   created_at: string;
   nome_display?: string;
+  payment_method?: string | null;
 }
 
 interface Pagamento {
@@ -289,6 +290,7 @@ export default function EventosPage() {
   const [loadingInsc,       setLoadingInsc]       = useState(false);
   const [buscaInsc,         setBuscaInsc]         = useState('');
   const [filtroStatusInsc,  setFiltroStatusInsc]  = useState<'' | StatusInscricao>('');
+  const [filtroPaymentMethod, setFiltroPaymentMethod] = useState<'' | 'pix' | 'card'>('');
   const [showFormInsc,      setShowFormInsc]      = useState(false);
   const [formInsc,          setFormInsc]          = useState<FormInscricao>(FORM_INSCRICAO_INICIAL);
   const [buscaMembro,       setBuscaMembro]       = useState('');
@@ -393,17 +395,25 @@ export default function EventosPage() {
     setLoadingInsc(true);
     const { data, error } = await supabase
       .from('eventos_inscricoes')
-      .select('*, members(nome_completo)')
+      .select('*, members(nome_completo), eventos_pagamentos(payment_method, status)')
       .eq('evento_id', eventoId)
       .order('created_at', { ascending: false });
 
     if (error) { showModal('Erro', error.message, 'error'); setLoadingInsc(false); return; }
 
-    type RawInsc = Inscricao & { members?: { nome_completo: string } | null };
-    setInscricoes(((data ?? []) as RawInsc[]).map(i => ({
-      ...i,
-      nome_display: i.member_id ? (i.members?.nome_completo ?? '—') : (i.nome_externo ?? '—'),
-    })));
+    type RawInsc = Inscricao & { 
+      members?: { nome_completo: string } | null;
+      eventos_pagamentos?: { payment_method: string; status: string }[];
+    };
+    setInscricoes(((data ?? []) as RawInsc[]).map(i => {
+      const pago = i.eventos_pagamentos?.find(p => p.status === 'pago');
+      const method = pago?.payment_method || i.eventos_pagamentos?.[0]?.payment_method || null;
+      return {
+        ...i,
+        nome_display: i.member_id ? (i.members?.nome_completo ?? '—') : (i.nome_externo ?? '—'),
+        payment_method: method,
+      };
+    }));
     setLoadingInsc(false);
   }, [supabase]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -461,6 +471,13 @@ export default function EventosPage() {
   const inscricoesFiltradas = useMemo(() => {
     let list = inscricoes;
     if (filtroStatusInsc) list = list.filter(i => i.status === filtroStatusInsc);
+    if (filtroPaymentMethod) {
+      if (filtroPaymentMethod === 'pix') {
+        list = list.filter(i => i.payment_method === 'pix');
+      } else if (filtroPaymentMethod === 'card') {
+        list = list.filter(i => i.payment_method === 'card' || i.payment_method === 'credit_card');
+      }
+    }
     if (buscaInsc) {
       const t = buscaInsc.toLowerCase();
       list = list.filter(i =>
@@ -470,7 +487,7 @@ export default function EventosPage() {
       );
     }
     return list;
-  }, [inscricoes, filtroStatusInsc, buscaInsc]);
+  }, [inscricoes, filtroStatusInsc, filtroPaymentMethod, buscaInsc]);
 
   const checkinFiltrado = useMemo(() => {
     const base = buscaCheckin.trim()
@@ -492,6 +509,7 @@ export default function EventosPage() {
     setAba(proximaAba);
     setBuscaInsc('');
     setFiltroStatusInsc('');
+    setFiltroPaymentMethod('');
     setBuscaCheckin('');
   };
 
@@ -1036,6 +1054,7 @@ export default function EventosPage() {
                 setPagamentos([]);
                 setBuscaInsc('');
                 setFiltroStatusInsc('');
+                setFiltroPaymentMethod('');
                 setBuscaCheckin('');
               }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
@@ -1104,6 +1123,12 @@ export default function EventosPage() {
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
               <option value="">Todos os status</option>
               {STATUS_INSCRICAO.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+            <select value={filtroPaymentMethod} onChange={e => setFiltroPaymentMethod(e.target.value as '' | 'pix' | 'card')}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              <option value="">Todas as formas</option>
+              <option value="pix">PIX</option>
+              <option value="card">Cartão</option>
             </select>
             {scope.canWrite && (
               <button onClick={() => setShowFormInsc(v => !v)}
@@ -1212,6 +1237,7 @@ export default function EventosPage() {
                     <th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">Nome</th>
                     <th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">Contato</th>
                     <th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">Status</th>
+                    <th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">Pagamento</th>
                     <th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">Hospedagem</th>
                     <th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">Observações</th>
                     {scope.canWrite && <th className="px-4 py-3 w-10" />}
@@ -1230,6 +1256,17 @@ export default function EventosPage() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusInscricaoCor(i.status)}`}>
                           {statusInscricaoLabel(i.status)}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600">
+                        {i.payment_method === 'pix' ? (
+                          <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200 font-medium">PIX</span>
+                        ) : (i.payment_method === 'credit_card' || i.payment_method === 'card') ? (
+                          <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 font-medium">Cartão</span>
+                        ) : i.payment_method ? (
+                          <span className="bg-gray-50 text-gray-700 px-1.5 py-0.5 rounded border border-gray-200 font-medium uppercase">{i.payment_method}</span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {i.com_hospedagem ? (

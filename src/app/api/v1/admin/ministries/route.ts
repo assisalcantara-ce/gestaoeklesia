@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-guard'
 import { randomBytes } from 'node:crypto'
+import { encryptTenantPassword } from '@/lib/tenant-password'
 
 function slugify(input: string) {
   return input
@@ -196,6 +197,8 @@ export async function POST(request: NextRequest) {
           max_storage_bytes: body?.max_storage_bytes || 5368709120,
           timezone: body?.timezone || 'America/Sao_Paulo',
           is_active: body?.is_active !== false,
+          access_password_encrypted: encryptTenantPassword(password),
+          access_password_updated_at: new Date().toISOString(),
         },
       ])
       .select()
@@ -364,6 +367,10 @@ export async function PATCH(request: NextRequest) {
       }
 
       if (accessEmail) payload.email_admin = accessEmail
+      if (accessPassword) {
+        payload.access_password_encrypted = encryptTenantPassword(accessPassword)
+        payload.access_password_updated_at = new Date().toISOString()
+      }
     }
 
     const { data, error } = await supabase

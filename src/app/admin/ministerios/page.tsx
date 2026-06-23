@@ -689,9 +689,24 @@ export default function MinisteriosPage() {
       setImportLoading(false)
     }
   }
-  const handlePrintLabel = (m: SupabaseMinistry) => {
-    const password = prompt('Digite a senha do tenant para a etiqueta (deixe em branco se não quiser exibir):', tempPasswords[m.id] || '');
-    if (password === null) return; // Cancelado
+  const handlePrintLabel = async (m: SupabaseMinistry) => {
+    let password = tempPasswords[m.id] || '';
+
+    try {
+      const response = await authenticatedFetch('/api/v1/admin/ministries/decrypt-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: m.id }),
+      })
+      if (response.ok) {
+        const resData = await response.json()
+        if (resData.password) {
+          password = resData.password
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao buscar senha descriptografada:', err)
+    }
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -712,19 +727,19 @@ export default function MinisteriosPage() {
               padding: 2mm 3.5mm;
               box-sizing: border-box;
               font-family: Arial, sans-serif;
-              font-size: 10px;
-              line-height: 1.2;
+              font-size: 11px;
+              line-height: 1.25;
               color: #000;
               display: flex;
               flex-direction: column;
               justify-content: center;
             }
             .title {
-              font-size: 12px;
+              font-size: 13px;
               font-weight: bold;
               border-bottom: 0.5px solid #000;
               padding-bottom: 1.5px;
-              margin-bottom: 2px;
+              margin-bottom: 3px;
               text-transform: uppercase;
               white-space: nowrap;
               overflow: hidden;
@@ -746,11 +761,11 @@ export default function MinisteriosPage() {
         </head>
         <body>
           <div class="title">${m.name}</div>
-          <div class="info"><span class="bold">Link de Acesso:</span> app.gestaoeklesia.com.br</div>
+          <div class="info"><span class="bold">Link:</span> app.gestaoeklesia.com.br</div>
           <div class="info"><span class="bold">E-mail:</span> ${m.email_admin || '-'}</div>
-          ${password ? `<div class="info"><span class="bold">Senha:</span> ${password}</div>` : ''}
+          <div class="info"><span class="bold">Senha:</span> ${password || 'Não alterada'}</div>
           <div class="info"><span class="bold">Plano:</span> <span style="text-transform: uppercase;">${m.plan || 'Starter'}</span></div>
-          <div class="info"><span class="bold">Telefone:</span> ${m.phone ? formatPhone(m.phone) : '-'}</div>
+          <div class="info"><span class="bold">Telefone:</span> ${formatPhoneDisplay(m.phone)}</div>
           <div class="footer">Gestão Eklésia</div>
           <script>
             window.onload = function() {
