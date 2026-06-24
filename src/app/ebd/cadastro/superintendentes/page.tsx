@@ -53,7 +53,7 @@ export default function EbdSuperintendentesPage() {
 
       const payload = await res.json();
       const todos: Superintendente[] = (payload?.data ?? []).filter(
-        (u: any) => u.nivel === 'superintendente'
+        (u: any) => u.nivel === 'superintendente_ebd' || u.nivel === 'superintendente'
       );
       setSuperintendentes(todos);
       setLoading(false);

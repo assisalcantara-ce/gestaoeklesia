@@ -92,13 +92,14 @@ export async function resolveEbdScope(supabase: SupabaseClient): Promise<{ minis
     if (mu?.ministry_id) {
       const perms: string[] = Array.isArray(mu.permissions) ? mu.permissions : [];
       const role = String(mu.role || '').toLowerCase();
-      const isSuperintendente =
-        role === 'superintendente' ||
-        role === 'superintendent' ||
-        perms.some(p => typeof p === 'string' && p.toUpperCase() === 'SUPERINTENDENTE');
+      const isLocalEbd =
+        role === 'coordenador_ebd' ||
+        role === 'coordenador' ||
+        role === 'superintendente' || // superintendente legado era local
+        perms.some(p => typeof p === 'string' && ['COORDENADOR_EBD', 'COORDENADOR', 'SUPERINTENDENTE'].includes(p.toUpperCase()));
       return {
         ministryId: mu.ministry_id,
-        churchId: isSuperintendente ? (mu.congregacao_id ?? null) : null,
+        churchId: isLocalEbd ? (mu.congregacao_id ?? null) : null,
       };
     }
 
