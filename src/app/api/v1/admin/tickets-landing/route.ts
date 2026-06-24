@@ -7,7 +7,7 @@ import { requireAdmin } from '@/lib/admin-guard'
 
 export async function GET(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    const result = await requireAdmin(request)
     if (!result.ok) return result.response
     const { supabaseAdmin } = result.ctx
     const searchParams = request.nextUrl.searchParams
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    const result = await requireAdmin(request)
     if (!result.ok) return result.response
     const { supabaseAdmin } = result.ctx
 

@@ -3,7 +3,7 @@ import { requireAdmin } from '@/lib/admin-guard'
 
 export async function GET(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    const result = await requireAdmin(request)
     if (!result.ok) return result.response
     const { supabaseAdmin } = result.ctx
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    const result = await requireAdmin(request)
     if (!result.ok) return result.response
     const { supabaseAdmin, user } = result.ctx
 
