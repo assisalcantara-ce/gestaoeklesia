@@ -2,13 +2,18 @@ export type NivelAcesso =
   | 'administrador'
   | 'financeiro'
   | 'supervisor'
+  | 'secretaria_local'
+  | 'tesouraria_local'
+  | 'superintendente_ebd'
+  | 'coordenador_ebd'
+  | 'presidencia'
+  | 'conselho_fiscal'
+  // Legado para compatibilidade
   | 'admin_local'
   | 'financeiro_local'
   | 'superintendente'
   | 'coordenador'
-  | 'operador'
-  | 'presidencia'
-  | 'conselho_fiscal';
+  | 'operador';
 
 export type RoleConfig = {
   role: 'admin' | 'manager' | 'operator';
@@ -50,12 +55,48 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'secretaria',
     'comissao',
   ],
+  secretaria_local: [
+    'dashboard',
+    'secretaria',
+    'secretaria_local',
+    'configuracoes',
+    'suporte',
+    'patrimonio',
+    'geolocalizacao',
+    'gestao',
+  ],
+  tesouraria_local: [
+    'financeiro',
+    'tesouraria',
+  ],
+  superintendente_ebd: [
+    'ebd',
+  ],
+  coordenador_ebd: [
+    'ebd',
+    'configuracoes',
+  ],
+  presidencia: [
+    'dashboard',
+    'presidencia',
+    'consolidado_financeiro',
+    'conselho_fiscal',
+  ],
+  conselho_fiscal: [
+    'presidencia',
+    'consolidado_financeiro',
+    'conselho_fiscal',
+  ],
+  // Mapeamentos legados (compartilham as mesmas permissões dos novos)
   admin_local: [
     'dashboard',
     'secretaria',
     'secretaria_local',
     'configuracoes',
     'suporte',
+    'patrimonio',
+    'geolocalizacao',
+    'gestao',
   ],
   financeiro_local: [
     'financeiro',
@@ -69,22 +110,14 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'configuracoes',
   ],
   operador: [
+    'dashboard',
     'secretaria',
     'secretaria_local',
+    'configuracoes',
+    'suporte',
     'patrimonio',
     'geolocalizacao',
     'gestao',
-  ],
-  presidencia: [
-    'dashboard',
-    'presidencia',
-    'consolidado_financeiro',
-    'conselho_fiscal',
-  ],
-  conselho_fiscal: [
-    'presidencia',
-    'consolidado_financeiro',
-    'conselho_fiscal',
   ],
 };
 
@@ -116,8 +149,32 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
   supervisor: [
     'secretaria',
   ],
+  secretaria_local: [
+    'secretaria',
+    'patrimonio',
+    'geolocalizacao',
+    'gestao',
+  ],
+  tesouraria_local: [
+    'financeiro',
+    'tesouraria',
+  ],
+  superintendente_ebd: [
+    'ebd',
+  ],
+  coordenador_ebd: [
+    'ebd',
+  ],
+  presidencia: [],
+  conselho_fiscal: [
+    'conselho_fiscal',
+  ],
+  // Legados
   admin_local: [
     'secretaria',
+    'patrimonio',
+    'geolocalizacao',
+    'gestao',
   ],
   financeiro_local: [
     'financeiro',
@@ -135,10 +192,6 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'geolocalizacao',
     'gestao',
   ],
-  presidencia: [],
-  conselho_fiscal: [
-    'conselho_fiscal',
-  ],
 };
 
 export function normalizePermissions(permissions: unknown): string[] {
@@ -154,38 +207,51 @@ export function resolveNivel(role: string | null | undefined, permissions: unkno
 
   if (!roleNorm && perms.length === 0) return null;
 
-  if (perms.includes('ADMINISTRADOR')) return 'administrador';
-  if (perms.includes('ADMIN_LOCAL')) return 'admin_local';
-  if (perms.includes('FINANCEIRO_LOCAL')) return 'financeiro_local';
-  if (perms.includes('FINANCEIRO')) return 'financeiro';
-  if (perms.includes('SUPERINTENDENTE')) return 'superintendente';
-  if (perms.includes('SUPERVISOR')) return 'supervisor';
-  if (perms.includes('COORDENADOR')) return 'coordenador';
-  if (perms.includes('OPERADOR')) return 'operador';
-  if (perms.includes('PRESIDENCIA')) return 'presidencia';
-  if (perms.includes('CONSELHO_FISCAL')) return 'conselho_fiscal';
+  let resolved: NivelAcesso | null = null;
 
-  const map: Record<string, NivelAcesso> = {
-    admin: 'administrador',
-    administrador: 'administrador',
-    manager: 'financeiro',
-    financeiro: 'financeiro',
-    financial: 'financeiro',
-    financeiro_local: 'financeiro_local',
-    supervisor: 'supervisor',
-    superintendente: 'superintendente',
-    superintendent: 'superintendente',
-    admin_local: 'admin_local',
-    operador: 'operador',
-    operator: 'operador',
-    coordenador: 'coordenador',
-    coordinator: 'coordenador',
-    viewer: 'operador',
-    presidencia: 'presidencia',
-    conselho_fiscal: 'conselho_fiscal',
-  };
+  if (perms.includes('ADMINISTRADOR')) resolved = 'administrador';
+  else if (perms.includes('ADMIN_LOCAL')) resolved = 'secretaria_local';
+  else if (perms.includes('SECRETARIA_LOCAL')) resolved = 'secretaria_local';
+  else if (perms.includes('FINANCEIRO_LOCAL')) resolved = 'tesouraria_local';
+  else if (perms.includes('TESOURARIA_LOCAL')) resolved = 'tesouraria_local';
+  else if (perms.includes('FINANCEIRO')) resolved = 'financeiro';
+  else if (perms.includes('SUPERINTENDENTE_EBD')) resolved = 'superintendente_ebd';
+  else if (perms.includes('SUPERINTENDENTE')) resolved = 'superintendente_ebd';
+  else if (perms.includes('SUPERVISOR')) resolved = 'supervisor';
+  else if (perms.includes('COORDENADOR_EBD')) resolved = 'coordenador_ebd';
+  else if (perms.includes('COORDENADOR')) resolved = 'coordenador_ebd';
+  else if (perms.includes('OPERADOR')) resolved = 'secretaria_local';
+  else if (perms.includes('PRESIDENCIA')) resolved = 'presidencia';
+  else if (perms.includes('CONSELHO_FISCAL')) resolved = 'conselho_fiscal';
 
-  return map[roleNorm] ?? null;
+  if (!resolved) {
+    const map: Record<string, NivelAcesso> = {
+      admin: 'administrador',
+      administrador: 'administrador',
+      manager: 'financeiro',
+      financeiro: 'financeiro',
+      financial: 'financeiro',
+      financeiro_local: 'tesouraria_local',
+      tesouraria_local: 'tesouraria_local',
+      supervisor: 'supervisor',
+      superintendente: 'superintendente_ebd',
+      superintendente_ebd: 'superintendente_ebd',
+      superintent: 'superintendente_ebd',
+      admin_local: 'secretaria_local',
+      secretaria_local: 'secretaria_local',
+      operador: 'secretaria_local',
+      operator: 'secretaria_local',
+      coordenador: 'coordenador_ebd',
+      coordenador_ebd: 'coordenador_ebd',
+      coordinator: 'coordenador_ebd',
+      viewer: 'secretaria_local',
+      presidencia: 'presidencia',
+      conselho_fiscal: 'conselho_fiscal',
+    };
+    resolved = map[roleNorm] ?? null;
+  }
+
+  return resolved;
 }
 
 export function resolveRoles(role: string | null | undefined, permissions: unknown): string[] {
@@ -204,16 +270,19 @@ export function mapRoleAndPermissions(nivel: NivelAcesso): RoleConfig {
       return { role: 'manager', permissions: ['FINANCEIRO'] };
     case 'supervisor':
       return { role: 'manager', permissions: ['SUPERVISOR'] };
+    case 'secretaria_local':
     case 'admin_local':
-      return { role: 'operator', permissions: ['ADMIN_LOCAL'] };
-    case 'financeiro_local':
-      return { role: 'operator', permissions: ['FINANCEIRO_LOCAL'] };
-    case 'superintendente':
-      return { role: 'operator', permissions: ['SUPERINTENDENTE'] };
-    case 'coordenador':
-      return { role: 'operator', permissions: ['COORDENADOR'] };
     case 'operador':
-      return { role: 'operator', permissions: ['OPERADOR'] };
+      return { role: 'operator', permissions: ['SECRETARIA_LOCAL', 'ADMIN_LOCAL', 'OPERADOR'] };
+    case 'tesouraria_local':
+    case 'financeiro_local':
+      return { role: 'operator', permissions: ['TESOURARIA_LOCAL', 'FINANCEIRO_LOCAL'] };
+    case 'superintendente_ebd':
+    case 'superintendente':
+      return { role: 'operator', permissions: ['SUPERINTENDENTE_EBD', 'SUPERINTENDENTE'] };
+    case 'coordenador_ebd':
+    case 'coordenador':
+      return { role: 'operator', permissions: ['COORDENADOR_EBD', 'COORDENADOR'] };
     case 'presidencia':
       return { role: 'operator', permissions: ['PRESIDENCIA'] };
     case 'conselho_fiscal':
@@ -236,5 +305,13 @@ export function hasRole(roles: string[], required: string[] | string): boolean {
 }
 
 export function isLocalNivel(nivel: NivelAcesso): boolean {
-  return ['admin_local', 'financeiro_local', 'coordenador', 'operador'].includes(nivel);
+  return [
+    'secretaria_local',
+    'tesouraria_local',
+    'coordenador_ebd',
+    'admin_local',
+    'financeiro_local',
+    'coordenador',
+    'operador'
+  ].includes(nivel);
 }

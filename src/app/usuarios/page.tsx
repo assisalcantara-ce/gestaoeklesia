@@ -7,14 +7,14 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { useAuditLog } from '@/hooks/useAuditLog';
-
+import { type NivelAcesso as NivelAcessoRole } from '@/lib/access-control';
 
 interface Usuario {
   id: string;
   nome: string;
   email: string;
   email_confirmed?: boolean;
-  nivel: 'administrador' | 'financeiro' | 'supervisor' | 'admin_local' | 'financeiro_local' | 'superintendente';
+  nivel: NivelAcessoRole;
   congregacao?: string;
   congregacao_id?: string | null;
   supervisao?: string;
@@ -101,49 +101,55 @@ export default function UsuariosPage() {
     {
       id: 'administrador',
       nome: 'Administrador',
-      descricao: 'Secretaria Geral — Acesso total ao sistema',
+      descricao: 'Acesso total a todos os recursos do sistema',
       icon: '👑',
       cor: 'bg-purple-100 border-purple-300',
     },
     {
       id: 'financeiro',
       nome: 'Financeiro',
-      descricao: 'Funções reduzidas com acesso ao módulo Financeiro Geral',
+      descricao: 'Acesso completo ao financeiro e tesouraria geral',
       icon: '💳',
       cor: 'bg-blue-100 border-blue-300',
     },
     {
-      id: 'supervisor',
-      nome: 'Supervisor',
-      descricao: 'Consultas cadastrais da sua área. Sem acesso ao financeiro ou cadastros gerais',
-      icon: '🗺️',
-      cor: 'bg-indigo-100 border-indigo-300',
+      id: 'secretaria_local',
+      nome: 'Secretaria Local',
+      descricao: 'Acesso restrito aos dados da sua congregação',
+      icon: '👤',
+      cor: 'bg-gray-100 border-gray-300',
     },
     {
-      id: 'financeiro_local',
-      nome: 'Financeiro Local',
-      descricao: 'Funções reduzidas com acesso ao módulo Financeiro da sua Congregação',
+      id: 'tesouraria_local',
+      nome: 'Tesouraria Local',
+      descricao: 'Acesso restrito à tesouraria da sua congregação',
       icon: '💰',
       cor: 'bg-yellow-50 border-yellow-300',
     },
     {
-      id: 'superintendente',
+      id: 'superintendente_ebd',
       nome: 'Superintendente EBD',
-      descricao: 'Acesso exclusivo ao módulo EBD da sua congregação',
+      descricao: 'Acesso completo ao módulo EBD do ministério',
       icon: '📖',
       cor: 'bg-teal-100 border-teal-300',
     },
     {
-      id: 'operador',
-      nome: 'Operador Local',
-      descricao: 'Acesso somente à secretaria da sua congregação. Sem acesso a financeiro, suporte ou configurações',
-      icon: '👤',
-      cor: 'bg-gray-100 border-gray-300',
+      id: 'coordenador_ebd',
+      nome: 'Coordenador EBD',
+      descricao: 'Acesso restrito à EBD da sua congregação',
+      icon: '🎓',
+      cor: 'bg-indigo-100 border-indigo-300',
     },
   ];
 
   const getNivelInfo = (nivel: string) => {
-    return nivelAcessoInfo.find(n => n.id === nivel);
+    return nivelAcessoInfo.find(n => n.id === nivel) || {
+      id: nivel,
+      nome: nivel === 'operador' ? 'Operador Local (Legado)' : nivel === 'admin_local' ? 'Admin Local (Legado)' : nivel === 'financeiro_local' ? 'Financeiro Local (Legado)' : nivel === 'superintendente' ? 'Superintendente EBD (Legado)' : nivel === 'coordenador' ? 'Coordenador EBD (Legado)' : nivel,
+      descricao: '',
+      icon: '👤',
+      cor: 'bg-gray-50 border-gray-200',
+    };
   };
 
   const getCorNivel = (nivel: string) => {
@@ -319,7 +325,7 @@ export default function UsuariosPage() {
       return;
     }
 
-    if (['admin_local', 'financeiro_local'].includes(editData.nivel) && !editData.congregacao_id) {
+    if (['secretaria_local', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'coordenador', 'operador'].includes(editData.nivel) && !editData.congregacao_id) {
       setEditError('Congregação obrigatória para este nível.');
       return;
     }
@@ -483,7 +489,7 @@ export default function UsuariosPage() {
       return;
     }
 
-    if (['admin_local', 'financeiro_local'].includes(formData.nivel) && !formData.congregacao_id) {
+    if (['secretaria_local', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'coordenador', 'operador'].includes(formData.nivel) && !formData.congregacao_id) {
       setFormError('Congregação obrigatória para este nível.');
       return;
     }
@@ -738,7 +744,7 @@ export default function UsuariosPage() {
                 </div>
               )}
 
-              {['admin_local', 'financeiro_local', 'superintendente', 'operador'].includes(selectedLevel) && (
+              {['secretaria_local', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'coordenador', 'operador'].includes(selectedLevel) && (
                 <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                   <label className="block text-sm font-semibold text-green-800 mb-1">
                     Congregação / Igreja * <span className="font-normal text-green-600">(1ª divisão — escopo de acesso)</span>
@@ -1040,7 +1046,7 @@ export default function UsuariosPage() {
                   </div>
                 </div>
 
-                {['admin_local', 'financeiro_local', 'superintendente', 'operador'].includes(editData.nivel) && (
+                {['secretaria_local', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'coordenador', 'operador'].includes(editData.nivel) && (
                   <div>
                     <label className="block text-sm font-semibold text-[#123b63] mb-2">Congregação / Igreja *</label>
                     <select

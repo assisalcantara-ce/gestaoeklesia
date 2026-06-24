@@ -36,15 +36,15 @@ export function isOperador(nivel: NivelAcesso): boolean {
 }
 
 export function isFinanceiro(nivel: NivelAcesso): boolean {
-  return nivel === 'financeiro' || nivel === 'financeiro_local';
+  return nivel === 'financeiro' || nivel === 'tesouraria_local' || nivel === 'financeiro_local';
 }
 
 export function isSuperintendente(nivel: NivelAcesso): boolean {
-  return nivel === 'superintendente';
+  return nivel === 'superintendente_ebd' || nivel === 'superintendente';
 }
 
 export function isCoordenador(nivel: NivelAcesso): boolean {
-  return nivel === 'coordenador';
+  return nivel === 'coordenador_ebd' || nivel === 'coordenador';
 }
 
 export function podeAcessarSecretaria(nivel: NivelAcesso): boolean {
@@ -73,7 +73,7 @@ export function filtrarCongregacoes(
     return congregacoes.filter(c => c.supervisao === supervisaoUsuario);
   }
 
-  if (['operador', 'admin_local', 'financeiro_local', 'coordenador'].includes(nivel) && congregacaoUsuario) {
+  if (['secretaria_local', 'tesouraria_local', 'coordenador_ebd', 'operador', 'admin_local', 'financeiro_local', 'coordenador'].includes(nivel) && congregacaoUsuario) {
     return congregacoes.filter(c => c.nome === congregacaoUsuario || c.id === congregacaoUsuario);
   }
 
