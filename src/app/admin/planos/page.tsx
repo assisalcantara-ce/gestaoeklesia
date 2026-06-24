@@ -273,17 +273,6 @@ export default function PlanosPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Usuários Administrativos</label>
-                    <input
-                      type="number"
-                      value={formData.max_users}
-                      onChange={(e) => setFormData({ ...formData, max_users: e.target.value })}
-                      required
-                      className="w-full px-4 py-2 border rounded-lg"
-                    />
-                  </div>
-
-                  <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Máximo de Membros</label>
                     <input
                       type="number"
@@ -322,31 +311,6 @@ export default function PlanosPage() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Taxa por Igreja Adicional (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.additional_church_monthly_fee}
-                      onChange={(e) => setFormData({ ...formData, additional_church_monthly_fee: e.target.value })}
-                      required
-                      className="w-full px-4 py-2 border rounded-lg"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Admins por Igreja Adicional</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData.additional_admin_users_per_church}
-                      onChange={(e) => setFormData({ ...formData, additional_admin_users_per_church: e.target.value })}
-                      required
-                      className="w-full px-4 py-2 border rounded-lg"
-                    />
-                  </div>
-
                   <div className="md:col-span-3">
                     <label className="block text-sm font-medium text-gray-300 mb-2">Descrição</label>
                     <textarea
@@ -357,7 +321,7 @@ export default function PlanosPage() {
                     />
                   </div>
 
-                  <div>
+                  <div className="md:col-span-3">
                     <label className="block text-sm font-medium text-gray-300 mb-2">Preço Mensal (R$)</label>
                     <input
                       type="number"
@@ -368,125 +332,6 @@ export default function PlanosPage() {
                       className="w-full px-4 py-2 border rounded-lg"
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Preço Anual (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.price_annually}
-                      onChange={(e) => setFormData({ ...formData, price_annually: e.target.value })}
-                      className="w-full px-4 py-2 border rounded-lg"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Preço de Implantação (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.setup_fee}
-                      onChange={(e) => setFormData({ ...formData, setup_fee: e.target.value })}
-                      className="w-full px-4 py-2 border rounded-lg"
-                    />
-                  </div>
-
-
-                  <h3 className="md:col-span-3 font-semibold text-lg mt-4">Recursos</h3>
-
-                  <label className="col-span-1 flex items-center text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={formData.has_api_access}
-                      onChange={(e) => setFormData({ ...formData, has_api_access: e.target.checked })}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="ml-2">Acesso à API</span>
-                  </label>
-
-
-
-                  <label className="col-span-1 flex items-center text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={formData.has_advanced_reports}
-                      onChange={(e) => setFormData({ ...formData, has_advanced_reports: e.target.checked })}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="ml-2">Relatórios Avançados</span>
-                  </label>
-
-                  <label className="col-span-1 flex items-center text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={formData.has_priority_support}
-                      onChange={(e) => setFormData({ ...formData, has_priority_support: e.target.checked })}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="ml-2">Suporte Prioritário</span>
-                  </label>
-
-                  <h3 className="md:col-span-3 font-semibold text-lg mt-4">Módulos Extras</h3>
-
-                  <label className="col-span-1 flex items-center text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={formData.has_modulo_financeiro}
-                      onChange={(e) => setFormData({ ...formData, has_modulo_financeiro: e.target.checked })}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="ml-2">Financeiro</span>
-                  </label>
-
-                  <label className="col-span-1 flex items-center text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={formData.has_modulo_eventos}
-                      onChange={(e) => setFormData({ ...formData, has_modulo_eventos: e.target.checked })}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="ml-2">Eventos</span>
-                  </label>
-
-                  <label className="col-span-1 flex items-center text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={formData.has_modulo_reunioes}
-                      onChange={(e) => setFormData({ ...formData, has_modulo_reunioes: e.target.checked })}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="ml-2">Reuniões</span>
-                  </label>
-
-                  <label className="col-span-1 flex items-center text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={formData.has_custom_domain}
-                      onChange={(e) => setFormData({ ...formData, has_custom_domain: e.target.checked })}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="ml-2">Domínio Próprio</span>
-                  </label>
-
-                  <label className="col-span-1 flex items-center text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={formData.has_white_label}
-                      onChange={(e) => setFormData({ ...formData, has_white_label: e.target.checked })}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="ml-2">White Label</span>
-                  </label>
-
-                  <label className="col-span-1 flex items-center text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={formData.has_automation}
-                      onChange={(e) => setFormData({ ...formData, has_automation: e.target.checked })}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="ml-2">Automação</span>
-                  </label>
 
                   <div className="md:col-span-3">
                     <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -537,11 +382,6 @@ export default function PlanosPage() {
                         R$ {plan.price_monthly.toFixed(2)}
                         <span className="text-base text-gray-300">/mês</span>
                       </div>
-                      {(plan.price_annually ?? 0) > 0 && (
-                        <p className="text-sm text-gray-300 mt-2">
-                          R$ {plan.price_annually!.toFixed(2)}/ano
-                        </p>
-                      )}
                     </div>
 
                     <div className="p-6 border-b border-gray-800">
@@ -553,18 +393,6 @@ export default function PlanosPage() {
                         <li className="flex items-center text-sm">
                           <span className="font-semibold text-gray-100 mr-2">🏛️</span>
                           Até {(plan as any).max_ministerios || 0} Igrejas Inclusas
-                        </li>
-                        <li className="flex items-center text-sm">
-                          <span className="font-semibold text-gray-100 mr-2">👥</span>
-                          Até {plan.max_users} Usuários Administrativos
-                        </li>
-                        <li className="flex items-center text-sm">
-                          <span className="font-semibold text-gray-100 mr-2">➕</span>
-                          R$ {Number((plan as any).additional_church_monthly_fee || 0).toFixed(2)} por igreja adicional/mês
-                        </li>
-                        <li className="flex items-center text-sm">
-                          <span className="font-semibold text-gray-100 mr-2">👤</span>
-                          +{(plan as any).additional_admin_users_per_church || 0} admins por igreja adicional
                         </li>
                       </ul>
                     </div>
