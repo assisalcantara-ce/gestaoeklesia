@@ -33,16 +33,9 @@ type PlanoDB = {
 
 function buildHighlights(plan: PlanoDB): string[] {
   const h: string[] = [];
-  if (plan.max_users > 0) h.push(`Até ${plan.max_users} Usuários Administrativos`);
   if (plan.max_members > 0) h.push(`Até ${plan.max_members.toLocaleString('pt-BR')} Membros`);
   else h.push('Membros ilimitados');
   if (plan.max_ministerios > 0) h.push(`Até ${plan.max_ministerios} Igrejas inclusas`);
-  if (plan.additional_church_monthly_fee > 0) {
-    h.push(`R$ ${plan.additional_church_monthly_fee.toFixed(2).replace('.', ',')}/mês por igreja adicional`);
-  }
-  if (plan.additional_admin_users_per_church > 0) {
-    h.push(`+${plan.additional_admin_users_per_church} admins por igreja adicional`);
-  }
   // Módulos registrados no banco (coluna modulos)
   if (plan.modulos && plan.modulos.length > 0) {
     plan.modulos.forEach(m => h.push(m));
