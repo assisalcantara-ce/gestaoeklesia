@@ -204,53 +204,22 @@ type PlanoDB = {
 
 function buildHighlights(plan: PlanoDB): string[] {
   const h: string[] = [];
-  if (plan.max_users > 0) h.push(`Até ${plan.max_users} Usuários Administrativos`);
-  if (plan.max_members > 0) h.push(`Até ${plan.max_members.toLocaleString('pt-BR')} Membros`);
-  else h.push('Membros ilimitados');
-  if (plan.max_ministerios > 0) h.push(`Até ${plan.max_ministerios} Igrejas inclusas`);
-  if (plan.additional_church_monthly_fee > 0) {
-    h.push(`R$ ${plan.additional_church_monthly_fee.toFixed(2)}/mês por igreja adicional`);
+  if (plan.max_members > 0) {
+    h.push(`Até ${plan.max_members.toLocaleString('pt-BR')} Membros`);
+  } else {
+    h.push('Membros ilimitados');
   }
-  if (plan.additional_admin_users_per_church > 0) {
-    h.push(`+${plan.additional_admin_users_per_church} admins por igreja adicional`);
+  if (plan.max_ministerios > 0) {
+    h.push(`Até ${plan.max_ministerios} Igrejas inclusas`);
   }
-  if (plan.has_advanced_reports) h.push('Relatórios Avançados');
-  if (plan.has_api_access) h.push('Acesso à API');
-  if (plan.has_priority_support) h.push('Suporte Prioritário');
-  if (plan.has_custom_domain) h.push('Domínio Personalizado');
-  if (plan.has_white_label) h.push('White Label');
-  if (plan.has_automation) h.push('Automação');
   return h;
 }
 
 function buildModuleHighlights(plan: PlanoDB): { modules: string[]; label: string } {
-  const normalizeKey = (value: string) =>
-    value
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
-      .toLowerCase()
-      .trim();
-
-  const key = normalizeKey(plan.slug || plan.name || '');
-  const base = ['Secretaria Geral', 'Achados e Perdidos', 'Patrimônio', 'Geolocalização', 'Auditoria'];
-
-  if (key === 'basic' || key === 'basico') {
-    return { modules: base, label: 'Módulos inclusos' };
-  }
-
-  if (key === 'starter') {
-    return { modules: ['Todos do Basic', 'Tesouraria', 'Missões', 'Chat Interno', 'EBD'], label: 'Módulos inclusos' };
-  }
-
-  if (key === 'intermediario') {
-    return { modules: ['Todos do Starter', 'Funcionários', 'Comissão', 'Kids', 'Reuniões'], label: 'Módulos inclusos' };
-  }
-
-  if (key === 'profissional' || key === 'professional') {
-    return { modules: ['Todos do Intermediário', 'Eventos', 'Financeiro', 'Presidência'], label: 'Módulos inclusos' };
-  }
-
-  return { modules: base, label: 'Módulos inclusos' };
+  return {
+    modules: Array.isArray(plan.modulos) ? plan.modulos : [],
+    label: 'Módulos inclusos',
+  };
 }
 
 export default function LandingPage() {
