@@ -621,7 +621,7 @@ export default function TesourariaPage() {
         .maybeSingle();
       if (mu) {
         const perms: string[] = Array.isArray(mu.permissions) ? mu.permissions : [];
-        const isLocal  = perms.includes('FINANCEIRO_LOCAL');
+        const isLocal  = perms.includes('FINANCEIRO_LOCAL') || perms.includes('TESOURARIA_LOCAL') || mu.role === 'tesouraria_local' || mu.role === 'financeiro_local';
         const isAdmin  = perms.includes('ADMINISTRADOR') || mu.role === 'admin';
         const isFin    = perms.includes('FINANCEIRO');
         if (isLocal) scopeCongId = mu.congregacao_id ?? null;

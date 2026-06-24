@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Configuracao de senha nao definida' }, { status: 500 });
     }
 
-    if (['admin_local', 'financeiro_local', 'superintendente', 'coordenador', 'operador'].includes(nivel) && !congregacaoId) {
+    if (['secretaria_local', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'superintendente', 'coordenador', 'operador'].includes(nivel) && !congregacaoId) {
       return NextResponse.json({ error: 'Congregacao obrigatoria para este nivel' }, { status: 400 });
     }
 
@@ -308,7 +308,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Senha muito curta' }, { status: 400 });
     }
 
-    if (['admin_local', 'financeiro_local', 'superintendente', 'coordenador', 'operador'].includes(nivel) && !congregacaoId) {
+    if (['secretaria_local', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'superintendente', 'coordenador', 'operador'].includes(nivel) && !congregacaoId) {
       return NextResponse.json({ error: 'Congregacao obrigatoria para este nivel' }, { status: 400 });
     }
 

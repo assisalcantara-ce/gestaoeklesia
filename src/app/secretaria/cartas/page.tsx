@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
@@ -317,7 +317,7 @@ export default function CartasPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const userCtx = useUserContext();
-  const isOperador = !userCtx.loading && userCtx.nivel === 'operador';
+  const isOperador = !userCtx.loading && ['secretaria_local', 'admin_local', 'operador'].includes(userCtx.nivel || '');
   const { fetchMembers } = useMembers();
   const canvasImageInputRef = useRef<HTMLInputElement>(null);
   const canvasBackgroundInputRef = useRef<HTMLInputElement>(null);

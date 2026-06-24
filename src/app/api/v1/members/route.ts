@@ -37,9 +37,9 @@ export async function GET(request: NextRequest) {
     const permsSet = new Set(
       (Array.isArray(muScope?.permissions) ? muScope.permissions : []).map((p: any) => String(p).toUpperCase())
     )
-    const isAdminLocal  = permsSet.has('ADMIN_LOCAL') || context.nivel === 'admin_local'
-    const isFinLocal    = permsSet.has('FINANCEIRO_LOCAL') || context.nivel === 'financeiro_local'
-    const isOperadorLocal = context.nivel === 'operador' || context.nivel === 'coordenador'
+    const isAdminLocal  = permsSet.has('ADMIN_LOCAL') || permsSet.has('SECRETARIA_LOCAL') || context.nivel === 'admin_local' || context.nivel === 'secretaria_local'
+    const isFinLocal    = permsSet.has('FINANCEIRO_LOCAL') || permsSet.has('TESOURARIA_LOCAL') || context.nivel === 'financeiro_local' || context.nivel === 'tesouraria_local'
+    const isOperadorLocal = context.nivel === 'operador' || context.nivel === 'coordenador' || context.nivel === 'coordenador_ebd'
     const isSupervisor  = permsSet.has('SUPERVISOR') || context.nivel === 'supervisor'
     const scopeCongId   = (isAdminLocal || isFinLocal || isOperadorLocal) ? (muScope?.congregacao_id ?? context.congregacaoId ?? null) : null
 
