@@ -19,8 +19,10 @@ import {
   Link2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
+import { useAdminAuth } from '@/providers/AdminAuthProvider'
 
 export default function AdminSidebar() {
+  const { adminUser } = useAdminAuth()
   const pathname = usePathname()
   const router = useRouter()
   const [isOpen, _setIsOpen] = useState(true)
@@ -35,21 +37,27 @@ export default function AdminSidebar() {
     router.push('/admin/login')
   }
 
+  const role = adminUser?.role || ''
+
   const menuItems = [
     { label: 'Dashboard', href: '/admin/dashboard', icon: Home },
     { label: 'Ministérios', href: '/admin/ministerios', icon: Building2 },
-    { label: 'Pagamentos', href: '/admin/pagamentos', icon: CreditCard },
-    { label: 'Planos', href: '/admin/planos', icon: BarChart3 },
+    ...(role !== 'suporte' ? [{ label: 'Pagamentos', href: '/admin/pagamentos', icon: CreditCard }] : []),
+    ...(role !== 'financeiro' && role !== 'suporte' ? [{ label: 'Planos', href: '/admin/planos', icon: BarChart3 }] : []),
     { label: 'Suporte', href: '/admin/suporte', icon: HeadphonesIcon },
-    {
-      label: 'Configurações',
-      icon: Settings,
-      submenu: [
-        { label: 'Supabase', href: '/admin/configuracoes/supabase', icon: Database },
-        { label: 'Usuários', href: '/admin/configuracoes/usuarios', icon: Users },
-        { label: 'Gateway', href: '/admin/configuracoes/gateway', icon: Link2 },
-      ],
-    },
+    ...(role !== 'financeiro' && role !== 'suporte'
+      ? [
+          {
+            label: 'Configurações',
+            icon: Settings,
+            submenu: [
+              { label: 'Supabase', href: '/admin/configuracoes/supabase', icon: Database },
+              { label: 'Usuários', href: '/admin/configuracoes/usuarios', icon: Users },
+              { label: 'Gateway', href: '/admin/configuracoes/gateway', icon: Link2 },
+            ],
+          },
+        ]
+      : []),
   ]
 
   return (

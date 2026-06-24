@@ -4,8 +4,10 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react'
 import { Database, AlertTriangle, HardDrive } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import AdminSidebar from '@/components/AdminSidebar'
 import { createClient } from '@/lib/supabase-client'
+import { useAdminAuth } from '@/providers/AdminAuthProvider'
 
 type AlertLevel = 'warning' | 'critical'
 
@@ -32,13 +34,26 @@ interface CapacityMetrics {
 }
 
 export default function SupabasePage() {
+  const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
+  const router = useRouter()
   const [stats, setStats] = useState<CapacityMetrics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchDatabaseStats()
-  }, [])
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        router.push('/admin/login')
+        return
+      }
+      const role = adminUser?.role
+      if (role === 'financeiro' || role === 'suporte') {
+        router.push('/admin/dashboard')
+        return
+      }
+      fetchDatabaseStats()
+    }
+  }, [isLoading, isAuthenticated, adminUser, router])
 
   const fetchDatabaseStats = async () => {
     try {

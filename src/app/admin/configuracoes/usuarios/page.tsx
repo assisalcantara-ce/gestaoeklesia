@@ -9,6 +9,8 @@ import { useAppDialog } from '@/providers/AppDialogProvider'
 import { Plus, Trash2, Edit2, Shield, CreditCard, Headphones } from 'lucide-react'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 
+import { useRouter } from 'next/navigation'
+
 interface AdminUser {
   id: string
   email: string
@@ -39,6 +41,8 @@ const ROLE_CONFIG = {
 }
 
 export default function UsuariosPage() {
+  const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
+  const router = useRouter()
   const dialog = useAppDialog()
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loadingUsers, setLoadingUsers] = useState(true)
@@ -92,7 +96,20 @@ export default function UsuariosPage() {
     }
   }
 
-  useEffect(() => { fetchUsers() }, [])
+  useEffect(() => {
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        router.push('/admin/login')
+        return
+      }
+      const role = adminUser?.role
+      if (role === 'financeiro' || role === 'suporte') {
+        router.push('/admin/dashboard')
+        return
+      }
+      fetchUsers()
+    }
+  }, [isLoading, isAuthenticated, adminUser, router])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -184,8 +201,6 @@ export default function UsuariosPage() {
       setActionLoading(false)
     }
   }
-
-  const { adminUser } = useAdminAuth()
 
   // Função utilitária para saber se é o próprio usuário logado
   const isSelf = (user: AdminUser): boolean => {

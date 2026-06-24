@@ -4,8 +4,10 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react'
 import { CheckCircle2, AlertTriangle, Link2, ShieldCheck } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import AdminSidebar from '@/components/AdminSidebar'
 import { createClient } from '@/lib/supabase-client'
+import { useAdminAuth } from '@/providers/AdminAuthProvider'
 
 interface GatewaySettings {
   provider: 'asaas'
@@ -17,6 +19,8 @@ interface GatewaySettings {
 }
 
 export default function GatewayConfigPage() {
+  const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [testing, setTesting] = useState(false)
   const [error, setError] = useState('')
@@ -30,8 +34,19 @@ export default function GatewayConfigPage() {
   })
 
   useEffect(() => {
-    fetchSettings()
-  }, [])
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        router.push('/admin/login')
+        return
+      }
+      const role = adminUser?.role
+      if (role === 'financeiro' || role === 'suporte') {
+        router.push('/admin/dashboard')
+        return
+      }
+      fetchSettings()
+    }
+  }, [isLoading, isAuthenticated, adminUser, router])
 
   async function fetchSettings() {
     try {

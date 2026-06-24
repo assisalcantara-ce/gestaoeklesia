@@ -11,7 +11,7 @@ import { useAppDialog } from '@/providers/AppDialogProvider'
 import AdminSidebar from '@/components/AdminSidebar'
 
 export default function PlanosPage() {
-  const { isLoading, isAuthenticated } = useAdminAuth()
+  const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
   const dialog = useAppDialog()
   const formRef = useRef<HTMLDivElement>(null)
   const [planos, setPlanos] = useState<SubscriptionPlan[]>([])
@@ -60,16 +60,23 @@ export default function PlanosPage() {
   })
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/admin/login')
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        router.push('/admin/login')
+        return
+      }
+      const role = adminUser?.role
+      if (role === 'financeiro' || role === 'suporte') {
+        router.push('/admin/dashboard')
+      }
     }
-  }, [isLoading, isAuthenticated, router])
+  }, [isLoading, isAuthenticated, adminUser, router])
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && adminUser?.role !== 'financeiro' && adminUser?.role !== 'suporte') {
       fetchPlanos()
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, adminUser])
 
   const fetchPlanos = async () => {
     try {
