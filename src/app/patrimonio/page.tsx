@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
@@ -320,7 +320,14 @@ export default function PatrimonioPage() {
   const showNotif = (type: typeof notification.type, title: string, message: string, autoClose: number | undefined = 3000) =>
     setNotification({ isOpen: true, title, message, type, autoClose });
 
-  const resetForm = () => { setFormData({ ...EMPTY_FORM }); setEditingId(null); setFieldErrors({}); };
+  const resetForm = () => {
+    setFormData({
+      ...EMPTY_FORM,
+      local_id: ctx.nivel === 'operador' && ctx.congregacaoId ? ctx.congregacaoId : '',
+    });
+    setEditingId(null);
+    setFieldErrors({});
+  };
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -347,10 +354,14 @@ export default function PatrimonioPage() {
     : '';
 
   const loadLocais = async (mid: string) => {
-    const [camposRes, congRes] = await Promise.all([
+    let [camposRes, congRes] = await Promise.all([
       supabase.from('campos').select('id, nome, pastor_nome').eq('ministry_id', mid).eq('is_active', true).order('nome'),
       supabase.from('congregacoes').select('id, nome, dirigente, dirigente_cargo').eq('ministry_id', mid).eq('is_active', true).order('nome'),
     ]);
+    if (ctx.nivel === 'operador' && ctx.congregacaoId) {
+      congRes.data = (congRes.data || []).filter((c: any) => c.id === ctx.congregacaoId);
+      camposRes.data = [];
+    }
     const lista: LocalOption[] = [
       ...((camposRes.data || []).map((c: any) => ({ id: c.id, nome: c.nome, tipo: 'campo' as const, pastor_nome: c.pastor_nome }))),
       ...((congRes.data || []).map((c: any) => ({ id: c.id, nome: c.nome, tipo: 'congregacao' as const, dirigente: c.dirigente, dirigente_cargo: c.dirigente_cargo }))),
@@ -359,8 +370,11 @@ export default function PatrimonioPage() {
   };
 
   const loadItens = async (mid: string) => {
-    const { data, error } = await supabase
-      .from('patrimonio_itens').select('*').eq('ministry_id', mid).order('created_at', { ascending: false });
+    let query = supabase.from('patrimonio_itens').select('*').eq('ministry_id', mid);
+    if (ctx.nivel === 'operador' && ctx.congregacaoId) {
+      query = query.eq('congregacao_id', ctx.congregacaoId);
+    }
+    const { data, error } = await query.order('created_at', { ascending: false });
     if (error) { showNotif('error', 'Erro ao carregar', error.message, undefined); return; }
     setItens((data || []) as PatrimonioItem[]);
   };
@@ -390,7 +404,11 @@ export default function PatrimonioPage() {
       if (mid) {
         await Promise.all([loadLocais(mid), loadItens(mid)]);
         const nextTomb = await generateNextTombamento(mid);
-        setFormData((p) => ({ ...p, numero_tombamento: nextTomb }));
+        setFormData((p) => ({
+          ...p,
+          numero_tombamento: nextTomb,
+          local_id: ctx.nivel === 'operador' && ctx.congregacaoId ? ctx.congregacaoId : p.local_id,
+        }));
       }
       setLoadingData(false);
     };

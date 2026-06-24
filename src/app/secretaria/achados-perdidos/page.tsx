@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
@@ -115,7 +115,10 @@ export default function AchadosPerdidosPage() {
     setNotification({ isOpen: true, title, message, type, autoClose });
 
   const resetForm = () => {
-    setFormData({ ...EMPTY_FORM });
+    setFormData({
+      ...EMPTY_FORM,
+      congregacao_id: ctx.nivel === 'operador' && ctx.congregacaoId ? ctx.congregacaoId : '',
+    });
     setEditingId(null);
     setFieldErrors({});
   };
@@ -129,10 +132,15 @@ export default function AchadosPerdidosPage() {
   };
 
   const loadLocais = async (mid: string) => {
-    const [camposRes, congregacoesRes] = await Promise.all([
+    let [camposRes, congregacoesRes] = await Promise.all([
       supabase.from('campos').select('id, nome').eq('ministry_id', mid).eq('is_active', true).order('nome'),
       supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).eq('is_active', true).order('nome'),
     ]);
+
+    if (ctx.nivel === 'operador' && ctx.congregacaoId) {
+      congregacoesRes.data = (congregacoesRes.data || []).filter((c: any) => c.id === ctx.congregacaoId);
+      camposRes.data = [];
+    }
 
     const lista: LocalOption[] = [
       ...((camposRes.data || []).map((c: any) => ({ id: c.id, nome: c.nome, tipo: 'campo' as const }))),
@@ -142,11 +150,11 @@ export default function AchadosPerdidosPage() {
   };
 
   const loadRegistros = async (mid: string) => {
-    const { data, error } = await supabase
-      .from('achados_perdidos_registros')
-      .select('*')
-      .eq('ministry_id', mid)
-      .order('created_at', { ascending: false });
+    let query = supabase.from('achados_perdidos_registros').select('*').eq('ministry_id', mid);
+    if (ctx.nivel === 'operador' && ctx.congregacaoId) {
+      query = query.eq('congregacao_id', ctx.congregacaoId);
+    }
+    const { data, error } = await query.order('created_at', { ascending: false });
     if (error) { showNotification('error', 'Erro', error.message, undefined); return; }
     setRegistros((data || []) as AchadoPerdido[]);
   };
@@ -159,11 +167,15 @@ export default function AchadosPerdidosPage() {
       setMinistryId(mid);
       if (mid) {
         await Promise.all([loadLocais(mid), loadRegistros(mid)]);
+        setFormData((p) => ({
+          ...p,
+          congregacao_id: ctx.nivel === 'operador' && ctx.congregacaoId ? ctx.congregacaoId : p.congregacao_id,
+        }));
       }
       setLoadingData(false);
     };
     run();
-  }, [ctx.loading, bloqueado, supabase]);
+  }, [ctx.loading, bloqueado, supabase, ctx.nivel, ctx.congregacaoId]);
 
   const handleSubmit = async () => {
     if (!ministryId) return;

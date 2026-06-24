@@ -71,6 +71,9 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
   operador: [
     'secretaria',
     'secretaria_local',
+    'patrimonio',
+    'geolocalizacao',
+    'gestao',
   ],
   presidencia: [
     'dashboard',
@@ -128,6 +131,9 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
   ],
   operador: [
     'secretaria',
+    'patrimonio',
+    'geolocalizacao',
+    'gestao',
   ],
   presidencia: [],
   conselho_fiscal: [

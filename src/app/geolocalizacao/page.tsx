@@ -37,22 +37,32 @@ export default function GeolocalizacaoPage() {
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
+      const extraFilters: any = {};
+      if (ctx.nivel === 'operador' && ctx.congregacaoId) {
+        extraFilters.congregacao = ctx.congregacaoId;
+      }
       const [membrosData, cidadesData] = await Promise.all([
         buscarMembrosFiltrados({
           nome: filtroNome || undefined,
           cidade: filtroCidade || undefined,
           status: filtroStatus || undefined,
+          ...extraFilters,
         }),
         buscarCidades(),
       ]);
       setMembros(membrosData);
-      setCidades(cidadesData);
+      if (ctx.nivel === 'operador' && ctx.congregacaoId) {
+        const uniqueCities = Array.from(new Set(membrosData.map(m => m.cidade).filter(Boolean))) as string[];
+        setCidades(uniqueCities.sort());
+      } else {
+        setCidades(cidadesData);
+      }
     } catch {
       setMembros([]);
     } finally {
       setLoading(false);
     }
-  }, [filtroNome, filtroCidade, filtroStatus]);
+  }, [filtroNome, filtroCidade, filtroStatus, ctx.nivel, ctx.congregacaoId]);
 
   useEffect(() => {
     if (ctx.loading) return;
