@@ -571,9 +571,10 @@ export default function PatrimonioPage() {
                       <div>
                         <label className="text-xs font-semibold text-gray-600">Congregação/Igreja</label>
                         <select
+                          disabled={ctx.nivel === 'operador'}
                           value={formData.local_id}
                           onChange={(e) => setFormData((p) => ({ ...p, local_id: e.target.value }))}
-                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                         >
                           <option value="">Selecione...</option>
                           {locais.filter((l) => l.tipo === 'congregacao').map((c) => (
@@ -620,36 +621,51 @@ export default function PatrimonioPage() {
                       <label className="text-xs font-semibold text-gray-600">Categoria</label>
                       <select
                         value={formData.categoria}
-                        onChange={(e) => setFormData((p) => ({ ...p, categoria: e.target.value }))}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData((p) => ({
+                            ...p,
+                            categoria: val,
+                            ...(val === 'imovel' ? { marca_modelo: '', numero_serie: '', cor: '' } : {}),
+                          }));
+                        }}
                         className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                       >
                         {CATEGORIAS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                       </select>
                     </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Marca / Modelo</label>
-                      <input
-                        value={formData.marca_modelo}
-                        onChange={(e) => setFormData((p) => ({ ...p, marca_modelo: e.target.value }))}
-                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Nº de série / Placa</label>
-                      <input
-                        value={formData.numero_serie}
-                        onChange={(e) => setFormData((p) => ({ ...p, numero_serie: e.target.value }))}
-                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Cor</label>
-                      <input
-                        value={formData.cor}
-                        onChange={(e) => setFormData((p) => ({ ...p, cor: e.target.value }))}
-                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      />
-                    </div>
+                    {formData.categoria !== 'imovel' && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-600">Marca / Modelo</label>
+                        <input
+                          value={formData.marca_modelo}
+                          onChange={(e) => setFormData((p) => ({ ...p, marca_modelo: e.target.value }))}
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        />
+                      </div>
+                    )}
+                    {formData.categoria !== 'imovel' && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-600">
+                          {formData.categoria === 'veiculo' ? 'Placa' : 'Nº de série'}
+                        </label>
+                        <input
+                          value={formData.numero_serie}
+                          onChange={(e) => setFormData((p) => ({ ...p, numero_serie: e.target.value }))}
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        />
+                      </div>
+                    )}
+                    {formData.categoria !== 'imovel' && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-600">Cor</label>
+                        <input
+                          value={formData.cor}
+                          onChange={(e) => setFormData((p) => ({ ...p, cor: e.target.value }))}
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        />
+                      </div>
+                    )}
                     <div>
                       <label className="text-xs font-semibold text-gray-600">Estado de conservação</label>
                       <select
