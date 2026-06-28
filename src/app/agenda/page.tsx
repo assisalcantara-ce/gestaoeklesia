@@ -1057,7 +1057,7 @@ export default function AgendaPage() {
       <DashboardContent>
 
         {/* ─── KPIS GLOBAIS DO MÓDULO (Executive Summary) ──────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <ExecutiveMetricCard
             title="Oficiais"
             value={totalEventosOficiais}
@@ -1222,7 +1222,7 @@ export default function AgendaPage() {
       {/* TAB 1: CALENDÁRIO MENSAL (Elemento Principal em 2 colunas)          */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'calendario' && (
-        <div className="flex flex-col lg:flex-row gap-5">
+        <div className="flex flex-col lg:flex-row gap-6">
           
           {/* LADO ESQUERDO: Calendário Mensal Compacto */}
           <DashboardSection
@@ -1245,7 +1245,7 @@ export default function AgendaPage() {
             <div className="grid grid-cols-7 gap-1">
               {daysInMonthArray.map((day, idx) => {
                 if (day.dayNum === null) {
-                  return <div key={`empty-${idx}`} className="aspect-square bg-slate-50/50 rounded-lg" />;
+                  return <div key={`empty-${idx}`} className="min-h-[56px] sm:min-h-[64px] bg-slate-50/50 rounded-md" />;
                 }
 
                 const dateStr = day.dateStr!;
@@ -1257,16 +1257,16 @@ export default function AgendaPage() {
                   <button
                     key={dateStr}
                     onClick={() => setSelectedDate(isSelected ? null : dateStr)}
-                    className={`aspect-square p-1 rounded-xl flex flex-col justify-between border transition relative ${
+                    className={`min-h-[56px] sm:min-h-[64px] p-1.5 rounded-md flex flex-col justify-between items-center border transition relative ${
                       isSelected 
                         ? 'bg-blue-600 border-blue-600 text-white shadow-xs' 
                         : isToday
-                          ? 'bg-blue-50/50 border-blue-200 text-blue-800'
-                          : 'bg-white border-slate-100 hover:bg-slate-50 text-slate-700'
+                          ? 'bg-blue-50/50 border-blue-200/60 text-blue-800'
+                          : 'bg-white border-slate-100/70 hover:bg-slate-50 text-slate-700'
                     }`}
                   >
                     {/* Número do dia */}
-                    <span className="text-xs font-bold">{day.dayNum}</span>
+                    <span className="text-xs font-semibold text-center w-full block">{day.dayNum}</span>
 
                     {/* Dot indicators (Oficiais/Locais/Sincronizados) */}
                     <div className="flex gap-0.5 justify-center mt-auto w-full">
@@ -1318,6 +1318,8 @@ export default function AgendaPage() {
             <DashboardSection
               title={selectedDate ? `Eventos de ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR')}` : 'Compromissos do Mês'}
               icon={CalendarRange}
+              iconClassName="text-slate-400"
+              className="!p-5"
               actions={
                 selectedDate ? (
                   <button onClick={() => setSelectedDate(null)} className="text-[10px] text-blue-600 hover:text-blue-700 font-extrabold hover:underline">
@@ -1427,6 +1429,8 @@ export default function AgendaPage() {
             <DashboardSection
               title="Linha do Tempo"
               icon={TrendingUp}
+              iconClassName="text-slate-400"
+              className="!p-5"
             >
               {proximosEventos.length === 0 ? (
                 <div className="text-center py-6 text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
@@ -1448,8 +1452,8 @@ export default function AgendaPage() {
                       <div key={evt.id} className="relative group transition-all duration-200">
                         <span className={`absolute -left-[22px] top-1 w-2.5 h-2.5 rounded-full border-2 border-white ring-4 transition ${bulletColor}`} />
                         <div className="bg-slate-50/50 hover:bg-slate-50 border border-slate-100 rounded-xl p-2.5 transition">
-                          <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
-                            <Clock className="h-3 w-3 text-slate-400" />
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-medium">
+                            <Clock className="h-4 w-4 text-slate-400" />
                             <span>{d.toLocaleDateString('pt-BR')} às {d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                           <h4 className="font-black text-slate-800 text-xs mt-1 truncate">{evt.titulo}</h4>
