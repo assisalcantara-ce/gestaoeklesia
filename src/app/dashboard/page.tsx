@@ -202,7 +202,7 @@ export default function DashboardPage() {
         ebdTurmasRes, ebdChamadasRes, usuariosRes,
         visitantesRes, ultimasCartasRes, ultimosFluxosRes, cartaPedidosRes,
       ] = await Promise.all([
-        safeQuery(withScopeMember(supabase.from('members').select('status, batizado, gender').eq('ministry_id', ministryId))),
+        safeQuery(withScopeMember(supabase.from('members').select('status, gender, custom_fields').eq('ministry_id', ministryId))),
         safeQuery(supabase.from('flow_instances').select('status, tipo_fluxo, created_at').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(10)),
         safeQuery(supabase.from('cartas_ministeriais').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId)),
         safeQuery(
@@ -240,7 +240,11 @@ export default function DashboardPage() {
       // membros
       const membros          = membrosRes.data ?? [];
       const totalMembros     = membros.length;
-      const membrosBatizados = membros.filter((m: any) => m.batizado === true || m.batizado === 'true' || m.batizado === 1).length;
+      const membrosBatizados = membros.filter((m: any) => {
+        const cf = m.custom_fields && typeof m.custom_fields === 'object' ? m.custom_fields : {};
+        const bat = m.batizado ?? cf.batizado ?? cf.batizadoAguas ?? cf.dataBatismoAguas;
+        return bat === true || bat === 'true' || bat === 1 || (typeof bat === 'string' && bat.trim() !== '');
+      }).length;
       const membrosAtivos    = membros.filter((m: any) => (m.status ?? 'active') === 'active').length;
 
       // fluxos
