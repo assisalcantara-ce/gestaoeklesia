@@ -1052,7 +1052,7 @@ export default function AgendaPage() {
           ) : undefined
         }
         extra={
-          <div className="flex gap-1 -mb-4">
+          <div className="flex gap-1">
             {TABS.map(tab => {
               const Icon = tab.icon;
               return (
@@ -1062,7 +1062,7 @@ export default function AgendaPage() {
                     setActiveTab(tab.id as any);
                     setSelectedDate(null);
                   }}
-                  className={`flex items-center gap-1.5 px-4 py-2 font-bold text-xs tracking-wide uppercase transition border-b-2 -mb-[17px] ${
+                  className={`flex items-center gap-1.5 px-4 py-2.5 font-bold text-xs tracking-wide uppercase transition border-b-2 ${
                     activeTab === tab.id
                       ? 'border-blue-600 text-blue-600'
                       : 'border-transparent text-slate-500 hover:text-slate-700'
