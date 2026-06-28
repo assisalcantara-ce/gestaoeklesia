@@ -1,7 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import PageLayout from '@/components/PageLayout';
+import DashboardContainer from '@/components/dashboard/DashboardContainer';
+import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import DashboardContent from '@/components/dashboard/DashboardContent';
+import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
+import DashboardSection from '@/components/dashboard/DashboardSection';
+import DashboardActions from '@/components/dashboard/DashboardActions';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
@@ -979,46 +984,50 @@ export default function AgendaPage() {
   }
 
   return (
-    <PageLayout title="Agenda Ministerial" description="Planejamento e coordenação de datas e agendas integradas" activeMenu="agenda">
-      
-      {/* ─── BARRA DE ABAS E BOTÃO SUPERIOR RAPIDO (COMPACTO) ───────────────── */}
-      <div className="flex flex-wrap items-center justify-between border-b border-slate-200 mb-4 pb-1">
-        <div className="flex gap-1">
-          {TABS.map(tab => {
-            const Icon = tab.icon;
-            return (
+    <DashboardContainer>
+      <DashboardHeader
+        title="Agenda Ministerial"
+        description="Planejamento e coordenação de datas e agendas integradas"
+        actions={
+          isEscritaPermitida ? (
+            <DashboardActions>
               <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id as any);
-                  setSelectedDate(null);
-                }}
-                className={`flex items-center gap-1.5 px-4 py-2 font-bold text-xs tracking-wide uppercase transition border-b-2 -mb-[5px] ${
-                  activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700'
-                }`}
+                onClick={() => openForm(null)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition"
               >
-                <Icon className="h-3.5 w-3.5" />
-                {tab.label}
+                <Plus className="h-3.5 w-3.5" />
+                Novo Compromisso
               </button>
-            );
-          })}
-        </div>
+            </DashboardActions>
+          ) : undefined
+        }
+        extra={
+          <div className="flex gap-1 -mb-4">
+            {TABS.map(tab => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id as any);
+                    setSelectedDate(null);
+                  }}
+                  className={`flex items-center gap-1.5 px-4 py-2 font-bold text-xs tracking-wide uppercase transition border-b-2 -mb-[17px] ${
+                    activeTab === tab.id
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        }
+      />
 
-        {/* Ações Rápidas no Topo */}
-        <div className="flex items-center gap-1.5 py-1">
-          {isEscritaPermitida && (
-            <button
-              onClick={() => openForm(null)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Novo Compromisso
-            </button>
-          )}
-        </div>
-      </div>
+      <DashboardContent>
 
       {/* ─── CONTROL BAR ÚNICA (Reorganização do topo) ──────────────────────── */}
       {activeTab === 'calendario' && (
@@ -1151,10 +1160,10 @@ export default function AgendaPage() {
       {/* TAB 1: CALENDÁRIO MENSAL (Elemento Principal em 2 colunas)          */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'calendario' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="flex flex-col lg:flex-row gap-4">
           
-          {/* LADO ESQUERDO: Calendário Mensal Compacto (8/12 colunas) */}
-          <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+          {/* LADO ESQUERDO: Calendário Mensal Compacto */}
+          <div className="flex-1 min-w-0 bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
             
             {/* Cabeçalho da grade de dias da semana */}
             <div className="grid grid-cols-7 gap-1 text-center font-black text-slate-400 text-[10px] tracking-wider mb-2">
@@ -1237,8 +1246,8 @@ export default function AgendaPage() {
             </div>
           </div>
 
-          {/* LADO DIREITO: Agenda dos Próximos Dias / Detalhes (5/12 colunas) */}
-          <div className="lg:col-span-5 flex flex-col gap-4">
+          {/* LADO DIREITO: Agenda dos Próximos Dias / Detalhes */}
+          <DashboardSidebar className="w-full lg:w-80">
             
             {/* Próximos compromissos lateral */}
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-md p-5 flex-1 flex flex-col min-h-[350px]">
@@ -1336,7 +1345,7 @@ export default function AgendaPage() {
                 </div>
               )}
             </div>
-          </div>
+          </DashboardSidebar>
         </div>
       )}
 
@@ -1350,72 +1359,62 @@ export default function AgendaPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
             {/* Card: Oficiais */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-50/50 to-white rounded-2xl border border-indigo-100 shadow-xs p-4 flex flex-col justify-between transition-all hover:shadow-md hover:translate-y-[-1px] duration-200">
-              <div className="flex justify-between items-start">
-                <div>
-                  <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider block">Oficiais</span>
-                  <p className="text-3xl font-black text-indigo-700 mt-1">{totalEventosOficiais}</p>
-                </div>
-                <div className="p-2 bg-indigo-50 rounded-xl text-indigo-500">
-                  <ShieldCheck className="h-5 w-5" />
-                </div>
+            <DashboardSection
+              title="Oficiais"
+              icon={ShieldCheck}
+              className="relative overflow-hidden bg-gradient-to-br from-indigo-50/50 to-white border-indigo-100 shadow-xs transition-all duration-200 hover:shadow-md hover:translate-y-[-1px]"
+            >
+              <div className="flex flex-col justify-between h-full">
+                <p className="text-3xl font-black text-indigo-700 mt-1">{totalEventosOficiais}</p>
+                <span className="text-[10px] text-indigo-600 font-semibold block mt-3">Calendário Geral da Igreja</span>
               </div>
-              <span className="text-[10px] text-indigo-600 font-semibold block mt-3">Calendário Geral da Igreja</span>
-            </div>
+            </DashboardSection>
 
             {/* Card: Total do Mês */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-150 shadow-xs p-4 flex flex-col justify-between transition-all hover:shadow-md hover:translate-y-[-1px] duration-200">
-              <div className="flex justify-between items-start">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Compromissos</span>
-                  <p className="text-3xl font-black text-slate-700 mt-1">{eventos.length}</p>
-                </div>
-                <div className="p-2 bg-slate-100 rounded-xl text-slate-500">
-                  <Calendar className="h-5 w-5" />
-                </div>
+            <DashboardSection
+              title="Compromissos"
+              icon={Calendar}
+              className="relative overflow-hidden bg-gradient-to-br from-slate-50 to-white border-slate-150 shadow-xs transition-all duration-200 hover:shadow-md hover:translate-y-[-1px]"
+            >
+              <div className="flex flex-col justify-between h-full">
+                <p className="text-3xl font-black text-slate-700 mt-1">{eventos.length}</p>
+                <span className="text-[10px] text-slate-500 font-semibold block mt-3">Agendados para este mês</span>
               </div>
-              <span className="text-[10px] text-slate-500 font-semibold block mt-3">Agendados para este mês</span>
-            </div>
+            </DashboardSection>
 
             {/* Card: Cultos & Reuniões */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50/50 to-white rounded-2xl border border-emerald-100 shadow-xs p-4 flex flex-col justify-between transition-all hover:shadow-md hover:translate-y-[-1px] duration-200">
-              <div className="flex justify-between items-start">
-                <div>
-                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">Cultos & Reuniões</span>
-                  <p className="text-3xl font-black text-emerald-700 mt-1">{totalCultos + totalReunioes}</p>
-                </div>
-                <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
-                  <Flame className="h-5 w-5" />
-                </div>
+            <DashboardSection
+              title="Cultos & Reuniões"
+              icon={Flame}
+              className="relative overflow-hidden bg-gradient-to-br from-emerald-50/50 to-white border-emerald-100 shadow-xs transition-all duration-200 hover:shadow-md hover:translate-y-[-1px]"
+            >
+              <div className="flex flex-col justify-between h-full">
+                <p className="text-3xl font-black text-emerald-700 mt-1">{totalCultos + totalReunioes}</p>
+                <span className="text-[10px] text-emerald-600 font-semibold block mt-3">
+                  {totalCultos} Cultos · {totalReunioes} Reuniões
+                </span>
               </div>
-              <span className="text-[10px] text-emerald-600 font-semibold block mt-3">
-                {totalCultos} Cultos · {totalReunioes} Reuniões
-              </span>
-            </div>
+            </DashboardSection>
 
             {/* Card: Sincronizados */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-rose-50/50 to-white rounded-2xl border border-rose-100 shadow-xs p-4 flex flex-col justify-between transition-all hover:shadow-md hover:translate-y-[-1px] duration-200">
-              <div className="flex justify-between items-start">
-                <div>
-                  <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider block">Sincronizados</span>
-                  <p className="text-3xl font-black text-rose-600 mt-1">{totalEventosSincronizados}</p>
-                </div>
-                <div className="p-2 bg-rose-50 rounded-xl text-rose-500">
-                  <Lock className="h-5 w-5" />
-                </div>
+            <DashboardSection
+              title="Sincronizados"
+              icon={Lock}
+              className="relative overflow-hidden bg-gradient-to-br from-rose-50/50 to-white border-rose-100 shadow-xs transition-all duration-200 hover:shadow-md hover:translate-y-[-1px]"
+            >
+              <div className="flex flex-col justify-between h-full">
+                <p className="text-3xl font-black text-rose-600 mt-1">{totalEventosSincronizados}</p>
+                <span className="text-[10px] text-rose-600 font-semibold block mt-3">De outros módulos do sistema</span>
               </div>
-              <span className="text-[10px] text-rose-600 font-semibold block mt-3">De outros módulos do sistema</span>
-            </div>
+            </DashboardSection>
 
           </div>
 
           {/* Timeline de Próximos Eventos Estilizada */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <h3 className="font-black text-slate-800 text-xs tracking-wider uppercase mb-4 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-blue-600" />
-              Linha do Tempo Ministerial
-            </h3>
-
+          <DashboardSection
+            title="Linha do Tempo Ministerial"
+            icon={TrendingUp}
+          >
             {proximosEventos.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
                 <CalendarIcon className="h-8 w-8 text-slate-200" />
@@ -1468,7 +1467,7 @@ export default function AgendaPage() {
                 })}
               </div>
             )}
-          </div>
+          </DashboardSection>
         </div>
       )}
 
@@ -1855,6 +1854,7 @@ export default function AgendaPage() {
           </div>
         </div>
       )}
-    </PageLayout>
+      </DashboardContent>
+    </DashboardContainer>
   );
 }
