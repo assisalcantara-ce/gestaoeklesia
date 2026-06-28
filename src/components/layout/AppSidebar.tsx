@@ -127,12 +127,13 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
 
   const filterItem = (i: NavigationItem) => {
     if (planFeatures.loading || userCtx.loading) {
-      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios'].includes(i.id);
+      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda'].includes(i.id);
     }
     if (i.id === 'tesouraria' && !planFeatures.has_modulo_financeiro)          return false;
     if (i.id === 'financeiro' && !planFeatures.has_modulo_financeiro_avancado) return false;
     if (i.id === 'eventos'    && !planFeatures.has_modulo_eventos)             return false;
     if (i.id === 'reunioes'   && !planFeatures.has_modulo_reunioes)            return false;
+    if (i.id === 'agenda'     && !planFeatures.has_modulo_agenda)              return false;
     
     const modulo = i.modulo;
     if (modulo && !userCtx.podeAcessar(modulo)) return false;
@@ -145,7 +146,7 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
       return { ...group, items };
     }).filter(group => group.items.length > 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planFeatures.loading, userCtx.loading, planFeatures.has_modulo_financeiro, planFeatures.has_modulo_financeiro_avancado, planFeatures.has_modulo_eventos, planFeatures.has_modulo_reunioes, userCtx.nivel]);
+  }, [planFeatures.loading, userCtx.loading, planFeatures.has_modulo_financeiro, planFeatures.has_modulo_financeiro_avancado, planFeatures.has_modulo_eventos, planFeatures.has_modulo_reunioes, planFeatures.has_modulo_agenda, userCtx.nivel]);
 
   // Expand group associated with active item automatically
   useEffect(() => {

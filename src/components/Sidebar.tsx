@@ -198,13 +198,14 @@ export default function Sidebar() {
   const menuItems = allMenuItems.filter(i => {
     // Enquanto algum dos dois carrega, oculta itens sensíveis para não piscar
     if (planFeatures.loading || userCtx.loading) {
-      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios'].includes(i.id);
+      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda'].includes(i.id);
     }
     // Filtro por plano
     if (i.id === 'tesouraria' && !planFeatures.has_modulo_financeiro)          return false;
     if (i.id === 'financeiro' && !planFeatures.has_modulo_financeiro_avancado) return false;
     if (i.id === 'eventos'    && !planFeatures.has_modulo_eventos)             return false;
     if (i.id === 'reunioes'   && !planFeatures.has_modulo_reunioes)            return false;
+    if (i.id === 'agenda'     && !planFeatures.has_modulo_agenda)              return false;
     // Filtro por permissão de nível
     const modulo = (i as any).modulo as string | undefined;
     if (modulo && !userCtx.podeAcessar(modulo)) return false;

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import {
@@ -149,6 +151,14 @@ export default function AgendaPage() {
   const supabase = useMemo(() => createClient(), []);
   const dialog = useAppDialog();
   const { registrarAcao } = useAuditLog();
+  const planFeatures = usePlanFeatures();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!planFeatures.loading && !planFeatures.has_modulo_agenda) {
+      router.push('/acesso-negado');
+    }
+  }, [planFeatures.loading, planFeatures.has_modulo_agenda, router]);
 
   // Tab inicial padrão restaurada para CALENDÁRIO conforme Sprint UX 2.0
   const [activeTab, setActiveTab] = useState<'calendario' | 'dashboard' | 'planejamento' | 'solicitacoes'>('calendario');
@@ -959,6 +969,14 @@ export default function AgendaPage() {
     }
     return base;
   }, [isPresidenciaOrAdmin]);
+
+  if (ctx.loading || planFeatures.loading) {
+    return <div className="p-8 text-gray-500">Carregando...</div>;
+  }
+
+  if (bloqueado || !planFeatures.has_modulo_agenda) {
+    return null;
+  }
 
   return (
     <PageLayout title="Agenda Ministerial" description="Planejamento e coordenação de datas e agendas integradas" activeMenu="agenda">
