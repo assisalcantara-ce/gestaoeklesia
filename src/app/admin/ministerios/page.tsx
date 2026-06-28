@@ -8,12 +8,13 @@ import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import TrialSignupsWidget from '@/components/TrialSignupsWidget'
 import AdminSidebar from '@/components/AdminSidebar'
+import { temAcessoAdmin } from '@/lib/access-control'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 import type { SubscriptionPlan } from '@/types/admin'
 import { onlyDigits, formatCnpj, formatPhone, validarCnpj } from '@/lib/mascaras'
 import { CheckCircle2, ExternalLink, Copy, Pencil, Trash2, Play, Tag, Coins } from 'lucide-react'
 export default function MinisteriosPage() {
-  const { isLoading, isAuthenticated } = useAdminAuth()
+  const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
   const [ministerios, setMinisterios] = useState<SupabaseMinistry[]>([])
   const [planos, setPlanos] = useState<SubscriptionPlan[]>([])
   const [planosLoading, setPlanosLoading] = useState(false)
@@ -342,17 +343,23 @@ export default function MinisteriosPage() {
   }
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/admin/login')
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        router.push('/admin/login')
+        return
+      }
+      if (!temAcessoAdmin(adminUser?.role, 'ministerios')) {
+        router.push('/admin/dashboard')
+      }
     }
-  }, [isLoading, isAuthenticated, router])
+  }, [isLoading, isAuthenticated, adminUser, router])
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && temAcessoAdmin(adminUser?.role, 'ministerios')) {
       fetchMinisterios()
       fetchPlanos()
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, adminUser])
 
   const fetchPlanos = async () => {
     try {

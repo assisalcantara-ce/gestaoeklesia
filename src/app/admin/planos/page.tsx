@@ -9,6 +9,7 @@ import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import type { SubscriptionPlan } from '@/types/admin'
 import { useAppDialog } from '@/providers/AppDialogProvider'
 import AdminSidebar from '@/components/AdminSidebar'
+import { temAcessoAdmin } from '@/lib/access-control'
 
 export default function PlanosPage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
@@ -65,15 +66,14 @@ export default function PlanosPage() {
         router.push('/admin/login')
         return
       }
-      const role = adminUser?.role
-      if (role === 'financeiro' || role === 'suporte') {
+      if (!temAcessoAdmin(adminUser?.role, 'planos')) {
         router.push('/admin/dashboard')
       }
     }
   }, [isLoading, isAuthenticated, adminUser, router])
 
   useEffect(() => {
-    if (isAuthenticated && adminUser?.role !== 'financeiro' && adminUser?.role !== 'suporte') {
+    if (isAuthenticated && temAcessoAdmin(adminUser?.role, 'planos')) {
       fetchPlanos()
     }
   }, [isAuthenticated, adminUser])

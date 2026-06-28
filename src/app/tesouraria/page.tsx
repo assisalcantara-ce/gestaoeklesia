@@ -684,7 +684,7 @@ export default function TesourariaPage() {
       .select('*')
       .eq('ministry_id', mid);
     if (scopeCongId) lancsQuery = lancsQuery.eq('congregacao_id', scopeCongId);
-    const { data: lancs } = await lancsQuery.order('data_lancamento', { ascending: false }).limit(200);
+    const { data: lancs } = await lancsQuery.order('data_lancamento', { ascending: false }).limit(5000);
 
     if (lancs) {
       // Enriquecer com nomes
@@ -862,7 +862,20 @@ export default function TesourariaPage() {
       ? scope.congregacaoId 
       : (filtroCong || null);
 
-    const { data_inicio, data_fim, data_fim_inclusive } = obterFiltroDatasParaMes(mes, activeCongId, fechamentos);
+    let data_inicio: string;
+    let data_fim: string;
+    let data_fim_inclusive = false;
+
+    if (activeCongId === null) {
+      data_inicio = `${mes}-01`;
+      data_fim = `${mesProximo(mes)}-01`;
+      data_fim_inclusive = false;
+    } else {
+      const dates = obterFiltroDatasParaMes(mes, activeCongId, fechamentos);
+      data_inicio = dates.data_inicio;
+      data_fim = dates.data_fim;
+      data_fim_inclusive = dates.data_fim_inclusive ?? false;
+    }
 
     let q = supabase
       .from('tesouraria_lancamentos')
@@ -1318,7 +1331,20 @@ export default function TesourariaPage() {
 
     // Verificar se o lançamento cai em algum período já fechado da respectiva congregação
     const dataL = form.data_lancamento;
-    const congId = form.congregacao_id || null;
+    
+    // Resolver congregacao_id correto de acordo com o escopo do usuário
+    let finalCongregacaoId: string | null = null;
+    if (scope.isFinanceiroLocal) {
+      if (!scope.congregacaoId) {
+        showModal('Erro de Escopo', 'Não foi possível determinar sua congregação local.', 'error');
+        return;
+      }
+      finalCongregacaoId = scope.congregacaoId;
+    } else {
+      finalCongregacaoId = form.congregacao_id || null;
+    }
+
+    const congId = finalCongregacaoId;
     const mestaFechado = fechamentos.some(f => {
       if (f.status !== 'fechado') return false;
       const fCongId = f.congregacao_id || null;
@@ -1339,7 +1365,7 @@ export default function TesourariaPage() {
     const now = new Date().toISOString();
     const payload: any = {
       ministry_id:      ministryId,
-      congregacao_id:   form.congregacao_id  || null,
+      congregacao_id:   finalCongregacaoId,
       departamento_id:  form.departamento_id || null,
       member_id:        dizSelId || null,
       tipo_movimento:   form.tipo_movimento,

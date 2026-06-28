@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const result = await requireAdmin(request)
+    const result = await requireAdmin(request, { requiredModule: 'pagamentos' })
     if (!result.ok) return result.response
     const { supabaseAdmin: supabase } = result.ctx
 
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const result = await requireAdmin(request)
+    const result = await requireAdmin(request, { requiredModule: 'pagamentos' })
     if (!result.ok) return result.response
     const { supabaseAdmin: supabase, user } = result.ctx
 

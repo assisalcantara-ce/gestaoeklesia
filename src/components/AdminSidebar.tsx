@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
+import { temAcessoAdmin } from '@/lib/access-control'
 
 export default function AdminSidebar() {
   const { adminUser } = useAdminAuth()
@@ -41,19 +42,19 @@ export default function AdminSidebar() {
 
   const menuItems = [
     { label: 'Dashboard', href: '/admin/dashboard', icon: Home },
-    { label: 'Ministérios', href: '/admin/ministerios', icon: Building2 },
-    ...(role !== 'suporte' ? [{ label: 'Pagamentos', href: '/admin/pagamentos', icon: CreditCard }] : []),
-    ...(role !== 'financeiro' && role !== 'suporte' ? [{ label: 'Planos', href: '/admin/planos', icon: BarChart3 }] : []),
+    ...(temAcessoAdmin(role, 'ministerios') ? [{ label: 'Ministérios', href: '/admin/ministerios', icon: Building2 }] : []),
+    ...(temAcessoAdmin(role, 'pagamentos') ? [{ label: 'Pagamentos', href: '/admin/pagamentos', icon: CreditCard }] : []),
+    ...(temAcessoAdmin(role, 'planos') ? [{ label: 'Planos', href: '/admin/planos', icon: BarChart3 }] : []),
     { label: 'Suporte', href: '/admin/suporte', icon: HeadphonesIcon },
-    ...(role !== 'financeiro' && role !== 'suporte'
+    ...(temAcessoAdmin(role, 'configuracoes_supabase') || temAcessoAdmin(role, 'configuracoes_usuarios') || temAcessoAdmin(role, 'configuracoes_gateway')
       ? [
           {
             label: 'Configurações',
             icon: Settings,
             submenu: [
-              { label: 'Supabase', href: '/admin/configuracoes/supabase', icon: Database },
-              { label: 'Usuários', href: '/admin/configuracoes/usuarios', icon: Users },
-              { label: 'Gateway', href: '/admin/configuracoes/gateway', icon: Link2 },
+              ...(temAcessoAdmin(role, 'configuracoes_supabase') ? [{ label: 'Supabase', href: '/admin/configuracoes/supabase', icon: Database }] : []),
+              ...(temAcessoAdmin(role, 'configuracoes_usuarios') ? [{ label: 'Usuários', href: '/admin/configuracoes/usuarios', icon: Users }] : []),
+              ...(temAcessoAdmin(role, 'configuracoes_gateway') ? [{ label: 'Gateway', href: '/admin/configuracoes/gateway', icon: Link2 }] : []),
             ],
           },
         ]

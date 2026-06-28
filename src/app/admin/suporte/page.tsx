@@ -8,9 +8,10 @@ import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import AdminSidebar from '@/components/AdminSidebar'
 import type { SupportTicket, SupportTicketMessage, SupportTicketLanding, LandingTicketNote } from '@/types/admin'
+import { temAcessoAdmin } from '@/lib/access-control'
 
 export default function SuportePage() {
-  const { isLoading, isAuthenticated } = useAdminAuth()
+  const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [landingTickets, setLandingTickets] = useState<SupportTicketLanding[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,20 +49,26 @@ export default function SuportePage() {
   })
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/admin/login')
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        router.push('/admin/login')
+        return
+      }
+      if (!temAcessoAdmin(adminUser?.role, 'suporte')) {
+        router.push('/admin/dashboard')
+      }
     }
-  }, [isLoading, isAuthenticated, router])
+  }, [isLoading, isAuthenticated, adminUser, router])
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && temAcessoAdmin(adminUser?.role, 'suporte')) {
       if (ticketView === 'tenant') {
         fetchTickets()
       } else {
         fetchLandingTickets()
       }
     }
-  }, [page, statusFilter, priorityFilter, landingPage, landingStatusFilter, ticketView, isAuthenticated])
+  }, [page, statusFilter, priorityFilter, landingPage, landingStatusFilter, ticketView, isAuthenticated, adminUser])
 
   useEffect(() => {
     if (ticketView !== 'tenant' || !selectedTicket) return

@@ -1,11 +1,11 @@
 import { createServerClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
-
-type AdminRole = string
+import { ADMIN_MODULOS_ACESSO, type AdminRole } from '@/lib/access-control'
 
 export type RequireAdminOptions = {
   requiredRole?: AdminRole
   requiredCapability?: string
+  requiredModule?: string
 }
 
 export type AdminContext = {
@@ -104,6 +104,17 @@ export async function requireAdmin(
     return {
       ok: false,
       response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
+    }
+  }
+
+  if (options.requiredModule) {
+    const roleNorm = String(adminUser?.role || '').toLowerCase().trim() as AdminRole;
+    const allowed = ADMIN_MODULOS_ACESSO[roleNorm]?.includes(options.requiredModule);
+    if (!allowed && roleNorm !== 'admin' && roleNorm !== 'super_admin') {
+      return {
+        ok: false,
+        response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
+      }
     }
   }
 

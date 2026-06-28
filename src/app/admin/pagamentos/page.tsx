@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import AdminSidebar from '@/components/AdminSidebar'
+import { temAcessoAdmin } from '@/lib/access-control'
 import { ExternalLink, Copy, Check, Filter, RefreshCw, AlertCircle, Coins, Plus, Search, ChevronDown, ChevronRight } from 'lucide-react'
 
 interface BillingInvoice {
@@ -30,7 +31,7 @@ interface BillingInvoice {
 }
 
 export default function PagamentosPage() {
-  const { isLoading, isAuthenticated, isAdmin } = useAdminAuth()
+  const { isLoading, isAuthenticated, isAdmin, adminUser } = useAdminAuth()
   const [invoices, setInvoices] = useState<BillingInvoice[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -55,10 +56,16 @@ export default function PagamentosPage() {
   const router = useRouter()
 
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || !isAdmin)) {
-      router.push('/admin/login')
+    if (!isLoading) {
+      if (!isAuthenticated || !isAdmin) {
+        router.push('/admin/login')
+        return
+      }
+      if (!temAcessoAdmin(adminUser?.role, 'pagamentos')) {
+        router.push('/admin/dashboard')
+      }
     }
-  }, [isLoading, isAuthenticated, isAdmin, router])
+  }, [isLoading, isAuthenticated, isAdmin, adminUser, router])
 
   const fetchInvoices = async () => {
     try {
@@ -92,16 +99,16 @@ export default function PagamentosPage() {
   }
 
   useEffect(() => {
-    if (isAuthenticated && isAdmin) {
+    if (isAuthenticated && isAdmin && temAcessoAdmin(adminUser?.role, 'pagamentos')) {
       fetchInvoices()
     }
-  }, [statusFilter, isAuthenticated, isAdmin])
+  }, [statusFilter, isAuthenticated, isAdmin, adminUser])
 
   useEffect(() => {
-    if (isAuthenticated && isAdmin) {
+    if (isAuthenticated && isAdmin && temAcessoAdmin(adminUser?.role, 'pagamentos')) {
       fetchMinistries()
     }
-  }, [isAuthenticated, isAdmin])
+  }, [isAuthenticated, isAdmin, adminUser])
 
   const handleCopyLink = async (url: string, id: string) => {
     try {

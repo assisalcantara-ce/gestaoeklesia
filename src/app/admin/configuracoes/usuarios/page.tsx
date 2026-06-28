@@ -8,6 +8,7 @@ import { authenticatedFetch } from '@/lib/api-client'
 import { useAppDialog } from '@/providers/AppDialogProvider'
 import { Plus, Trash2, Edit2, Shield, CreditCard, Headphones } from 'lucide-react'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
+import { temAcessoAdmin } from '@/lib/access-control'
 
 import { useRouter } from 'next/navigation'
 
@@ -102,8 +103,7 @@ export default function UsuariosPage() {
         router.push('/admin/login')
         return
       }
-      const role = adminUser?.role
-      if (role === 'financeiro' || role === 'suporte') {
+      if (!temAcessoAdmin(adminUser?.role, 'configuracoes_usuarios')) {
         router.push('/admin/dashboard')
         return
       }

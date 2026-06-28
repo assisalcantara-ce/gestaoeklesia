@@ -48,7 +48,7 @@ function lowerText(value: unknown): string | null {
 
 export async function GET(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredCapability: 'can_manage_ministries' })
+    const result = await requireAdmin(request, { requiredModule: 'ministerios' })
     if (!result.ok) return result.response
     const { supabaseAdmin } = result.ctx
     const searchParams = request.nextUrl.searchParams
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredCapability: 'can_manage_ministries' })
+    const result = await requireAdmin(request, { requiredModule: 'ministerios' })
     if (!result.ok) return result.response
     const { supabaseAdmin: supabase, adminUser } = result.ctx
     const body = await request.json()
@@ -255,7 +255,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredCapability: 'can_manage_ministries' })
+    const result = await requireAdmin(request, { requiredModule: 'ministerios' })
     if (!result.ok) return result.response
     const { supabaseAdmin: supabase, adminUser } = result.ctx
     const body = await request.json()
@@ -394,7 +394,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredCapability: 'can_manage_ministries' })
+    const result = await requireAdmin(request, { requiredModule: 'ministerios' })
     if (!result.ok) return result.response
     const { supabaseAdmin: supabase, adminUser } = result.ctx
     const body = await request.json()

@@ -1,3 +1,44 @@
+export type AdminRole = 'admin' | 'super_admin' | 'financeiro' | 'suporte';
+
+export const ADMIN_MODULOS_ACESSO: Record<AdminRole, string[]> = {
+  admin: [
+    'dashboard',
+    'ministerios',
+    'pagamentos',
+    'planos',
+    'suporte',
+    'configuracoes_supabase',
+    'configuracoes_usuarios',
+    'configuracoes_gateway',
+  ],
+  super_admin: [
+    'dashboard',
+    'ministerios',
+    'pagamentos',
+    'planos',
+    'suporte',
+    'configuracoes_supabase',
+    'configuracoes_usuarios',
+    'configuracoes_gateway',
+  ],
+  financeiro: [
+    'dashboard',
+    'pagamentos',
+    'planos',
+    'suporte',
+  ],
+  suporte: [
+    'dashboard',
+    'ministerios',
+    'suporte',
+  ],
+};
+
+export function temAcessoAdmin(role: string | null | undefined, modulo: string): boolean {
+  const normalizedRole = String(role || '').toLowerCase().trim() as AdminRole;
+  return ADMIN_MODULOS_ACESSO[normalizedRole]?.includes(modulo) ?? false;
+}
+
 export type NivelAcesso =
   | 'administrador'
   | 'financeiro'
@@ -44,12 +85,9 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'gestao',
   ],
   financeiro: [
-    'financeiro',
+    'dashboard',
     'tesouraria',
-    'suporte',
-    'presidencia',
-    'consolidado_financeiro',
-    'conselho_fiscal',
+    'auditoria',
   ],
   supervisor: [
     'secretaria',
@@ -59,22 +97,21 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'dashboard',
     'secretaria',
     'secretaria_local',
-    'configuracoes',
-    'suporte',
     'patrimonio',
     'geolocalizacao',
     'gestao',
   ],
   tesouraria_local: [
-    'financeiro',
+    'dashboard',
     'tesouraria',
   ],
   superintendente_ebd: [
+    'dashboard',
     'ebd',
   ],
   coordenador_ebd: [
+    'dashboard',
     'ebd',
-    'configuracoes',
   ],
   presidencia: [
     'dashboard',
@@ -92,29 +129,26 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'dashboard',
     'secretaria',
     'secretaria_local',
-    'configuracoes',
-    'suporte',
     'patrimonio',
     'geolocalizacao',
     'gestao',
   ],
   financeiro_local: [
-    'financeiro',
+    'dashboard',
     'tesouraria',
   ],
   superintendente: [
+    'dashboard',
     'ebd',
   ],
   coordenador: [
+    'dashboard',
     'ebd',
-    'configuracoes',
   ],
   operador: [
     'dashboard',
     'secretaria',
     'secretaria_local',
-    'configuracoes',
-    'suporte',
     'patrimonio',
     'geolocalizacao',
     'gestao',
@@ -142,21 +176,19 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'geolocalizacao',
   ],
   financeiro: [
-    'financeiro',
     'tesouraria',
-    'consolidado_financeiro',
   ],
   supervisor: [
     'secretaria',
   ],
   secretaria_local: [
     'secretaria',
+    'secretaria_local',
     'patrimonio',
     'geolocalizacao',
     'gestao',
   ],
   tesouraria_local: [
-    'financeiro',
     'tesouraria',
   ],
   superintendente_ebd: [
@@ -172,12 +204,12 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
   // Legados
   admin_local: [
     'secretaria',
+    'secretaria_local',
     'patrimonio',
     'geolocalizacao',
     'gestao',
   ],
   financeiro_local: [
-    'financeiro',
     'tesouraria',
   ],
   superintendente: [
@@ -188,6 +220,7 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
   ],
   operador: [
     'secretaria',
+    'secretaria_local',
     'patrimonio',
     'geolocalizacao',
     'gestao',

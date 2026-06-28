@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import AdminSidebar from '@/components/AdminSidebar'
 import { createClient } from '@/lib/supabase-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
+import { temAcessoAdmin } from '@/lib/access-control'
 
 interface GatewaySettings {
   provider: 'asaas'
@@ -39,8 +40,7 @@ export default function GatewayConfigPage() {
         router.push('/admin/login')
         return
       }
-      const role = adminUser?.role
-      if (role === 'financeiro' || role === 'suporte') {
+      if (!temAcessoAdmin(adminUser?.role, 'configuracoes_gateway')) {
         router.push('/admin/dashboard')
         return
       }
