@@ -163,9 +163,11 @@ export default function DashboardPage() {
 
       const temFinanceiro = userCtx.podeAcessar('tesouraria');
 
-      // Escopo por nível: admin_local/financeiro_local → congregacao; supervisor → supervisao
-      const scopeCongId  = userCtx.congregacaoId;  // não-null só para admin_local / financeiro_local
-      const scopeSupId   = userCtx.supervisaoId;    // não-null só para supervisor
+      // Escopo por nível: aplicar congregação apenas para admin_local/financeiro_local; supervisão para supervisor
+      const isLocal = userCtx.nivel === 'admin_local' || userCtx.nivel === 'financeiro_local';
+      const isSup = userCtx.nivel === 'supervisor';
+      const scopeCongId  = isLocal ? userCtx.congregacaoId : null;
+      const scopeSupId   = isSup ? userCtx.supervisaoId : null;
 
       const agora    = new Date();
       const anoAtual = agora.getFullYear();
