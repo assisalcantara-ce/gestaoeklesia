@@ -767,9 +767,9 @@ export default function DashboardPage() {
                 <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Sem dados</div>
               ) : (
                 <ResponsiveContainer width="100%" height={210}>
-                  <BarChart data={congBarData} margin={{ top: 4, right: 4, left: -20, bottom: 42 }}>
+                  <BarChart data={congBarData} margin={{ top: 4, right: 4, left: -20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="nome" tick={{ fontSize: 10, fill: '#9ca3af' }} angle={-40} textAnchor="end" interval={0} />
+                    <XAxis dataKey="nome" tick={{ fontSize: 10, fill: '#9ca3af' }} textAnchor="middle" interval={0} />
                     <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
                     <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} />
                     <Bar dataKey="total" fill="#1E3A5F" radius={[4, 4, 0, 0]} name="Membros" />
