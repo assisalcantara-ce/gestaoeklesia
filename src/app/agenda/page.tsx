@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import DashboardContainer from '@/components/dashboard/DashboardContainer';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState';
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 import DashboardContent from '@/components/dashboard/DashboardContent';
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
@@ -172,6 +173,14 @@ export default function AgendaPage() {
     const mes = meses[d.getMonth()];
     const ano = d.getFullYear();
     return `${diaSemana}, ${dia} de ${mes} de ${ano}`;
+  }, []);
+
+  const daysLeftInMonth = useMemo(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+    return lastDayOfMonth - today.getDate();
   }, []);
 
   useEffect(() => {
@@ -1320,10 +1329,25 @@ export default function AgendaPage() {
               {loading ? (
                 <div className="text-xs text-slate-400 text-center py-10">Carregando eventos...</div>
               ) : eventosColunaDireita.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center p-6 gap-2 my-auto min-h-[200px]">
-                  <CalendarIcon className="h-8 w-8 text-slate-200" />
-                  <p className="text-xs font-bold text-slate-500">Nenhum compromisso.</p>
-                </div>
+                <DashboardEmptyState
+                  icon={CalendarIcon}
+                  title="Nenhum compromisso agendado"
+                  description="Você não possui eventos ou reuniões registradas para o período visualizado. Que tal criar o primeiro?"
+                  action={
+                    isEscritaPermitida
+                      ? {
+                          label: 'Novo Compromisso',
+                          onClick: () => openForm(null),
+                          icon: Plus,
+                        }
+                      : undefined
+                  }
+                  extra={
+                    <p className="text-[11px] text-slate-500 font-semibold">
+                      Faltam {daysLeftInMonth} dias para o encerramento do mês de {MESES_PT[new Date().getMonth()]}
+                    </p>
+                  }
+                />
               ) : (
                 <div className="space-y-3 overflow-y-auto max-h-[360px] pr-1">
                   {eventosColunaDireita.map(evt => {
@@ -1452,10 +1476,20 @@ export default function AgendaPage() {
             icon={TrendingUp}
           >
             {proximosEventos.length === 0 ? (
-              <div className="text-center py-12 text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
-                <CalendarIcon className="h-8 w-8 text-slate-200" />
-                <span className="font-semibold text-slate-500">Nenhum compromisso agendado para os próximos dias.</span>
-              </div>
+              <DashboardEmptyState
+                icon={TrendingUp}
+                title="Linha do tempo livre"
+                description="Seus próximos dias estão livres de atividades oficiais ou locais agendadas."
+                action={
+                  isEscritaPermitida
+                    ? {
+                        label: 'Registrar Evento',
+                        onClick: () => openForm(null),
+                        icon: Plus,
+                      }
+                    : undefined
+                }
+              />
             ) : (
               <div className="relative border-l-2 border-slate-100 ml-4 pl-6 space-y-5 py-2">
                 {proximosEventos.map(evt => {
@@ -1622,7 +1656,11 @@ export default function AgendaPage() {
           {loadingSols ? (
             <div className="text-center py-6 text-slate-400 text-xs">Carregando solicitações...</div>
           ) : solicitacoes.length === 0 ? (
-            <div className="text-center py-6 text-slate-400 text-xs">Nenhuma solicitação encontrada no momento.</div>
+            <DashboardEmptyState
+              icon={Gavel}
+              title="Sem solicitações pendentes"
+              description="Nenhuma solicitação de alteração de datas ou exceções aguarda sua aprovação."
+            />
           ) : (
             <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
               {solicitacoes.map(sol => {
