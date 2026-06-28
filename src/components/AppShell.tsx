@@ -22,6 +22,7 @@ const SIDEBAR_PREFIXES = [
   '/usuarios',
   '/suporte',
   '/configuracoes',
+  '/agenda',
 ];
 
 export default function AppShell({ children }: { children: ReactNode }) {

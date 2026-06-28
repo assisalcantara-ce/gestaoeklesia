@@ -7,11 +7,11 @@ import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import {
-  Plus, Pencil, Trash2, Calendar, MapPin, Tag, Eye, Clock, X,
-  AlertTriangle, ShieldCheck, Lock, Check, Archive, User,
+  Plus, Pencil, Trash2, Calendar as CalendarIcon, X,
+  AlertTriangle, Check, Archive,
   ChevronLeft, ChevronRight, Filter, LayoutDashboard,
   BookOpen, TrendingUp, ChevronDown, ChevronUp,
-  CheckCircle2, Ban, Flame
+  CheckCircle2, CalendarRange, Gavel
 } from 'lucide-react';
 import { useAppDialog } from '@/providers/AppDialogProvider';
 import { OrganizationalService, getOrgHelpers, OrgStructure } from '@/lib/organizational-service';
@@ -86,16 +86,32 @@ interface Congregacao {
   nome: string;
 }
 
-// ─── Dicionários ─────────────────────────────────────────────────────────────
-
-const TIPOS_INFO_LEGADO = {
-  culto: { label: 'Culto', corBg: 'bg-red-50 text-red-700 border-red-200' },
-  reuniao: { label: 'Reunião', corBg: 'bg-purple-50 text-purple-700 border-purple-200' },
-  aula: { label: 'Aula', corBg: 'bg-blue-50 text-blue-700 border-blue-200' },
-  evento: { label: 'Evento', corBg: 'bg-green-50 text-green-700 border-green-200' },
-  tarefa: { label: 'Tarefa', corBg: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
-  outro: { label: 'Outro', corBg: 'bg-gray-50 text-gray-700 border-gray-200' },
-};
+interface SolicitacaoExcecao {
+  id: string;
+  ministry_id: string;
+  planejamento_id: string | null;
+  evento_id: string | null;
+  solicitante_id: string | null;
+  tipo_solicitacao: 'conflito_data' | 'alteracao_data' | 'alteracao_escopo' | 'coexistencia' | 'criacao_evento';
+  escopo: 'organizacao' | 'divisao1' | 'divisao2' | 'divisao3';
+  titulo: string;
+  justificativa: string;
+  data_inicio: string;
+  data_fim: string | null;
+  conflito_id: string | null;
+  status: 'pendente' | 'aprovado' | 'rejeitado' | 'cancelado';
+  tipo_decisao: 'aprovar' | 'rejeitar' | 'aprovar_com_restricao' | null;
+  numero_decisao: string | null;
+  vigencia_tipo: 'unica' | 'temporaria' | 'permanente';
+  vigencia_inicio: string | null;
+  vigencia_fim: string | null;
+  efeito: 'autorizar_evento' | 'permitir_coexistencia' | 'alterar_escopo' | 'alterar_data' | 'outro' | null;
+  analisado_por: string | null;
+  analisado_em: string | null;
+  parecer: string | null;
+  created_at: string;
+  conflito_evento?: { titulo: string } | null;
+}
 
 const CATEGORIAS_LABEL = {
   culto: 'Cultos',
@@ -106,24 +122,18 @@ const CATEGORIAS_LABEL = {
   administrativo: 'Administrativo',
 };
 
-const VISIBILIDADE_INFO = {
-  privado: 'Privado',
-  lideranca: 'Liderança',
-  igreja: 'Membros da Igreja',
-  ministerio: 'Ministério Geral',
-  publico: 'Público Geral',
-};
-
-const STATUS_INFO = {
-  agendado: { label: 'Agendado', cor: 'bg-blue-100 text-blue-800' },
-  cancelado: { label: 'Cancelado', cor: 'bg-red-100 text-red-800' },
-  concluido: { label: 'Concluído', cor: 'bg-green-100 text-green-800' },
-};
-
 const STATUS_PLAN_INFO = {
-  rascunho: { label: 'Rascunho', cor: 'bg-amber-100 text-amber-800 border-amber-200' },
-  publicado: { label: 'Publicado', cor: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-  arquivado: { label: 'Arquivado', cor: 'bg-slate-100 text-slate-800 border-slate-200' },
+  rascunho: { label: 'Rascunho', cor: 'bg-amber-50 text-amber-700 border-amber-200' },
+  publicado: { label: 'Publicado', cor: 'bg-blue-50 text-blue-700 border-blue-200' },
+  arquivado: { label: 'Arquivado', cor: 'bg-slate-50 text-slate-700 border-slate-200' },
+};
+
+const TIPO_SOLICITACAO_LABEL = {
+  conflito_data: 'Conflito de Data',
+  alteracao_data: 'Alteração de Data',
+  alteracao_escopo: 'Alteração de Escopo',
+  coexistencia: 'Coexistência de Eventos',
+  criacao_evento: 'Criação de Evento Extra',
 };
 
 const MESES_PT = [
@@ -131,7 +141,6 @@ const MESES_PT = [
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
 ];
 
-// ─── Quick filter type ────────────────────────────────────────────────────────
 type QuickFilter = 'todos' | 'oficiais' | 'locais' | 'bloqueados';
 
 export default function AgendaPage() {
@@ -141,7 +150,8 @@ export default function AgendaPage() {
   const dialog = useAppDialog();
   const { registrarAcao } = useAuditLog();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'calendario' | 'planejamento'>('dashboard');
+  // Tab inicial padrão restaurada para CALENDÁRIO conforme Sprint UX 2.0
+  const [activeTab, setActiveTab] = useState<'calendario' | 'dashboard' | 'planejamento' | 'solicitacoes'>('calendario');
 
   const [ministryId, setMinistryId] = useState<string | null>(null);
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
@@ -156,7 +166,11 @@ export default function AgendaPage() {
   const [planningEventCount, setPlanningEventCount] = useState<number>(0);
   const [responsibleEmail, setResponsibleEmail] = useState<string | null>(null);
 
-  // Filtros
+  // Solicitações carregadas dinamicamente se o usuário for administrador ou presidência
+  const [solicitacoes, setSolicitacoes] = useState<SolicitacaoExcecao[]>([]);
+  const [loadingSols, setLoadingSols] = useState(false);
+
+  // Filtros de Agenda
   const [filtroMes, setFiltroMes] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -166,6 +180,7 @@ export default function AgendaPage() {
   const [filtroVisibilidade, setFiltroVisibilidade] = useState<string>('');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('todos');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null); // Filtro de dia selecionado no calendário
 
   // Modais / Formulário
   const [showModal, setShowModal] = useState(false);
@@ -193,6 +208,7 @@ export default function AgendaPage() {
   const isEdicaoBloqueada = activePlanning?.status === 'publicado' || activePlanning?.status === 'arquivado';
   const isEscritaPermitida = (ctx.nivel === 'administrador' || ctx.nivel === 'secretaria_local' || ctx.nivel === 'presidencia') && !isEdicaoBloqueada;
   const isAdmin = ctx.nivel === 'administrador';
+  const isPresidenciaOrAdmin = ctx.nivel === 'administrador' || ctx.nivel === 'presidencia';
   const orgHelper = orgStructure ? getOrgHelpers(orgStructure) : null;
 
   const flash = (tipo: 'ok' | 'erro', texto: string) => {
@@ -266,6 +282,38 @@ export default function AgendaPage() {
     }
   }, [supabase]);
 
+  // Carrega solicitações (para a aba de solicitações integrada)
+  const loadSolicitacoes = useCallback(async (mid: string) => {
+    if (!isPresidenciaOrAdmin) return;
+    setLoadingSols(true);
+    try {
+      const { data, error } = await supabase
+        .from('agenda_solicitacoes')
+        .select('*')
+        .eq('ministry_id', mid)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const resolved = await Promise.all((data as SolicitacaoExcecao[] ?? []).map(async (item) => {
+        if (item.conflito_id) {
+          const { data: cEvt } = await supabase
+            .from('agenda_eventos')
+            .select('titulo')
+            .eq('id', item.conflito_id)
+            .maybeSingle();
+          return { ...item, conflito_evento: cEvt };
+        }
+        return item;
+      }));
+      setSolicitacoes(resolved);
+    } catch (err) {
+      console.error('Erro ao buscar solicitacoes:', err);
+    } finally {
+      setLoadingSols(false);
+    }
+  }, [supabase, isPresidenciaOrAdmin]);
+
   // Carrega eventos filtrados
   const loadEventos = useCallback(async (mid: string) => {
     setLoading(true);
@@ -307,17 +355,19 @@ export default function AgendaPage() {
         setMinistryId(mid);
         loadCongregacoes(mid);
         loadTipos(mid);
+        loadSolicitacoes(mid);
         OrganizationalService.getEstrutura(supabase).then(setOrgStructure);
       }
     });
-  }, [user, bloqueado, supabase, loadCongregacoes, loadTipos]);
+  }, [user, bloqueado, supabase, loadCongregacoes, loadTipos, loadSolicitacoes]);
 
   useEffect(() => {
     if (ministryId) {
       loadEventos(ministryId);
       loadPlanningData(ministryId, currentYear);
+      loadSolicitacoes(ministryId);
     }
-  }, [ministryId, loadEventos, loadPlanningData, currentYear]);
+  }, [ministryId, loadEventos, loadPlanningData, loadSolicitacoes, currentYear]);
 
   // Navegação de meses
   const handlePrevMonth = () => {
@@ -329,6 +379,7 @@ export default function AgendaPage() {
       ano -= 1;
     }
     setFiltroMes(`${ano}-${String(mes).padStart(2, '0')}`);
+    setSelectedDate(null);
   };
 
   const handleNextMonth = () => {
@@ -340,6 +391,13 @@ export default function AgendaPage() {
       ano += 1;
     }
     setFiltroMes(`${ano}-${String(mes).padStart(2, '0')}`);
+    setSelectedDate(null);
+  };
+
+  const handleGoToToday = () => {
+    const now = new Date();
+    setFiltroMes(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+    setSelectedDate(now.toISOString().split('T')[0]);
   };
 
   // Abrir Modal de Cadastro
@@ -348,7 +406,6 @@ export default function AgendaPage() {
       flash('erro', 'Ações de escrita estão bloqueadas porque este planejamento anual já está publicado/arquivado.');
       return;
     }
-    // Eventos gerenciados por outros módulos não podem ser editados diretamente
     if (evt?.bloqueado && evt?.origem && evt.origem !== 'manual' && evt.origem !== '') {
       const moduloLabel = ORIGEM_LABELS[evt.origem as keyof typeof ORIGEM_LABELS] ?? evt.origem;
       flash('erro', `Este compromisso é gerenciado pelo módulo ${moduloLabel}. Edite-o diretamente neste módulo.`);
@@ -380,15 +437,24 @@ export default function AgendaPage() {
       });
     } else {
       const now = new Date();
-      const tzOffset = now.getTimezoneOffset() * 60000;
-      const initialDate = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
+      let initialDateStr = '';
+      if (selectedDate) {
+        // Se houver um dia selecionado no calendário, inicia o form com esse dia
+        const selectD = new Date(selectedDate);
+        selectD.setHours(now.getHours(), now.getMinutes());
+        const tzOffset = selectD.getTimezoneOffset() * 60000;
+        initialDateStr = new Date(selectD.getTime() - tzOffset).toISOString().slice(0, 16);
+      } else {
+        const tzOffset = now.getTimezoneOffset() * 60000;
+        initialDateStr = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
+      }
       const defaultTipoId = tipos.length > 0 ? tipos[0].id : '';
 
       setForm({
         titulo: '',
         descricao: '',
         tipo_id: defaultTipoId,
-        data_inicio: initialDate,
+        data_inicio: initialDateStr,
         data_fim: '',
         local: '',
         visibilidade: 'ministerio',
@@ -538,6 +604,7 @@ export default function AgendaPage() {
               });
 
               flash('ok', 'Solicitação de exceção encaminhada com sucesso à Presidência!');
+              loadSolicitacoes(ministryId);
             } catch (err: any) {
               console.error(err);
               flash('erro', 'Erro ao registrar solicitação de exceção.');
@@ -620,13 +687,13 @@ export default function AgendaPage() {
 
       if (error) throw error;
 
-      flash('ok', editEvento ? 'Compromisso atualizado com sucesso!' : 'Compromisso criado com sucesso!');
+      flash('ok', editEvento ? 'Compromisso atualizado!' : 'Compromisso criado!');
       setShowModal(false);
       loadEventos(ministryId);
       loadPlanningData(ministryId, currentYear);
     } catch (err: any) {
       console.error(err);
-      flash('erro', 'Erro ao salvar o compromisso.');
+      flash('erro', 'Erro ao salvar compromisso.');
     } finally {
       setSaving(false);
     }
@@ -656,45 +723,19 @@ export default function AgendaPage() {
           .eq('id', evt.id);
 
         if (error) throw error;
-        flash('ok', 'Compromisso excluído com sucesso!');
+        flash('ok', 'Compromisso excluído!');
         if (ministryId) {
           loadEventos(ministryId);
           loadPlanningData(ministryId, currentYear);
         }
       } catch (err: any) {
         console.error(err);
-        flash('erro', 'Erro ao excluir o compromisso.');
+        flash('erro', 'Erro ao excluir compromisso.');
       }
     }
   };
 
-  // Cancelar Evento (Rápido)
-  const handleCancelQuick = async (evt: AgendaEvento) => {
-    if (!isEscritaPermitida || evt.bloqueado) return;
-    const ok = await dialog.confirm({
-      title: 'Cancelar Compromisso',
-      message: `Deseja realmente alterar o status do compromisso "${evt.titulo}" para Cancelado?`,
-      confirmText: 'Sim, Cancelar',
-      cancelText: 'Voltar',
-      type: 'warning',
-    });
 
-    if (ok) {
-      try {
-        const { error } = await supabase
-          .from('agenda_eventos')
-          .update({ status: 'cancelado' })
-          .eq('id', evt.id);
-
-        if (error) throw error;
-        flash('ok', 'Compromisso cancelado!');
-        if (ministryId) loadEventos(ministryId);
-      } catch (err: any) {
-        console.error(err);
-        flash('erro', 'Erro ao cancelar o compromisso.');
-      }
-    }
-  };
 
   // Ação: Publicar Planejamento
   const handlePublishPlanning = async () => {
@@ -730,7 +771,7 @@ export default function AgendaPage() {
           descricao: `Publicou oficialmente o Planejamento Anual de ${activePlanning.ano}.`,
         });
 
-        flash('ok', `Planejamento de ${activePlanning.ano} publicado com sucesso!`);
+        flash('ok', `Planejamento de ${activePlanning.ano} publicado!`);
         loadPlanningData(ministryId, currentYear);
         loadEventos(ministryId);
       } catch (err: any) {
@@ -780,9 +821,44 @@ export default function AgendaPage() {
     }
   };
 
-  const getCongName = (id: string | null) => {
-    if (!id) return orgHelper ? `Todas as ${orgHelper.label('divisao1')}s` : 'Todas as Congregações';
-    return congregacoes.find(c => c.id === id)?.nome ?? (orgHelper ? orgHelper.label('divisao1') : 'Congregação');
+  // Julgamento de solicitação administrativa integrado na aba
+  const handleDecidirSolicitacao = async (solId: string, tipoDecisao: 'aprovar' | 'rejeitar', parecer: string) => {
+    if (!ministryId || !isPresidenciaOrAdmin) return;
+    try {
+      const statusFinal = tipoDecisao === 'rejeitar' ? 'rejeitado' : 'aprovado';
+      const payload = {
+        status: statusFinal,
+        tipo_decisao: tipoDecisao,
+        efeito: statusFinal === 'rejeitado' ? null : 'autorizar_evento',
+        vigencia_tipo: 'unica',
+        parecer: parecer.trim() || `Solicitação julgada administrativamente como: ${tipoDecisao}`,
+        analisado_por: user?.id || null,
+        analisado_em: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('agenda_solicitacoes')
+        .update(payload)
+        .eq('id', solId);
+
+      if (error) throw error;
+      flash('ok', `Solicitação julgada como ${statusFinal}!`);
+      loadSolicitacoes(ministryId);
+      loadEventos(ministryId);
+    } catch (err) {
+      console.error(err);
+      flash('erro', 'Erro ao julgar solicitação.');
+    }
+  };
+
+
+  const getEscopoLabel = (escopoVal: string) => {
+    if (!orgHelper) return escopoVal;
+    if (escopoVal === 'organizacao') return orgHelper.label('organizacao');
+    if (escopoVal === 'divisao1') return orgHelper.label('divisao1');
+    if (escopoVal === 'divisao2') return orgHelper.label('divisao2');
+    if (escopoVal === 'divisao3') return orgHelper.label('divisao3');
+    return escopoVal;
   };
 
   const tiposAgrupados = useMemo(() => {
@@ -802,28 +878,13 @@ export default function AgendaPage() {
     return grupos;
   }, [tipos]);
 
-  const getEscopoLabel = (escopoVal: string) => {
-    if (!orgHelper) return escopoVal;
-    if (escopoVal === 'organizacao') return orgHelper.label('organizacao');
-    if (escopoVal === 'divisao1') return orgHelper.label('divisao1');
-    if (escopoVal === 'divisao2') return orgHelper.label('divisao2');
-    if (escopoVal === 'divisao3') return orgHelper.label('divisao3');
-    return escopoVal;
-  };
+  // ─── Métricas de Dashboard (KPIs Compactos Ministeriais) ───────────────────
+  const totalCultos = useMemo(() => eventos.filter(e => e.tipo === 'culto' && e.status === 'agendado').length, [eventos]);
+  const totalReunioes = useMemo(() => eventos.filter(e => e.tipo === 'reuniao' && e.status === 'agendado').length, [eventos]);
+  const totalEventosOficiais = useMemo(() => eventos.filter(e => e.calendario_oficial && e.status === 'agendado').length, [eventos]);
+  const totalEventosSincronizados = useMemo(() => eventos.filter(e => e.origem && e.origem !== 'manual' && e.origem !== '').length, [eventos]);
 
-
-  const eventosOficiais = useMemo(() => eventos.filter(e => e.calendario_oficial), [eventos]);
-  const eventosLocais = useMemo(() => eventos.filter(e => !e.calendario_oficial && !e.bloqueado), [eventos]);
-  const eventosBloqueados = useMemo(() => eventos.filter(e => e.bloqueado), [eventos]);
-
-  const proximoEvento = useMemo(() => {
-    const now = new Date();
-    return eventos
-      .filter(e => e.status === 'agendado' && new Date(e.data_inicio) >= now)
-      .sort((a, b) => new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime())[0] ?? null;
-  }, [eventos]);
-
-  // Aplicar quick filter + advanced filters na listagem
+  // Eventos Filtrados para listagem/calendário (filtrando também quando há busca ativa ou quickFilter)
   const eventosFiltrados = useMemo(() => {
     let result = eventos;
     if (quickFilter === 'oficiais') result = result.filter(e => e.calendario_oficial);
@@ -832,369 +893,672 @@ export default function AgendaPage() {
     return result;
   }, [eventos, quickFilter]);
 
-  // Timeline: próximos 5 eventos a partir de hoje em todos os meses
-  const timelineEventos = useMemo(() => {
+  // Próximos Eventos em ordem cronológica (sempre filtrados ou do mês)
+  const proximosEventos = useMemo(() => {
     const now = new Date();
-    return eventos
+    return eventosFiltrados
       .filter(e => e.status === 'agendado' && new Date(e.data_inicio) >= now)
+      .sort((a, b) => new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime())
       .slice(0, 5);
+  }, [eventosFiltrados]);
+
+  // ─── LÓGICA DO CALENDÁRIO COMPACTO MENSAL ──────────────────────────────────
+  const daysInMonthArray = useMemo(() => {
+    const [yearStr, monthStr] = filtroMes.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const firstDayIndex = new Date(year, month - 1, 1).getDay(); // 0 = Domingo
+
+    const array: { dateStr: string | null; dayNum: number | null }[] = [];
+    
+    // Fill blank spaces for previous month
+    for (let i = 0; i < firstDayIndex; i++) {
+      array.push({ dateStr: null, dayNum: null });
+    }
+
+    // Fill days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      array.push({ dateStr: dateString, dayNum: day });
+    }
+
+    return array;
+  }, [filtroMes]);
+
+  // Eventos por dia do calendário
+  const eventosPorDia = useMemo(() => {
+    const mapa: Record<string, AgendaEvento[]> = {};
+    eventos.forEach(e => {
+      const dayStr = e.data_inicio.split('T')[0];
+      if (!mapa[dayStr]) mapa[dayStr] = [];
+      mapa[dayStr].push(e);
+    });
+    return mapa;
   }, [eventos]);
 
-  if (ctx.loading) return <div className="p-8">Carregando permissões do módulo...</div>;
-  if (bloqueado) return null;
+  // Eventos exibidos na coluna da direita com base na seleção do calendário
+  const eventosColunaDireita = useMemo(() => {
+    if (selectedDate) {
+      return eventos.filter(e => e.data_inicio.startsWith(selectedDate));
+    }
+    // Se nenhum dia estiver clicado, exibe os eventos da semana/mês atual ordenados
+    return eventos.sort((a, b) => new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime());
+  }, [eventos, selectedDate]);
 
-  // ─── Tabs config ─────────────────────────────────────────────────────────
-  const TABS = [
-    { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
-    { id: 'calendario', label: 'Calendário', icon: Calendar },
-    { id: 'planejamento', label: 'Planejamento', icon: BookOpen },
-  ] as const;
+  // Abas conforme Sprint UX 2.0 (ordem: Calendário, Visão Geral, Planejamento, Solicitações se admin/presidencia)
+  const TABS = useMemo(() => {
+    const base = [
+      { id: 'calendario', label: 'Calendário', icon: CalendarIcon },
+      { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
+      { id: 'planejamento', label: 'Planejamento', icon: BookOpen },
+    ] as const;
+    if (isPresidenciaOrAdmin) {
+      return [...base, { id: 'solicitacoes', label: 'Solicitações', icon: Gavel }] as const;
+    }
+    return base;
+  }, [isPresidenciaOrAdmin]);
 
   return (
-    <PageLayout title="Agenda" description="Gestão de compromissos, cultos e reuniões ministeriais" activeMenu="agenda">
+    <PageLayout title="Agenda Ministerial" description="Planejamento e coordenação de datas e agendas integradas" activeMenu="agenda">
+      
+      {/* ─── BARRA DE ABAS E BOTÃO SUPERIOR RAPIDO (COMPACTO) ───────────────── */}
+      <div className="flex flex-wrap items-center justify-between border-b border-slate-200 mb-4 pb-1">
+        <div className="flex gap-1">
+          {TABS.map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id as any);
+                  setSelectedDate(null);
+                }}
+                className={`flex items-center gap-1.5 px-4 py-2 font-bold text-xs tracking-wide uppercase transition border-b-2 -mb-[5px] ${
+                  activeTab === tab.id
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
 
-      {/* ─── Tabs ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 border-b border-slate-200 mb-6">
-        {TABS.map(tab => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm transition-all border-b-2 -mb-px ${
-                activeTab === tab.id
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          );
-        })}
-
-        {/* Spacer + Novo Compromisso */}
-        <div className="ml-auto pb-1">
+        {/* Ações Rápidas no Topo */}
+        <div className="flex items-center gap-1.5 py-1">
           {isEscritaPermitida && (
             <button
               onClick={() => openForm(null)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition shadow-md shadow-blue-500/20"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5" />
               Novo Compromisso
             </button>
           )}
         </div>
       </div>
 
-      {/* ─── Feedback ─────────────────────────────────────────────────────── */}
+      {/* ─── CONTROL BAR ÚNICA (Reorganização do topo) ──────────────────────── */}
+      {activeTab === 'calendario' && (
+        <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-xs mb-4 flex flex-wrap items-center justify-between gap-3">
+          
+          {/* Navegação de Mês/Ano compacta */}
+          <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200">
+            <button onClick={handlePrevMonth} className="px-2 py-1 hover:bg-white hover:shadow-xs rounded text-slate-700 text-xs font-black transition">
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span className="text-xs font-black text-slate-800 px-1.5 min-w-[110px] text-center">
+              {MESES_PT[currentMonth - 1].toUpperCase()} {currentYear}
+            </span>
+            <button onClick={handleNextMonth} className="px-2 py-1 hover:bg-white hover:shadow-xs rounded text-slate-700 text-xs font-black transition">
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Filtros Rápidos (Pills compactos) */}
+          <div className="flex items-center gap-1 overflow-x-auto">
+            <button
+              onClick={() => handleGoToToday()}
+              className="px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold transition shrink-0"
+            >
+              Hoje
+            </button>
+            {([
+              { key: 'todos', label: 'Todos' },
+              { key: 'oficiais', label: '🔵 Oficiais' },
+              { key: 'locais', label: '🟢 Locais' },
+              { key: 'bloqueados', label: '🔴 Gerenciados' },
+            ] as { key: QuickFilter; label: string }[]).map(f => (
+              <button
+                key={f.key}
+                onClick={() => setQuickFilter(f.key)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold border transition shrink-0 ${
+                  quickFilter === f.key
+                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Trigger Filtros Avançados */}
+          <button
+            onClick={() => setShowAdvancedFilters(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1 border rounded-lg text-xs font-bold transition ${
+              showAdvancedFilters || filtroTipoId || filtroCongregacao || filtroVisibilidade
+                ? 'border-blue-200 text-blue-600 bg-blue-50/50'
+                : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <Filter className="h-3.5 w-3.5" />
+            Filtros
+            {showAdvancedFilters ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+        </div>
+      )}
+
+      {/* Filtros Avançados Recolhíveis */}
+      {activeTab === 'calendario' && showAdvancedFilters && (
+        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-xs mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tipo de Compromisso</label>
+            <select
+              value={filtroTipoId}
+              onChange={(e) => setFiltroTipoId(e.target.value)}
+              className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none text-slate-700 bg-white"
+            >
+              <option value="">Todos</option>
+              {Object.entries(tiposAgrupados).map(([categoria, lista]) => {
+                if (lista.length === 0) return null;
+                return (
+                  <optgroup key={categoria} label={CATEGORIAS_LABEL[categoria as keyof typeof CATEGORIAS_LABEL]}>
+                    {lista.map(t => (
+                      <option key={t.id} value={t.id}>{t.nome}</option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+              {orgHelper ? orgHelper.label('divisao1') : 'Congregação'}
+            </label>
+            <select
+              value={filtroCongregacao}
+              onChange={(e) => setFiltroCongregacao(e.target.value)}
+              className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none text-slate-700 bg-white"
+            >
+              <option value="">Todas</option>
+              {congregacoes.map((c) => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Visibilidade</label>
+            <select
+              value={filtroVisibilidade}
+              onChange={(e) => setFiltroVisibilidade(e.target.value)}
+              className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none text-slate-700 bg-white"
+            >
+              <option value="">Todas</option>
+              <option value="privado">Privado</option>
+              <option value="lideranca">Liderança</option>
+              <option value="igreja">Membros</option>
+              <option value="ministerio">Ministério</option>
+              <option value="publico">Público</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Feedback Alert ──────────────────────────────────────────────── */}
       {msg && (
-        <div className={`p-3.5 mb-5 rounded-xl border flex items-center gap-3 text-sm font-medium transition-all duration-300 ${
-          msg.tipo === 'ok'
-            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-            : 'bg-rose-50 text-rose-800 border-rose-200'
+        <div className={`p-3 mb-4 rounded-xl border flex items-center gap-2 text-xs font-semibold ${
+          msg.tipo === 'ok' ? 'bg-emerald-50 text-emerald-800 border-emerald-150' : 'bg-rose-50 text-rose-800 border-rose-150'
         }`}>
-          {msg.tipo === 'ok'
-            ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-            : <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
-          }
+          {msg.tipo === 'ok' ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <AlertTriangle className="h-4 w-4 text-rose-600" />}
           {msg.texto}
         </div>
       )}
 
-      {/* ─── Banner de Planejamento Travado ───────────────────────────────── */}
-      {isEdicaoBloqueada && (
-        <div className="bg-amber-50 text-amber-800 border border-amber-200 p-3.5 rounded-xl mb-5 flex items-center gap-3 text-sm font-semibold">
-          <Lock className="h-4 w-4 shrink-0 text-amber-600" />
-          Calendário {currentYear} — {activePlanning?.status === 'publicado' ? 'Publicado' : 'Arquivado'} · Modo somente-leitura ativo.
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* TAB 1: CALENDÁRIO MENSAL (Elemento Principal em 2 colunas)          */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'calendario' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          
+          {/* LADO ESQUERDO: Calendário Mensal Compacto (8/12 colunas) */}
+          <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+            
+            {/* Cabeçalho da grade de dias da semana */}
+            <div className="grid grid-cols-7 gap-1 text-center font-black text-slate-400 text-[10px] tracking-wider mb-2">
+              <span>DOM</span>
+              <span>SEG</span>
+              <span>TER</span>
+              <span>QUA</span>
+              <span>QUI</span>
+              <span>SEX</span>
+              <span>SÁB</span>
+            </div>
+
+            {/* Grade de Dias */}
+            <div className="grid grid-cols-7 gap-1">
+              {daysInMonthArray.map((day, idx) => {
+                if (day.dayNum === null) {
+                  return <div key={`empty-${idx}`} className="aspect-square bg-slate-50/50 rounded-lg" />;
+                }
+
+                const dateStr = day.dateStr!;
+                const diaEventos = eventosPorDia[dateStr] ?? [];
+                const isSelected = selectedDate === dateStr;
+                const isToday = new Date().toISOString().split('T')[0] === dateStr;
+
+                return (
+                  <button
+                    key={dateStr}
+                    onClick={() => setSelectedDate(isSelected ? null : dateStr)}
+                    className={`aspect-square p-1 rounded-xl flex flex-col justify-between border transition relative ${
+                      isSelected 
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-xs' 
+                        : isToday
+                          ? 'bg-blue-50/50 border-blue-200 text-blue-800'
+                          : 'bg-white border-slate-100 hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    {/* Número do dia */}
+                    <span className="text-xs font-bold">{day.dayNum}</span>
+
+                    {/* Dot indicators (Oficiais/Locais/Sincronizados) */}
+                    <div className="flex gap-0.5 justify-center mt-auto w-full">
+                      {diaEventos.slice(0, 3).map(e => {
+                        let dotColor = 'bg-slate-400';
+                        if (e.calendario_oficial) dotColor = 'bg-indigo-500';
+                        else if (e.bloqueado) dotColor = 'bg-rose-500';
+                        else dotColor = 'bg-emerald-500';
+
+                        return (
+                          <span
+                            key={e.id}
+                            className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white/80' : dotColor}`}
+                          />
+                        );
+                      })}
+                      {diaEventos.length > 3 && (
+                        <span className={`text-[8px] font-black leading-none ${isSelected ? 'text-white' : 'text-slate-400'}`}>
+                          +
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Legenda compacta */}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-4 pt-3 border-t border-slate-100 text-[10px] text-slate-400 font-bold justify-center">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                Oficial
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                Local
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-rose-500" />
+                Sincronizado/Bloqueado
+              </span>
+            </div>
+          </div>
+
+          {/* LADO DIREITO: Agenda dos Próximos Dias / Detalhes (5/12 colunas) */}
+          <div className="lg:col-span-5 flex flex-col gap-4">
+            
+            {/* Próximos compromissos lateral */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex-1 flex flex-col min-h-[350px]">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
+                <h3 className="font-black text-slate-700 text-xs tracking-wider uppercase flex items-center gap-1.5">
+                  <CalendarRange className="h-3.5 w-3.5 text-blue-600" />
+                  {selectedDate ? `Eventos de ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR')}` : 'Compromissos do Mês'}
+                </h3>
+                {selectedDate && (
+                  <button onClick={() => setSelectedDate(null)} className="text-[10px] text-blue-600 font-bold hover:underline">
+                    Ver todos
+                  </button>
+                )}
+              </div>
+
+              {loading ? (
+                <div className="text-xs text-slate-400 text-center py-10">Carregando eventos...</div>
+              ) : eventosColunaDireita.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 gap-2 my-auto">
+                  <CalendarIcon className="h-8 w-8 text-slate-200" />
+                  <p className="text-xs font-bold text-slate-500">Nenhum compromisso para este período.</p>
+                  <p className="text-[10px] text-slate-400">Clique em "Novo Compromisso" para iniciar seu planejamento.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5 overflow-y-auto max-h-[360px] pr-1">
+                  {eventosColunaDireita.map(evt => {
+                    const dateObj = new Date(evt.data_inicio);
+                    const hora = dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    const diaNum = dateObj.getDate();
+                    const mesAbrev = dateObj.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase();
+
+                    return (
+                      <div
+                        key={evt.id}
+                        className={`flex gap-3 p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50/50 transition group ${
+                          evt.calendario_oficial ? 'border-l-4 border-l-indigo-400' :
+                          evt.bloqueado ? 'border-l-4 border-l-rose-400' : 'border-l-4 border-l-emerald-400'
+                        }`}
+                      >
+                        {/* Mini data block */}
+                        <div className="w-10 h-10 bg-slate-50 rounded-lg border border-slate-150 flex flex-col items-center justify-center shrink-0">
+                          <span className="text-[8px] font-black text-slate-400 leading-none">{mesAbrev}</span>
+                          <span className="text-base font-black text-slate-700 leading-none mt-0.5">{diaNum}</span>
+                        </div>
+
+                        {/* Detalhes */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="text-[9px] font-bold text-slate-400">{hora}</span>
+                            {evt.local && <span className="text-[9px] text-slate-400 truncate max-w-[100px]">· {evt.local}</span>}
+                          </div>
+                          <p className="text-xs font-bold text-slate-800 truncate leading-tight">{evt.titulo}</p>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {evt.calendario_oficial && (
+                              <span className="text-[8px] bg-indigo-50 text-indigo-700 border border-indigo-150 px-1.5 py-0.2 rounded-full font-bold">Oficial</span>
+                            )}
+                            {evt.bloqueado && (
+                              <span className="text-[8px] bg-rose-50 text-rose-700 border border-rose-150 px-1.5 py-0.2 rounded-full font-bold">Bloqueado</span>
+                            )}
+                            <span className="text-[8px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded-full font-bold">{getEscopoLabel(evt.escopo)}</span>
+                          </div>
+                        </div>
+
+                        {/* Ações Rápidas */}
+                        {isEscritaPermitida && !evt.bloqueado && (
+                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 self-center">
+                            <button
+                              onClick={() => openForm(evt)}
+                              className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                              title="Editar"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(evt)}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                              title="Excluir"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* ABA 1: DASHBOARD                                                    */}
+      {/* TAB 2: DASHBOARD / VISÃO GERAL                                      */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'dashboard' && (
-        <div className="space-y-6">
-
-          {/* Cards executivos */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-
-            {/* Planejamento */}
-            <div className="col-span-2 md:col-span-1 bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col gap-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Planejamento</span>
-              <p className="text-lg font-black text-slate-800">{currentYear}</p>
-              {activePlanning ? (
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border w-fit ${STATUS_PLAN_INFO[activePlanning.status].cor}`}>
-                  {STATUS_PLAN_INFO[activePlanning.status].label}
-                </span>
-              ) : (
-                <span className="text-[10px] text-slate-400 font-semibold">Não iniciado</span>
-              )}
+        <div className="space-y-4">
+          
+          {/* Indicadores Compactos Ministeriais */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-3">
+              <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider block">Oficiais</span>
+              <p className="text-xl font-black text-indigo-700 mt-0.5">{totalEventosOficiais}</p>
+              <span className="text-[9px] text-slate-400 font-bold block mt-0.5">Calendário da Igreja</span>
             </div>
-
-            {/* Total de Eventos */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col gap-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Este Mês</span>
-              <p className="text-2xl font-black text-slate-800">{eventos.length}</p>
-              <span className="text-[10px] text-slate-400 font-medium">Compromissos</span>
+            <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-3">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Total Mês</span>
+              <p className="text-xl font-black text-slate-700 mt-0.5">{eventos.length}</p>
+              <span className="text-[9px] text-slate-400 font-bold block mt-0.5">Compromissos</span>
             </div>
-
-            {/* Oficiais */}
-            <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm p-4 flex flex-col gap-2">
-              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
-                <ShieldCheck className="h-3 w-3" /> Oficiais
-              </span>
-              <p className="text-2xl font-black text-indigo-700">{eventosOficiais.length}</p>
-              <span className="text-[10px] text-slate-400 font-medium">Calendário oficial</span>
+            <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-3">
+              <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider block">Cultos & Reuniões</span>
+              <p className="text-xl font-black text-emerald-700 mt-0.5">{totalCultos + totalReunioes}</p>
+              <span className="text-[9px] text-slate-400 font-bold block mt-0.5">{totalCultos} cultos · {totalReunioes} reuniões</span>
             </div>
-
-            {/* Locais */}
-            <div className="bg-white rounded-2xl border border-emerald-100 shadow-sm p-4 flex flex-col gap-2">
-              <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Locais</span>
-              <p className="text-2xl font-black text-emerald-700">{eventosLocais.length}</p>
-              <span className="text-[10px] text-slate-400 font-medium">Congregacionais</span>
+            <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-3">
+              <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider block">Sincronizados</span>
+              <p className="text-xl font-black text-rose-600 mt-0.5">{totalEventosSincronizados}</p>
+              <span className="text-[9px] text-slate-400 font-bold block mt-0.5">De outros módulos</span>
             </div>
-
-            {/* Bloqueados / Via Módulo */}
-            <div className="bg-white rounded-2xl border border-rose-100 shadow-sm p-4 flex flex-col gap-2">
-              <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1">
-                <Lock className="h-3 w-3" /> Gerenciados
-              </span>
-              <p className="text-2xl font-black text-rose-600">{eventosBloqueados.length}</p>
-              <span className="text-[10px] text-slate-400 font-medium">Por outros módulos</span>
-            </div>
-
-            {/* Próximo Evento */}
-            <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-4 flex flex-col gap-2">
-              <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
-                <Flame className="h-3 w-3" /> Próximo
-              </span>
-              {proximoEvento ? (
-                <>
-                  <p className="text-sm font-bold text-slate-800 line-clamp-1">{proximoEvento.titulo}</p>
-                  <span className="text-[10px] text-slate-500 font-medium">
-                    {new Date(proximoEvento.data_inicio).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
-                  </span>
-                </>
-              ) : (
-                <span className="text-[10px] text-slate-400 font-medium mt-1">Nenhum agendado</span>
-              )}
-            </div>
-
           </div>
 
-          {/* Timeline — Próximos Compromissos */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-blue-500" />
-                Próximos Compromissos
-              </h2>
-              <button
-                onClick={() => setActiveTab('calendario')}
-                className="text-xs text-blue-600 font-semibold hover:underline"
-              >
-                Ver calendário →
-              </button>
-            </div>
+          {/* Timeline de Próximos Eventos */}
+          <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-4">
+            <h3 className="font-black text-slate-700 text-xs tracking-wider uppercase mb-3 flex items-center gap-1">
+              <TrendingUp className="h-3.5 w-3.5 text-blue-600" />
+              Linha do Tempo
+            </h3>
 
-            {loading ? (
-              <div className="text-sm text-slate-400 text-center py-6">Carregando...</div>
-            ) : timelineEventos.length === 0 ? (
-              <div className="text-sm text-slate-400 text-center py-6 flex flex-col items-center gap-2">
-                <Calendar className="h-8 w-8 text-slate-200" />
-                <span>Nenhum compromisso futuro para o mês selecionado.</span>
+            {proximosEventos.length === 0 ? (
+              <div className="text-center py-6 text-slate-400 text-xs">
+                Nenhum compromisso agendado para os próximos dias.
               </div>
             ) : (
-              <div className="space-y-3">
-                {timelineEventos.map((evt) => {
+              <div className="relative border-l-2 border-slate-100 ml-3 pl-4 space-y-4 py-1">
+                {proximosEventos.map(evt => {
                   const d = new Date(evt.data_inicio);
-                  const corCustom = evt.agenda_tipos?.cor;
-                  const nomeTipo = evt.agenda_tipos?.nome ?? TIPOS_INFO_LEGADO[evt.tipo]?.label ?? 'Outro';
-                  const badgeStyle = corCustom
-                    ? { backgroundColor: `${corCustom}18`, color: corCustom, borderColor: `${corCustom}30` }
-                    : { backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' };
-
                   return (
-                    <div key={evt.id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 transition group">
-                      {/* Data pill */}
-                      <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex flex-col items-center justify-center shrink-0">
-                        <span className="text-[10px] font-bold text-blue-400 uppercase leading-none">
-                          {d.toLocaleDateString('pt-BR', { month: 'short' })}
-                        </span>
-                        <span className="text-lg font-black text-blue-700 leading-tight">{d.getDate()}</span>
+                    <div key={evt.id} className="relative">
+                      {/* Bullet indicador */}
+                      <span className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 border-white ring-4 ring-slate-50" />
+                      <div className="text-xs">
+                        <span className="font-bold text-blue-600">{d.toLocaleDateString('pt-BR')} às {d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        <h4 className="font-bold text-slate-800 mt-0.5">{evt.titulo}</h4>
+                        {evt.descricao && <p className="text-slate-500 text-[11px] mt-0.5">{evt.descricao}</p>}
                       </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                          <span style={badgeStyle} className="text-[10px] px-2 py-0.5 rounded-full font-bold border shrink-0">
-                            {nomeTipo}
-                          </span>
-                          {evt.calendario_oficial && (
-                            <span title="Calendário Oficial">
-                              <ShieldCheck className="h-3 w-3 text-indigo-500 shrink-0" />
-                            </span>
-                          )}
-                          {evt.bloqueado && (
-                            <span title="Gerenciado por outro módulo">
-                              <Lock className="h-3 w-3 text-rose-400 shrink-0" />
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm font-semibold text-slate-800 truncate">{evt.titulo}</p>
-                        <p className="text-xs text-slate-400 flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          {evt.local && <> · <MapPin className="h-3 w-3" /> {evt.local}</>}
-                        </p>
-                      </div>
-
-                      {/* Ação rápida */}
-                      {isEscritaPermitida && !evt.bloqueado && (
-                        <button
-                          onClick={() => openForm(evt)}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                          title="Editar"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      )}
                     </div>
                   );
                 })}
               </div>
             )}
           </div>
+        </div>
+      )}
 
-          {/* Resumo do Planejamento */}
-          {activePlanning && (
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-indigo-500" />
-                  Planejamento Anual {currentYear}
-                </h2>
-                <button
-                  onClick={() => setActiveTab('planejamento')}
-                  className="text-xs text-blue-600 font-semibold hover:underline"
-                >
-                  Gerenciar →
-                </button>
-              </div>
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* TAB 3: PLANEJAMENTO ANUAL                                           */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'planejamento' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-4 space-y-4">
+            <h3 className="font-black text-slate-700 text-xs uppercase tracking-wider pb-2 border-b border-slate-100">
+              Resumo do Exercício {currentYear}
+            </h3>
 
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-xl font-black text-slate-800">{planningEventCount}</p>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Compromissos no Ano</p>
+            {activePlanning ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase">Status</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border inline-block mt-1 ${STATUS_PLAN_INFO[activePlanning.status].cor}`}>
+                      {STATUS_PLAN_INFO[activePlanning.status].label}
+                    </span>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase">Total Eventos</span>
+                    <p className="text-lg font-black text-slate-800 mt-0.5">{planningEventCount}</p>
+                  </div>
                 </div>
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-bold border inline-block ${STATUS_PLAN_INFO[activePlanning.status].cor}`}>
-                    {STATUS_PLAN_INFO[activePlanning.status].label}
-                  </span>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-1">Status</p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-sm font-bold text-slate-700 truncate">
-                    {activePlanning.published_at
-                      ? new Date(activePlanning.published_at).toLocaleDateString('pt-BR')
-                      : '—'
-                    }
-                  </p>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Publicado em</p>
+
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1.5 text-xs text-slate-600">
+                  <span className="text-[9px] font-bold text-slate-400 block uppercase">Publicação</span>
+                  <p>Data: {activePlanning.published_at ? new Date(activePlanning.published_at).toLocaleString('pt-BR') : 'Rascunho'}</p>
+                  {responsibleEmail && <p>Responsável: {responsibleEmail}</p>}
                 </div>
               </div>
+            ) : (
+              <div className="text-center py-6 text-slate-400 text-xs">
+                Nenhum planejamento inicializado para {currentYear}.
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-4">
+            <h3 className="font-black text-slate-700 text-xs uppercase tracking-wider pb-2 border-b border-slate-100 mb-4">
+              Controles Anuais
+            </h3>
+            
+            {activePlanning ? (
+              <div className="space-y-2">
+                {activePlanning.status === 'rascunho' && (
+                  <button
+                    onClick={handlePublishPlanning}
+                    className="w-full flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-xs transition"
+                  >
+                    <Check className="h-4 w-4" />
+                    Publicar Planejamento
+                  </button>
+                )}
+                {activePlanning.status !== 'arquivado' && (
+                  <button
+                    onClick={handleArchivePlanning}
+                    className="w-full flex items-center justify-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs rounded-lg transition"
+                  >
+                    <Archive className="h-4 w-4" />
+                    Arquivar Planejamento
+                  </button>
+                )}
+                {activePlanning.status === 'arquivado' && (
+                  <p className="text-xs text-slate-400 text-center font-bold">Este planejamento foi arquivado.</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 text-center">Nenhum rascunho ativo.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* TAB 4: SOLICITAÇÕES INTEGRADA (Sprint UX 2.0)                        */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'solicitacoes' && isPresidenciaOrAdmin && (
+        <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-4 space-y-3">
+          <h3 className="font-black text-slate-700 text-xs uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-1.5">
+            <Gavel className="h-4 w-4 text-blue-600" />
+            Solicitações de Exceção ao Planejamento
+          </h3>
+
+          {loadingSols ? (
+            <div className="text-center py-6 text-slate-400 text-xs">Carregando solicitações...</div>
+          ) : solicitacoes.length === 0 ? (
+            <div className="text-center py-6 text-slate-400 text-xs">Nenhuma solicitação encontrada no momento.</div>
+          ) : (
+            <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+              {solicitacoes.map(sol => {
+                const isPending = sol.status === 'pendente';
+                const statusCls = sol.status === 'aprovado' ? 'bg-emerald-50 text-emerald-700 border-emerald-150' :
+                                  sol.status === 'rejeitado' ? 'bg-rose-50 text-rose-700 border-rose-150' :
+                                  'bg-amber-50 text-amber-700 border-amber-150';
+
+                return (
+                  <div key={sol.id} className="p-3 border border-slate-100 rounded-xl bg-slate-50/50 flex flex-col sm:flex-row justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full border ${statusCls}`}>
+                          {sol.status.toUpperCase()}
+                        </span>
+                        <span className="text-[8px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded-full border border-slate-200">
+                          {TIPO_SOLICITACAO_LABEL[sol.tipo_solicitacao]}
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-bold text-slate-800">{sol.titulo}</h4>
+                      <p className="text-[11px] text-slate-500">Justificativa: "{sol.justificativa}"</p>
+                      {sol.parecer && <p className="text-[10px] text-blue-600 italic">Parecer: "{sol.parecer}"</p>}
+                    </div>
+
+                    {isPending && (
+                      <div className="flex items-center gap-1.5 shrink-0 sm:self-center">
+                        <button
+                          onClick={() => {
+                            const p = prompt('Parecer para aprovação:', '');
+                            if (p !== null) handleDecidirSolicitacao(sol.id, 'aprovar', p);
+                          }}
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition"
+                        >
+                          Aprovar
+                        </button>
+                        <button
+                          onClick={() => {
+                            const p = prompt('Parecer para rejeição:', '');
+                            if (p !== null) handleDecidirSolicitacao(sol.id, 'rejeitar', p);
+                          }}
+                          className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg transition"
+                        >
+                          Rejeitar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* ABA 2: CALENDÁRIO                                                   */}
+      {/* MODAL DE COMPROMISSO (Formulário Otimizado e Responsivo)              */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {activeTab === 'calendario' && (
-        <>
-          {/* Barra de controle: navegação + filtros rápidos + avançados */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm mb-6 overflow-hidden">
-            {/* Linha 1: Navegação de mês */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handlePrevMonth}
-                  className="p-1.5 hover:bg-slate-100 rounded-lg transition text-slate-600"
-                  title="Mês anterior"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <span className="text-base font-bold text-slate-800 min-w-[140px] text-center">
-                  {MESES_PT[currentMonth - 1]} de {currentYear}
-                </span>
-                <button
-                  onClick={handleNextMonth}
-                  className="p-1.5 hover:bg-slate-100 rounded-lg transition text-slate-600"
-                  title="Próximo mês"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
+      {showModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md shadow-xl border border-slate-100 flex flex-col max-h-[85vh]">
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 font-medium hidden md:inline">
-                  {eventosFiltrados.length} compromisso{eventosFiltrados.length !== 1 ? 's' : ''}
-                </span>
-                <button
-                  onClick={() => setShowAdvancedFilters(v => !v)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-semibold transition ${
-                    showAdvancedFilters || filtroTipoId || filtroCongregacao || filtroVisibilidade
-                      ? 'border-blue-300 text-blue-600 bg-blue-50'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <Filter className="h-3.5 w-3.5" />
-                  Filtros
-                  {showAdvancedFilters ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                </button>
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="font-black text-slate-800 text-sm">
+                  {editEvento ? 'EDITAR COMPROMISSO' : 'NOVO COMPROMISSO'}
+                </h3>
               </div>
+              <button onClick={() => setShowModal(false)} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg transition">
+                <X className="h-4.5 w-4.5" />
+              </button>
             </div>
 
-            {/* Linha 2: Quick filters em pills */}
-            <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-50/60 border-b border-slate-100 overflow-x-auto">
-              {([
-                { key: 'todos', label: 'Todos', count: eventos.length },
-                { key: 'oficiais', label: '🔵 Oficiais', count: eventosOficiais.length },
-                { key: 'locais', label: '🟢 Locais', count: eventosLocais.length },
-                { key: 'bloqueados', label: '🔴 Gerenciados', count: eventosBloqueados.length },
-              ] as { key: QuickFilter; label: string; count: number }[]).map(f => (
-                <button
-                  key={f.key}
-                  onClick={() => setQuickFilter(f.key)}
-                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition ${
-                    quickFilter === f.key
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  {f.label}
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                    quickFilter === f.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                  }`}>
-                    {f.count}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div>
+                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Título *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Reunião Geral de Obreiros"
+                  value={form.titulo}
+                  onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
 
-            {/* Linha 3: Filtros Avançados (recolhíveis) */}
-            {showAdvancedFilters && (
-              <div className="px-5 py-4 border-b border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5">Tipo de Compromisso</label>
+                  <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Tipo *</label>
                   <select
-                    value={filtroTipoId}
-                    onChange={(e) => setFiltroTipoId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-700 bg-white"
+                    value={form.tipo_id}
+                    required
+                    onChange={(e) => handleTipoChange(e.target.value)}
+                    className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
                   >
-                    <option value="">Todos os tipos</option>
+                    <option value="" disabled>Selecione</option>
                     {Object.entries(tiposAgrupados).map(([categoria, lista]) => {
                       if (lista.length === 0) return null;
                       return (
@@ -1209,592 +1573,158 @@ export default function AgendaPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5">
-                    {orgHelper ? orgHelper.label('divisao1') : 'Congregação'}
-                  </label>
+                  <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Status</label>
                   <select
-                    value={filtroCongregacao}
-                    onChange={(e) => setFiltroCongregacao(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-700 bg-white"
+                    value={form.status}
+                    onChange={(e) => setForm({ ...form, status: e.target.value as AgendaEvento['status'] })}
+                    className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
                   >
-                    <option value="">Todas</option>
-                    {congregacoes.map((c) => (
-                      <option key={c.id} value={c.id}>{c.nome}</option>
-                    ))}
+                    <option value="agendado">Agendado</option>
+                    <option value="cancelado">Cancelado</option>
+                    <option value="concluido">Concluído</option>
                   </select>
                 </div>
+              </div>
 
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5">Visibilidade</label>
-                  <select
-                    value={filtroVisibilidade}
-                    onChange={(e) => setFiltroVisibilidade(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-700 bg-white"
-                  >
-                    <option value="">Todas</option>
-                    <option value="privado">Privado</option>
-                    <option value="lideranca">Liderança</option>
-                    <option value="igreja">Membros</option>
-                    <option value="ministerio">Ministério</option>
-                    <option value="publico">Público</option>
-                  </select>
+                  <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Início *</label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={form.data_inicio}
+                    onChange={(e) => setForm({ ...form, data_inicio: e.target.value })}
+                    className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
+                  />
                 </div>
-
-                {(filtroTipoId || filtroCongregacao || filtroVisibilidade) && (
-                  <div className="md:col-span-3 flex justify-end">
-                    <button
-                      onClick={() => { setFiltroTipoId(''); setFiltroCongregacao(''); setFiltroVisibilidade(''); }}
-                      className="text-xs text-rose-500 hover:text-rose-700 font-semibold flex items-center gap-1"
-                    >
-                      <X className="h-3 w-3" /> Limpar filtros avançados
-                    </button>
-                  </div>
-                )}
+                <div>
+                  <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Fim</label>
+                  <input
+                    type="datetime-local"
+                    value={form.data_fim}
+                    onChange={(e) => setForm({ ...form, data_fim: e.target.value })}
+                    className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
+                  />
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Lista de Compromissos */}
-          {loading ? (
-            <div className="bg-white p-12 text-center text-slate-400 rounded-2xl shadow-sm border border-slate-100 text-sm">
-              Carregando compromissos...
-            </div>
-          ) : eventosFiltrados.length === 0 ? (
-            <div className="bg-white p-16 text-center text-slate-400 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-3">
-              <Calendar className="h-10 w-10 text-slate-200" />
-              <p className="text-base font-semibold text-slate-500">
-                {quickFilter !== 'todos'
-                  ? 'Nenhum compromisso para este filtro no mês selecionado.'
-                  : 'Nenhum compromisso agendado para este mês.'}
-              </p>
-              {isEscritaPermitida && quickFilter === 'todos' && (
-                <button
-                  onClick={() => openForm(null)}
-                  className="mt-1 px-4 py-2 text-sm text-blue-600 border border-blue-200 hover:bg-blue-50 rounded-xl font-bold transition"
-                >
-                  + Adicionar primeiro compromisso
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {eventosFiltrados.map((evt) => {
-                const dateObj = new Date(evt.data_inicio);
-                const diaSemana = dateObj.toLocaleDateString('pt-BR', { weekday: 'short' });
-                const diaNum = dateObj.getDate();
-                const hora = dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                const isCanceled = evt.status === 'cancelado';
-
-                const statusInfo = STATUS_INFO[evt.status];
-                const corCustom = evt.agenda_tipos?.cor;
-                const nomeTipo = evt.agenda_tipos?.nome ?? TIPOS_INFO_LEGADO[evt.tipo]?.label ?? 'Outro';
-
-                const badgeStyle = corCustom
-                  ? { backgroundColor: `${corCustom}15`, color: corCustom, borderColor: `${corCustom}30` }
-                  : { backgroundColor: '#f3f4f6', color: '#374151', borderColor: '#e5e7eb' };
-
-                const origemLabel = evt.origem && evt.origem !== 'manual' && evt.origem !== ''
-                  ? ORIGEM_LABELS[evt.origem as keyof typeof ORIGEM_LABELS] ?? evt.origem
-                  : null;
-
-                return (
-                  <div
-                    key={evt.id}
-                    className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition group flex flex-col sm:flex-row gap-0 overflow-hidden ${
-                      isCanceled ? 'border-slate-100 opacity-60' : 'border-slate-100'
-                    } ${evt.calendario_oficial ? 'border-l-4 border-l-indigo-400' : ''}`}
-                  >
-                    {/* Coluna de Data */}
-                    <div className="flex sm:flex-col items-center justify-center gap-3 sm:gap-1 bg-slate-50 border-b sm:border-b-0 sm:border-r border-slate-100 px-5 py-4 sm:w-20 shrink-0">
-                      <span className="text-xs font-bold text-slate-400 uppercase">{diaSemana}</span>
-                      <span className="text-2xl font-black text-slate-800">{diaNum}</span>
-                      <span className="text-xs text-slate-400">{hora}</span>
-                    </div>
-
-                    {/* Conteúdo Principal */}
-                    <div className="flex-1 p-4 min-w-0">
-                      {/* Badges linha */}
-                      <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                        <span style={badgeStyle} className="text-[10px] px-2 py-0.5 rounded-full font-bold border">
-                          {nomeTipo}
-                        </span>
-                        {evt.calendario_oficial && (
-                          <span className="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-0.5">
-                            <ShieldCheck className="h-2.5 w-2.5" /> Oficial
-                          </span>
-                        )}
-                        {evt.bloqueado && (
-                          <span
-                            className="text-[10px] text-rose-700 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-full font-bold flex items-center gap-0.5"
-                            title={origemLabel ? `Gerenciado pelo módulo ${origemLabel}` : 'Alterações devem ser feitas na origem'}
-                          >
-                            <Lock className="h-2.5 w-2.5" />
-                            {origemLabel ? `Via ${origemLabel}` : 'Bloqueado'}
-                          </span>
-                        )}
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${statusInfo.cor}`}>
-                          {statusInfo.label}
-                        </span>
-                        <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-semibold border border-blue-100">
-                          {getEscopoLabel(evt.escopo)}
-                        </span>
-                      </div>
-
-                      {/* Título */}
-                      <h3 className={`text-base font-bold text-slate-800 ${isCanceled ? 'line-through text-slate-400' : ''}`}>
-                        {evt.titulo}
-                      </h3>
-
-                      {/* Descrição */}
-                      {evt.descricao && (
-                        <p className="text-slate-500 text-sm mt-0.5 line-clamp-1">{evt.descricao}</p>
-                      )}
-
-                      {/* Meta row */}
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-slate-400 font-medium">
-                        {evt.local && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3 shrink-0" />
-                            {evt.local}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Tag className="h-3 w-3 shrink-0" />
-                          {getCongName(evt.church_id)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Eye className="h-3 w-3 shrink-0" />
-                          {VISIBILIDADE_INFO[evt.visibilidade]}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Ações */}
-                    {isEscritaPermitida && !evt.bloqueado && (
-                      <div className="flex sm:flex-col items-center justify-end gap-1.5 px-3 py-4 shrink-0 border-t sm:border-t-0 sm:border-l border-slate-100">
-                        {evt.status === 'agendado' && (
-                          <button
-                            onClick={() => handleCancelQuick(evt)}
-                            className="p-2 text-amber-500 hover:bg-amber-50 border border-amber-100 rounded-xl transition"
-                            title="Cancelar"
-                          >
-                            <Ban className="h-4 w-4" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => openForm(evt)}
-                          className="p-2 text-slate-500 hover:bg-slate-50 border border-slate-200 hover:text-blue-600 rounded-xl transition"
-                          title="Editar"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        {evt.status === 'agendado' && (
-                          <button
-                            onClick={() => handleDelete(evt)}
-                            className="p-2 text-rose-500 hover:bg-rose-50 border border-rose-100 hover:text-rose-700 rounded-xl transition"
-                            title="Excluir"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* ABA 3: PLANEJAMENTO ANUAL                                           */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {activeTab === 'planejamento' && (
-        <div className="space-y-5">
-
-          {/* Cabeçalho com seletor de ano */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-slate-800">Exercício do Planejamento Anual</h2>
-                <p className="text-sm text-slate-400 mt-0.5">Ciclo de vida e publicação do calendário oficial.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setFiltroMes(`${currentYear - 1}-01`)}
-                  className="p-1.5 border border-slate-200 hover:bg-slate-50 rounded-lg transition"
-                >
-                  <ChevronLeft className="h-4 w-4 text-slate-600" />
-                </button>
-                <span className="text-lg font-black text-slate-700 px-2">{currentYear}</span>
-                <button
-                  onClick={() => setFiltroMes(`${currentYear + 1}-01`)}
-                  className="p-1.5 border border-slate-200 hover:bg-slate-50 rounded-lg transition"
-                >
-                  <ChevronRight className="h-4 w-4 text-slate-600" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {activePlanning ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-              {/* Métricas */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5">
-                <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wide border-b border-slate-100 pb-3">
-                  Resumo do Exercício
-                </h3>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Status Geral</span>
-                    <span className={`text-sm px-3 py-1 rounded-full font-bold border inline-block ${STATUS_PLAN_INFO[activePlanning.status].cor}`}>
-                      {STATUS_PLAN_INFO[activePlanning.status].label}
-                    </span>
-                  </div>
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Total de Compromissos</span>
-                    <p className="text-2xl font-black text-slate-800">{planningEventCount}</p>
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Metadados de Publicação</span>
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
-                    <span>
-                      {activePlanning.published_at
-                        ? `Publicado em ${new Date(activePlanning.published_at).toLocaleString('pt-BR')}`
-                        : 'Ainda não publicado'}
-                    </span>
-                  </div>
-                  {responsibleEmail && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                      <User className="h-4 w-4 text-slate-400 shrink-0" />
-                      <span>Por: {responsibleEmail}</span>
-                    </div>
-                  )}
-                </div>
+                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Local</label>
+                <input
+                  type="text"
+                  placeholder="Templo Central, Sala 3..."
+                  value={form.local}
+                  onChange={(e) => setForm({ ...form, local: e.target.value })}
+                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
               </div>
 
-              {/* Ações de Estado */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-                <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wide border-b border-slate-100 pb-3 mb-5">
-                  Ações do Planejamento
-                </h3>
-
-                <div className="space-y-3">
-                  {activePlanning.status === 'rascunho' && (
-                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                      <p className="text-sm font-semibold text-blue-800 mb-1 flex items-center gap-2">
-                        <Check className="h-4 w-4" />
-                        Publicar Calendário Oficial
-                      </p>
-                      <p className="text-xs text-blue-600 mb-3">
-                        Tornará o calendário somente-leitura para edições normais. Alterações subsequentes requerem exceção formal.
-                      </p>
-                      <button
-                        onClick={handlePublishPlanning}
-                        className="w-full flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition text-sm shadow-md shadow-blue-500/10"
-                      >
-                        <Check className="h-4 w-4" />
-                        Publicar Agora
-                      </button>
-                    </div>
-                  )}
-
-                  {activePlanning.status === 'publicado' && (
-                    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
-                      <p className="text-sm font-semibold text-indigo-800 mb-1 flex items-center gap-2">
-                        <ShieldCheck className="h-4 w-4" />
-                        Calendário Oficial Publicado
-                      </p>
-                      <p className="text-xs text-indigo-600">
-                        Este calendário está ativo e protegido. Para alterações, utilize o fluxo de Solicitações.
-                      </p>
-                    </div>
-                  )}
-
-                  {activePlanning.status !== 'arquivado' && (
-                    <button
-                      onClick={handleArchivePlanning}
-                      className="w-full flex items-center justify-center gap-2 px-5 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold rounded-xl transition text-sm"
-                    >
-                      <Archive className="h-4 w-4 text-slate-400" />
-                      Arquivar Planejamento
-                    </button>
-                  )}
-
-                  {activePlanning.status === 'arquivado' && (
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-center text-sm font-semibold text-slate-500 flex items-center justify-center gap-2">
-                      <Lock className="h-4 w-4" />
-                      Este planejamento foi arquivado de forma definitiva.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-16 text-center text-slate-400 flex flex-col items-center gap-3">
-              <Calendar className="h-12 w-12 text-slate-200" />
-              <p className="text-base font-semibold text-slate-500">
-                Nenhum planejamento inicializado para {currentYear}.
-              </p>
-              <p className="text-xs">
-                Ele será criado automaticamente quando o primeiro compromisso for inserido na aba Calendário.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* MODAL DE FORMULÁRIO                                                  */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
-
-            {/* Header */}
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
-              <div>
-                <h2 className="text-lg font-bold text-slate-800">
-                  {editEvento ? 'Editar Compromisso' : 'Novo Compromisso'}
-                </h2>
-                {editEvento && (
-                  <p className="text-xs text-slate-400 mt-0.5">Atualizando: {editEvento.titulo}</p>
-                )}
-              </div>
+              {/* Botão para mostrar campos avançados (Toggle) */}
               <button
-                onClick={() => setShowModal(false)}
-                className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition"
+                type="button"
+                onClick={() => setShowAdvancedFormFields(v => !v)}
+                className="w-full text-center py-2 border border-dashed border-slate-200 rounded-lg text-[10px] font-bold text-slate-400 hover:bg-slate-50 transition"
               >
-                <X className="h-5 w-5" />
+                {showAdvancedFormFields ? 'Ocultar Detalhes Avançados' : 'Mostrar Detalhes Avançados'}
               </button>
-            </div>
 
-            {/* Form */}
-            <form onSubmit={handleSave} className="flex-1 overflow-y-auto">
-              <div className="p-5 space-y-4">
-
-                {/* Grupo 1: Essencial */}
-                <div className="space-y-3">
+              {showAdvancedFormFields && (
+                <div className="p-3 border border-slate-100 rounded-xl bg-slate-50/50 space-y-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1.5">Título *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ex: Reunião Geral de Obreiros"
-                      value={form.titulo}
-                      onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Descrição</label>
+                    <textarea
+                      placeholder="Pauta ou pormenores..."
+                      value={form.descricao}
+                      onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+                      rows={2}
+                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none bg-white"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1.5">Tipo *</label>
+                      <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Escopo</label>
                       <select
-                        value={form.tipo_id}
-                        required
-                        onChange={(e) => handleTipoChange(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                        value={form.escopo}
+                        onChange={(e) => setForm({ ...form, escopo: e.target.value as AgendaEvento['escopo'] })}
+                        className="w-full px-2 py-1 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
                       >
-                        <option value="" disabled>Selecione</option>
-                        {Object.entries(tiposAgrupados).map(([categoria, lista]) => {
-                          if (lista.length === 0) return null;
-                          return (
-                            <optgroup key={categoria} label={CATEGORIAS_LABEL[categoria as keyof typeof CATEGORIAS_LABEL]}>
-                              {lista.map(t => (
-                                <option key={t.id} value={t.id}>{t.nome}</option>
-                              ))}
-                            </optgroup>
-                          );
-                        })}
+                        <option value="organizacao">{orgHelper ? orgHelper.label('organizacao') : 'Organização'}</option>
+                        {orgHelper?.ativa('divisao3') && <option value="divisao3">{orgHelper.label('divisao3')}</option>}
+                        {orgHelper?.ativa('divisao2') && <option value="divisao2">{orgHelper.label('divisao2')}</option>}
+                        {orgHelper?.ativa('divisao1') && <option value="divisao1">{orgHelper.label('divisao1')}</option>}
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1.5">Status</label>
+                      <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Visibilidade</label>
                       <select
-                        value={form.status}
-                        onChange={(e) => setForm({ ...form, status: e.target.value as AgendaEvento['status'] })}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                        value={form.visibilidade}
+                        onChange={(e) => setForm({ ...form, visibilidade: e.target.value as AgendaEvento['visibilidade'] })}
+                        className="w-full px-2 py-1 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
                       >
-                        <option value="agendado">Agendado</option>
-                        <option value="cancelado">Cancelado</option>
-                        <option value="concluido">Concluído</option>
+                        <option value="privado">Privado</option>
+                        <option value="lideranca">Liderança</option>
+                        <option value="igreja">Membros</option>
+                        <option value="ministerio">Ministério</option>
+                        <option value="publico">Público</option>
                       </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1.5">Início *</label>
-                      <input
-                        type="datetime-local"
-                        required
-                        value={form.data_inicio}
-                        onChange={(e) => setForm({ ...form, data_inicio: e.target.value })}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1.5">Fim</label>
-                      <input
-                        type="datetime-local"
-                        value={form.data_fim}
-                        onChange={(e) => setForm({ ...form, data_fim: e.target.value })}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-                      />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1.5">Local</label>
-                    <input
-                      type="text"
-                      placeholder="Templo Central, Sala 3 ou link..."
-                      value={form.local}
-                      onChange={(e) => setForm({ ...form, local: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    />
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Regra de Posicionamento</label>
+                    <select
+                      value={form.regra_posicionamento}
+                      onChange={(e) => setForm({ ...form, regra_posicionamento: e.target.value })}
+                      className="w-full px-2 py-1 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
+                    >
+                      <option value="">Nenhuma (Data Fixa)</option>
+                      <option value="primeiro_domingo">Primeiro Domingo</option>
+                      <option value="segundo_domingo">Segundo Domingo</option>
+                      <option value="terceiro_domingo">Terceiro Domingo</option>
+                      <option value="ultimo_domingo">Último Domingo</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-4 pt-1">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-600 font-bold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.calendario_oficial}
+                        onChange={(e) => setForm({ ...form, calendario_oficial: e.target.checked })}
+                        className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 border-slate-300"
+                      />
+                      Oficial
+                    </label>
+                    <label className={`flex items-center gap-1.5 text-xs font-bold ${isAdmin ? 'text-slate-600 cursor-pointer' : 'text-slate-350 cursor-not-allowed select-none'}`}>
+                      <input
+                        type="checkbox"
+                        disabled={!isAdmin}
+                        checked={form.gera_bloqueio}
+                        onChange={(e) => setForm({ ...form, gera_bloqueio: e.target.checked })}
+                        className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 border-slate-300 disabled:opacity-40"
+                      />
+                      Gera Bloqueio
+                    </label>
                   </div>
                 </div>
+              )}
 
-                {/* Toggle Campos Avançados */}
-                <button
-                  type="button"
-                  onClick={() => setShowAdvancedFormFields(v => !v)}
-                  className="w-full flex items-center justify-between px-4 py-2.5 border border-dashed border-slate-200 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 transition"
-                >
-                  <span>Configurações avançadas (Escopo, Visibilidade, Bloqueio...)</span>
-                  {showAdvancedFormFields
-                    ? <ChevronUp className="h-4 w-4" />
-                    : <ChevronDown className="h-4 w-4" />
-                  }
-                </button>
-
-                {/* Campos Avançados */}
-                {showAdvancedFormFields && (
-                  <div className="space-y-3 border border-slate-100 rounded-xl p-4 bg-slate-50/50">
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1.5">Descrição</label>
-                      <textarea
-                        placeholder="Detalhamento do compromisso, pauta, etc."
-                        value={form.descricao}
-                        onChange={(e) => setForm({ ...form, descricao: e.target.value })}
-                        rows={2}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none bg-white"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1.5">Escopo</label>
-                        <select
-                          value={form.escopo}
-                          onChange={(e) => setForm({ ...form, escopo: e.target.value as AgendaEvento['escopo'] })}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-                        >
-                          <option value="organizacao">{orgHelper ? orgHelper.label('organizacao') : 'Organização'}</option>
-                          {orgHelper?.ativa('divisao3') && <option value="divisao3">{orgHelper.label('divisao3')}</option>}
-                          {orgHelper?.ativa('divisao2') && <option value="divisao2">{orgHelper.label('divisao2')}</option>}
-                          {orgHelper?.ativa('divisao1') && <option value="divisao1">{orgHelper.label('divisao1')}</option>}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1.5">Visibilidade</label>
-                        <select
-                          value={form.visibilidade}
-                          onChange={(e) => setForm({ ...form, visibilidade: e.target.value as AgendaEvento['visibilidade'] })}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-                        >
-                          <option value="privado">Privado</option>
-                          <option value="lideranca">Liderança</option>
-                          <option value="igreja">Membros</option>
-                          <option value="ministerio">Ministério</option>
-                          <option value="publico">Público</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1.5">
-                        {orgHelper ? orgHelper.label('divisao1') : 'Congregação'}
-                      </label>
-                      <select
-                        value={form.church_id}
-                        onChange={(e) => setForm({ ...form, church_id: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-                      >
-                        <option value="">Todas (Consolidado)</option>
-                        {congregacoes.map((c) => (
-                          <option key={c.id} value={c.id}>{c.nome}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1.5">Regra de Posicionamento</label>
-                      <select
-                        value={form.regra_posicionamento}
-                        onChange={(e) => setForm({ ...form, regra_posicionamento: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-                      >
-                        <option value="">Nenhuma (Data Fixa)</option>
-                        <option value="primeiro_domingo">Primeiro Domingo</option>
-                        <option value="segundo_domingo">Segundo Domingo</option>
-                        <option value="terceiro_domingo">Terceiro Domingo</option>
-                        <option value="ultimo_domingo">Último Domingo</option>
-                        <option value="sem_regra">Sem Regra de Posicionamento</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-center gap-6 pt-1">
-                      <label className="flex items-center gap-2 text-sm text-slate-700 font-semibold cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={form.calendario_oficial}
-                          onChange={(e) => setForm({ ...form, calendario_oficial: e.target.checked })}
-                          className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
-                        />
-                        Calendário Oficial
-                      </label>
-                      <label className={`flex items-center gap-2 text-sm font-semibold ${isAdmin ? 'text-slate-700 cursor-pointer' : 'text-slate-300 cursor-not-allowed select-none'}`}>
-                        <input
-                          type="checkbox"
-                          disabled={!isAdmin}
-                          checked={form.gera_bloqueio}
-                          onChange={(e) => setForm({ ...form, gera_bloqueio: e.target.checked })}
-                          className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300 disabled:opacity-40"
-                        />
-                        Gera Bloqueio
-                      </label>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0 bg-slate-50/50">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 bg-slate-50/50 -mx-4 -mb-4 p-4 shrink-0 rounded-b-xl">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-5 py-2.5 border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-white transition text-sm"
+                  className="px-4 py-2 border border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-white transition text-xs"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-xl transition text-sm shadow-md shadow-blue-500/10 disabled:opacity-60"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-xs transition text-xs disabled:opacity-60"
                 >
-                  {saving ? 'Salvando...' : (editEvento ? 'Salvar Alterações' : 'Criar Compromisso')}
+                  {saving ? 'Salvando...' : 'Confirmar'}
                 </button>
               </div>
             </form>
