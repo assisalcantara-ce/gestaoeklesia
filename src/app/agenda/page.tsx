@@ -1472,12 +1472,12 @@ export default function AgendaPage() {
       {/* TAB 2: DASHBOARD / VISÃO GERAL                                      */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'dashboard' && (
-        <div className="space-y-4">
-          
-          {/* Timeline de Próximos Eventos Estilizada */}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* LADO ESQUERDO: Linha do Tempo Ministerial expandida */}
           <DashboardSection
             title="Linha do Tempo Ministerial"
             icon={TrendingUp}
+            className="flex-1 min-w-0"
           >
             {proximosEventos.length === 0 ? (
               <DashboardEmptyState
@@ -1542,6 +1542,51 @@ export default function AgendaPage() {
               </div>
             )}
           </DashboardSection>
+
+          {/* LADO DIREITO: Visão Geral Consolidada */}
+          <DashboardSidebar className="w-full lg:w-80">
+            <DashboardSection
+              title="Visão Geral Consolidada"
+              icon={LayoutDashboard}
+              className="!p-5"
+            >
+              <div className="space-y-4 text-xs">
+                <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl">
+                  <h4 className="font-bold mb-1">Orientações Executivas</h4>
+                  <p className="leading-relaxed text-slate-705">
+                    Monitore a distribuição de datas para evitar sobrecarga de atividades nas congregações. Priorize sempre os eventos do calendário oficial.
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="font-bold text-slate-800 mb-2">Legenda de Cores</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-indigo-500 shrink-0" />
+                      <span className="text-slate-600">Azul (Oficial): Eventos institucionais e prioritários.</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="text-slate-600">Verde (Local): Atividades e reuniões locais.</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-rose-500 shrink-0" />
+                      <span className="text-slate-600">Vermelho (Bloqueado): Datas gerenciadas por outros módulos.</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 pt-3">
+                  <h4 className="font-bold text-slate-800 mb-1.5">Instruções Rápidas</h4>
+                  <ul className="list-disc pl-4 space-y-1 text-slate-505">
+                    <li>Selecione um dia no Calendário para filtrar os compromissos específicos.</li>
+                    <li>Aprovação de conflitos requer análise e parecer na aba de Solicitações.</li>
+                    <li>O Planejamento publicado impede novas edições normais de datas.</li>
+                  </ul>
+                </div>
+              </div>
+            </DashboardSection>
+          </DashboardSidebar>
         </div>
       )}
 
@@ -1549,19 +1594,19 @@ export default function AgendaPage() {
       {/* TAB 3: PLANEJAMENTO ANUAL                                           */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'planejamento' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-md p-5 space-y-5">
-            <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-1.5">
-              <Calendar className="h-4 w-4 text-blue-600" />
-              Resumo do Exercício {currentYear}
-            </h3>
-
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* LADO ESQUERDO: Planejamento de Exercício Vigente */}
+          <DashboardSection
+            title={`Planejamento de Exercício Vigente - ${currentYear}`}
+            icon={Calendar}
+            className="flex-1 min-w-0"
+          >
             {activePlanning ? (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Status Block */}
                   <div className="relative overflow-hidden bg-gradient-to-br from-indigo-50/40 to-white p-4 rounded-2xl border border-indigo-100/80 shadow-xs hover:shadow transition-all duration-200">
-                    <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider block">Status</span>
+                    <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider block">Status da Agenda</span>
                     <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border inline-block mt-2 ${STATUS_PLAN_INFO[activePlanning.status].cor}`}>
                       {STATUS_PLAN_INFO[activePlanning.status].label}
                     </span>
@@ -1572,7 +1617,7 @@ export default function AgendaPage() {
 
                   {/* Total Eventos Block */}
                   <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50/40 to-white p-4 rounded-2xl border border-emerald-100/80 shadow-xs hover:shadow transition-all duration-200">
-                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">Total Eventos</span>
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">Total de Eventos no Exercício</span>
                     <p className="text-2xl font-black text-emerald-800 mt-1">{planningEventCount}</p>
                     <div className="absolute right-2 bottom-2 text-emerald-450 pointer-events-none opacity-20">
                       <CalendarRange className="h-12 w-12" />
@@ -1581,10 +1626,10 @@ export default function AgendaPage() {
                 </div>
 
                 {/* Publication Block */}
-                <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 to-white p-4 rounded-2xl border border-slate-200/60 shadow-xs hover:shadow transition-all duration-200 space-y-2 text-xs text-slate-600">
+                <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 to-white p-4 rounded-2xl border border-slate-200/60 shadow-xs hover:shadow transition-all duration-200 space-y-2 text-xs text-slate-650">
                   <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Publicação</span>
                   <div className="space-y-1 relative z-10">
-                    <p className="font-semibold text-slate-700">Data: <span className="font-bold text-slate-900">{activePlanning.published_at ? new Date(activePlanning.published_at).toLocaleString('pt-BR') : 'Rascunho'}</span></p>
+                    <p className="font-semibold text-slate-700">Data de Publicação: <span className="font-bold text-slate-900">{activePlanning.published_at ? new Date(activePlanning.published_at).toLocaleString('pt-BR') : 'Ainda não publicado'}</span></p>
                     {responsibleEmail && <p className="font-semibold text-slate-700">Responsável: <span className="font-bold text-slate-900">{responsibleEmail}</span></p>}
                   </div>
                   <div className="absolute right-3 bottom-3 text-slate-400 pointer-events-none opacity-20">
@@ -1593,20 +1638,20 @@ export default function AgendaPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-10 text-slate-450 text-xs gap-2">
-                <CalendarIcon className="h-8 w-8 text-slate-350" />
-                <p className="text-xs font-bold text-slate-500">Nenhum planejamento inicializado para {currentYear}.</p>
+              <div className="flex flex-col items-center justify-center py-10 text-slate-400 text-xs gap-2">
+                <CalendarIcon className="h-8 w-8 text-slate-300" />
+                <p className="text-xs font-bold text-slate-500">Nenhum planejamento inicializado para o ano {currentYear}.</p>
               </div>
             )}
-          </div>
+          </DashboardSection>
 
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-md p-5 flex flex-col justify-between min-h-[220px]">
-            <div>
-              <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider pb-2 border-b border-slate-100 mb-4 flex items-center gap-1.5">
-                <BookOpen className="h-4 w-4 text-blue-600" />
-                Controles Anuais
-              </h3>
-              
+          {/* LADO DIREITO: Ações Estratégicas Anuais */}
+          <DashboardSidebar className="w-full lg:w-80">
+            <DashboardSection
+              title="Ações Estratégicas Anuais"
+              icon={BookOpen}
+              className="!p-5"
+            >
               {activePlanning ? (
                 <div className="space-y-3">
                   {activePlanning.status === 'rascunho' && (
@@ -1621,15 +1666,15 @@ export default function AgendaPage() {
                   {activePlanning.status !== 'arquivado' && (
                     <button
                       onClick={handleArchivePlanning}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-extrabold text-xs rounded-xl shadow-xs hover:shadow border border-slate-250 hover:border-slate-350 transition duration-200"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-55 text-slate-700 font-extrabold text-xs rounded-xl shadow-xs hover:shadow border border-slate-200 hover:border-slate-300 transition duration-200"
                     >
                       <Archive className="h-4 w-4" />
                       Arquivar Planejamento
                     </button>
                   )}
                   {activePlanning.status === 'arquivado' && (
-                    <div className="p-4 bg-slate-55/60 border border-slate-200 rounded-xl text-center">
-                      <p className="text-xs text-slate-550 font-bold flex items-center justify-center gap-1.5">
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                      <p className="text-xs text-slate-500 font-bold flex items-center justify-center gap-1.5">
                         <Lock className="h-4 w-4 text-slate-400" />
                         Este planejamento foi arquivado de forma definitiva.
                       </p>
@@ -1637,13 +1682,13 @@ export default function AgendaPage() {
                   )}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-10 text-slate-450 text-xs gap-2">
-                  <CalendarIcon className="h-8 w-8 text-slate-350" />
-                  <p className="text-xs font-bold text-slate-500">Nenhum rascunho ativo.</p>
+                <div className="flex flex-col items-center justify-center py-10 text-slate-400 text-xs gap-2">
+                  <CalendarIcon className="h-8 w-8 text-slate-300" />
+                  <p className="text-xs font-bold text-slate-550">Nenhum rascunho ativo.</p>
                 </div>
               )}
-            </div>
-          </div>
+            </DashboardSection>
+          </DashboardSidebar>
         </div>
       )}
 
@@ -1651,71 +1696,109 @@ export default function AgendaPage() {
       {/* TAB 4: SOLICITAÇÕES INTEGRADA (Sprint UX 2.0)                        */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'solicitacoes' && isPresidenciaOrAdmin && (
-        <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-4 space-y-3">
-          <h3 className="font-black text-slate-700 text-xs uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-1.5">
-            <Gavel className="h-4 w-4 text-blue-600" />
-            Solicitações de Exceção ao Planejamento
-          </h3>
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* LADO ESQUERDO: Solicitações de Exceção de Datas */}
+          <DashboardSection
+            title="Solicitações de Exceção de Datas"
+            icon={Gavel}
+            className="flex-1 min-w-0"
+          >
+            {loadingSols ? (
+              <div className="text-center py-6 text-slate-400 text-xs">Carregando solicitações...</div>
+            ) : solicitacoes.length === 0 ? (
+              <DashboardEmptyState
+                icon={Gavel}
+                title="Sem solicitações pendentes"
+                description="Nenhuma solicitação de alteração de datas ou exceções aguarda sua aprovação."
+              />
+            ) : (
+              <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                {solicitacoes.map(sol => {
+                  const isPending = sol.status === 'pendente';
+                  const statusCls = sol.status === 'aprovado' ? 'bg-emerald-50 text-emerald-700 border-emerald-150' :
+                                    sol.status === 'rejeitado' ? 'bg-rose-50 text-rose-700 border-rose-150' :
+                                    'bg-amber-50 text-amber-700 border-amber-150';
 
-          {loadingSols ? (
-            <div className="text-center py-6 text-slate-400 text-xs">Carregando solicitações...</div>
-          ) : solicitacoes.length === 0 ? (
-            <DashboardEmptyState
-              icon={Gavel}
-              title="Sem solicitações pendentes"
-              description="Nenhuma solicitação de alteração de datas ou exceções aguarda sua aprovação."
-            />
-          ) : (
-            <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-              {solicitacoes.map(sol => {
-                const isPending = sol.status === 'pendente';
-                const statusCls = sol.status === 'aprovado' ? 'bg-emerald-50 text-emerald-700 border-emerald-150' :
-                                  sol.status === 'rejeitado' ? 'bg-rose-50 text-rose-700 border-rose-150' :
-                                  'bg-amber-50 text-amber-700 border-amber-150';
-
-                return (
-                  <div key={sol.id} className="p-3 border border-slate-100 rounded-xl bg-slate-50/50 flex flex-col sm:flex-row justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap gap-1.5">
-                        <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full border ${statusCls}`}>
-                          {sol.status.toUpperCase()}
-                        </span>
-                        <span className="text-[8px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded-full border border-slate-200">
-                          {TIPO_SOLICITACAO_LABEL[sol.tipo_solicitacao]}
-                        </span>
+                  return (
+                    <div key={sol.id} className="p-3 border border-slate-100 rounded-xl bg-slate-50/50 flex flex-col sm:flex-row justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full border ${statusCls}`}>
+                            {sol.status.toUpperCase()}
+                          </span>
+                          <span className="text-[8px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded-full border border-slate-200">
+                            {TIPO_SOLICITACAO_LABEL[sol.tipo_solicitacao]}
+                          </span>
+                        </div>
+                        <h4 className="text-xs font-bold text-slate-800">{sol.titulo}</h4>
+                        <p className="text-[11px] text-slate-500">Justificativa: "{sol.justificativa}"</p>
+                        {sol.parecer && <p className="text-[10px] text-blue-600 italic">Parecer: "{sol.parecer}"</p>}
                       </div>
-                      <h4 className="text-xs font-bold text-slate-800">{sol.titulo}</h4>
-                      <p className="text-[11px] text-slate-500">Justificativa: "{sol.justificativa}"</p>
-                      {sol.parecer && <p className="text-[10px] text-blue-600 italic">Parecer: "{sol.parecer}"</p>}
+
+                      {isPending && (
+                        <div className="flex items-center gap-1.5 shrink-0 sm:self-center">
+                          <button
+                            onClick={() => {
+                              const p = prompt('Parecer para aprovação:', '');
+                              if (p !== null) handleDecidirSolicitacao(sol.id, 'aprovar', p);
+                            }}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition"
+                          >
+                            Aprovar
+                          </button>
+                          <button
+                            onClick={() => {
+                              const p = prompt('Parecer para rejeição:', '');
+                              if (p !== null) handleDecidirSolicitacao(sol.id, 'rejeitar', p);
+                            }}
+                            className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg transition"
+                          >
+                            Rejeitar
+                          </button>
+                        </div>
+                      )}
                     </div>
+                  );
+                })}
+              </div>
+            )}
+          </DashboardSection>
 
-                    {isPending && (
-                      <div className="flex items-center gap-1.5 shrink-0 sm:self-center">
-                        <button
-                          onClick={() => {
-                            const p = prompt('Parecer para aprovação:', '');
-                            if (p !== null) handleDecidirSolicitacao(sol.id, 'aprovar', p);
-                          }}
-                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition"
-                        >
-                          Aprovar
-                        </button>
-                        <button
-                          onClick={() => {
-                            const p = prompt('Parecer para rejeição:', '');
-                            if (p !== null) handleDecidirSolicitacao(sol.id, 'rejeitar', p);
-                          }}
-                          className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg transition"
-                        >
-                          Rejeitar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {/* LADO DIREITO: Políticas de Aprovação */}
+          <DashboardSidebar className="w-full lg:w-80">
+            <DashboardSection
+              title="Políticas de Aprovação"
+              icon={ShieldCheck}
+              className="!p-5"
+            >
+              <div className="space-y-4 text-xs text-slate-600">
+                <div className="bg-amber-50 border border-amber-255 text-amber-850 p-3 rounded-xl">
+                  <h4 className="font-bold mb-1 flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Limites de Conflitos
+                  </h4>
+                  <p className="leading-relaxed text-slate-700">
+                    O sistema impede o choque de datas para eventos oficiais ou bloqueantes no mesmo local e horário. Exceções devem ser justificadas sob a chancela da Presidência.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-slate-800 mb-1.5">Processo de Aprovação</h4>
+                  <ol className="list-decimal pl-4 space-y-1.5 text-slate-500">
+                    <li>
+                      <strong>Análise de Justificativa:</strong> Verifique se a relevância do evento justifica a coexistência ou alteração.
+                    </li>
+                    <li>
+                      <strong>Parecer Obrigatório:</strong> Forneça observações e diretrizes claras ao deferir ou indeferir a exceção.
+                    </li>
+                    <li>
+                      <strong>Publicação:</strong> A aprovação insere automaticamente o compromisso sob regime especial no calendário.
+                    </li>
+                  </ol>
+                </div>
+              </div>
+            </DashboardSection>
+          </DashboardSidebar>
         </div>
       )}
 
