@@ -267,13 +267,30 @@ export default function AgendaPage() {
 
   // Carrega tipos de compromissos
   const loadTipos = useCallback(async (mid: string) => {
-    const { data } = await supabase
+    let { data } = await supabase
       .from('agenda_tipos')
       .select('*')
       .eq('ministry_id', mid)
       .eq('ativo', true)
       .order('ordem')
       .order('nome');
+
+    if ((!data || data.length === 0) && mid) {
+      // Se não houver tipos cadastrados para o ministério, executa a RPC de sementes padrão
+      const { error: rpcError } = await supabase.rpc('seed_agenda_tipos_padrao', {
+        p_ministry_id: mid
+      });
+      if (!rpcError) {
+        const { data: newData } = await supabase
+          .from('agenda_tipos')
+          .select('*')
+          .eq('ministry_id', mid)
+          .eq('ativo', true)
+          .order('ordem')
+          .order('nome');
+        data = newData;
+      }
+    }
 
     setTipos(data ?? []);
   }, [supabase]);
