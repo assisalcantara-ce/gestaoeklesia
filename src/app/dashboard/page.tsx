@@ -202,7 +202,7 @@ export default function DashboardPage() {
         ebdTurmasRes, ebdChamadasRes, usuariosRes,
         visitantesRes, ultimasCartasRes, ultimosFluxosRes, cartaPedidosRes,
       ] = await Promise.all([
-        safeQuery(withScopeMember(supabase.from('members').select('status, gender, custom_fields').eq('ministry_id', ministryId))),
+        safeQuery(withScopeMember(supabase.from('members').select('status, custom_fields').eq('ministry_id', ministryId))),
         safeQuery(supabase.from('flow_instances').select('status, tipo_fluxo, created_at').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(10)),
         safeQuery(supabase.from('cartas_ministeriais').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId)),
         safeQuery(
