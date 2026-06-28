@@ -1223,14 +1223,14 @@ export default function AgendaPage() {
           <div className="lg:col-span-5 flex flex-col gap-4">
             
             {/* Próximos compromissos lateral */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex-1 flex flex-col min-h-[350px]">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-                <h3 className="font-black text-slate-700 text-xs tracking-wider uppercase flex items-center gap-1.5">
-                  <CalendarRange className="h-3.5 w-3.5 text-blue-600" />
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-md p-5 flex-1 flex flex-col min-h-[350px]">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                <h3 className="font-black text-slate-800 text-xs tracking-wider uppercase flex items-center gap-1.5">
+                  <CalendarRange className="h-4 w-4 text-blue-600" />
                   {selectedDate ? `Eventos de ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR')}` : 'Compromissos do Mês'}
                 </h3>
                 {selectedDate && (
-                  <button onClick={() => setSelectedDate(null)} className="text-[10px] text-blue-600 font-bold hover:underline">
+                  <button onClick={() => setSelectedDate(null)} className="text-[10px] text-blue-600 hover:text-blue-700 font-extrabold hover:underline">
                     Ver todos
                   </button>
                 )}
@@ -1245,7 +1245,7 @@ export default function AgendaPage() {
                   <p className="text-[10px] text-slate-400">Clique em "Novo Compromisso" para iniciar seu planejamento.</p>
                 </div>
               ) : (
-                <div className="space-y-2.5 overflow-y-auto max-h-[360px] pr-1">
+                <div className="space-y-3 overflow-y-auto max-h-[360px] pr-1">
                   {eventosColunaDireita.map(evt => {
                     const dateObj = new Date(evt.data_inicio);
                     const hora = dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -1255,51 +1255,60 @@ export default function AgendaPage() {
                     return (
                       <div
                         key={evt.id}
-                        className={`flex gap-3 p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50/50 transition group ${
-                          evt.calendario_oficial ? 'border-l-4 border-l-indigo-400' :
-                          evt.bloqueado ? 'border-l-4 border-l-rose-400' : 'border-l-4 border-l-emerald-400'
+                        className={`flex gap-3.5 p-3 rounded-xl border bg-white hover:bg-slate-50/30 shadow-xs hover:shadow-md transition-all duration-300 hover:translate-y-[-1px] group relative ${
+                          evt.calendario_oficial ? 'border-indigo-100 hover:border-indigo-200 border-l-4 border-l-indigo-500' :
+                          evt.bloqueado ? 'border-rose-100 hover:border-rose-200 border-l-4 border-l-rose-500' : 
+                          'border-emerald-100 hover:border-emerald-200 border-l-4 border-l-emerald-500'
                         }`}
                       >
-                        {/* Mini data block */}
-                        <div className="w-10 h-10 bg-slate-50 rounded-lg border border-slate-150 flex flex-col items-center justify-center shrink-0">
-                          <span className="text-[8px] font-black text-slate-400 leading-none">{mesAbrev}</span>
-                          <span className="text-base font-black text-slate-700 leading-none mt-0.5">{diaNum}</span>
+                        {/* Mini data block elevado */}
+                        <div className={`w-11 h-11 rounded-xl border flex flex-col items-center justify-center shrink-0 shadow-xs transition-transform duration-200 group-hover:scale-105 ${
+                          evt.calendario_oficial ? 'bg-gradient-to-b from-indigo-50 to-white border-indigo-250/70' :
+                          evt.bloqueado ? 'bg-gradient-to-b from-rose-50 to-white border-rose-250/70' :
+                          'bg-gradient-to-b from-emerald-50 to-white border-emerald-250/70'
+                        }`}>
+                          <span className={`text-[8px] font-black leading-none tracking-wider ${
+                            evt.calendario_oficial ? 'text-indigo-600' :
+                            evt.bloqueado ? 'text-rose-600' :
+                            'text-emerald-600'
+                          }`}>{mesAbrev}</span>
+                          <span className="text-base font-black text-slate-850 leading-none mt-0.5">{diaNum}</span>
                         </div>
 
                         {/* Detalhes */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <span className="text-[9px] font-bold text-slate-400">{hora}</span>
-                            {evt.local && <span className="text-[9px] text-slate-400 truncate max-w-[100px]">· {evt.local}</span>}
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-[10px] font-extrabold text-slate-400 bg-slate-50 border border-slate-200/50 px-1.5 py-0.2 rounded">{hora}</span>
+                            {evt.local && <span className="text-[10px] font-semibold text-slate-400 truncate max-w-[120px]">· {evt.local}</span>}
                           </div>
-                          <p className="text-xs font-bold text-slate-800 truncate leading-tight">{evt.titulo}</p>
-                          <div className="flex items-center gap-1.5 mt-1">
+                          <p className="text-xs font-black text-slate-800 truncate leading-snug">{evt.titulo}</p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                             {evt.calendario_oficial && (
-                              <span className="text-[8px] bg-indigo-50 text-indigo-700 border border-indigo-150 px-1.5 py-0.2 rounded-full font-bold">Oficial</span>
+                              <span className="text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full font-bold shadow-2xs">Oficial</span>
                             )}
                             {evt.bloqueado && (
-                              <span className="text-[8px] bg-rose-50 text-rose-700 border border-rose-150 px-1.5 py-0.2 rounded-full font-bold">Bloqueado</span>
+                              <span className="text-[9px] bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded-full font-bold shadow-2xs">Bloqueado</span>
                             )}
-                            <span className="text-[8px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded-full font-bold">{getEscopoLabel(evt.escopo)}</span>
+                            <span className="text-[9px] bg-slate-50 text-slate-600 border border-slate-200/60 px-2 py-0.5 rounded-full font-bold shadow-2xs">{getEscopoLabel(evt.escopo)}</span>
                           </div>
                         </div>
 
                         {/* Ações Rápidas */}
                         {isEscritaPermitida && !evt.bloqueado && (
-                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 self-center">
+                          <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 flex items-center gap-1 shrink-0 self-center transition-all duration-200 bg-white/90 backdrop-blur-xs pl-2">
                             <button
                               onClick={() => openForm(evt)}
-                              className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 rounded-lg transition-all duration-200 shadow-2xs hover:shadow-xs"
                               title="Editar"
                             >
-                              <Pencil className="h-3 w-3" />
+                              <Pencil className="h-3.5 w-3.5" />
                             </button>
                             <button
                               onClick={() => handleDelete(evt)}
-                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 rounded-lg transition-all duration-200 shadow-2xs hover:shadow-xs"
                               title="Excluir"
                             >
-                              <Trash2 className="h-3 w-3" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         )}
@@ -1450,71 +1459,99 @@ export default function AgendaPage() {
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'planejamento' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-4 space-y-4">
-            <h3 className="font-black text-slate-700 text-xs uppercase tracking-wider pb-2 border-b border-slate-100">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-md p-5 space-y-5">
+            <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-1.5">
+              <Calendar className="h-4 w-4 text-blue-600" />
               Resumo do Exercício {currentYear}
             </h3>
 
             {activePlanning ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <span className="text-[9px] font-bold text-slate-400 block uppercase">Status</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border inline-block mt-1 ${STATUS_PLAN_INFO[activePlanning.status].cor}`}>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3.5">
+                  {/* Status Block */}
+                  <div className="relative overflow-hidden bg-gradient-to-br from-indigo-50/40 to-white p-4 rounded-2xl border border-indigo-100/80 shadow-xs hover:shadow transition-all duration-200">
+                    <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider block">Status</span>
+                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border inline-block mt-2 ${STATUS_PLAN_INFO[activePlanning.status].cor}`}>
                       {STATUS_PLAN_INFO[activePlanning.status].label}
                     </span>
+                    <div className="absolute right-2 bottom-2 text-indigo-400 pointer-events-none opacity-20">
+                      <ShieldCheck className="h-12 w-12" />
+                    </div>
                   </div>
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <span className="text-[9px] font-bold text-slate-400 block uppercase">Total Eventos</span>
-                    <p className="text-lg font-black text-slate-800 mt-0.5">{planningEventCount}</p>
+
+                  {/* Total Eventos Block */}
+                  <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50/40 to-white p-4 rounded-2xl border border-emerald-100/80 shadow-xs hover:shadow transition-all duration-200">
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">Total Eventos</span>
+                    <p className="text-2xl font-black text-emerald-800 mt-1">{planningEventCount}</p>
+                    <div className="absolute right-2 bottom-2 text-emerald-450 pointer-events-none opacity-20">
+                      <CalendarRange className="h-12 w-12" />
+                    </div>
                   </div>
                 </div>
 
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1.5 text-xs text-slate-600">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase">Publicação</span>
-                  <p>Data: {activePlanning.published_at ? new Date(activePlanning.published_at).toLocaleString('pt-BR') : 'Rascunho'}</p>
-                  {responsibleEmail && <p>Responsável: {responsibleEmail}</p>}
+                {/* Publication Block */}
+                <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 to-white p-4 rounded-2xl border border-slate-200/60 shadow-xs hover:shadow transition-all duration-200 space-y-2 text-xs text-slate-600">
+                  <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Publicação</span>
+                  <div className="space-y-1 relative z-10">
+                    <p className="font-semibold text-slate-700">Data: <span className="font-bold text-slate-900">{activePlanning.published_at ? new Date(activePlanning.published_at).toLocaleString('pt-BR') : 'Rascunho'}</span></p>
+                    {responsibleEmail && <p className="font-semibold text-slate-700">Responsável: <span className="font-bold text-slate-900">{responsibleEmail}</span></p>}
+                  </div>
+                  <div className="absolute right-3 bottom-3 text-slate-400 pointer-events-none opacity-20">
+                    <Clock className="h-12 w-12" />
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-6 text-slate-400 text-xs">
-                Nenhum planejamento inicializado para {currentYear}.
+              <div className="flex flex-col items-center justify-center py-10 text-slate-450 text-xs gap-2">
+                <CalendarIcon className="h-8 w-8 text-slate-350" />
+                <p className="text-xs font-bold text-slate-500">Nenhum planejamento inicializado para {currentYear}.</p>
               </div>
             )}
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-4">
-            <h3 className="font-black text-slate-700 text-xs uppercase tracking-wider pb-2 border-b border-slate-100 mb-4">
-              Controles Anuais
-            </h3>
-            
-            {activePlanning ? (
-              <div className="space-y-2">
-                {activePlanning.status === 'rascunho' && (
-                  <button
-                    onClick={handlePublishPlanning}
-                    className="w-full flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-xs transition"
-                  >
-                    <Check className="h-4 w-4" />
-                    Publicar Planejamento
-                  </button>
-                )}
-                {activePlanning.status !== 'arquivado' && (
-                  <button
-                    onClick={handleArchivePlanning}
-                    className="w-full flex items-center justify-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs rounded-lg transition"
-                  >
-                    <Archive className="h-4 w-4" />
-                    Arquivar Planejamento
-                  </button>
-                )}
-                {activePlanning.status === 'arquivado' && (
-                  <p className="text-xs text-slate-400 text-center font-bold">Este planejamento foi arquivado.</p>
-                )}
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400 text-center">Nenhum rascunho ativo.</p>
-            )}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-md p-5 flex flex-col justify-between min-h-[220px]">
+            <div>
+              <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider pb-2 border-b border-slate-100 mb-4 flex items-center gap-1.5">
+                <BookOpen className="h-4 w-4 text-blue-600" />
+                Controles Anuais
+              </h3>
+              
+              {activePlanning ? (
+                <div className="space-y-3">
+                  {activePlanning.status === 'rascunho' && (
+                    <button
+                      onClick={handlePublishPlanning}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-xs rounded-xl shadow-sm hover:shadow-md border border-blue-700 transition duration-200"
+                    >
+                      <Check className="h-4 w-4" />
+                      Publicar Planejamento
+                    </button>
+                  )}
+                  {activePlanning.status !== 'arquivado' && (
+                    <button
+                      onClick={handleArchivePlanning}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-extrabold text-xs rounded-xl shadow-xs hover:shadow border border-slate-250 hover:border-slate-350 transition duration-200"
+                    >
+                      <Archive className="h-4 w-4" />
+                      Arquivar Planejamento
+                    </button>
+                  )}
+                  {activePlanning.status === 'arquivado' && (
+                    <div className="p-4 bg-slate-55/60 border border-slate-200 rounded-xl text-center">
+                      <p className="text-xs text-slate-550 font-bold flex items-center justify-center gap-1.5">
+                        <Lock className="h-4 w-4 text-slate-400" />
+                        Este planejamento foi arquivado de forma definitiva.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 text-slate-450 text-xs gap-2">
+                  <CalendarIcon className="h-8 w-8 text-slate-350" />
+                  <p className="text-xs font-bold text-slate-500">Nenhum rascunho ativo.</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
