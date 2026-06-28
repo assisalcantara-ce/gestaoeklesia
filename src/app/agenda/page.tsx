@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import DashboardContainer from '@/components/dashboard/DashboardContainer';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 import DashboardContent from '@/components/dashboard/DashboardContent';
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
 import DashboardSection from '@/components/dashboard/DashboardSection';
@@ -158,6 +159,20 @@ export default function AgendaPage() {
   const { registrarAcao } = useAuditLog();
   const planFeatures = usePlanFeatures();
   const router = useRouter();
+
+  const currentDateFormatted = useMemo(() => {
+    const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    const meses = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    const d = new Date();
+    const diaSemana = diasSemana[d.getDay()];
+    const dia = d.getDate();
+    const mes = meses[d.getMonth()];
+    const ano = d.getFullYear();
+    return `${diaSemana}, ${dia} de ${mes} de ${ano}`;
+  }, []);
 
   useEffect(() => {
     if (!planFeatures.loading && !planFeatures.has_modulo_agenda) {
@@ -988,6 +1003,9 @@ export default function AgendaPage() {
       <DashboardHeader
         title="Agenda Ministerial"
         description="Planejamento e coordenação de datas e agendas integradas"
+        contextSubtitle="Planejamento Ministerial"
+        greeting="Gestão Ministerial"
+        currentDate={currentDateFormatted}
         actions={
           isEscritaPermitida ? (
             <DashboardActions>
@@ -1358,55 +1376,37 @@ export default function AgendaPage() {
           {/* Indicadores Compactos Ministeriais Estilizados */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            {/* Card: Oficiais */}
-            <DashboardSection
+            <ExecutiveMetricCard
               title="Oficiais"
+              value={totalEventosOficiais}
               icon={ShieldCheck}
-              className="relative overflow-hidden bg-gradient-to-br from-indigo-50/50 to-white border-indigo-100 shadow-xs transition-all duration-200 hover:shadow-md hover:translate-y-[-1px]"
-            >
-              <div className="flex flex-col justify-between h-full">
-                <p className="text-3xl font-black text-indigo-700 mt-1">{totalEventosOficiais}</p>
-                <span className="text-[10px] text-indigo-600 font-semibold block mt-3">Calendário Geral da Igreja</span>
-              </div>
-            </DashboardSection>
+              color="indigo"
+              subtitle="Calendário Oficial da Igreja"
+            />
 
-            {/* Card: Total do Mês */}
-            <DashboardSection
+            <ExecutiveMetricCard
               title="Compromissos"
+              value={eventos.length}
               icon={Calendar}
-              className="relative overflow-hidden bg-gradient-to-br from-slate-50 to-white border-slate-150 shadow-xs transition-all duration-200 hover:shadow-md hover:translate-y-[-1px]"
-            >
-              <div className="flex flex-col justify-between h-full">
-                <p className="text-3xl font-black text-slate-700 mt-1">{eventos.length}</p>
-                <span className="text-[10px] text-slate-500 font-semibold block mt-3">Agendados para este mês</span>
-              </div>
-            </DashboardSection>
+              color="slate"
+              subtitle="Agendados para este mês"
+            />
 
-            {/* Card: Cultos & Reuniões */}
-            <DashboardSection
+            <ExecutiveMetricCard
               title="Cultos & Reuniões"
+              value={totalCultos + totalReunioes}
               icon={Flame}
-              className="relative overflow-hidden bg-gradient-to-br from-emerald-50/50 to-white border-emerald-100 shadow-xs transition-all duration-200 hover:shadow-md hover:translate-y-[-1px]"
-            >
-              <div className="flex flex-col justify-between h-full">
-                <p className="text-3xl font-black text-emerald-700 mt-1">{totalCultos + totalReunioes}</p>
-                <span className="text-[10px] text-emerald-600 font-semibold block mt-3">
-                  {totalCultos} Cultos · {totalReunioes} Reuniões
-                </span>
-              </div>
-            </DashboardSection>
+              color="emerald"
+              subtitle={`${totalCultos} Cultos e ${totalReunioes} Reuniões`}
+            />
 
-            {/* Card: Sincronizados */}
-            <DashboardSection
+            <ExecutiveMetricCard
               title="Sincronizados"
+              value={totalEventosSincronizados}
               icon={Lock}
-              className="relative overflow-hidden bg-gradient-to-br from-rose-50/50 to-white border-rose-100 shadow-xs transition-all duration-200 hover:shadow-md hover:translate-y-[-1px]"
-            >
-              <div className="flex flex-col justify-between h-full">
-                <p className="text-3xl font-black text-rose-600 mt-1">{totalEventosSincronizados}</p>
-                <span className="text-[10px] text-rose-600 font-semibold block mt-3">De outros módulos do sistema</span>
-              </div>
-            </DashboardSection>
+              color="rose"
+              subtitle="Integrados de outros módulos"
+            />
 
           </div>
 
