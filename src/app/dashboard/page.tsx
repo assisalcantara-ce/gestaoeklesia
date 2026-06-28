@@ -216,7 +216,7 @@ export default function DashboardPage() {
         ebdTurmasRes, ebdChamadasRes, usuariosRes,
         visitantesRes, ultimasCartasRes, ultimosFluxosRes, cartaPedidosRes,
       ] = await Promise.all([
-        safeQuery(withScopeMember(supabase.from('members').select('status, custom_fields').eq('ministry_id', ministryId))),
+        safeQuery(withScopeMember(supabase.from('members').select('status, role, tipo_cadastro, custom_fields').eq('ministry_id', ministryId))),
         safeQuery(supabase.from('flow_instances').select('status, tipo_fluxo, created_at').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(10)),
         safeQuery(supabase.from('cartas_ministeriais').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId)),
         safeQuery(
@@ -245,14 +245,19 @@ export default function DashboardPage() {
         safeQuery(supabase.from('ebd_turmas').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('ativo', true)),
         safeQuery(supabase.from('ebd_chamadas').select('presentes, total_alunos').eq('ministry_id', ministryId).gte('data_chamada', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).limit(100)),
         safeQuery(supabase.from('ministry_users').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'ativo')),
-        safeQuery(supabase.from('members').select('id').eq('ministry_id', ministryId).is('congregacao_id', null)),
+        safeQuery(supabase.from('members').select('id').eq('ministry_id', ministryId).eq('role', 'visitante')),
         safeQuery(supabase.from('cartas_ministeriais').select('id, tipo, created_at, membro_nome').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(5)),
         safeQuery(supabase.from('flow_instances').select('id, status, tipo_fluxo').eq('ministry_id', ministryId).neq('status', 'concluido').limit(5)),
         safeQuery(supabase.from('carta_pedidos').select('id, status, tipo_carta').eq('ministry_id', ministryId).neq('status', 'rejeitado').order('created_at', { ascending: false }).limit(3)),
       ]);
 
       // membros
-      const membros          = membrosRes.data ?? [];
+      const todosOsMembros   = membrosRes.data ?? [];
+      const membros          = todosOsMembros.filter((m: any) => {
+        const cf = m.custom_fields && typeof m.custom_fields === 'object' ? m.custom_fields : {};
+        const role = String(m.role || m.tipo_cadastro || cf.tipoCadastro || '').toLowerCase();
+        return role !== 'visitante';
+      });
       const totalMembros     = membros.length;
       const membrosBatizados = membros.filter((m: any) => {
         const cf = m.custom_fields && typeof m.custom_fields === 'object' ? m.custom_fields : {};
