@@ -89,6 +89,20 @@ const EMPTY: DashData = {
   nomeMinisterio: '',
 };
 
+async function safeQuery(promise: Promise<any>, fallback: any = { data: [], count: 0 }): Promise<any> {
+  try {
+    const res = await promise;
+    if ((res as any)?.error) {
+      console.error('Erro de consulta:', (res as any).error);
+      return fallback;
+    }
+    return res;
+  } catch (err) {
+    console.error('Erro de requisição:', err);
+    return fallback;
+  }
+}
+
 // component
 export default function DashboardPage() {
   const router = useRouter();
@@ -186,31 +200,39 @@ export default function DashboardPage() {
         ebdTurmasRes, ebdChamadasRes, usuariosRes,
         visitantesRes, ultimasCartasRes, ultimosFluxosRes, cartaPedidosRes,
       ] = await Promise.all([
-        withScopeMember(supabase.from('members').select('status, batizado, gender').eq('ministry_id', ministryId)),
-        supabase.from('flow_instances').select('status, tipo_fluxo, created_at').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(10),
-        supabase.from('cartas_ministeriais').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId),
-        scopeCongId
-          ? supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('id', scopeCongId).eq('is_active', true)
-          : scopeSupId
-            ? supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('supervisao_id', scopeSupId).eq('is_active', true)
-            : supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('is_active', true),
-        supabase.from('departamentos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId),
-        temFinanceiro
-          ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, tipo_recebimento, valor, forma_pagamento, congregacao_id').eq('ministry_id', ministryId).like('data_lancamento', `${mesRef}%`))
-          : Promise.resolve({ data: [] }),
-        temFinanceiro
-          ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, valor').eq('ministry_id', ministryId).like('data_lancamento', `${mesAnterior}%`))
-          : Promise.resolve({ data: [] }),
-        temFinanceiro
-          ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, valor, data_lancamento').eq('ministry_id', ministryId).gte('data_lancamento', `${ultimos6[0]}-01`))
-          : Promise.resolve({ data: [] }),
-        supabase.from('ebd_turmas').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('ativo', true),
-        supabase.from('ebd_chamadas').select('presentes, total_alunos').eq('ministry_id', ministryId).gte('data_chamada', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).limit(100),
-        supabase.from('ministry_users').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'ativo'),
-        supabase.from('members').select('id').eq('ministry_id', ministryId).is('congregacao_id', null),
-        supabase.from('cartas_ministeriais').select('id, tipo, created_at, membro_nome').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(5),
-        supabase.from('flow_instances').select('id, status, tipo_fluxo').eq('ministry_id', ministryId).neq('status', 'concluido').limit(5),
-        supabase.from('carta_pedidos').select('id, status, tipo_carta').eq('ministry_id', ministryId).neq('status', 'rejeitado').order('created_at', { ascending: false }).limit(3),
+        safeQuery(withScopeMember(supabase.from('members').select('status, batizado, gender').eq('ministry_id', ministryId))),
+        safeQuery(supabase.from('flow_instances').select('status, tipo_fluxo, created_at').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(10)),
+        safeQuery(supabase.from('cartas_ministeriais').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId)),
+        safeQuery(
+          scopeCongId
+            ? supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('id', scopeCongId).eq('is_active', true)
+            : scopeSupId
+              ? supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('supervisao_id', scopeSupId).eq('is_active', true)
+              : supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('is_active', true)
+        ),
+        safeQuery(supabase.from('departamentos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId)),
+        safeQuery(
+          temFinanceiro
+            ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, tipo_recebimento, valor, forma_pagamento, congregacao_id').eq('ministry_id', ministryId).like('data_lancamento', `${mesRef}%`))
+            : Promise.resolve({ data: [] })
+        ),
+        safeQuery(
+          temFinanceiro
+            ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, valor').eq('ministry_id', ministryId).like('data_lancamento', `${mesAnterior}%`))
+            : Promise.resolve({ data: [] })
+        ),
+        safeQuery(
+          temFinanceiro
+            ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, valor, data_lancamento').eq('ministry_id', ministryId).gte('data_lancamento', `${ultimos6[0]}-01`))
+            : Promise.resolve({ data: [] })
+        ),
+        safeQuery(supabase.from('ebd_turmas').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('ativo', true)),
+        safeQuery(supabase.from('ebd_chamadas').select('presentes, total_alunos').eq('ministry_id', ministryId).gte('data_chamada', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).limit(100)),
+        safeQuery(supabase.from('ministry_users').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'ativo')),
+        safeQuery(supabase.from('members').select('id').eq('ministry_id', ministryId).is('congregacao_id', null)),
+        safeQuery(supabase.from('cartas_ministeriais').select('id, tipo, created_at, membro_nome').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(5)),
+        safeQuery(supabase.from('flow_instances').select('id, status, tipo_fluxo').eq('ministry_id', ministryId).neq('status', 'concluido').limit(5)),
+        safeQuery(supabase.from('carta_pedidos').select('id, status, tipo_carta').eq('ministry_id', ministryId).neq('status', 'rejeitado').order('created_at', { ascending: false }).limit(3)),
       ]);
 
       // membros
@@ -307,13 +329,13 @@ export default function DashboardPage() {
         congListRes, allMembersRes, eventosProxRes,
         memberGrowthRes, cartasPendCountRes, pareceresRes, ministerioRes,
       ] = await Promise.all([
-        supabase.from('congregacoes').select('id, nome').eq('ministry_id', ministryId).eq('is_active', true).order('nome').limit(50),
-        supabase.from('members').select('congregacao_id, status').eq('ministry_id', ministryId).limit(10000),
-        supabase.from('eventos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'programado').gte('data_inicio', todayStr).lte('data_inicio', in30daysStr),
-        supabase.from('members').select('created_at').eq('ministry_id', ministryId).gte('created_at', twelveMonthsAgo).limit(5000),
-        supabase.from('carta_pedidos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'pendente'),
-        supabase.from('flow_instances').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).in('status', ['pendente', 'em_analise']),
-        supabase.from('ministries').select('name').eq('id', ministryId).maybeSingle(),
+        safeQuery(supabase.from('congregacoes').select('id, nome').eq('ministry_id', ministryId).eq('is_active', true).order('nome').limit(50)),
+        safeQuery(supabase.from('members').select('congregacao_id, status').eq('ministry_id', ministryId).limit(10000)),
+        safeQuery(supabase.from('eventos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'programado').gte('data_inicio', todayStr).lte('data_inicio', in30daysStr)),
+        safeQuery(supabase.from('members').select('created_at').eq('ministry_id', ministryId).gte('created_at', twelveMonthsAgo).limit(5000)),
+        safeQuery(supabase.from('carta_pedidos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'pendente')),
+        safeQuery(supabase.from('flow_instances').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).in('status', ['pendente', 'em_analise'])),
+        safeQuery(supabase.from('ministries').select('name').eq('id', ministryId).maybeSingle(), { data: { name: '' } }),
       ]);
 
       // PIX vencidos (best-effort — campo status pode não existir)
