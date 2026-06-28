@@ -1047,7 +1047,42 @@ export default function AgendaPage() {
 
       <DashboardContent>
 
-      {/* ─── CONTROL BAR ÚNICA (Reorganização do topo) ──────────────────────── */}
+        {/* ─── KPIS GLOBAIS DO MÓDULO (Executive Summary) ──────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <ExecutiveMetricCard
+            title="Oficiais"
+            value={totalEventosOficiais}
+            icon={ShieldCheck}
+            color="indigo"
+            subtitle="Calendário Oficial da Igreja"
+          />
+
+          <ExecutiveMetricCard
+            title="Compromissos"
+            value={eventos.length}
+            icon={Calendar}
+            color="slate"
+            subtitle="Agendados para este mês"
+          />
+
+          <ExecutiveMetricCard
+            title="Cultos & Reuniões"
+            value={totalCultos + totalReunioes}
+            icon={Flame}
+            color="emerald"
+            subtitle={`${totalCultos} Cultos e ${totalReunioes} Reuniões`}
+          />
+
+          <ExecutiveMetricCard
+            title="Sincronizados"
+            value={totalEventosSincronizados}
+            icon={Lock}
+            color="rose"
+            subtitle="Integrados de outros módulos"
+          />
+        </div>
+
+        {/* ─── CONTROL BAR ÚNICA (Reorganização do topo) ──────────────────────── */}
       {activeTab === 'calendario' && (
         <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-xs mb-4 flex flex-wrap items-center justify-between gap-3">
           
@@ -1178,11 +1213,14 @@ export default function AgendaPage() {
       {/* TAB 1: CALENDÁRIO MENSAL (Elemento Principal em 2 colunas)          */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'calendario' && (
-        <div className="flex flex-col lg:flex-row gap-4">
+        <div className="flex flex-col lg:flex-row gap-5">
           
           {/* LADO ESQUERDO: Calendário Mensal Compacto */}
-          <div className="flex-1 min-w-0 bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-            
+          <DashboardSection
+            title="Calendário Mensal"
+            icon={CalendarIcon}
+            className="flex-1 min-w-0"
+          >
             {/* Cabeçalho da grade de dias da semana */}
             <div className="grid grid-cols-7 gap-1 text-center font-black text-slate-400 text-[10px] tracking-wider mb-2">
               <span>DOM</span>
@@ -1262,32 +1300,29 @@ export default function AgendaPage() {
                 Sincronizado/Bloqueado
               </span>
             </div>
-          </div>
+          </DashboardSection>
 
-          {/* LADO DIREITO: Agenda dos Próximos Dias / Detalhes */}
+          {/* LADO DIREITO: Agenda dos Próximos Dias & Apoio Lateral */}
           <DashboardSidebar className="w-full lg:w-80">
             
             {/* Próximos compromissos lateral */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-md p-5 flex-1 flex flex-col min-h-[350px]">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                <h3 className="font-black text-slate-800 text-xs tracking-wider uppercase flex items-center gap-1.5">
-                  <CalendarRange className="h-4 w-4 text-blue-600" />
-                  {selectedDate ? `Eventos de ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR')}` : 'Compromissos do Mês'}
-                </h3>
-                {selectedDate && (
+            <DashboardSection
+              title={selectedDate ? `Eventos de ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR')}` : 'Compromissos do Mês'}
+              icon={CalendarRange}
+              actions={
+                selectedDate ? (
                   <button onClick={() => setSelectedDate(null)} className="text-[10px] text-blue-600 hover:text-blue-700 font-extrabold hover:underline">
                     Ver todos
                   </button>
-                )}
-              </div>
-
+                ) : undefined
+              }
+            >
               {loading ? (
                 <div className="text-xs text-slate-400 text-center py-10">Carregando eventos...</div>
               ) : eventosColunaDireita.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 gap-2 my-auto">
+                <div className="flex flex-col items-center justify-center text-center p-6 gap-2 my-auto min-h-[200px]">
                   <CalendarIcon className="h-8 w-8 text-slate-200" />
-                  <p className="text-xs font-bold text-slate-500">Nenhum compromisso para este período.</p>
-                  <p className="text-[10px] text-slate-400">Clique em "Novo Compromisso" para iniciar seu planejamento.</p>
+                  <p className="text-xs font-bold text-slate-500">Nenhum compromisso.</p>
                 </div>
               ) : (
                 <div className="space-y-3 overflow-y-auto max-h-[360px] pr-1">
@@ -1362,7 +1397,45 @@ export default function AgendaPage() {
                   })}
                 </div>
               )}
-            </div>
+            </DashboardSection>
+
+            {/* Linha do Tempo Ministerial (Apoio Lateral Secundário) */}
+            <DashboardSection
+              title="Linha do Tempo"
+              icon={TrendingUp}
+            >
+              {proximosEventos.length === 0 ? (
+                <div className="text-center py-6 text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
+                  <CalendarIcon className="h-8 w-8 text-slate-200" />
+                  <span className="font-semibold text-slate-500">Nenhum compromisso.</span>
+                </div>
+              ) : (
+                <div className="relative border-l-2 border-slate-100 ml-4 pl-4 space-y-4 py-1">
+                  {proximosEventos.map(evt => {
+                    const d = new Date(evt.data_inicio);
+                    const isOficial = evt.calendario_oficial;
+                    const isBlocked = evt.bloqueado;
+
+                    let bulletColor = 'bg-emerald-500 ring-emerald-100';
+                    if (isOficial) bulletColor = 'bg-indigo-500 ring-indigo-100';
+                    else if (isBlocked) bulletColor = 'bg-rose-500 ring-rose-100';
+
+                    return (
+                      <div key={evt.id} className="relative group transition-all duration-200">
+                        <span className={`absolute -left-[22px] top-1 w-2.5 h-2.5 rounded-full border-2 border-white ring-4 transition ${bulletColor}`} />
+                        <div className="bg-slate-50/50 hover:bg-slate-50 border border-slate-100 rounded-xl p-2.5 transition">
+                          <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                            <Clock className="h-3 w-3 text-slate-400" />
+                            <span>{d.toLocaleDateString('pt-BR')} às {d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <h4 className="font-black text-slate-800 text-xs mt-1 truncate">{evt.titulo}</h4>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </DashboardSection>
           </DashboardSidebar>
         </div>
       )}
@@ -1373,43 +1446,6 @@ export default function AgendaPage() {
       {activeTab === 'dashboard' && (
         <div className="space-y-4">
           
-          {/* Indicadores Compactos Ministeriais Estilizados */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            
-            <ExecutiveMetricCard
-              title="Oficiais"
-              value={totalEventosOficiais}
-              icon={ShieldCheck}
-              color="indigo"
-              subtitle="Calendário Oficial da Igreja"
-            />
-
-            <ExecutiveMetricCard
-              title="Compromissos"
-              value={eventos.length}
-              icon={Calendar}
-              color="slate"
-              subtitle="Agendados para este mês"
-            />
-
-            <ExecutiveMetricCard
-              title="Cultos & Reuniões"
-              value={totalCultos + totalReunioes}
-              icon={Flame}
-              color="emerald"
-              subtitle={`${totalCultos} Cultos e ${totalReunioes} Reuniões`}
-            />
-
-            <ExecutiveMetricCard
-              title="Sincronizados"
-              value={totalEventosSincronizados}
-              icon={Lock}
-              color="rose"
-              subtitle="Integrados de outros módulos"
-            />
-
-          </div>
-
           {/* Timeline de Próximos Eventos Estilizada */}
           <DashboardSection
             title="Linha do Tempo Ministerial"
