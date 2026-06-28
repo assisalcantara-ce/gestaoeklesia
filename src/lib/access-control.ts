@@ -83,6 +83,7 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'geolocalizacao',
     'comissao',
     'gestao',
+    'agenda',
   ],
   financeiro: [
     'dashboard',
@@ -100,29 +101,35 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'patrimonio',
     'geolocalizacao',
     'gestao',
+    'agenda',
   ],
   tesouraria_local: [
     'dashboard',
     'tesouraria',
+    'agenda',
   ],
   superintendente_ebd: [
     'dashboard',
     'ebd',
+    'agenda',
   ],
   coordenador_ebd: [
     'dashboard',
     'ebd',
+    'agenda',
   ],
   presidencia: [
     'dashboard',
     'presidencia',
     'consolidado_financeiro',
     'conselho_fiscal',
+    'agenda',
   ],
   conselho_fiscal: [
     'presidencia',
     'consolidado_financeiro',
     'conselho_fiscal',
+    'agenda',
   ],
   // Mapeamentos legados (compartilham as mesmas permissões dos novos)
   admin_local: [
@@ -132,18 +139,22 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'patrimonio',
     'geolocalizacao',
     'gestao',
+    'agenda',
   ],
   financeiro_local: [
     'dashboard',
     'tesouraria',
+    'agenda',
   ],
   superintendente: [
     'dashboard',
     'ebd',
+    'agenda',
   ],
   coordenador: [
     'dashboard',
     'ebd',
+    'agenda',
   ],
   operador: [
     'dashboard',
@@ -174,6 +185,7 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'conselho_fiscal',
     'suporte',
     'geolocalizacao',
+    'agenda',
   ],
   financeiro: [
     'tesouraria',
@@ -187,6 +199,7 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'patrimonio',
     'geolocalizacao',
     'gestao',
+    'agenda',
   ],
   tesouraria_local: [
     'tesouraria',
@@ -197,7 +210,9 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
   coordenador_ebd: [
     'ebd',
   ],
-  presidencia: [],
+  presidencia: [
+    'agenda',
+  ],
   conselho_fiscal: [
     'conselho_fiscal',
   ],
@@ -208,6 +223,7 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'patrimonio',
     'geolocalizacao',
     'gestao',
+    'agenda',
   ],
   financeiro_local: [
     'tesouraria',

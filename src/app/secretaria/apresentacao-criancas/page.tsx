@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
@@ -12,6 +12,7 @@ import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-temp
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { substituirPlaceholdersCertificado } from '@/lib/certificados-utils';
 import { Pencil, Printer, Trash2 } from 'lucide-react';
+import { sincronizarAgenda } from '@/lib/agenda-sync-service';
 
 type CertificadoTemplate = {
   id: string;
@@ -239,6 +240,10 @@ export default function ApresentacaoCriancasPage() {
 
       setRegistros((prev) => prev.map((r) => (r.id === editingId ? (data as ApresentacaoRegistro) : r)));
       showNotification('success', 'Sucesso', 'Registro atualizado com sucesso.', 3000);
+      // Sincronizar com a Agenda (update)
+      if (data && ministryId) {
+        void sincronizarAgenda({ supabase, origem: 'secretaria', origemTipo: 'apresentacao_criancas', origemId: editingId, acao: 'update', ministryId, dados: { titulo: `Apresentação – ${(data as ApresentacaoRegistro).crianca_nome}`, descricao: (data as ApresentacaoRegistro).observacoes ?? null, dataInicio: (data as ApresentacaoRegistro).data_apresentacao ? new Date((data as ApresentacaoRegistro).data_apresentacao!).toISOString() : new Date().toISOString(), dataFim: null, local: (data as ApresentacaoRegistro).local_apresentacao ?? null } });
+      }
       resetForm();
       setActiveTab('registros');
       return;
@@ -257,6 +262,10 @@ export default function ApresentacaoCriancasPage() {
 
     setRegistros((prev) => [data as ApresentacaoRegistro, ...prev]);
     showNotification('success', 'Sucesso', 'Registro criado com sucesso.', 3000);
+    // Sincronizar com a Agenda (create)
+    if (data && ministryId) {
+      void sincronizarAgenda({ supabase, origem: 'secretaria', origemTipo: 'apresentacao_criancas', origemId: (data as ApresentacaoRegistro).id, acao: 'create', ministryId, dados: { titulo: `Apresentação – ${(data as ApresentacaoRegistro).crianca_nome}`, descricao: (data as ApresentacaoRegistro).observacoes ?? null, dataInicio: (data as ApresentacaoRegistro).data_apresentacao ? new Date((data as ApresentacaoRegistro).data_apresentacao!).toISOString() : new Date().toISOString(), dataFim: null, local: (data as ApresentacaoRegistro).local_apresentacao ?? null } });
+    }
     resetForm();
     setActiveTab('registros');
   };
@@ -292,6 +301,10 @@ export default function ApresentacaoCriancasPage() {
     }
 
     setRegistros((prev) => prev.filter((r) => r.id !== id));
+    // Cancelar evento correspondente na Agenda
+    if (ministryId) {
+      void sincronizarAgenda({ supabase, origem: 'secretaria', origemTipo: 'apresentacao_criancas', origemId: id, acao: 'delete', ministryId });
+    }
     showNotification('success', 'Sucesso', 'Registro excluido.', 3000);
   };
 

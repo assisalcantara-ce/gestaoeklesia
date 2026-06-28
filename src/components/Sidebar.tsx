@@ -120,6 +120,7 @@ export default function Sidebar() {
   // Módulo que cada item requer (undefined = visível para todos autenticados)
   const allMenuItems = [
     { id: 'dashboard',        label: 'Dashboard',          icon: '📊', path: '/dashboard',   modulo: 'dashboard'  },
+    { id: 'agenda',           label: 'Agenda',             icon: '📅', path: '/agenda',      modulo: 'agenda'     },
     {
       id: 'secretaria',
       label: 'Secretaria',

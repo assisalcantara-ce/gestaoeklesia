@@ -24,6 +24,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
     groupName: "GERAL",
     items: [
       { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard', modulo: 'dashboard' },
+      { id: 'agenda', label: 'Agenda', icon: '📅', path: '/agenda', modulo: 'agenda' },
       {
         id: 'configuracoes',
         label: 'Configurações',
@@ -82,6 +83,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
           { id: 'prestacao-contas-oficial', label: 'Prestação de Contas Oficial', icon: '📋', path: '/presidencia/prestacao-contas-oficial', modulo: 'consolidado_financeiro' },
           { id: 'auditoria-financeira', label: 'Auditoria Financeira', icon: '🔍', path: '/presidencia/auditoria', modulo: 'consolidado_financeiro' },
           { id: 'conselho-fiscal', label: 'Conselho Fiscal', icon: '⚖️', path: '/presidencia/conselho-fiscal', modulo: 'conselho_fiscal' },
+          { id: 'planejamento-solicitacoes', label: 'Solicitações de Exceção', icon: '📅', path: '/presidencia/planejamento/solicitacoes', modulo: 'presidencia' },
         ]
       },
       { id: 'financeiro', label: 'Financeiro', icon: '💳', path: '/financeiro', modulo: 'financeiro' },

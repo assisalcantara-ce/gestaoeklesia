@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
@@ -12,6 +12,7 @@ import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-temp
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { substituirPlaceholdersCertificado } from '@/lib/certificados-utils';
 import { Pencil, Printer, Trash2 } from 'lucide-react';
+import { sincronizarAgenda } from '@/lib/agenda-sync-service';
 
 type CertificadoTemplate = {
   id: string;
@@ -300,6 +301,10 @@ export default function BatismoAguasPage() {
       }
       setRegistros((prev) => prev.map((r) => (r.id === editingId ? (data as BatismoRegistro) : r)));
       showNotification('success', 'Sucesso', 'Registro atualizado com sucesso.', 3000);
+      // Sincronizar com a Agenda (update)
+      if (data && ministryId) {
+        void sincronizarAgenda({ supabase, origem: 'secretaria', origemTipo: 'batismo', origemId: editingId, acao: 'update', ministryId, dados: { titulo: `Batismo – ${(data as BatismoRegistro).candidato_nome}`, descricao: (data as BatismoRegistro).observacoes ?? null, dataInicio: (data as BatismoRegistro).data_batismo ? new Date((data as BatismoRegistro).data_batismo!).toISOString() : new Date().toISOString(), dataFim: null, local: (data as BatismoRegistro).local_batismo ?? null } });
+      }
       resetForm();
       setActiveTab('registros');
       return;
@@ -318,6 +323,10 @@ export default function BatismoAguasPage() {
 
     setRegistros((prev) => [data as BatismoRegistro, ...prev]);
     showNotification('success', 'Sucesso', 'Registro criado com sucesso.', 3000);
+    // Sincronizar com a Agenda (create)
+    if (data && ministryId) {
+      void sincronizarAgenda({ supabase, origem: 'secretaria', origemTipo: 'batismo', origemId: (data as BatismoRegistro).id, acao: 'create', ministryId, dados: { titulo: `Batismo – ${(data as BatismoRegistro).candidato_nome}`, descricao: (data as BatismoRegistro).observacoes ?? null, dataInicio: (data as BatismoRegistro).data_batismo ? new Date((data as BatismoRegistro).data_batismo!).toISOString() : new Date().toISOString(), dataFim: null, local: (data as BatismoRegistro).local_batismo ?? null } });
+    }
     resetForm();
     setActiveTab('registros');
   };
@@ -349,6 +358,10 @@ export default function BatismoAguasPage() {
       return;
     }
     setRegistros((prev) => prev.filter((r) => r.id !== id));
+    // Cancelar evento correspondente na Agenda
+    if (ministryId) {
+      void sincronizarAgenda({ supabase, origem: 'secretaria', origemTipo: 'batismo', origemId: id, acao: 'delete', ministryId });
+    }
     showNotification('success', 'Sucesso', 'Registro excluido.', 3000);
   };
 
