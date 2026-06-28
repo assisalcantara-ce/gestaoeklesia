@@ -103,6 +103,15 @@ async function safeQuery(promise: Promise<any>, fallback: any = { data: [], coun
   }
 }
 
+function obterIniciais(nome: string): string {
+  if (!nome) return '';
+  return nome
+    .split(/\s+/)
+    .filter(word => word.length > 0 && !['de', 'da', 'do', 'dos', 'das', 'e', 'em'].includes(word.toLowerCase()))
+    .map(word => word[0].toUpperCase())
+    .join('');
+}
+
 // component
 export default function DashboardPage() {
   const router = useRouter();
@@ -543,7 +552,7 @@ export default function DashboardPage() {
     .sort((a, b) => b.membrosAtivos - a.membrosAtivos)
     .slice(0, 8)
     .map(c => ({
-      nome: c.nome.length > 14 ? c.nome.slice(0, 13) + '…' : c.nome,
+      nome: obterIniciais(c.nome),
       total: c.membrosAtivos,
     }));
 
