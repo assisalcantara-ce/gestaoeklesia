@@ -1080,7 +1080,7 @@ export default function AgendaPage() {
       <DashboardContent>
 
         {/* ─── KPIS GLOBAIS DO MÓDULO (Executive Summary) ──────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <ExecutiveMetricCard
             title="Oficiais"
             value={totalEventosOficiais}
@@ -1114,19 +1114,19 @@ export default function AgendaPage() {
           />
         </div>
 
-        {/* ─── CONTROL BAR ÚNICA (Reorganização do topo) ──────────────────────── */}
+        {/* ─── CONTROL BAR ÚNICA (integrada, sem card isolado) ──────────────────── */}
       {activeTab === 'calendario' && (
-        <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-xs mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
           
           {/* Navegação de Mês/Ano compacta */}
-          <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200">
-            <button onClick={handlePrevMonth} className="px-2 py-1 hover:bg-white hover:shadow-xs rounded text-slate-700 text-xs font-black transition">
+          <div className="flex items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-200/70 shadow-xs">
+            <button onClick={handlePrevMonth} className="px-2 py-1 hover:bg-slate-50 rounded text-slate-700 text-xs font-black transition">
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
             <span className="text-xs font-black text-slate-800 px-1.5 min-w-[110px] text-center">
               {MESES_PT[currentMonth - 1].toUpperCase()} {currentYear}
             </span>
-            <button onClick={handleNextMonth} className="px-2 py-1 hover:bg-white hover:shadow-xs rounded text-slate-700 text-xs font-black transition">
+            <button onClick={handleNextMonth} className="px-2 py-1 hover:bg-slate-50 rounded text-slate-700 text-xs font-black transition">
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -1135,7 +1135,7 @@ export default function AgendaPage() {
           <div className="flex items-center gap-1 overflow-x-auto">
             <button
               onClick={() => handleGoToToday()}
-              className="px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold transition shrink-0"
+              className="px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/70 rounded-lg text-xs font-bold transition shrink-0 shadow-xs"
             >
               Hoje
             </button>
@@ -1151,7 +1151,7 @@ export default function AgendaPage() {
                 className={`px-3 py-1 rounded-lg text-xs font-bold border transition shrink-0 ${
                   quickFilter === f.key
                     ? 'bg-blue-50 text-blue-700 border-blue-200'
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                    : 'bg-white text-slate-600 border-slate-200/70 hover:border-slate-300 shadow-xs'
                 }`}
               >
                 {f.label}
@@ -1164,8 +1164,8 @@ export default function AgendaPage() {
             onClick={() => setShowAdvancedFilters(v => !v)}
             className={`flex items-center gap-1.5 px-3 py-1 border rounded-lg text-xs font-bold transition ${
               showAdvancedFilters || filtroTipoId || filtroCongregacao || filtroVisibilidade
-                ? 'border-blue-200 text-blue-600 bg-blue-50/50'
-                : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                ? 'border-blue-200 text-blue-600 bg-blue-50'
+                : 'border-slate-200/70 text-slate-500 bg-white hover:bg-slate-50 shadow-xs'
             }`}
           >
             <Filter className="h-3.5 w-3.5" />
@@ -1177,7 +1177,7 @@ export default function AgendaPage() {
 
       {/* Filtros Avançados Recolhíveis */}
       {activeTab === 'calendario' && showAdvancedFilters && (
-        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-xs mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-white p-4 rounded-xl border border-slate-200/60 shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tipo de Compromisso</label>
             <select
@@ -1245,13 +1245,13 @@ export default function AgendaPage() {
       {/* TAB 1: CALENDÁRIO MENSAL (Elemento Principal em 2 colunas)          */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'calendario' && (
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col lg:flex-row gap-5 items-start">
           
-          {/* LADO ESQUERDO: Calendário Mensal Compacto */}
+          {/* LADO ESQUERDO: Calendário Mensal — superfície flat integrada */}
           <DashboardSection
             title="Calendário Mensal"
             icon={CalendarIcon}
-            className="flex-1 min-w-0"
+            className="flex-1 min-w-0 !shadow-none !border-slate-200/50"
           >
             {/* Cabeçalho da grade de dias da semana */}
             <div className="grid grid-cols-7 gap-1 text-center font-black text-slate-400 text-[10px] tracking-wider mb-2">
@@ -1334,8 +1334,8 @@ export default function AgendaPage() {
             </div>
           </DashboardSection>
 
-          {/* LADO DIREITO: Agenda dos Próximos Dias & Apoio Lateral */}
-          <DashboardSidebar className="w-full lg:w-80">
+          {/* LADO DIREITO: Sidebar integrada — painel de apoio conectado */}
+          <DashboardSidebar className="w-full lg:w-[320px] lg:border-l lg:border-slate-200/50 lg:pl-5">
             
             {/* Próximos compromissos lateral */}
             <DashboardSection

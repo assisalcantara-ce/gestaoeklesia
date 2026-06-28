@@ -28,7 +28,7 @@ export default function DashboardHeader({
   centerContent,
 }: DashboardHeaderProps) {
   return (
-    <div className="bg-white border-b border-slate-200/80 px-4 md:px-6 py-5 md:py-6 shrink-0 transition-all duration-300">
+    <div className="bg-white px-4 md:px-6 pt-5 pb-0 shrink-0">
       
       {/* Top Meta: Saudação e Data */}
       {(greeting || currentDate) && (
