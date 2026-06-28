@@ -129,6 +129,7 @@ export default function DashboardPage() {
 
   // auth + dados
   useEffect(() => {
+    if (userCtx.loading) return; // Aguarda o carregamento completo do contexto de usuário/permissões
     const run = async () => {
       const { data: authData } = await supabase.auth.getUser();
       if (!authData.user) { router.push('/login'); return; }
@@ -173,9 +174,13 @@ export default function DashboardPage() {
       const anoAtual = agora.getFullYear();
       const mesAtual = agora.getMonth() + 1;
       const mesRef   = `${anoAtual}-${String(mesAtual).padStart(2,'0')}`;
+      const ultimoDiaMes = new Date(anoAtual, mesAtual, 0).getDate();
+      const dataFimRef   = `${mesRef}-${String(ultimoDiaMes).padStart(2,'0')}`;
 
       const dAnterior   = new Date(anoAtual, mesAtual - 2, 1);
       const mesAnterior = `${dAnterior.getFullYear()}-${String(dAnterior.getMonth() + 1).padStart(2,'0')}`;
+      const ultimoDiaAnterior = new Date(dAnterior.getFullYear(), dAnterior.getMonth() + 1, 0).getDate();
+      const dataFimAnterior   = `${mesAnterior}-${String(ultimoDiaAnterior).padStart(2,'0')}`;
 
       const ultimos6: string[] = [];
       for (let i = 5; i >= 0; i--) {
@@ -215,12 +220,12 @@ export default function DashboardPage() {
         safeQuery(supabase.from('departamentos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId)),
         safeQuery(
           temFinanceiro
-            ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, tipo_recebimento, valor, forma_pagamento, congregacao_id').eq('ministry_id', ministryId).like('data_lancamento', `${mesRef}%`))
+            ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, tipo_recebimento, valor, forma_pagamento, congregacao_id').eq('ministry_id', ministryId).gte('data_lancamento', `${mesRef}-01`).lte('data_lancamento', dataFimRef))
             : Promise.resolve({ data: [] })
         ),
         safeQuery(
           temFinanceiro
-            ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, valor').eq('ministry_id', ministryId).like('data_lancamento', `${mesAnterior}%`))
+            ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, valor').eq('ministry_id', ministryId).gte('data_lancamento', `${mesAnterior}-01`).lte('data_lancamento', dataFimAnterior))
             : Promise.resolve({ data: [] })
         ),
         safeQuery(
@@ -498,7 +503,7 @@ export default function DashboardPage() {
     };
 
     run();
-  }, [router, supabase]);
+  }, [router, supabase, userCtx.loading, userCtx]);
 
   const handleLogout = () => supabase.auth.signOut().finally(() => router.push('/'));
 
