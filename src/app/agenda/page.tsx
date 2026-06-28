@@ -11,7 +11,7 @@ import {
   AlertTriangle, Check, Archive,
   ChevronLeft, ChevronRight, Filter, LayoutDashboard,
   BookOpen, TrendingUp, ChevronDown, ChevronUp,
-  CheckCircle2, CalendarRange, Gavel
+  CheckCircle2, CalendarRange, Gavel, ShieldCheck, Lock, Clock, Calendar, Flame
 } from 'lucide-react';
 import { useAppDialog } from '@/providers/AppDialogProvider';
 import { OrganizationalService, getOrgHelpers, OrgStructure } from '@/lib/organizational-service';
@@ -1319,53 +1319,122 @@ export default function AgendaPage() {
       {activeTab === 'dashboard' && (
         <div className="space-y-4">
           
-          {/* Indicadores Compactos Ministeriais */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-3">
-              <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider block">Oficiais</span>
-              <p className="text-xl font-black text-indigo-700 mt-0.5">{totalEventosOficiais}</p>
-              <span className="text-[9px] text-slate-400 font-bold block mt-0.5">Calendário da Igreja</span>
+          {/* Indicadores Compactos Ministeriais Estilizados */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            {/* Card: Oficiais */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-50/50 to-white rounded-2xl border border-indigo-100 shadow-xs p-4 flex flex-col justify-between transition-all hover:shadow-md hover:translate-y-[-1px] duration-200">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider block">Oficiais</span>
+                  <p className="text-3xl font-black text-indigo-700 mt-1">{totalEventosOficiais}</p>
+                </div>
+                <div className="p-2 bg-indigo-50 rounded-xl text-indigo-500">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+              </div>
+              <span className="text-[10px] text-indigo-600 font-semibold block mt-3">Calendário Geral da Igreja</span>
             </div>
-            <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-3">
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Total Mês</span>
-              <p className="text-xl font-black text-slate-700 mt-0.5">{eventos.length}</p>
-              <span className="text-[9px] text-slate-400 font-bold block mt-0.5">Compromissos</span>
+
+            {/* Card: Total do Mês */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-150 shadow-xs p-4 flex flex-col justify-between transition-all hover:shadow-md hover:translate-y-[-1px] duration-200">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Compromissos</span>
+                  <p className="text-3xl font-black text-slate-700 mt-1">{eventos.length}</p>
+                </div>
+                <div className="p-2 bg-slate-100 rounded-xl text-slate-500">
+                  <Calendar className="h-5 w-5" />
+                </div>
+              </div>
+              <span className="text-[10px] text-slate-500 font-semibold block mt-3">Agendados para este mês</span>
             </div>
-            <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-3">
-              <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider block">Cultos & Reuniões</span>
-              <p className="text-xl font-black text-emerald-700 mt-0.5">{totalCultos + totalReunioes}</p>
-              <span className="text-[9px] text-slate-400 font-bold block mt-0.5">{totalCultos} cultos · {totalReunioes} reuniões</span>
+
+            {/* Card: Cultos & Reuniões */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50/50 to-white rounded-2xl border border-emerald-100 shadow-xs p-4 flex flex-col justify-between transition-all hover:shadow-md hover:translate-y-[-1px] duration-200">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">Cultos & Reuniões</span>
+                  <p className="text-3xl font-black text-emerald-700 mt-1">{totalCultos + totalReunioes}</p>
+                </div>
+                <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
+                  <Flame className="h-5 w-5" />
+                </div>
+              </div>
+              <span className="text-[10px] text-emerald-600 font-semibold block mt-3">
+                {totalCultos} Cultos · {totalReunioes} Reuniões
+              </span>
             </div>
-            <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-3">
-              <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider block">Sincronizados</span>
-              <p className="text-xl font-black text-rose-600 mt-0.5">{totalEventosSincronizados}</p>
-              <span className="text-[9px] text-slate-400 font-bold block mt-0.5">De outros módulos</span>
+
+            {/* Card: Sincronizados */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-rose-50/50 to-white rounded-2xl border border-rose-100 shadow-xs p-4 flex flex-col justify-between transition-all hover:shadow-md hover:translate-y-[-1px] duration-200">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider block">Sincronizados</span>
+                  <p className="text-3xl font-black text-rose-600 mt-1">{totalEventosSincronizados}</p>
+                </div>
+                <div className="p-2 bg-rose-50 rounded-xl text-rose-500">
+                  <Lock className="h-5 w-5" />
+                </div>
+              </div>
+              <span className="text-[10px] text-rose-600 font-semibold block mt-3">De outros módulos do sistema</span>
             </div>
+
           </div>
 
-          {/* Timeline de Próximos Eventos */}
-          <div className="bg-white rounded-xl border border-slate-150 shadow-xs p-4">
-            <h3 className="font-black text-slate-700 text-xs tracking-wider uppercase mb-3 flex items-center gap-1">
-              <TrendingUp className="h-3.5 w-3.5 text-blue-600" />
-              Linha do Tempo
+          {/* Timeline de Próximos Eventos Estilizada */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <h3 className="font-black text-slate-800 text-xs tracking-wider uppercase mb-4 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-blue-600" />
+              Linha do Tempo Ministerial
             </h3>
 
             {proximosEventos.length === 0 ? (
-              <div className="text-center py-6 text-slate-400 text-xs">
-                Nenhum compromisso agendado para os próximos dias.
+              <div className="text-center py-12 text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
+                <CalendarIcon className="h-8 w-8 text-slate-200" />
+                <span className="font-semibold text-slate-500">Nenhum compromisso agendado para os próximos dias.</span>
               </div>
             ) : (
-              <div className="relative border-l-2 border-slate-100 ml-3 pl-4 space-y-4 py-1">
+              <div className="relative border-l-2 border-slate-100 ml-4 pl-6 space-y-5 py-2">
                 {proximosEventos.map(evt => {
                   const d = new Date(evt.data_inicio);
+                  const isOficial = evt.calendario_oficial;
+                  const isBlocked = evt.bloqueado;
+
+                  let bulletColor = 'bg-emerald-500 ring-emerald-100';
+                  if (isOficial) bulletColor = 'bg-indigo-500 ring-indigo-100';
+                  else if (isBlocked) bulletColor = 'bg-rose-500 ring-rose-100';
+
                   return (
-                    <div key={evt.id} className="relative">
+                    <div key={evt.id} className="relative group transition-all duration-200">
                       {/* Bullet indicador */}
-                      <span className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 border-white ring-4 ring-slate-50" />
-                      <div className="text-xs">
-                        <span className="font-bold text-blue-600">{d.toLocaleDateString('pt-BR')} às {d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                        <h4 className="font-bold text-slate-800 mt-0.5">{evt.titulo}</h4>
-                        {evt.descricao && <p className="text-slate-500 text-[11px] mt-0.5">{evt.descricao}</p>}
+                      <span className={`absolute -left-[30px] top-1 w-3.5 h-3.5 rounded-full border-2 border-white ring-4 transition ${bulletColor}`} />
+                      
+                      <div className="bg-slate-50/50 hover:bg-slate-50 border border-slate-100 rounded-xl p-3 max-w-2xl transition">
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                          <Clock className="h-3 w-3 text-slate-400" />
+                          <span>{d.toLocaleDateString('pt-BR')} às {d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                          {evt.local && (
+                            <>
+                              <span>•</span>
+                              <span className="text-slate-500">{evt.local}</span>
+                            </>
+                          )}
+                        </div>
+                        <h4 className="font-black text-slate-850 text-sm mt-1">{evt.titulo}</h4>
+                        {evt.descricao && (
+                          <p className="text-slate-500 text-xs mt-1 leading-relaxed">{evt.descricao}</p>
+                        )}
+                        
+                        <div className="flex gap-1.5 mt-2">
+                          {isOficial && (
+                            <span className="text-[8px] bg-indigo-50 text-indigo-700 border border-indigo-150 px-2 py-0.5 rounded-full font-bold">Oficial</span>
+                          )}
+                          {isBlocked && (
+                            <span className="text-[8px] bg-rose-50 text-rose-700 border border-rose-150 px-2 py-0.5 rounded-full font-bold">Sincronizado</span>
+                          )}
+                          <span className="text-[8px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">{getEscopoLabel(evt.escopo)}</span>
+                        </div>
                       </div>
                     </div>
                   );
