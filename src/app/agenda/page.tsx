@@ -242,6 +242,15 @@ export default function AgendaPage() {
     regra_posicionamento: '' as string,
   });
 
+  // Controle de Tipos de Agenda
+  const [showTiposModal, setShowTiposModal] = useState(false);
+  const [novoTipoNome, setNovoTipoNome] = useState('');
+  const [novoTipoCategoria, setNovoTipoCategoria] = useState<'culto' | 'reuniao' | 'evento' | 'missoes' | 'departamento' | 'administrativo'>('culto');
+  const [novoTipoCor, setNovoTipoCor] = useState('#3b82f6');
+  const [novoTipoBloqueio, setNovoTipoBloqueio] = useState(false);
+  const [isSalvandoTipo, setIsSalvandoTipo] = useState(false);
+
+
   const currentYear = parseInt(filtroMes.split('-')[0], 10);
   const currentMonth = parseInt(filtroMes.split('-')[1], 10);
   const isEdicaoBloqueada = activePlanning?.status === 'publicado' || activePlanning?.status === 'arquivado';
@@ -277,18 +286,51 @@ export default function AgendaPage() {
 
     if ((!data || data.length === 0) && mid) {
       // Se não houver tipos cadastrados para o ministério, executa a RPC de sementes padrão
-      const { error: rpcError } = await supabase.rpc('seed_agenda_tipos_padrao', {
+      await supabase.rpc('seed_agenda_tipos_padrao', {
         p_ministry_id: mid
       });
-      if (!rpcError) {
-        const { data: newData } = await supabase
+
+      // Tenta buscar novamente
+      let { data: verifyData } = await supabase
+        .from('agenda_tipos')
+        .select('*')
+        .eq('ministry_id', mid)
+        .eq('ativo', true)
+        .order('ordem')
+        .order('nome');
+
+      // Se ainda estiver vazio (RPC falhou/permissão), insere direto via frontend
+      if (!verifyData || verifyData.length === 0) {
+        const defaultTypes = [
+          { ministry_id: mid, codigo: 'culto_doutrina', nome: 'Culto de Doutrina', categoria: 'culto', cor: '#ef4444', icone: 'BookOpen', sistema: true, permite_edicao: true, gera_bloqueio: false, ordem: 1 },
+          { ministry_id: mid, codigo: 'culto_familia', nome: 'Culto da Família', categoria: 'culto', cor: '#f87171', icone: 'Home', sistema: true, permite_edicao: true, gera_bloqueio: false, ordem: 2 },
+          { ministry_id: mid, codigo: 'culto_missoes', nome: 'Culto de Missões', categoria: 'culto', cor: '#dc2626', icone: 'Globe', sistema: true, permite_edicao: true, gera_bloqueio: false, ordem: 3 },
+          { ministry_id: mid, codigo: 'santa_ceia', nome: 'Santa Ceia', categoria: 'culto', cor: '#991b1b', icone: 'GlassWater', sistema: true, permite_edicao: true, gera_bloqueio: true, ordem: 8 },
+          { ministry_id: mid, codigo: 'reuniao_ministerial', nome: 'Reunião Ministerial', categoria: 'reuniao', cor: '#8b5cf6', icone: 'Briefcase', sistema: true, permite_edicao: true, gera_bloqueio: false, ordem: 11 },
+          { ministry_id: mid, codigo: 'reuniao_obreiros', nome: 'Reunião de Obreiros', categoria: 'reuniao', cor: '#a78bfa', icone: 'Users', sistema: true, permite_edicao: true, gera_bloqueio: false, ordem: 12 },
+          { ministry_id: mid, codigo: 'congresso', nome: 'Congresso', categoria: 'evento', cor: '#10b981', icone: 'Calendar', sistema: true, permite_edicao: true, gera_bloqueio: true, ordem: 16 },
+          { ministry_id: mid, codigo: 'retiro', nome: 'Retiro', categoria: 'evento', cor: '#6ee7b7', icone: 'Compass', sistema: true, permite_edicao: true, gera_bloqueio: false, ordem: 19 },
+          { ministry_id: mid, codigo: 'atendimento_pastoral', nome: 'Atendimento Pastoral', categoria: 'administrativo', cor: '#3b82f6', icone: 'MessageSquare', sistema: true, permite_edicao: true, gera_bloqueio: false, ordem: 24 },
+          { ministry_id: mid, codigo: 'casamento', nome: 'Casamento', categoria: 'administrativo', cor: '#60a5fa', icone: 'Heart', sistema: true, permite_edicao: true, gera_bloqueio: false, ordem: 25 },
+          { ministry_id: mid, codigo: 'batismo', nome: 'Batismo', categoria: 'administrativo', cor: '#2563eb', icone: 'Droplet', sistema: true, permite_edicao: true, gera_bloqueio: false, ordem: 26 },
+        ];
+
+        const { error: insertError } = await supabase
           .from('agenda_tipos')
-          .select('*')
-          .eq('ministry_id', mid)
-          .eq('ativo', true)
-          .order('ordem')
-          .order('nome');
-        data = newData;
+          .insert(defaultTypes);
+
+        if (!insertError) {
+          const { data: newData } = await supabase
+            .from('agenda_tipos')
+            .select('*')
+            .eq('ministry_id', mid)
+            .eq('ativo', true)
+            .order('ordem')
+            .order('nome');
+          data = newData;
+        }
+      } else {
+        data = verifyData;
       }
     }
 
@@ -792,6 +834,70 @@ export default function AgendaPage() {
   };
 
 
+
+  // Ações de gerenciamento dos Tipos de compromisso
+  const handleCriarTipo = async () => {
+    if (!novoTipoNome.trim() || !ministryId) return;
+
+    setIsSalvandoTipo(true);
+    try {
+      const codigo = 'custom_' + novoTipoNome.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+      const { error } = await supabase
+        .from('agenda_tipos')
+        .insert({
+          ministry_id: ministryId,
+          codigo,
+          nome: novoTipoNome.trim(),
+          categoria: novoTipoCategoria,
+          cor: novoTipoCor,
+          sistema: false,
+          permite_edicao: true,
+          gera_bloqueio: novoTipoBloqueio,
+          ordem: tipos.length + 1
+        });
+
+      if (error) throw error;
+
+      flash('ok', 'Tipo de compromisso cadastrado!');
+      setNovoTipoNome('');
+      setNovoTipoBloqueio(false);
+      
+      await loadTipos(ministryId);
+    } catch (err: any) {
+      console.error(err);
+      flash('erro', err.message || 'Erro ao criar tipo de compromisso.');
+    } finally {
+      setIsSalvandoTipo(false);
+    }
+  };
+
+  const handleDeletarTipo = async (tipoId: string) => {
+    const ok = await dialog.confirm({
+      title: 'Excluir Tipo de Compromisso',
+      message: 'Tem certeza que deseja excluir este tipo de compromisso? Os eventos associados continuarão existindo, mas sem este tipo.',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      type: 'warning',
+    });
+
+    if (ok && ministryId) {
+      try {
+        const { error } = await supabase
+          .from('agenda_tipos')
+          .delete()
+          .eq('id', tipoId);
+
+        if (error) throw error;
+
+        flash('ok', 'Tipo de compromisso excluído!');
+        await loadTipos(ministryId);
+      } catch (err: any) {
+        console.error(err);
+        flash('erro', err.message || 'Erro ao excluir tipo de compromisso.');
+      }
+    }
+  };
 
   // Ação: Publicar Planejamento
   const handlePublishPlanning = async () => {
@@ -1728,6 +1834,23 @@ export default function AgendaPage() {
                 </div>
               )}
             </DashboardSection>
+
+            <DashboardSection
+              title="Configurações de Tipos"
+              icon={Filter}
+              className="!p-5 mt-4"
+            >
+              <p className="text-[11px] text-slate-550 font-bold mb-3 leading-relaxed">
+                Personalize as cores, regras de bloqueio e categorias dos compromissos da igreja.
+              </p>
+              <button
+                onClick={() => setShowTiposModal(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-750 font-extrabold text-xs rounded-xl shadow-xs border border-slate-200 hover:border-slate-300 transition duration-200"
+              >
+                <Plus className="h-3.5 w-3.5 text-slate-500" />
+                Gerenciar Tipos
+              </button>
+            </DashboardSection>
           </DashboardSidebar>
         </div>
       )}
@@ -1875,7 +1998,16 @@ export default function AgendaPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Tipo *</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase">Tipo *</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowTiposModal(true)}
+                      className="text-[9px] text-blue-600 hover:text-blue-750 font-extrabold hover:underline"
+                    >
+                      + Configurar
+                    </button>
+                  </div>
                   <select
                     value={form.tipo_id}
                     required
@@ -2052,6 +2184,166 @@ export default function AgendaPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* MODAL DE GERENCIAMENTO DE TIPOS DE COMPROMISSO                       */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {showTiposModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full sm:max-w-2xl shadow-xl border border-slate-100 flex flex-col max-h-[85vh]">
+            
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <h3 className="font-black text-slate-800 text-sm">
+                CONFIGURAR TIPOS DE COMPROMISSO
+              </h3>
+              <button 
+                onClick={() => setShowTiposModal(false)} 
+                className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg transition"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
+              
+              {/* LADO ESQUERDO: Lista dos Tipos Existentes */}
+              <div className="flex flex-col min-h-0">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Tipos Cadastrados</h4>
+                <div className="flex-1 overflow-y-auto border border-slate-150 rounded-xl divide-y divide-slate-100 max-h-[300px] md:max-h-none bg-slate-50/20">
+                  {tipos.length === 0 ? (
+                    <p className="p-4 text-xs text-slate-400 text-center font-bold">Nenhum tipo cadastrado.</p>
+                  ) : (
+                    tipos.map(t => (
+                      <div key={t.id} className="p-3 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-3.5 h-3.5 rounded-full shrink-0 border border-slate-205" style={{ backgroundColor: t.cor || '#cbd5e1' }} />
+                          <div className="truncate">
+                            <p className="font-extrabold text-slate-800 truncate">{t.nome}</p>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">
+                              {CATEGORIAS_LABEL[t.categoria as keyof typeof CATEGORIAS_LABEL] || t.categoria} 
+                              {t.gera_bloqueio ? ' · Bloqueia Agenda' : ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        {!t.sistema ? (
+                          <button
+                            onClick={() => handleDeletarTipo(t.id)}
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <span className="text-[8px] font-black text-slate-400 bg-slate-100 border border-slate-200 px-1.5 py-0.2 rounded uppercase select-none">Fixo</span>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* LADO DIREITO: Form de Criação */}
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Novo Tipo de Compromisso</h4>
+                
+                <div className="space-y-3 p-4 border border-slate-150 rounded-xl bg-slate-50/50">
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Nome do Tipo *</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Jantar de Casais, Batismo"
+                      value={novoTipoNome}
+                      onChange={(e) => setNovoTipoNome(e.target.value)}
+                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Categoria Principal *</label>
+                    <select
+                      value={novoTipoCategoria}
+                      onChange={(e) => setNovoTipoCategoria(e.target.value as any)}
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
+                    >
+                      <option value="culto">Culto</option>
+                      <option value="reuniao">Reunião</option>
+                      <option value="evento">Evento</option>
+                      <option value="missoes">Missões</option>
+                      <option value="departamento">Departamento / Ministério</option>
+                      <option value="administrativo">Administrativo / Outro</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1.5">Cor do Tipo *</label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        '#ef4444', // Vermelho
+                        '#f97316', // Laranja
+                        '#f59e0b', // Amarelo
+                        '#10b981', // Verde
+                        '#06b6d4', // Ciano
+                        '#3b82f6', // Azul
+                        '#6366f1', // Indigo
+                        '#8b5cf6', // Roxo
+                        '#ec4899', // Rosa
+                        '#64748b'  // Slate
+                      ].map(colorHex => (
+                        <button
+                          key={colorHex}
+                          type="button"
+                          onClick={() => setNovoTipoCor(colorHex)}
+                          className={`w-6 h-6 rounded-full border transition-transform ${
+                            novoTipoCor === colorHex ? 'scale-115 border-slate-600 ring-2 ring-slate-100' : 'border-transparent hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: colorHex }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-1">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-650 font-bold cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={novoTipoBloqueio}
+                        onChange={(e) => setNovoTipoBloqueio(e.target.checked)}
+                        className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
+                      />
+                      Gera Bloqueio na Agenda Geral
+                    </label>
+                    <p className="text-[9px] text-slate-450 mt-1 pl-5.5 leading-relaxed font-semibold">
+                      Se ativado, outros departamentos não poderão marcar eventos que gerem choque de data neste mesmo dia/horário.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isSalvandoTipo || !novoTipoNome.trim()}
+                    onClick={handleCriarTipo}
+                    className="w-full flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-extrabold text-xs rounded-xl shadow-xs transition duration-200"
+                  >
+                    {isSalvandoTipo ? 'Salvando...' : 'Adicionar Tipo'}
+                  </button>
+                </div>
+
+              </div>
+
+            </div>
+
+            <div className="p-4 border-t border-slate-100 flex justify-end shrink-0 bg-slate-50/50 rounded-b-2xl">
+              <button
+                type="button"
+                onClick={() => setShowTiposModal(false)}
+                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-extrabold rounded-lg shadow-xs transition text-xs"
+              >
+                Concluir
+              </button>
+            </div>
+
           </div>
         </div>
       )}
