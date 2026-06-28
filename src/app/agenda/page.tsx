@@ -1015,6 +1015,29 @@ export default function AgendaPage() {
         contextSubtitle="Planejamento Ministerial"
         greeting="Gestão Ministerial"
         currentDate={currentDateFormatted}
+        centerContent={
+          <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500">
+            <span className="text-slate-600 font-extrabold uppercase">
+              {MESES_PT[currentMonth - 1].toUpperCase()} DE {currentYear}
+            </span>
+            <span className="text-slate-300">·</span>
+            <span className="text-slate-400 font-semibold">
+              <span className="font-bold text-slate-500">{eventos.length}</span> COMPROMISSOS
+            </span>
+            <span className="text-slate-300">·</span>
+            <span className="text-slate-400 font-semibold">
+              <span className="font-bold text-slate-500">{totalCultos}</span> CULTOS
+            </span>
+            <span className="text-slate-300">·</span>
+            <span className="text-slate-400 font-semibold">
+              <span className="font-bold text-slate-500">{totalReunioes}</span> REUNIÕES
+            </span>
+            <span className="text-slate-300">·</span>
+            <span className="text-slate-400 font-semibold">
+              <span className="font-bold text-slate-500">{totalEventosSincronizados}</span> SINCRONIZAÇÕES
+            </span>
+          </div>
+        }
         actions={
           isEscritaPermitida ? (
             <DashboardActions>

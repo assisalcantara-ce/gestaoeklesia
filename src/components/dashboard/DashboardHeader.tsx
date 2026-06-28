@@ -12,6 +12,7 @@ interface DashboardHeaderProps {
   currentDate?: string;
   quickStats?: ReactNode;
   contextSubtitle?: string;
+  centerContent?: ReactNode;
 }
 
 export default function DashboardHeader({
@@ -24,6 +25,7 @@ export default function DashboardHeader({
   currentDate,
   quickStats,
   contextSubtitle,
+  centerContent,
 }: DashboardHeaderProps) {
   return (
     <div className="bg-white border-b border-slate-200/80 px-4 md:px-6 py-5 md:py-6 shrink-0 transition-all duration-300">
@@ -56,9 +58,11 @@ export default function DashboardHeader({
         </nav>
       )}
 
-      {/* Titulo, Descrição e Ações */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="space-y-1">
+      {/* Titulo, Snapshot Central e Ações */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+        
+        {/* Esquerda: Titulo e Descrição */}
+        <div className="space-y-1 max-w-xl">
           {contextSubtitle && (
             <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-0.5">
               {contextSubtitle}
@@ -68,13 +72,21 @@ export default function DashboardHeader({
             {title}
           </h1>
           {description && (
-            <p className="text-slate-500 text-xs md:text-sm leading-relaxed max-w-2xl font-medium">
+            <p className="text-slate-500 text-xs md:text-sm leading-relaxed font-medium">
               {description}
             </p>
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0 self-start md:self-center">
+        {/* Centro: Snapshot Executivo opcional */}
+        {centerContent && (
+          <div className="flex items-center justify-start lg:justify-center shrink-0 w-full lg:w-auto py-2 lg:py-0 border-t border-b lg:border-none border-slate-50">
+            {centerContent}
+          </div>
+        )}
+
+        {/* Direita: Quick Stats e Botões de Ação */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0 self-start lg:self-center">
           {quickStats && (
             <div className="flex items-center gap-4 border-r border-slate-100 pr-4 mr-1 shrink-0">
               {quickStats}
@@ -86,6 +98,7 @@ export default function DashboardHeader({
             </div>
           )}
         </div>
+
       </div>
 
       {/* Área Opcional para Indicadores Rápidos / Abas */}
