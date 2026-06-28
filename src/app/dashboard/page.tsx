@@ -186,7 +186,7 @@ export default function DashboardPage() {
         ebdTurmasRes, ebdChamadasRes, usuariosRes,
         visitantesRes, ultimasCartasRes, ultimosFluxosRes, cartaPedidosRes,
       ] = await Promise.all([
-        withScopeMember(supabase.from('members').select('status2, batizado, gender').eq('ministry_id', ministryId)),
+        withScopeMember(supabase.from('members').select('status, batizado, gender').eq('ministry_id', ministryId)),
         supabase.from('flow_instances').select('status, tipo_fluxo, created_at').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(10),
         supabase.from('cartas_ministeriais').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId),
         scopeCongId
@@ -217,7 +217,7 @@ export default function DashboardPage() {
       const membros          = membrosRes.data ?? [];
       const totalMembros     = membros.length;
       const membrosBatizados = membros.filter((m: any) => m.batizado === true || m.batizado === 'true' || m.batizado === 1).length;
-      const membrosAtivos    = membros.filter((m: any) => (m.status2 ?? 'ativo') === 'ativo').length;
+      const membrosAtivos    = membros.filter((m: any) => (m.status ?? 'active') === 'active').length;
 
       // fluxos
       const fluxos          = fluxosRes.data ?? [];
@@ -308,7 +308,7 @@ export default function DashboardPage() {
         memberGrowthRes, cartasPendCountRes, pareceresRes, ministerioRes,
       ] = await Promise.all([
         supabase.from('congregacoes').select('id, nome').eq('ministry_id', ministryId).eq('is_active', true).order('nome').limit(50),
-        supabase.from('members').select('congregacao_id, status2').eq('ministry_id', ministryId).limit(10000),
+        supabase.from('members').select('congregacao_id, status').eq('ministry_id', ministryId).limit(10000),
         supabase.from('eventos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'programado').gte('data_inicio', todayStr).lte('data_inicio', in30daysStr),
         supabase.from('members').select('created_at').eq('ministry_id', ministryId).gte('created_at', twelveMonthsAgo).limit(5000),
         supabase.from('carta_pedidos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'pendente'),
@@ -352,8 +352,8 @@ export default function DashboardPage() {
         const cid = (m as any).congregacao_id ?? '__none__';
         if (!membersByCong[cid]) membersByCong[cid] = { ativos: 0, total: 0 };
         membersByCong[cid].total++;
-        const st = (m as any).status2;
-        if (!st || st === 'ativo') membersByCong[cid].ativos++;
+        const st = (m as any).status;
+        if (!st || st === 'active') membersByCong[cid].ativos++;
       }
 
       const congregacoesData: CongregacaoItem[] = congList.map((c: any) => ({
