@@ -12,8 +12,10 @@ export default function DashboardContainer({
   className = '',
 }: DashboardContainerProps) {
   return (
-    <div className={`flex flex-col h-full min-w-0 overflow-x-hidden bg-slate-50/50 ${className}`}>
-      {children}
+    <div className="w-full bg-slate-50/50 min-h-screen overflow-y-auto">
+      <div className={`max-w-[1440px] mx-auto w-full flex flex-col min-w-0 px-4 md:px-6 ${className}`}>
+        {children}
+      </div>
     </div>
   );
 }
