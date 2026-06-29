@@ -217,7 +217,7 @@ export default function DashboardPage() {
       ] = await Promise.all([
         safeQuery(withScopeMember(supabase.from('members').select('status, role, tipo_cadastro, custom_fields').eq('ministry_id', ministryId))),
         safeQuery(supabase.from('flow_instances').select('status, tipo_fluxo, created_at').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(10)),
-        safeQuery(supabase.from('cartas_ministeriais').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId)),
+        safeQuery(supabase.from('cartas_registros').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId)),
         safeQuery(
           scopeCongId
             ? supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('id', scopeCongId).eq('is_active', true)
@@ -245,7 +245,7 @@ export default function DashboardPage() {
         safeQuery(supabase.from('ebd_chamadas').select('presentes, total_alunos').eq('ministry_id', ministryId).gte('data_chamada', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).limit(100)),
         safeQuery(supabase.from('ministry_users').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'ativo')),
         safeQuery(supabase.from('members').select('id').eq('ministry_id', ministryId).eq('role', 'visitante')),
-        safeQuery(supabase.from('cartas_ministeriais').select('id, tipo, created_at, membro_nome').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(5)),
+        safeQuery(supabase.from('cartas_registros').select('id, template_title, issued_at, members(name)').eq('ministry_id', ministryId).order('issued_at', { ascending: false }).limit(5)),
         safeQuery(supabase.from('flow_instances').select('id, status, tipo_fluxo').eq('ministry_id', ministryId).neq('status', 'concluido').limit(5)),
         safeQuery(supabase.from('carta_pedidos').select('id, status, tipo_carta').eq('ministry_id', ministryId).neq('status', 'rejeitado').order('created_at', { ascending: false }).limit(3)),
       ]);
@@ -273,9 +273,9 @@ export default function DashboardPage() {
       // últimas cartas
       const ultimasCartas = (ultimasCartasRes.data ?? []).map((c: any) => ({
         id: c.id,
-        tipo: c.tipo,
-        created_at: c.created_at,
-        membro_nome: c.membro_nome,
+        tipo: c.template_title ?? '',
+        created_at: c.issued_at ?? '',
+        membro_nome: c.members?.name ?? '',
       }));
 
       // últimos fluxos pendentes
