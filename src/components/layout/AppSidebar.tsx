@@ -135,6 +135,10 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
     if (i.id === 'reunioes'   && !planFeatures.has_modulo_reunioes)            return false;
     if (i.id === 'agenda'     && !planFeatures.has_modulo_agenda)              return false;
     
+    if (i.id === 'funcionarios') {
+      const isLocal = userCtx.nivel && ['admin_local', 'financeiro_local', 'supervisor', 'viewer'].includes(userCtx.nivel);
+      if (isLocal) return false;
+    }
     const modulo = i.modulo;
     if (modulo && !userCtx.podeAcessar(modulo)) return false;
     return true;

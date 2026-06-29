@@ -508,8 +508,16 @@ export default function GerenciarFuncionarios() {
   const gruposCustom = gruposFuncao.filter(g => !GRUPOS_FUNCAO_BASE.some(base => base.valor === g.valor));
   const funcoesCustom = funcoes.filter(f => !FUNCOES_BASE.some(base => base.valor === f.valor));
 
+  const isLocal = ctx.nivel && ['admin_local', 'financeiro_local', 'supervisor', 'viewer'].includes(ctx.nivel);
+
   if (ctx.loading) return <div className="p-8">Carregando...</div>;
-  if (bloqueado) return null;
+  if (bloqueado || isLocal) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50 text-gray-500 font-semibold p-8 text-center">
+        Acesso restrito para a Sede do Ministério.
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-auto">
