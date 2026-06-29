@@ -217,7 +217,11 @@ export default function DashboardPage() {
       ] = await Promise.all([
         safeQuery(withScopeMember(supabase.from('members').select('status, role, tipo_cadastro, custom_fields').eq('ministry_id', ministryId))),
         safeQuery(supabase.from('flow_instances').select('status, tipo_fluxo, created_at').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(10)),
-        safeQuery(supabase.from('cartas_registros').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId)),
+        safeQuery(
+          scopeCongId
+            ? supabase.from('cartas_registros').select('id, members!inner(congregacao_id)', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('members.congregacao_id', scopeCongId)
+            : supabase.from('cartas_registros').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId)
+        ),
         safeQuery(
           scopeCongId
             ? supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('id', scopeCongId).eq('is_active', true)
@@ -245,7 +249,11 @@ export default function DashboardPage() {
         safeQuery(supabase.from('ebd_chamadas').select('presentes, total_alunos').eq('ministry_id', ministryId).gte('data_chamada', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).limit(100)),
         safeQuery(supabase.from('ministry_users').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'ativo')),
         safeQuery(supabase.from('members').select('id').eq('ministry_id', ministryId).eq('role', 'visitante')),
-        safeQuery(supabase.from('cartas_registros').select('id, template_title, issued_at, members(name)').eq('ministry_id', ministryId).order('issued_at', { ascending: false }).limit(5)),
+        safeQuery(
+          scopeCongId
+            ? supabase.from('cartas_registros').select('id, template_title, issued_at, members!inner(name, congregacao_id)').eq('ministry_id', ministryId).eq('members.congregacao_id', scopeCongId).order('issued_at', { ascending: false }).limit(5)
+            : supabase.from('cartas_registros').select('id, template_title, issued_at, members(name)').eq('ministry_id', ministryId).order('issued_at', { ascending: false }).limit(5)
+        ),
         safeQuery(supabase.from('flow_instances').select('id, status, tipo_fluxo').eq('ministry_id', ministryId).neq('status', 'concluido').limit(5)),
         safeQuery(supabase.from('carta_pedidos').select('id, status, tipo_carta').eq('ministry_id', ministryId).neq('status', 'rejeitado').order('created_at', { ascending: false }).limit(3)),
       ]);
