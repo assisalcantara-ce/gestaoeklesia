@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
-import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { useUserContext } from '@/hooks/useUserContext';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -168,7 +167,7 @@ export default function DashboardPage() {
       });
       setAuthLoading(false);
 
-      const ministryId = await resolveMinistryId(supabase);
+      const ministryId = userCtx.ministryId;
       if (!ministryId) { setLoadingDash(false); return; }
 
       const temFinanceiro = userCtx.podeAcessar('tesouraria');
