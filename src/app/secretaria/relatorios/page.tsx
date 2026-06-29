@@ -9,6 +9,7 @@ import {
 import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
+import { useUserContext } from '@/hooks/useUserContext';
 
 // ─── Labels e helpers ────────────────────────────────────────────────────────
 
@@ -689,21 +690,31 @@ function RelatorioCartasPendentes() {
   const [loading, setLoading] = useState(true);
   const [pedidos, setPedidos] = useState<CartaPedidoRow[]>([]);
   const [filtroStatus, setFiltroStatus] = useState('pendente');
+  const userCtx = useUserContext();
 
   useEffect(() => {
+    if (userCtx.loading || !userCtx.ministryId) return;
     const supabase = createClient();
-    supabase
+    let query = supabase
       .from('carta_pedidos')
       .select(
         'id, solicitante_nome, membro_nome, tipo_carta, status, created_at, congregacao_id, congregacoes(nome)',
       )
+      .eq('ministry_id', userCtx.ministryId);
+
+    const isLocal = userCtx.nivel === 'admin_local' || userCtx.nivel === 'financeiro_local';
+    if (isLocal && userCtx.congregacaoId) {
+      query = query.eq('congregacao_id', userCtx.congregacaoId);
+    }
+
+    query
       .order('created_at', { ascending: false })
       .limit(500)
       .then((res: { data: CartaPedidoRow[] | null }) => {
         setPedidos(res.data ?? []);
         setLoading(false);
       });
-  }, []);
+  }, [userCtx.loading, userCtx.ministryId, userCtx.nivel, userCtx.congregacaoId]);
 
   const filtrados = useMemo(() => {
     if (!filtroStatus) return pedidos;
@@ -801,19 +812,22 @@ function RelatorioBatismos() {
   const [batismos, setBatismos] = useState<BatismoRow[]>([]);
   const [filtroAno, setFiltroAno] = useState(() => String(new Date().getFullYear()));
   const [filtroStatus, setFiltroStatus] = useState('');
+  const userCtx = useUserContext();
 
   useEffect(() => {
+    if (userCtx.loading || !userCtx.ministryId) return;
     const supabase = createClient();
     supabase
       .from('batismo_aguas_registros')
       .select('id, candidato_nome, data_batismo, local_batismo, pastor_nome, status')
+      .eq('ministry_id', userCtx.ministryId)
       .order('data_batismo', { ascending: false })
       .limit(1000)
       .then((res: { data: BatismoRow[] | null }) => {
         setBatismos(res.data ?? []);
         setLoading(false);
       });
-  }, []);
+  }, [userCtx.loading, userCtx.ministryId]);
 
   const anos = useMemo(() => {
     const s = new Set<string>();

@@ -595,13 +595,24 @@ export default function CartasPage() {
   };
 
   const loadRecords = async () => {
-    const { data } = await supabase
+    const mid = userCtx.ministryId;
+    if (!mid) return;
+
+    let query = supabase
       .from('cartas_registros')
-      .select('*')
+      .select('*, members!inner(congregacao_id)')
+      .eq('ministry_id', mid);
+
+    const isLocal = !userCtx.loading && ['admin_local', 'financeiro_local', 'secretaria_local'].includes(userCtx.nivel || '');
+    if (isLocal && userCtx.congregacaoId) {
+      query = query.eq('members.congregacao_id', userCtx.congregacaoId);
+    }
+
+    const { data } = await query
       .order('issued_at', { ascending: false })
       .limit(50);
 
-    setRecords((data || []) as CartaRegistro[]);
+    setRecords((data || []) as any[]);
   };
 
   const loadMembers = async () => {
