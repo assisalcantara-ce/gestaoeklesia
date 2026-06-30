@@ -268,10 +268,19 @@ export default function CultosPage() {
     }
   };
 
-  const handleAddNovoTipo = (e: React.FormEvent) => {
+  const handleAddNovoTipo = async (e: React.FormEvent) => {
     e.preventDefault();
     const nomeLimpo = novoTipoNome.trim();
-    if (!nomeLimpo) return;
+    if (!nomeLimpo || !ctx?.ministryId) return;
+
+    try {
+      await supabase
+        .from('culto_categorias')
+        .insert({ ministry_id: ctx.ministryId, nome: nomeLimpo });
+    } catch (err) {
+      console.error(err);
+    }
+
     if (!tiposCulto.includes(nomeLimpo)) {
       setTiposCulto(prev => {
         const novos = [...prev];
@@ -285,10 +294,41 @@ export default function CultosPage() {
     setShowNovoTipoModal(false);
   };
 
-  const handleRemoveTipo = (tipo: string) => {
+  const handleRemoveTipo = async (tipo: string) => {
     if (TIPO_CULTO_OPTIONS.includes(tipo)) return; // Não remove nativos
+    if (!ctx?.ministryId) return;
+    try {
+      await supabase
+        .from('culto_categorias')
+        .delete()
+        .eq('ministry_id', ctx.ministryId)
+        .eq('nome', tipo);
+    } catch (err) {
+      console.error(err);
+    }
     setTiposCulto(prev => prev.filter(t => t !== tipo));
     setFormData(prev => ({ ...prev, tipo_culto: TIPO_CULTO_OPTIONS[0] }));
+  };
+
+  const loadCategorias = async () => {
+    if (!ctx?.ministryId) return;
+    try {
+      const { data, error } = await supabase
+        .from('culto_categorias')
+        .select('nome')
+        .eq('ministry_id', ctx.ministryId)
+        .order('nome', { ascending: true });
+      if (!error && data) {
+        const nomes = data.map((c: any) => c.nome);
+        setTiposCulto(prev => {
+          const uniqueTypes = Array.from(new Set([...prev, ...nomes]));
+          const semOutro = uniqueTypes.filter(t => t !== 'Outro');
+          return [...semOutro, 'Outro'];
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   useEffect(() => {
@@ -481,6 +521,7 @@ export default function CultosPage() {
   useEffect(() => {
     if (!ctx?.loading && ctx?.ministryId) {
       loadRegistros();
+      loadCategorias();
     }
   }, [ctx?.loading, ctx?.ministryId, ctx?.congregacaoId, isLocalUser]);
 
