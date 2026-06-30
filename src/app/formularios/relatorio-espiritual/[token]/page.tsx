@@ -108,36 +108,85 @@ export default function PublicRelatorioEspiritualPage({ params }: { params: Prom
     e.preventDefault();
     if (!tokenData) return;
 
+    // Validações obrigatórias
+    if (!formData.data_atividade) {
+      alert('A data da atividade é obrigatória.');
+      return;
+    }
+    if (!formData.tipo_atividade) {
+      alert('O tipo da atividade é obrigatório.');
+      return;
+    }
+
+    const cultos = Number(formData.cultos_realizados) || 0;
+    const visitas = Number(formData.visitas_realizadas) || 0;
+    const almas = Number(formData.almas_alcancadas) || 0;
+    const biblias = Number(formData.biblias_doadas) || 0;
+    const literaturas = Number(formData.literaturas_entregues) || 0;
+    const cearam = formData.tipo_atividade === 'Santa Ceia' ? (Number(formData.membros_cearam) || 0) : 0;
+    const visitantes = formData.tipo_atividade === 'Culto' ? (Number(formData.visitantes_presentes) || 0) : 0;
+
+    if (cultos < 0 || visitas < 0 || almas < 0 || biblias < 0 || literaturas < 0 || cearam < 0 || visitantes < 0) {
+      alert('Os valores numéricos não podem ser negativos.');
+      return;
+    }
+
+    if (formData.tipo_atividade === 'Santa Ceia' && cearam <= 0) {
+      alert('Para a atividade de Santa Ceia, a quantidade de membros que cearam deve ser maior que zero.');
+      return;
+    }
+
+    if (formData.tipo_atividade === 'Culto' && visitantes < 0) {
+      alert('A quantidade de visitantes presentes deve ser informada (mínimo 0).');
+      return;
+    }
+
+    const totalValores = cultos + visitas + almas + biblias + literaturas + cearam + visitantes;
+    if (totalValores <= 0) {
+      alert('O relatório não pode ser enviado totalmente zerado.');
+      return;
+    }
+
+    if (formData.observacoes.length > 500) {
+      alert('As observações não podem exceder o limite de 500 caracteres.');
+      return;
+    }
+
     setSubmitting(true);
-    const payload: any = {
-      ministry_id: tokenData.ministry_id,
-      congregacao_id: tokenData.congregacao_id,
-      data_atividade: formData.data_atividade,
-      tipo_atividade: formData.tipo_atividade,
-      cultos_realizados: Number(formData.cultos_realizados) || 0,
-      visitas_realizadas: Number(formData.visitas_realizadas) || 0,
-      almas_alcancadas: Number(formData.almas_alcancadas) || 0,
-      biblias_doadas: Number(formData.biblias_doadas) || 0,
-      literaturas_entregues: Number(formData.literaturas_entregues) || 0,
-      observacoes: formData.observacoes.trim() || null,
-      status: 'Enviado', // Gravar como Enviado
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    if (formData.tipo_atividade === 'Santa Ceia') {
-      payload.membros_cearam = Number(formData.membros_cearam) || 0;
-    } else {
-      payload.membros_cearam = 0;
-    }
-
-    if (formData.tipo_atividade === 'Culto') {
-      payload.visitantes_presentes = Number(formData.visitantes_presentes) || 0;
-    } else {
-      payload.visitantes_presentes = 0;
-    }
 
     try {
+      // Segurança: Verifica no banco de dados se o token continua ativo/válido antes do envio
+      const { data: verifyToken, error: verifyError } = await supabase
+        .from('relatorio_espiritual_tokens')
+        .select('id, is_active')
+        .eq('token', token)
+        .eq('is_active', true)
+        .single();
+
+      if (verifyError || !verifyToken) {
+        alert('Este link de formulário expirou ou foi inativado. O envio foi bloqueado.');
+        setSubmitting(false);
+        return;
+      }
+
+      const payload: any = {
+        ministry_id: tokenData.ministry_id,
+        congregacao_id: tokenData.congregacao_id,
+        data_atividade: formData.data_atividade,
+        tipo_atividade: formData.tipo_atividade,
+        cultos_realizados: cultos,
+        visitas_realizadas: visitas,
+        almas_alcancadas: almas,
+        biblias_doadas: biblias,
+        literaturas_entregues: literaturas,
+        membros_cearam: cearam,
+        visitantes_presentes: visitantes,
+        observacoes: formData.observacoes.trim() || null,
+        status: 'Enviado', // Gravar como Enviado
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
       const { error } = await supabase
         .from('relatorio_espiritual_registros')
         .insert(payload);

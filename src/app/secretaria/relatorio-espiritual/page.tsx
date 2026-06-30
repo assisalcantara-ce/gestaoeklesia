@@ -319,33 +319,66 @@ export default function RelatorioEspiritualPage() {
       return;
     }
 
+    // Validações obrigatórias
+    if (!formData.data_atividade) {
+      showNotification('error', 'Erro', 'A data da atividade é obrigatória.');
+      return;
+    }
+    if (!formData.tipo_atividade) {
+      showNotification('error', 'Erro', 'O tipo da atividade é obrigatório.');
+      return;
+    }
+
+    const cultos = Number(formData.cultos_realizados) || 0;
+    const visitas = Number(formData.visitas_realizadas) || 0;
+    const almas = Number(formData.almas_alcancadas) || 0;
+    const biblias = Number(formData.biblias_doadas) || 0;
+    const literaturas = Number(formData.literaturas_entregues) || 0;
+    const cearam = formData.tipo_atividade === 'Santa Ceia' ? (Number(formData.membros_cearam) || 0) : 0;
+    const visitantes = formData.tipo_atividade === 'Culto' ? (Number(formData.visitantes_presentes) || 0) : 0;
+
+    if (cultos < 0 || visitas < 0 || almas < 0 || biblias < 0 || literaturas < 0 || cearam < 0 || visitantes < 0) {
+      showNotification('error', 'Erro', 'Os valores numéricos não podem ser negativos.');
+      return;
+    }
+
+    if (formData.tipo_atividade === 'Santa Ceia' && cearam <= 0) {
+      showNotification('error', 'Erro', 'Para a atividade de Santa Ceia, a quantidade de membros que cearam deve ser maior que zero.');
+      return;
+    }
+
+    if (formData.tipo_atividade === 'Culto' && visitantes < 0) {
+      showNotification('error', 'Erro', 'A quantidade de visitantes presentes deve ser informada (mínimo 0).');
+      return;
+    }
+
+    const totalValores = cultos + visitas + almas + biblias + literaturas + cearam + visitantes;
+    if (totalValores <= 0) {
+      showNotification('error', 'Erro', 'O relatório não pode ser enviado totalmente zerado.');
+      return;
+    }
+
+    if (formData.observacoes.length > 500) {
+      showNotification('error', 'Erro', 'As observações não podem exceder o limite de 500 caracteres.');
+      return;
+    }
+
     const payload: any = {
       ministry_id: ctx.ministryId,
       congregacao_id: finalCongregacaoId,
       data_atividade: formData.data_atividade,
       tipo_atividade: formData.tipo_atividade,
-      cultos_realizados: Number(formData.cultos_realizados) || 0,
-      visitas_realizadas: Number(formData.visitas_realizadas) || 0,
-      almas_alcancadas: Number(formData.almas_alcancadas) || 0,
-      biblias_doadas: Number(formData.biblias_doadas) || 0,
-      literaturas_entregues: Number(formData.literaturas_entregues) || 0,
+      cultos_realizados: cultos,
+      visitas_realizadas: visitas,
+      almas_alcancadas: almas,
+      biblias_doadas: biblias,
+      literaturas_entregues: literaturas,
+      membros_cearam: cearam,
+      visitantes_presentes: visitantes,
       observacoes: formData.observacoes.trim() || null,
       status: formData.status,
       updated_at: new Date().toISOString()
     };
-
-    // Campos condicionais
-    if (formData.tipo_atividade === 'Santa Ceia') {
-      payload.membros_cearam = Number(formData.membros_cearam) || 0;
-    } else {
-      payload.membros_cearam = 0;
-    }
-
-    if (formData.tipo_atividade === 'Culto') {
-      payload.visitantes_presentes = Number(formData.visitantes_presentes) || 0;
-    } else {
-      payload.visitantes_presentes = 0;
-    }
 
     try {
       if (editingId) {
