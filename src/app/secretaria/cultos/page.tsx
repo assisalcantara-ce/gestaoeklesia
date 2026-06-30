@@ -249,14 +249,16 @@ export default function CultosPage() {
     }
     try {
       const { data, error } = await supabase
-        .from('membros')
-        .select('id, nome')
+        .from('members')
+        .select('id, name')
         .eq('ministry_id', ctx.ministryId)
-        .ilike('nome', `%${search}%`)
+        .ilike('name', `%${search}%`)
         .limit(6);
       if (!error && data) {
-        setMembrosSugestoes(data);
-        setShowSugestoes(data.length > 0);
+        // Mapeia name para nome para compatibilidade com o JSX do autocomplete
+        const mapped = data.map((m: any) => ({ id: m.id, nome: m.name }));
+        setMembrosSugestoes(mapped);
+        setShowSugestoes(mapped.length > 0);
       } else {
         setMembrosSugestoes([]);
         setShowSugestoes(false);
@@ -281,6 +283,12 @@ export default function CultosPage() {
     setFormData(prev => ({ ...prev, tipo_culto: nomeLimpo }));
     setNovoTipoNome('');
     setShowNovoTipoModal(false);
+  };
+
+  const handleRemoveTipo = (tipo: string) => {
+    if (TIPO_CULTO_OPTIONS.includes(tipo)) return; // Não remove nativos
+    setTiposCulto(prev => prev.filter(t => t !== tipo));
+    setFormData(prev => ({ ...prev, tipo_culto: TIPO_CULTO_OPTIONS[0] }));
   };
 
   useEffect(() => {
@@ -875,14 +883,25 @@ export default function CultosPage() {
                           <option key={tipo} value={tipo}>{tipo}</option>
                         ))}
                       </select>
-                      <button
-                        type="button"
-                        onClick={() => setShowNovoTipoModal(true)}
-                        className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-sm font-bold transition flex items-center justify-center cursor-pointer"
-                        title="Adicionar tipo personalizado"
-                      >
-                        +
-                      </button>
+                      {!TIPO_CULTO_OPTIONS.includes(formData.tipo_culto) ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTipo(formData.tipo_culto)}
+                          className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-sm font-bold transition flex items-center justify-center cursor-pointer"
+                          title="Remover tipo personalizado"
+                        >
+                          -
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowNovoTipoModal(true)}
+                          className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-sm font-bold transition flex items-center justify-center cursor-pointer"
+                          title="Adicionar tipo personalizado"
+                        >
+                          +
+                        </button>
+                      )}
                     </div>
                   </div>
 
