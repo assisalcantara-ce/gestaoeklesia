@@ -106,21 +106,21 @@ export default function RelatorioEspiritualPage() {
 
   // Estados da Central de Coleta
   const [isCentralColetaOpen, setIsCentralColetaOpen] = useState(false);
-  const [tokens, setTokens] = useState<Record<string, { token: string; is_active: boolean }>>({});
+  const [tokens, setTokens] = useState<Record<string, { token: string; is_active: boolean; expires_at?: string }>>({});
   const [qrCodeCongId, setQrCodeCongId] = useState<string | null>(null);
 
   const loadTokens = async () => {
     if (!ctx?.ministryId) return;
     const { data, error } = await supabase
       .from('relatorio_espiritual_tokens')
-      .select('congregacao_id, token, is_active')
+      .select('congregacao_id, token, is_active, expires_at')
       .eq('ministry_id', ctx.ministryId);
 
     if (!error && data) {
-      const mapa: Record<string, { token: string; is_active: boolean }> = {};
+      const mapa: Record<string, { token: string; is_active: boolean; expires_at?: string }> = {};
       data.forEach((t: any) => {
         if (t.congregacao_id) {
-          mapa[t.congregacao_id] = { token: t.token, is_active: t.is_active };
+          mapa[t.congregacao_id] = { token: t.token, is_active: t.is_active, expires_at: t.expires_at };
         }
       });
       setTokens(mapa);
@@ -215,12 +215,14 @@ export default function RelatorioEspiritualPage() {
     if (!ctx?.ministryId || !congId) return;
 
     try {
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from('relatorio_espiritual_tokens')
         .insert({
           ministry_id: ctx.ministryId,
           congregacao_id: congId,
-          is_active: true
+          is_active: true,
+          expires_at: expiresAt
         })
         .select('token')
         .single();
@@ -262,9 +264,15 @@ export default function RelatorioEspiritualPage() {
 
     try {
       const novoToken = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       const { error } = await supabase
         .from('relatorio_espiritual_tokens')
-        .update({ token: novoToken, is_active: true, created_at: new Date().toISOString() })
+        .update({ 
+          token: novoToken, 
+          is_active: true, 
+          created_at: new Date().toISOString(),
+          expires_at: expiresAt
+        })
         .eq('ministry_id', ctx.ministryId)
         .eq('congregacao_id', congId);
 
@@ -1219,19 +1227,33 @@ export default function RelatorioEspiritualPage() {
                     {locais.map(loc => {
                       const tokenInfo = tokens[loc.id];
                       const hasToken = !!tokenInfo;
+                      const isExpired = hasToken && tokenInfo.expires_at && new Date(tokenInfo.expires_at) <= new Date();
+                      const isInactive = hasToken && !tokenInfo.is_active;
+                      const isActive = hasToken && tokenInfo.is_active && (!tokenInfo.expires_at || new Date(tokenInfo.expires_at) > new Date());
                       const link = hasToken ? `${window.location.origin}/formularios/relatorio-espiritual/${tokenInfo.token}` : '';
 
                       return (
                         <tr key={loc.id} className="hover:bg-slate-50/50 transition">
                           <td className="p-3 font-semibold text-slate-800">{loc.nome}</td>
                           <td className="p-3 text-center">
-                            {hasToken ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-105 text-emerald-800">
+                            {isActive && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
                                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                 Ativo
                               </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-105 text-amber-800">
+                            )}
+                            {isExpired && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
+                                Expirado
+                              </span>
+                            )}
+                            {isInactive && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800">
+                                Inativo
+                              </span>
+                            )}
+                            {!hasToken && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
                                 Sem Link
                               </span>
                             )}

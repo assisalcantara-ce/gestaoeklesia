@@ -19,6 +19,7 @@ const BYPASS_PATHS = [
   '/acesso-negado',
   '/auth',
   '/admin',
+  '/formularios',
 ]
 
 /** Intervalo de polling para re-verificar o status do trial (5 minutos). */

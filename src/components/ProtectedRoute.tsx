@@ -17,6 +17,7 @@ const PUBLIC_PREFIXES = [
   '/acesso-negado',
   '/auth',
   '/admin',
+  '/formularios',
   // Apenas as rotas mobile públicas explícitas estão liberadas do ProtectedRoute global
   '/app/login',
   '/app/vincular',

@@ -10,6 +10,7 @@ interface TokenData {
   congregacao_id: string | null;
   token: string;
   is_active: boolean;
+  expires_at?: string;
   ministries?: {
     name: string;
   } | null;
@@ -68,11 +69,14 @@ export default function PublicRelatorioEspiritualPage({ params }: { params: Prom
             congregacoes ( nome )
           `)
           .eq('token', token)
-          .eq('is_active', true)
           .single();
 
         if (error || !data) {
-          setErrorMsg('Este link de formulário expirou, está inativo ou não existe.');
+          setErrorMsg('Este link de formulário é inválido ou não existe.');
+        } else if (!data.is_active) {
+          setErrorMsg('Este link de formulário está inativo.');
+        } else if (data.expires_at && new Date(data.expires_at) <= new Date()) {
+          setErrorMsg('Este link de envio expirou. Solicite um novo link à Secretaria Geral.');
         } else {
           setTokenData(data as any);
         }
@@ -166,13 +170,24 @@ export default function PublicRelatorioEspiritualPage({ params }: { params: Prom
       // Segurança: Verifica no banco de dados se o token continua ativo/válido antes do envio
       const { data: verifyToken, error: verifyError } = await supabase
         .from('relatorio_espiritual_tokens')
-        .select('id, is_active')
+        .select('id, is_active, expires_at')
         .eq('token', token)
-        .eq('is_active', true)
         .single();
 
       if (verifyError || !verifyToken) {
-        alert('Este link de formulário expirou ou foi inativado. O envio foi bloqueado.');
+        alert('Este link de formulário é inválido.');
+        setSubmitting(false);
+        return;
+      }
+
+      if (!verifyToken.is_active) {
+        alert('Este link de formulário está inativo.');
+        setSubmitting(false);
+        return;
+      }
+
+      if (verifyToken.expires_at && new Date(verifyToken.expires_at) <= new Date()) {
+        alert('Este link de envio expirou. Solicite um novo link à Secretaria Geral.');
         setSubmitting(false);
         return;
       }
