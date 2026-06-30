@@ -16,6 +16,7 @@ interface TokenData {
     data_culto: string;
     horario_culto: string;
     status: string;
+    congregacao_id: string;
     congregacoes?: {
       nome: string;
     } | null;
@@ -77,6 +78,7 @@ export default function PublicCultoRecepcaoPage({ params }: { params: Promise<{ 
               data_culto,
               horario_culto,
               status,
+              congregacao_id,
               congregacoes ( nome )
             )
           `)
@@ -129,6 +131,7 @@ export default function PublicCultoRecepcaoPage({ params }: { params: Promise<{ 
       const payload = {
         culto_id: tokenData.culto_id,
         ministry_id: tokenData.ministry_id,
+        congregacao_id: tokenData.culto_registros?.congregacao_id,
         nome: formData.nome.trim(),
         telefone: formData.telefone.trim() || null,
         cidade: formData.cidade.trim() || null,
