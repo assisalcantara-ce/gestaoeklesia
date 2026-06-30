@@ -454,7 +454,22 @@ export default function CultosPage() {
       if (error) {
         showNotification('error', 'Erro', 'Erro ao carregar os registros de cultos.');
       } else {
-        setRegistros((data || []) as CultoRegistro[]);
+        const list = (data || []) as CultoRegistro[];
+        setRegistros(list);
+
+        // Extrair categorias de cultos salvas no banco que não são nativas
+        const customTypes = list
+          .map(r => r.tipo_culto)
+          .filter(tipo => tipo && !TIPO_CULTO_OPTIONS.includes(tipo));
+        
+        if (customTypes.length > 0) {
+          setTiposCulto(prev => {
+            const uniqueTypes = Array.from(new Set([...prev, ...customTypes]));
+            // Garante que 'Outro' fique sempre no final, se existir
+            const semOutro = uniqueTypes.filter(t => t !== 'Outro');
+            return [...semOutro, 'Outro'];
+          });
+        }
       }
     } catch (err) {
       console.error(err);
