@@ -241,10 +241,16 @@ export default function RelatorioEspiritualPage() {
     if (!confirm('Deseja realmente excluir este relatório espiritual?')) return;
 
     try {
-      const { error } = await supabase
+      let query = supabase
         .from('relatorio_espiritual_registros')
         .delete()
         .eq('id', id);
+
+      if (isLocalUser && ctx.congregacaoId) {
+        query = query.eq('congregacao_id', ctx.congregacaoId);
+      }
+
+      const { error } = await query;
 
       if (error) {
         showNotification('error', 'Erro', 'Não foi possível excluir o registro.');
@@ -265,9 +271,17 @@ export default function RelatorioEspiritualPage() {
       return;
     }
 
+    // Se for usuário de congregação local, força o ID da congregação dele
+    const finalCongregacaoId = isLocalUser ? (ctx.congregacaoId || null) : (formData.congregacao_id || null);
+
+    if (isLocalUser && !ctx.congregacaoId) {
+      showNotification('error', 'Erro', 'Você não possui uma congregação local associada ao seu usuário.');
+      return;
+    }
+
     const payload: any = {
       ministry_id: ctx.ministryId,
-      congregacao_id: formData.congregacao_id || null,
+      congregacao_id: finalCongregacaoId,
       data_atividade: formData.data_atividade,
       tipo_atividade: formData.tipo_atividade,
       cultos_realizados: Number(formData.cultos_realizados) || 0,
@@ -295,10 +309,16 @@ export default function RelatorioEspiritualPage() {
 
     try {
       if (editingId) {
-        const { error } = await supabase
+        let query = supabase
           .from('relatorio_espiritual_registros')
           .update(payload)
           .eq('id', editingId);
+
+        if (isLocalUser && ctx.congregacaoId) {
+          query = query.eq('congregacao_id', ctx.congregacaoId);
+        }
+
+        const { error } = await query;
 
         if (error) {
           showNotification('error', 'Erro', error.message || 'Erro ao atualizar relatório.');
