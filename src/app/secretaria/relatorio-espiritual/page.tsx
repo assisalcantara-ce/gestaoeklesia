@@ -7,7 +7,8 @@ import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { Pencil, Trash2, Plus, Minus, FileText, Loader2, Church, Home, Flame, BookOpen, GlassWater, UserPlus, Link as LinkIcon, Sparkles, Heart, Megaphone, Users } from 'lucide-react';
+import { Pencil, Trash2, Plus, Minus, FileText, Loader2, Church, Home, Flame, BookOpen, GlassWater, UserPlus, Link as LinkIcon, Sparkles, Heart, Megaphone, Users, QrCode, Copy, RefreshCw, X, Globe } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 
 interface LocalOption {
@@ -103,6 +104,29 @@ export default function RelatorioEspiritualPage() {
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
 
+  // Estados da Central de Coleta
+  const [isCentralColetaOpen, setIsCentralColetaOpen] = useState(false);
+  const [tokens, setTokens] = useState<Record<string, { token: string; is_active: boolean }>>({});
+  const [qrCodeCongId, setQrCodeCongId] = useState<string | null>(null);
+
+  const loadTokens = async () => {
+    if (!ctx?.ministryId) return;
+    const { data, error } = await supabase
+      .from('relatorio_espiritual_tokens')
+      .select('congregacao_id, token, is_active')
+      .eq('ministry_id', ctx.ministryId);
+
+    if (!error && data) {
+      const mapa: Record<string, { token: string; is_active: boolean }> = {};
+      data.forEach((t: any) => {
+        if (t.congregacao_id) {
+          mapa[t.congregacao_id] = { token: t.token, is_active: t.is_active };
+        }
+      });
+      setTokens(mapa);
+    }
+  };
+
   const [modalNotify, setModalNotify] = useState<{
     isOpen: boolean;
     title: string;
@@ -187,7 +211,7 @@ export default function RelatorioEspiritualPage() {
     }
   };
 
-  const handleGerarLink = async (congId: string | null) => {
+  const handleGerarLink = async (congId: string | null, silently?: boolean) => {
     if (!ctx?.ministryId || !congId) return;
 
     try {
@@ -211,23 +235,56 @@ export default function RelatorioEspiritualPage() {
 
         if (existing) {
           const link = `${window.location.origin}/formularios/relatorio-espiritual/${existing.token}`;
-          navigator.clipboard.writeText(link);
-          showNotification('success', 'Link Copiado', 'O link do formulário público foi copiado para a sua área de transferência.');
+          if (!silently) {
+            navigator.clipboard.writeText(link);
+            showNotification('success', 'Link Copiado', 'O link do formulário público foi copiado para a sua área de transferência.');
+          }
         }
       } else if (data) {
         const link = `${window.location.origin}/formularios/relatorio-espiritual/${data.token}`;
-        navigator.clipboard.writeText(link);
-        showNotification('success', 'Link Gerado e Copiado', 'Um novo link exclusivo foi gerado e copiado para a sua área de transferência.');
+        if (!silently) {
+          navigator.clipboard.writeText(link);
+          showNotification('success', 'Link Gerado e Copiado', 'Um novo link exclusivo foi gerado e copiado para a sua área de transferência.');
+        }
+      }
+      await loadTokens();
+    } catch (err) {
+      console.error(err);
+      if (!silently) {
+        showNotification('error', 'Erro', 'Erro ao processar o link.');
+      }
+    }
+  };
+
+  const handleRegenerarToken = async (congId: string) => {
+    if (!ctx?.ministryId || !congId) return;
+    if (!confirm('Deseja realmente regenerar o token desta congregação? O link antigo deixará de funcionar imediatamente.')) return;
+
+    try {
+      const novoToken = crypto.randomUUID();
+      const { error } = await supabase
+        .from('relatorio_espiritual_tokens')
+        .update({ token: novoToken, is_active: true, created_at: new Date().toISOString() })
+        .eq('ministry_id', ctx.ministryId)
+        .eq('congregacao_id', congId);
+
+      if (error) {
+        // Se ainda não existir por algum motivo, tenta fazer o insert
+        await handleGerarLink(congId, true);
+      } else {
+        showNotification('success', 'Token Regenerado', 'Um novo token foi gerado com sucesso. O link antigo foi desativado.');
+        await loadTokens();
       }
     } catch (err) {
       console.error(err);
-      showNotification('error', 'Erro', 'Erro ao processar o link.');
+      showNotification('error', 'Erro', 'Erro ao regenerar o token.');
     }
   };
 
   useEffect(() => {
     if (!ctx?.loading && ctx?.ministryId) {
       loadRegistros();
+      loadTokens();
     }
   }, [ctx?.loading, ctx?.ministryId, ctx?.congregacaoId, isLocalUser]);
 
@@ -570,7 +627,7 @@ export default function RelatorioEspiritualPage() {
     <PageLayout title="Relatório Espiritual" description="Gestão de Relatórios Espirituais">
       <div className="p-6 max-w-7xl mx-auto">
         {/* Cabeçalho */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <span className="text-4xl">🕊️</span>
@@ -578,10 +635,19 @@ export default function RelatorioEspiritualPage() {
             </div>
             <p className="text-slate-600">Fundação do Relatório de Atividades Espirituais do Ministério</p>
           </div>
+          {!isLocalUser && (
+            <button
+              onClick={() => setIsCentralColetaOpen(true)}
+              className="px-5 py-2.5 bg-[#062E6F] hover:bg-[#154A92] text-white rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto"
+            >
+              <Globe className="h-4 w-4" />
+              Coleta das Congregações
+            </button>
+          )}
         </div>
 
         {/* Resumo de Indicadores KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-3 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 mb-8">
           <ExecutiveMetricCard title="Cultos" value={kpis.cultos} color="blue" icon={Church} />
           <ExecutiveMetricCard title="Visitas" value={kpis.visitas} color="indigo" icon={Home} />
           <ExecutiveMetricCard title="Almas" value={kpis.almas} color="rose" icon={Flame} />
@@ -1113,6 +1179,180 @@ export default function RelatorioEspiritualPage() {
         type={modalNotify.type}
         onClose={() => setModalNotify(prev => ({ ...prev, isOpen: false }))}
       />
+
+      {/* Central de Coleta Modal */}
+      {isCentralColetaOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all">
+          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] shadow-2xl flex flex-col overflow-hidden border border-slate-100">
+            {/* Header */}
+            <div className="p-6 bg-white border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <Globe className="h-5 w-5 text-[#062E6F]" />
+                  Central de Coleta de Relatórios
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">Gerencie os tokens, links e QR codes de envio para as congregações.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsCentralColetaOpen(false);
+                  setQrCodeCongId(null);
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* List */}
+            <div className="flex-1 p-6 overflow-y-auto space-y-4">
+              <div className="overflow-hidden border border-slate-100 rounded-xl">
+                <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
+                      <th className="p-3">Congregação / Unidade</th>
+                      <th className="p-3 text-center">Status</th>
+                      <th className="p-3 text-right">Ações de Coleta</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {locais.map(loc => {
+                      const tokenInfo = tokens[loc.id];
+                      const hasToken = !!tokenInfo;
+                      const link = hasToken ? `${window.location.origin}/formularios/relatorio-espiritual/${tokenInfo.token}` : '';
+
+                      return (
+                        <tr key={loc.id} className="hover:bg-slate-50/50 transition">
+                          <td className="p-3 font-semibold text-slate-800">{loc.nome}</td>
+                          <td className="p-3 text-center">
+                            {hasToken ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-105 text-emerald-800">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Ativo
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-105 text-amber-800">
+                                Sem Link
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {!hasToken ? (
+                                <button
+                                  onClick={() => handleGerarLink(loc.id, true)}
+                                  className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Plus className="h-3 w-3" /> Gerar Link
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(link);
+                                      showNotification('success', 'Copiado', 'Link copiado para a área de transferência!');
+                                    }}
+                                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+                                    title="Copiar Link"
+                                  >
+                                    <Copy className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => setQrCodeCongId(qrCodeCongId === loc.id ? null : loc.id)}
+                                    className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                                      qrCodeCongId === loc.id
+                                        ? 'bg-blue-50 border-blue-200 text-blue-600'
+                                        : 'border-slate-200 hover:bg-slate-100 text-slate-600'
+                                    }`}
+                                    title="Exibir QR Code"
+                                  >
+                                    <QrCode className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleRegenerarToken(loc.id)}
+                                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-650 hover:text-amber-600 transition cursor-pointer"
+                                    title="Regenerar Token / Link"
+                                  >
+                                    <RefreshCw className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* QR Code Container Inline */}
+              {qrCodeCongId && locais.find(l => l.id === qrCodeCongId) && (() => {
+                const selectedLoc = locais.find(l => l.id === qrCodeCongId)!;
+                const tokenInfo = tokens[qrCodeCongId];
+                const link = tokenInfo ? `${window.location.origin}/formularios/relatorio-espiritual/${tokenInfo.token}` : '';
+
+                return (
+                  <div className="bg-slate-50 border border-slate-200/60 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-5 animate-fade-in">
+                    <div className="flex-1 text-center sm:text-left">
+                      <span className="text-xs font-black text-blue-800 uppercase tracking-widest block mb-1">QR Code de Envio</span>
+                      <h4 className="text-sm font-bold text-slate-800">{selectedLoc.nome}</h4>
+                      <p className="text-xs text-slate-500 mt-1 max-w-md">Posicione a câmera do celular no QR Code para acessar o formulário público desta congregação sem precisar de senha.</p>
+                      <input
+                        type="text"
+                        readOnly
+                        value={link}
+                        className="w-full text-slate-500 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg text-xs mt-3 select-all focus:outline-none"
+                      />
+                    </div>
+                    <div className="p-3 bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center justify-center">
+                      {link ? (
+                        <QRCodeSVG value={link} size={130} includeMargin={true} />
+                      ) : (
+                        <span className="text-xs text-slate-400 italic">Sem link gerado</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <button
+                onClick={async () => {
+                  const linksCopyList: string[] = [];
+                  locais.forEach(loc => {
+                    const tInfo = tokens[loc.id];
+                    if (tInfo) {
+                      linksCopyList.push(`${loc.nome}: ${window.location.origin}/formularios/relatorio-espiritual/${tInfo.token}`);
+                    }
+                  });
+                  if (linksCopyList.length === 0) {
+                    showNotification('warning', 'Aviso', 'Nenhuma congregação possui links ativos para copiar.');
+                    return;
+                  }
+                  navigator.clipboard.writeText(linksCopyList.join('\n'));
+                  showNotification('success', 'Links Copiados', `${linksCopyList.length} links copiados de uma vez.`);
+                }}
+                className="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 border border-slate-250 cursor-pointer"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                Copiar Todos os Links
+              </button>
+              <button
+                onClick={() => {
+                  setIsCentralColetaOpen(false);
+                  setQrCodeCongId(null);
+                }}
+                className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs transition cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageLayout>
   );
 }
