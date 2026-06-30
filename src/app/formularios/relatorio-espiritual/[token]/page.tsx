@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import { createClient } from '@/lib/supabase-client';
-import { Loader2, CheckCircle2, AlertCircle, Church, Home, Flame, BookOpen, FileText, GlassWater, UserPlus, Plus, Minus } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, Church, Home, Flame, BookOpen, FileText, GlassWater, UserPlus, Plus, Minus, Sparkles, Heart, Megaphone, Users } from 'lucide-react';
 
 interface TokenData {
   id: string;
@@ -46,6 +46,10 @@ export default function PublicRelatorioEspiritualPage({ params }: { params: Prom
     almas_alcancadas: 0,
     biblias_doadas: 0,
     literaturas_entregues: 0,
+    batismos_espirito_santo: 0,
+    curas_divinas: 0,
+    evangelismos_realizados: 0,
+    reconciliacoes: 0,
     membros_cearam: 0,
     visitantes_presentes: 0,
     observacoes: ''
@@ -123,10 +127,14 @@ export default function PublicRelatorioEspiritualPage({ params }: { params: Prom
     const almas = Number(formData.almas_alcancadas) || 0;
     const biblias = Number(formData.biblias_doadas) || 0;
     const literaturas = Number(formData.literaturas_entregues) || 0;
+    const batismos = Number(formData.batismos_espirito_santo) || 0;
+    const curas = Number(formData.curas_divinas) || 0;
+    const evangelismos = Number(formData.evangelismos_realizados) || 0;
+    const reconciliacoes = Number(formData.reconciliacoes) || 0;
     const cearam = formData.tipo_atividade === 'Santa Ceia' ? (Number(formData.membros_cearam) || 0) : 0;
     const visitantes = formData.tipo_atividade === 'Culto' ? (Number(formData.visitantes_presentes) || 0) : 0;
 
-    if (cultos < 0 || visitas < 0 || almas < 0 || biblias < 0 || literaturas < 0 || cearam < 0 || visitantes < 0) {
+    if (cultos < 0 || visitas < 0 || almas < 0 || biblias < 0 || literaturas < 0 || batismos < 0 || curas < 0 || evangelismos < 0 || reconciliacoes < 0 || cearam < 0 || visitantes < 0) {
       alert('Os valores numéricos não podem ser negativos.');
       return;
     }
@@ -141,7 +149,7 @@ export default function PublicRelatorioEspiritualPage({ params }: { params: Prom
       return;
     }
 
-    const totalValores = cultos + visitas + almas + biblias + literaturas + cearam + visitantes;
+    const totalValores = cultos + visitas + almas + biblias + literaturas + batismos + curas + evangelismos + reconciliacoes + cearam + visitantes;
     if (totalValores <= 0) {
       alert('O relatório não pode ser enviado totalmente zerado.');
       return;
@@ -179,6 +187,10 @@ export default function PublicRelatorioEspiritualPage({ params }: { params: Prom
         almas_alcancadas: almas,
         biblias_doadas: biblias,
         literaturas_entregues: literaturas,
+        batismos_espirito_santo: batismos,
+        curas_divinas: curas,
+        evangelismos_realizados: evangelismos,
+        reconciliacoes: reconciliacoes,
         membros_cearam: cearam,
         visitantes_presentes: visitantes,
         observacoes: formData.observacoes.trim() || null,
@@ -260,6 +272,10 @@ export default function PublicRelatorioEspiritualPage({ params }: { params: Prom
                   almas_alcancadas: 0,
                   biblias_doadas: 0,
                   literaturas_entregues: 0,
+                  batismos_espirito_santo: 0,
+                  curas_divinas: 0,
+                  evangelismos_realizados: 0,
+                  reconciliacoes: 0,
                   membros_cearam: 0,
                   visitantes_presentes: 0,
                   observacoes: ''
@@ -415,7 +431,7 @@ export default function PublicRelatorioEspiritualPage({ params }: { params: Prom
               </div>
 
               {/* Literaturas */}
-              <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-2xl flex items-center justify-between md:col-span-2">
+              <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-2xl flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-slate-500/10 text-slate-400 rounded-xl">
                     <FileText className="h-5 w-5" />
@@ -431,6 +447,94 @@ export default function PublicRelatorioEspiritualPage({ params }: { params: Prom
                   </button>
                   <span className="w-8 text-center text-sm font-black text-white">{formData.literaturas_entregues}</span>
                   <button type="button" onClick={() => incrementMetric('literaturas_entregues')} className="p-1 bg-slate-800 rounded hover:bg-slate-700 text-slate-300 transition">
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Batismos Espírito Santo */}
+              <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-rose-550/10 text-rose-450 rounded-xl">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Batismos Espírito Santo</span>
+                    <span className="text-[10px] text-slate-500">Evidência de línguas</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => decrementMetric('batismos_espirito_santo')} className="p-1 bg-slate-800 rounded hover:bg-slate-700 text-slate-300 transition">
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <span className="w-8 text-center text-sm font-black text-white">{formData.batismos_espirito_santo}</span>
+                  <button type="button" onClick={() => incrementMetric('batismos_espirito_santo')} className="p-1 bg-slate-800 rounded hover:bg-slate-700 text-slate-300 transition">
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Curas Divinas */}
+              <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-rose-500/10 text-rose-450 rounded-xl">
+                    <Heart className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Curas Divinas</span>
+                    <span className="text-[10px] text-slate-500">Testemunhos de curas</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => decrementMetric('curas_divinas')} className="p-1 bg-slate-800 rounded hover:bg-slate-700 text-slate-300 transition">
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <span className="w-8 text-center text-sm font-black text-white">{formData.curas_divinas}</span>
+                  <button type="button" onClick={() => incrementMetric('curas_divinas')} className="p-1 bg-slate-800 rounded hover:bg-slate-700 text-slate-300 transition">
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Evangelismos Realizados */}
+              <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/10 text-blue-450 rounded-xl">
+                    <Megaphone className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Evangelismos Realizados</span>
+                    <span className="text-[10px] text-slate-500">Ações evangelísticas</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => decrementMetric('evangelismos_realizados')} className="p-1 bg-slate-800 rounded hover:bg-slate-700 text-slate-300 transition">
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <span className="w-8 text-center text-sm font-black text-white">{formData.evangelismos_realizados}</span>
+                  <button type="button" onClick={() => incrementMetric('evangelismos_realizados')} className="p-1 bg-slate-800 rounded hover:bg-slate-700 text-slate-300 transition">
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Reconciliações */}
+              <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-2xl flex items-center justify-between md:col-span-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-500/10 text-emerald-450 rounded-xl">
+                    <Users className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Reconciliações</span>
+                    <span className="text-[10px] text-slate-500">Retornos para Jesus</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => decrementMetric('reconciliacoes')} className="p-1 bg-slate-800 rounded hover:bg-slate-700 text-slate-300 transition">
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <span className="w-8 text-center text-sm font-black text-white">{formData.reconciliacoes}</span>
+                  <button type="button" onClick={() => incrementMetric('reconciliacoes')} className="p-1 bg-slate-800 rounded hover:bg-slate-700 text-slate-300 transition">
                     <Plus className="h-4 w-4" />
                   </button>
                 </div>

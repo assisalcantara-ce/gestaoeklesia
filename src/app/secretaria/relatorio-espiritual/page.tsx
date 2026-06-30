@@ -7,7 +7,7 @@ import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { Pencil, Trash2, Plus, Minus, FileText, Loader2, Church, Home, Flame, BookOpen, GlassWater, UserPlus, Link as LinkIcon } from 'lucide-react';
+import { Pencil, Trash2, Plus, Minus, FileText, Loader2, Church, Home, Flame, BookOpen, GlassWater, UserPlus, Link as LinkIcon, Sparkles, Heart, Megaphone, Users } from 'lucide-react';
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 
 interface LocalOption {
@@ -26,6 +26,10 @@ interface RelatorioEspiritualRegistro {
   almas_alcancadas: number;
   biblias_doadas: number;
   literaturas_entregues: number;
+  batismos_espirito_santo: number;
+  curas_divinas: number;
+  evangelismos_realizados: number;
+  reconciliacoes: number;
   membros_cearam?: number;
   visitantes_presentes?: number;
   observacoes: string | null;
@@ -64,6 +68,10 @@ const EMPTY_FORM = {
   almas_alcancadas: 0,
   biblias_doadas: 0,
   literaturas_entregues: 0,
+  batismos_espirito_santo: 0,
+  curas_divinas: 0,
+  evangelismos_realizados: 0,
+  reconciliacoes: 0,
   membros_cearam: 0,
   visitantes_presentes: 0,
   observacoes: '',
@@ -241,6 +249,10 @@ export default function RelatorioEspiritualPage() {
     let almas = 0;
     let biblias = 0;
     let literaturas = 0;
+    let batismos = 0;
+    let curas = 0;
+    let evangelismos = 0;
+    let reconciliacoes = 0;
     let cearam = 0;
     let visitantes = 0;
 
@@ -250,11 +262,15 @@ export default function RelatorioEspiritualPage() {
       almas += r.almas_alcancadas || 0;
       biblias += r.biblias_doadas || 0;
       literaturas += r.literaturas_entregues || 0;
+      batismos += r.batismos_espirito_santo || 0;
+      curas += r.curas_divinas || 0;
+      evangelismos += r.evangelismos_realizados || 0;
+      reconciliacoes += r.reconciliacoes || 0;
       cearam += r.membros_cearam || 0;
       visitantes += r.visitantes_presentes || 0;
     });
 
-    return { cultos, visitas, almas, biblias, literaturas, cearam, visitantes };
+    return { cultos, visitas, almas, biblias, literaturas, batismos, curas, evangelismos, reconciliacoes, cearam, visitantes };
   }, [registrosFiltrados]);
 
   const consolidadoPorCongregacao = useMemo(() => {
@@ -266,6 +282,10 @@ export default function RelatorioEspiritualPage() {
       almas: number;
       biblias: number;
       literaturas: number;
+      batismos: number;
+      curas: number;
+      evangelismos: number;
+      reconciliacoes: number;
       cearam: number;
       visitantes: number;
       ultimo_envio: string | null;
@@ -283,6 +303,10 @@ export default function RelatorioEspiritualPage() {
         almas: 0,
         biblias: 0,
         literaturas: 0,
+        batismos: 0,
+        curas: 0,
+        evangelismos: 0,
+        reconciliacoes: 0,
         cearam: 0,
         visitantes: 0,
         ultimo_envio: null
@@ -298,6 +322,10 @@ export default function RelatorioEspiritualPage() {
         almas: 0,
         biblias: 0,
         literaturas: 0,
+        batismos: 0,
+        curas: 0,
+        evangelismos: 0,
+        reconciliacoes: 0,
         cearam: 0,
         visitantes: 0,
         ultimo_envio: null
@@ -313,6 +341,10 @@ export default function RelatorioEspiritualPage() {
       mapa[key].almas += r.almas_alcancadas || 0;
       mapa[key].biblias += r.biblias_doadas || 0;
       mapa[key].literaturas += r.literaturas_entregues || 0;
+      mapa[key].batismos += r.batismos_espirito_santo || 0;
+      mapa[key].curas += r.curas_divinas || 0;
+      mapa[key].evangelismos += r.evangelismos_realizados || 0;
+      mapa[key].reconciliacoes += r.reconciliacoes || 0;
       mapa[key].cearam += r.membros_cearam || 0;
       mapa[key].visitantes += r.visitantes_presentes || 0;
 
@@ -322,7 +354,7 @@ export default function RelatorioEspiritualPage() {
     });
 
     return Object.values(mapa).filter(c => {
-      return c.cultos > 0 || c.visitas > 0 || c.almas > 0 || c.ultimo_envio !== null || (isLocalUser && c.congregacao_id === ctx?.congregacaoId);
+      return c.cultos > 0 || c.visitas > 0 || c.almas > 0 || c.batismos > 0 || c.curas > 0 || c.evangelismos > 0 || c.reconciliacoes > 0 || c.ultimo_envio !== null || (isLocalUser && c.congregacao_id === ctx?.congregacaoId);
     });
   }, [registrosFiltrados, locais, filtroCongregacao, isLocalUser, ctx?.congregacaoId]);
 
@@ -359,6 +391,10 @@ export default function RelatorioEspiritualPage() {
       almas_alcancadas: r.almas_alcancadas,
       biblias_doadas: r.biblias_doadas,
       literaturas_entregues: r.literaturas_entregues,
+      batismos_espirito_santo: r.batismos_espirito_santo || 0,
+      curas_divinas: r.curas_divinas || 0,
+      evangelismos_realizados: r.evangelismos_realizados || 0,
+      reconciliacoes: r.reconciliacoes || 0,
       membros_cearam: r.membros_cearam || 0,
       visitantes_presentes: r.visitantes_presentes || 0,
       observacoes: r.observacoes || '',
@@ -424,10 +460,14 @@ export default function RelatorioEspiritualPage() {
     const almas = Number(formData.almas_alcancadas) || 0;
     const biblias = Number(formData.biblias_doadas) || 0;
     const literaturas = Number(formData.literaturas_entregues) || 0;
+    const batismos = Number(formData.batismos_espirito_santo) || 0;
+    const curas = Number(formData.curas_divinas) || 0;
+    const evangelismos = Number(formData.evangelismos_realizados) || 0;
+    const reconciliacoes = Number(formData.reconciliacoes) || 0;
     const cearam = formData.tipo_atividade === 'Santa Ceia' ? (Number(formData.membros_cearam) || 0) : 0;
     const visitantes = formData.tipo_atividade === 'Culto' ? (Number(formData.visitantes_presentes) || 0) : 0;
 
-    if (cultos < 0 || visitas < 0 || almas < 0 || biblias < 0 || literaturas < 0 || cearam < 0 || visitantes < 0) {
+    if (cultos < 0 || visitas < 0 || almas < 0 || biblias < 0 || literaturas < 0 || batismos < 0 || curas < 0 || evangelismos < 0 || reconciliacoes < 0 || cearam < 0 || visitantes < 0) {
       showNotification('error', 'Erro', 'Os valores numéricos não podem ser negativos.');
       return;
     }
@@ -442,7 +482,7 @@ export default function RelatorioEspiritualPage() {
       return;
     }
 
-    const totalValores = cultos + visitas + almas + biblias + literaturas + cearam + visitantes;
+    const totalValores = cultos + visitas + almas + biblias + literaturas + batismos + curas + evangelismos + reconciliacoes + cearam + visitantes;
     if (totalValores <= 0) {
       showNotification('error', 'Erro', 'O relatório não pode ser enviado totalmente zerado.');
       return;
@@ -463,6 +503,10 @@ export default function RelatorioEspiritualPage() {
       almas_alcancadas: almas,
       biblias_doadas: biblias,
       literaturas_entregues: literaturas,
+      batismos_espirito_santo: batismos,
+      curas_divinas: curas,
+      evangelismos_realizados: evangelismos,
+      reconciliacoes: reconciliacoes,
       membros_cearam: cearam,
       visitantes_presentes: visitantes,
       observacoes: formData.observacoes.trim() || null,
@@ -537,12 +581,16 @@ export default function RelatorioEspiritualPage() {
         </div>
 
         {/* Resumo de Indicadores KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-3 mb-8">
           <ExecutiveMetricCard title="Cultos" value={kpis.cultos} color="blue" icon={Church} />
           <ExecutiveMetricCard title="Visitas" value={kpis.visitas} color="indigo" icon={Home} />
           <ExecutiveMetricCard title="Almas" value={kpis.almas} color="rose" icon={Flame} />
           <ExecutiveMetricCard title="Bíblias" value={kpis.biblias} color="amber" icon={BookOpen} />
           <ExecutiveMetricCard title="Literaturas" value={kpis.literaturas} color="slate" icon={FileText} />
+          <ExecutiveMetricCard title="Batismos ES" value={kpis.batismos} color="rose" icon={Sparkles} subtitle="Batismos no Espírito Santo" />
+          <ExecutiveMetricCard title="Curas" value={kpis.curas} color="rose" icon={Heart} subtitle="Curas divinas testemunhadas" />
+          <ExecutiveMetricCard title="Evangelismos" value={kpis.evangelismos} color="blue" icon={Megaphone} subtitle="Atividades de evangelismo" />
+          <ExecutiveMetricCard title="Reconciliações" value={kpis.reconciliacoes} color="emerald" icon={Users} subtitle="Retornos à fé" />
           <ExecutiveMetricCard title="Santa Ceia" value={kpis.cearam} color="emerald" icon={GlassWater} subtitle="Membros que cearam" />
           <ExecutiveMetricCard title="Visitantes" value={kpis.visitantes} color="blue" icon={UserPlus} subtitle="Visitantes presentes" />
         </div>
@@ -666,6 +714,54 @@ export default function RelatorioEspiritualPage() {
                       <div className="flex items-center gap-1.5">
                         <button type="button" onClick={() => decrementMetric('literaturas_entregues')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
                         <button type="button" onClick={() => incrementMetric('literaturas_entregues')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
+                      </div>
+                    </div>
+
+                    {/* Batismos Espírito Santo */}
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Batismos Espírito Santo</span>
+                        <span className="text-xl font-bold text-slate-800">{formData.batismos_espirito_santo}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button type="button" onClick={() => decrementMetric('batismos_espirito_santo')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => incrementMetric('batismos_espirito_santo')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
+                      </div>
+                    </div>
+
+                    {/* Curas Divinas */}
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Curas Divinas</span>
+                        <span className="text-xl font-bold text-slate-800">{formData.curas_divinas}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button type="button" onClick={() => decrementMetric('curas_divinas')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => incrementMetric('curas_divinas')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
+                      </div>
+                    </div>
+
+                    {/* Evangelismos Realizados */}
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Evangelismos Realizados</span>
+                        <span className="text-xl font-bold text-slate-800">{formData.evangelismos_realizados}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button type="button" onClick={() => decrementMetric('evangelismos_realizados')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => incrementMetric('evangelismos_realizados')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
+                      </div>
+                    </div>
+
+                    {/* Reconciliações */}
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Reconciliações</span>
+                        <span className="text-xl font-bold text-slate-800">{formData.reconciliacoes}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button type="button" onClick={() => decrementMetric('reconciliacoes')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => incrementMetric('reconciliacoes')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
                       </div>
                     </div>
                   </div>
@@ -884,12 +980,16 @@ export default function RelatorioEspiritualPage() {
                           </h4>
 
                           {/* Resumo de Métricas */}
-                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-1 text-xs text-slate-600">
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-15 text-xs text-slate-600">
                             <span>⛪ Cultos: <strong>{reg.cultos_realizados}</strong></span>
                             <span>🏠 Visitas: <strong>{reg.visitas_realizadas}</strong></span>
                             <span>🔥 Almas: <strong>{reg.almas_alcancadas}</strong></span>
                             <span>📖 Bíblias: <strong>{reg.biblias_doadas}</strong></span>
                             <span>📢 Literaturas: <strong>{reg.literaturas_entregues}</strong></span>
+                            <span>🕊️ Batismos ES: <strong>{reg.batismos_espirito_santo}</strong></span>
+                            <span>❤️ Curas: <strong>{reg.curas_divinas}</strong></span>
+                            <span>📢 Evangelismos: <strong>{reg.evangelismos_realizados}</strong></span>
+                            <span>🤝 Reconciliações: <strong>{reg.reconciliacoes}</strong></span>
                             {reg.tipo_atividade === 'Santa Ceia' && (
                               <span className="col-span-2 text-amber-700 font-semibold">🍇 Cearam: {reg.membros_cearam || 0}</span>
                             )}
@@ -942,6 +1042,10 @@ export default function RelatorioEspiritualPage() {
                       <th className="p-4 text-center">🔥 Almas</th>
                       <th className="p-4 text-center">📖 Bíblias</th>
                       <th className="p-4 text-center">📢 Literaturas</th>
+                      <th className="p-4 text-center">🕊️ Batismos ES</th>
+                      <th className="p-4 text-center">❤️ Curas</th>
+                      <th className="p-4 text-center">📢 Evangelismos</th>
+                      <th className="p-4 text-center">🤝 Reconciliações</th>
                       <th className="p-4 text-center">🍇 Ceias</th>
                       <th className="p-4 text-center">👥 Visitantes</th>
                       <th className="p-4 text-right">📅 Último Envio</th>
@@ -970,6 +1074,10 @@ export default function RelatorioEspiritualPage() {
                         <td className="p-4 text-center text-rose-700 font-bold">{item.almas}</td>
                         <td className="p-4 text-center text-slate-700 font-semibold">{item.biblias}</td>
                         <td className="p-4 text-center text-slate-700 font-semibold">{item.literaturas}</td>
+                        <td className="p-4 text-center text-slate-700 font-semibold">{item.batismos}</td>
+                        <td className="p-4 text-center text-slate-700 font-semibold">{item.curas}</td>
+                        <td className="p-4 text-center text-slate-700 font-semibold">{item.evangelismos}</td>
+                        <td className="p-4 text-center text-slate-700 font-semibold">{item.reconciliacoes}</td>
                         <td className="p-4 text-center text-amber-700 font-bold">{item.cearam}</td>
                         <td className="p-4 text-center text-blue-700 font-bold">{item.visitantes}</td>
                         <td className="p-4 text-right text-slate-500 font-medium">
@@ -985,7 +1093,7 @@ export default function RelatorioEspiritualPage() {
                     ))}
                     {consolidadoPorCongregacao.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="p-8 text-center text-slate-400 italic">
+                        <td colSpan={13} className="p-8 text-center text-slate-400 italic">
                           Nenhum dado de consolidação disponível para os filtros selecionados.
                         </td>
                       </tr>
