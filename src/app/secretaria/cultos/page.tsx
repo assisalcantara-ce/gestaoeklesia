@@ -7,7 +7,7 @@ import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { Pencil, Trash2, Loader2, Church, Home, Flame, Calendar, Clock, CheckCircle2, Users, X, Link, Copy, Check, RefreshCw, QrCode, ClipboardList } from 'lucide-react';
+import { Pencil, Trash2, Loader2, Church, Home, Flame, Calendar, Clock, CheckCircle2, Users, X, Link, Copy, Check, RefreshCw, QrCode, ClipboardList, BookCheck } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 
@@ -40,6 +40,8 @@ interface CultoRegistro {
   observacoes_encerramento: string | null;
   encerrado_em: string | null;
   encerrado_por: string | null;
+  // Referencia ao relatorio espiritual gerado (anti-duplicidade)
+  relatorio_espiritual_id: string | null;
   created_at: string;
   updated_at: string;
   congregacoes?: {
@@ -513,24 +515,98 @@ export default function CultosPage() {
     setActiveTab('cadastro');
   };
 
-  const handleTransicaoStatus = async (id: string, novoStatus: 'Encerrado' | 'Consolidado') => {
+
+
+  // Consolida culto encerrado no Relatório Espiritual (sem redigitação)
+  const handleConsolidar = async (culto: CultoRegistro) => {
     if (!isEscritaPermitida) {
       showNotification('warning', 'Acesso Negado', 'Permissão insuficiente.');
       return;
     }
+    if (culto.status !== 'Encerrado') {
+      showNotification('warning', 'Não Permitido', 'Apenas cultos encerrados podem ser consolidados.');
+      return;
+    }
+    if (!confirm(`Consolidar "${culto.tipo_culto}" de ${formatDate(culto.data_culto)} no Relatório Espiritual?\n\nUm registro será criado automaticamente com os dados do encerramento.`)) return;
+
     setLoadingData(true);
     try {
-      const { error } = await supabase
-        .from('culto_registros')
-        .update({ status: novoStatus, updated_at: new Date().toISOString() })
-        .eq('id', id);
+      // Verificar duplicidade: já existe registro espiritual vinculado a este culto?
+      const { data: existing } = await supabase
+        .from('relatorio_espiritual_registros')
+        .select('id')
+        .eq('culto_id', culto.id)
+        .maybeSingle();
 
-      if (error) throw error;
-      showNotification('success', 'Status Atualizado', `Culto marcado como ${novoStatus} com sucesso.`);
+      if (existing) {
+        showNotification('warning', 'Já Consolidado', 'Este culto já possui um registro no Relatório Espiritual.');
+        return;
+      }
+
+      // Mapear tipo do culto para tipo de atividade
+      const tipoAtividade = culto.tipo_culto === 'Santa Ceia' ? 'Santa Ceia' : 'Culto';
+
+      // Criar registro no Relatório Espiritual
+      const { data: novoRegistro, error: errInsert } = await supabase
+        .from('relatorio_espiritual_registros')
+        .insert({
+          ministry_id: culto.ministry_id,
+          congregacao_id: culto.congregacao_id,
+          culto_id: culto.id,
+          data_atividade: culto.data_culto,
+          tipo_atividade: tipoAtividade,
+          cultos_realizados: 1,
+          visitantes_presentes: culto.visitantes_presentes ?? 0,
+          membros_cearam: culto.membros_cearam ?? 0,
+          almas_alcancadas: culto.almas_alcancadas ?? 0,
+          reconciliacoes: culto.reconciliacoes ?? 0,
+          batismos_espirito_santo: culto.batismos_espirito_santo ?? 0,
+          curas_divinas: culto.curas_divinas ?? 0,
+          biblias_doadas: culto.biblias_doadas ?? 0,
+          literaturas_entregues: culto.literaturas_entregues ?? 0,
+          observacoes: culto.observacoes_encerramento ?? null,
+          usuario_responsavel: ctx?.userId ?? null,
+          status: 'Enviado'
+        })
+        .select('id')
+        .single();
+
+      if (errInsert) throw errInsert;
+
+      // Atualizar status do culto para Consolidado e salvar referência ao relatório
+      const { error: errUpdate } = await supabase
+        .from('culto_registros')
+        .update({
+          status: 'Consolidado',
+          relatorio_espiritual_id: novoRegistro?.id ?? null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', culto.id);
+
+      if (errUpdate) throw errUpdate;
+
+      // AuditLog
+      try {
+        await fetch('/api/v1/audit-logs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            acao: 'editar',
+            modulo: 'Cultos',
+            area: 'Secretaria',
+            tabela_afetada: 'culto_registros',
+            registro_id: culto.id,
+            descricao: `Culto consolidado no Relatório Espiritual: ${culto.tipo_culto} em ${formatDate(culto.data_culto)}`,
+            dados_novos: { status: 'Consolidado', relatorio_espiritual_id: novoRegistro?.id }
+          })
+        });
+      } catch { /* audit não bloqueia */ }
+
+      showNotification('success', 'Consolidado com Sucesso!', `O culto foi consolidado no Relatório Espiritual com status Enviado.`);
       await loadRegistros();
     } catch (err: any) {
       console.error(err);
-      showNotification('error', 'Erro', 'Erro ao transicionar status: ' + err.message);
+      showNotification('error', 'Erro', 'Erro ao consolidar: ' + (err.message || 'Tente novamente.'));
     } finally {
       setLoadingData(false);
     }
@@ -1025,10 +1101,11 @@ export default function CultosPage() {
                               )}
                               {reg.status === 'Encerrado' && isEscritaPermitida && (
                                 <button
-                                  onClick={() => handleTransicaoStatus(reg.id, 'Consolidado')}
-                                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition cursor-pointer"
-                                  title="Consolidar Culto"
+                                  onClick={() => handleConsolidar(reg)}
+                                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                                  title="Consolidar no Relatório Espiritual"
                                 >
+                                  <BookCheck className="h-3.5 w-3.5" />
                                   Consolidar
                                 </button>
                               )}
