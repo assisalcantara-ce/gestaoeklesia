@@ -260,32 +260,25 @@ export default function RelatorioEspiritualPage() {
 
   const handleRegenerarToken = async (congId: string) => {
     if (!ctx?.ministryId || !congId) return;
-    if (!confirm('Deseja realmente regenerar o token desta congregação? O link antigo deixará de funcionar imediatamente.')) return;
+    if (!confirm('Deseja realmente regenerar o link desta congregação? O link antigo deixará de funcionar imediatamente.')) return;
 
+    setLoadingData(true);
     try {
-      const novoToken = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      const { error } = await supabase
+      // Deleta o token anterior
+      await supabase
         .from('relatorio_espiritual_tokens')
-        .update({ 
-          token: novoToken, 
-          is_active: true, 
-          created_at: new Date().toISOString(),
-          expires_at: expiresAt
-        })
+        .delete()
         .eq('ministry_id', ctx.ministryId)
         .eq('congregacao_id', congId);
 
-      if (error) {
-        // Se ainda não existir por algum motivo, tenta fazer o insert
-        await handleGerarLink(congId, true);
-      } else {
-        showNotification('success', 'Token Regenerado', 'Um novo token foi gerado com sucesso. O link antigo foi desativado.');
-        await loadTokens();
-      }
+      // Gera um novo
+      await handleGerarLink(congId, true);
+      showNotification('success', 'Link Regenerado', 'Um novo link exclusivo foi gerado e copiado para a área de transferência.');
     } catch (err) {
       console.error(err);
       showNotification('error', 'Erro', 'Erro ao regenerar o token.');
+    } finally {
+      setLoadingData(false);
     }
   };
 
