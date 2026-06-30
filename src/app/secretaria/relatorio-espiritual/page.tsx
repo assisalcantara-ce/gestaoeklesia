@@ -235,6 +235,97 @@ export default function RelatorioEspiritualPage() {
     });
   }, [registros, filtroCongregacao, filtroTipo, filtroStatus, filtroDataInicio, filtroDataFim]);
 
+  const kpis = useMemo(() => {
+    let cultos = 0;
+    let visitas = 0;
+    let almas = 0;
+    let biblias = 0;
+    let literaturas = 0;
+    let cearam = 0;
+    let visitantes = 0;
+
+    registrosFiltrados.forEach(r => {
+      cultos += r.cultos_realizados || 0;
+      visitas += r.visitas_realizadas || 0;
+      almas += r.almas_alcancadas || 0;
+      biblias += r.biblias_doadas || 0;
+      literaturas += r.literaturas_entregues || 0;
+      cearam += r.membros_cearam || 0;
+      visitantes += r.visitantes_presentes || 0;
+    });
+
+    return { cultos, visitas, almas, biblias, literaturas, cearam, visitantes };
+  }, [registrosFiltrados]);
+
+  const consolidadoPorCongregacao = useMemo(() => {
+    const mapa: Record<string, {
+      congregacao_id: string | null;
+      nome: string;
+      cultos: number;
+      visitas: number;
+      almas: number;
+      biblias: number;
+      literaturas: number;
+      cearam: number;
+      visitantes: number;
+      ultimo_envio: string | null;
+    }> = {};
+
+    // Inicializa as congregações
+    locais.forEach(loc => {
+      if (filtroCongregacao && loc.id !== filtroCongregacao) return;
+      
+      mapa[loc.id] = {
+        congregacao_id: loc.id,
+        nome: loc.nome,
+        cultos: 0,
+        visitas: 0,
+        almas: 0,
+        biblias: 0,
+        literaturas: 0,
+        cearam: 0,
+        visitantes: 0,
+        ultimo_envio: null
+      };
+    });
+
+    if (!filtroCongregacao && !isLocalUser) {
+      mapa['sede'] = {
+        congregacao_id: null,
+        nome: 'Sede / Geral',
+        cultos: 0,
+        visitas: 0,
+        almas: 0,
+        biblias: 0,
+        literaturas: 0,
+        cearam: 0,
+        visitantes: 0,
+        ultimo_envio: null
+      };
+    }
+
+    registrosFiltrados.forEach(r => {
+      const key = r.congregacao_id || 'sede';
+      if (!mapa[key]) return;
+
+      mapa[key].cultos += r.cultos_realizados || 0;
+      mapa[key].visitas += r.visitas_realizadas || 0;
+      mapa[key].almas += r.almas_alcancadas || 0;
+      mapa[key].biblias += r.biblias_doadas || 0;
+      mapa[key].literaturas += r.literaturas_entregues || 0;
+      mapa[key].cearam += r.membros_cearam || 0;
+      mapa[key].visitantes += r.visitantes_presentes || 0;
+
+      if (!mapa[key].ultimo_envio || r.data_atividade > mapa[key].ultimo_envio!) {
+        mapa[key].ultimo_envio = r.data_atividade;
+      }
+    });
+
+    return Object.values(mapa).filter(c => {
+      return c.cultos > 0 || c.visitas > 0 || c.almas > 0 || c.ultimo_envio !== null || (isLocalUser && c.congregacao_id === ctx?.congregacaoId);
+    });
+  }, [registrosFiltrados, locais, filtroCongregacao, isLocalUser, ctx?.congregacaoId]);
+
   const incrementMetric = (key: keyof typeof EMPTY_FORM) => {
     setFormData(prev => ({
       ...prev,
@@ -430,97 +521,6 @@ export default function RelatorioEspiritualPage() {
   }
 
   if (bloqueado) return null;
-
-  const kpis = useMemo(() => {
-    let cultos = 0;
-    let visitas = 0;
-    let almas = 0;
-    let biblias = 0;
-    let literaturas = 0;
-    let cearam = 0;
-    let visitantes = 0;
-
-    registrosFiltrados.forEach(r => {
-      cultos += r.cultos_realizados || 0;
-      visitas += r.visitas_realizadas || 0;
-      almas += r.almas_alcancadas || 0;
-      biblias += r.biblias_doadas || 0;
-      literaturas += r.literaturas_entregues || 0;
-      cearam += r.membros_cearam || 0;
-      visitantes += r.visitantes_presentes || 0;
-    });
-
-    return { cultos, visitas, almas, biblias, literaturas, cearam, visitantes };
-  }, [registrosFiltrados]);
-
-  const consolidadoPorCongregacao = useMemo(() => {
-    const mapa: Record<string, {
-      congregacao_id: string | null;
-      nome: string;
-      cultos: number;
-      visitas: number;
-      almas: number;
-      biblias: number;
-      literaturas: number;
-      cearam: number;
-      visitantes: number;
-      ultimo_envio: string | null;
-    }> = {};
-
-    // Inicializa as congregações
-    locais.forEach(loc => {
-      if (filtroCongregacao && loc.id !== filtroCongregacao) return;
-      
-      mapa[loc.id] = {
-        congregacao_id: loc.id,
-        nome: loc.nome,
-        cultos: 0,
-        visitas: 0,
-        almas: 0,
-        biblias: 0,
-        literaturas: 0,
-        cearam: 0,
-        visitantes: 0,
-        ultimo_envio: null
-      };
-    });
-
-    if (!filtroCongregacao && !isLocalUser) {
-      mapa['sede'] = {
-        congregacao_id: null,
-        nome: 'Sede / Geral',
-        cultos: 0,
-        visitas: 0,
-        almas: 0,
-        biblias: 0,
-        literaturas: 0,
-        cearam: 0,
-        visitantes: 0,
-        ultimo_envio: null
-      };
-    }
-
-    registrosFiltrados.forEach(r => {
-      const key = r.congregacao_id || 'sede';
-      if (!mapa[key]) return;
-
-      mapa[key].cultos += r.cultos_realizados || 0;
-      mapa[key].visitas += r.visitas_realizadas || 0;
-      mapa[key].almas += r.almas_alcancadas || 0;
-      mapa[key].biblias += r.biblias_doadas || 0;
-      mapa[key].literaturas += r.literaturas_entregues || 0;
-      mapa[key].cearam += r.membros_cearam || 0;
-      mapa[key].visitantes += r.visitantes_presentes || 0;
-
-      if (!mapa[key].ultimo_envio || r.data_atividade > mapa[key].ultimo_envio!) {
-        mapa[key].ultimo_envio = r.data_atividade;
-      }
-    });
-
-    return Object.values(mapa).filter(c => {
-      return c.cultos > 0 || c.visitas > 0 || c.almas > 0 || c.ultimo_envio !== null || (isLocalUser && c.congregacao_id === ctx?.congregacaoId);
-    });
-  }, [registrosFiltrados, locais, filtroCongregacao, isLocalUser, ctx?.congregacaoId]);
 
   return (
     <PageLayout title="Relatório Espiritual" description="Gestão de Relatórios Espirituais">
