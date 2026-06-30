@@ -52,6 +52,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
       { id: 'certificados', label: 'Certificados', icon: '🎓', path: '/secretaria/certificados', modulo: 'gestao' },
       { id: 'relatorios-secretaria', label: 'Relatórios', icon: '📋', path: '/secretaria/relatorios', modulo: 'gestao' },
       { id: 'relatorio-espiritual', label: 'Relatório Espiritual', icon: '🕊️', path: '/secretaria/relatorio-espiritual', modulo: 'gestao' },
+      { id: 'cultos', label: 'Cultos', icon: '⛪', path: '/secretaria/cultos', modulo: 'gestao' },
       { id: 'funcionarios', label: 'Funcionários', icon: '👔', path: '/secretaria/funcionarios', modulo: 'gestao' },
       { id: 'achados-perdidos', label: 'Achados e Perdidos', icon: '🔍', path: '/secretaria/achados-perdidos', modulo: 'gestao' },
       {

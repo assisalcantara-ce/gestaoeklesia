@@ -1,0 +1,724 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import PageLayout from '@/components/PageLayout';
+import Tabs from '@/components/Tabs';
+import Section from '@/components/Section';
+import NotificationModal from '@/components/NotificationModal';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { createClient } from '@/lib/supabase-client';
+import { Pencil, Trash2, Loader2, Church, Home, Flame, Calendar, Clock, CheckCircle2 } from 'lucide-react';
+import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
+
+interface LocalOption {
+  id: string;
+  nome: string;
+}
+
+interface CultoRegistro {
+  id: string;
+  ministry_id: string;
+  congregacao_id: string;
+  data_culto: string;
+  horario_culto: string;
+  tipo_culto: string;
+  dirigente: string;
+  pregador: string | null;
+  observacoes: string | null;
+  status: 'Aberto' | 'Encerrado' | 'Consolidado';
+  created_at: string;
+  updated_at: string;
+  congregacoes?: {
+    nome: string;
+  } | null;
+}
+
+const TIPO_CULTO_OPTIONS = [
+  'Culto de Doutrina',
+  'Culto de Evangelismo',
+  'Culto de Ensino',
+  'Culto de Jovens',
+  'Culto de Senhoras',
+  'Culto de Oração',
+  'Santa Ceia',
+  'Culto Festivo',
+  'Outro'
+];
+
+const STATUS_OPTIONS = [
+  { value: 'Aberto', label: '📖 Aberto' },
+  { value: 'Encerrado', label: '🔒 Encerrado' },
+  { value: 'Consolidado', label: '✅ Consolidado' }
+];
+
+const EMPTY_FORM = {
+  data_culto: new Date().toISOString().split('T')[0],
+  horario_culto: '19:30',
+  tipo_culto: 'Culto de Doutrina',
+  dirigente: '',
+  pregador: '',
+  observacoes: '',
+  status: 'Aberto' as 'Aberto' | 'Encerrado' | 'Consolidado',
+  congregacao_id: ''
+};
+
+const TABS = [
+  { id: 'cadastro', label: 'Registrar Culto' },
+  { id: 'listagem', label: 'Histórico de Cultos' }
+];
+
+const formatDate = (value?: string | null) => {
+  if (!value) return '';
+  const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : value;
+};
+
+export default function CultosPage() {
+  const { ctx, bloqueado } = useRequireModulo('gestao');
+  const supabase = useMemo(() => createClient(), []);
+
+  const [activeTab, setActiveTab] = useState('cadastro');
+  const [registros, setRegistros] = useState<CultoRegistro[]>([]);
+  const [locais, setLocais] = useState<LocalOption[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [formData, setFormData] = useState(EMPTY_FORM);
+
+  // Filtros de listagem
+  const [filtroCongregacao, setFiltroCongregacao] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('');
+  const [filtroDataInicio, setFiltroDataInicio] = useState('');
+  const [filtroDataFim, setFiltroDataFim] = useState('');
+
+  const [modalNotify, setModalNotify] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'success'
+  });
+
+  const showNotification = (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => {
+    setModalNotify({ isOpen: true, type, title, message });
+  };
+
+  const isLocalUser = useMemo(() => {
+    if (!ctx) return true;
+    return (ctx.nivel as string) === 'secretario_local' || (ctx.nivel as string) === 'tesoureiro_local';
+  }, [ctx]);
+
+  const isEscritaPermitida = useMemo(() => {
+    if (!ctx) return false;
+    return ['administrador', 'suporte', 'secretaria', 'secretario_local', 'presidencia'].includes(ctx.nivel as string);
+  }, [ctx]);
+
+  // Carregar congregações
+  useEffect(() => {
+    const loadLocais = async () => {
+      if (!ctx?.ministryId) return;
+      try {
+        const { data, error } = await supabase
+          .from('congregacoes')
+          .select('id, nome')
+          .eq('ministry_id', ctx.ministryId)
+          .order('nome', { ascending: true });
+
+        if (!error && data) {
+          setLocais(data as LocalOption[]);
+          // Definir congregação padrão no form
+          if (isLocalUser && ctx?.congregacaoId) {
+            setFormData(prev => ({ ...prev, congregacao_id: ctx.congregacaoId || '' }));
+          } else if (data.length > 0) {
+            setFormData(prev => ({ ...prev, congregacao_id: data[0].id }));
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    if (!ctx?.loading && ctx?.ministryId) {
+      loadLocais();
+    }
+  }, [ctx?.loading, ctx?.ministryId, ctx?.congregacaoId, isLocalUser, supabase]);
+
+  // Carregar Registros de Cultos
+  const loadRegistros = async () => {
+    if (!ctx?.ministryId) return;
+    setLoadingData(true);
+
+    try {
+      let query = supabase
+        .from('culto_registros')
+        .select(`
+          *,
+          congregacoes ( nome )
+        `)
+        .eq('ministry_id', ctx.ministryId);
+
+      if (isLocalUser && ctx?.congregacaoId) {
+        query = query.eq('congregacao_id', ctx.congregacaoId);
+      }
+
+      const { data, error } = await query.order('data_culto', { ascending: false }).order('horario_culto', { ascending: false });
+
+      if (error) {
+        showNotification('error', 'Erro', 'Erro ao carregar os registros de cultos.');
+      } else {
+        setRegistros((data || []) as CultoRegistro[]);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!ctx?.loading && ctx?.ministryId) {
+      loadRegistros();
+    }
+  }, [ctx?.loading, ctx?.ministryId, ctx?.congregacaoId, isLocalUser]);
+
+  // Filtragem local de registros
+  const registrosFiltrados = useMemo(() => {
+    return registros.filter(r => {
+      if (filtroCongregacao && r.congregacao_id !== filtroCongregacao) return false;
+      if (filtroTipo && r.tipo_culto !== filtroTipo) return false;
+      if (filtroStatus && r.status !== filtroStatus) return false;
+      if (filtroDataInicio && r.data_culto < filtroDataInicio) return false;
+      if (filtroDataFim && r.data_culto > filtroDataFim) return false;
+      return true;
+    });
+  }, [registros, filtroCongregacao, filtroTipo, filtroStatus, filtroDataInicio, filtroDataFim]);
+
+  // KPIs
+  const kpis = useMemo(() => {
+    const filtered = registrosFiltrados;
+    return {
+      total: filtered.length,
+      abertos: filtered.filter(r => r.status === 'Aberto').length,
+      encerrados: filtered.filter(r => r.status === 'Encerrado').length,
+      consolidados: filtered.filter(r => r.status === 'Consolidado').length
+    };
+  }, [registrosFiltrados]);
+
+  // Salvar / Editar
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isEscritaPermitida) {
+      showNotification('warning', 'Acesso Negado', 'Você não tem permissão para salvar registros de cultos.');
+      return;
+    }
+
+    if (!formData.data_culto) {
+      showNotification('warning', 'Campo Obrigatório', 'A data do culto é obrigatória.');
+      return;
+    }
+    if (!formData.horario_culto) {
+      showNotification('warning', 'Campo Obrigatório', 'O horário do culto é obrigatório.');
+      return;
+    }
+    if (!formData.dirigente.trim()) {
+      showNotification('warning', 'Campo Obrigatório', 'O dirigente é obrigatório.');
+      return;
+    }
+
+    setLoadingData(true);
+    try {
+      const payload = {
+        ministry_id: ctx?.ministryId,
+        congregacao_id: isLocalUser ? ctx?.congregacaoId : formData.congregacao_id,
+        data_culto: formData.data_culto,
+        horario_culto: formData.horario_culto,
+        tipo_culto: formData.tipo_culto,
+        dirigente: formData.dirigente.trim(),
+        pregador: formData.pregador.trim() || null,
+        observacoes: formData.observacoes.trim() || null,
+        status: formData.status,
+        usuario_responsavel: ctx?.userId
+      };
+
+      if (editingId) {
+        const { error } = await supabase
+          .from('culto_registros')
+          .update(payload)
+          .eq('id', editingId);
+
+        if (error) throw error;
+        showNotification('success', 'Sucesso', 'Culto atualizado com sucesso.');
+      } else {
+        const { error } = await supabase
+          .from('culto_registros')
+          .insert(payload);
+
+        if (error) throw error;
+        showNotification('success', 'Sucesso', 'Culto registrado com sucesso.');
+      }
+
+      setFormData({
+        ...EMPTY_FORM,
+        congregacao_id: isLocalUser && ctx?.congregacaoId ? ctx.congregacaoId : (locais[0]?.id || '')
+      });
+      setEditingId(null);
+      await loadRegistros();
+      setActiveTab('listagem');
+    } catch (err: any) {
+      console.error(err);
+      showNotification('error', 'Erro', 'Erro ao salvar o registro de culto: ' + err.message);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  const handleEdit = (reg: CultoRegistro) => {
+    setEditingId(reg.id);
+    setFormData({
+      data_culto: reg.data_culto,
+      horario_culto: reg.horario_culto.substring(0, 5),
+      tipo_culto: reg.tipo_culto,
+      dirigente: reg.dirigente,
+      pregador: reg.pregador || '',
+      observacoes: reg.observacoes || '',
+      status: reg.status,
+      congregacao_id: reg.congregacao_id
+    });
+    setActiveTab('cadastro');
+  };
+
+  const handleTransicaoStatus = async (id: string, novoStatus: 'Encerrado' | 'Consolidado') => {
+    if (!isEscritaPermitida) {
+      showNotification('warning', 'Acesso Negado', 'Permissão insuficiente.');
+      return;
+    }
+    setLoadingData(true);
+    try {
+      const { error } = await supabase
+        .from('culto_registros')
+        .update({ status: novoStatus, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+      showNotification('success', 'Status Atualizado', `Culto marcado como ${novoStatus} com sucesso.`);
+      await loadRegistros();
+    } catch (err: any) {
+      console.error(err);
+      showNotification('error', 'Erro', 'Erro ao transicionar status: ' + err.message);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!isEscritaPermitida) {
+      showNotification('warning', 'Acesso Negado', 'Permissão insuficiente.');
+      return;
+    }
+    if (!confirm('Deseja realmente excluir este registro de culto? Esta ação não pode ser desfeita.')) return;
+
+    setLoadingData(true);
+    try {
+      const { error } = await supabase
+        .from('culto_registros')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      showNotification('success', 'Removido', 'Registro de culto excluído com sucesso.');
+      await loadRegistros();
+    } catch (err: any) {
+      console.error(err);
+      showNotification('error', 'Erro', 'Erro ao excluir registro: ' + err.message);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  if (bloqueado) {
+    return (
+      <PageLayout title="Acesso Negado" description="Módulo Cultos">
+        <div className="p-8 text-center">
+          <p className="text-red-500 font-bold">Você não tem permissão para acessar este módulo.</p>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  if (ctx?.loading) {
+    return (
+      <PageLayout title="Cultos" description="Carregando dados...">
+        <div className="min-h-[50vh] flex items-center justify-center">
+          <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+        </div>
+      </PageLayout>
+    );
+  }
+
+  return (
+    <PageLayout title="Cultos" description="Gestão de registros operacionais de Cultos">
+      <div className="p-6 max-w-7xl mx-auto">
+        {/* Cabeçalho */}
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-4xl">⛪</span>
+              <h1 className="text-3xl font-bold text-slate-800">Operação de Cultos</h1>
+            </div>
+            <p className="text-slate-600">Registro histórico e gestão operacional dos cultos da igreja</p>
+          </div>
+        </div>
+
+        {/* KPIs */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <ExecutiveMetricCard title="Total de Cultos" value={kpis.total} color="blue" icon={Church} />
+          <ExecutiveMetricCard title="Cultos Abertos" value={kpis.abertos} color="slate" icon={Flame} />
+          <ExecutiveMetricCard title="Cultos Encerrados" value={kpis.encerrados} color="indigo" icon={Home} />
+          <ExecutiveMetricCard title="Consolidados" value={kpis.consolidados} color="emerald" icon={CheckCircle2} />
+        </div>
+
+        <Tabs tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab}>
+          {activeTab === 'cadastro' && (
+            <Section title={editingId ? 'Editar Culto' : 'Novo Registro de Culto'}>
+              <form onSubmit={handleSave} className="space-y-6 max-w-3xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Congregação (Bloqueado para local) */}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Congregação / Unidade *</label>
+                    <select
+                      disabled={isLocalUser || !!editingId}
+                      value={isLocalUser ? (ctx?.congregacaoId || '') : formData.congregacao_id}
+                      onChange={e => setFormData(prev => ({ ...prev, congregacao_id: e.target.value }))}
+                      className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm bg-white"
+                    >
+                      {locais.map(loc => (
+                        <option key={loc.id} value={loc.id}>{loc.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Tipo do Culto */}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Tipo do Culto *</label>
+                    <select
+                      value={formData.tipo_culto}
+                      onChange={e => setFormData(prev => ({ ...prev, tipo_culto: e.target.value }))}
+                      className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm bg-white"
+                    >
+                      {TIPO_CULTO_OPTIONS.map(tipo => (
+                        <option key={tipo} value={tipo}>{tipo}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Data do Culto */}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Data *</label>
+                    <input
+                      type="date"
+                      value={formData.data_culto}
+                      onChange={e => setFormData(prev => ({ ...prev, data_culto: e.target.value }))}
+                      className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm"
+                      required
+                    />
+                  </div>
+
+                  {/* Horário */}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Horário *</label>
+                    <input
+                      type="time"
+                      value={formData.horario_culto}
+                      onChange={e => setFormData(prev => ({ ...prev, horario_culto: e.target.value }))}
+                      className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm"
+                      required
+                    />
+                  </div>
+
+                  {/* Dirigente */}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Dirigente do Trabalho *</label>
+                    <input
+                      type="text"
+                      value={formData.dirigente}
+                      onChange={e => setFormData(prev => ({ ...prev, dirigente: e.target.value }))}
+                      placeholder="Nome do dirigente"
+                      className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm"
+                      required
+                    />
+                  </div>
+
+                  {/* Pregador */}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Ministrador / Pregador</label>
+                    <input
+                      type="text"
+                      value={formData.pregador}
+                      onChange={e => setFormData(prev => ({ ...prev, pregador: e.target.value }))}
+                      placeholder="Nome do pregador (opcional)"
+                      className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Status Operacional *</label>
+                    <select
+                      value={formData.status}
+                      onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
+                      className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm bg-white"
+                    >
+                      {STATUS_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Observações */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Observações / Resumo do Culto</label>
+                  <textarea
+                    rows={4}
+                    value={formData.observacoes}
+                    onChange={e => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
+                    placeholder="Resumo, decisões por Cristo, testemunhos marcantes ou observações administrativas..."
+                    className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={loadingData}
+                    className="px-6 py-2.5 bg-[#062E6F] hover:bg-[#154A92] text-white rounded-xl font-bold text-sm shadow-md transition flex items-center gap-1 cursor-pointer disabled:opacity-55"
+                  >
+                    {loadingData && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {editingId ? 'Atualizar Culto' : 'Registrar Culto'}
+                  </button>
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(null);
+                        setFormData({
+                          ...EMPTY_FORM,
+                          congregacao_id: isLocalUser && ctx?.congregacaoId ? ctx.congregacaoId : (locais[0]?.id || '')
+                        });
+                      }}
+                      className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-755 rounded-xl font-bold text-sm transition"
+                    >
+                      Cancelar Edição
+                    </button>
+                  )}
+                </div>
+              </form>
+            </Section>
+          )}
+
+          {activeTab === 'listagem' && (
+            <Section title="Histórico de Cultos Registrados">
+              {/* Filtros */}
+              <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-2xl mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                {/* Congregação (apenas para Admin) */}
+                {!isLocalUser && (
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-550 uppercase mb-1">Congregação</label>
+                    <select
+                      value={filtroCongregacao}
+                      onChange={e => setFiltroCongregacao(e.target.value)}
+                      className="w-full border border-slate-250 rounded-lg px-2.5 py-1.5 text-xs bg-white"
+                    >
+                      <option value="">Todas</option>
+                      {locais.map(loc => (
+                        <option key={loc.id} value={loc.id}>{loc.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Tipo de Culto */}
+                <div>
+                  <label className="block text-[11px] font-black text-slate-550 uppercase mb-1">Tipo</label>
+                  <select
+                    value={filtroTipo}
+                    onChange={e => setFiltroTipo(e.target.value)}
+                    className="w-full border border-slate-250 rounded-lg px-2.5 py-1.5 text-xs bg-white"
+                  >
+                    <option value="">Todos</option>
+                    {TIPO_CULTO_OPTIONS.map(tipo => (
+                      <option key={tipo} value={tipo}>{tipo}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-[11px] font-black text-slate-550 uppercase mb-1">Status</label>
+                  <select
+                    value={filtroStatus}
+                    onChange={e => setFiltroStatus(e.target.value)}
+                    className="w-full border border-slate-250 rounded-lg px-2.5 py-1.5 text-xs bg-white"
+                  >
+                    <option value="">Todos</option>
+                    {STATUS_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Início */}
+                <div>
+                  <label className="block text-[11px] font-black text-slate-550 uppercase mb-1">Data Início</label>
+                  <input
+                    type="date"
+                    value={filtroDataInicio}
+                    onChange={e => setFiltroDataInicio(e.target.value)}
+                    className="w-full border border-slate-250 rounded-lg px-2.5 py-1.5 text-xs"
+                  />
+                </div>
+
+                {/* Fim */}
+                <div>
+                  <label className="block text-[11px] font-black text-slate-550 uppercase mb-1">Data Fim</label>
+                  <input
+                    type="date"
+                    value={filtroDataFim}
+                    onChange={e => setFiltroDataFim(e.target.value)}
+                    className="w-full border border-slate-250 rounded-lg px-2.5 py-1.5 text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Tabela */}
+              <div className="overflow-x-auto border border-slate-100 rounded-2xl shadow-sm">
+                <table className="w-full border-collapse text-left text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-xs">
+                      <th className="p-3.5">Data/Horário</th>
+                      {!isLocalUser && <th className="p-3.5">Congregação</th>}
+                      <th className="p-3.5">Tipo</th>
+                      <th className="p-3.5">Dirigente / Pregador</th>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {registrosFiltrados.length === 0 ? (
+                      <tr>
+                        <td colSpan={isLocalUser ? 5 : 6} className="p-8 text-center text-slate-400 text-xs italic">
+                          Nenhum registro de culto encontrado com os filtros selecionados.
+                        </td>
+                      </tr>
+                    ) : (
+                      registrosFiltrados.map(reg => (
+                        <tr key={reg.id} className="hover:bg-slate-50/50 transition">
+                          <td className="p-3.5">
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-slate-800 flex items-center gap-1">
+                                <Calendar className="h-3 w-3 text-slate-400" />
+                                {formatDate(reg.data_culto)}
+                              </span>
+                              <span className="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5">
+                                <Clock className="h-2.5 w-2.5" />
+                                {reg.horario_culto.substring(0, 5)}
+                              </span>
+                            </div>
+                          </td>
+                          {!isLocalUser && (
+                            <td className="p-3.5 font-medium text-slate-700">
+                              {reg.congregacoes?.nome || 'Unidade Geral'}
+                            </td>
+                          )}
+                          <td className="p-3.5 font-bold text-[#062E6F]">{reg.tipo_culto}</td>
+                          <td className="p-3.5">
+                            <div className="flex flex-col text-xs">
+                              <span className="font-medium text-slate-800">Dirigente: {reg.dirigente}</span>
+                              {reg.pregador && (
+                                <span className="text-slate-500 mt-0.5">Pregador: {reg.pregador}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3.5">
+                            {reg.status === 'Aberto' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-850">
+                                Aberto
+                              </span>
+                            )}
+                            {reg.status === 'Encerrado' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">
+                                Encerrado
+                              </span>
+                            )}
+                            {reg.status === 'Consolidado' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                                Consolidado
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3.5 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {reg.status === 'Aberto' && isEscritaPermitida && (
+                                <button
+                                  onClick={() => handleTransicaoStatus(reg.id, 'Encerrado')}
+                                  className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition cursor-pointer"
+                                  title="Encerrar Culto"
+                                >
+                                  Encerrar
+                                </button>
+                              )}
+                              {reg.status === 'Encerrado' && isEscritaPermitida && (
+                                <button
+                                  onClick={() => handleTransicaoStatus(reg.id, 'Consolidado')}
+                                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition cursor-pointer"
+                                  title="Consolidar Culto"
+                                >
+                                  Consolidar
+                                </button>
+                              )}
+                              {isEscritaPermitida && (
+                                <>
+                                  <button
+                                    onClick={() => handleEdit(reg)}
+                                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+                                    title="Editar"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(reg.id)}
+                                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-rose-600 transition cursor-pointer"
+                                    title="Excluir"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
+          )}
+        </Tabs>
+      </div>
+
+      <NotificationModal
+        isOpen={modalNotify.isOpen}
+        title={modalNotify.title}
+        message={modalNotify.message}
+        type={modalNotify.type}
+        onClose={() => setModalNotify(prev => ({ ...prev, isOpen: false }))}
+      />
+    </PageLayout>
+  );
+}
