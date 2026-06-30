@@ -51,7 +51,8 @@ const STATUS_OPTIONS = [
 
 const TABS = [
   { id: 'cadastro', label: 'Cadastro', icon: '📝' },
-  { id: 'registros', label: 'Registros', icon: '🔍' }
+  { id: 'registros', label: 'Registros', icon: '🔍' },
+  { id: 'consolidado', label: 'Consolidação por Congregação', icon: '🏢' }
 ];
 
 const EMPTY_FORM = {
@@ -381,6 +382,75 @@ export default function RelatorioEspiritualPage() {
 
     return { cultos, visitas, almas, biblias, literaturas, cearam, visitantes };
   }, [registrosFiltrados]);
+
+  const consolidadoPorCongregacao = useMemo(() => {
+    const mapa: Record<string, {
+      congregacao_id: string | null;
+      nome: string;
+      cultos: number;
+      visitas: number;
+      almas: number;
+      biblias: number;
+      literaturas: number;
+      cearam: number;
+      visitantes: number;
+      ultimo_envio: string | null;
+    }> = {};
+
+    // Inicializa as congregações
+    locais.forEach(loc => {
+      if (filtroCongregacao && loc.id !== filtroCongregacao) return;
+      
+      mapa[loc.id] = {
+        congregacao_id: loc.id,
+        nome: loc.nome,
+        cultos: 0,
+        visitas: 0,
+        almas: 0,
+        biblias: 0,
+        literaturas: 0,
+        cearam: 0,
+        visitantes: 0,
+        ultimo_envio: null
+      };
+    });
+
+    if (!filtroCongregacao && !isLocalUser) {
+      mapa['sede'] = {
+        congregacao_id: null,
+        nome: 'Sede / Geral',
+        cultos: 0,
+        visitas: 0,
+        almas: 0,
+        biblias: 0,
+        literaturas: 0,
+        cearam: 0,
+        visitantes: 0,
+        ultimo_envio: null
+      };
+    }
+
+    registrosFiltrados.forEach(r => {
+      const key = r.congregacao_id || 'sede';
+      if (!mapa[key]) return;
+
+      mapa[key].cultos += r.cultos_realizados || 0;
+      mapa[key].visitas += r.visitas_realizadas || 0;
+      mapa[key].almas += r.almas_alcancadas || 0;
+      mapa[key].biblias += r.biblias_doadas || 0;
+      mapa[key].literaturas += r.literaturas_entregues || 0;
+      mapa[key].cearam += r.membros_cearam || 0;
+      mapa[key].visitantes += r.visitantes_presentes || 0;
+
+      if (!mapa[key].ultimo_envio || r.data_atividade > mapa[key].ultimo_envio!) {
+        mapa[key].ultimo_envio = r.data_atividade;
+      }
+    });
+
+    return Object.values(mapa).filter(c => {
+      return c.cultos > 0 || c.visitas > 0 || c.almas > 0 || c.ultimo_envio !== null || (isLocalUser && c.congregacao_id === ctx.congregacaoId);
+    });
+  }, [registrosFiltrados, locais, filtroCongregacao, isLocalUser, ctx.congregacaoId]);
 
   return (
     <PageLayout title="Relatório Espiritual" description="Gestão de Relatórios Espirituais">
@@ -787,6 +857,58 @@ export default function RelatorioEspiritualPage() {
                   })}
                 </div>
               )}
+            </Section>
+          )}
+
+          {activeTab === 'consolidado' && (
+            <Section icon="🏢" title="Consolidação de Atividades por Unidade / Congregação">
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
+                      <th className="p-4">Congregação / Unidade</th>
+                      <th className="p-4 text-center">⛪ Cultos</th>
+                      <th className="p-4 text-center">🏠 Visitas</th>
+                      <th className="p-4 text-center">🔥 Almas</th>
+                      <th className="p-4 text-center">📖 Bíblias</th>
+                      <th className="p-4 text-center">📢 Literaturas</th>
+                      <th className="p-4 text-center">🍇 Ceias</th>
+                      <th className="p-4 text-center">👥 Visitantes</th>
+                      <th className="p-4 text-right">📅 Último Envio</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {consolidadoPorCongregacao.map(item => (
+                      <tr key={item.congregacao_id || 'sede'} className="border-b border-slate-100 hover:bg-slate-50/50 transition">
+                        <td className="p-4 font-bold text-slate-800">{item.nome}</td>
+                        <td className="p-4 text-center text-slate-700 font-semibold">{item.cultos}</td>
+                        <td className="p-4 text-center text-slate-700 font-semibold">{item.visitas}</td>
+                        <td className="p-4 text-center text-rose-700 font-bold">{item.almas}</td>
+                        <td className="p-4 text-center text-slate-700 font-semibold">{item.biblias}</td>
+                        <td className="p-4 text-center text-slate-700 font-semibold">{item.literaturas}</td>
+                        <td className="p-4 text-center text-amber-700 font-bold">{item.cearam}</td>
+                        <td className="p-4 text-center text-blue-700 font-bold">{item.visitantes}</td>
+                        <td className="p-4 text-right text-slate-500 font-medium">
+                          {item.ultimo_envio ? (
+                            <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-full text-xs">
+                              {formatDate(item.ultimo_envio)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-350 italic">Sem registros</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {consolidadoPorCongregacao.length === 0 && (
+                      <tr>
+                        <td colSpan={9} className="p-8 text-center text-slate-400 italic">
+                          Nenhum dado de consolidação disponível para os filtros selecionados.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </Section>
           )}
         </Tabs>
