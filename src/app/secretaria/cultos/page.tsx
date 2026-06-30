@@ -7,7 +7,7 @@ import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { Pencil, Trash2, Loader2, Church, Home, Flame, Calendar, Clock, CheckCircle2, Users, X } from 'lucide-react';
+import { Pencil, Trash2, Loader2, Church, Home, Flame, Calendar, Clock, CheckCircle2, Users, X, Link, Copy, Check, RefreshCw, QrCode } from 'lucide-react';
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 
 interface LocalOption {
@@ -110,6 +110,13 @@ export default function CultosPage() {
     observacoes: ''
   });
 
+  // Estados do Link da Recepção (token público por culto)
+  const [cultoLink, setCultoLink] = useState<CultoRegistro | null>(null);
+  const [linkUrl, setLinkUrl] = useState<string>('');
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [loadingToken, setLoadingToken] = useState(false);
+  const [qrSrc, setQrSrc] = useState<string>('');
+
   const loadVisitantes = async (cultoId: string) => {
     setLoadingVisitantes(true);
     try {
@@ -147,6 +154,75 @@ export default function CultosPage() {
       });
     }
   }, [selectedCultoRecepcao]);
+
+  // Gera ou regenera o token público para um culto (expira em 24h)
+  const gerarTokenCulto = async (culto: CultoRegistro, regenerar = false) => {
+    if (!ctx?.ministryId) return;
+    setLoadingToken(true);
+    setLinkUrl('');
+    setQrSrc('');
+    try {
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      if (regenerar) {
+        // Exclui token existente para forçar novo
+        await supabase
+          .from('culto_tokens')
+          .delete()
+          .eq('culto_id', culto.id);
+      }
+
+      // Tenta inserir novo token
+      const { data, error } = await supabase
+        .from('culto_tokens')
+        .insert({
+          ministry_id: ctx.ministryId,
+          culto_id: culto.id,
+          is_active: true,
+          expires_at: expiresAt
+        })
+        .select('token')
+        .single();
+
+      let tokenValue: string | null = null;
+
+      if (error) {
+        // Já existe — busca o token atual
+        const { data: existing } = await supabase
+          .from('culto_tokens')
+          .select('token, expires_at')
+          .eq('culto_id', culto.id)
+          .single();
+        tokenValue = existing?.token ?? null;
+      } else {
+        tokenValue = data?.token ?? null;
+      }
+
+      if (tokenValue) {
+        const url = `${window.location.origin}/formularios/cultos/${tokenValue}`;
+        setLinkUrl(url);
+        // QR Code via API pública (sem dependência de pacote)
+        setQrSrc(`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}`);
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification('error', 'Erro', 'Não foi possível gerar o link de recepção.');
+    } finally {
+      setLoadingToken(false);
+    }
+  };
+
+  // Ao abrir o modal de link, carrega token existente automaticamente
+  useEffect(() => {
+    if (cultoLink) {
+      gerarTokenCulto(cultoLink, false);
+    } else {
+      setLinkUrl('');
+      setQrSrc('');
+      setLinkCopied(false);
+    }
+  }, [cultoLink]);
+
 
   const [modalNotify, setModalNotify] = useState<{
     isOpen: boolean;
@@ -838,6 +914,16 @@ export default function CultosPage() {
                                 <Users className="h-3.5 w-3.5" />
                                 Recepção
                               </button>
+                              {reg.status === 'Aberto' && (
+                                <button
+                                  onClick={() => setCultoLink(reg)}
+                                  className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                                  title="Link Público da Recepção"
+                                >
+                                  <Link className="h-3.5 w-3.5" />
+                                  Link
+                                </button>
+                              )}
                               {reg.status === 'Aberto' && isEscritaPermitida && (
                                 <button
                                   onClick={() => handleTransicaoStatus(reg.id, 'Encerrado')}
@@ -1212,6 +1298,111 @@ export default function CultosPage() {
                 className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs transition cursor-pointer"
               >
                 Fechar Recepção
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Link Público da Recepção + QR Code */}
+      {cultoLink && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden border border-slate-100">
+            {/* Header */}
+            <div className="p-6 bg-gradient-to-r from-teal-600 to-teal-700 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <QrCode className="h-5 w-5" />
+                  Link da Recepção
+                </h3>
+                <p className="text-xs text-teal-100 mt-0.5">
+                  {cultoLink.tipo_culto} · {formatDate(cultoLink.data_culto)}
+                </p>
+              </div>
+              <button
+                onClick={() => setCultoLink(null)}
+                className="p-1.5 rounded-lg text-teal-200 hover:bg-teal-500 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Corpo */}
+            <div className="p-6 flex flex-col items-center gap-5">
+              {loadingToken ? (
+                <div className="py-10 flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
+                </div>
+              ) : linkUrl ? (
+                <>
+                  {/* QR Code */}
+                  {qrSrc && (
+                    <div className="p-3 bg-white border-2 border-slate-200 rounded-2xl shadow-sm">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={qrSrc}
+                        alt="QR Code da Recepção"
+                        width={220}
+                        height={220}
+                        className="block"
+                      />
+                    </div>
+                  )}
+
+                  {/* URL */}
+                  <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-600 break-all font-mono select-all">
+                    {linkUrl}
+                  </div>
+
+                  {/* Ações */}
+                  <div className="w-full flex gap-2">
+                    <button
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(linkUrl);
+                        setLinkCopied(true);
+                        setTimeout(() => setLinkCopied(false), 2500);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold text-xs transition cursor-pointer"
+                    >
+                      {linkCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {linkCopied ? 'Copiado!' : 'Copiar Link'}
+                    </button>
+                    <button
+                      onClick={() => gerarTokenCulto(cultoLink, true)}
+                      disabled={loadingToken}
+                      className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition cursor-pointer disabled:opacity-50"
+                      title="Invalidar link atual e gerar novo"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Regenerar
+                    </button>
+                  </div>
+
+                  <p className="text-[10px] text-slate-400 text-center">
+                    ⏱ Este link expira em 24 horas e permite apenas cadastro de visitantes.<br />
+                    O culto precisa estar <strong>Aberto</strong> para aceitar envios.
+                  </p>
+                </>
+              ) : (
+                <div className="py-10 text-center">
+                  <p className="text-sm text-slate-500">Não foi possível carregar o link.</p>
+                  <button
+                    onClick={() => gerarTokenCulto(cultoLink, false)}
+                    className="mt-3 text-xs font-bold text-teal-600 hover:underline cursor-pointer"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setCultoLink(null)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs transition cursor-pointer"
+              >
+                Fechar
               </button>
             </div>
           </div>
