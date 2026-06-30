@@ -108,6 +108,14 @@ export default function CultosPage() {
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
 
+  // Estados dinâmicos adicionais
+  const [tiposCulto, setTiposCulto] = useState<string[]>(TIPO_CULTO_OPTIONS);
+  const [showNovoTipoModal, setShowNovoTipoModal] = useState(false);
+  const [novoTipoNome, setNovoTipoNome] = useState('');
+
+  const [membrosSugestoes, setMembrosSugestoes] = useState<{ id: string; nome: string }[]>([]);
+  const [showSugestoes, setShowSugestoes] = useState(false);
+
   // Estados da Recepção de Visitantes
   const [selectedCultoRecepcao, setSelectedCultoRecepcao] = useState<CultoRegistro | null>(null);
   const [visitantes, setVisitantes] = useState<any[]>([]);
@@ -229,6 +237,50 @@ export default function CultosPage() {
     } finally {
       setLoadingVisitantes(false);
     }
+  };
+
+  // Busca dinâmica de membros para o input Dirigente
+  const handleSearchMembros = async (search: string) => {
+    setFormData(prev => ({ ...prev, dirigente: search }));
+    if (!ctx?.ministryId || search.trim().length < 2) {
+      setMembrosSugestoes([]);
+      setShowSugestoes(false);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('membros')
+        .select('id, nome')
+        .eq('ministry_id', ctx.ministryId)
+        .ilike('nome', `%${search}%`)
+        .limit(6);
+      if (!error && data) {
+        setMembrosSugestoes(data);
+        setShowSugestoes(data.length > 0);
+      } else {
+        setMembrosSugestoes([]);
+        setShowSugestoes(false);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAddNovoTipo = (e: React.FormEvent) => {
+    e.preventDefault();
+    const nomeLimpo = novoTipoNome.trim();
+    if (!nomeLimpo) return;
+    if (!tiposCulto.includes(nomeLimpo)) {
+      setTiposCulto(prev => {
+        const novos = [...prev];
+        // Insere antes do 'Outro'
+        novos.splice(novos.length - 1, 0, nomeLimpo);
+        return novos;
+      });
+    }
+    setFormData(prev => ({ ...prev, tipo_culto: nomeLimpo }));
+    setNovoTipoNome('');
+    setShowNovoTipoModal(false);
   };
 
   useEffect(() => {
@@ -813,15 +865,25 @@ export default function CultosPage() {
                   {/* Tipo do Culto */}
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Tipo do Culto *</label>
-                    <select
-                      value={formData.tipo_culto}
-                      onChange={e => setFormData(prev => ({ ...prev, tipo_culto: e.target.value }))}
-                      className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm bg-white"
-                    >
-                      {TIPO_CULTO_OPTIONS.map(tipo => (
-                        <option key={tipo} value={tipo}>{tipo}</option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                      <select
+                        value={formData.tipo_culto}
+                        onChange={e => setFormData(prev => ({ ...prev, tipo_culto: e.target.value }))}
+                        className="flex-1 border border-slate-350 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500/20"
+                      >
+                        {tiposCulto.map(tipo => (
+                          <option key={tipo} value={tipo}>{tipo}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowNovoTipoModal(true)}
+                        className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-sm font-bold transition flex items-center justify-center cursor-pointer"
+                        title="Adicionar tipo personalizado"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
 
                   {/* Data do Culto */}
@@ -849,16 +911,40 @@ export default function CultosPage() {
                   </div>
 
                   {/* Dirigente */}
-                  <div>
+                  <div className="relative">
                     <label className="block text-sm font-bold text-slate-700 mb-1">Dirigente do Trabalho *</label>
                     <input
                       type="text"
                       value={formData.dirigente}
-                      onChange={e => setFormData(prev => ({ ...prev, dirigente: e.target.value }))}
+                      onChange={e => handleSearchMembros(e.target.value)}
+                      onFocus={() => {
+                        if (membrosSugestoes.length > 0) setShowSugestoes(true);
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => setShowSugestoes(false), 200);
+                      }}
                       placeholder="Nome do dirigente"
-                      className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm"
+                      className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20"
                       required
+                      autoComplete="off"
                     />
+                    {showSugestoes && (
+                      <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-30 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                        {membrosSugestoes.map(m => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, dirigente: m.nome }));
+                              setShowSugestoes(false);
+                            }}
+                            className="w-full text-left px-3.5 py-2.5 hover:bg-slate-50 text-xs font-semibold text-slate-750 transition"
+                          >
+                            👤 {m.nome}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Pregador */}
@@ -1699,6 +1785,65 @@ export default function CultosPage() {
                 Fechar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Novo Tipo de Culto Customizado */}
+      {showNovoTipoModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl flex flex-col overflow-hidden border border-slate-100 animate-fade-in">
+            {/* Header */}
+            <div className="p-5 bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Church className="h-5 w-5" />
+                  Nova Categoria de Culto
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNovoTipoModal(false)}
+                className="p-1 rounded-lg text-blue-200 hover:bg-blue-500 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Corpo */}
+            <form onSubmit={handleAddNovoTipo}>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Nome da Categoria *</label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="Ex: Culto de Casais, Vigília..."
+                    value={novoTipoNome}
+                    onChange={e => setNovoTipoNome(e.target.value)}
+                    className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNovoTipoModal(false)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-755 rounded-xl font-bold text-xs transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[#062E6F] hover:bg-[#154A92] text-white rounded-xl font-bold text-xs shadow-md transition cursor-pointer"
+                >
+                  Adicionar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
