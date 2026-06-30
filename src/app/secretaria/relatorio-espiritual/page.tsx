@@ -7,7 +7,7 @@ import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { Pencil, Trash2, Plus, Minus, FileText, Loader2, Church, Home, Flame, BookOpen, GlassWater, UserPlus } from 'lucide-react';
+import { Pencil, Trash2, Plus, Minus, FileText, Loader2, Church, Home, Flame, BookOpen, GlassWater, UserPlus, Link as LinkIcon } from 'lucide-react';
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 
 interface LocalOption {
@@ -177,6 +177,44 @@ export default function RelatorioEspiritualPage() {
       console.error(err);
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  const handleGerarLink = async (congId: string | null) => {
+    if (!ctx.ministryId || !congId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('relatorio_espiritual_tokens')
+        .insert({
+          ministry_id: ctx.ministryId,
+          congregacao_id: congId,
+          is_active: true
+        })
+        .select('token')
+        .single();
+
+      if (error) {
+        const { data: existing } = await supabase
+          .from('relatorio_espiritual_tokens')
+          .select('token')
+          .eq('ministry_id', ctx.ministryId)
+          .eq('congregacao_id', congId)
+          .single();
+
+        if (existing) {
+          const link = `${window.location.origin}/formularios/relatorio-espiritual/${existing.token}`;
+          navigator.clipboard.writeText(link);
+          showNotification('success', 'Link Copiado', 'O link do formulário público foi copiado para a sua área de transferência.');
+        }
+      } else if (data) {
+        const link = `${window.location.origin}/formularios/relatorio-espiritual/${data.token}`;
+        navigator.clipboard.writeText(link);
+        showNotification('success', 'Link Gerado e Copiado', 'Um novo link exclusivo foi gerado e copiado para a sua área de transferência.');
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification('error', 'Erro', 'Erro ao processar o link.');
     }
   };
 
@@ -880,7 +918,21 @@ export default function RelatorioEspiritualPage() {
                   <tbody>
                     {consolidadoPorCongregacao.map(item => (
                       <tr key={item.congregacao_id || 'sede'} className="border-b border-slate-100 hover:bg-slate-50/50 transition">
-                        <td className="p-4 font-bold text-slate-800">{item.nome}</td>
+                        <td className="p-4 font-bold text-slate-800">
+                          <div className="flex items-center justify-between">
+                            <span>{item.nome}</span>
+                            {!isLocalUser && item.congregacao_id && (
+                              <button
+                                onClick={() => handleGerarLink(item.congregacao_id)}
+                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg transition text-xs font-semibold flex items-center gap-1 border border-slate-200 cursor-pointer"
+                                title="Copiar Link de Formulário Público"
+                              >
+                                <LinkIcon className="h-3 w-3" />
+                                Link de Envio
+                              </button>
+                            )}
+                          </div>
+                        </td>
                         <td className="p-4 text-center text-slate-700 font-semibold">{item.cultos}</td>
                         <td className="p-4 text-center text-slate-700 font-semibold">{item.visitas}</td>
                         <td className="p-4 text-center text-rose-700 font-bold">{item.almas}</td>
