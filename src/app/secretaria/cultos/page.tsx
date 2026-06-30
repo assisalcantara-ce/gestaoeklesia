@@ -8,6 +8,7 @@ import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { Pencil, Trash2, Loader2, Church, Home, Flame, Calendar, Clock, CheckCircle2, Users, X, Link, Copy, Check, RefreshCw, QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 
 interface LocalOption {
@@ -115,7 +116,7 @@ export default function CultosPage() {
   const [linkUrl, setLinkUrl] = useState<string>('');
   const [linkCopied, setLinkCopied] = useState(false);
   const [loadingToken, setLoadingToken] = useState(false);
-  const [qrSrc, setQrSrc] = useState<string>('');
+
 
   const loadVisitantes = async (cultoId: string) => {
     setLoadingVisitantes(true);
@@ -160,7 +161,6 @@ export default function CultosPage() {
     if (!ctx?.ministryId) return;
     setLoadingToken(true);
     setLinkUrl('');
-    setQrSrc('');
     try {
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
@@ -201,8 +201,6 @@ export default function CultosPage() {
       if (tokenValue) {
         const url = `${window.location.origin}/formularios/cultos/${tokenValue}`;
         setLinkUrl(url);
-        // QR Code via API pública (sem dependência de pacote)
-        setQrSrc(`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}`);
       }
     } catch (err) {
       console.error(err);
@@ -218,7 +216,6 @@ export default function CultosPage() {
       gerarTokenCulto(cultoLink, false);
     } else {
       setLinkUrl('');
-      setQrSrc('');
       setLinkCopied(false);
     }
   }, [cultoLink]);
@@ -1335,19 +1332,14 @@ export default function CultosPage() {
                 </div>
               ) : linkUrl ? (
                 <>
-                  {/* QR Code */}
-                  {qrSrc && (
-                    <div className="p-3 bg-white border-2 border-slate-200 rounded-2xl shadow-sm">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={qrSrc}
-                        alt="QR Code da Recepção"
-                        width={220}
-                        height={220}
-                        className="block"
-                      />
-                    </div>
-                  )}
+                  {/* QR Code local via qrcode.react */}
+                  <div className="p-3 bg-white border-2 border-slate-200 rounded-2xl shadow-sm">
+                    <QRCodeSVG
+                      value={linkUrl}
+                      size={220}
+                      includeMargin={true}
+                    />
+                  </div>
 
                   {/* URL */}
                   <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-600 break-all font-mono select-all">
