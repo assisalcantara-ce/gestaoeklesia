@@ -853,7 +853,6 @@ export default function MinisteriosPage() {
           <div class="info"><span class="bold">E-mail:</span> ${m.email_admin || '-'}</div>
           <div class="info"><span class="bold">Senha:</span> ${password || 'Não alterada'}</div>
           <div class="info"><span class="bold">Plano:</span> <span style="text-transform: uppercase;">${m.plan || 'Starter'}</span></div>
-          <div class="info"><span class="bold">Telefone:</span> ${formatPhoneDisplay(m.phone)}</div>
           <div class="footer">Gestão Eklésia</div>
           <script>
             window.onload = function() {
