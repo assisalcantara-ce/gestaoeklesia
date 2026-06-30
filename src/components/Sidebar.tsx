@@ -99,6 +99,7 @@ export default function Sidebar() {
     'cartas-pedidos': 'secretaria',
     'certificados': 'secretaria',
     'relatorios-secretaria': 'secretaria',
+    'relatorio-espiritual': 'secretaria',
     'config-geral': 'configuracoes',
     'config-cartoes': 'configuracoes',
     'ativar-fluxo': 'configuracoes',
@@ -137,6 +138,7 @@ export default function Sidebar() {
         { id: 'cartas-pedidos',        label: 'Pedidos de Cartas',      icon: '✉️', path: '/secretaria/cartas/pedidos',         modulo: 'secretaria_local' },
         { id: 'certificados',          label: 'Certificados',           icon: '🎓', path: '/secretaria/certificados',           modulo: 'gestao'          },
         { id: 'relatorios-secretaria', label: 'Relatórios',              icon: '📋', path: '/secretaria/relatorios',             modulo: 'gestao'          },
+        { id: 'relatorio-espiritual',  label: 'Relatório Espiritual',    icon: '🕊️', path: '/secretaria/relatorio-espiritual',   modulo: 'gestao'          },
       ]
     },
     { id: 'tesouraria', label: 'Tesouraria', icon: '💰', path: '/tesouraria', modulo: 'tesouraria' },
