@@ -7,7 +7,7 @@ import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { Pencil, Trash2, Loader2, Church, Home, Flame, Calendar, Clock, CheckCircle2 } from 'lucide-react';
+import { Pencil, Trash2, Loader2, Church, Home, Flame, Calendar, Clock, CheckCircle2, Users, X } from 'lucide-react';
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 
 interface LocalOption {
@@ -91,6 +91,62 @@ export default function CultosPage() {
   const [filtroStatus, setFiltroStatus] = useState('');
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
+
+  // Estados da Recepção de Visitantes
+  const [selectedCultoRecepcao, setSelectedCultoRecepcao] = useState<CultoRegistro | null>(null);
+  const [visitantes, setVisitantes] = useState<any[]>([]);
+  const [loadingVisitantes, setLoadingVisitantes] = useState(false);
+  const [activeRecepcaoTab, setActiveRecepcaoTab] = useState<'lista' | 'form'>('lista');
+  const [editingVisitanteId, setEditingVisitanteId] = useState<string | null>(null);
+  const [visitanteForm, setVisitanteForm] = useState({
+    nome: '',
+    telefone: '',
+    cidade: '',
+    bairro: '',
+    igreja_origem: '',
+    primeira_visita: true,
+    is_ministro: false,
+    cargo_ministerial: 'Pastor',
+    observacoes: ''
+  });
+
+  const loadVisitantes = async (cultoId: string) => {
+    setLoadingVisitantes(true);
+    try {
+      const { data, error } = await supabase
+        .from('culto_visitantes')
+        .select('*')
+        .eq('culto_id', cultoId)
+        .order('nome', { ascending: true });
+
+      if (!error && data) {
+        setVisitantes(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingVisitantes(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedCultoRecepcao) {
+      loadVisitantes(selectedCultoRecepcao.id);
+      setActiveRecepcaoTab('lista');
+      setEditingVisitanteId(null);
+      setVisitanteForm({
+        nome: '',
+        telefone: '',
+        cidade: '',
+        bairro: '',
+        igreja_origem: '',
+        primeira_visita: true,
+        is_ministro: false,
+        cargo_ministerial: 'Pastor',
+        observacoes: ''
+      });
+    }
+  }, [selectedCultoRecepcao]);
 
   const [modalNotify, setModalNotify] = useState<{
     isOpen: boolean;
@@ -337,6 +393,117 @@ export default function CultosPage() {
       showNotification('error', 'Erro', 'Erro ao excluir registro: ' + err.message);
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  const handleSaveVisitante = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCultoRecepcao) return;
+    if (!isEscritaPermitida) {
+      showNotification('warning', 'Acesso Negado', 'Permissão insuficiente.');
+      return;
+    }
+
+    if (!visitanteForm.nome.trim()) {
+      showNotification('warning', 'Campo Obrigatório', 'O nome do visitante é obrigatório.');
+      return;
+    }
+
+    setLoadingVisitantes(true);
+    try {
+      const payload = {
+        culto_id: selectedCultoRecepcao.id,
+        ministry_id: selectedCultoRecepcao.ministry_id,
+        congregacao_id: selectedCultoRecepcao.congregacao_id,
+        nome: visitanteForm.nome.trim(),
+        telefone: visitanteForm.telefone.trim() || null,
+        cidade: visitanteForm.cidade.trim() || null,
+        bairro: visitanteForm.bairro.trim() || null,
+        igreja_origem: visitanteForm.igreja_origem.trim() || null,
+        primeira_visita: visitanteForm.primeira_visita,
+        is_ministro: visitanteForm.is_ministro,
+        cargo_ministerial: visitanteForm.is_ministro ? visitanteForm.cargo_ministerial : null,
+        observacoes: visitanteForm.observacoes.trim() || null
+      };
+
+      if (editingVisitanteId) {
+        const { error } = await supabase
+          .from('culto_visitantes')
+          .update(payload)
+          .eq('id', editingVisitanteId);
+
+        if (error) throw error;
+        showNotification('success', 'Sucesso', 'Visitante atualizado com sucesso.');
+      } else {
+        const { error } = await supabase
+          .from('culto_visitantes')
+          .insert(payload);
+
+        if (error) throw error;
+        showNotification('success', 'Sucesso', 'Visitante cadastrado com sucesso.');
+      }
+
+      setVisitanteForm({
+        nome: '',
+        telefone: '',
+        cidade: '',
+        bairro: '',
+        igreja_origem: '',
+        primeira_visita: true,
+        is_ministro: false,
+        cargo_ministerial: 'Pastor',
+        observacoes: ''
+      });
+      setEditingVisitanteId(null);
+      await loadVisitantes(selectedCultoRecepcao.id);
+      setActiveRecepcaoTab('lista');
+    } catch (err: any) {
+      console.error(err);
+      showNotification('error', 'Erro', 'Erro ao salvar visitante: ' + err.message);
+    } finally {
+      setLoadingVisitantes(false);
+    }
+  };
+
+  const handleEditVisitante = (v: any) => {
+    setEditingVisitanteId(v.id);
+    setVisitanteForm({
+      nome: v.nome,
+      telefone: v.telefone || '',
+      cidade: v.cidade || '',
+      bairro: v.bairro || '',
+      igreja_origem: v.igreja_origem || '',
+      primeira_visita: v.primeira_visita,
+      is_ministro: v.is_ministro,
+      cargo_ministerial: v.cargo_ministerial || 'Pastor',
+      observacoes: v.observacoes || ''
+    });
+    setActiveRecepcaoTab('form');
+  };
+
+  const handleDeleteVisitante = async (id: string) => {
+    if (!selectedCultoRecepcao) return;
+    if (!isEscritaPermitida) {
+      showNotification('warning', 'Acesso Negado', 'Permissão insuficiente.');
+      return;
+    }
+    if (!confirm('Deseja realmente remover este visitante do culto?')) return;
+
+    setLoadingVisitantes(true);
+    try {
+      const { error } = await supabase
+        .from('culto_visitantes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      showNotification('success', 'Removido', 'Visitante removido do culto.');
+      await loadVisitantes(selectedCultoRecepcao.id);
+    } catch (err: any) {
+      console.error(err);
+      showNotification('error', 'Erro', 'Erro ao excluir visitante: ' + err.message);
+    } finally {
+      setLoadingVisitantes(false);
     }
   };
 
@@ -663,6 +830,14 @@ export default function CultosPage() {
                           </td>
                           <td className="p-3.5 text-right">
                             <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => setSelectedCultoRecepcao(reg)}
+                                className="px-2.5 py-1 bg-[#062E6F]/10 hover:bg-[#062E6F]/20 text-[#062E6F] rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                                title="Recepção de Visitantes"
+                              >
+                                <Users className="h-3.5 w-3.5" />
+                                Recepção
+                              </button>
                               {reg.status === 'Aberto' && isEscritaPermitida && (
                                 <button
                                   onClick={() => handleTransicaoStatus(reg.id, 'Encerrado')}
@@ -719,6 +894,329 @@ export default function CultosPage() {
         type={modalNotify.type}
         onClose={() => setModalNotify(prev => ({ ...prev, isOpen: false }))}
       />
+
+      {/* Modal de Recepção de Visitantes */}
+      {selectedCultoRecepcao && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all">
+          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] shadow-2xl flex flex-col overflow-hidden border border-slate-100">
+            {/* Header */}
+            <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <Users className="h-5 w-5 text-[#062E6F]" />
+                  Recepção de Visitantes
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Culto: <span className="font-bold text-[#062E6F]">{selectedCultoRecepcao.tipo_culto}</span> em <span className="font-bold">{formatDate(selectedCultoRecepcao.data_culto)}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedCultoRecepcao(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Abas Internas do Modal */}
+            <div className="flex border-b border-slate-100 px-6 bg-slate-50/50">
+              <button
+                onClick={() => {
+                  setActiveRecepcaoTab('lista');
+                  setEditingVisitanteId(null);
+                }}
+                className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  activeRecepcaoTab === 'lista'
+                    ? 'border-[#062E6F] text-[#062E6F]'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                Visitantes Presentes ({visitantes.length})
+              </button>
+              <button
+                onClick={() => {
+                  setActiveRecepcaoTab('form');
+                  if (!editingVisitanteId) {
+                    setVisitanteForm({
+                      nome: '',
+                      telefone: '',
+                      cidade: '',
+                      bairro: '',
+                      igreja_origem: '',
+                      primeira_visita: true,
+                      is_ministro: false,
+                      cargo_ministerial: 'Pastor',
+                      observacoes: ''
+                    });
+                  }
+                }}
+                className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  activeRecepcaoTab === 'form'
+                    ? 'border-[#062E6F] text-[#062E6F]'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {editingVisitanteId ? '🖊️ Editar Visitante' : '➕ Registrar Visitante'}
+              </button>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="flex-1 p-6 overflow-y-auto">
+              {loadingVisitantes ? (
+                <div className="min-h-[30vh] flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                </div>
+              ) : activeRecepcaoTab === 'lista' ? (
+                <div className="space-y-4">
+                  {visitantes.length === 0 ? (
+                    <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                      <Users className="h-10 w-10 text-slate-350 mx-auto mb-2" />
+                      <p className="text-slate-400 text-sm italic">Nenhum visitante cadastrado para este culto.</p>
+                      <button
+                        onClick={() => setActiveRecepcaoTab('form')}
+                        className="mt-3 text-xs font-bold text-[#062E6F] hover:underline"
+                      >
+                        Cadastrar o primeiro visitante
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden border border-slate-100 rounded-xl">
+                      <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-xs">
+                            <th className="p-3">Visitante</th>
+                            <th className="p-3">Contato / Localização</th>
+                            <th className="p-3">Detalhes</th>
+                            <th className="p-3 text-right">Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {visitantes.map(v => (
+                            <tr key={v.id} className="hover:bg-slate-50/50 transition">
+                              <td className="p-3">
+                                <div className="font-bold text-slate-800">{v.nome}</div>
+                                {v.is_ministro && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded text-[10px] font-black bg-amber-100 text-amber-800">
+                                    👑 Ministro: {v.cargo_ministerial}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                <div className="text-slate-650 font-medium">{v.telefone || 'Sem telefone'}</div>
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  {v.bairro || 'S/ Bairro'}, {v.cidade || 'S/ Cidade'}
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex flex-col gap-1 text-[11px]">
+                                  {v.primeira_visita ? (
+                                    <span className="text-rose-700 font-semibold">📍 Primeira Visita</span>
+                                  ) : (
+                                    <span className="text-slate-500">📍 Já visitou antes</span>
+                                  )}
+                                  {v.igreja_origem && (
+                                    <span className="text-slate-600 font-medium">Origem: {v.igreja_origem}</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-3 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => handleEditVisitante(v)}
+                                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+                                    title="Editar"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteVisitante(v.id)}
+                                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-rose-600 transition cursor-pointer"
+                                    title="Excluir"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <form onSubmit={handleSaveVisitante} className="space-y-6 max-w-3xl">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Nome */}
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Nome Completo *</label>
+                      <input
+                        type="text"
+                        value={visitanteForm.nome}
+                        onChange={e => setVisitanteForm(prev => ({ ...prev, nome: e.target.value }))}
+                        placeholder="Nome do visitante"
+                        className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm"
+                        required
+                      />
+                    </div>
+
+                    {/* Telefone */}
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Telefone / WhatsApp</label>
+                      <input
+                        type="text"
+                        value={visitanteForm.telefone}
+                        onChange={e => setVisitanteForm(prev => ({ ...prev, telefone: e.target.value }))}
+                        placeholder="(00) 00000-0000"
+                        className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    {/* Cidade */}
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Cidade</label>
+                      <input
+                        type="text"
+                        value={visitanteForm.cidade}
+                        onChange={e => setVisitanteForm(prev => ({ ...prev, cidade: e.target.value }))}
+                        placeholder="Ex: São Paulo"
+                        className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    {/* Bairro */}
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Bairro</label>
+                      <input
+                        type="text"
+                        value={visitanteForm.bairro}
+                        onChange={e => setVisitanteForm(prev => ({ ...prev, bairro: e.target.value }))}
+                        placeholder="Ex: Centro"
+                        className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    {/* Igreja de Origem */}
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Igreja de Origem</label>
+                      <input
+                        type="text"
+                        value={visitanteForm.igreja_origem}
+                        onChange={e => setVisitanteForm(prev => ({ ...prev, igreja_origem: e.target.value }))}
+                        placeholder="Ex: Assembleia de Deus"
+                        className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    {/* Primeira Visita (Checkbox/Switch) */}
+                    <div className="flex items-center gap-3 pt-6">
+                      <input
+                        type="checkbox"
+                        id="primeira_visita"
+                        checked={visitanteForm.primeira_visita}
+                        onChange={e => setVisitanteForm(prev => ({ ...prev, primeira_visita: e.target.checked }))}
+                        className="h-4 w-4 text-blue-600 border-slate-300 rounded"
+                      />
+                      <label htmlFor="primeira_visita" className="text-sm font-bold text-slate-700 cursor-pointer">
+                        É a primeira visita deste irmão?
+                      </label>
+                    </div>
+
+                    {/* É Ministro? */}
+                    <div className="flex items-center gap-3 pt-6">
+                      <input
+                        type="checkbox"
+                        id="is_ministro"
+                        checked={visitanteForm.is_ministro}
+                        onChange={e => setVisitanteForm(prev => ({ ...prev, is_ministro: e.target.checked }))}
+                        className="h-4 w-4 text-blue-600 border-slate-300 rounded"
+                      />
+                      <label htmlFor="is_ministro" className="text-sm font-bold text-slate-700 cursor-pointer">
+                        É Ministro / Oficial?
+                      </label>
+                    </div>
+
+                    {/* Cargo Ministerial */}
+                    {visitanteForm.is_ministro && (
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Cargo Ministerial</label>
+                        <select
+                          value={visitanteForm.cargo_ministerial}
+                          onChange={e => setVisitanteForm(prev => ({ ...prev, cargo_ministerial: e.target.value }))}
+                          className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm bg-white"
+                        >
+                          <option value="Pastor">Pastor</option>
+                          <option value="Evangelista">Evangelista</option>
+                          <option value="Presbítero">Presbítero</option>
+                          <option value="Diácono">Diácono</option>
+                          <option value="Missionário">Missionário</option>
+                          <option value="Outro">Outro</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Observações */}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Observações Administrativas</label>
+                    <textarea
+                      rows={3}
+                      value={visitanteForm.observacoes}
+                      onChange={e => setVisitanteForm(prev => ({ ...prev, observacoes: e.target.value }))}
+                      placeholder="Observações administrativas ou pedidos de oração informados..."
+                      className="w-full border border-slate-350 rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="submit"
+                      disabled={loadingVisitantes}
+                      className="px-5 py-2 bg-[#062E6F] hover:bg-[#154A92] text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer disabled:opacity-55"
+                    >
+                      {loadingVisitantes && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      {editingVisitanteId ? 'Atualizar Dados' : 'Registrar Visitante'}
+                    </button>
+                    {editingVisitanteId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingVisitanteId(null);
+                          setVisitanteForm({
+                            nome: '',
+                            telefone: '',
+                            cidade: '',
+                            bairro: '',
+                            igreja_origem: '',
+                            primeira_visita: true,
+                            is_ministro: false,
+                            cargo_ministerial: 'Pastor',
+                            observacoes: ''
+                          });
+                          setActiveRecepcaoTab('lista');
+                        }}
+                        className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-xl font-bold text-xs transition cursor-pointer"
+                      >
+                        Cancelar Edição
+                      </button>
+                    )}
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setSelectedCultoRecepcao(null)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs transition cursor-pointer"
+              >
+                Fechar Recepção
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageLayout>
   );
 }
