@@ -7,7 +7,7 @@ import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { Pencil, Trash2, Loader2, Church, Home, Flame, Calendar, Clock, CheckCircle2, Users, X, Link, Copy, Check, RefreshCw, QrCode } from 'lucide-react';
+import { Pencil, Trash2, Loader2, Church, Home, Flame, Calendar, Clock, CheckCircle2, Users, X, Link, Copy, Check, RefreshCw, QrCode, ClipboardList } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 
@@ -27,6 +27,19 @@ interface CultoRegistro {
   pregador: string | null;
   observacoes: string | null;
   status: 'Aberto' | 'Encerrado' | 'Consolidado';
+  // Campos de encerramento
+  membros_presentes: number;
+  visitantes_presentes: number;
+  almas_alcancadas: number;
+  reconciliacoes: number;
+  batismos_espirito_santo: number;
+  curas_divinas: number;
+  biblias_doadas: number;
+  literaturas_entregues: number;
+  membros_cearam: number;
+  observacoes_encerramento: string | null;
+  encerrado_em: string | null;
+  encerrado_por: string | null;
   created_at: string;
   updated_at: string;
   congregacoes?: {
@@ -113,10 +126,89 @@ export default function CultosPage() {
 
   // Estados do Link da Recepção (token público por culto)
   const [cultoLink, setCultoLink] = useState<CultoRegistro | null>(null);
+
+  // Estados do modal de Encerramento Oficial
+  const EMPTY_ENCERRAMENTO = {
+    membros_presentes: 0,
+    visitantes_presentes: 0,
+    almas_alcancadas: 0,
+    reconciliacoes: 0,
+    batismos_espirito_santo: 0,
+    curas_divinas: 0,
+    biblias_doadas: 0,
+    literaturas_entregues: 0,
+    membros_cearam: 0,
+    observacoes_encerramento: ''
+  };
+  const [cultoEncerrar, setCultoEncerrar] = useState<CultoRegistro | null>(null);
+  const [encerramentoForm, setEncerramentoForm] = useState(EMPTY_ENCERRAMENTO);
+  const [loadingEncerramento, setLoadingEncerramento] = useState(false);
   const [linkUrl, setLinkUrl] = useState<string>('');
   const [linkCopied, setLinkCopied] = useState(false);
   const [loadingToken, setLoadingToken] = useState(false);
 
+  const handleEncerrar = async () => {
+    if (!cultoEncerrar || !ctx?.userId) return;
+    setLoadingEncerramento(true);
+    try {
+      const { error } = await supabase
+        .from('culto_registros')
+        .update({
+          ...encerramentoForm,
+          status: 'Encerrado',
+          encerrado_em: new Date().toISOString(),
+          encerrado_por: ctx.userId
+        })
+        .eq('id', cultoEncerrar.id);
+
+      if (error) throw error;
+
+      // AuditLog
+      try {
+        await fetch('/api/v1/audit-logs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            acao: 'editar',
+            modulo: 'Cultos',
+            area: 'Secretaria',
+            tabela_afetada: 'culto_registros',
+            registro_id: cultoEncerrar.id,
+            descricao: `Culto encerrado: ${cultoEncerrar.tipo_culto} em ${formatDate(cultoEncerrar.data_culto)}`,
+            dados_novos: { status: 'Encerrado', ...encerramentoForm }
+          })
+        });
+      } catch { /* audit não bloqueia operação */ }
+      showNotification('success', 'Sucesso', 'Culto encerrado com êxito.');
+      setCultoEncerrar(null);
+      setEncerramentoForm(EMPTY_ENCERRAMENTO);
+      loadRegistros();
+    } catch (err) {
+      console.error(err);
+      showNotification('error', 'Erro', 'Erro ao encerrar culto.');
+    } finally {
+      setLoadingEncerramento(false);
+    }
+  };
+
+  // Auto-fill: ao abrir o modal de encerramento, busca a quantidade de visitantes cadastrados
+  useEffect(() => {
+    if (!cultoEncerrar) {
+      setEncerramentoForm(EMPTY_ENCERRAMENTO);
+      return;
+    }
+    const fetchVisitantesCount = async () => {
+      const { count } = await supabase
+        .from('culto_visitantes')
+        .select('id', { count: 'exact', head: true })
+        .eq('culto_id', cultoEncerrar.id);
+      setEncerramentoForm(prev => ({
+        ...prev,
+        visitantes_presentes: count ?? 0
+      }));
+    };
+    fetchVisitantesCount();
+  }, [cultoEncerrar]);
 
   const loadVisitantes = async (cultoId: string) => {
     setLoadingVisitantes(true);
@@ -923,10 +1015,11 @@ export default function CultosPage() {
                               )}
                               {reg.status === 'Aberto' && isEscritaPermitida && (
                                 <button
-                                  onClick={() => handleTransicaoStatus(reg.id, 'Encerrado')}
-                                  className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition cursor-pointer"
+                                  onClick={() => setCultoEncerrar(reg)}
+                                  className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
                                   title="Encerrar Culto"
                                 >
+                                  <ClipboardList className="h-3.5 w-3.5" />
                                   Encerrar
                                 </button>
                               )}
@@ -1296,6 +1389,138 @@ export default function CultosPage() {
               >
                 Fechar Recepção
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Encerramento Oficial do Culto */}
+      {cultoEncerrar && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden border border-slate-100">
+            {/* Header */}
+            <div className="p-5 bg-gradient-to-r from-indigo-600 to-indigo-700 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5" />
+                  Encerramento Oficial do Culto
+                </h3>
+                <p className="text-xs text-indigo-200 mt-0.5">
+                  {cultoEncerrar.tipo_culto} · {formatDate(cultoEncerrar.data_culto)} · {cultoEncerrar.horario_culto}
+                </p>
+              </div>
+              <button onClick={() => setCultoEncerrar(null)} className="p-1.5 rounded-lg text-indigo-200 hover:bg-indigo-500 transition cursor-pointer">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Conteúdo rolável */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+              {/* Participação */}
+              <div>
+                <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3">Participação</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Membros Presentes</label>
+                    <input
+                      type="number" min={0}
+                      value={encerramentoForm.membros_presentes}
+                      onChange={e => setEncerramentoForm(prev => ({ ...prev, membros_presentes: Math.max(0, +e.target.value) }))}
+                      className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">
+                      Visitantes Presentes
+                      <span className="text-xs text-indigo-500 font-normal ml-1">(auto-preenchido pela Recepção)</span>
+                    </label>
+                    <input
+                      type="number" min={0}
+                      value={encerramentoForm.visitantes_presentes}
+                      onChange={e => setEncerramentoForm(prev => ({ ...prev, visitantes_presentes: Math.max(0, +e.target.value) }))}
+                      className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Resultados Espirituais */}
+              <div>
+                <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3">Resultados Espirituais</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {([
+                    { key: 'almas_alcancadas', label: 'Almas Alcançadas' },
+                    { key: 'reconciliacoes', label: 'Reconciliações' },
+                    { key: 'batismos_espirito_santo', label: 'Batismos c/ Espírito Santo' },
+                    { key: 'curas_divinas', label: 'Curas Divinas' },
+                    { key: 'biblias_doadas', label: 'Bíblias Doadas' },
+                    { key: 'literaturas_entregues', label: 'Literaturas Entregues' },
+                  ] as { key: keyof typeof encerramentoForm, label: string }[]).map(({ key, label }) => (
+                    <div key={key}>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">{label}</label>
+                      <input
+                        type="number" min={0}
+                        value={encerramentoForm[key] as number}
+                        onChange={e => setEncerramentoForm(prev => ({ ...prev, [key]: Math.max(0, +e.target.value) }))}
+                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Santa Ceia — só exibe se for Santa Ceia */}
+              {cultoEncerrar.tipo_culto === 'Santa Ceia' && (
+                <div>
+                  <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3">Santa Ceia</h4>
+                  <div className="max-w-xs">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Membros que Cearam</label>
+                    <input
+                      type="number" min={0}
+                      value={encerramentoForm.membros_cearam}
+                      onChange={e => setEncerramentoForm(prev => ({ ...prev, membros_cearam: Math.max(0, +e.target.value) }))}
+                      className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Observações */}
+              <div>
+                <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3">Observações Finais</h4>
+                <textarea
+                  rows={3}
+                  value={encerramentoForm.observacoes_encerramento}
+                  onChange={e => setEncerramentoForm(prev => ({ ...prev, observacoes_encerramento: e.target.value }))}
+                  placeholder="Registre ocorrências, destaques ou informações relevantes do culto..."
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+                  maxLength={1000}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-5 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
+              <p className="text-[10px] text-slate-400">
+                Esta ação alterará o status para <strong>Encerrado</strong> e registrará a data/hora e o responsável.
+              </p>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={() => setCultoEncerrar(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleEncerrar}
+                  disabled={loadingEncerramento}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer disabled:opacity-55"
+                >
+                  {loadingEncerramento && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Confirmar Encerramento
+                </button>
+              </div>
             </div>
           </div>
         </div>
