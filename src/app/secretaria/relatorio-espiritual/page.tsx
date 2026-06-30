@@ -7,7 +7,8 @@ import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { Pencil, Trash2, Plus, Minus, FileText, Loader2 } from 'lucide-react';
+import { Pencil, Trash2, Plus, Minus, FileText, Loader2, Church, Home, Flame, BookOpen, GlassWater, UserPlus } from 'lucide-react';
+import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 
 interface LocalOption {
   id: string;
@@ -359,6 +360,28 @@ export default function RelatorioEspiritualPage() {
 
   if (bloqueado) return null;
 
+  const kpis = useMemo(() => {
+    let cultos = 0;
+    let visitas = 0;
+    let almas = 0;
+    let biblias = 0;
+    let literaturas = 0;
+    let cearam = 0;
+    let visitantes = 0;
+
+    registrosFiltrados.forEach(r => {
+      cultos += r.cultos_realizados || 0;
+      visitas += r.visitas_realizadas || 0;
+      almas += r.almas_alcancadas || 0;
+      biblias += r.biblias_doadas || 0;
+      literaturas += r.literaturas_entregues || 0;
+      cearam += r.membros_cearam || 0;
+      visitantes += r.visitantes_presentes || 0;
+    });
+
+    return { cultos, visitas, almas, biblias, literaturas, cearam, visitantes };
+  }, [registrosFiltrados]);
+
   return (
     <PageLayout title="Relatório Espiritual" description="Gestão de Relatórios Espirituais">
       <div className="p-6 max-w-7xl mx-auto">
@@ -371,6 +394,17 @@ export default function RelatorioEspiritualPage() {
             </div>
             <p className="text-slate-600">Fundação do Relatório de Atividades Espirituais do Ministério</p>
           </div>
+        </div>
+
+        {/* Resumo de Indicadores KPIs */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+          <ExecutiveMetricCard title="Cultos" value={kpis.cultos} color="blue" icon={Church} />
+          <ExecutiveMetricCard title="Visitas" value={kpis.visitas} color="indigo" icon={Home} />
+          <ExecutiveMetricCard title="Almas" value={kpis.almas} color="rose" icon={Flame} />
+          <ExecutiveMetricCard title="Bíblias" value={kpis.biblias} color="amber" icon={BookOpen} />
+          <ExecutiveMetricCard title="Literaturas" value={kpis.literaturas} color="slate" icon={FileText} />
+          <ExecutiveMetricCard title="Santa Ceia" value={kpis.cearam} color="emerald" icon={GlassWater} subtitle="Membros que cearam" />
+          <ExecutiveMetricCard title="Visitantes" value={kpis.visitantes} color="blue" icon={UserPlus} subtitle="Visitantes presentes" />
         </div>
 
         <Tabs tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab}>
