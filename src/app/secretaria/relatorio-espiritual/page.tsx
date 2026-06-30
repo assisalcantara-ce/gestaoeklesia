@@ -36,13 +36,12 @@ interface RelatorioEspiritualRegistro {
   observacoes: string | null;
   usuario_responsavel: string | null;
   status: 'Rascunho' | 'Enviado' | 'Revisado';
+  culto_id?: string | null;
   created_at: string;
   updated_at: string;
 }
 
 const TIPO_ATIVIDADE_OPTIONS = [
-  { value: 'Culto', label: '⛪ Culto' },
-  { value: 'Santa Ceia', label: '🍇 Santa Ceia' },
   { value: 'Visita', label: '🏠 Visita' },
   { value: 'Evangelismo', label: '📢 Evangelismo' },
   { value: 'Outro', label: '📦 Outro' }
@@ -63,7 +62,7 @@ const TABS = [
 const EMPTY_FORM = {
   congregacao_id: '',
   data_atividade: new Date().toISOString().split('T')[0],
-  tipo_atividade: 'Culto' as 'Culto' | 'Santa Ceia' | 'Visita' | 'Evangelismo' | 'Outro',
+  tipo_atividade: 'Visita' as 'Culto' | 'Santa Ceia' | 'Visita' | 'Evangelismo' | 'Outro',
   cultos_realizados: 0,
   visitas_realizadas: 0,
   almas_alcancadas: 0,
@@ -439,6 +438,10 @@ export default function RelatorioEspiritualPage() {
   };
 
   const handleEdit = (r: RelatorioEspiritualRegistro) => {
+    if (r.culto_id) {
+      showNotification('warning', 'Bloqueado', 'Este registro foi consolidado automaticamente através do módulo Cultos e não pode ser editado diretamente. Edite o respectivo culto para alterar os dados.');
+      return;
+    }
     setEditingId(r.id);
     setFormData({
       congregacao_id: r.congregacao_id || '',
@@ -462,6 +465,13 @@ export default function RelatorioEspiritualPage() {
   };
 
   const handleExcluir = async (id: string) => {
+    // Buscar se possui culto_id antes
+    const registro = registros.find(r => r.id === id);
+    if (registro?.culto_id) {
+      showNotification('warning', 'Bloqueado', 'Este registro foi consolidado automaticamente através do módulo Cultos e não pode ser excluído diretamente. Exclua ou modifique o respectivo culto.');
+      return;
+    }
+
     if (!confirm('Deseja realmente excluir este relatório espiritual?')) return;
 
     try {
@@ -1037,6 +1047,11 @@ export default function RelatorioEspiritualPage() {
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusOpt?.color || 'bg-slate-100'}`}>
                               {reg.status}
                             </span>
+                            {reg.culto_id && (
+                              <span className="text-[10px] font-black bg-indigo-100 text-indigo-750 px-2 py-0.5 rounded-full border border-indigo-200">
+                                🔗 Consolidado do Culto
+                              </span>
+                            )}
                             <span className="text-xs text-slate-500 font-semibold">
                               {formatDate(reg.data_atividade)}
                             </span>
@@ -1074,20 +1089,28 @@ export default function RelatorioEspiritualPage() {
 
                         {/* Ações */}
                         <div className="flex items-center gap-2 self-end md:self-center">
-                          <button
-                            onClick={() => handleEdit(reg)}
-                            className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition"
-                            title="Editar"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleExcluir(reg.id)}
-                            className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-rose-600 transition"
-                            title="Excluir"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {reg.culto_id ? (
+                            <span className="text-xs text-slate-400 italic font-medium px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg">
+                              Apenas visualização
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleEdit(reg)}
+                                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition cursor-pointer"
+                                title="Editar"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleExcluir(reg.id)}
+                                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-rose-600 transition cursor-pointer"
+                                title="Excluir"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
