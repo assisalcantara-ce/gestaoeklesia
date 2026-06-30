@@ -1262,7 +1262,7 @@ export default function RelatorioEspiritualPage() {
                             <div className="flex items-center justify-end gap-2">
                               {!hasToken ? (
                                 <button
-                                  onClick={() => handleGerarLink(loc.id, true)}
+                                  onClick={() => handleGerarLink(loc.id, false)}
                                   className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
                                 >
                                   <Plus className="h-3 w-3" /> Gerar Link
