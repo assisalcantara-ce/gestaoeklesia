@@ -1725,7 +1725,7 @@ export default function MinisteriosPage() {
       {/* Modal: Ativar Ministério */}
       {activatingMinistry && (
         <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 text-gray-100">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 text-gray-100 max-h-[90vh] overflow-y-auto flex flex-col">
             <h2 className="text-xl font-bold text-white mb-4">Ativar Ministério</h2>
             
             {asaasSuccessData ? (
