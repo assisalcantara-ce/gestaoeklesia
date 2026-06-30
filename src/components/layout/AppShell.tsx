@@ -66,7 +66,7 @@ export default function AppShell({ children }: AppShellProps) {
 
       {/* Sidebar Container */}
       <div
-        className={`fixed left-0 top-0 h-full z-40 transition-transform duration-250 md:static md:translate-x-0 ${
+        className={`fixed left-0 top-0 h-dvh min-h-screen z-40 transition-transform duration-250 md:static md:translate-x-0 md:h-full ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

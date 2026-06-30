@@ -116,12 +116,12 @@ export default function RelatorioEspiritualPage() {
   };
 
   const isLocalUser = useMemo(() => {
-    return !!(ctx.nivel && ['admin_local', 'financeiro_local', 'secretaria_local'].includes(ctx.nivel));
-  }, [ctx.nivel]);
+    return !!(ctx?.nivel && ['admin_local', 'financeiro_local', 'secretaria_local'].includes(ctx.nivel));
+  }, [ctx?.nivel]);
 
   // Carregar Congregações (Locais)
   useEffect(() => {
-    if (ctx.loading || !ctx.ministryId) return;
+    if (ctx?.loading || !ctx?.ministryId) return;
 
     const loadLocais = async () => {
       let query = supabase
@@ -131,7 +131,7 @@ export default function RelatorioEspiritualPage() {
         .eq('is_active', true)
         .order('nome', { ascending: true });
 
-      if (isLocalUser && ctx.congregacaoId) {
+      if (isLocalUser && ctx?.congregacaoId) {
         query = query.eq('id', ctx.congregacaoId);
       }
 
@@ -140,8 +140,7 @@ export default function RelatorioEspiritualPage() {
         console.error('Erro ao carregar congregações:', error);
       } else {
         setLocais((data || []) as LocalOption[]);
-        // Se for local, pré-seleciona a única congregação
-        if (isLocalUser && ctx.congregacaoId) {
+        if (isLocalUser && ctx?.congregacaoId) {
           setFormData(prev => ({ ...prev, congregacao_id: ctx.congregacaoId || '' }));
           setFiltroCongregacao(ctx.congregacaoId || '');
         }
@@ -149,11 +148,11 @@ export default function RelatorioEspiritualPage() {
     };
 
     loadLocais();
-  }, [ctx.loading, ctx.ministryId, ctx.congregacaoId, isLocalUser, supabase]);
+  }, [ctx?.loading, ctx?.ministryId, ctx?.congregacaoId, isLocalUser, supabase]);
 
   // Carregar Registros de Relatório Espiritual
   const loadRegistros = async () => {
-    if (!ctx.ministryId) return;
+    if (!ctx?.ministryId) return;
     setLoadingData(true);
 
     try {
@@ -162,7 +161,7 @@ export default function RelatorioEspiritualPage() {
         .select('*')
         .eq('ministry_id', ctx.ministryId);
 
-      if (isLocalUser && ctx.congregacaoId) {
+      if (isLocalUser && ctx?.congregacaoId) {
         query = query.eq('congregacao_id', ctx.congregacaoId);
       }
 
@@ -181,7 +180,7 @@ export default function RelatorioEspiritualPage() {
   };
 
   const handleGerarLink = async (congId: string | null) => {
-    if (!ctx.ministryId || !congId) return;
+    if (!ctx?.ministryId || !congId) return;
 
     try {
       const { data, error } = await supabase
@@ -219,10 +218,10 @@ export default function RelatorioEspiritualPage() {
   };
 
   useEffect(() => {
-    if (!ctx.loading && ctx.ministryId) {
+    if (!ctx?.loading && ctx?.ministryId) {
       loadRegistros();
     }
-  }, [ctx.loading, ctx.ministryId, ctx.congregacaoId, isLocalUser]);
+  }, [ctx?.loading, ctx?.ministryId, ctx?.congregacaoId, isLocalUser]);
 
   // Filtragem local de registros
   const registrosFiltrados = useMemo(() => {
@@ -519,9 +518,9 @@ export default function RelatorioEspiritualPage() {
     });
 
     return Object.values(mapa).filter(c => {
-      return c.cultos > 0 || c.visitas > 0 || c.almas > 0 || c.ultimo_envio !== null || (isLocalUser && c.congregacao_id === ctx.congregacaoId);
+      return c.cultos > 0 || c.visitas > 0 || c.almas > 0 || c.ultimo_envio !== null || (isLocalUser && c.congregacao_id === ctx?.congregacaoId);
     });
-  }, [registrosFiltrados, locais, filtroCongregacao, isLocalUser, ctx.congregacaoId]);
+  }, [registrosFiltrados, locais, filtroCongregacao, isLocalUser, ctx?.congregacaoId]);
 
   return (
     <PageLayout title="Relatório Espiritual" description="Gestão de Relatórios Espirituais">

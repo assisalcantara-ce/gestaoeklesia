@@ -178,7 +178,7 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
   };
 
   return (
-    <div className="w-64 bg-[#0A2A4F] text-white shadow-lg flex flex-col h-full shrink-0">
+    <div className="w-64 bg-[#0A2A4F] text-white shadow-lg flex flex-col h-dvh min-h-screen md:h-full shrink-0">
       {/* LOGO */}
       <div className="p-4 border-b border-white/5 flex items-center justify-center mb-1">
         <Image
