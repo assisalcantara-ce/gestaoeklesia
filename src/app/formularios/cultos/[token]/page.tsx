@@ -44,6 +44,20 @@ const EMPTY_FORM = {
   observacoes: '',
 };
 
+const maskTelefone = (value: string): string => {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 10) {
+    // Fixo: (00) 0000-0000
+    return digits
+      .replace(/^(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{4})(\d)/, '$1-$2');
+  }
+  // Celular: (00) 00000-0000
+  return digits
+    .replace(/^(\d{2})(\d)/, '($1) $2')
+    .replace(/(\d{5})(\d)/, '$1-$2');
+};
+
 const formatDate = (value?: string | null) => {
   if (!value) return '';
   const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -291,9 +305,11 @@ export default function PublicCultoRecepcaoPage({ params }: { params: Promise<{ 
             </label>
             <input
               type="tel"
+              inputMode="numeric"
               value={formData.telefone}
-              onChange={e => setFormData(prev => ({ ...prev, telefone: e.target.value }))}
+              onChange={e => setFormData(prev => ({ ...prev, telefone: maskTelefone(e.target.value) }))}
               placeholder="(00) 00000-0000"
+              maxLength={15}
               className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#062E6F]/30 focus:border-[#062E6F]"
             />
           </div>
