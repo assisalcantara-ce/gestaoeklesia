@@ -15,6 +15,7 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
   { path: '/secretaria/batismo-aguas',         id: 'batismo-aguas'        },
   { path: '/secretaria/cartas/pedidos',        id: 'cartas-pedidos'       },
   { path: '/secretaria/achados-perdidos',      id: 'achados-perdidos'     },
+  { path: '/secretaria/sorteios',             id: 'sorteios'             },
   { path: '/secretaria/ativar-fluxo',          id: 'ativar-fluxo'         },
   { path: '/secretaria/funcionarios',          id: 'funcionarios'         },
   { path: '/secretaria/consagracao',           id: 'consagracao'          },

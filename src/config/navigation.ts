@@ -55,6 +55,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
       { id: 'relatorio-espiritual', label: 'Relatório Espiritual', icon: '🕊️', path: '/secretaria/relatorio-espiritual', modulo: 'gestao' },
       { id: 'funcionarios', label: 'Funcionários', icon: '👔', path: '/secretaria/funcionarios', modulo: 'gestao' },
       { id: 'achados-perdidos', label: 'Achados e Perdidos', icon: '🔍', path: '/secretaria/achados-perdidos', modulo: 'gestao' },
+      { id: 'sorteios', label: 'Sorteios', icon: '🎰', path: '/secretaria/sorteios', modulo: 'secretaria_local' },
       {
         id: 'comissao',
         label: 'Comissão',
