@@ -107,6 +107,7 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
     'relatorios-secretaria': 'secretaria',
     'relatorio-espiritual': 'secretaria',
     'cultos': 'secretaria',
+    'sorteios': 'secretaria',
     'config-geral': 'configuracoes',
     'config-cartoes': 'configuracoes',
     'ativar-fluxo': 'configuracoes',

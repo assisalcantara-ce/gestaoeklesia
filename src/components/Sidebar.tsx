@@ -104,6 +104,7 @@ export default function Sidebar() {
     'relatorios-secretaria': 'secretaria',
     'relatorio-espiritual': 'secretaria',
     'cultos': 'secretaria',
+    'sorteios': 'secretaria',
     'config-geral': 'configuracoes',
     'config-cartoes': 'configuracoes',
     'ativar-fluxo': 'configuracoes',
@@ -144,6 +145,7 @@ export default function Sidebar() {
         { id: 'relatorios-secretaria', label: 'Relatórios',              icon: '📋', path: '/secretaria/relatorios',             modulo: 'gestao'          },
         { id: 'cultos',                label: 'Cultos',                  icon: '⛪', path: '/secretaria/cultos',                 modulo: 'gestao'          },
         { id: 'relatorio-espiritual',  label: 'Relatório Espiritual',    icon: '🕊️', path: '/secretaria/relatorio-espiritual',   modulo: 'gestao'          },
+        { id: 'sorteios',              label: 'Sorteios',                icon: '🎰', path: '/secretaria/sorteios',               modulo: 'secretaria_local' },
       ]
     },
     { id: 'tesouraria', label: 'Tesouraria', icon: '💰', path: '/tesouraria', modulo: 'tesouraria' },
