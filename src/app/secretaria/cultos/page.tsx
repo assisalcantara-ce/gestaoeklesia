@@ -156,6 +156,7 @@ export default function CultosPage() {
   const [linkUrl, setLinkUrl] = useState<string>('');
   const [linkCopied, setLinkCopied] = useState(false);
   const [loadingToken, setLoadingToken] = useState(false);
+  const [cultoParaConsolidar, setCultoParaConsolidar] = useState<CultoRegistro | null>(null);
 
   const handleEncerrar = async () => {
     if (!cultoEncerrar || !ctx?.userId) return;
@@ -634,7 +635,7 @@ export default function CultosPage() {
 
 
   // Consolida culto encerrado no Relatório Espiritual (sem redigitação)
-  const handleConsolidar = async (culto: CultoRegistro) => {
+  const handleConsolidar = (culto: CultoRegistro) => {
     if (!isEscritaPermitida) {
       showNotification('warning', 'Acesso Negado', 'Permissão insuficiente.');
       return;
@@ -643,8 +644,14 @@ export default function CultosPage() {
       showNotification('warning', 'Não Permitido', 'Apenas cultos encerrados podem ser consolidados.');
       return;
     }
-    if (!confirm(`Consolidar "${culto.tipo_culto}" de ${formatDate(culto.data_culto)} no Relatório Espiritual?\n\nUm registro será criado automaticamente com os dados do encerramento.`)) return;
+    // Abre o modal de confirmação estilizado
+    setCultoParaConsolidar(culto);
+  };
 
+  const confirmarConsolidacao = async () => {
+    const culto = cultoParaConsolidar;
+    if (!culto) return;
+    setCultoParaConsolidar(null);
     setLoadingData(true);
     try {
       // Verificar duplicidade: já existe registro espiritual vinculado a este culto?
@@ -1919,6 +1926,94 @@ export default function CultosPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmar Consolidação no Relatório Espiritual */}
+      {cultoParaConsolidar && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden border border-slate-100 animate-fade-in">
+
+            {/* Header */}
+            <div className="p-5 bg-gradient-to-r from-emerald-600 to-teal-600 flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-xl">
+                  <BookCheck className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Consolidar no Relatório Espiritual</h3>
+                  <p className="text-emerald-100 text-xs mt-0.5">Esta ação não pode ser desfeita</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCultoParaConsolidar(null)}
+                className="p-1 rounded-lg text-emerald-200 hover:bg-emerald-500 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Corpo */}
+            <div className="p-5 space-y-4">
+              {/* Info do culto */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Church className="h-4 w-4 text-slate-400 shrink-0" />
+                  <span className="text-sm font-bold text-slate-800">{cultoParaConsolidar.tipo_culto}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
+                  <span className="text-sm text-slate-600">{formatDate(cultoParaConsolidar.data_culto)}{cultoParaConsolidar.horario_culto ? ` — ${cultoParaConsolidar.horario_culto}` : ''}</span>
+                </div>
+              </div>
+
+              {/* O que será consolidado */}
+              <div>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Dados que serão enviados ao relatório</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: 'Visitantes', value: cultoParaConsolidar.visitantes_presentes ?? 0 },
+                    { label: 'Membros', value: cultoParaConsolidar.membros_presentes ?? 0 },
+                    { label: 'Almas Alcançadas', value: cultoParaConsolidar.almas_alcancadas ?? 0 },
+                    { label: 'Reconciliações', value: cultoParaConsolidar.reconciliacoes ?? 0 },
+                    { label: 'Batismos Esp. Santo', value: cultoParaConsolidar.batismos_espirito_santo ?? 0 },
+                    { label: 'Curas Divinas', value: cultoParaConsolidar.curas_divinas ?? 0 },
+                  ].map(item => (
+                    <div key={item.label} className="flex justify-between items-center bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-1.5">
+                      <span className="text-xs text-slate-600">{item.label}</span>
+                      <span className="text-xs font-bold text-emerald-700">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Um registro será criado automaticamente no <strong>Relatório Espiritual</strong> com estes dados e o culto receberá o status <span className="text-emerald-600 font-bold">Consolidado</span>.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCultoParaConsolidar(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarConsolidacao}
+                disabled={loadingData}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md transition cursor-pointer flex items-center gap-1.5 disabled:opacity-60"
+              >
+                {loadingData && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                <BookCheck className="h-3.5 w-3.5" />
+                Confirmar Consolidação
+              </button>
+            </div>
           </div>
         </div>
       )}
