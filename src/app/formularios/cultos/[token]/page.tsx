@@ -128,10 +128,22 @@ export default function PublicCultoRecepcaoPage({ params }: { params: Promise<{ 
 
     setSubmitting(true);
     try {
+      // congregacao_id pode vir do join ou ser buscado diretamente se o join não retornou
+      let congregacaoId: string | null = tokenData.culto_registros?.congregacao_id || null;
+
+      if (!congregacaoId && tokenData.culto_id) {
+        const { data: cultoData } = await supabase
+          .from('culto_registros')
+          .select('congregacao_id')
+          .eq('id', tokenData.culto_id)
+          .single();
+        congregacaoId = cultoData?.congregacao_id ?? null;
+      }
+
       const payload = {
         culto_id: tokenData.culto_id,
         ministry_id: tokenData.ministry_id,
-        congregacao_id: tokenData.culto_registros?.congregacao_id,
+        congregacao_id: congregacaoId,
         nome: formData.nome.trim(),
         telefone: formData.telefone.trim() || null,
         cidade: formData.cidade.trim() || null,
