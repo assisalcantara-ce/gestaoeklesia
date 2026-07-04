@@ -24,10 +24,11 @@ import {
   QrCode,
   X,
   Globe,
-  Calendar,
   Lightbulb,
   Clock,
-  Activity
+  Activity,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import {
   LineChart,
@@ -69,6 +70,18 @@ interface RelatorioEspiritualRegistro {
   culto_id?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface FechamentoRegistro {
+  id: string;
+  ministry_id: string;
+  congregacao_id: string | null;
+  mes: number;
+  ano: number;
+  status: 'Aberta' | 'Fechada';
+  fechado_em: string | null;
+  fechado_por: string | null;
+  observacoes: string | null;
 }
 
 const TABS = [
@@ -119,18 +132,21 @@ export default function RelatorioEspiritualPage() {
 
   const labelDivPrincipal = 'Congregação';
 
-  const [formData, setFormData] = useState(EMPTY_FORM);
-
-  // Filtros de listagem
-  const [filtroCongregacao, setFiltroCongregacao] = useState('');
-  const [filtroTipo, setFiltroTipo] = useState('');
-  const [filtroStatus, setFiltroStatus] = useState('');
-  const [filtroDataInicio, setFiltroDataInicio] = useState('');
-  const [filtroDataFim, setFiltroDataFim] = useState('');
-
-  // Filtros da competência do Dashboard Executivo
+  // Competência selecionada globalmente
   const [dashMes, setDashMes] = useState<number>(new Date().getMonth() + 1);
   const [dashAno, setDashAno] = useState<number>(new Date().getFullYear());
+  const [filtroCongregacao, setFiltroCongregacao] = useState('');
+
+  // Status de Fechamento da Competência
+  const [fechamentoStatus, setFechamentoStatus] = useState<'Aberta' | 'Fechada'>('Aberta');
+  const [fechamentoInfo, setFechamentoInfo] = useState<FechamentoRegistro | null>(null);
+  const [loadingFechamento, setLoadingFechamento] = useState(false);
+
+  const [formData, setFormData] = useState(EMPTY_FORM);
+
+  // Filtros internos das abas
+  const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('');
 
   // Métrica selecionada no Gráfico de Evolução
   const [evolucaoMetrica, setEvolucaoMetrica] = useState<'almas' | 'visitantes' | 'reconciliacoes' | 'batismos'>('almas');
@@ -187,6 +203,119 @@ export default function RelatorioEspiritualPage() {
   const isLocalUser = useMemo(() => {
     return !!(ctx?.nivel && ['admin_local', 'financeiro_local', 'secretaria_local'].includes(ctx.nivel));
   }, [ctx?.nivel]);
+
+  const dashCongregacaoId = useMemo(() => {
+    return isLocalUser ? (ctx.congregacaoId || '') : filtroCongregacao;
+  }, [isLocalUser, ctx.congregacaoId, filtroCongregacao]);
+
+  // Carregar status do Fechamento
+  const loadStatusFechamento = async () => {
+    if (!ctx?.ministryId) return;
+    setLoadingFechamento(true);
+    try {
+      let query = supabase
+        .from('relatorio_espiritual_fechamentos')
+        .select('*')
+        .eq('ministry_id', ctx.ministryId)
+        .eq('mes', dashMes)
+        .eq('ano', dashAno);
+
+      if (dashCongregacaoId) {
+        query = query.eq('congregacao_id', dashCongregacaoId);
+      } else {
+        query = query.is('congregacao_id', null);
+      }
+
+      const { data, error } = await query.maybeSingle();
+
+      if (!error && data) {
+        setFechamentoStatus(data.status as 'Aberta' | 'Fechada');
+        setFechamentoInfo(data as FechamentoRegistro);
+      } else {
+        setFechamentoStatus('Aberta');
+        setFechamentoInfo(null);
+      }
+    } catch (err) {
+      console.error(err);
+      setFechamentoStatus('Aberta');
+      setFechamentoInfo(null);
+    } finally {
+      setLoadingFechamento(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!ctx?.loading && ctx?.ministryId) {
+      loadStatusFechamento();
+    }
+  }, [ctx?.loading, ctx?.ministryId, dashMes, dashAno, dashCongregacaoId]);
+
+  // Ações de Fechamento / Reabertura
+  const handleFecharCompetencia = async () => {
+    if (!ctx?.ministryId) return;
+    if (!confirm(`Deseja realmente FECHAR a competência de ${MESES_NOMES[dashMes - 1]}/${dashAno}? Novos registros serão bloqueados.`)) return;
+
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      const payload = {
+        ministry_id: ctx.ministryId,
+        congregacao_id: dashCongregacaoId || null,
+        mes: dashMes,
+        ano: dashAno,
+        status: 'Fechada',
+        fechado_em: new Date().toISOString(),
+        fechado_por: user.user?.id || null,
+        observacoes: `Competência fechada pelo gestor.`
+      };
+
+      const { error } = await supabase
+        .from('relatorio_espiritual_fechamentos')
+        .upsert(payload, { onConflict: 'ministry_id,congregacao_id,mes,ano' });
+
+      if (error) {
+        showNotification('error', 'Erro', 'Não foi possível fechar a competência: ' + error.message);
+      } else {
+        showNotification('success', 'Fechado', 'Competência fechada com sucesso. Lançamentos bloqueados.');
+        loadStatusFechamento();
+      }
+    } catch (err: any) {
+      console.error(err);
+      showNotification('error', 'Erro', 'Erro operacional ao fechar competência.');
+    }
+  };
+
+  const handleReabrirCompetencia = async () => {
+    if (!ctx?.ministryId) return;
+    
+    // Validar permissão
+    const isAutorizado = !isLocalUser || ['administrador', 'suporte', 'presidencia', 'secretaria'].includes(ctx.nivel as string);
+    if (!isAutorizado) {
+      showNotification('warning', 'Acesso Negado', 'Você não possui permissão administrativa geral para reabrir esta competência.');
+      return;
+    }
+
+    if (!confirm(`Deseja realmente REABRIR a competência de ${MESES_NOMES[dashMes - 1]}/${dashAno}? Lançamentos serão liberados.`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('relatorio_espiritual_fechamentos')
+        .delete()
+        .eq('ministry_id', ctx.ministryId)
+        .eq('mes', dashMes)
+        .eq('ano', dashAno)
+        .eq(dashCongregacaoId ? 'congregacao_id' : 'id', dashCongregacaoId || (fechamentoInfo?.id || '')); // corrige match de id
+
+      if (error) {
+        showNotification('error', 'Erro', 'Não foi possível reabrir a competência: ' + error.message);
+      } else {
+        showNotification('success', 'Reaberta', 'Competência reaberta com sucesso. Lançamentos liberados.');
+        loadStatusFechamento();
+      }
+    } catch (err: any) {
+      console.error(err);
+      showNotification('error', 'Erro', 'Erro operacional ao reabrir competência.');
+    }
+  };
 
   // Carregar Congregações (Locais)
   useEffect(() => {
@@ -245,24 +374,75 @@ export default function RelatorioEspiritualPage() {
     }
   }, [ctx?.loading, ctx?.ministryId, isLocalUser, ctx?.congregacaoId]);
 
-  // Filtros aplicados sobre a listagem da aba "Registros"
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    showNotification('info', 'Copiado', 'Link de coleta copiado para a área de transferência.');
+  };
+
+  const toggleLinkColeta = async (congId: string, active: boolean) => {
+    if (!ctx?.ministryId) return;
+    try {
+      if (active) {
+        const token = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+        const { error } = await supabase
+          .from('relatorio_espiritual_tokens')
+          .insert({
+            ministry_id: ctx.ministryId,
+            congregacao_id: congId,
+            token,
+            is_active: true,
+            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          });
+
+        if (error) {
+          showNotification('error', 'Erro', 'Erro ao ativar link: ' + error.message);
+        } else {
+          showNotification('success', 'Ativado', 'Link externo ativado com sucesso.');
+          loadTokens();
+        }
+      } else {
+        const { error } = await supabase
+          .from('relatorio_espiritual_tokens')
+          .delete()
+          .eq('ministry_id', ctx.ministryId)
+          .eq('congregacao_id', congId);
+
+        if (error) {
+          showNotification('error', 'Erro', 'Erro ao desativar link: ' + error.message);
+        } else {
+          showNotification('success', 'Desativado', 'Link externo desativado.');
+          loadTokens();
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      showNotification('error', 'Erro', 'Erro operacional ao alterar link.');
+    }
+  };
+
+  // Alinha a data padrão de novos lançamentos ao alterar a competência
+  useEffect(() => {
+    const mesStr = String(dashMes).padStart(2, '0');
+    setFormData(prev => ({
+      ...prev,
+      data_atividade: `${dashAno}-${mesStr}-01`
+    }));
+  }, [dashMes, dashAno]);
+
+  // Filtros aplicados sobre a listagem da aba "Registros" (Isolamento de Competência Mensal)
   const registrosFiltrados = useMemo(() => {
     return registros.filter(r => {
-      if (filtroCongregacao && r.congregacao_id !== filtroCongregacao) return false;
+      if (dashCongregacaoId && r.congregacao_id !== dashCongregacaoId) return false;
       if (filtroTipo && r.tipo_atividade !== filtroTipo) return false;
       if (filtroStatus && r.status !== filtroStatus) return false;
-      if (filtroDataInicio && r.data_atividade < filtroDataInicio) return false;
-      if (filtroDataFim && r.data_atividade > filtroDataFim) return false;
-      return true;
+
+      // Isolamento absoluto da competência
+      const d = new Date(r.data_atividade);
+      const m = d.getUTCMonth() + 1;
+      const y = d.getUTCFullYear();
+      return m === dashMes && y === dashAno;
     });
-  }, [registros, filtroCongregacao, filtroTipo, filtroStatus, filtroDataInicio, filtroDataFim]);
-
-  // --- MÓDULO DASHBOARD EXECUTIVO INTELIGENTE ---
-
-  // Filtro de congregação aplicado ao Dashboard
-  const dashCongregacaoId = useMemo(() => {
-    return isLocalUser ? (ctx.congregacaoId || '') : filtroCongregacao;
-  }, [isLocalUser, ctx.congregacaoId, filtroCongregacao]);
+  }, [registros, dashCongregacaoId, filtroTipo, filtroStatus, dashMes, dashAno]);
 
   // Registros pertencentes ao mês filtrado
   const registrosMesAtual = useMemo(() => {
@@ -391,7 +571,6 @@ export default function RelatorioEspiritualPage() {
 
   // --- MODELAGEM DE SAÚDE E PONTUAÇÃO (ISE) ---
 
-  // Função auxiliar para calcular a soma ponderada de uma congregação em um determinado período
   const obterSomaPonderada = (
     congId: string,
     regs: RelatorioEspiritualRegistro[]
@@ -407,22 +586,18 @@ export default function RelatorioEspiritualPage() {
         visitas += r.visitas_realizadas || 0;
       }
     });
-    // Pesos: Almas(5), Reconciliações(4), Batismos(4), Visitantes(2), Evangelismos(2), Visitas(1)
     return (almas * 5) + (recon * 4) + (bat * 4) + (visit * 2) + (evang * 2) + (visitas * 1);
   };
 
-  // Cálculo da nota do Índice de Saúde Espiritual (ISE) para o mês filtrado de todas as congregações
+  // Cálculo da Saúde Espiritual (ISE) por congregação
   const congregacoesAnaliticas = useMemo(() => {
-    // Achar a maior soma ponderada do mês atual para normalização do ISE
-    let maxSoma = 20; // Piso de 20 pontos de benchmark para evitar ISE inflado com baixo volume
+    let maxSoma = 20;
     locais.forEach(l => {
       const soma = obterSomaPonderada(l.id, registrosMesAtual);
       if (soma > maxSoma) maxSoma = soma;
     });
 
-    // Mapear dados para cada congregação
     return locais.map(l => {
-      // 1. Mês Atual
       let almas = 0, reconciliacoes = 0, visitantes = 0, batismos = 0, evangelismos = 0, visitas = 0;
       registrosMesAtual.forEach(r => {
         if (r.congregacao_id === l.id) {
@@ -438,7 +613,6 @@ export default function RelatorioEspiritualPage() {
       const somaPonderada = (almas * 5) + (reconciliacoes * 4) + (batismos * 4) + (visitantes * 2) + (evangelismos * 2) + (visitas * 1);
       const ise = Math.round((somaPonderada / maxSoma) * 100);
 
-      // 2. Mês Anterior (para variação e tendências)
       let almasAnterior = 0, reconciliacoesAnterior = 0, visitantesAnterior = 0, batismosAnterior = 0, evangelismosAnterior = 0, visitasAnterior = 0;
       registrosMesAnterior.forEach(r => {
         if (r.congregacao_id === l.id) {
@@ -452,8 +626,7 @@ export default function RelatorioEspiritualPage() {
       });
 
       const somaPonderadaAnterior = (almasAnterior * 5) + (reconciliacoesAnterior * 4) + (batismosAnterior * 4) + (visitantesAnterior * 2) + (evangelismosAnterior * 2) + (visitasAnterior * 1);
-      
-      // Variação do ISE em relação ao mês anterior
+
       let variacaoIse = 0;
       if (somaPonderadaAnterior === 0) {
         variacaoIse = somaPonderada > 0 ? 100 : 0;
@@ -461,7 +634,7 @@ export default function RelatorioEspiritualPage() {
         variacaoIse = ((somaPonderada - somaPonderadaAnterior) / somaPonderadaAnterior) * 100;
       }
 
-      // 3. Mês Retrasado (para tendência de 3 meses)
+      // Mês Retrasado
       const prev2Mes = dashMes <= 2 ? (dashMes === 2 ? 12 : 11) : dashMes - 2;
       const prev2Ano = dashMes <= 2 ? (dashMes === 2 ? dashAno - 1 : dashAno - 1) : dashAno;
       const registrosMesRetrasado = registros.filter(r => {
@@ -483,7 +656,6 @@ export default function RelatorioEspiritualPage() {
 
       const somaPonderadaRetrasado = (almasRetrasado * 5) + (reconciliacoesRetrasado * 4) + (batismosRetrasado * 4) + (visitantesRetrasado * 2) + (evangelismosRetrasado * 2) + (visitasRetrasado * 1);
 
-      // Decidir Tendência (3 meses)
       let tendencia: 'Crescimento' | 'Estabilidade' | 'Queda' = 'Estabilidade';
       if (somaPonderada > somaPonderadaAnterior && somaPonderadaAnterior >= somaPonderadaRetrasado) {
         tendencia = 'Crescimento';
@@ -495,10 +667,9 @@ export default function RelatorioEspiritualPage() {
         else if (diff < -5) tendencia = 'Queda';
       }
 
-      // Decidir Classificação Visual (Semáforo Ministerial)
       let semaforo: 'Excelente' | 'Atenção' | 'Crítico' = 'Atenção';
       if (somaPonderada === 0) {
-        semaforo = 'Crítico'; // Sem movimentação
+        semaforo = 'Crítico';
       } else if (ise >= 65 || (ise >= 45 && tendencia === 'Crescimento')) {
         semaforo = 'Excelente';
       } else if (ise < 25 || (ise < 40 && tendencia === 'Queda')) {
@@ -524,7 +695,7 @@ export default function RelatorioEspiritualPage() {
     });
   }, [locais, registrosMesAtual, registrosMesAnterior, registros, dashMes, dashAno]);
 
-  // Ranking com ordenação dinâmica
+  // Ranking ordenado dinamicamente
   const rankingOrdenado = useMemo(() => {
     return [...congregacoesAnaliticas].sort((a, b) => {
       if (rankingSortKey === 'ise') return b.ise - a.ise;
@@ -540,21 +711,14 @@ export default function RelatorioEspiritualPage() {
   const destaques = useMemo(() => {
     const defaultDestaque = { nome: 'Sem registros', valor: 0 };
     
-    // Congregação Destaque (maior crescimento percentual do ISE)
     const topCrescimento = [...congregacoesAnaliticas]
       .filter(c => c.somaPonderada > 0)
       .sort((a, b) => b.variacaoIse - a.variacaoIse)[0];
 
-    // Congregação Evangelística (maior número de visitantes)
     const topEvangelistica = [...congregacoesAnaliticas].sort((a, b) => b.visitantes - a.visitantes)[0];
-
-    // Congregação Missionária (maior número de evangelismos)
     const topMissionaria = [...congregacoesAnaliticas].sort((a, b) => b.evangelismos - a.evangelismos)[0];
-
-    // Congregação Frutífera (maior número de almas)
     const topFrutifera = [...congregacoesAnaliticas].sort((a, b) => b.almas - a.almas)[0];
-
-    // Congregação em Atenção (maior queda percentual do ISE)
+    
     const topQueda = [...congregacoesAnaliticas]
       .filter(c => c.somaPonderadaAnterior > 0)
       .sort((a, b) => a.variacaoIse - b.variacaoIse)[0];
@@ -568,9 +732,8 @@ export default function RelatorioEspiritualPage() {
     };
   }, [congregacoesAnaliticas]);
 
-  // Projeção Anual (Média dos meses transcorridos do ano atual até o mês filtrado multiplicada por 12)
+  // Projeção Anual
   const projecaoAnual = useMemo(() => {
-    // 1. Pegar registros do ano selecionado até o mês selecionado
     const registrosAno = registros.filter(r => {
       if (dashCongregacaoId && r.congregacao_id !== dashCongregacaoId) return false;
       const d = new Date(r.data_atividade);
@@ -579,7 +742,6 @@ export default function RelatorioEspiritualPage() {
       return y === dashAno && m <= dashMes;
     });
 
-    // Contar quantidade de meses com lançamentos registrados no ano corrente
     const mesesComRegistro = new Set<number>();
     registrosAno.forEach(r => {
       const d = new Date(r.data_atividade);
@@ -596,7 +758,6 @@ export default function RelatorioEspiritualPage() {
       batismosTot += r.batismos_espirito_santo || 0;
     });
 
-    // Média mensal multiplicada pelas 12 competências do ano
     return {
       almas: Math.round((almasTot / divisor) * 12),
       visitantes: Math.round((visitantesTot / divisor) * 12),
@@ -606,20 +767,17 @@ export default function RelatorioEspiritualPage() {
     };
   }, [registros, dashCongregacaoId, dashMes, dashAno]);
 
-  // Mapa de Calor (Heatmap)
+  // Heatmap
   const heatmapDados = useMemo(() => {
     return locais.map(l => {
       const colunasMeses = Array.from({ length: 12 }, (_, mesIdx) => {
         const m = mesIdx + 1;
-        
-        // Obter registros da congregação no mês m do ano filtrado
         const regsMes = registros.filter(r => {
           if (r.congregacao_id !== l.id) return false;
           const d = new Date(r.data_atividade);
           return (d.getUTCMonth() + 1) === m && d.getUTCFullYear() === dashAno;
         });
 
-        // Calcular soma ponderada
         let almas = 0, recon = 0, bat = 0, visit = 0, evang = 0, visitas = 0;
         regsMes.forEach(r => {
           almas += r.almas_alcancadas || 0;
@@ -630,21 +788,15 @@ export default function RelatorioEspiritualPage() {
           visitas += r.visitas_realizadas || 0;
         });
         const soma = (almas * 5) + (recon * 4) + (bat * 4) + (visit * 2) + (evang * 2) + (visitas * 1);
-
-        // Normalização simples do Heatmap (teto estático local de 30 pontos = intensidade total)
         const intensidade = Math.min(100, Math.round((soma / 30) * 100));
         return { mes: m, ise: intensidade, somaRaw: soma };
       });
 
-      return {
-        id: l.id,
-        nome: l.nome,
-        meses: colunasMeses
-      };
+      return { id: l.id, nome: l.nome, meses: colunasMeses };
     });
   }, [locais, registros, dashAno]);
 
-  // Histórico de 12 Meses de uma congregação selecionada (para o Modal)
+  // Evolução individual (Modal)
   const evolucaoDadosModal = useMemo(() => {
     if (!selectedCongregacaoEvolucao) return [];
     const dados = [];
@@ -682,25 +834,74 @@ export default function RelatorioEspiritualPage() {
     return dados;
   }, [registros, selectedCongregacaoEvolucao, dashMes, dashAno]);
 
+
+
+  // Consolidação por congregação calculada
+  const consolidadoPorCongregacao = useMemo(() => {
+    return locais.map(l => {
+      let cultos = 0, almas = 0, batismos = 0, reconciliacoes = 0, visitantes = 0, visitas = 0, evangelismos = 0, cearam = 0;
+      let ultimoEnvio: string | null = null;
+
+      registrosMesAtual.forEach(r => {
+        if (r.congregacao_id === l.id) {
+          cultos += r.cultos_realizados || 0;
+          almas += r.almas_alcancadas || 0;
+          batismos += r.batismos_espirito_santo || 0;
+          reconciliacoes += r.reconciliacoes || 0;
+          visitantes += r.visitantes_presentes || 0;
+          visitas += r.visitas_realizadas || 0;
+          evangelismos += r.evangelismos_realizados || 0;
+          cearam += r.membros_cearam || 0;
+          
+          if (!ultimoEnvio || new Date(r.data_atividade) > new Date(ultimoEnvio)) {
+            ultimoEnvio = r.data_atividade;
+          }
+        }
+      });
+
+      return {
+        congregacao_id: l.id,
+        nome: l.nome,
+        cultos,
+        cearam,
+        visitas,
+        evangelismos,
+        almas,
+        batismos,
+        reconciliacoes,
+        visitantes,
+        ultimo_envio: ultimoEnvio
+      };
+    });
+  }, [locais, registrosMesAtual]);
+
   // --- LÓGICA DE CADASTRO E LANÇAMENTO ---
 
   const incrementMetric = (field: keyof typeof EMPTY_FORM) => {
+    if (fechamentoStatus === 'Fechada') return;
     setFormData(prev => ({ ...prev, [field]: (prev[field] as number) + 1 }));
   };
 
   const decrementMetric = (field: keyof typeof EMPTY_FORM) => {
+    if (fechamentoStatus === 'Fechada') return;
     setFormData(prev => ({ ...prev, [field]: Math.max(0, (prev[field] as number) - 1) }));
   };
 
   const resetForm = () => {
+    const mesStr = String(dashMes).padStart(2, '0');
     setFormData({
       ...EMPTY_FORM,
-      congregacao_id: isLocalUser ? (ctx.congregacaoId || '') : ''
+      congregacao_id: isLocalUser ? (ctx.congregacaoId || '') : '',
+      data_atividade: `${dashAno}-${mesStr}-01`
     });
     setEditingId(null);
   };
 
   const startEdit = (reg: RelatorioEspiritualRegistro) => {
+    if (fechamentoStatus === 'Fechada') {
+      showNotification('warning', 'Bloqueado', 'Esta competência encontra-se fechada. Não é permitido editar registros.');
+      return;
+    }
     setEditingId(reg.id);
     setFormData({
       congregacao_id: reg.congregacao_id || '',
@@ -724,6 +925,10 @@ export default function RelatorioEspiritualPage() {
   };
 
   const deleteRegistro = async (id: string) => {
+    if (fechamentoStatus === 'Fechada') {
+      showNotification('warning', 'Bloqueado', 'Esta competência encontra-se fechada. Não é permitido excluir registros.');
+      return;
+    }
     if (!confirm('Deseja realmente excluir este registro de relatório espiritual?')) return;
     try {
       const { error } = await supabase
@@ -746,8 +951,23 @@ export default function RelatorioEspiritualPage() {
     e.preventDefault();
     if (!ctx?.ministryId) return;
 
+    if (fechamentoStatus === 'Fechada') {
+      showNotification('warning', 'Bloqueado', 'Esta competência encontra-se fechada. Lançamentos bloqueados.');
+      return;
+    }
+
     if (!formData.congregacao_id) {
       showNotification('warning', 'Alerta', 'Selecione uma congregação válida.');
+      return;
+    }
+
+    // Validação rígida de isolamento de Competência
+    const dAct = new Date(formData.data_atividade);
+    const mAct = dAct.getUTCMonth() + 1;
+    const yAct = dAct.getUTCFullYear();
+
+    if (mAct !== dashMes || yAct !== dashAno) {
+      showNotification('warning', 'Fora da Competência', `A data da atividade (${formatDate(formData.data_atividade)}) não pertence à competência selecionada no topo (${MESES_NOMES[dashMes - 1]}/${dashAno}). Corrija a data.`);
       return;
     }
 
@@ -807,111 +1027,6 @@ export default function RelatorioEspiritualPage() {
     }
   };
 
-  // Consolidação por congregação
-  const consolidadoPorCongregacao = useMemo(() => {
-    const mapa: Record<string, {
-      congregacao_id: string | null;
-      nome: string;
-      cultos: number;
-      visitas: number;
-      almas: number;
-      biblias: number;
-      literaturas: number;
-      batismos: number;
-      curas: number;
-      evangelismos: number;
-      reconciliacoes: number;
-      cearam: number;
-      visitantes: number;
-      ultimo_envio: string | null;
-    }> = {};
-
-    locais.forEach(l => {
-      mapa[l.id] = {
-        congregacao_id: l.id,
-        nome: l.nome,
-        cultos: 0,
-        visitas: 0,
-        almas: 0,
-        biblias: 0,
-        literaturas: 0,
-        batismos: 0,
-        curas: 0,
-        evangelismos: 0,
-        reconciliacoes: 0,
-        cearam: 0,
-        visitantes: 0,
-        ultimo_envio: null
-      };
-    });
-
-    registrosFiltrados.forEach(r => {
-      if (r.congregacao_id && mapa[r.congregacao_id]) {
-        const item = mapa[r.congregacao_id];
-        item.cultos += r.cultos_realizados || 0;
-        item.visitas += r.visitas_realizadas || 0;
-        item.almas += r.almas_alcancadas || 0;
-        item.biblias += r.biblias_doadas || 0;
-        item.literaturas += r.literaturas_entregues || 0;
-        item.batismos += r.batismos_espirito_santo || 0;
-        item.curas += r.curas_divinas || 0;
-        item.evangelismos += r.evangelismos_realizados || 0;
-        item.reconciliacoes += r.reconciliacoes || 0;
-        item.cearam += r.membros_cearam || 0;
-        item.visitantes += r.visitantes_presentes || 0;
-
-        if (!item.ultimo_envio || r.data_atividade > item.ultimo_envio) {
-          item.ultimo_envio = r.data_atividade;
-        }
-      }
-    });
-
-    return Object.values(mapa);
-  }, [locais, registrosFiltrados]);
-
-  // Central de Coleta
-  const toggleLinkColeta = async (congId: string, active: boolean) => {
-    try {
-      if (!ctx?.ministryId) return;
-      if (active) {
-        const tokenString = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-        const expires = new Date();
-        expires.setDate(expires.getDate() + 30); // 30 dias
-
-        const { error } = await supabase
-          .from('relatorio_espiritual_tokens')
-          .upsert({
-            ministry_id: ctx.ministryId,
-            congregacao_id: congId,
-            token: tokenString,
-            is_active: true,
-            expires_at: expires.toISOString()
-          }, { onConflict: 'ministry_id,congregacao_id' });
-
-        if (error) throw error;
-        showNotification('success', 'Link Ativado', 'Link externo gerado com sucesso.');
-      } else {
-        const { error } = await supabase
-          .from('relatorio_espiritual_tokens')
-          .update({ is_active: false })
-          .eq('ministry_id', ctx.ministryId)
-          .eq('congregacao_id', congId);
-
-        if (error) throw error;
-        showNotification('info', 'Link Desativado', 'Link de coleta desativado.');
-      }
-      loadTokens();
-    } catch (err: any) {
-      console.error(err);
-      showNotification('error', 'Erro', 'Erro ao configurar link externo: ' + (err.message || ''));
-    }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    showNotification('info', 'Copiado', 'Link de coleta copiado para a área de transferência.');
-  };
-
   if (bloqueado) return null;
 
   return (
@@ -952,21 +1067,15 @@ export default function RelatorioEspiritualPage() {
       />
 
       <DashboardContent>
-        {/* ABA 1: DASHBOARD EXECUTIVO ANALÍTICO */}
-        {activeTab === 'dashboard' && (
-          <div className="space-y-8">
-            
-            {/* Linha 0: Filtro de Competência do Dashboard */}
-            <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-[#062E6F]" />
-                <h3 className="font-extrabold text-slate-800 text-sm uppercase tracking-wider">
-                  Período de Competência
-                </h3>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                {/* Seleção do Mês */}
+        {/* CAIXA DE COMPETÊNCIA GLOBAL & STATUS DE FECHAMENTO */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-5 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+            {/* Seleção do Período */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Competência Selecionada
+              </label>
+              <div className="flex gap-2">
                 <select
                   value={dashMes}
                   onChange={e => setDashMes(parseInt(e.target.value))}
@@ -977,7 +1086,6 @@ export default function RelatorioEspiritualPage() {
                   ))}
                 </select>
 
-                {/* Seleção do Ano */}
                 <select
                   value={dashAno}
                   onChange={e => setDashAno(parseInt(e.target.value))}
@@ -987,23 +1095,78 @@ export default function RelatorioEspiritualPage() {
                   <option value={2025}>2025</option>
                   <option value={2026}>2026</option>
                 </select>
-
-                {/* Seletor Congregação */}
-                {!isLocalUser && (
-                  <select
-                    value={filtroCongregacao}
-                    onChange={e => setFiltroCongregacao(e.target.value)}
-                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition cursor-pointer"
-                  >
-                    <option value="">Todas as congregações</option>
-                    {locais.map(l => (
-                      <option key={l.id} value={l.id}>{l.nome}</option>
-                    ))}
-                  </select>
-                )}
               </div>
             </div>
 
+            {/* Seleção da Congregação */}
+            {!isLocalUser && (
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Congregação em Análise
+                </label>
+                <select
+                  value={filtroCongregacao}
+                  onChange={e => setFiltroCongregacao(e.target.value)}
+                  className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition cursor-pointer min-w-[200px]"
+                >
+                  <option value="">Visão Consolidada do Tenant</option>
+                  {locais.map(l => (
+                    <option key={l.id} value={l.id}>{l.nome}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Indicador Visual do Fechamento */}
+            <div className="space-y-1">
+              <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Status da Competência
+              </span>
+              <div className="flex items-center gap-2 pt-1.5">
+                {loadingFechamento ? (
+                  <span className="text-slate-400 text-xs font-bold animate-pulse">Sincronizando...</span>
+                ) : fechamentoStatus === 'Fechada' ? (
+                  <span className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 border border-rose-100 rounded-full px-3 py-1 font-bold text-xs uppercase tracking-wide">
+                    <Lock className="h-3.5 w-3.5" />
+                    Competência Fechada
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-3 py-1 font-bold text-xs uppercase tracking-wide animate-pulse">
+                    <Unlock className="h-3.5 w-3.5" />
+                    Competência Aberta
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Botões de Fechamento / Reabertura */}
+          <div className="flex items-center gap-2">
+            {fechamentoStatus === 'Aberta' ? (
+              <button
+                onClick={handleFecharCompetencia}
+                disabled={loadingFechamento}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Lock className="h-3.5 w-3.5" />
+                Fechar Competência
+              </button>
+            ) : (
+              <button
+                onClick={handleReabrirCompetencia}
+                disabled={loadingFechamento}
+                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Unlock className="h-3.5 w-3.5" />
+                Reabrir Competência
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ABA 1: DASHBOARD EXECUTIVO ANALÍTICO */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-8">
             {/* Linha 1: KPIs & Comparativos */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <ExecutiveMetricCard
@@ -1038,8 +1201,6 @@ export default function RelatorioEspiritualPage() {
 
             {/* Linha 2: Evolução Mensal & Distribuição das Atividades */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
-              {/* Evolução Mensal (Linha) */}
               <div className="lg:col-span-2">
                 <DashboardSection title="Evolução Mensal (Últimos 12 Meses)">
                   <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
@@ -1093,7 +1254,6 @@ export default function RelatorioEspiritualPage() {
                 </DashboardSection>
               </div>
 
-              {/* Distribuição das Atividades (Barras) */}
               <div>
                 <DashboardSection title="Atividades da Competência">
                   <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
@@ -1114,21 +1274,15 @@ export default function RelatorioEspiritualPage() {
                   </div>
                 </DashboardSection>
               </div>
-
             </div>
 
             {/* Linha 3: Ranking Inteligente, Painel de Saúde & Destaques */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
-              {/* Ranking & Painel de Saúde (2 colunas no desktop) */}
               <div className="lg:col-span-2">
                 <DashboardSection title="Ranking de Saúde & Desempenho Espiritual">
                   <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
-                    {/* Controladores de ordenação dinâmica */}
                     <div className="p-4 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-2 items-center justify-between">
-                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                        Ordenar ranking por:
-                      </span>
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Ordenar ranking por:</span>
                       <div className="flex flex-wrap gap-1.5">
                         {([
                           { key: 'ise', label: 'Saúde (ISE)' },
@@ -1156,13 +1310,13 @@ export default function RelatorioEspiritualPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
-                          <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase font-black tracking-wider">
+                          <tr className="bg-slate-50 border-b border-slate-100 text-slate-550 uppercase font-black tracking-wider">
                             <th className="px-5 py-3 text-center w-12">Pos</th>
                             <th className="px-5 py-3">Congregação</th>
                             <th className="px-5 py-3 text-center w-24">Semáforo</th>
                             <th className="px-5 py-3 text-center w-12">Tend.</th>
                             <th className="px-5 py-3 text-center w-40">Índice Saúde (ISE)</th>
-                            <th className="px-5 py-3 text-center w-20">Lançamento</th>
+                            <th className="px-5 py-3 text-right">Ficha</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
@@ -1172,24 +1326,17 @@ export default function RelatorioEspiritualPage() {
                               onClick={() => setSelectedCongregacaoEvolucao({ id: c.id, nome: c.nome })}
                               className="hover:bg-slate-50/50 transition cursor-pointer group"
                             >
-                              {/* Posição */}
                               <td className="px-5 py-4 text-center font-black">
                                 {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`}
                               </td>
-
-                              {/* Nome Congregação */}
                               <td className="px-5 py-4">
-                                <div className="font-extrabold text-slate-800 text-sm group-hover:text-[#062E6F] transition">
-                                  {c.nome}
-                                </div>
+                                <div className="font-extrabold text-slate-800 text-sm group-hover:text-[#062E6F] transition">{c.nome}</div>
                                 <div className="text-[10px] text-slate-400 mt-0.5">
                                   Almas: <strong className="text-rose-600 font-bold">{c.almas}</strong> |
                                   Visitantes: <strong className="text-blue-600 font-bold">{c.visitantes}</strong> |
                                   Evang.: <strong className="text-slate-700 font-bold">{c.evangelismos}</strong>
                                 </div>
                               </td>
-
-                              {/* Semáforo */}
                               <td className="px-5 py-4 text-center whitespace-nowrap">
                                 {c.semaforo === 'Excelente' ? (
                                   <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2 py-0.5 font-bold text-[9px] uppercase tracking-wide">
@@ -1208,24 +1355,18 @@ export default function RelatorioEspiritualPage() {
                                   </span>
                                 )}
                               </td>
-
-                              {/* Tendência */}
                               <td className="px-5 py-4 text-center text-sm font-black whitespace-nowrap">
                                 {c.tendencia === 'Crescimento' ? (
-                                  <span className="text-emerald-600" title="Crescimento (últimos 3 meses)">⬈</span>
+                                  <span className="text-emerald-600">⬈</span>
                                 ) : c.tendencia === 'Queda' ? (
-                                  <span className="text-rose-600" title="Queda (últimos 3 meses)">⬊</span>
+                                  <span className="text-rose-600">⬊</span>
                                 ) : (
-                                  <span className="text-slate-400" title="Estabilidade (últimos 3 meses)">➡</span>
+                                  <span className="text-slate-400">➡</span>
                                 )}
                               </td>
-
-                              {/* ISE nota + barra de progresso */}
                               <td className="px-5 py-4">
                                 <div className="flex items-center gap-3">
-                                  <span className="text-slate-800 font-extrabold text-sm w-8 shrink-0">
-                                    {c.ise}
-                                  </span>
+                                  <span className="text-slate-800 font-extrabold text-sm w-8 shrink-0">{c.ise}</span>
                                   <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                                     <div
                                       className={`h-full rounded-full transition-all duration-500 ${
@@ -1237,12 +1378,8 @@ export default function RelatorioEspiritualPage() {
                                   </div>
                                 </div>
                               </td>
-
-                              {/* Detalhe interativo */}
                               <td className="px-5 py-4 text-right">
-                                <button className="text-[10px] font-black uppercase text-[#062E6F] hover:underline whitespace-nowrap">
-                                  Ver Ficha
-                                </button>
+                                <button className="text-[10px] font-black uppercase text-[#062E6F] hover:underline whitespace-nowrap">Ver Ficha</button>
                               </td>
                             </tr>
                           ))}
@@ -1253,95 +1390,63 @@ export default function RelatorioEspiritualPage() {
                 </DashboardSection>
               </div>
 
-              {/* Destaques do Período */}
               <div>
                 <DashboardSection title="Destaques do Período">
                   <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4.5">
-                    
-                    {/* Congregação Destaque */}
                     <div className="p-4 bg-emerald-50/40 border border-emerald-100/50 rounded-xl space-y-1">
                       <div className="flex justify-between items-center">
-                        <span className="text-emerald-700 font-bold text-xs flex items-center gap-1.5">
-                          🏆 Congregação Destaque
-                        </span>
-                        <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
-                          {destaques.destaque.valor}
-                        </span>
+                        <span className="text-emerald-700 font-bold text-xs flex items-center gap-1.5">🏆 Congregação Destaque</span>
+                        <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">{destaques.destaque.valor}</span>
                       </div>
                       <h4 className="font-extrabold text-slate-800 text-sm">{destaques.destaque.nome}</h4>
                       <p className="text-[10px] text-slate-500">Maior crescimento percentual do ISE.</p>
                     </div>
 
-                    {/* Congregação Evangelística */}
                     <div className="p-4 bg-blue-50/40 border border-blue-100/50 rounded-xl space-y-1">
                       <div className="flex justify-between items-center">
-                        <span className="text-blue-700 font-bold text-xs flex items-center gap-1.5">
-                          🔥 Congregação Evangelística
-                        </span>
-                        <span className="text-[10px] font-black text-blue-800 bg-blue-100 px-2 py-0.5 rounded-md">
-                          {destaques.evangelistica.valor} visit.
-                        </span>
+                        <span className="text-blue-700 font-bold text-xs flex items-center gap-1.5">🔥 Congregação Evangelística</span>
+                        <span className="text-[10px] font-black text-blue-800 bg-blue-100 px-2 py-0.5 rounded-md">{destaques.evangelistica.valor} visit.</span>
                       </div>
                       <h4 className="font-extrabold text-slate-800 text-sm">{destaques.evangelistica.nome}</h4>
                       <p className="text-[10px] text-slate-500">Maior número de visitantes atraídos nos cultos.</p>
                     </div>
 
-                    {/* Congregação Missionária */}
                     <div className="p-4 bg-slate-50 border border-slate-150 rounded-xl space-y-1">
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-700 font-bold text-xs flex items-center gap-1.5">
-                          📢 Congregação Missionária
-                        </span>
-                        <span className="text-[10px] font-black text-slate-800 bg-slate-200 px-2 py-0.5 rounded-md">
-                          {destaques.missionaria.valor} ações
-                        </span>
+                        <span className="text-slate-700 font-bold text-xs flex items-center gap-1.5">📢 Congregação Missionária</span>
+                        <span className="text-[10px] font-black text-slate-800 bg-slate-200 px-2 py-0.5 rounded-md">{destaques.missionaria.valor} ações</span>
                       </div>
                       <h4 className="font-extrabold text-slate-800 text-sm">{destaques.missionaria.nome}</h4>
                       <p className="text-[10px] text-slate-500">Maior número de ações de evangelismo externo.</p>
                     </div>
 
-                    {/* Congregação Frutífera */}
                     <div className="p-4 bg-rose-50/40 border border-rose-100/50 rounded-xl space-y-1">
                       <div className="flex justify-between items-center">
-                        <span className="text-rose-700 font-bold text-xs flex items-center gap-1.5">
-                          ❤️ Congregação Frutífera
-                        </span>
-                        <span className="text-[10px] font-black text-rose-800 bg-rose-100 px-2 py-0.5 rounded-md">
-                          {destaques.frutifera.valor} almas
-                        </span>
+                        <span className="text-rose-700 font-bold text-xs flex items-center gap-1.5">❤️ Congregação Frutífera</span>
+                        <span className="text-[10px] font-black text-rose-800 bg-rose-100 px-2 py-0.5 rounded-md">{destaques.frutifera.valor} almas</span>
                       </div>
                       <h4 className="font-extrabold text-slate-800 text-sm">{destaques.frutifera.nome}</h4>
                       <p className="text-[10px] text-slate-500">Maior número de almas ganhas para Cristo.</p>
                     </div>
 
-                    {/* Congregação em Atenção */}
                     <div className="p-4 bg-rose-50/30 border border-rose-100/30 rounded-xl space-y-1">
                       <div className="flex justify-between items-center">
-                        <span className="text-rose-900 font-bold text-xs flex items-center gap-1.5">
-                          ⚠️ Congregação em Atenção
-                        </span>
-                        <span className="text-[10px] font-black text-rose-950 bg-rose-100 px-2 py-0.5 rounded-md">
-                          {destaques.atencao.valor}
-                        </span>
+                        <span className="text-rose-900 font-bold text-xs flex items-center gap-1.5">⚠️ Congregação em Atenção</span>
+                        <span className="text-[10px] font-black text-rose-950 bg-rose-100 px-2 py-0.5 rounded-md">{destaques.atencao.valor}</span>
                       </div>
                       <h4 className="font-extrabold text-slate-800 text-sm">{destaques.atencao.nome}</h4>
                       <p className="text-[10px] text-slate-500">Maior redução percentual do ISE.</p>
                     </div>
-
                   </div>
                 </DashboardSection>
               </div>
-
             </div>
 
-            {/* Linha 4: Mapa de Calor (Heatmap) & Projeção Anual */}
+            {/* Linha 4: Heatmap & Projeção Anual */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
-              {/* Mapa de Calor (Heatmap) */}
               <div className="lg:col-span-2">
                 <DashboardSection title={`Mapa de Calor do Índice de Saúde Espiritual (Ano: ${dashAno})`}>
                   <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
-                    
                     <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       <span>Linhas: Congregações | Colunas: Jan a Dez</span>
                       <div className="flex items-center gap-2">
@@ -1355,9 +1460,7 @@ export default function RelatorioEspiritualPage() {
                       <div className="min-w-[600px] space-y-3">
                         {heatmapDados.map(row => (
                           <div key={row.id} className="flex items-center gap-2">
-                            <span className="w-36 text-xs font-bold text-slate-700 truncate" title={row.nome}>
-                              {row.nome}
-                            </span>
+                            <span className="w-36 text-xs font-bold text-slate-700 truncate" title={row.nome}>{row.nome}</span>
                             <div className="flex gap-1.5 flex-1 justify-between">
                               {row.meses.map(col => (
                                 <div
@@ -1378,367 +1481,309 @@ export default function RelatorioEspiritualPage() {
                             </div>
                           </div>
                         ))}
-                        
-                        {/* Linha de cabeçalho dos meses */}
+
                         <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                           <span className="w-36" />
                           <div className="flex gap-1.5 flex-1 justify-between text-[10px] font-bold text-slate-400 text-center">
                             {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].map((m, idx) => (
-                              <span key={idx} className="flex-1">
-                                {m}
-                              </span>
+                              <span key={idx} className="flex-1">{m}</span>
                             ))}
                           </div>
                         </div>
-
                       </div>
                     </div>
-
                   </div>
                 </DashboardSection>
               </div>
 
-              {/* Projeção Anual */}
               <div>
                 <DashboardSection title="Projeção Acumulada do Ano">
                   <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4.5 min-h-[300px]">
                     <div className="flex items-center gap-2 text-indigo-600 mb-1">
                       <Activity className="h-5 w-5" />
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                        Projeções Matemáticas (Jan a Dez)
-                      </span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Projeções Matemáticas (Jan a Dez)</span>
                     </div>
-
                     <p className="text-[11px] font-semibold text-slate-500 leading-relaxed">
                       Estimativa de fechamento anual com base no histórico de {projecaoAnual.divisor} meses registrados em {dashAno}.
                     </p>
 
                     <div className="space-y-3.5">
-                      {/* Almas */}
                       <div className="flex justify-between items-center p-3 bg-slate-50/80 rounded-xl border border-slate-100">
-                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                          🔥 Almas
-                        </span>
-                        <strong className="text-sm font-black text-rose-600">
-                          {projecaoAnual.almas} vidas
-                        </strong>
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">🔥 Almas</span>
+                        <strong className="text-sm font-black text-rose-600">{projecaoAnual.almas} vidas</strong>
                       </div>
 
-                      {/* Visitantes */}
                       <div className="flex justify-between items-center p-3 bg-slate-50/80 rounded-xl border border-slate-100">
-                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                          👥 Visitantes
-                        </span>
-                        <strong className="text-sm font-black text-blue-600">
-                          {projecaoAnual.visitantes} pessoas
-                        </strong>
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">👥 Visitantes</span>
+                        <strong className="text-sm font-black text-blue-600">{projecaoAnual.visitantes} pessoas</strong>
                       </div>
 
-                      {/* Reconciliados */}
                       <div className="flex justify-between items-center p-3 bg-slate-50/80 rounded-xl border border-slate-100">
-                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                          🤝 Reconciliações
-                        </span>
-                        <strong className="text-sm font-black text-emerald-600">
-                          {projecaoAnual.reconciliacoes} retornos
-                        </strong>
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">🤝 Reconciliações</span>
+                        <strong className="text-sm font-black text-emerald-600">{projecaoAnual.reconciliacoes} retornos</strong>
                       </div>
 
-                      {/* Batismos ES */}
                       <div className="flex justify-between items-center p-3 bg-slate-50/80 rounded-xl border border-slate-100">
-                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                          ✨ Batismos ES
-                        </span>
-                        <strong className="text-sm font-black text-rose-500">
-                          {projecaoAnual.batismos} batismos
-                        </strong>
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">✨ Batismos ES</span>
+                        <strong className="text-sm font-black text-rose-500">{projecaoAnual.batismos} batismos</strong>
                       </div>
                     </div>
-
                   </div>
                 </DashboardSection>
               </div>
-
             </div>
-
           </div>
         )}
 
         {/* ABA 2: CADASTRO E LANÇAMENTOS */}
         {activeTab === 'cadastro' && (
           <DashboardSection title={editingId ? "✏️ Editar Relatório Espiritual" : "📝 Cadastrar Atividade Espiritual"}>
-            <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-6">
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                
-                {/* Congregação */}
+            {fechamentoStatus === 'Fechada' ? (
+              <div className="bg-rose-50 border border-rose-250 p-5 rounded-2xl text-rose-700 font-bold flex items-center gap-3">
+                <Lock className="h-6 w-6 text-rose-600" />
                 <div>
-                  <label className="block text-sm font-semibold text-slate-750 mb-1">
-                    {labelDivPrincipal} *
-                  </label>
-                  <select
-                    disabled={isLocalUser}
-                    value={formData.congregacao_id}
-                    onChange={e => setFormData(prev => ({ ...prev, congregacao_id: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
-                    required
-                  >
-                    <option value="">Selecione...</option>
-                    {locais.map(l => (
-                      <option key={l.id} value={l.id}>{l.nome}</option>
-                    ))}
-                  </select>
+                  <h4 className="text-sm uppercase tracking-wide">Competência Fechada</h4>
+                  <p className="text-xs font-medium text-rose-650 mt-1">
+                    Esta competência ({MESES_NOMES[dashMes - 1]}/{dashAno}) encontra-se fechada. Não é permitido novos lançamentos ou alterações de registros.
+                  </p>
                 </div>
-
-                {/* Data */}
-                <div>
-                  <label className="block text-sm font-semibold text-slate-750 mb-1">Data da Atividade *</label>
-                  <input
-                    type="date"
-                    value={formData.data_atividade}
-                    onChange={e => setFormData(prev => ({ ...prev, data_atividade: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
-                    required
-                  />
-                </div>
-
-                {/* Tipo de Atividade */}
-                <div>
-                  <label className="block text-sm font-semibold text-slate-750 mb-1">Tipo de Atividade *</label>
-                  <select
-                    value={formData.tipo_atividade}
-                    onChange={e => setFormData(prev => ({ ...prev, tipo_atividade: e.target.value as any }))}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
-                    required
-                  >
-                    <option value="Visita">🏠 Visita</option>
-                    <option value="Evangelismo">📢 Evangelismo</option>
-                    <option value="Culto">⛪ Culto</option>
-                    <option value="Santa Ceia">🍇 Santa Ceia</option>
-                    <option value="Outro">📦 Outro</option>
-                  </select>
-                </div>
-
               </div>
-
-              {/* Métricas Principais */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                
-                {/* Cultos Realizados */}
-                {['Culto', 'Santa Ceia'].includes(formData.tipo_atividade) && (
+            ) : (
+              <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <label className="block text-xs font-black uppercase text-slate-500 mb-1">Cultos Realizados</label>
+                    <label className="block text-sm font-semibold text-slate-750 mb-1">{labelDivPrincipal} *</label>
+                    <select
+                      disabled={isLocalUser}
+                      value={formData.congregacao_id}
+                      onChange={e => setFormData(prev => ({ ...prev, congregacao_id: e.target.value }))}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none cursor-pointer"
+                      required
+                    >
+                      <option value="">Selecione...</option>
+                      {locais.map(l => (
+                        <option key={l.id} value={l.id}>{l.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-750 mb-1">Data da Atividade *</label>
+                    <input
+                      type="date"
+                      value={formData.data_atividade}
+                      onChange={e => setFormData(prev => ({ ...prev, data_atividade: e.target.value }))}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-750 mb-1">Tipo de Atividade *</label>
+                    <select
+                      value={formData.tipo_atividade}
+                      onChange={e => setFormData(prev => ({ ...prev, tipo_atividade: e.target.value as any }))}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none cursor-pointer"
+                      required
+                    >
+                      <option value="Visita">🏠 Visita</option>
+                      <option value="Evangelismo">📢 Evangelismo</option>
+                      <option value="Culto">⛪ Culto</option>
+                      <option value="Santa Ceia">🍇 Santa Ceia</option>
+                      <option value="Outro">📦 Outro</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                  {['Culto', 'Santa Ceia'].includes(formData.tipo_atividade) && (
+                    <div>
+                      <label className="block text-xs font-black uppercase text-slate-500 mb-1">Cultos Realizados</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          value={formData.cultos_realizados}
+                          onChange={e => setFormData(prev => ({ ...prev, cultos_realizados: Math.max(0, parseInt(e.target.value) || 0) }))}
+                          className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
+                        />
+                        <div className="flex items-center gap-1">
+                          <button type="button" onClick={() => decrementMetric('cultos_realizados')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
+                          <button type="button" onClick={() => incrementMetric('cultos_realizados')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.tipo_atividade === 'Visita' && (
+                    <div>
+                      <label className="block text-xs font-black uppercase text-slate-500 mb-1">Visitas Realizadas</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          value={formData.visitas_realizadas}
+                          onChange={e => setFormData(prev => ({ ...prev, visitas_realizadas: Math.max(0, parseInt(e.target.value) || 0) }))}
+                          className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
+                        />
+                        <div className="flex items-center gap-1">
+                          <button type="button" onClick={() => decrementMetric('visitas_realizadas')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
+                          <button type="button" onClick={() => incrementMetric('visitas_realizadas')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-black uppercase text-slate-500 mb-1">Almas Alcançadas</label>
                     <div className="flex items-center gap-3">
                       <input
                         type="number"
-                        value={formData.cultos_realizados}
-                        onChange={e => setFormData(prev => ({ ...prev, cultos_realizados: Math.max(0, parseInt(e.target.value) || 0) }))}
+                        value={formData.almas_alcancadas}
+                        onChange={e => setFormData(prev => ({ ...prev, almas_alcancadas: Math.max(0, parseInt(e.target.value) || 0) }))}
                         className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
                       />
                       <div className="flex items-center gap-1">
-                        <button type="button" onClick={() => decrementMetric('cultos_realizados')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
-                        <button type="button" onClick={() => incrementMetric('cultos_realizados')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                        <button type="button" onClick={() => decrementMetric('almas_alcancadas')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
+                        <button type="button" onClick={() => incrementMetric('almas_alcancadas')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
                       </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black uppercase text-slate-500 mb-1">Batismos ES</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        value={formData.batismos_espirito_santo}
+                        onChange={e => setFormData(prev => ({ ...prev, batismos_espirito_santo: Math.max(0, parseInt(e.target.value) || 0) }))}
+                        className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
+                      />
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => decrementMetric('batismos_espirito_santo')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
+                        <button type="button" onClick={() => incrementMetric('batismos_espirito_santo')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black uppercase text-slate-500 mb-1">Reconciliações</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        value={formData.reconciliacoes}
+                        onChange={e => setFormData(prev => ({ ...prev, reconciliacoes: Math.max(0, parseInt(e.target.value) || 0) }))}
+                        className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
+                      />
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => decrementMetric('reconciliacoes')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
+                        <button type="button" onClick={() => incrementMetric('reconciliacoes')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {['Santa Ceia', 'Culto'].includes(formData.tipo_atividade) && (
+                  <div className="p-5 bg-amber-50/50 rounded-2xl border border-amber-100/50 space-y-4">
+                    <h3 className="text-xs font-black uppercase text-amber-800 tracking-wider">🌟 Requisitos da Atividade</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {formData.tipo_atividade === 'Santa Ceia' && (
+                        <div>
+                          <label className="block text-xs font-black uppercase text-slate-500 mb-1">Membros que Cearam</label>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="number"
+                              value={formData.membros_cearam}
+                              onChange={e => setFormData(prev => ({ ...prev, membros_cearam: Math.max(0, parseInt(e.target.value) || 0) }))}
+                              className="w-40 rounded-xl border border-slate-300 bg-white px-4 py-2 shadow-sm focus:outline-none"
+                            />
+                            <div className="flex items-center gap-1.5">
+                              <button type="button" onClick={() => decrementMetric('membros_cearam')} className="p-1.5 border border-slate-300 bg-white hover:bg-slate-100 rounded-lg"><Minus className="h-3.5 w-3.5" /></button>
+                              <button type="button" onClick={() => incrementMetric('membros_cearam')} className="p-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg"><Plus className="h-3.5 w-3.5" /></button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {formData.tipo_atividade === 'Culto' && (
+                        <div>
+                          <label className="block text-xs font-black uppercase text-slate-500 mb-1">Visitantes Presentes</label>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="number"
+                              value={formData.visitantes_presentes}
+                              onChange={e => setFormData(prev => ({ ...prev, visitantes_presentes: Math.max(0, parseInt(e.target.value) || 0) }))}
+                              className="w-40 rounded-xl border border-slate-300 bg-white px-4 py-2 shadow-sm focus:outline-none"
+                            />
+                            <div className="flex items-center gap-1.5">
+                              <button type="button" onClick={() => decrementMetric('visitantes_presentes')} className="p-1.5 border border-slate-300 bg-white hover:bg-slate-100 rounded-lg"><Minus className="h-3.5 w-3.5" /></button>
+                              <button type="button" onClick={() => incrementMetric('visitantes_presentes')} className="p-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg"><Plus className="h-3.5 w-3.5" /></button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
-                {/* Visitas Realizadas */}
-                {formData.tipo_atividade === 'Visita' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Observações espirituais</label>
+                    <textarea
+                      value={formData.observacoes}
+                      onChange={e => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
+                      rows={3}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
+                      placeholder="Espaço reservado para observações espirituais..."
+                    />
+                  </div>
+
                   <div>
-                    <label className="block text-xs font-black uppercase text-slate-500 mb-1">Visitas Realizadas</label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="number"
-                        value={formData.visitas_realizadas}
-                        onChange={e => setFormData(prev => ({ ...prev, visitas_realizadas: Math.max(0, parseInt(e.target.value) || 0) }))}
-                        className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
-                      />
-                      <div className="flex items-center gap-1">
-                        <button type="button" onClick={() => decrementMetric('visitas_realizadas')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
-                        <button type="button" onClick={() => incrementMetric('visitas_realizadas')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Almas Alcançadas */}
-                <div>
-                  <label className="block text-xs font-black uppercase text-slate-500 mb-1">Almas Alcançadas</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="number"
-                      value={formData.almas_alcancadas}
-                      onChange={e => setFormData(prev => ({ ...prev, almas_alcancadas: Math.max(0, parseInt(e.target.value) || 0) }))}
-                      className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
-                    />
-                    <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => decrementMetric('almas_alcancadas')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
-                      <button type="button" onClick={() => incrementMetric('almas_alcancadas')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
-                    </div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Status *</label>
+                    <select
+                      value={formData.status}
+                      onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
+                      required
+                    >
+                      <option value="Rascunho">Rascunho</option>
+                      <option value="Enviado">Enviado</option>
+                      <option value="Revisado">Revisado</option>
+                    </select>
                   </div>
                 </div>
 
-                {/* Batismos Espírito Santo */}
-                <div>
-                  <label className="block text-xs font-black uppercase text-slate-500 mb-1">Batismos ES</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="number"
-                      value={formData.batismos_espirito_santo}
-                      onChange={e => setFormData(prev => ({ ...prev, batismos_espirito_santo: Math.max(0, parseInt(e.target.value) || 0) }))}
-                      className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
-                    />
-                    <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => decrementMetric('batismos_espirito_santo')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
-                      <button type="button" onClick={() => incrementMetric('batismos_espirito_santo')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Reconciliações */}
-                <div>
-                  <label className="block text-xs font-black uppercase text-slate-500 mb-1">Reconciliações</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="number"
-                      value={formData.reconciliacoes}
-                      onChange={e => setFormData(prev => ({ ...prev, reconciliacoes: Math.max(0, parseInt(e.target.value) || 0) }))}
-                      className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
-                    />
-                    <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => decrementMetric('reconciliacoes')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
-                      <button type="button" onClick={() => incrementMetric('reconciliacoes')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Detalhes de Ceia e Cultos */}
-              {['Santa Ceia', 'Culto'].includes(formData.tipo_atividade) && (
-                <div className="p-5 bg-amber-50/50 rounded-2xl border border-amber-100/50 space-y-4">
-                  <h3 className="text-xs font-black uppercase text-amber-800 tracking-wider">🌟 Requisitos da Atividade</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {formData.tipo_atividade === 'Santa Ceia' && (
-                      <div>
-                        <label className="block text-xs font-black uppercase text-slate-500 mb-1">Membros que Cearam</label>
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="number"
-                            value={formData.membros_cearam}
-                            onChange={e => setFormData(prev => ({ ...prev, membros_cearam: Math.max(0, parseInt(e.target.value) || 0) }))}
-                            className="w-40 rounded-xl border border-slate-300 bg-white px-4 py-2 shadow-sm focus:outline-none"
-                          />
-                          <div className="flex items-center gap-1.5">
-                            <button type="button" onClick={() => decrementMetric('membros_cearam')} className="p-1.5 border border-slate-300 bg-white hover:bg-slate-100 rounded-lg"><Minus className="h-3.5 w-3.5" /></button>
-                            <button type="button" onClick={() => incrementMetric('membros_cearam')} className="p-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg"><Plus className="h-3.5 w-3.5" /></button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {formData.tipo_atividade === 'Culto' && (
-                      <div>
-                        <label className="block text-xs font-black uppercase text-slate-500 mb-1">Visitantes Presentes</label>
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="number"
-                            value={formData.visitantes_presentes}
-                            onChange={e => setFormData(prev => ({ ...prev, visitantes_presentes: Math.max(0, parseInt(e.target.value) || 0) }))}
-                            className="w-40 rounded-xl border border-slate-300 bg-white px-4 py-2 shadow-sm focus:outline-none"
-                          />
-                          <div className="flex items-center gap-1.5">
-                            <button type="button" onClick={() => decrementMetric('visitantes_presentes')} className="p-1.5 border border-slate-300 bg-white hover:bg-slate-100 rounded-lg"><Minus className="h-3.5 w-3.5" /></button>
-                            <button type="button" onClick={() => incrementMetric('visitantes_presentes')} className="p-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg"><Plus className="h-3.5 w-3.5" /></button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Observações e Status */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Observações espirituais</label>
-                  <textarea
-                    value={formData.observacoes}
-                    onChange={e => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
-                    rows={3}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
-                    placeholder="Espaço reservado para observações espirituais..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Status *</label>
-                  <select
-                    value={formData.status}
-                    onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
-                    required
-                  >
-                    <option value="Rascunho">Rascunho</option>
-                    <option value="Enviado">Enviado</option>
-                    <option value="Revisado">Revisado</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Ações */}
-              <div className="flex gap-2 justify-end pt-4 border-t border-slate-150">
-                {editingId && (
+                <div className="flex gap-2 justify-end pt-4 border-t border-slate-150">
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 transition cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                  )}
                   <button
-                    type="button"
-                    onClick={resetForm}
-                    className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 transition cursor-pointer"
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-md transition cursor-pointer"
                   >
-                    Cancelar
+                    {editingId ? 'Salvar Alterações' : 'Salvar Registro'}
                   </button>
-                )}
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-md transition cursor-pointer"
-                >
-                  {editingId ? 'Salvar Alterações' : 'Salvar Registro'}
-                </button>
-              </div>
-
-            </form>
+                </div>
+              </form>
+            )}
           </DashboardSection>
         )}
 
         {/* ABA 3: REGISTROS ENVIADOS */}
         {activeTab === 'registros' && (
           <DashboardSection title="Registros Enviados">
-            {/* Filtros de Listagem */}
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-              
-              {/* Congregação */}
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Congregação</label>
-                <select
-                  value={filtroCongregacao}
-                  onChange={e => setFiltroCongregacao(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none cursor-pointer"
-                >
-                  <option value="">Todas</option>
-                  {locais.map(l => (
-                    <option key={l.id} value={l.id}>{l.nome}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Tipo */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Tipo</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Tipo de Atividade</label>
                 <select
                   value={filtroTipo}
                   onChange={e => setFiltroTipo(e.target.value)}
                   className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none cursor-pointer"
                 >
-                  <option value="">Todos</option>
+                  <option value="">Todos os tipos</option>
                   <option value="Culto">⛪ Culto</option>
                   <option value="Santa Ceia">🍇 Santa Ceia</option>
                   <option value="Visita">🏠 Visita</option>
@@ -1747,7 +1792,6 @@ export default function RelatorioEspiritualPage() {
                 </select>
               </div>
 
-              {/* Status */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">Status</label>
                 <select
@@ -1755,42 +1799,23 @@ export default function RelatorioEspiritualPage() {
                   onChange={e => setFiltroStatus(e.target.value)}
                   className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none cursor-pointer"
                 >
-                  <option value="">Todos</option>
+                  <option value="">Todos os status</option>
                   <option value="Rascunho">Rascunho</option>
                   <option value="Enviado">Enviado</option>
                   <option value="Revisado">Revisado</option>
                 </select>
               </div>
 
-              {/* Data Inicial */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Desde</label>
-                <input
-                  type="date"
-                  value={filtroDataInicio}
-                  onChange={e => setFiltroDataInicio(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none"
-                />
+              <div className="flex items-end text-slate-500 font-bold text-xs pb-2 whitespace-nowrap">
+                Filtros aplicados para a competência: <strong className="text-slate-800 ml-1">{MESES_NOMES[dashMes - 1]}/{dashAno}</strong>
               </div>
-
-              {/* Data Final */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Até</label>
-                <input
-                  type="date"
-                  value={filtroDataFim}
-                  onChange={e => setFiltroDataFim(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none"
-                />
-              </div>
-
             </div>
 
             {registrosFiltrados.length === 0 ? (
               <DashboardEmptyState
                 icon={FileText}
                 title="Sem lançamentos espirituais"
-                description="Nenhum relatório espíritual foi encontrado para os filtros aplicados."
+                description="Nenhum relatório espiritual foi encontrado para os filtros aplicados nesta competência."
               />
             ) : (
               <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
@@ -1836,18 +1861,24 @@ export default function RelatorioEspiritualPage() {
                           </td>
                           <td className="px-5 py-4 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                onClick={() => startEdit(r)}
-                                className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition cursor-pointer"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={() => deleteRegistro(r.id)}
-                                className="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg transition cursor-pointer"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                              {fechamentoStatus === 'Aberta' ? (
+                                <>
+                                  <button
+                                    onClick={() => startEdit(r)}
+                                    className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition cursor-pointer"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => deleteRegistro(r.id)}
+                                    className="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg transition cursor-pointer"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 italic">Competência Fechada</span>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1862,12 +1893,12 @@ export default function RelatorioEspiritualPage() {
 
         {/* ABA 4: CONSOLIDAÇÃO POR CONGREGAÇÃO */}
         {activeTab === 'consolidado' && (
-          <DashboardSection title="Consolidação por Congregação">
+          <DashboardSection title={`Consolidação da Competência: ${MESES_NOMES[dashMes - 1]}/${dashAno}`}>
             {consolidadoPorCongregacao.length === 0 ? (
               <DashboardEmptyState
                 icon={Users}
                 title="Sem consolidações"
-                description="Selecione filtros na aba de registros para ver dados de consolidação."
+                description="Nenhum relatório foi lançado nesta competência ainda."
               />
             ) : (
               <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
@@ -1911,27 +1942,20 @@ export default function RelatorioEspiritualPage() {
             )}
           </DashboardSection>
         )}
-
       </DashboardContent>
 
-      {/* Modal: Evolução Detalhada da Congregação (Ficha/Gráficos Históricos) */}
+      {/* Modal: Evolução Detalhada da Congregação */}
       {selectedCongregacaoEvolucao && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-100 max-h-[90vh] animate-fade-in">
-            
-            {/* Header */}
+          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-100 max-h-[90vh]">
             <div className="p-5 bg-gradient-to-r from-[#062E6F] to-[#154A92] flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white/10 rounded-xl">
                   <Activity className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-white uppercase tracking-wide">
-                    Ficha de Evolução Espiritual
-                  </h3>
-                  <p className="text-blue-100 text-xs mt-0.5 font-semibold">
-                    Histórico detalhado da congregação: {selectedCongregacaoEvolucao.nome}
-                  </p>
+                  <h3 className="text-base font-extrabold text-white uppercase tracking-wide">Ficha de Evolução Espiritual</h3>
+                  <p className="text-blue-100 text-xs mt-0.5 font-semibold">Histórico detalhado da congregação: {selectedCongregacaoEvolucao.nome}</p>
                 </div>
               </div>
               <button
@@ -1943,16 +1967,10 @@ export default function RelatorioEspiritualPage() {
               </button>
             </div>
 
-            {/* Corpo / Gráficos de Linha */}
             <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-[300px]">
-              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Almas e Reconciliados */}
                 <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-2">
-                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-wider">
-                    Frutos: Almas & Reconciliados
-                  </h4>
+                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-wider">Frutos: Almas & Reconciliados</h4>
                   <div className="h-[180px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={evolucaoDadosModal}>
@@ -1967,11 +1985,8 @@ export default function RelatorioEspiritualPage() {
                   </div>
                 </div>
 
-                {/* Visitantes e Visitas */}
                 <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-2">
-                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-wider">
-                    Acolhimento: Visitantes & Visitas
-                  </h4>
+                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-wider">Acolhimento: Visitantes & Visitas</h4>
                   <div className="h-[180px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={evolucaoDadosModal}>
@@ -1986,11 +2001,8 @@ export default function RelatorioEspiritualPage() {
                   </div>
                 </div>
 
-                {/* Batismos e Evangelismos */}
                 <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-2 col-span-1 md:col-span-2">
-                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-wider">
-                    Espiritualidade & Missões: Batismos ES & Evangelismos
-                  </h4>
+                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-wider">Espiritualidade & Missões: Batismos ES & Evangelismos</h4>
                   <div className="h-[180px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={evolucaoDadosModal}>
@@ -2004,22 +2016,18 @@ export default function RelatorioEspiritualPage() {
                     </ResponsiveContainer>
                   </div>
                 </div>
-
               </div>
-
             </div>
 
-            {/* Footer */}
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
                 onClick={() => setSelectedCongregacaoEvolucao(null)}
                 className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs shadow-md transition cursor-pointer"
               >
-                Fechar Painel
+                Fechar Ficha
               </button>
             </div>
-
           </div>
         </div>
       )}
@@ -2028,20 +2036,14 @@ export default function RelatorioEspiritualPage() {
       {isCentralColetaOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-100 max-h-[85vh]">
-            
-            {/* Header */}
             <div className="p-5 bg-gradient-to-r from-[#062E6F] to-[#154A92] flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white/10 rounded-xl">
                   <Globe className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-white uppercase tracking-wide">
-                    Central de Coleta Externa
-                  </h3>
-                  <p className="text-blue-100 text-xs mt-0.5 font-semibold">
-                    Envio de relatórios espirituais sem necessidade de login no sistema
-                  </p>
+                  <h3 className="text-base font-extrabold text-white uppercase tracking-wide">Central de Coleta Externa</h3>
+                  <p className="text-blue-100 text-xs mt-0.5 font-semibold">Envio de relatórios espirituais sem necessidade de login no sistema</p>
                 </div>
               </div>
               <button
@@ -2056,9 +2058,7 @@ export default function RelatorioEspiritualPage() {
               </button>
             </div>
 
-            {/* Corpo */}
             <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-[300px]">
-              
               <div className="bg-slate-50 border border-slate-150 rounded-xl p-4 text-xs font-semibold text-slate-700 flex gap-2.5">
                 <Lightbulb className="h-5 w-5 text-amber-600 shrink-0" />
                 <p className="leading-relaxed">
@@ -2066,12 +2066,8 @@ export default function RelatorioEspiritualPage() {
                 </p>
               </div>
 
-              {/* Lista de congregações */}
               <div className="space-y-4">
-                <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">
-                  Links de Coleta por Congregação
-                </h4>
-
+                <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Links de Coleta por Congregação</h4>
                 <div className="space-y-3.5">
                   {locais.map(l => {
                     const statusToken = tokens[l.id];
@@ -2082,7 +2078,6 @@ export default function RelatorioEspiritualPage() {
                       <div key={l.id} className="border border-slate-100 rounded-xl p-4 bg-white hover:shadow-sm transition space-y-3">
                         <div className="flex justify-between items-center flex-wrap gap-2">
                           <span className="font-bold text-slate-800 text-sm">{l.nome}</span>
-                          
                           <div className="flex gap-2">
                             {statusToken?.is_active ? (
                               <>
@@ -2121,7 +2116,6 @@ export default function RelatorioEspiritualPage() {
                           </div>
                         </div>
 
-                        {/* Detalhe de expiração */}
                         {statusToken?.is_active && (
                           <div className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
                             <Clock className="h-3 w-3" />
@@ -2129,7 +2123,6 @@ export default function RelatorioEspiritualPage() {
                           </div>
                         )}
 
-                        {/* Área do QR Code se aberto */}
                         {qrCodeCongId === l.id && statusToken?.is_active && (
                           <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col items-center justify-center space-y-3">
                             <QRCodeSVG value={linkUrl} size={150} />
@@ -2138,17 +2131,13 @@ export default function RelatorioEspiritualPage() {
                             </span>
                           </div>
                         )}
-
                       </div>
                     );
                   })}
                 </div>
-
               </div>
-
             </div>
 
-            {/* Footer */}
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
@@ -2161,7 +2150,6 @@ export default function RelatorioEspiritualPage() {
                 Fechar Painel
               </button>
             </div>
-
           </div>
         </div>
       )}
