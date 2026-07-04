@@ -28,7 +28,10 @@ import {
   Clock,
   Activity,
   Lock,
-  Unlock
+  Unlock,
+  ClipboardCopy,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import {
   LineChart,
@@ -74,6 +77,7 @@ interface RelatorioEspiritualRegistro {
 
 interface FechamentoRegistro {
   id: string;
+  text_id?: string;
   ministry_id: string;
   congregacao_id: string | null;
   mes: number;
@@ -834,8 +838,6 @@ export default function RelatorioEspiritualPage() {
     return dados;
   }, [registros, selectedCongregacaoEvolucao, dashMes, dashAno]);
 
-
-
   // Consolidação por congregação calculada
   const consolidadoPorCongregacao = useMemo(() => {
     return locais.map(l => {
@@ -874,6 +876,45 @@ export default function RelatorioEspiritualPage() {
       };
     });
   }, [locais, registrosMesAtual]);
+
+  // --- MÉTODOS DE FECHAMENTO MENSAL E PENDÊNCIAS (SPRINT 10) ---
+
+  const congregacoesComEnvio = useMemo(() => {
+    return new Set(registrosMesAtual.map(r => r.congregacao_id).filter(Boolean));
+  }, [registrosMesAtual]);
+
+  const totalEnviados = useMemo(() => {
+    return congregacoesComEnvio.size;
+  }, [congregacoesComEnvio]);
+
+  const totalPendentes = useMemo(() => {
+    return Math.max(0, locais.length - totalEnviados);
+  }, [locais, totalEnviados]);
+
+  const listaPendentes = useMemo(() => {
+    if (isLocalUser && ctx.congregacaoId) {
+      const enviado = congregacoesComEnvio.has(ctx.congregacaoId);
+      if (!enviado) {
+        const local = locais.find(l => l.id === ctx.congregacaoId);
+        return local ? [local] : [];
+      }
+      return [];
+    }
+    return locais.filter(l => !congregacoesComEnvio.has(l.id));
+  }, [locais, congregacoesComEnvio, isLocalUser, ctx.congregacaoId]);
+
+  const ultimaAtualizacao = useMemo(() => {
+    if (registrosMesAtual.length === 0) return 'Nenhum registro lançado';
+    const datas = registrosMesAtual.map(r => new Date(r.updated_at).getTime());
+    const maxTime = Math.max(...datas);
+    return new Date(maxTime).toLocaleString('pt-BR');
+  }, [registrosMesAtual]);
+
+  const handleCopiarLembrete = (nomeCongregacao: string) => {
+    const msg = `A Paz do Senhor.\n\nA competência ${MESES_NOMES[dashMes - 1]}/${dashAno} ainda encontra-se pendente.\n\nSolicitamos o envio do Relatório Espiritual para que seja possível realizar o fechamento mensal.\n\nSecretaria Geral`;
+    navigator.clipboard.writeText(msg);
+    showNotification('success', 'Lembrete Copiado', `Lembrete de pendência para a congregação ${nomeCongregacao} copiado para a área de transferência!`);
+  };
 
   // --- LÓGICA DE CADASTRO E LANÇAMENTO ---
 
@@ -1067,106 +1108,248 @@ export default function RelatorioEspiritualPage() {
       />
 
       <DashboardContent>
-        {/* CAIXA DE COMPETÊNCIA GLOBAL & STATUS DE FECHAMENTO */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-5 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-            {/* Seleção do Período */}
-            <div className="space-y-1">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Competência Selecionada
-              </label>
-              <div className="flex gap-2">
-                <select
-                  value={dashMes}
-                  onChange={e => setDashMes(parseInt(e.target.value))}
-                  className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition cursor-pointer"
-                >
-                  {MESES_NOMES.map((nome, index) => (
-                    <option key={index + 1} value={index + 1}>{nome}</option>
-                  ))}
-                </select>
-
-                <select
-                  value={dashAno}
-                  onChange={e => setDashAno(parseInt(e.target.value))}
-                  className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition cursor-pointer"
-                >
-                  <option value={2024}>2024</option>
-                  <option value={2025}>2025</option>
-                  <option value={2026}>2026</option>
-                </select>
+        {/* BLOCO VISUAL PÁGINA FECHADA (REFORÇO SPRINT 10) */}
+        {fechamentoStatus === 'Fechada' && (
+          <div className="bg-rose-50 border border-rose-250 p-5 rounded-2xl text-rose-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-rose-100 rounded-xl">
+                <Lock className="h-6 w-6 text-rose-700 animate-pulse" />
               </div>
-            </div>
-
-            {/* Seleção da Congregação */}
-            {!isLocalUser && (
-              <div className="space-y-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Congregação em Análise
-                </label>
-                <select
-                  value={filtroCongregacao}
-                  onChange={e => setFiltroCongregacao(e.target.value)}
-                  className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition cursor-pointer min-w-[200px]"
-                >
-                  <option value="">Visão Consolidada do Tenant</option>
-                  {locais.map(l => (
-                    <option key={l.id} value={l.id}>{l.nome}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Indicador Visual do Fechamento */}
-            <div className="space-y-1">
-              <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Status da Competência
-              </span>
-              <div className="flex items-center gap-2 pt-1.5">
-                {loadingFechamento ? (
-                  <span className="text-slate-400 text-xs font-bold animate-pulse">Sincronizando...</span>
-                ) : fechamentoStatus === 'Fechada' ? (
-                  <span className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 border border-rose-100 rounded-full px-3 py-1 font-bold text-xs uppercase tracking-wide">
-                    <Lock className="h-3.5 w-3.5" />
-                    Competência Fechada
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-3 py-1 font-bold text-xs uppercase tracking-wide animate-pulse">
-                    <Unlock className="h-3.5 w-3.5" />
-                    Competência Aberta
-                  </span>
+              <div>
+                <h4 className="text-sm font-black uppercase tracking-wider">Competência Fechada</h4>
+                <p className="text-xs font-semibold text-rose-650 mt-0.5">
+                  Os relatórios de <strong>{MESES_NOMES[dashMes - 1]}/{dashAno}</strong> foram arquivados para visualização. Lançamentos e exclusões desabilitados.
+                </p>
+                {fechamentoInfo?.fechado_em && (
+                  <div className="text-[10px] text-rose-500 font-bold mt-1 uppercase tracking-wide">
+                    Fechado em: {new Date(fechamentoInfo.fechado_em).toLocaleString('pt-BR')} {fechamentoInfo.fechado_por ? `| Responsável: ${fechamentoInfo.fechado_por.substring(0, 8)}...` : ''}
+                  </div>
                 )}
               </div>
             </div>
-          </div>
-
-          {/* Botões de Fechamento / Reabertura */}
-          <div className="flex items-center gap-2">
-            {fechamentoStatus === 'Aberta' ? (
-              <button
-                onClick={handleFecharCompetencia}
-                disabled={loadingFechamento}
-                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-              >
-                <Lock className="h-3.5 w-3.5" />
-                Fechar Competência
-              </button>
-            ) : (
+            
+            {(!isLocalUser || ['administrador', 'suporte', 'presidencia', 'secretaria'].includes(ctx.nivel as string)) && (
               <button
                 onClick={handleReabrirCompetencia}
-                disabled={loadingFechamento}
-                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
               >
                 <Unlock className="h-3.5 w-3.5" />
                 Reabrir Competência
               </button>
             )}
           </div>
+        )}
+
+        {/* CABEÇALHO EXECUTIVO DA COMPETÊNCIA (SPRINT 10) */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm space-y-6 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-slate-100 pb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+              {/* Seleção do Período */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Competência Selecionada
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    value={dashMes}
+                    onChange={e => setDashMes(parseInt(e.target.value))}
+                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition cursor-pointer"
+                  >
+                    {MESES_NOMES.map((nome, index) => (
+                      <option key={index + 1} value={index + 1}>{nome}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={dashAno}
+                    onChange={e => setDashAno(parseInt(e.target.value))}
+                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition cursor-pointer"
+                  >
+                    <option value={2024}>2024</option>
+                    <option value={2025}>2025</option>
+                    <option value={2026}>2026</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Seleção da Congregação */}
+              {!isLocalUser && (
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    Congregação em Análise
+                  </label>
+                  <select
+                    value={filtroCongregacao}
+                    onChange={e => setFiltroCongregacao(e.target.value)}
+                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition cursor-pointer min-w-[200px]"
+                  >
+                    <option value="">Visão Consolidada do Tenant</option>
+                    {locais.map(l => (
+                      <option key={l.id} value={l.id}>{l.nome}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Indicador Visual do Fechamento */}
+              <div className="space-y-1">
+                <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Status da Competência
+                </span>
+                <div className="flex items-center gap-2 pt-1.5">
+                  {loadingFechamento ? (
+                    <span className="text-slate-400 text-xs font-bold animate-pulse">Sincronizando...</span>
+                  ) : fechamentoStatus === 'Fechada' ? (
+                    <span className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 border border-rose-100 rounded-full px-3 py-1 font-bold text-xs uppercase tracking-wide">
+                      <Lock className="h-3.5 w-3.5" />
+                      Competência Fechada
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-3 py-1 font-bold text-xs uppercase tracking-wide animate-pulse">
+                      <Unlock className="h-3.5 w-3.5" />
+                      Competência Aberta
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Ações Rápidas de Fechamento */}
+            {fechamentoStatus === 'Aberta' && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleFecharCompetencia}
+                  disabled={loadingFechamento}
+                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <Lock className="h-3.5 w-3.5" />
+                  Fechar Competência
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Cards de Metadados do Fechamento */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-1">
+              <span className="block text-[9px] font-black text-slate-400 uppercase tracking-wider">Última Atualização</span>
+              <strong className="block text-slate-700 font-extrabold text-sm">{ultimaAtualizacao}</strong>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-1">
+              <span className="block text-[9px] font-black text-slate-400 uppercase tracking-wider">Cultos Consolidados</span>
+              <strong className="block text-slate-700 font-extrabold text-sm">{somaAtual.cultos} cultos</strong>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-1">
+              <span className="block text-[9px] font-black text-slate-400 uppercase tracking-wider">Congregações com Envio</span>
+              <strong className="block text-slate-700 font-extrabold text-sm">{totalEnviados} de {locais.length}</strong>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-1">
+              <span className="block text-[9px] font-black text-slate-400 uppercase tracking-wider">Congregações Pendentes</span>
+              <strong className={`block font-extrabold text-sm ${totalPendentes > 0 ? 'text-amber-600 animate-pulse' : 'text-emerald-600'}`}>
+                {totalPendentes} unidades
+              </strong>
+            </div>
+          </div>
         </div>
 
         {/* ABA 1: DASHBOARD EXECUTIVO ANALÍTICO */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
+            {/* Linha 0 (Sprint 10): Checklist de Fechamento & Congregações Pendentes */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Checklist de Fechamento */}
+              <div className="lg:col-span-1">
+                <DashboardSection title="📋 Checklist de Fechamento">
+                  <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className={`h-4 w-4 ${somaAtual.cultos > 0 ? 'text-emerald-500' : 'text-slate-350'}`} />
+                        <span className="text-xs font-bold text-slate-700">Cultos Consolidados</span>
+                      </div>
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${somaAtual.cultos > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                        {somaAtual.cultos > 0 ? 'Sim' : 'Nenhum'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className={`h-4 w-4 ${totalPendentes === 0 ? 'text-emerald-500' : 'text-slate-350'}`} />
+                        <span className="text-xs font-bold text-slate-700">Relatórios Recebidos</span>
+                      </div>
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${totalPendentes === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                        {totalPendentes === 0 ? '100%' : `${totalEnviados}/${locais.length}`}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className={`h-4 w-4 ${fechamentoStatus === 'Fechada' ? 'text-rose-500' : 'text-emerald-500'}`} />
+                        <span className="text-xs font-bold text-slate-700">Status Competência</span>
+                      </div>
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${fechamentoStatus === 'Fechada' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                        {fechamentoStatus}
+                      </span>
+                    </div>
+
+                    {fechamentoStatus === 'Aberta' && (
+                      <p className="text-[10px] font-bold text-slate-400 text-center leading-relaxed">
+                        {totalPendentes > 0 ? '⚠️ Solucione as pendências de envio das congregações para poder realizar o fechamento do mês com segurança.' : '✅ Tudo pronto! Todos os relatórios foram recebidos.'}
+                      </p>
+                    )}
+                  </div>
+                </DashboardSection>
+              </div>
+
+              {/* Congregações Pendentes */}
+              <div className="lg:col-span-2">
+                <DashboardSection title="🏢 Congregações Pendentes">
+                  <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                    <div className="max-h-[220px] overflow-y-auto">
+                      {listaPendentes.length === 0 ? (
+                        <div className="p-8 text-center text-xs font-semibold text-slate-400">
+                          🎉 Nenhuma congregação pendente nesta competência!
+                        </div>
+                      ) : (
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-100 text-slate-450 uppercase font-black tracking-wider">
+                              <th className="px-5 py-3">Unidade / Congregação</th>
+                              <th className="px-5 py-3 w-32">Status</th>
+                              <th className="px-5 py-3 text-right">Cobrança</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                            {listaPendentes.map(l => (
+                              <tr key={l.id} className="hover:bg-slate-55/30 transition">
+                                <td className="px-5 py-3 font-extrabold text-slate-800">{l.nome}</td>
+                                <td className="px-5 py-3">
+                                  <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-2 py-0.5 font-bold text-[9px] uppercase tracking-wide">
+                                    Pendente
+                                  </span>
+                                </td>
+                                <td className="px-5 py-3 text-right">
+                                  <button
+                                    onClick={() => handleCopiarLembrete(l.nome)}
+                                    className="p-1.5 text-[#062E6F] hover:bg-slate-100 rounded-lg transition inline-flex items-center gap-1 cursor-pointer font-bold text-[10px] uppercase border border-slate-200"
+                                  >
+                                    <ClipboardCopy className="h-3.5 w-3.5" />
+                                    Copiar lembrete
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                </DashboardSection>
+              </div>
+            </div>
+
             {/* Linha 1: KPIs & Comparativos */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <ExecutiveMetricCard
@@ -1324,7 +1507,7 @@ export default function RelatorioEspiritualPage() {
                             <tr
                               key={c.id}
                               onClick={() => setSelectedCongregacaoEvolucao({ id: c.id, nome: c.nome })}
-                              className="hover:bg-slate-50/50 transition cursor-pointer group"
+                              className="hover:bg-slate-55/30 transition cursor-pointer group"
                             >
                               <td className="px-5 py-4 text-center font-black">
                                 {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`}
@@ -1414,7 +1597,7 @@ export default function RelatorioEspiritualPage() {
                     <div className="p-4 bg-slate-50 border border-slate-150 rounded-xl space-y-1">
                       <div className="flex justify-between items-center">
                         <span className="text-slate-700 font-bold text-xs flex items-center gap-1.5">📢 Congregação Missionária</span>
-                        <span className="text-[10px] font-black text-slate-800 bg-slate-200 px-2 py-0.5 rounded-md">{destaques.missionaria.valor} ações</span>
+                        <span className="text-[10px] font-black text-slate-800 bg-slate-205 px-2 py-0.5 rounded-md">{destaques.missionaria.valor} ações</span>
                       </div>
                       <h4 className="font-extrabold text-slate-800 text-sm">{destaques.missionaria.nome}</h4>
                       <p className="text-[10px] text-slate-500">Maior número de ações de evangelismo externo.</p>
@@ -1432,7 +1615,7 @@ export default function RelatorioEspiritualPage() {
                     <div className="p-4 bg-rose-50/30 border border-rose-100/30 rounded-xl space-y-1">
                       <div className="flex justify-between items-center">
                         <span className="text-rose-900 font-bold text-xs flex items-center gap-1.5">⚠️ Congregação em Atenção</span>
-                        <span className="text-[10px] font-black text-rose-950 bg-rose-100 px-2 py-0.5 rounded-md">{destaques.atencao.valor}</span>
+                        <span className="text-[10px] font-black text-rose-955 bg-rose-100 px-2 py-0.5 rounded-md">{destaques.atencao.valor}</span>
                       </div>
                       <h4 className="font-extrabold text-slate-800 text-sm">{destaques.atencao.nome}</h4>
                       <p className="text-[10px] text-slate-500">Maior redução percentual do ISE.</p>
@@ -1504,7 +1687,7 @@ export default function RelatorioEspiritualPage() {
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Projeções Matemáticas (Jan a Dez)</span>
                     </div>
                     <p className="text-[11px] font-semibold text-slate-500 leading-relaxed">
-                      Estimativa de fechamento anual com base no histórico de {projecaoAnual.divisor} meses registrados em {dashAno}.
+                      Estimativa de fechamento anual com base no histórico de {projecaoAnual.divisor} meses registrados in {dashAno}.
                     </p>
 
                     <div className="space-y-3.5">
@@ -1608,7 +1791,7 @@ export default function RelatorioEspiritualPage() {
                         />
                         <div className="flex items-center gap-1">
                           <button type="button" onClick={() => decrementMetric('cultos_realizados')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
-                          <button type="button" onClick={() => incrementMetric('cultos_realizados')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                          <button type="button" onClick={() => incrementMetric('cultos_realizados')} className="p-1 bg-slate-950 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
                         </div>
                       </div>
                     </div>
@@ -1626,7 +1809,7 @@ export default function RelatorioEspiritualPage() {
                         />
                         <div className="flex items-center gap-1">
                           <button type="button" onClick={() => decrementMetric('visitas_realizadas')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
-                          <button type="button" onClick={() => incrementMetric('visitas_realizadas')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                          <button type="button" onClick={() => incrementMetric('visitas_realizadas')} className="p-1 bg-slate-950 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
                         </div>
                       </div>
                     </div>
@@ -1643,7 +1826,7 @@ export default function RelatorioEspiritualPage() {
                       />
                       <div className="flex items-center gap-1">
                         <button type="button" onClick={() => decrementMetric('almas_alcancadas')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
-                        <button type="button" onClick={() => incrementMetric('almas_alcancadas')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                        <button type="button" onClick={() => incrementMetric('almas_alcancadas')} className="p-1 bg-slate-950 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
                       </div>
                     </div>
                   </div>
@@ -1659,7 +1842,7 @@ export default function RelatorioEspiritualPage() {
                       />
                       <div className="flex items-center gap-1">
                         <button type="button" onClick={() => decrementMetric('batismos_espirito_santo')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
-                        <button type="button" onClick={() => incrementMetric('batismos_espirito_santo')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                        <button type="button" onClick={() => incrementMetric('batismos_espirito_santo')} className="p-1 bg-slate-955 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
                       </div>
                     </div>
                   </div>
@@ -1675,7 +1858,7 @@ export default function RelatorioEspiritualPage() {
                       />
                       <div className="flex items-center gap-1">
                         <button type="button" onClick={() => decrementMetric('reconciliacoes')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
-                        <button type="button" onClick={() => incrementMetric('reconciliacoes')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                        <button type="button" onClick={() => incrementMetric('reconciliacoes')} className="p-1 bg-slate-950 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
                       </div>
                     </div>
                   </div>
@@ -1697,7 +1880,7 @@ export default function RelatorioEspiritualPage() {
                             />
                             <div className="flex items-center gap-1.5">
                               <button type="button" onClick={() => decrementMetric('membros_cearam')} className="p-1.5 border border-slate-300 bg-white hover:bg-slate-100 rounded-lg"><Minus className="h-3.5 w-3.5" /></button>
-                              <button type="button" onClick={() => incrementMetric('membros_cearam')} className="p-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg"><Plus className="h-3.5 w-3.5" /></button>
+                              <button type="button" onClick={() => incrementMetric('membros_cearam')} className="p-1.5 bg-slate-950 text-white hover:bg-slate-800 rounded-lg"><Plus className="h-3.5 w-3.5" /></button>
                             </div>
                           </div>
                         </div>
@@ -1714,7 +1897,7 @@ export default function RelatorioEspiritualPage() {
                             />
                             <div className="flex items-center gap-1.5">
                               <button type="button" onClick={() => decrementMetric('visitantes_presentes')} className="p-1.5 border border-slate-300 bg-white hover:bg-slate-100 rounded-lg"><Minus className="h-3.5 w-3.5" /></button>
-                              <button type="button" onClick={() => incrementMetric('visitantes_presentes')} className="p-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg"><Plus className="h-3.5 w-3.5" /></button>
+                              <button type="button" onClick={() => incrementMetric('visitantes_presentes')} className="p-1.5 bg-slate-950 text-white hover:bg-slate-800 rounded-lg"><Plus className="h-3.5 w-3.5" /></button>
                             </div>
                           </div>
                         </div>
@@ -1836,7 +2019,7 @@ export default function RelatorioEspiritualPage() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                       {registrosFiltrados.map(r => (
-                        <tr key={r.id} className="hover:bg-slate-50/50 transition">
+                        <tr key={r.id} className="hover:bg-slate-55/30 transition">
                           <td className="px-5 py-4 whitespace-nowrap">{formatDate(r.data_atividade)}</td>
                           <td className="px-5 py-4 font-bold text-slate-800">
                             {locais.find(l => l.id === r.congregacao_id)?.nome || 'Outra'}
@@ -1920,7 +2103,7 @@ export default function RelatorioEspiritualPage() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                       {consolidadoPorCongregacao.map(c => (
-                        <tr key={c.congregacao_id || ''} className="hover:bg-slate-50/50 transition">
+                        <tr key={c.congregacao_id || ''} className="hover:bg-slate-55/30 transition">
                           <td className="px-5 py-4 font-bold text-slate-800 text-sm">{c.nome}</td>
                           <td className="px-5 py-4 text-center font-semibold text-slate-700">{c.cultos}</td>
                           <td className="px-5 py-4 text-center">{c.cearam > 0 ? `${c.cearam} part.` : '—'}</td>
