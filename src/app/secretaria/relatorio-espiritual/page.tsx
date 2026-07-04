@@ -26,7 +26,8 @@ import {
   Globe,
   Calendar,
   Lightbulb,
-  Clock
+  Clock,
+  Activity
 } from 'lucide-react';
 import {
   LineChart,
@@ -69,8 +70,6 @@ interface RelatorioEspiritualRegistro {
   created_at: string;
   updated_at: string;
 }
-
-// TIPO_ATIVIDADE_OPTIONS e STATUS_OPTIONS removidos para evitar warnings de não uso.
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
@@ -135,6 +134,12 @@ export default function RelatorioEspiritualPage() {
 
   // Métrica selecionada no Gráfico de Evolução
   const [evolucaoMetrica, setEvolucaoMetrica] = useState<'almas' | 'visitantes' | 'reconciliacoes' | 'batismos'>('almas');
+
+  // Chave de ordenação dinâmica do Ranking
+  const [rankingSortKey, setRankingSortKey] = useState<'ise' | 'almas' | 'visitantes' | 'evangelismos' | 'reconciliacoes' | 'batismos'>('ise');
+
+  // Congregação selecionada para visualização de evolução detalhada (Modal)
+  const [selectedCongregacaoEvolucao, setSelectedCongregacaoEvolucao] = useState<{ id: string; nome: string } | null>(null);
 
   // Estados da Central de Coleta
   const [isCentralColetaOpen, setIsCentralColetaOpen] = useState(false);
@@ -252,7 +257,7 @@ export default function RelatorioEspiritualPage() {
     });
   }, [registros, filtroCongregacao, filtroTipo, filtroStatus, filtroDataInicio, filtroDataFim]);
 
-  // --- MÓDULO DASHBOARD: Lógica e Cálculos de Competência ---
+  // --- MÓDULO DASHBOARD EXECUTIVO INTELIGENTE ---
 
   // Filtro de congregação aplicado ao Dashboard
   const dashCongregacaoId = useMemo(() => {
@@ -321,7 +326,7 @@ export default function RelatorioEspiritualPage() {
     return { almas, visitantes, reconciliacoes, batismos, cultos, ceias, visitas, evangelismos };
   }, [registrosMesAnterior]);
 
-  // Variações Percentuais
+  // Variações Percentuais Gerais
   const variacoes = useMemo(() => {
     const calcVar = (atual: number, anterior: number) => {
       if (anterior === 0) return atual > 0 ? 100 : 0;
@@ -338,10 +343,10 @@ export default function RelatorioEspiritualPage() {
   const getTrend = (value: number) => {
     if (value > 0) return { direction: 'up' as const, label: `↑ +${value.toFixed(1)}% comparado ao mês anterior` };
     if (value < 0) return { direction: 'down' as const, label: `↓ ${value.toFixed(1)}% comparado ao mês anterior` };
-    return { direction: 'stable' as const, label: `Stable comparado ao mês anterior` };
+    return { direction: 'stable' as const, label: `Estável comparado ao mês anterior` };
   };
 
-  // 12 Meses de Histórico para Gráfico de Evolução
+  // 12 Meses de Histórico Geral
   const evolucaoDados = useMemo(() => {
     const dados = [];
     const baseDate = new Date(dashAno, dashMes - 1, 15);
@@ -351,7 +356,6 @@ export default function RelatorioEspiritualPage() {
       const m = d.getMonth() + 1;
       const y = d.getFullYear();
 
-      // Somar métricas desse mês/ano
       let almas = 0, visitantes = 0, reconciliacoes = 0, batismos = 0;
       registros.forEach(r => {
         if (dashCongregacaoId && r.congregacao_id !== dashCongregacaoId) return;
@@ -375,7 +379,7 @@ export default function RelatorioEspiritualPage() {
     return dados;
   }, [registros, dashCongregacaoId, dashMes, dashAno]);
 
-  // Distribuição de Atividades no Mês Filtrado
+  // Distribuição de Atividades
   const distribuicaoAtividades = useMemo(() => {
     return [
       { name: 'Cultos', Quantidade: somaAtual.cultos },
@@ -385,120 +389,298 @@ export default function RelatorioEspiritualPage() {
     ];
   }, [somaAtual]);
 
-  // Ranking das Congregações
-  const rankingCongregacoes = useMemo(() => {
-    const pontuacaoCong: Record<string, {
-      id: string;
-      nome: string;
-      almas: number;
-      reconciliacoes: number;
-      visitantes: number;
-      batismos: number;
-      totalCombinado: number;
-      almasAnterior: number;
-    }> = {};
+  // --- MODELAGEM DE SAÚDE E PONTUAÇÃO (ISE) ---
 
-    // Iniciar congregações
+  // Função auxiliar para calcular a soma ponderada de uma congregação em um determinado período
+  const obterSomaPonderada = (
+    congId: string,
+    regs: RelatorioEspiritualRegistro[]
+  ) => {
+    let almas = 0, recon = 0, bat = 0, visit = 0, evang = 0, visitas = 0;
+    regs.forEach(r => {
+      if (r.congregacao_id === congId) {
+        almas += r.almas_alcancadas || 0;
+        recon += r.reconciliacoes || 0;
+        bat += r.batismos_espirito_santo || 0;
+        visit += r.visitantes_presentes || 0;
+        evang += r.evangelismos_realizados || 0;
+        visitas += r.visitas_realizadas || 0;
+      }
+    });
+    // Pesos: Almas(5), Reconciliações(4), Batismos(4), Visitantes(2), Evangelismos(2), Visitas(1)
+    return (almas * 5) + (recon * 4) + (bat * 4) + (visit * 2) + (evang * 2) + (visitas * 1);
+  };
+
+  // Cálculo da nota do Índice de Saúde Espiritual (ISE) para o mês filtrado de todas as congregações
+  const congregacoesAnaliticas = useMemo(() => {
+    // Achar a maior soma ponderada do mês atual para normalização do ISE
+    let maxSoma = 20; // Piso de 20 pontos de benchmark para evitar ISE inflado com baixo volume
     locais.forEach(l => {
-      pontuacaoCong[l.id] = {
+      const soma = obterSomaPonderada(l.id, registrosMesAtual);
+      if (soma > maxSoma) maxSoma = soma;
+    });
+
+    // Mapear dados para cada congregação
+    return locais.map(l => {
+      // 1. Mês Atual
+      let almas = 0, reconciliacoes = 0, visitantes = 0, batismos = 0, evangelismos = 0, visitas = 0;
+      registrosMesAtual.forEach(r => {
+        if (r.congregacao_id === l.id) {
+          almas += r.almas_alcancadas || 0;
+          reconciliacoes += r.reconciliacoes || 0;
+          visitantes += r.visitantes_presentes || 0;
+          batismos += r.batismos_espirito_santo || 0;
+          evangelismos += r.evangelismos_realizados || 0;
+          visitas += r.visitas_realizadas || 0;
+        }
+      });
+
+      const somaPonderada = (almas * 5) + (reconciliacoes * 4) + (batismos * 4) + (visitantes * 2) + (evangelismos * 2) + (visitas * 1);
+      const ise = Math.round((somaPonderada / maxSoma) * 100);
+
+      // 2. Mês Anterior (para variação e tendências)
+      let almasAnterior = 0, reconciliacoesAnterior = 0, visitantesAnterior = 0, batismosAnterior = 0, evangelismosAnterior = 0, visitasAnterior = 0;
+      registrosMesAnterior.forEach(r => {
+        if (r.congregacao_id === l.id) {
+          almasAnterior += r.almas_alcancadas || 0;
+          reconciliacoesAnterior += r.reconciliacoes || 0;
+          visitantesAnterior += r.visitantes_presentes || 0;
+          batismosAnterior += r.batismos_espirito_santo || 0;
+          evangelismosAnterior += r.evangelismos_realizados || 0;
+          visitasAnterior += r.visitas_realizadas || 0;
+        }
+      });
+
+      const somaPonderadaAnterior = (almasAnterior * 5) + (reconciliacoesAnterior * 4) + (batismosAnterior * 4) + (visitantesAnterior * 2) + (evangelismosAnterior * 2) + (visitasAnterior * 1);
+      
+      // Variação do ISE em relação ao mês anterior
+      let variacaoIse = 0;
+      if (somaPonderadaAnterior === 0) {
+        variacaoIse = somaPonderada > 0 ? 100 : 0;
+      } else {
+        variacaoIse = ((somaPonderada - somaPonderadaAnterior) / somaPonderadaAnterior) * 100;
+      }
+
+      // 3. Mês Retrasado (para tendência de 3 meses)
+      const prev2Mes = dashMes <= 2 ? (dashMes === 2 ? 12 : 11) : dashMes - 2;
+      const prev2Ano = dashMes <= 2 ? (dashMes === 2 ? dashAno - 1 : dashAno - 1) : dashAno;
+      const registrosMesRetrasado = registros.filter(r => {
+        const d = new Date(r.data_atividade);
+        const m = d.getUTCMonth() + 1;
+        const y = d.getUTCFullYear();
+        return r.congregacao_id === l.id && m === prev2Mes && y === prev2Ano;
+      });
+
+      let almasRetrasado = 0, reconciliacoesRetrasado = 0, visitantesRetrasado = 0, batismosRetrasado = 0, evangelismosRetrasado = 0, visitasRetrasado = 0;
+      registrosMesRetrasado.forEach(r => {
+        almasRetrasado += r.almas_alcancadas || 0;
+        reconciliacoesRetrasado += r.reconciliacoes || 0;
+        visitantesRetrasado += r.visitantes_presentes || 0;
+        batismosRetrasado += r.batismos_espirito_santo || 0;
+        evangelismosRetrasado += r.evangelismos_realizados || 0;
+        visitasRetrasado += r.visitas_realizadas || 0;
+      });
+
+      const somaPonderadaRetrasado = (almasRetrasado * 5) + (reconciliacoesRetrasado * 4) + (batismosRetrasado * 4) + (visitantesRetrasado * 2) + (evangelismosRetrasado * 2) + (visitasRetrasado * 1);
+
+      // Decidir Tendência (3 meses)
+      let tendencia: 'Crescimento' | 'Estabilidade' | 'Queda' = 'Estabilidade';
+      if (somaPonderada > somaPonderadaAnterior && somaPonderadaAnterior >= somaPonderadaRetrasado) {
+        tendencia = 'Crescimento';
+      } else if (somaPonderada < somaPonderadaAnterior && somaPonderadaAnterior <= somaPonderadaRetrasado) {
+        tendencia = 'Queda';
+      } else {
+        const diff = somaPonderada - somaPonderadaAnterior;
+        if (diff > 5) tendencia = 'Crescimento';
+        else if (diff < -5) tendencia = 'Queda';
+      }
+
+      // Decidir Classificação Visual (Semáforo Ministerial)
+      let semaforo: 'Excelente' | 'Atenção' | 'Crítico' = 'Atenção';
+      if (somaPonderada === 0) {
+        semaforo = 'Crítico'; // Sem movimentação
+      } else if (ise >= 65 || (ise >= 45 && tendencia === 'Crescimento')) {
+        semaforo = 'Excelente';
+      } else if (ise < 25 || (ise < 40 && tendencia === 'Queda')) {
+        semaforo = 'Crítico';
+      }
+
+      return {
         id: l.id,
         nome: l.nome,
-        almas: 0,
-        reconciliacoes: 0,
-        visitantes: 0,
-        batismos: 0,
-        totalCombinado: 0,
-        almasAnterior: 0
+        almas,
+        reconciliacoes,
+        visitantes,
+        batismos,
+        evangelismos,
+        visitas,
+        somaPonderada,
+        somaPonderadaAnterior,
+        ise,
+        variacaoIse,
+        tendencia,
+        semaforo
       };
     });
+  }, [locais, registrosMesAtual, registrosMesAnterior, registros, dashMes, dashAno]);
 
-    // Mês Atual
-    registrosMesAtual.forEach(r => {
-      if (r.congregacao_id && pontuacaoCong[r.congregacao_id]) {
-        const item = pontuacaoCong[r.congregacao_id];
-        item.almas += r.almas_alcancadas || 0;
-        item.reconciliacoes += r.reconciliacoes || 0;
-        item.visitantes += r.visitantes_presentes || 0;
-        item.batismos += r.batismos_espirito_santo || 0;
-      }
+  // Ranking com ordenação dinâmica
+  const rankingOrdenado = useMemo(() => {
+    return [...congregacoesAnaliticas].sort((a, b) => {
+      if (rankingSortKey === 'ise') return b.ise - a.ise;
+      if (rankingSortKey === 'almas') return b.almas - a.almas;
+      if (rankingSortKey === 'visitantes') return b.visitantes - a.visitantes;
+      if (rankingSortKey === 'evangelismos') return b.evangelismos - a.evangelismos;
+      if (rankingSortKey === 'reconciliacoes') return b.reconciliacoes - a.reconciliacoes;
+      return b.batismos - a.batismos;
+    });
+  }, [congregacoesAnaliticas, rankingSortKey]);
+
+  // Destaques do Período
+  const destaques = useMemo(() => {
+    const defaultDestaque = { nome: 'Sem registros', valor: 0 };
+    
+    // Congregação Destaque (maior crescimento percentual do ISE)
+    const topCrescimento = [...congregacoesAnaliticas]
+      .filter(c => c.somaPonderada > 0)
+      .sort((a, b) => b.variacaoIse - a.variacaoIse)[0];
+
+    // Congregação Evangelística (maior número de visitantes)
+    const topEvangelistica = [...congregacoesAnaliticas].sort((a, b) => b.visitantes - a.visitantes)[0];
+
+    // Congregação Missionária (maior número de evangelismos)
+    const topMissionaria = [...congregacoesAnaliticas].sort((a, b) => b.evangelismos - a.evangelismos)[0];
+
+    // Congregação Frutífera (maior número de almas)
+    const topFrutifera = [...congregacoesAnaliticas].sort((a, b) => b.almas - a.almas)[0];
+
+    // Congregação em Atenção (maior queda percentual do ISE)
+    const topQueda = [...congregacoesAnaliticas]
+      .filter(c => c.somaPonderadaAnterior > 0)
+      .sort((a, b) => a.variacaoIse - b.variacaoIse)[0];
+
+    return {
+      destaque: topCrescimento && topCrescimento.variacaoIse > 0 ? { nome: topCrescimento.nome, valor: `${topCrescimento.variacaoIse.toFixed(0)}%` } : defaultDestaque,
+      evangelistica: topEvangelistica && topEvangelistica.visitantes > 0 ? { nome: topEvangelistica.nome, valor: topEvangelistica.visitantes } : defaultDestaque,
+      missionaria: topMissionaria && topMissionaria.evangelismos > 0 ? { nome: topMissionaria.nome, valor: topMissionaria.evangelismos } : defaultDestaque,
+      frutifera: topFrutifera && topFrutifera.almas > 0 ? { nome: topFrutifera.nome, valor: topFrutifera.almas } : defaultDestaque,
+      atencao: topQueda && topQueda.variacaoIse < 0 ? { nome: topQueda.nome, valor: `${topQueda.variacaoIse.toFixed(0)}%` } : defaultDestaque
+    };
+  }, [congregacoesAnaliticas]);
+
+  // Projeção Anual (Média dos meses transcorridos do ano atual até o mês filtrado multiplicada por 12)
+  const projecaoAnual = useMemo(() => {
+    // 1. Pegar registros do ano selecionado até o mês selecionado
+    const registrosAno = registros.filter(r => {
+      if (dashCongregacaoId && r.congregacao_id !== dashCongregacaoId) return false;
+      const d = new Date(r.data_atividade);
+      const m = d.getUTCMonth() + 1;
+      const y = d.getUTCFullYear();
+      return y === dashAno && m <= dashMes;
     });
 
-    // Mês Anterior
-    registrosMesAnterior.forEach(r => {
-      if (r.congregacao_id && pontuacaoCong[r.congregacao_id]) {
-        pontuacaoCong[r.congregacao_id].almasAnterior += r.almas_alcancadas || 0;
-      }
+    // Contar quantidade de meses com lançamentos registrados no ano corrente
+    const mesesComRegistro = new Set<number>();
+    registrosAno.forEach(r => {
+      const d = new Date(r.data_atividade);
+      mesesComRegistro.add(d.getUTCMonth() + 1);
     });
 
-    // Calcular variação percentual de almas por congregação
-    return Object.values(pontuacaoCong)
-      .map(c => {
-        let variacaoAlmas = 0;
-        if (c.almasAnterior === 0) {
-          variacaoAlmas = c.almas > 0 ? 100 : 0;
-        } else {
-          variacaoAlmas = ((c.almas - c.almasAnterior) / c.almasAnterior) * 100;
-        }
-        return {
-          ...c,
-          variacaoAlmas,
-          totalCombinado: c.almas + c.reconciliacoes + c.visitantes + c.batismos
-        };
-      })
-      .sort((a, b) => {
-        if (b.almas !== a.almas) return b.almas - a.almas;
-        if (b.reconciliacoes !== a.reconciliacoes) return b.reconciliacoes - a.reconciliacoes;
-        if (b.visitantes !== a.visitantes) return b.visitantes - a.visitantes;
-        return b.batismos - a.batismos;
+    const divisor = mesesComRegistro.size || 1;
+
+    let almasTot = 0, visitantesTot = 0, reconciliacoesTot = 0, batismosTot = 0;
+    registrosAno.forEach(r => {
+      almasTot += r.almas_alcancadas || 0;
+      visitantesTot += r.visitantes_presentes || 0;
+      reconciliacoesTot += r.reconciliacoes || 0;
+      batismosTot += r.batismos_espirito_santo || 0;
+    });
+
+    // Média mensal multiplicada pelas 12 competências do ano
+    return {
+      almas: Math.round((almasTot / divisor) * 12),
+      visitantes: Math.round((visitantesTot / divisor) * 12),
+      reconciliacoes: Math.round((reconciliacoesTot / divisor) * 12),
+      batismos: Math.round((batismosTot / divisor) * 12),
+      divisor
+    };
+  }, [registros, dashCongregacaoId, dashMes, dashAno]);
+
+  // Mapa de Calor (Heatmap)
+  const heatmapDados = useMemo(() => {
+    return locais.map(l => {
+      const colunasMeses = Array.from({ length: 12 }, (_, mesIdx) => {
+        const m = mesIdx + 1;
+        
+        // Obter registros da congregação no mês m do ano filtrado
+        const regsMes = registros.filter(r => {
+          if (r.congregacao_id !== l.id) return false;
+          const d = new Date(r.data_atividade);
+          return (d.getUTCMonth() + 1) === m && d.getUTCFullYear() === dashAno;
+        });
+
+        // Calcular soma ponderada
+        let almas = 0, recon = 0, bat = 0, visit = 0, evang = 0, visitas = 0;
+        regsMes.forEach(r => {
+          almas += r.almas_alcancadas || 0;
+          recon += r.reconciliacoes || 0;
+          bat += r.batismos_espirito_santo || 0;
+          visit += r.visitantes_presentes || 0;
+          evang += r.evangelismos_realizados || 0;
+          visitas += r.visitas_realizadas || 0;
+        });
+        const soma = (almas * 5) + (recon * 4) + (bat * 4) + (visit * 2) + (evang * 2) + (visitas * 1);
+
+        // Normalização simples do Heatmap (teto estático local de 30 pontos = intensidade total)
+        const intensidade = Math.min(100, Math.round((soma / 30) * 100));
+        return { mes: m, ise: intensidade, somaRaw: soma };
       });
-  }, [locais, registrosMesAtual, registrosMesAnterior]);
 
-  // Insights Automáticos
-  const insights = useMemo(() => {
-    const list: string[] = [];
+      return {
+        id: l.id,
+        nome: l.nome,
+        meses: colunasMeses
+      };
+    });
+  }, [locais, registros, dashAno]);
 
-    // 1. Visitantes
-    if (somaAtual.visitantes > somaAnterior.visitantes) {
-      const p = somaAnterior.visitantes === 0 ? 100 : ((somaAtual.visitantes - somaAnterior.visitantes) / somaAnterior.visitantes) * 100;
-      list.push(`📈 Crescimento de visitantes: O número de visitantes cresceu +${p.toFixed(0)}% comparado ao mês anterior.`);
-    } else if (somaAtual.visitantes < somaAnterior.visitantes) {
-      list.push(`📉 Redução de visitantes: A presença de novos visitantes diminuiu este mês. Recomendamos ações de recepção.`);
+  // Histórico de 12 Meses de uma congregação selecionada (para o Modal)
+  const evolucaoDadosModal = useMemo(() => {
+    if (!selectedCongregacaoEvolucao) return [];
+    const dados = [];
+    const baseDate = new Date(dashAno, dashMes - 1, 15);
+
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(baseDate.getFullYear(), baseDate.getMonth() - i, 15);
+      const m = d.getMonth() + 1;
+      const y = d.getFullYear();
+
+      let almas = 0, visitantes = 0, reconciliacoes = 0, batismos = 0, evangelismos = 0, visitas = 0;
+      registros.forEach(r => {
+        if (r.congregacao_id !== selectedCongregacaoEvolucao.id) return;
+        const actDate = new Date(r.data_atividade);
+        if (actDate.getUTCMonth() + 1 === m && actDate.getUTCFullYear() === y) {
+          almas += r.almas_alcancadas || 0;
+          visitantes += r.visitantes_presentes || 0;
+          reconciliacoes += r.reconciliacoes || 0;
+          batismos += r.batismos_espirito_santo || 0;
+          evangelismos += r.evangelismos_realizados || 0;
+          visitas += r.visitas_realizadas || 0;
+        }
+      });
+
+      dados.push({
+        mesAno: `${m.toString().padStart(2, '0')}/${y.toString().substring(2)}`,
+        Almas: almas,
+        Visitantes: visitantes,
+        Reconciliacoes: reconciliacoes,
+        Batismos: batismos,
+        Evangelismos: evangelismos,
+        Visitas: visitas
+      });
     }
-
-    // 2. Evangelismos
-    if (somaAtual.evangelismos < somaAnterior.evangelismos) {
-      list.push(`📢 Ações de evangelismo: Redução nas atividades de evangelismo local em relação ao mês anterior.`);
-    } else if (somaAtual.evangelismos > 0) {
-      list.push(`🔥 Evangelismo ativo: Houve um engajamento maior no trabalho de evangelismo externo.`);
-    }
-
-    // 3. Congregações destaques
-    if (rankingCongregacoes.length > 0) {
-      const top = rankingCongregacoes[0];
-      if (top.almas > 0) {
-        list.push(`🏆 Destaque em Almas: A congregação ${top.nome} registrou a maior colheita espiritual com ${top.almas} almas alcançadas.`);
-      }
-
-      // Maior crescimento percentual
-      const maisCresceu = [...rankingCongregacoes].sort((a, b) => b.variacaoAlmas - a.variacaoAlmas)[0];
-      if (maisCresceu && maisCresceu.variacaoAlmas > 0) {
-        list.push(`✨ Maior crescimento: ${maisCresceu.nome} apresentou o maior crescimento percentual em novos frutos espirituais (+${maisCresceu.variacaoAlmas.toFixed(0)}%).`);
-      }
-
-      // Sem movimentação
-      const semMov = rankingCongregacoes.filter(c => c.totalCombinado === 0);
-      if (semMov.length > 0) {
-        const nomes = semMov.map(c => c.nome).slice(0, 3).join(', ');
-        list.push(`⚠️ Alerta pastoral: Congregações sem atividade espiritual registrada este mês: ${nomes}${semMov.length > 3 ? ' e outras.' : '.'}`);
-      }
-    }
-
-    if (list.length === 0) {
-      list.push('💡 Nenhuma variação significativa de indicadores identificada para o mês filtrado.');
-    }
-
-    return list;
-  }, [somaAtual, somaAnterior, rankingCongregacoes]);
+    return dados;
+  }, [registros, selectedCongregacaoEvolucao, dashMes, dashAno]);
 
   // --- LÓGICA DE CADASTRO E LANÇAMENTO ---
 
@@ -625,7 +807,7 @@ export default function RelatorioEspiritualPage() {
     }
   };
 
-  // Consolidação por congregação na quarta aba
+  // Consolidação por congregação
   const consolidadoPorCongregacao = useMemo(() => {
     const mapa: Record<string, {
       congregacao_id: string | null;
@@ -687,12 +869,11 @@ export default function RelatorioEspiritualPage() {
     return Object.values(mapa);
   }, [locais, registrosFiltrados]);
 
-  // Ativar ou desativar Link Externo de Coleta
+  // Central de Coleta
   const toggleLinkColeta = async (congId: string, active: boolean) => {
     try {
       if (!ctx?.ministryId) return;
       if (active) {
-        // Gerar Token
         const tokenString = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         const expires = new Date();
         expires.setDate(expires.getDate() + 30); // 30 dias
@@ -710,7 +891,6 @@ export default function RelatorioEspiritualPage() {
         if (error) throw error;
         showNotification('success', 'Link Ativado', 'Link externo gerado com sucesso.');
       } else {
-        // Desativar
         const { error } = await supabase
           .from('relatorio_espiritual_tokens')
           .update({ is_active: false })
@@ -772,11 +952,11 @@ export default function RelatorioEspiritualPage() {
       />
 
       <DashboardContent>
-        {/* ABA 1: DASHBOARD EXECUTIVO */}
+        {/* ABA 1: DASHBOARD EXECUTIVO ANALÍTICO */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-6">
+          <div className="space-y-8">
             
-            {/* Filtro de Competência do Dashboard */}
+            {/* Linha 0: Filtro de Competência do Dashboard */}
             <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <Calendar className="h-5 w-5 text-[#062E6F]" />
@@ -790,7 +970,7 @@ export default function RelatorioEspiritualPage() {
                 <select
                   value={dashMes}
                   onChange={e => setDashMes(parseInt(e.target.value))}
-                  className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition"
+                  className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition cursor-pointer"
                 >
                   {MESES_NOMES.map((nome, index) => (
                     <option key={index + 1} value={index + 1}>{nome}</option>
@@ -801,19 +981,19 @@ export default function RelatorioEspiritualPage() {
                 <select
                   value={dashAno}
                   onChange={e => setDashAno(parseInt(e.target.value))}
-                  className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition"
+                  className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition cursor-pointer"
                 >
                   <option value={2024}>2024</option>
                   <option value={2025}>2025</option>
                   <option value={2026}>2026</option>
                 </select>
 
-                {/* Seletor Congregação (Visível e ativo apenas se for admin/secretario) */}
+                {/* Seletor Congregação */}
                 {!isLocalUser && (
                   <select
                     value={filtroCongregacao}
                     onChange={e => setFiltroCongregacao(e.target.value)}
-                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition"
+                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition cursor-pointer"
                   >
                     <option value="">Todas as congregações</option>
                     {locais.map(l => (
@@ -824,7 +1004,7 @@ export default function RelatorioEspiritualPage() {
               </div>
             </div>
 
-            {/* KPIs Consolidados com Comparativos */}
+            {/* Linha 1: KPIs & Comparativos */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <ExecutiveMetricCard
                 title="Almas Alcançadas"
@@ -856,7 +1036,7 @@ export default function RelatorioEspiritualPage() {
               />
             </div>
 
-            {/* Gráficos de Evolução e Distribuição */}
+            {/* Linha 2: Evolução Mensal & Distribuição das Atividades */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
               {/* Evolução Mensal (Linha) */}
@@ -937,47 +1117,132 @@ export default function RelatorioEspiritualPage() {
 
             </div>
 
-            {/* Ranking das Congregações e Insights do Mês */}
+            {/* Linha 3: Ranking Inteligente, Painel de Saúde & Destaques */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
-              {/* Ranking (Top Congregações) */}
+              {/* Ranking & Painel de Saúde (2 colunas no desktop) */}
               <div className="lg:col-span-2">
-                <DashboardSection title="Ranking Geral das Congregações">
+                <DashboardSection title="Ranking de Saúde & Desempenho Espiritual">
                   <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                    {/* Controladores de ordenação dinâmica */}
+                    <div className="p-4 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-2 items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                        Ordenar ranking por:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {([
+                          { key: 'ise', label: 'Saúde (ISE)' },
+                          { key: 'almas', label: 'Almas' },
+                          { key: 'visitantes', label: 'Visitantes' },
+                          { key: 'evangelismos', label: 'Evang.' },
+                          { key: 'reconciliacoes', label: 'Recon.' },
+                          { key: 'batismos', label: 'Batismo ES' }
+                        ] as const).map(k => (
+                          <button
+                            key={k.key}
+                            onClick={() => setRankingSortKey(k.key)}
+                            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase transition ${
+                              rankingSortKey === k.key
+                                ? 'bg-slate-900 text-white shadow-sm'
+                                : 'bg-white border border-slate-200 text-slate-650 hover:bg-slate-100'
+                            }`}
+                          >
+                            {k.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase font-black tracking-wider">
-                            <th className="px-5 py-3 text-center w-16">Posição</th>
+                            <th className="px-5 py-3 text-center w-12">Pos</th>
                             <th className="px-5 py-3">Congregação</th>
-                            <th className="px-5 py-3 text-center">Almas</th>
-                            <th className="px-5 py-3 text-center">Reconciliações</th>
-                            <th className="px-5 py-3 text-center">Visitantes</th>
-                            <th className="px-5 py-3 text-center">Batismos ES</th>
-                            <th className="px-5 py-3 text-right">Var. Almas (Mês)</th>
+                            <th className="px-5 py-3 text-center w-24">Semáforo</th>
+                            <th className="px-5 py-3 text-center w-12">Tend.</th>
+                            <th className="px-5 py-3 text-center w-40">Índice Saúde (ISE)</th>
+                            <th className="px-5 py-3 text-center w-20">Lançamento</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                          {rankingCongregacoes.map((c, i) => (
-                            <tr key={c.id} className="hover:bg-slate-50/50 transition">
+                          {rankingOrdenado.map((c, i) => (
+                            <tr
+                              key={c.id}
+                              onClick={() => setSelectedCongregacaoEvolucao({ id: c.id, nome: c.nome })}
+                              className="hover:bg-slate-50/50 transition cursor-pointer group"
+                            >
+                              {/* Posição */}
                               <td className="px-5 py-4 text-center font-black">
                                 {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`}
                               </td>
-                              <td className="px-5 py-4 font-bold text-slate-800 text-sm">
-                                {c.nome}
+
+                              {/* Nome Congregação */}
+                              <td className="px-5 py-4">
+                                <div className="font-extrabold text-slate-800 text-sm group-hover:text-[#062E6F] transition">
+                                  {c.nome}
+                                </div>
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  Almas: <strong className="text-rose-600 font-bold">{c.almas}</strong> |
+                                  Visitantes: <strong className="text-blue-600 font-bold">{c.visitantes}</strong> |
+                                  Evang.: <strong className="text-slate-700 font-bold">{c.evangelismos}</strong>
+                                </div>
                               </td>
-                              <td className="px-5 py-4 text-center font-bold text-rose-600">{c.almas}</td>
-                              <td className="px-5 py-4 text-center">{c.reconciliacoes}</td>
-                              <td className="px-5 py-4 text-center">{c.visitantes}</td>
-                              <td className="px-5 py-4 text-center">{c.batismos}</td>
-                              <td className="px-5 py-4 text-right whitespace-nowrap">
-                                {c.variacaoAlmas > 0 ? (
-                                  <span className="text-emerald-600 font-bold">+{c.variacaoAlmas.toFixed(0)}%</span>
-                                ) : c.variacaoAlmas < 0 ? (
-                                  <span className="text-rose-600 font-bold">{c.variacaoAlmas.toFixed(0)}%</span>
+
+                              {/* Semáforo */}
+                              <td className="px-5 py-4 text-center whitespace-nowrap">
+                                {c.semaforo === 'Excelente' ? (
+                                  <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2 py-0.5 font-bold text-[9px] uppercase tracking-wide">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    Excelente
+                                  </span>
+                                ) : c.semaforo === 'Atenção' ? (
+                                  <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-2 py-0.5 font-bold text-[9px] uppercase tracking-wide">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                    Atenção
+                                  </span>
                                 ) : (
-                                  <span className="text-slate-400 font-medium">0%</span>
+                                  <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-100 rounded-full px-2 py-0.5 font-bold text-[9px] uppercase tracking-wide">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                    Crítico
+                                  </span>
                                 )}
+                              </td>
+
+                              {/* Tendência */}
+                              <td className="px-5 py-4 text-center text-sm font-black whitespace-nowrap">
+                                {c.tendencia === 'Crescimento' ? (
+                                  <span className="text-emerald-600" title="Crescimento (últimos 3 meses)">⬈</span>
+                                ) : c.tendencia === 'Queda' ? (
+                                  <span className="text-rose-600" title="Queda (últimos 3 meses)">⬊</span>
+                                ) : (
+                                  <span className="text-slate-400" title="Estabilidade (últimos 3 meses)">➡</span>
+                                )}
+                              </td>
+
+                              {/* ISE nota + barra de progresso */}
+                              <td className="px-5 py-4">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-slate-800 font-extrabold text-sm w-8 shrink-0">
+                                    {c.ise}
+                                  </span>
+                                  <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full transition-all duration-500 ${
+                                        c.ise >= 65 ? 'bg-emerald-500' :
+                                        c.ise >= 25 ? 'bg-amber-500' : 'bg-rose-500'
+                                      }`}
+                                      style={{ width: `${c.ise}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Detalhe interativo */}
+                              <td className="px-5 py-4 text-right">
+                                <button className="text-[10px] font-black uppercase text-[#062E6F] hover:underline whitespace-nowrap">
+                                  Ver Ficha
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -988,25 +1253,208 @@ export default function RelatorioEspiritualPage() {
                 </DashboardSection>
               </div>
 
-              {/* Insights do Mês */}
+              {/* Destaques do Período */}
               <div>
-                <DashboardSection title="Insights do Mês">
-                  <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4 min-h-[300px]">
-                    <div className="flex items-center gap-2 text-amber-600 mb-2">
-                      <Lightbulb className="h-5 w-5" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                        Análise de Tendência
+                <DashboardSection title="Destaques do Período">
+                  <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4.5">
+                    
+                    {/* Congregação Destaque */}
+                    <div className="p-4 bg-emerald-50/40 border border-emerald-100/50 rounded-xl space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-emerald-700 font-bold text-xs flex items-center gap-1.5">
+                          🏆 Congregação Destaque
+                        </span>
+                        <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                          {destaques.destaque.valor}
+                        </span>
+                      </div>
+                      <h4 className="font-extrabold text-slate-800 text-sm">{destaques.destaque.nome}</h4>
+                      <p className="text-[10px] text-slate-500">Maior crescimento percentual do ISE.</p>
+                    </div>
+
+                    {/* Congregação Evangelística */}
+                    <div className="p-4 bg-blue-50/40 border border-blue-100/50 rounded-xl space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-blue-700 font-bold text-xs flex items-center gap-1.5">
+                          🔥 Congregação Evangelística
+                        </span>
+                        <span className="text-[10px] font-black text-blue-800 bg-blue-100 px-2 py-0.5 rounded-md">
+                          {destaques.evangelistica.valor} visit.
+                        </span>
+                      </div>
+                      <h4 className="font-extrabold text-slate-800 text-sm">{destaques.evangelistica.nome}</h4>
+                      <p className="text-[10px] text-slate-500">Maior número de visitantes atraídos nos cultos.</p>
+                    </div>
+
+                    {/* Congregação Missionária */}
+                    <div className="p-4 bg-slate-50 border border-slate-150 rounded-xl space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-700 font-bold text-xs flex items-center gap-1.5">
+                          📢 Congregação Missionária
+                        </span>
+                        <span className="text-[10px] font-black text-slate-800 bg-slate-200 px-2 py-0.5 rounded-md">
+                          {destaques.missionaria.valor} ações
+                        </span>
+                      </div>
+                      <h4 className="font-extrabold text-slate-800 text-sm">{destaques.missionaria.nome}</h4>
+                      <p className="text-[10px] text-slate-500">Maior número de ações de evangelismo externo.</p>
+                    </div>
+
+                    {/* Congregação Frutífera */}
+                    <div className="p-4 bg-rose-50/40 border border-rose-100/50 rounded-xl space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-rose-700 font-bold text-xs flex items-center gap-1.5">
+                          ❤️ Congregação Frutífera
+                        </span>
+                        <span className="text-[10px] font-black text-rose-800 bg-rose-100 px-2 py-0.5 rounded-md">
+                          {destaques.frutifera.valor} almas
+                        </span>
+                      </div>
+                      <h4 className="font-extrabold text-slate-800 text-sm">{destaques.frutifera.nome}</h4>
+                      <p className="text-[10px] text-slate-500">Maior número de almas ganhas para Cristo.</p>
+                    </div>
+
+                    {/* Congregação em Atenção */}
+                    <div className="p-4 bg-rose-50/30 border border-rose-100/30 rounded-xl space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-rose-900 font-bold text-xs flex items-center gap-1.5">
+                          ⚠️ Congregação em Atenção
+                        </span>
+                        <span className="text-[10px] font-black text-rose-950 bg-rose-100 px-2 py-0.5 rounded-md">
+                          {destaques.atencao.valor}
+                        </span>
+                      </div>
+                      <h4 className="font-extrabold text-slate-800 text-sm">{destaques.atencao.nome}</h4>
+                      <p className="text-[10px] text-slate-500">Maior redução percentual do ISE.</p>
+                    </div>
+
+                  </div>
+                </DashboardSection>
+              </div>
+
+            </div>
+
+            {/* Linha 4: Mapa de Calor (Heatmap) & Projeção Anual */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Mapa de Calor (Heatmap) */}
+              <div className="lg:col-span-2">
+                <DashboardSection title={`Mapa de Calor do Índice de Saúde Espiritual (Ano: ${dashAno})`}>
+                  <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
+                    
+                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <span>Linhas: Congregações | Colunas: Jan a Dez</span>
+                      <div className="flex items-center gap-2">
+                        <span>Menor ISE</span>
+                        <div className="flex h-3 w-20 rounded bg-gradient-to-r from-slate-100 via-emerald-200 to-emerald-700" />
+                        <span>Maior ISE</span>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[600px] space-y-3">
+                        {heatmapDados.map(row => (
+                          <div key={row.id} className="flex items-center gap-2">
+                            <span className="w-36 text-xs font-bold text-slate-700 truncate" title={row.nome}>
+                              {row.nome}
+                            </span>
+                            <div className="flex gap-1.5 flex-1 justify-between">
+                              {row.meses.map(col => (
+                                <div
+                                  key={col.mes}
+                                  title={`${MESES_NOMES[col.mes - 1]}: ISE de ${col.ise}% (${col.somaRaw} pts)`}
+                                  className="h-8 rounded-lg flex-1 flex items-center justify-center text-[9px] font-bold text-slate-700 transition duration-300 hover:scale-105 border border-slate-200/20"
+                                  style={{
+                                    backgroundColor: col.somaRaw === 0 ? '#F8FAFC' :
+                                                     col.ise < 25 ? '#ECFDF5' :
+                                                     col.ise < 55 ? '#A7F3D0' :
+                                                     col.ise < 80 ? '#34D399' : '#047857',
+                                    color: col.ise >= 55 ? '#FFFFFF' : '#334155'
+                                  }}
+                                >
+                                  {col.somaRaw > 0 ? col.ise : '—'}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {/* Linha de cabeçalho dos meses */}
+                        <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                          <span className="w-36" />
+                          <div className="flex gap-1.5 flex-1 justify-between text-[10px] font-bold text-slate-400 text-center">
+                            {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].map((m, idx) => (
+                              <span key={idx} className="flex-1">
+                                {m}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+
+                  </div>
+                </DashboardSection>
+              </div>
+
+              {/* Projeção Anual */}
+              <div>
+                <DashboardSection title="Projeção Acumulada do Ano">
+                  <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4.5 min-h-[300px]">
+                    <div className="flex items-center gap-2 text-indigo-600 mb-1">
+                      <Activity className="h-5 w-5" />
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        Projeções Matemáticas (Jan a Dez)
                       </span>
                     </div>
 
-                    <div className="space-y-3">
-                      {insights.map((insight, idx) => (
-                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100/70 text-xs font-semibold text-slate-700 leading-relaxed">
-                          <span>💡</span>
-                          <p>{insight}</p>
-                        </div>
-                      ))}
+                    <p className="text-[11px] font-semibold text-slate-500 leading-relaxed">
+                      Estimativa de fechamento anual com base no histórico de {projecaoAnual.divisor} meses registrados em {dashAno}.
+                    </p>
+
+                    <div className="space-y-3.5">
+                      {/* Almas */}
+                      <div className="flex justify-between items-center p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          🔥 Almas
+                        </span>
+                        <strong className="text-sm font-black text-rose-600">
+                          {projecaoAnual.almas} vidas
+                        </strong>
+                      </div>
+
+                      {/* Visitantes */}
+                      <div className="flex justify-between items-center p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          👥 Visitantes
+                        </span>
+                        <strong className="text-sm font-black text-blue-600">
+                          {projecaoAnual.visitantes} pessoas
+                        </strong>
+                      </div>
+
+                      {/* Reconciliados */}
+                      <div className="flex justify-between items-center p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          🤝 Reconciliações
+                        </span>
+                        <strong className="text-sm font-black text-emerald-600">
+                          {projecaoAnual.reconciliacoes} retornos
+                        </strong>
+                      </div>
+
+                      {/* Batismos ES */}
+                      <div className="flex justify-between items-center p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          ✨ Batismos ES
+                        </span>
+                        <strong className="text-sm font-black text-rose-500">
+                          {projecaoAnual.batismos} batismos
+                        </strong>
+                      </div>
                     </div>
+
                   </div>
                 </DashboardSection>
               </div>
@@ -1273,7 +1721,7 @@ export default function RelatorioEspiritualPage() {
                 <select
                   value={filtroCongregacao}
                   onChange={e => setFiltroCongregacao(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none"
+                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none cursor-pointer"
                 >
                   <option value="">Todas</option>
                   {locais.map(l => (
@@ -1288,7 +1736,7 @@ export default function RelatorioEspiritualPage() {
                 <select
                   value={filtroTipo}
                   onChange={e => setFiltroTipo(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none"
+                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none cursor-pointer"
                 >
                   <option value="">Todos</option>
                   <option value="Culto">⛪ Culto</option>
@@ -1305,7 +1753,7 @@ export default function RelatorioEspiritualPage() {
                 <select
                   value={filtroStatus}
                   onChange={e => setFiltroStatus(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none"
+                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none cursor-pointer"
                 >
                   <option value="">Todos</option>
                   <option value="Rascunho">Rascunho</option>
@@ -1390,13 +1838,13 @@ export default function RelatorioEspiritualPage() {
                             <div className="flex items-center justify-end gap-1.5">
                               <button
                                 onClick={() => startEdit(r)}
-                                className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition"
+                                className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition cursor-pointer"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
                               <button
                                 onClick={() => deleteRegistro(r.id)}
-                                className="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg transition"
+                                className="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg transition cursor-pointer"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
@@ -1465,6 +1913,116 @@ export default function RelatorioEspiritualPage() {
         )}
 
       </DashboardContent>
+
+      {/* Modal: Evolução Detalhada da Congregação (Ficha/Gráficos Históricos) */}
+      {selectedCongregacaoEvolucao && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-100 max-h-[90vh] animate-fade-in">
+            
+            {/* Header */}
+            <div className="p-5 bg-gradient-to-r from-[#062E6F] to-[#154A92] flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/10 rounded-xl">
+                  <Activity className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white uppercase tracking-wide">
+                    Ficha de Evolução Espiritual
+                  </h3>
+                  <p className="text-blue-100 text-xs mt-0.5 font-semibold">
+                    Histórico detalhado da congregação: {selectedCongregacaoEvolucao.nome}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedCongregacaoEvolucao(null)}
+                className="p-1 rounded-lg text-blue-200 hover:bg-white/15 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Corpo / Gráficos de Linha */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-[300px]">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Almas e Reconciliados */}
+                <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-2">
+                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-wider">
+                    Frutos: Almas & Reconciliados
+                  </h4>
+                  <div className="h-[180px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={evolucaoDadosModal}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#CBD5E1" />
+                        <XAxis dataKey="mesAno" stroke="#64748B" fontSize={9} />
+                        <YAxis stroke="#64748B" fontSize={9} />
+                        <ChartTooltip />
+                        <Line type="monotone" dataKey="Almas" stroke="#E11D48" strokeWidth={2} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="Reconciliacoes" stroke="#10B981" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Visitantes e Visitas */}
+                <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-2">
+                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-wider">
+                    Acolhimento: Visitantes & Visitas
+                  </h4>
+                  <div className="h-[180px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={evolucaoDadosModal}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#CBD5E1" />
+                        <XAxis dataKey="mesAno" stroke="#64748B" fontSize={9} />
+                        <YAxis stroke="#64748B" fontSize={9} />
+                        <ChartTooltip />
+                        <Line type="monotone" dataKey="Visitantes" stroke="#2563EB" strokeWidth={2} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="Visitas" stroke="#4F46E5" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Batismos e Evangelismos */}
+                <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-2 col-span-1 md:col-span-2">
+                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-wider">
+                    Espiritualidade & Missões: Batismos ES & Evangelismos
+                  </h4>
+                  <div className="h-[180px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={evolucaoDadosModal}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#CBD5E1" />
+                        <XAxis dataKey="mesAno" stroke="#64748B" fontSize={9} />
+                        <YAxis stroke="#64748B" fontSize={9} />
+                        <ChartTooltip />
+                        <Line type="monotone" dataKey="Batismos" stroke="#F59E0B" strokeWidth={2} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="Evangelismos" stroke="#475569" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedCongregacaoEvolucao(null)}
+                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs shadow-md transition cursor-pointer"
+              >
+                Fechar Painel
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Modal: Central de Coleta de Relatórios das Congregações */}
       {isCentralColetaOpen && (
