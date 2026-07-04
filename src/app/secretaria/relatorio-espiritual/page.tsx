@@ -1,15 +1,44 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import PageLayout from '@/components/PageLayout';
-import Tabs from '@/components/Tabs';
-import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
+import DashboardContainer from '@/components/dashboard/DashboardContainer';
+import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import DashboardContent from '@/components/dashboard/DashboardContent';
+import DashboardSection from '@/components/dashboard/DashboardSection';
+import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
+import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { Pencil, Trash2, Plus, Minus, FileText, Loader2, Church, Home, Flame, BookOpen, GlassWater, UserPlus, Link as LinkIcon, Sparkles, Heart, Megaphone, Users, QrCode, Copy, RefreshCw, X, Globe } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
+import {
+  Pencil,
+  Trash2,
+  Plus,
+  Minus,
+  FileText,
+  Flame,
+  UserPlus,
+  Sparkles,
+  Users,
+  QrCode,
+  X,
+  Globe,
+  Calendar,
+  Lightbulb,
+  Clock
+} from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as ChartTooltip,
+  ResponsiveContainer
+} from 'recharts';
 
 interface LocalOption {
   id: string;
@@ -41,20 +70,11 @@ interface RelatorioEspiritualRegistro {
   updated_at: string;
 }
 
-const TIPO_ATIVIDADE_OPTIONS = [
-  { value: 'Visita', label: '🏠 Visita' },
-  { value: 'Evangelismo', label: '📢 Evangelismo' },
-  { value: 'Outro', label: '📦 Outro' }
-];
-
-const STATUS_OPTIONS = [
-  { value: 'Rascunho', label: 'Rascunho', color: 'bg-slate-100 text-slate-700' },
-  { value: 'Enviado', label: 'Enviado', color: 'bg-blue-100 text-blue-700' },
-  { value: 'Revisado', label: 'Revisado', color: 'bg-emerald-100 text-emerald-700' }
-];
+// TIPO_ATIVIDADE_OPTIONS e STATUS_OPTIONS removidos para evitar warnings de não uso.
 
 const TABS = [
-  { id: 'cadastro', label: 'Cadastro', icon: '📝' },
+  { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+  { id: 'cadastro', label: 'Lançamentos', icon: '📝' },
   { id: 'registros', label: 'Registros', icon: '🔍' },
   { id: 'consolidado', label: 'Consolidação por Congregação', icon: '🏢' }
 ];
@@ -84,15 +104,21 @@ const formatDate = (value?: string | null) => {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : value;
 };
 
+const MESES_NOMES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+];
+
 export default function RelatorioEspiritualPage() {
   const { ctx, bloqueado } = useRequireModulo('gestao');
   const supabase = useMemo(() => createClient(), []);
 
-  const [activeTab, setActiveTab] = useState('cadastro');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [registros, setRegistros] = useState<RelatorioEspiritualRegistro[]>([]);
   const [locais, setLocais] = useState<LocalOption[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const labelDivPrincipal = 'Congregação';
 
   const [formData, setFormData] = useState(EMPTY_FORM);
 
@@ -102,6 +128,13 @@ export default function RelatorioEspiritualPage() {
   const [filtroStatus, setFiltroStatus] = useState('');
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
+
+  // Filtros da competência do Dashboard Executivo
+  const [dashMes, setDashMes] = useState<number>(new Date().getMonth() + 1);
+  const [dashAno, setDashAno] = useState<number>(new Date().getFullYear());
+
+  // Métrica selecionada no Gráfico de Evolução
+  const [evolucaoMetrica, setEvolucaoMetrica] = useState<'almas' | 'visitantes' | 'reconciliacoes' | 'batismos'>('almas');
 
   // Estados da Central de Coleta
   const [isCentralColetaOpen, setIsCentralColetaOpen] = useState(false);
@@ -159,19 +192,16 @@ export default function RelatorioEspiritualPage() {
         .from('congregacoes')
         .select('id, nome')
         .eq('ministry_id', ctx.ministryId)
-        .eq('is_active', true)
-        .order('nome', { ascending: true });
+        .order('nome');
 
-      if (isLocalUser && ctx?.congregacaoId) {
+      if (isLocalUser && ctx.congregacaoId) {
         query = query.eq('id', ctx.congregacaoId);
       }
 
       const { data, error } = await query;
-      if (error) {
-        console.error('Erro ao carregar congregações:', error);
-      } else {
-        setLocais((data || []) as LocalOption[]);
-        if (isLocalUser && ctx?.congregacaoId) {
+      if (!error && data) {
+        setLocais(data as LocalOption[]);
+        if (isLocalUser && ctx.congregacaoId) {
           setFormData(prev => ({ ...prev, congregacao_id: ctx.congregacaoId || '' }));
           setFiltroCongregacao(ctx.congregacaoId || '');
         }
@@ -179,116 +209,38 @@ export default function RelatorioEspiritualPage() {
     };
 
     loadLocais();
-  }, [ctx?.loading, ctx?.ministryId, ctx?.congregacaoId, isLocalUser, supabase]);
+    loadTokens();
+  }, [ctx?.loading, ctx?.ministryId, isLocalUser, ctx?.congregacaoId]);
 
-  // Carregar Registros de Relatório Espiritual
+  // Carregar todos os Relatórios do Tenant
   const loadRegistros = async () => {
     if (!ctx?.ministryId) return;
-    setLoadingData(true);
-
     try {
       let query = supabase
         .from('relatorio_espiritual_registros')
         .select('*')
         .eq('ministry_id', ctx.ministryId);
 
-      if (isLocalUser && ctx?.congregacaoId) {
+      if (isLocalUser && ctx.congregacaoId) {
         query = query.eq('congregacao_id', ctx.congregacaoId);
       }
 
       const { data, error } = await query.order('data_atividade', { ascending: false });
-
-      if (error) {
-        showNotification('error', 'Erro', 'Erro ao carregar os relatórios espirituais.');
-      } else {
-        setRegistros((data || []) as RelatorioEspiritualRegistro[]);
+      if (!error && data) {
+        setRegistros(data as RelatorioEspiritualRegistro[]);
       }
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoadingData(false);
-    }
-  };
-
-  const handleGerarLink = async (congId: string | null, silently?: boolean) => {
-    if (!ctx?.ministryId || !congId) return;
-
-    try {
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      const { data, error } = await supabase
-        .from('relatorio_espiritual_tokens')
-        .insert({
-          ministry_id: ctx.ministryId,
-          congregacao_id: congId,
-          is_active: true,
-          expires_at: expiresAt
-        })
-        .select('token')
-        .single();
-
-      if (error) {
-        const { data: existing } = await supabase
-          .from('relatorio_espiritual_tokens')
-          .select('token')
-          .eq('ministry_id', ctx.ministryId)
-          .eq('congregacao_id', congId)
-          .single();
-
-        if (existing) {
-          const link = `${window.location.origin}/formularios/relatorio-espiritual/${existing.token}`;
-          if (!silently) {
-            navigator.clipboard.writeText(link);
-            showNotification('success', 'Link Copiado', 'O link do formulário público foi copiado para a sua área de transferência.');
-          }
-        }
-      } else if (data) {
-        const link = `${window.location.origin}/formularios/relatorio-espiritual/${data.token}`;
-        if (!silently) {
-          navigator.clipboard.writeText(link);
-          showNotification('success', 'Link Gerado e Copiado', 'Um novo link exclusivo foi gerado e copiado para a sua área de transferência.');
-        }
-      }
-      await loadTokens();
-    } catch (err) {
-      console.error(err);
-      if (!silently) {
-        showNotification('error', 'Erro', 'Erro ao processar o link.');
-      }
-    }
-  };
-
-  const handleRegenerarToken = async (congId: string) => {
-    if (!ctx?.ministryId || !congId) return;
-    if (!confirm('Deseja realmente regenerar o link desta congregação? O link antigo deixará de funcionar imediatamente.')) return;
-
-    setLoadingData(true);
-    try {
-      // Deleta o token anterior
-      await supabase
-        .from('relatorio_espiritual_tokens')
-        .delete()
-        .eq('ministry_id', ctx.ministryId)
-        .eq('congregacao_id', congId);
-
-      // Gera um novo
-      await handleGerarLink(congId, true);
-      showNotification('success', 'Link Regenerado', 'Um novo link exclusivo foi gerado e copiado para a área de transferência.');
-    } catch (err) {
-      console.error(err);
-      showNotification('error', 'Erro', 'Erro ao regenerar o token.');
-    } finally {
-      setLoadingData(false);
     }
   };
 
   useEffect(() => {
     if (!ctx?.loading && ctx?.ministryId) {
       loadRegistros();
-      loadTokens();
     }
-  }, [ctx?.loading, ctx?.ministryId, ctx?.congregacaoId, isLocalUser]);
+  }, [ctx?.loading, ctx?.ministryId, isLocalUser, ctx?.congregacaoId]);
 
-  // Filtragem local de registros
+  // Filtros aplicados sobre a listagem da aba "Registros"
   const registrosFiltrados = useMemo(() => {
     return registros.filter(r => {
       if (filtroCongregacao && r.congregacao_id !== filtroCongregacao) return false;
@@ -300,196 +252,307 @@ export default function RelatorioEspiritualPage() {
     });
   }, [registros, filtroCongregacao, filtroTipo, filtroStatus, filtroDataInicio, filtroDataFim]);
 
-  const kpis = useMemo(() => {
-    let cultos = 0;
-    let visitas = 0;
-    let almas = 0;
-    let biblias = 0;
-    let literaturas = 0;
-    let batismos = 0;
-    let curas = 0;
-    let evangelismos = 0;
-    let reconciliacoes = 0;
-    let cearam = 0;
-    let visitantes = 0;
+  // --- MÓDULO DASHBOARD: Lógica e Cálculos de Competência ---
 
-    registrosFiltrados.forEach(r => {
-      cultos += r.cultos_realizados || 0;
-      visitas += r.visitas_realizadas || 0;
+  // Filtro de congregação aplicado ao Dashboard
+  const dashCongregacaoId = useMemo(() => {
+    return isLocalUser ? (ctx.congregacaoId || '') : filtroCongregacao;
+  }, [isLocalUser, ctx.congregacaoId, filtroCongregacao]);
+
+  // Registros pertencentes ao mês filtrado
+  const registrosMesAtual = useMemo(() => {
+    return registros.filter(r => {
+      if (dashCongregacaoId && r.congregacao_id !== dashCongregacaoId) return false;
+      const d = new Date(r.data_atividade);
+      const m = d.getUTCMonth() + 1;
+      const y = d.getUTCFullYear();
+      return m === dashMes && y === dashAno;
+    });
+  }, [registros, dashCongregacaoId, dashMes, dashAno]);
+
+  // Registros pertencentes ao mês anterior
+  const registrosMesAnterior = useMemo(() => {
+    const prevMes = dashMes === 1 ? 12 : dashMes - 1;
+    const prevAno = dashMes === 1 ? dashAno - 1 : dashAno;
+    return registros.filter(r => {
+      if (dashCongregacaoId && r.congregacao_id !== dashCongregacaoId) return false;
+      const d = new Date(r.data_atividade);
+      const m = d.getUTCMonth() + 1;
+      const y = d.getUTCFullYear();
+      return m === prevMes && y === prevAno;
+    });
+  }, [registros, dashCongregacaoId, dashMes, dashAno]);
+
+  // Somatórias do Mês Atual
+  const somaAtual = useMemo(() => {
+    let almas = 0, visitantes = 0, reconciliacoes = 0, batismos = 0;
+    let cultos = 0, ceias = 0, visitas = 0, evangelismos = 0;
+
+    registrosMesAtual.forEach(r => {
       almas += r.almas_alcancadas || 0;
-      biblias += r.biblias_doadas || 0;
-      literaturas += r.literaturas_entregues || 0;
-      batismos += r.batismos_espirito_santo || 0;
-      curas += r.curas_divinas || 0;
-      evangelismos += r.evangelismos_realizados || 0;
-      reconciliacoes += r.reconciliacoes || 0;
-      cearam += r.membros_cearam || 0;
       visitantes += r.visitantes_presentes || 0;
+      reconciliacoes += r.reconciliacoes || 0;
+      batismos += r.batismos_espirito_santo || 0;
+      cultos += r.cultos_realizados || 0;
+      if (r.tipo_atividade === 'Santa Ceia') ceias += 1;
+      visitas += r.visitas_realizadas || 0;
+      evangelismos += r.evangelismos_realizados || 0;
     });
 
-    return { cultos, visitas, almas, biblias, literaturas, batismos, curas, evangelismos, reconciliacoes, cearam, visitantes };
-  }, [registrosFiltrados]);
+    return { almas, visitantes, reconciliacoes, batismos, cultos, ceias, visitas, evangelismos };
+  }, [registrosMesAtual]);
 
-  const consolidadoPorCongregacao = useMemo(() => {
-    const mapa: Record<string, {
-      congregacao_id: string | null;
+  // Somatórias do Mês Anterior
+  const somaAnterior = useMemo(() => {
+    let almas = 0, visitantes = 0, reconciliacoes = 0, batismos = 0;
+    let cultos = 0, ceias = 0, visitas = 0, evangelismos = 0;
+
+    registrosMesAnterior.forEach(r => {
+      almas += r.almas_alcancadas || 0;
+      visitantes += r.visitantes_presentes || 0;
+      reconciliacoes += r.reconciliacoes || 0;
+      batismos += r.batismos_espirito_santo || 0;
+      cultos += r.cultos_realizados || 0;
+      if (r.tipo_atividade === 'Santa Ceia') ceias += 1;
+      visitas += r.visitas_realizadas || 0;
+      evangelismos += r.evangelismos_realizados || 0;
+    });
+
+    return { almas, visitantes, reconciliacoes, batismos, cultos, ceias, visitas, evangelismos };
+  }, [registrosMesAnterior]);
+
+  // Variações Percentuais
+  const variacoes = useMemo(() => {
+    const calcVar = (atual: number, anterior: number) => {
+      if (anterior === 0) return atual > 0 ? 100 : 0;
+      return ((atual - anterior) / anterior) * 100;
+    };
+    return {
+      almas: calcVar(somaAtual.almas, somaAnterior.almas),
+      visitantes: calcVar(somaAtual.visitantes, somaAnterior.visitantes),
+      reconciliacoes: calcVar(somaAtual.reconciliacoes, somaAnterior.reconciliacoes),
+      batismos: calcVar(somaAtual.batismos, somaAnterior.batismos)
+    };
+  }, [somaAtual, somaAnterior]);
+
+  const getTrend = (value: number) => {
+    if (value > 0) return { direction: 'up' as const, label: `↑ +${value.toFixed(1)}% comparado ao mês anterior` };
+    if (value < 0) return { direction: 'down' as const, label: `↓ ${value.toFixed(1)}% comparado ao mês anterior` };
+    return { direction: 'stable' as const, label: `Stable comparado ao mês anterior` };
+  };
+
+  // 12 Meses de Histórico para Gráfico de Evolução
+  const evolucaoDados = useMemo(() => {
+    const dados = [];
+    const baseDate = new Date(dashAno, dashMes - 1, 15);
+
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(baseDate.getFullYear(), baseDate.getMonth() - i, 15);
+      const m = d.getMonth() + 1;
+      const y = d.getFullYear();
+
+      // Somar métricas desse mês/ano
+      let almas = 0, visitantes = 0, reconciliacoes = 0, batismos = 0;
+      registros.forEach(r => {
+        if (dashCongregacaoId && r.congregacao_id !== dashCongregacaoId) return;
+        const actDate = new Date(r.data_atividade);
+        if (actDate.getUTCMonth() + 1 === m && actDate.getUTCFullYear() === y) {
+          almas += r.almas_alcancadas || 0;
+          visitantes += r.visitantes_presentes || 0;
+          reconciliacoes += r.reconciliacoes || 0;
+          batismos += r.batismos_espirito_santo || 0;
+        }
+      });
+
+      dados.push({
+        mesAno: `${m.toString().padStart(2, '0')}/${y.toString().substring(2)}`,
+        Almas: almas,
+        Visitantes: visitantes,
+        Reconciliacoes: reconciliacoes,
+        Batismos: batismos
+      });
+    }
+    return dados;
+  }, [registros, dashCongregacaoId, dashMes, dashAno]);
+
+  // Distribuição de Atividades no Mês Filtrado
+  const distribuicaoAtividades = useMemo(() => {
+    return [
+      { name: 'Cultos', Quantidade: somaAtual.cultos },
+      { name: 'Santa Ceias', Quantidade: somaAtual.ceias },
+      { name: 'Visitas', Quantidade: somaAtual.visitas },
+      { name: 'Evangelismos', Quantidade: somaAtual.evangelismos }
+    ];
+  }, [somaAtual]);
+
+  // Ranking das Congregações
+  const rankingCongregacoes = useMemo(() => {
+    const pontuacaoCong: Record<string, {
+      id: string;
       nome: string;
-      cultos: number;
-      visitas: number;
       almas: number;
-      biblias: number;
-      literaturas: number;
-      batismos: number;
-      curas: number;
-      evangelismos: number;
       reconciliacoes: number;
-      cearam: number;
       visitantes: number;
-      ultimo_envio: string | null;
+      batismos: number;
+      totalCombinado: number;
+      almasAnterior: number;
     }> = {};
 
-    // Inicializa as congregações
-    locais.forEach(loc => {
-      if (filtroCongregacao && loc.id !== filtroCongregacao) return;
-      
-      mapa[loc.id] = {
-        congregacao_id: loc.id,
-        nome: loc.nome,
-        cultos: 0,
-        visitas: 0,
+    // Iniciar congregações
+    locais.forEach(l => {
+      pontuacaoCong[l.id] = {
+        id: l.id,
+        nome: l.nome,
         almas: 0,
-        biblias: 0,
-        literaturas: 0,
-        batismos: 0,
-        curas: 0,
-        evangelismos: 0,
         reconciliacoes: 0,
-        cearam: 0,
         visitantes: 0,
-        ultimo_envio: null
+        batismos: 0,
+        totalCombinado: 0,
+        almasAnterior: 0
       };
     });
 
-    if (!filtroCongregacao && !isLocalUser) {
-      mapa['sede'] = {
-        congregacao_id: null,
-        nome: 'Sede / Geral',
-        cultos: 0,
-        visitas: 0,
-        almas: 0,
-        biblias: 0,
-        literaturas: 0,
-        batismos: 0,
-        curas: 0,
-        evangelismos: 0,
-        reconciliacoes: 0,
-        cearam: 0,
-        visitantes: 0,
-        ultimo_envio: null
-      };
-    }
-
-    registrosFiltrados.forEach(r => {
-      const key = r.congregacao_id || 'sede';
-      if (!mapa[key]) return;
-
-      mapa[key].cultos += r.cultos_realizados || 0;
-      mapa[key].visitas += r.visitas_realizadas || 0;
-      mapa[key].almas += r.almas_alcancadas || 0;
-      mapa[key].biblias += r.biblias_doadas || 0;
-      mapa[key].literaturas += r.literaturas_entregues || 0;
-      mapa[key].batismos += r.batismos_espirito_santo || 0;
-      mapa[key].curas += r.curas_divinas || 0;
-      mapa[key].evangelismos += r.evangelismos_realizados || 0;
-      mapa[key].reconciliacoes += r.reconciliacoes || 0;
-      mapa[key].cearam += r.membros_cearam || 0;
-      mapa[key].visitantes += r.visitantes_presentes || 0;
-
-      if (!mapa[key].ultimo_envio || r.data_atividade > mapa[key].ultimo_envio!) {
-        mapa[key].ultimo_envio = r.data_atividade;
+    // Mês Atual
+    registrosMesAtual.forEach(r => {
+      if (r.congregacao_id && pontuacaoCong[r.congregacao_id]) {
+        const item = pontuacaoCong[r.congregacao_id];
+        item.almas += r.almas_alcancadas || 0;
+        item.reconciliacoes += r.reconciliacoes || 0;
+        item.visitantes += r.visitantes_presentes || 0;
+        item.batismos += r.batismos_espirito_santo || 0;
       }
     });
 
-    return Object.values(mapa).filter(c => {
-      return c.cultos > 0 || c.visitas > 0 || c.almas > 0 || c.batismos > 0 || c.curas > 0 || c.evangelismos > 0 || c.reconciliacoes > 0 || c.ultimo_envio !== null || (isLocalUser && c.congregacao_id === ctx?.congregacaoId);
+    // Mês Anterior
+    registrosMesAnterior.forEach(r => {
+      if (r.congregacao_id && pontuacaoCong[r.congregacao_id]) {
+        pontuacaoCong[r.congregacao_id].almasAnterior += r.almas_alcancadas || 0;
+      }
     });
-  }, [registrosFiltrados, locais, filtroCongregacao, isLocalUser, ctx?.congregacaoId]);
 
-  const incrementMetric = (key: keyof typeof EMPTY_FORM) => {
-    setFormData(prev => ({
-      ...prev,
-      [key]: Math.max(0, (Number(prev[key]) || 0) + 1)
-    }));
+    // Calcular variação percentual de almas por congregação
+    return Object.values(pontuacaoCong)
+      .map(c => {
+        let variacaoAlmas = 0;
+        if (c.almasAnterior === 0) {
+          variacaoAlmas = c.almas > 0 ? 100 : 0;
+        } else {
+          variacaoAlmas = ((c.almas - c.almasAnterior) / c.almasAnterior) * 100;
+        }
+        return {
+          ...c,
+          variacaoAlmas,
+          totalCombinado: c.almas + c.reconciliacoes + c.visitantes + c.batismos
+        };
+      })
+      .sort((a, b) => {
+        if (b.almas !== a.almas) return b.almas - a.almas;
+        if (b.reconciliacoes !== a.reconciliacoes) return b.reconciliacoes - a.reconciliacoes;
+        if (b.visitantes !== a.visitantes) return b.visitantes - a.visitantes;
+        return b.batismos - a.batismos;
+      });
+  }, [locais, registrosMesAtual, registrosMesAnterior]);
+
+  // Insights Automáticos
+  const insights = useMemo(() => {
+    const list: string[] = [];
+
+    // 1. Visitantes
+    if (somaAtual.visitantes > somaAnterior.visitantes) {
+      const p = somaAnterior.visitantes === 0 ? 100 : ((somaAtual.visitantes - somaAnterior.visitantes) / somaAnterior.visitantes) * 100;
+      list.push(`📈 Crescimento de visitantes: O número de visitantes cresceu +${p.toFixed(0)}% comparado ao mês anterior.`);
+    } else if (somaAtual.visitantes < somaAnterior.visitantes) {
+      list.push(`📉 Redução de visitantes: A presença de novos visitantes diminuiu este mês. Recomendamos ações de recepção.`);
+    }
+
+    // 2. Evangelismos
+    if (somaAtual.evangelismos < somaAnterior.evangelismos) {
+      list.push(`📢 Ações de evangelismo: Redução nas atividades de evangelismo local em relação ao mês anterior.`);
+    } else if (somaAtual.evangelismos > 0) {
+      list.push(`🔥 Evangelismo ativo: Houve um engajamento maior no trabalho de evangelismo externo.`);
+    }
+
+    // 3. Congregações destaques
+    if (rankingCongregacoes.length > 0) {
+      const top = rankingCongregacoes[0];
+      if (top.almas > 0) {
+        list.push(`🏆 Destaque em Almas: A congregação ${top.nome} registrou a maior colheita espiritual com ${top.almas} almas alcançadas.`);
+      }
+
+      // Maior crescimento percentual
+      const maisCresceu = [...rankingCongregacoes].sort((a, b) => b.variacaoAlmas - a.variacaoAlmas)[0];
+      if (maisCresceu && maisCresceu.variacaoAlmas > 0) {
+        list.push(`✨ Maior crescimento: ${maisCresceu.nome} apresentou o maior crescimento percentual em novos frutos espirituais (+${maisCresceu.variacaoAlmas.toFixed(0)}%).`);
+      }
+
+      // Sem movimentação
+      const semMov = rankingCongregacoes.filter(c => c.totalCombinado === 0);
+      if (semMov.length > 0) {
+        const nomes = semMov.map(c => c.nome).slice(0, 3).join(', ');
+        list.push(`⚠️ Alerta pastoral: Congregações sem atividade espiritual registrada este mês: ${nomes}${semMov.length > 3 ? ' e outras.' : '.'}`);
+      }
+    }
+
+    if (list.length === 0) {
+      list.push('💡 Nenhuma variação significativa de indicadores identificada para o mês filtrado.');
+    }
+
+    return list;
+  }, [somaAtual, somaAnterior, rankingCongregacoes]);
+
+  // --- LÓGICA DE CADASTRO E LANÇAMENTO ---
+
+  const incrementMetric = (field: keyof typeof EMPTY_FORM) => {
+    setFormData(prev => ({ ...prev, [field]: (prev[field] as number) + 1 }));
   };
 
-  const decrementMetric = (key: keyof typeof EMPTY_FORM) => {
-    setFormData(prev => ({
-      ...prev,
-      [key]: Math.max(0, (Number(prev[key]) || 0) - 1)
-    }));
+  const decrementMetric = (field: keyof typeof EMPTY_FORM) => {
+    setFormData(prev => ({ ...prev, [field]: Math.max(0, (prev[field] as number) - 1) }));
   };
 
   const resetForm = () => {
     setFormData({
       ...EMPTY_FORM,
-      congregacao_id: isLocalUser ? ctx.congregacaoId || '' : ''
+      congregacao_id: isLocalUser ? (ctx.congregacaoId || '') : ''
     });
     setEditingId(null);
   };
 
-  const handleEdit = (r: RelatorioEspiritualRegistro) => {
-    if (r.culto_id) {
-      showNotification('warning', 'Bloqueado', 'Este registro foi consolidado automaticamente através do módulo Cultos e não pode ser editado diretamente. Edite o respectivo culto para alterar os dados.');
-      return;
-    }
-    setEditingId(r.id);
+  const startEdit = (reg: RelatorioEspiritualRegistro) => {
+    setEditingId(reg.id);
     setFormData({
-      congregacao_id: r.congregacao_id || '',
-      data_atividade: r.data_atividade,
-      tipo_atividade: r.tipo_atividade,
-      cultos_realizados: r.cultos_realizados,
-      visitas_realizadas: r.visitas_realizadas,
-      almas_alcancadas: r.almas_alcancadas,
-      biblias_doadas: r.biblias_doadas,
-      literaturas_entregues: r.literaturas_entregues,
-      batismos_espirito_santo: r.batismos_espirito_santo || 0,
-      curas_divinas: r.curas_divinas || 0,
-      evangelismos_realizados: r.evangelismos_realizados || 0,
-      reconciliacoes: r.reconciliacoes || 0,
-      membros_cearam: r.membros_cearam || 0,
-      visitantes_presentes: r.visitantes_presentes || 0,
-      observacoes: r.observacoes || '',
-      status: r.status
-    });
+      congregacao_id: reg.congregacao_id || '',
+      data_atividade: reg.data_atividade,
+      tipo_atividade: reg.tipo_atividade,
+      cultos_realizados: reg.cultos_realizados || 0,
+      visitas_realizadas: reg.visitas_realizadas || 0,
+      almas_alcancadas: reg.almas_alcancadas || 0,
+      biblias_doadas: reg.biblias_doadas || 0,
+      literaturas_entregues: reg.literaturas_entregues || 0,
+      batismos_espirito_santo: reg.batismos_espirito_santo || 0,
+      curas_divinas: reg.curas_divinas || 0,
+      evangelismos_realizados: reg.evangelismos_realizados || 0,
+      reconciliacoes: reg.reconciliacoes || 0,
+      membros_cearam: reg.membros_cearam || 0,
+      visitantes_presentes: reg.visitantes_presentes || 0,
+      observacoes: reg.observacoes || '',
+      status: reg.status
+    } as any);
     setActiveTab('cadastro');
   };
 
-  const handleExcluir = async (id: string) => {
-    // Buscar se possui culto_id antes
-    const registro = registros.find(r => r.id === id);
-    if (registro?.culto_id) {
-      showNotification('warning', 'Bloqueado', 'Este registro foi consolidado automaticamente através do módulo Cultos e não pode ser excluído diretamente. Exclua ou modifique o respectivo culto.');
-      return;
-    }
-
-    if (!confirm('Deseja realmente excluir este relatório espiritual?')) return;
-
+  const deleteRegistro = async (id: string) => {
+    if (!confirm('Deseja realmente excluir este registro de relatório espiritual?')) return;
     try {
-      let query = supabase
+      const { error } = await supabase
         .from('relatorio_espiritual_registros')
         .delete()
         .eq('id', id);
 
-      if (isLocalUser && ctx.congregacaoId) {
-        query = query.eq('congregacao_id', ctx.congregacaoId);
-      }
-
-      const { error } = await query;
-
       if (error) {
-        showNotification('error', 'Erro', 'Não foi possível excluir o registro.');
+        showNotification('error', 'Erro', error.message || 'Erro ao excluir.');
       } else {
-        showNotification('success', 'Sucesso', 'Registro excluído com sucesso.');
+        showNotification('success', 'Sucesso', 'Relatório excluído com sucesso.');
         loadRegistros();
       }
     } catch (err) {
@@ -499,101 +562,39 @@ export default function RelatorioEspiritualPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!ctx?.ministryId) return;
 
-    if (!ctx.ministryId) {
-      showNotification('error', 'Erro', 'Organização ou Ministério não identificado.');
+    if (!formData.congregacao_id) {
+      showNotification('warning', 'Alerta', 'Selecione uma congregação válida.');
       return;
     }
-
-    // Se for usuário de congregação local, força o ID da congregação dele
-    const finalCongregacaoId = isLocalUser ? (ctx.congregacaoId || null) : (formData.congregacao_id || null);
-
-    if (isLocalUser && !ctx.congregacaoId) {
-      showNotification('error', 'Erro', 'Você não possui uma congregação local associada ao seu usuário.');
-      return;
-    }
-
-    // Validações obrigatórias
-    if (!formData.data_atividade) {
-      showNotification('error', 'Erro', 'A data da atividade é obrigatória.');
-      return;
-    }
-    if (!formData.tipo_atividade) {
-      showNotification('error', 'Erro', 'O tipo da atividade é obrigatório.');
-      return;
-    }
-
-    const cultos = Number(formData.cultos_realizados) || 0;
-    const visitas = Number(formData.visitas_realizadas) || 0;
-    const almas = Number(formData.almas_alcancadas) || 0;
-    const biblias = Number(formData.biblias_doadas) || 0;
-    const literaturas = Number(formData.literaturas_entregues) || 0;
-    const batismos = Number(formData.batismos_espirito_santo) || 0;
-    const curas = Number(formData.curas_divinas) || 0;
-    const evangelismos = Number(formData.evangelismos_realizados) || 0;
-    const reconciliacoes = Number(formData.reconciliacoes) || 0;
-    const cearam = formData.tipo_atividade === 'Santa Ceia' ? (Number(formData.membros_cearam) || 0) : 0;
-    const visitantes = formData.tipo_atividade === 'Culto' ? (Number(formData.visitantes_presentes) || 0) : 0;
-
-    if (cultos < 0 || visitas < 0 || almas < 0 || biblias < 0 || literaturas < 0 || batismos < 0 || curas < 0 || evangelismos < 0 || reconciliacoes < 0 || cearam < 0 || visitantes < 0) {
-      showNotification('error', 'Erro', 'Os valores numéricos não podem ser negativos.');
-      return;
-    }
-
-    if (formData.tipo_atividade === 'Santa Ceia' && cearam <= 0) {
-      showNotification('error', 'Erro', 'Para a atividade de Santa Ceia, a quantidade de membros que cearam deve ser maior que zero.');
-      return;
-    }
-
-    if (formData.tipo_atividade === 'Culto' && visitantes < 0) {
-      showNotification('error', 'Erro', 'A quantidade de visitantes presentes deve ser informada (mínimo 0).');
-      return;
-    }
-
-    const totalValores = cultos + visitas + almas + biblias + literaturas + batismos + curas + evangelismos + reconciliacoes + cearam + visitantes;
-    if (totalValores <= 0) {
-      showNotification('error', 'Erro', 'O relatório não pode ser enviado totalmente zerado.');
-      return;
-    }
-
-    if (formData.observacoes.length > 500) {
-      showNotification('error', 'Erro', 'As observações não podem exceder o limite de 500 caracteres.');
-      return;
-    }
-
-    const payload: any = {
-      ministry_id: ctx.ministryId,
-      congregacao_id: finalCongregacaoId,
-      data_atividade: formData.data_atividade,
-      tipo_atividade: formData.tipo_atividade,
-      cultos_realizados: cultos,
-      visitas_realizadas: visitas,
-      almas_alcancadas: almas,
-      biblias_doadas: biblias,
-      literaturas_entregues: literaturas,
-      batismos_espirito_santo: batismos,
-      curas_divinas: curas,
-      evangelismos_realizados: evangelismos,
-      reconciliacoes: reconciliacoes,
-      membros_cearam: cearam,
-      visitantes_presentes: visitantes,
-      observacoes: formData.observacoes.trim() || null,
-      status: formData.status,
-      updated_at: new Date().toISOString()
-    };
 
     try {
+      const payload: Partial<RelatorioEspiritualRegistro> = {
+        ministry_id: ctx.ministryId,
+        congregacao_id: formData.congregacao_id,
+        data_atividade: formData.data_atividade,
+        tipo_atividade: formData.tipo_atividade,
+        cultos_realizados: formData.cultos_realizados,
+        visitas_realizadas: formData.visitas_realizadas,
+        almas_alcancadas: formData.almas_alcancadas,
+        biblias_doadas: formData.biblias_doadas,
+        literaturas_entregues: formData.literaturas_entregues,
+        batismos_espirito_santo: formData.batismos_espirito_santo,
+        curas_divinas: formData.curas_divinas,
+        evangelismos_realizados: formData.evangelismos_realizados,
+        reconciliacoes: formData.reconciliacoes,
+        membros_cearam: formData.membros_cearam,
+        visitantes_presentes: formData.visitantes_presentes,
+        observacoes: formData.observacoes,
+        status: formData.status
+      };
+
       if (editingId) {
-        let query = supabase
+        const { error } = await supabase
           .from('relatorio_espiritual_registros')
           .update(payload)
           .eq('id', editingId);
-
-        if (isLocalUser && ctx.congregacaoId) {
-          query = query.eq('congregacao_id', ctx.congregacaoId);
-        }
-
-        const { error } = await query;
 
         if (error) {
           showNotification('error', 'Erro', error.message || 'Erro ao atualizar relatório.');
@@ -624,577 +625,988 @@ export default function RelatorioEspiritualPage() {
     }
   };
 
-  if (ctx.loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#123b63]" />
-      </div>
-    );
-  }
+  // Consolidação por congregação na quarta aba
+  const consolidadoPorCongregacao = useMemo(() => {
+    const mapa: Record<string, {
+      congregacao_id: string | null;
+      nome: string;
+      cultos: number;
+      visitas: number;
+      almas: number;
+      biblias: number;
+      literaturas: number;
+      batismos: number;
+      curas: number;
+      evangelismos: number;
+      reconciliacoes: number;
+      cearam: number;
+      visitantes: number;
+      ultimo_envio: string | null;
+    }> = {};
+
+    locais.forEach(l => {
+      mapa[l.id] = {
+        congregacao_id: l.id,
+        nome: l.nome,
+        cultos: 0,
+        visitas: 0,
+        almas: 0,
+        biblias: 0,
+        literaturas: 0,
+        batismos: 0,
+        curas: 0,
+        evangelismos: 0,
+        reconciliacoes: 0,
+        cearam: 0,
+        visitantes: 0,
+        ultimo_envio: null
+      };
+    });
+
+    registrosFiltrados.forEach(r => {
+      if (r.congregacao_id && mapa[r.congregacao_id]) {
+        const item = mapa[r.congregacao_id];
+        item.cultos += r.cultos_realizados || 0;
+        item.visitas += r.visitas_realizadas || 0;
+        item.almas += r.almas_alcancadas || 0;
+        item.biblias += r.biblias_doadas || 0;
+        item.literaturas += r.literaturas_entregues || 0;
+        item.batismos += r.batismos_espirito_santo || 0;
+        item.curas += r.curas_divinas || 0;
+        item.evangelismos += r.evangelismos_realizados || 0;
+        item.reconciliacoes += r.reconciliacoes || 0;
+        item.cearam += r.membros_cearam || 0;
+        item.visitantes += r.visitantes_presentes || 0;
+
+        if (!item.ultimo_envio || r.data_atividade > item.ultimo_envio) {
+          item.ultimo_envio = r.data_atividade;
+        }
+      }
+    });
+
+    return Object.values(mapa);
+  }, [locais, registrosFiltrados]);
+
+  // Ativar ou desativar Link Externo de Coleta
+  const toggleLinkColeta = async (congId: string, active: boolean) => {
+    try {
+      if (!ctx?.ministryId) return;
+      if (active) {
+        // Gerar Token
+        const tokenString = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        const expires = new Date();
+        expires.setDate(expires.getDate() + 30); // 30 dias
+
+        const { error } = await supabase
+          .from('relatorio_espiritual_tokens')
+          .upsert({
+            ministry_id: ctx.ministryId,
+            congregacao_id: congId,
+            token: tokenString,
+            is_active: true,
+            expires_at: expires.toISOString()
+          }, { onConflict: 'ministry_id,congregacao_id' });
+
+        if (error) throw error;
+        showNotification('success', 'Link Ativado', 'Link externo gerado com sucesso.');
+      } else {
+        // Desativar
+        const { error } = await supabase
+          .from('relatorio_espiritual_tokens')
+          .update({ is_active: false })
+          .eq('ministry_id', ctx.ministryId)
+          .eq('congregacao_id', congId);
+
+        if (error) throw error;
+        showNotification('info', 'Link Desativado', 'Link de coleta desativado.');
+      }
+      loadTokens();
+    } catch (err: any) {
+      console.error(err);
+      showNotification('error', 'Erro', 'Erro ao configurar link externo: ' + (err.message || ''));
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    showNotification('info', 'Copiado', 'Link de coleta copiado para a área de transferência.');
+  };
 
   if (bloqueado) return null;
 
   return (
-    <PageLayout title="Relatório Espiritual" description="Gestão de Relatórios Espirituais">
-      <div className="p-6 max-w-7xl mx-auto">
-        {/* Cabeçalho */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-4xl">🕊️</span>
-              <h1 className="text-3xl font-bold text-slate-800">Relatório Espiritual</h1>
-            </div>
-            <p className="text-slate-600">Fundação do Relatório de Atividades Espirituais do Ministério</p>
-          </div>
-          {!isLocalUser && (
+    <DashboardContainer>
+      <DashboardHeader
+        title="Relatório Espiritual"
+        description="Acompanhamento consolidado das atividades espirituais e engajamento da igreja"
+        contextSubtitle="Gestão Ministerial"
+        actions={
+          !isLocalUser ? (
             <button
               onClick={() => setIsCentralColetaOpen(true)}
-              className="px-5 py-2.5 bg-[#062E6F] hover:bg-[#154A92] text-white rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto"
+              className="px-5 py-2.5 bg-[#062E6F] hover:bg-[#154A92] text-white rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <Globe className="h-4 w-4" />
               Coleta das Congregações
             </button>
-          )}
-        </div>
+          ) : undefined
+        }
+        extra={
+          <div className="flex border-b border-slate-200 mt-4">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-all relative ${
+                  activeTab === tab.id
+                    ? 'text-[#062E6F] border-b-2 border-[#062E6F]'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <span>{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
-        {/* Resumo de Indicadores KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 mb-8">
-          <ExecutiveMetricCard title="Cultos" value={kpis.cultos} color="blue" icon={Church} />
-          <ExecutiveMetricCard title="Visitas" value={kpis.visitas} color="indigo" icon={Home} />
-          <ExecutiveMetricCard title="Almas" value={kpis.almas} color="rose" icon={Flame} />
-          <ExecutiveMetricCard title="Bíblias" value={kpis.biblias} color="amber" icon={BookOpen} />
-          <ExecutiveMetricCard title="Literaturas" value={kpis.literaturas} color="slate" icon={FileText} />
-          <ExecutiveMetricCard title="Batismos ES" value={kpis.batismos} color="rose" icon={Sparkles} subtitle="Batismos no Espírito Santo" />
-          <ExecutiveMetricCard title="Curas" value={kpis.curas} color="rose" icon={Heart} subtitle="Curas divinas testemunhadas" />
-          <ExecutiveMetricCard title="Evangelismos" value={kpis.evangelismos} color="blue" icon={Megaphone} subtitle="Atividades de evangelismo" />
-          <ExecutiveMetricCard title="Reconciliações" value={kpis.reconciliacoes} color="emerald" icon={Users} subtitle="Retornos à fé" />
-          <ExecutiveMetricCard title="Santa Ceia" value={kpis.cearam} color="emerald" icon={GlassWater} subtitle="Membros que cearam" />
-          <ExecutiveMetricCard title="Visitantes" value={kpis.visitantes} color="blue" icon={UserPlus} subtitle="Visitantes presentes" />
-        </div>
+      <DashboardContent>
+        {/* ABA 1: DASHBOARD EXECUTIVO */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6">
+            
+            {/* Filtro de Competência do Dashboard */}
+            <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Calendar className="h-5 w-5 text-[#062E6F]" />
+                <h3 className="font-extrabold text-slate-800 text-sm uppercase tracking-wider">
+                  Período de Competência
+                </h3>
+              </div>
 
-        <Tabs tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab}>
-          {activeTab === 'cadastro' && (
-            <Section icon="📝" title={editingId ? 'Editar Relatório Espiritual' : 'Novo Relatório Espiritual'}>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Congregação */}
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Congregação / Sede *</label>
-                    <select
-                      value={formData.congregacao_id}
-                      onChange={e => setFormData(prev => ({ ...prev, congregacao_id: e.target.value }))}
-                      disabled={isLocalUser}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none disabled:bg-slate-50"
-                      required
-                    >
-                      <option value="">-- Selecione a Unidade (ou Sede) --</option>
-                      {locais.map(loc => (
-                        <option key={loc.id} value={loc.id}>
-                          {loc.nome}
-                        </option>
+              <div className="flex flex-wrap gap-3">
+                {/* Seleção do Mês */}
+                <select
+                  value={dashMes}
+                  onChange={e => setDashMes(parseInt(e.target.value))}
+                  className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition"
+                >
+                  {MESES_NOMES.map((nome, index) => (
+                    <option key={index + 1} value={index + 1}>{nome}</option>
+                  ))}
+                </select>
+
+                {/* Seleção do Ano */}
+                <select
+                  value={dashAno}
+                  onChange={e => setDashAno(parseInt(e.target.value))}
+                  className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition"
+                >
+                  <option value={2024}>2024</option>
+                  <option value={2025}>2025</option>
+                  <option value={2026}>2026</option>
+                </select>
+
+                {/* Seletor Congregação (Visível e ativo apenas se for admin/secretario) */}
+                {!isLocalUser && (
+                  <select
+                    value={filtroCongregacao}
+                    onChange={e => setFiltroCongregacao(e.target.value)}
+                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 font-bold focus:bg-white transition"
+                  >
+                    <option value="">Todas as congregações</option>
+                    {locais.map(l => (
+                      <option key={l.id} value={l.id}>{l.nome}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            {/* KPIs Consolidados com Comparativos */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <ExecutiveMetricCard
+                title="Almas Alcançadas"
+                value={somaAtual.almas}
+                icon={Flame}
+                color="rose"
+                trend={getTrend(variacoes.almas)}
+              />
+              <ExecutiveMetricCard
+                title="Visitantes nos Cultos"
+                value={somaAtual.visitantes}
+                icon={UserPlus}
+                color="blue"
+                trend={getTrend(variacoes.visitantes)}
+              />
+              <ExecutiveMetricCard
+                title="Reconciliações"
+                value={somaAtual.reconciliacoes}
+                icon={Users}
+                color="emerald"
+                trend={getTrend(variacoes.reconciliacoes)}
+              />
+              <ExecutiveMetricCard
+                title="Batismos ES"
+                value={somaAtual.batismos}
+                icon={Sparkles}
+                color="rose"
+                trend={getTrend(variacoes.batismos)}
+              />
+            </div>
+
+            {/* Gráficos de Evolução e Distribuição */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Evolução Mensal (Linha) */}
+              <div className="lg:col-span-2">
+                <DashboardSection title="Evolução Mensal (Últimos 12 Meses)">
+                  <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Selecione o Indicador</span>
+                      <div className="flex gap-1.5">
+                        {([
+                          { key: 'almas', label: 'Almas' },
+                          { key: 'visitantes', label: 'Visitantes' },
+                          { key: 'reconciliacoes', label: 'Reconciliações' },
+                          { key: 'batismos', label: 'Batismos ES' }
+                        ] as const).map(met => (
+                          <button
+                            key={met.key}
+                            onClick={() => setEvolucaoMetrica(met.key)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                              evolucaoMetrica === met.key
+                                ? 'bg-[#062E6F] text-white shadow-sm'
+                                : 'bg-slate-50 text-slate-650 hover:bg-slate-100'
+                            }`}
+                          >
+                            {met.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="h-[280px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={evolucaoDados} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                          <XAxis dataKey="mesAno" stroke="#94A3B8" fontSize={11} tickLine={false} />
+                          <YAxis stroke="#94A3B8" fontSize={11} tickLine={false} />
+                          <ChartTooltip />
+                          <Line
+                            type="monotone"
+                            dataKey={
+                              evolucaoMetrica === 'almas' ? 'Almas' :
+                              evolucaoMetrica === 'visitantes' ? 'Visitantes' :
+                              evolucaoMetrica === 'reconciliacoes' ? 'Reconciliacoes' : 'Batismos'
+                            }
+                            stroke="#062E6F"
+                            strokeWidth={3}
+                            dot={{ stroke: '#062E6F', strokeWidth: 2, r: 4, fill: '#fff' }}
+                            activeDot={{ r: 6 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </DashboardSection>
+              </div>
+
+              {/* Distribuição das Atividades (Barras) */}
+              <div>
+                <DashboardSection title="Atividades da Competência">
+                  <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">
+                      Cultos, Ceias, Visitas e Evangelismo
+                    </span>
+                    <div className="h-[280px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={distribuicaoAtividades} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                          <XAxis dataKey="name" stroke="#94A3B8" fontSize={11} tickLine={false} />
+                          <YAxis stroke="#94A3B8" fontSize={11} tickLine={false} />
+                          <ChartTooltip />
+                          <Bar dataKey="Quantidade" fill="#475569" radius={[6, 6, 0, 0]} barSize={32} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </DashboardSection>
+              </div>
+
+            </div>
+
+            {/* Ranking das Congregações e Insights do Mês */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Ranking (Top Congregações) */}
+              <div className="lg:col-span-2">
+                <DashboardSection title="Ranking Geral das Congregações">
+                  <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase font-black tracking-wider">
+                            <th className="px-5 py-3 text-center w-16">Posição</th>
+                            <th className="px-5 py-3">Congregação</th>
+                            <th className="px-5 py-3 text-center">Almas</th>
+                            <th className="px-5 py-3 text-center">Reconciliações</th>
+                            <th className="px-5 py-3 text-center">Visitantes</th>
+                            <th className="px-5 py-3 text-center">Batismos ES</th>
+                            <th className="px-5 py-3 text-right">Var. Almas (Mês)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                          {rankingCongregacoes.map((c, i) => (
+                            <tr key={c.id} className="hover:bg-slate-50/50 transition">
+                              <td className="px-5 py-4 text-center font-black">
+                                {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`}
+                              </td>
+                              <td className="px-5 py-4 font-bold text-slate-800 text-sm">
+                                {c.nome}
+                              </td>
+                              <td className="px-5 py-4 text-center font-bold text-rose-600">{c.almas}</td>
+                              <td className="px-5 py-4 text-center">{c.reconciliacoes}</td>
+                              <td className="px-5 py-4 text-center">{c.visitantes}</td>
+                              <td className="px-5 py-4 text-center">{c.batismos}</td>
+                              <td className="px-5 py-4 text-right whitespace-nowrap">
+                                {c.variacaoAlmas > 0 ? (
+                                  <span className="text-emerald-600 font-bold">+{c.variacaoAlmas.toFixed(0)}%</span>
+                                ) : c.variacaoAlmas < 0 ? (
+                                  <span className="text-rose-600 font-bold">{c.variacaoAlmas.toFixed(0)}%</span>
+                                ) : (
+                                  <span className="text-slate-400 font-medium">0%</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </DashboardSection>
+              </div>
+
+              {/* Insights do Mês */}
+              <div>
+                <DashboardSection title="Insights do Mês">
+                  <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4 min-h-[300px]">
+                    <div className="flex items-center gap-2 text-amber-600 mb-2">
+                      <Lightbulb className="h-5 w-5" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Análise de Tendência
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {insights.map((insight, idx) => (
+                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100/70 text-xs font-semibold text-slate-700 leading-relaxed">
+                          <span>💡</span>
+                          <p>{insight}</p>
+                        </div>
                       ))}
-                    </select>
+                    </div>
                   </div>
+                </DashboardSection>
+              </div>
 
-                  {/* Data */}
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Data da Atividade *</label>
-                    <input
-                      type="date"
-                      value={formData.data_atividade}
-                      onChange={e => setFormData(prev => ({ ...prev, data_atividade: e.target.value }))}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
-                      required
-                    />
-                  </div>
+            </div>
 
-                  {/* Tipo */}
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Tipo da Atividade *</label>
-                    <select
-                      value={formData.tipo_atividade}
-                      onChange={e => setFormData(prev => ({
-                        ...prev,
-                        tipo_atividade: e.target.value as any
-                      }))}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
-                      required
-                    >
-                      {TIPO_ATIVIDADE_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+          </div>
+        )}
+
+        {/* ABA 2: CADASTRO E LANÇAMENTOS */}
+        {activeTab === 'cadastro' && (
+          <DashboardSection title={editingId ? "✏️ Editar Relatório Espiritual" : "📝 Cadastrar Atividade Espiritual"}>
+            <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-6">
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Congregação */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-750 mb-1">
+                    {labelDivPrincipal} *
+                  </label>
+                  <select
+                    disabled={isLocalUser}
+                    value={formData.congregacao_id}
+                    onChange={e => setFormData(prev => ({ ...prev, congregacao_id: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
+                    required
+                  >
+                    <option value="">Selecione...</option>
+                    {locais.map(l => (
+                      <option key={l.id} value={l.id}>{l.nome}</option>
+                    ))}
+                  </select>
                 </div>
 
-                {/* Métricas Principais */}
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                  <h3 className="text-base font-bold text-slate-800 mb-4">📈 Indicadores e Atividades Espirituais</h3>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* Cultos Realizados */}
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Cultos Realizados</span>
-                        <span className="text-xl font-bold text-slate-800">{formData.cultos_realizados}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => decrementMetric('cultos_realizados')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
-                        <button type="button" onClick={() => incrementMetric('cultos_realizados')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </div>
-
-                    {/* Visitas Realizadas */}
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Visitas Realizadas</span>
-                        <span className="text-xl font-bold text-slate-800">{formData.visitas_realizadas}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => decrementMetric('visitas_realizadas')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
-                        <button type="button" onClick={() => incrementMetric('visitas_realizadas')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </div>
-
-                    {/* Almas Alcançadas */}
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Almas Alcançadas</span>
-                        <span className="text-xl font-bold text-slate-800">{formData.almas_alcancadas}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => decrementMetric('almas_alcancadas')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
-                        <button type="button" onClick={() => incrementMetric('almas_alcancadas')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </div>
-
-                    {/* Bíblias Doadas */}
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Bíblias Doadas</span>
-                        <span className="text-xl font-bold text-slate-800">{formData.biblias_doadas}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => decrementMetric('biblias_doadas')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
-                        <button type="button" onClick={() => incrementMetric('biblias_doadas')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </div>
-
-                    {/* Literaturas Entregues */}
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Literaturas Entregues</span>
-                        <span className="text-xl font-bold text-slate-800">{formData.literaturas_entregues}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => decrementMetric('literaturas_entregues')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
-                        <button type="button" onClick={() => incrementMetric('literaturas_entregues')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </div>
-
-                    {/* Batismos Espírito Santo */}
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Batismos Espírito Santo</span>
-                        <span className="text-xl font-bold text-slate-800">{formData.batismos_espirito_santo}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => decrementMetric('batismos_espirito_santo')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
-                        <button type="button" onClick={() => incrementMetric('batismos_espirito_santo')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </div>
-
-                    {/* Curas Divinas */}
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Curas Divinas</span>
-                        <span className="text-xl font-bold text-slate-800">{formData.curas_divinas}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => decrementMetric('curas_divinas')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
-                        <button type="button" onClick={() => incrementMetric('curas_divinas')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </div>
-
-                    {/* Evangelismos Realizados */}
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Evangelismos Realizados</span>
-                        <span className="text-xl font-bold text-slate-800">{formData.evangelismos_realizados}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => decrementMetric('evangelismos_realizados')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
-                        <button type="button" onClick={() => incrementMetric('evangelismos_realizados')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </div>
-
-                    {/* Reconciliações */}
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Reconciliações</span>
-                        <span className="text-xl font-bold text-slate-800">{formData.reconciliacoes}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => decrementMetric('reconciliacoes')} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
-                        <button type="button" onClick={() => incrementMetric('reconciliacoes')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </div>
-                  </div>
+                {/* Data */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-750 mb-1">Data da Atividade *</label>
+                  <input
+                    type="date"
+                    value={formData.data_atividade}
+                    onChange={e => setFormData(prev => ({ ...prev, data_atividade: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
+                    required
+                  />
                 </div>
 
-                {/* Campos Condicionais */}
-                {(formData.tipo_atividade === 'Santa Ceia' || formData.tipo_atividade === 'Culto') && (
-                  <div className="bg-amber-500/5 p-6 rounded-2xl border border-amber-500/10">
-                    <h3 className="text-base font-bold text-amber-800 mb-4">🌟 Requisitos do Tipo de Atividade</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {formData.tipo_atividade === 'Santa Ceia' && (
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-1">Membros que cearam</label>
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="number"
-                              value={formData.membros_cearam}
-                              onChange={e => setFormData(prev => ({ ...prev, membros_cearam: Math.max(0, parseInt(e.target.value) || 0) }))}
-                              className="w-40 rounded-xl border border-slate-300 bg-white px-4 py-2 shadow-sm focus:border-slate-500 focus:outline-none"
-                            />
-                            <div className="flex items-center gap-1.5">
-                              <button type="button" onClick={() => decrementMetric('membros_cearam')} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
-                              <button type="button" onClick={() => incrementMetric('membros_cearam')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                {/* Tipo de Atividade */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-750 mb-1">Tipo de Atividade *</label>
+                  <select
+                    value={formData.tipo_atividade}
+                    onChange={e => setFormData(prev => ({ ...prev, tipo_atividade: e.target.value as any }))}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
+                    required
+                  >
+                    <option value="Visita">🏠 Visita</option>
+                    <option value="Evangelismo">📢 Evangelismo</option>
+                    <option value="Culto">⛪ Culto</option>
+                    <option value="Santa Ceia">🍇 Santa Ceia</option>
+                    <option value="Outro">📦 Outro</option>
+                  </select>
+                </div>
 
-                      {formData.tipo_atividade === 'Culto' && (
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-1">Visitantes presentes</label>
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="number"
-                              value={formData.visitantes_presentes}
-                              onChange={e => setFormData(prev => ({ ...prev, visitantes_presentes: Math.max(0, parseInt(e.target.value) || 0) }))}
-                              className="w-40 rounded-xl border border-slate-300 bg-white px-4 py-2 shadow-sm focus:border-slate-500 focus:outline-none"
-                            />
-                            <div className="flex items-center gap-1.5">
-                              <button type="button" onClick={() => decrementMetric('visitantes_presentes')} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"><Minus className="h-3.5 w-3.5" /></button>
-                              <button type="button" onClick={() => incrementMetric('visitantes_presentes')} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"><Plus className="h-3.5 w-3.5" /></button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+              </div>
+
+              {/* Métricas Principais */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                
+                {/* Cultos Realizados */}
+                {['Culto', 'Santa Ceia'].includes(formData.tipo_atividade) && (
+                  <div>
+                    <label className="block text-xs font-black uppercase text-slate-500 mb-1">Cultos Realizados</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        value={formData.cultos_realizados}
+                        onChange={e => setFormData(prev => ({ ...prev, cultos_realizados: Math.max(0, parseInt(e.target.value) || 0) }))}
+                        className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
+                      />
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => decrementMetric('cultos_realizados')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
+                        <button type="button" onClick={() => incrementMetric('cultos_realizados')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Observações e Status */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Observações / Detalhes</label>
-                    <textarea
-                      value={formData.observacoes}
-                      onChange={e => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
-                      rows={3}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
-                      placeholder="Espaço reservado para observações espirituais..."
-                    />
-                  </div>
-
+                {/* Visitas Realizadas */}
+                {formData.tipo_atividade === 'Visita' && (
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Status do Registro *</label>
-                    <select
-                      value={formData.status}
-                      onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
-                      required
-                    >
-                      <option value="Rascunho">Rascunho</option>
-                      <option value="Enviado">Enviado</option>
-                      <option value="Revisado">Revisado</option>
-                    </select>
+                    <label className="block text-xs font-black uppercase text-slate-500 mb-1">Visitas Realizadas</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        value={formData.visitas_realizadas}
+                        onChange={e => setFormData(prev => ({ ...prev, visitas_realizadas: Math.max(0, parseInt(e.target.value) || 0) }))}
+                        className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
+                      />
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => decrementMetric('visitas_realizadas')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
+                        <button type="button" onClick={() => incrementMetric('visitas_realizadas')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Almas Alcançadas */}
+                <div>
+                  <label className="block text-xs font-black uppercase text-slate-500 mb-1">Almas Alcançadas</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      value={formData.almas_alcancadas}
+                      onChange={e => setFormData(prev => ({ ...prev, almas_alcancadas: Math.max(0, parseInt(e.target.value) || 0) }))}
+                      className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
+                    />
+                    <div className="flex items-center gap-1">
+                      <button type="button" onClick={() => decrementMetric('almas_alcancadas')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
+                      <button type="button" onClick={() => incrementMetric('almas_alcancadas')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                    </div>
                   </div>
                 </div>
 
-                {/* Botões de Ação */}
-                <div className="flex gap-3 justify-end pt-4 border-t border-slate-100">
-                  {editingId && (
-                    <button
-                      type="button"
-                      onClick={resetForm}
-                      className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 transition"
-                    >
-                      Cancelar
-                    </button>
-                  )}
-                  <button
-                    type="submit"
-                    className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold shadow-sm transition"
-                  >
-                    {editingId ? 'Salvar Alterações' : 'Salvar Registro'}
-                  </button>
-                </div>
-              </form>
-            </Section>
-          )}
-
-          {activeTab === 'registros' && (
-            <Section icon="🔍" title="Relatórios Espirituais Enviados">
-              {/* Filtros */}
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-                {/* Congregação */}
+                {/* Batismos Espírito Santo */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Congregação</label>
-                  <select
-                    value={filtroCongregacao}
-                    onChange={e => setFiltroCongregacao(e.target.value)}
-                    disabled={isLocalUser}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none disabled:bg-slate-50"
-                  >
-                    <option value="">-- Todos --</option>
-                    {locais.map(loc => (
-                      <option key={loc.id} value={loc.id}>
-                        {loc.nome}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="block text-xs font-black uppercase text-slate-500 mb-1">Batismos ES</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      value={formData.batismos_espirito_santo}
+                      onChange={e => setFormData(prev => ({ ...prev, batismos_espirito_santo: Math.max(0, parseInt(e.target.value) || 0) }))}
+                      className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
+                    />
+                    <div className="flex items-center gap-1">
+                      <button type="button" onClick={() => decrementMetric('batismos_espirito_santo')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
+                      <button type="button" onClick={() => incrementMetric('batismos_espirito_santo')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Tipo */}
+                {/* Reconciliações */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Tipo da Atividade</label>
-                  <select
-                    value={filtroTipo}
-                    onChange={e => setFiltroTipo(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none"
-                  >
-                    <option value="">-- Todos --</option>
-                    {TIPO_ATIVIDADE_OPTIONS.map(opt => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="block text-xs font-black uppercase text-slate-500 mb-1">Reconciliações</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      value={formData.reconciliacoes}
+                      onChange={e => setFormData(prev => ({ ...prev, reconciliacoes: Math.max(0, parseInt(e.target.value) || 0) }))}
+                      className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 focus:outline-none"
+                    />
+                    <div className="flex items-center gap-1">
+                      <button type="button" onClick={() => decrementMetric('reconciliacoes')} className="p-1 border border-slate-300 rounded bg-white hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
+                      <button type="button" onClick={() => incrementMetric('reconciliacoes')} className="p-1 bg-slate-900 text-white hover:bg-slate-800 rounded"><Plus className="h-3 w-3" /></button>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Status */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Status</label>
-                  <select
-                    value={filtroStatus}
-                    onChange={e => setFiltroStatus(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none"
-                  >
-                    <option value="">-- Todos --</option>
-                    {STATUS_OPTIONS.map(opt => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              </div>
 
-                {/* Período */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">A partir de</label>
-                  <input
-                    type="date"
-                    value={filtroDataInicio}
-                    onChange={e => setFiltroDataInicio(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none"
+              {/* Detalhes de Ceia e Cultos */}
+              {['Santa Ceia', 'Culto'].includes(formData.tipo_atividade) && (
+                <div className="p-5 bg-amber-50/50 rounded-2xl border border-amber-100/50 space-y-4">
+                  <h3 className="text-xs font-black uppercase text-amber-800 tracking-wider">🌟 Requisitos da Atividade</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {formData.tipo_atividade === 'Santa Ceia' && (
+                      <div>
+                        <label className="block text-xs font-black uppercase text-slate-500 mb-1">Membros que Cearam</label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="number"
+                            value={formData.membros_cearam}
+                            onChange={e => setFormData(prev => ({ ...prev, membros_cearam: Math.max(0, parseInt(e.target.value) || 0) }))}
+                            className="w-40 rounded-xl border border-slate-300 bg-white px-4 py-2 shadow-sm focus:outline-none"
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <button type="button" onClick={() => decrementMetric('membros_cearam')} className="p-1.5 border border-slate-300 bg-white hover:bg-slate-100 rounded-lg"><Minus className="h-3.5 w-3.5" /></button>
+                            <button type="button" onClick={() => incrementMetric('membros_cearam')} className="p-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg"><Plus className="h-3.5 w-3.5" /></button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {formData.tipo_atividade === 'Culto' && (
+                      <div>
+                        <label className="block text-xs font-black uppercase text-slate-500 mb-1">Visitantes Presentes</label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="number"
+                            value={formData.visitantes_presentes}
+                            onChange={e => setFormData(prev => ({ ...prev, visitantes_presentes: Math.max(0, parseInt(e.target.value) || 0) }))}
+                            className="w-40 rounded-xl border border-slate-300 bg-white px-4 py-2 shadow-sm focus:outline-none"
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <button type="button" onClick={() => decrementMetric('visitantes_presentes')} className="p-1.5 border border-slate-300 bg-white hover:bg-slate-100 rounded-lg"><Minus className="h-3.5 w-3.5" /></button>
+                            <button type="button" onClick={() => incrementMetric('visitantes_presentes')} className="p-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg"><Plus className="h-3.5 w-3.5" /></button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Observações e Status */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Observações espirituais</label>
+                  <textarea
+                    value={formData.observacoes}
+                    onChange={e => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
+                    rows={3}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
+                    placeholder="Espaço reservado para observações espirituais..."
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Até</label>
-                  <input
-                    type="date"
-                    value={filtroDataFim}
-                    onChange={e => setFiltroDataFim(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none"
-                  />
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Status *</label>
+                  <select
+                    value={formData.status}
+                    onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 shadow-sm focus:border-slate-500 focus:outline-none"
+                    required
+                  >
+                    <option value="Rascunho">Rascunho</option>
+                    <option value="Enviado">Enviado</option>
+                    <option value="Revisado">Revisado</option>
+                  </select>
                 </div>
               </div>
 
-              {/* Tabela/Cards */}
-              {loadingData ? (
-                <div className="py-12 flex justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+              {/* Ações */}
+              <div className="flex gap-2 justify-end pt-4 border-t border-slate-150">
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-md transition cursor-pointer"
+                >
+                  {editingId ? 'Salvar Alterações' : 'Salvar Registro'}
+                </button>
+              </div>
+
+            </form>
+          </DashboardSection>
+        )}
+
+        {/* ABA 3: REGISTROS ENVIADOS */}
+        {activeTab === 'registros' && (
+          <DashboardSection title="Registros Enviados">
+            {/* Filtros de Listagem */}
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+              
+              {/* Congregação */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Congregação</label>
+                <select
+                  value={filtroCongregacao}
+                  onChange={e => setFiltroCongregacao(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none"
+                >
+                  <option value="">Todas</option>
+                  {locais.map(l => (
+                    <option key={l.id} value={l.id}>{l.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Tipo */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Tipo</label>
+                <select
+                  value={filtroTipo}
+                  onChange={e => setFiltroTipo(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none"
+                >
+                  <option value="">Todos</option>
+                  <option value="Culto">⛪ Culto</option>
+                  <option value="Santa Ceia">🍇 Santa Ceia</option>
+                  <option value="Visita">🏠 Visita</option>
+                  <option value="Evangelismo">📢 Evangelismo</option>
+                  <option value="Outro">📦 Outro</option>
+                </select>
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Status</label>
+                <select
+                  value={filtroStatus}
+                  onChange={e => setFiltroStatus(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none"
+                >
+                  <option value="">Todos</option>
+                  <option value="Rascunho">Rascunho</option>
+                  <option value="Enviado">Enviado</option>
+                  <option value="Revisado">Revisado</option>
+                </select>
+              </div>
+
+              {/* Data Inicial */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Desde</label>
+                <input
+                  type="date"
+                  value={filtroDataInicio}
+                  onChange={e => setFiltroDataInicio(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none"
+                />
+              </div>
+
+              {/* Data Final */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Até</label>
+                <input
+                  type="date"
+                  value={filtroDataFim}
+                  onChange={e => setFiltroDataFim(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none"
+                />
+              </div>
+
+            </div>
+
+            {registrosFiltrados.length === 0 ? (
+              <DashboardEmptyState
+                icon={FileText}
+                title="Sem lançamentos espirituais"
+                description="Nenhum relatório espíritual foi encontrado para os filtros aplicados."
+              />
+            ) : (
+              <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100 text-slate-550 uppercase font-bold tracking-wider">
+                        <th className="px-5 py-3">Data</th>
+                        <th className="px-5 py-3">Congregação</th>
+                        <th className="px-5 py-3">Tipo</th>
+                        <th className="px-5 py-3 text-center">Almas</th>
+                        <th className="px-5 py-3 text-center">Batismos ES</th>
+                        <th className="px-5 py-3 text-center">Reconciliações</th>
+                        <th className="px-5 py-3 text-center">Visitantes</th>
+                        <th className="px-5 py-3 text-center">Status</th>
+                        <th className="px-5 py-3 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                      {registrosFiltrados.map(r => (
+                        <tr key={r.id} className="hover:bg-slate-50/50 transition">
+                          <td className="px-5 py-4 whitespace-nowrap">{formatDate(r.data_atividade)}</td>
+                          <td className="px-5 py-4 font-bold text-slate-800">
+                            {locais.find(l => l.id === r.congregacao_id)?.nome || 'Outra'}
+                          </td>
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase">
+                              {r.tipo_atividade}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-center font-bold text-rose-600">{r.almas_alcancadas || 0}</td>
+                          <td className="px-5 py-4 text-center font-bold text-rose-500">{r.batismos_espirito_santo || 0}</td>
+                          <td className="px-5 py-4 text-center">{r.reconciliacoes || 0}</td>
+                          <td className="px-5 py-4 text-center">{r.visitantes_presentes || 0}</td>
+                          <td className="px-5 py-4 text-center whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                              r.status === 'Rascunho' ? 'bg-slate-100 text-slate-750' :
+                              r.status === 'Enviado' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                              'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                            }`}>
+                              {r.status}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => startEdit(r)}
+                                className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => deleteRegistro(r.id)}
+                                className="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg transition"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ) : registrosFiltrados.length === 0 ? (
-                <div className="py-16 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                  <FileText className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-500 text-sm font-semibold">Nenhum relatório espiritual encontrado</p>
-                  <p className="text-slate-400 text-xs mt-1">Experimente mudar os filtros ou cadastrar um novo registro.</p>
+              </div>
+            )}
+          </DashboardSection>
+        )}
+
+        {/* ABA 4: CONSOLIDAÇÃO POR CONGREGAÇÃO */}
+        {activeTab === 'consolidado' && (
+          <DashboardSection title="Consolidação por Congregação">
+            {consolidadoPorCongregacao.length === 0 ? (
+              <DashboardEmptyState
+                icon={Users}
+                title="Sem consolidações"
+                description="Selecione filtros na aba de registros para ver dados de consolidação."
+              />
+            ) : (
+              <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100 text-slate-550 uppercase font-bold tracking-wider">
+                        <th className="px-5 py-3.5">Congregação</th>
+                        <th className="px-5 py-3.5 text-center">Cultos</th>
+                        <th className="px-5 py-3.5 text-center">Santa Ceias</th>
+                        <th className="px-5 py-3.5 text-center">Visitas</th>
+                        <th className="px-5 py-3.5 text-center">Evangelismos</th>
+                        <th className="px-5 py-3.5 text-center">Almas</th>
+                        <th className="px-5 py-3.5 text-center">Batismos ES</th>
+                        <th className="px-5 py-3.5 text-center">Reconciliados</th>
+                        <th className="px-5 py-3.5 text-center">Visitantes</th>
+                        <th className="px-5 py-3.5 text-right">Último Lançamento</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                      {consolidadoPorCongregacao.map(c => (
+                        <tr key={c.congregacao_id || ''} className="hover:bg-slate-50/50 transition">
+                          <td className="px-5 py-4 font-bold text-slate-800 text-sm">{c.nome}</td>
+                          <td className="px-5 py-4 text-center font-semibold text-slate-700">{c.cultos}</td>
+                          <td className="px-5 py-4 text-center">{c.cearam > 0 ? `${c.cearam} part.` : '—'}</td>
+                          <td className="px-5 py-4 text-center">{c.visitas}</td>
+                          <td className="px-5 py-4 text-center">{c.evangelismos}</td>
+                          <td className="px-5 py-4 text-center font-bold text-rose-600">{c.almas}</td>
+                          <td className="px-5 py-4 text-center font-bold text-rose-500">{c.batismos}</td>
+                          <td className="px-5 py-4 text-center font-bold text-emerald-600">{c.reconciliacoes}</td>
+                          <td className="px-5 py-4 text-center">{c.visitantes}</td>
+                          <td className="px-5 py-4 text-right font-medium text-slate-500">
+                            {c.ultimo_envio ? formatDate(c.ultimo_envio) : <span className="text-slate-400 italic">Nunca</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {registrosFiltrados.map(reg => {
-                    const localName = locais.find(l => l.id === reg.congregacao_id)?.nome || 'Sede / Geral';
-                    const statusOpt = STATUS_OPTIONS.find(s => s.value === reg.status);
-                    
+              </div>
+            )}
+          </DashboardSection>
+        )}
+
+      </DashboardContent>
+
+      {/* Modal: Central de Coleta de Relatórios das Congregações */}
+      {isCentralColetaOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-100 max-h-[85vh]">
+            
+            {/* Header */}
+            <div className="p-5 bg-gradient-to-r from-[#062E6F] to-[#154A92] flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/10 rounded-xl">
+                  <Globe className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white uppercase tracking-wide">
+                    Central de Coleta Externa
+                  </h3>
+                  <p className="text-blue-100 text-xs mt-0.5 font-semibold">
+                    Envio de relatórios espirituais sem necessidade de login no sistema
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCentralColetaOpen(false);
+                  setQrCodeCongId(null);
+                }}
+                className="p-1 rounded-lg text-blue-200 hover:bg-white/15 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Corpo */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-[300px]">
+              
+              <div className="bg-slate-50 border border-slate-150 rounded-xl p-4 text-xs font-semibold text-slate-700 flex gap-2.5">
+                <Lightbulb className="h-5 w-5 text-amber-600 shrink-0" />
+                <p className="leading-relaxed">
+                  Gere links externos com QR Codes para que os líderes locais possam lançar os indicadores diretamente de seus celulares sem precisar de usuário/senha. Os dados caem diretamente na sua tela como rascunhos.
+                </p>
+              </div>
+
+              {/* Lista de congregações */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">
+                  Links de Coleta por Congregação
+                </h4>
+
+                <div className="space-y-3.5">
+                  {locais.map(l => {
+                    const statusToken = tokens[l.id];
+                    const host = window.location.origin;
+                    const linkUrl = statusToken?.token ? `${host}/formularios/relatorio-espiritual/${statusToken.token}` : '';
+
                     return (
-                      <div
-                        key={reg.id}
-                        className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm/5 hover:shadow-md transition flex flex-col md:flex-row justify-between md:items-center gap-4"
-                      >
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
-                              {reg.tipo_atividade}
-                            </span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusOpt?.color || 'bg-slate-100'}`}>
-                              {reg.status}
-                            </span>
-                            {reg.culto_id && (
-                              <span className="text-[10px] font-black bg-indigo-100 text-indigo-750 px-2 py-0.5 rounded-full border border-indigo-200">
-                                🔗 Consolidado do Culto
-                              </span>
-                            )}
-                            <span className="text-xs text-slate-500 font-semibold">
-                              {formatDate(reg.data_atividade)}
-                            </span>
-                          </div>
-
-                          <h4 className="text-sm font-bold text-slate-800">
-                            🏢 Unidade: <span className="text-slate-600 font-semibold">{localName}</span>
-                          </h4>
-
-                          {/* Resumo de Métricas */}
-                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-15 text-xs text-slate-600">
-                            <span>⛪ Cultos: <strong>{reg.cultos_realizados}</strong></span>
-                            <span>🏠 Visitas: <strong>{reg.visitas_realizadas}</strong></span>
-                            <span>🔥 Almas: <strong>{reg.almas_alcancadas}</strong></span>
-                            <span>📖 Bíblias: <strong>{reg.biblias_doadas}</strong></span>
-                            <span>📢 Literaturas: <strong>{reg.literaturas_entregues}</strong></span>
-                            <span>🕊️ Batismos ES: <strong>{reg.batismos_espirito_santo}</strong></span>
-                            <span>❤️ Curas: <strong>{reg.curas_divinas}</strong></span>
-                            <span>📢 Evangelismos: <strong>{reg.evangelismos_realizados}</strong></span>
-                            <span>🤝 Reconciliações: <strong>{reg.reconciliacoes}</strong></span>
-                            {reg.tipo_atividade === 'Santa Ceia' && (
-                              <span className="col-span-2 text-amber-700 font-semibold">🍇 Cearam: {reg.membros_cearam || 0}</span>
-                            )}
-                            {reg.tipo_atividade === 'Culto' && (
-                              <span className="col-span-2 text-blue-700 font-semibold">👥 Visitantes: {reg.visitantes_presentes || 0}</span>
+                      <div key={l.id} className="border border-slate-100 rounded-xl p-4 bg-white hover:shadow-sm transition space-y-3">
+                        <div className="flex justify-between items-center flex-wrap gap-2">
+                          <span className="font-bold text-slate-800 text-sm">{l.nome}</span>
+                          
+                          <div className="flex gap-2">
+                            {statusToken?.is_active ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(linkUrl)}
+                                  className="px-2.5 py-1.5 border border-slate-300 hover:border-slate-400 rounded-lg text-[10px] font-extrabold text-slate-700 transition cursor-pointer"
+                                >
+                                  Copiar Link
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setQrCodeCongId(qrCodeCongId === l.id ? null : l.id)}
+                                  className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-850 rounded-lg text-[10px] font-extrabold text-white transition flex items-center gap-1 cursor-pointer"
+                                >
+                                  <QrCode className="h-3.5 w-3.5" />
+                                  QR Code
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleLinkColeta(l.id, false)}
+                                  className="px-2.5 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg text-[10px] font-extrabold transition cursor-pointer"
+                                >
+                                  Desativar
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => toggleLinkColeta(l.id, true)}
+                                className="px-3 py-1.5 bg-[#062E6F] hover:bg-[#154A92] text-white rounded-lg text-[10px] font-extrabold transition cursor-pointer"
+                              >
+                                Ativar Link Externo
+                              </button>
                             )}
                           </div>
-
-                          {reg.observacoes && (
-                            <p className="text-xs text-slate-500 bg-slate-50 p-2 rounded-lg italic">
-                              "{reg.observacoes}"
-                            </p>
-                          )}
                         </div>
 
-                        {/* Ações */}
-                        <div className="flex items-center gap-2 self-end md:self-center">
-                          {reg.culto_id ? (
-                            <span className="text-xs text-slate-400 italic font-medium px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg">
-                              Apenas visualização
+                        {/* Detalhe de expiração */}
+                        {statusToken?.is_active && (
+                          <div className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Link ativo {statusToken.expires_at ? `(Expira em ${new Date(statusToken.expires_at).toLocaleDateString('pt-BR')})` : ''}
+                          </div>
+                        )}
+
+                        {/* Área do QR Code se aberto */}
+                        {qrCodeCongId === l.id && statusToken?.is_active && (
+                          <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col items-center justify-center space-y-3">
+                            <QRCodeSVG value={linkUrl} size={150} />
+                            <span className="text-[10px] text-slate-500 font-bold max-w-xs text-center">
+                              Aponte a câmera do celular para abrir o formulário da congregação
                             </span>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => handleEdit(reg)}
-                                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition cursor-pointer"
-                                title="Editar"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => handleExcluir(reg.id)}
-                                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-rose-600 transition cursor-pointer"
-                                title="Excluir"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
+                          </div>
+                        )}
+
                       </div>
                     );
                   })}
                 </div>
-              )}
-            </Section>
-          )}
 
-          {activeTab === 'consolidado' && (
-            <Section icon="🏢" title="Consolidação de Atividades por Unidade / Congregação">
-              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
-                <table className="w-full text-left border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
-                      <th className="p-4">Congregação / Unidade</th>
-                      <th className="p-4 text-center">⛪ Cultos</th>
-                      <th className="p-4 text-center">🏠 Visitas</th>
-                      <th className="p-4 text-center">🔥 Almas</th>
-                      <th className="p-4 text-center">📖 Bíblias</th>
-                      <th className="p-4 text-center">📢 Literaturas</th>
-                      <th className="p-4 text-center">🕊️ Batismos ES</th>
-                      <th className="p-4 text-center">❤️ Curas</th>
-                      <th className="p-4 text-center">📢 Evangelismos</th>
-                      <th className="p-4 text-center">🤝 Reconciliações</th>
-                      <th className="p-4 text-center">🍇 Ceias</th>
-                      <th className="p-4 text-center">👥 Visitantes</th>
-                      <th className="p-4 text-right">📅 Último Envio</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {consolidadoPorCongregacao.map(item => (
-                      <tr key={item.congregacao_id || 'sede'} className="border-b border-slate-100 hover:bg-slate-50/50 transition">
-                        <td className="p-4 font-bold text-slate-800">
-                          <div className="flex items-center justify-between">
-                            <span>{item.nome}</span>
-                            {!isLocalUser && item.congregacao_id && (
-                              <button
-                                onClick={() => handleGerarLink(item.congregacao_id)}
-                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg transition text-xs font-semibold flex items-center gap-1 border border-slate-200 cursor-pointer"
-                                title="Copiar Link de Formulário Público"
-                              >
-                                <LinkIcon className="h-3 w-3" />
-                                Link de Envio
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-4 text-center text-slate-700 font-semibold">{item.cultos}</td>
-                        <td className="p-4 text-center text-slate-700 font-semibold">{item.visitas}</td>
-                        <td className="p-4 text-center text-rose-700 font-bold">{item.almas}</td>
-                        <td className="p-4 text-center text-slate-700 font-semibold">{item.biblias}</td>
-                        <td className="p-4 text-center text-slate-700 font-semibold">{item.literaturas}</td>
-                        <td className="p-4 text-center text-slate-700 font-semibold">{item.batismos}</td>
-                        <td className="p-4 text-center text-slate-700 font-semibold">{item.curas}</td>
-                        <td className="p-4 text-center text-slate-700 font-semibold">{item.evangelismos}</td>
-                        <td className="p-4 text-center text-slate-700 font-semibold">{item.reconciliacoes}</td>
-                        <td className="p-4 text-center text-amber-700 font-bold">{item.cearam}</td>
-                        <td className="p-4 text-center text-blue-700 font-bold">{item.visitantes}</td>
-                        <td className="p-4 text-right text-slate-500 font-medium">
-                          {item.ultimo_envio ? (
-                            <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-full text-xs">
-                              {formatDate(item.ultimo_envio)}
-                            </span>
-                          ) : (
-                            <span className="text-slate-350 italic">Sem registros</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {consolidadoPorCongregacao.length === 0 && (
-                      <tr>
-                        <td colSpan={13} className="p-8 text-center text-slate-400 italic">
-                          Nenhum dado de consolidação disponível para os filtros selecionados.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
               </div>
-            </Section>
-          )}
-        </Tabs>
-      </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCentralColetaOpen(false);
+                  setQrCodeCongId(null);
+                }}
+                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs shadow-md transition cursor-pointer"
+              >
+                Fechar Painel
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       <NotificationModal
         isOpen={modalNotify.isOpen}
@@ -1203,194 +1615,6 @@ export default function RelatorioEspiritualPage() {
         type={modalNotify.type}
         onClose={() => setModalNotify(prev => ({ ...prev, isOpen: false }))}
       />
-
-      {/* Central de Coleta Modal */}
-      {isCentralColetaOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all">
-          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] shadow-2xl flex flex-col overflow-hidden border border-slate-100">
-            {/* Header */}
-            <div className="p-6 bg-white border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <Globe className="h-5 w-5 text-[#062E6F]" />
-                  Central de Coleta de Relatórios
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">Gerencie os tokens, links e QR codes de envio para as congregações.</p>
-              </div>
-              <button
-                onClick={() => {
-                  setIsCentralColetaOpen(false);
-                  setQrCodeCongId(null);
-                }}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* List */}
-            <div className="flex-1 p-6 overflow-y-auto space-y-4">
-              <div className="overflow-hidden border border-slate-100 rounded-xl">
-                <table className="w-full text-left border-collapse text-xs sm:text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
-                      <th className="p-3">Congregação / Unidade</th>
-                      <th className="p-3 text-center">Status</th>
-                      <th className="p-3 text-right">Ações de Coleta</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {locais.map(loc => {
-                      const tokenInfo = tokens[loc.id];
-                      const hasToken = !!tokenInfo;
-                      const isExpired = hasToken && tokenInfo.expires_at && new Date(tokenInfo.expires_at) <= new Date();
-                      const isInactive = hasToken && !tokenInfo.is_active;
-                      const isActive = hasToken && tokenInfo.is_active && (!tokenInfo.expires_at || new Date(tokenInfo.expires_at) > new Date());
-                      const link = hasToken ? `${window.location.origin}/formularios/relatorio-espiritual/${tokenInfo.token}` : '';
-
-                      return (
-                        <tr key={loc.id} className="hover:bg-slate-50/50 transition">
-                          <td className="p-3 font-semibold text-slate-800">{loc.nome}</td>
-                          <td className="p-3 text-center">
-                            {isActive && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                Ativo
-                              </span>
-                            )}
-                            {isExpired && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
-                                Expirado
-                              </span>
-                            )}
-                            {isInactive && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800">
-                                Inativo
-                              </span>
-                            )}
-                            {!hasToken && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
-                                Sem Link
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              {!hasToken ? (
-                                <button
-                                  onClick={() => handleGerarLink(loc.id, false)}
-                                  className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Plus className="h-3 w-3" /> Gerar Link
-                                </button>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(link);
-                                      showNotification('success', 'Copiado', 'Link copiado para a área de transferência!');
-                                    }}
-                                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                                    title="Copiar Link"
-                                  >
-                                    <Copy className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => setQrCodeCongId(qrCodeCongId === loc.id ? null : loc.id)}
-                                    className={`p-1.5 rounded-lg border transition cursor-pointer ${
-                                      qrCodeCongId === loc.id
-                                        ? 'bg-blue-50 border-blue-200 text-blue-600'
-                                        : 'border-slate-200 hover:bg-slate-100 text-slate-600'
-                                    }`}
-                                    title="Exibir QR Code"
-                                  >
-                                    <QrCode className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleRegenerarToken(loc.id)}
-                                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-650 hover:text-amber-600 transition cursor-pointer"
-                                    title="Regenerar Token / Link"
-                                  >
-                                    <RefreshCw className="h-3.5 w-3.5" />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* QR Code Container Inline */}
-              {qrCodeCongId && locais.find(l => l.id === qrCodeCongId) && (() => {
-                const selectedLoc = locais.find(l => l.id === qrCodeCongId)!;
-                const tokenInfo = tokens[qrCodeCongId];
-                const link = tokenInfo ? `${window.location.origin}/formularios/relatorio-espiritual/${tokenInfo.token}` : '';
-
-                return (
-                  <div className="bg-slate-50 border border-slate-200/60 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-5 animate-fade-in">
-                    <div className="flex-1 text-center sm:text-left">
-                      <span className="text-xs font-black text-blue-800 uppercase tracking-widest block mb-1">QR Code de Envio</span>
-                      <h4 className="text-sm font-bold text-slate-800">{selectedLoc.nome}</h4>
-                      <p className="text-xs text-slate-500 mt-1 max-w-md">Posicione a câmera do celular no QR Code para acessar o formulário público desta congregação sem precisar de senha.</p>
-                      <input
-                        type="text"
-                        readOnly
-                        value={link}
-                        className="w-full text-slate-500 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg text-xs mt-3 select-all focus:outline-none"
-                      />
-                    </div>
-                    <div className="p-3 bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center justify-center">
-                      {link ? (
-                        <QRCodeSVG value={link} size={130} includeMargin={true} />
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">Sem link gerado</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Footer */}
-            <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <button
-                onClick={async () => {
-                  const linksCopyList: string[] = [];
-                  locais.forEach(loc => {
-                    const tInfo = tokens[loc.id];
-                    if (tInfo) {
-                      linksCopyList.push(`${loc.nome}: ${window.location.origin}/formularios/relatorio-espiritual/${tInfo.token}`);
-                    }
-                  });
-                  if (linksCopyList.length === 0) {
-                    showNotification('warning', 'Aviso', 'Nenhuma congregação possui links ativos para copiar.');
-                    return;
-                  }
-                  navigator.clipboard.writeText(linksCopyList.join('\n'));
-                  showNotification('success', 'Links Copiados', `${linksCopyList.length} links copiados de uma vez.`);
-                }}
-                className="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 border border-slate-250 cursor-pointer"
-              >
-                <Copy className="h-3.5 w-3.5" />
-                Copiar Todos os Links
-              </button>
-              <button
-                onClick={() => {
-                  setIsCentralColetaOpen(false);
-                  setQrCodeCongId(null);
-                }}
-                className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs transition cursor-pointer"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </PageLayout>
+    </DashboardContainer>
   );
 }
