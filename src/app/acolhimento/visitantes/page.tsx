@@ -21,7 +21,6 @@ import {
   History,
   Clock,
   Sparkles,
-  UserPlus,
   MessageSquare
 } from 'lucide-react';
 
@@ -655,15 +654,6 @@ export default function VisitantesPage() {
                               className="inline-flex items-center justify-center p-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition border border-slate-205 cursor-pointer"
                             >
                               <Sparkles className="h-4 w-4" />
-                            </button>
-
-                            {/* Encaminhar */}
-                            <button
-                              onClick={() => showNotification('info', 'Encaminhamento', 'Encaminhamento pastoral será ativado em breve.')}
-                              title="Encaminhar Visitante"
-                              className="inline-flex items-center justify-center p-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition border border-slate-205 cursor-pointer"
-                            >
-                              <UserPlus className="h-4 w-4" />
                             </button>
 
                           </div>
