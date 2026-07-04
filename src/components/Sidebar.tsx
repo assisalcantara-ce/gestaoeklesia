@@ -128,18 +128,6 @@ export default function Sidebar() {
   const allMenuItems = [
     { id: 'dashboard',        label: 'Dashboard',          icon: '📊', path: '/dashboard',   modulo: 'dashboard'  },
     {
-      id: 'acolhimento',
-      label: 'Acolhimento',
-      icon: '🤝',
-      path: '/secretaria/cultos',
-      modulo: 'secretaria',
-      submenu: [
-        { id: 'cultos',                label: 'Cultos',                  icon: '⛪', path: '/secretaria/cultos',                 modulo: 'gestao'          },
-        { id: 'relatorio-espiritual',  label: 'Relatório Espiritual',    icon: '🕊️', path: '/secretaria/relatorio-espiritual',   modulo: 'gestao'          },
-        { id: 'visitantes',            label: 'Visitantes',              icon: '👥', path: '/acolhimento/visitantes',            modulo: 'secretaria_local' },
-      ]
-    },
-    {
       id: 'secretaria',
       label: 'Secretaria',
       icon: '📝',
@@ -160,6 +148,18 @@ export default function Sidebar() {
       ]
     },
     { id: 'tesouraria', label: 'Tesouraria', icon: '💰', path: '/tesouraria', modulo: 'tesouraria' },
+    {
+      id: 'acolhimento',
+      label: 'Acolhimento',
+      icon: '🤝',
+      path: '/secretaria/cultos',
+      modulo: 'secretaria',
+      submenu: [
+        { id: 'cultos',                label: 'Cultos',                  icon: '⛪', path: '/secretaria/cultos',                 modulo: 'gestao'          },
+        { id: 'relatorio-espiritual',  label: 'Relatório Espiritual',    icon: '🕊️', path: '/secretaria/relatorio-espiritual',   modulo: 'gestao'          },
+        { id: 'visitantes',            label: 'Visitantes',              icon: '👥', path: '/acolhimento/visitantes',            modulo: 'secretaria_local' },
+      ]
+    },
     { id: 'agenda',           label: 'Agenda',             icon: '📅', path: '/agenda',      modulo: 'agenda'     },
     {
       id: 'ebd',
