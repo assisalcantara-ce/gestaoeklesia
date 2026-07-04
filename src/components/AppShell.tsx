@@ -9,6 +9,7 @@ const SIDEBAR_PREFIXES = [
   '/dashboard',
   '/tesouraria',
   '/secretaria',
+  '/acolhimento',
   '/ebd',
   '/comissao',
   '/reunioes',
