@@ -101,9 +101,8 @@ export default function Sidebar() {
     'cartas': 'secretaria',
     'cartas-pedidos': 'secretaria',
     'certificados': 'secretaria',
-    'relatorios-secretaria': 'secretaria',
-    'relatorio-espiritual': 'secretaria',
-    'cultos': 'secretaria',
+    'relatorio-espiritual': 'acolhimento',
+    'cultos': 'acolhimento',
     'sorteios': 'secretaria',
     'config-geral': 'configuracoes',
     'config-cartoes': 'configuracoes',
@@ -127,6 +126,17 @@ export default function Sidebar() {
   const allMenuItems = [
     { id: 'dashboard',        label: 'Dashboard',          icon: '📊', path: '/dashboard',   modulo: 'dashboard'  },
     {
+      id: 'acolhimento',
+      label: 'Acolhimento',
+      icon: '🤝',
+      path: '/secretaria/cultos',
+      modulo: 'secretaria',
+      submenu: [
+        { id: 'cultos',                label: 'Cultos',                  icon: '⛪', path: '/secretaria/cultos',                 modulo: 'gestao'          },
+        { id: 'relatorio-espiritual',  label: 'Relatório Espiritual',    icon: '🕊️', path: '/secretaria/relatorio-espiritual',   modulo: 'gestao'          },
+      ]
+    },
+    {
       id: 'secretaria',
       label: 'Secretaria',
       icon: '📝',
@@ -143,8 +153,6 @@ export default function Sidebar() {
         { id: 'cartas-pedidos',        label: 'Pedidos de Cartas',      icon: '✉️', path: '/secretaria/cartas/pedidos',         modulo: 'secretaria_local' },
         { id: 'certificados',          label: 'Certificados',           icon: '🎓', path: '/secretaria/certificados',           modulo: 'gestao'          },
         { id: 'relatorios-secretaria', label: 'Relatórios',              icon: '📋', path: '/secretaria/relatorios',             modulo: 'gestao'          },
-        { id: 'cultos',                label: 'Cultos',                  icon: '⛪', path: '/secretaria/cultos',                 modulo: 'gestao'          },
-        { id: 'relatorio-espiritual',  label: 'Relatório Espiritual',    icon: '🕊️', path: '/secretaria/relatorio-espiritual',   modulo: 'gestao'          },
         { id: 'sorteios',              label: 'Sorteios',                icon: '🎰', path: '/secretaria/sorteios',               modulo: 'secretaria_local' },
       ]
     },

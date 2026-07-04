@@ -54,6 +54,7 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
 
 const GROUP_ICONS: Record<string, string> = {
   "GERAL": "📊",
+  "ACOLHIMENTO": "🤝",
   "SECRETARIA": "👥",
   "FINANCEIRO": "💰",
   "ENSINO": "📖",
@@ -105,8 +106,8 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
     'cartas-pedidos': 'secretaria',
     'certificados': 'secretaria',
     'relatorios-secretaria': 'secretaria',
-    'relatorio-espiritual': 'secretaria',
-    'cultos': 'secretaria',
+    'relatorio-espiritual': 'acolhimento',
+    'cultos': 'acolhimento',
     'sorteios': 'secretaria',
     'config-geral': 'configuracoes',
     'config-cartoes': 'configuracoes',

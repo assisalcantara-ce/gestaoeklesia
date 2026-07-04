@@ -40,6 +40,13 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
     ]
   },
   {
+    groupName: "ACOLHIMENTO",
+    items: [
+      { id: 'cultos', label: 'Cultos', icon: '⛪', path: '/secretaria/cultos', modulo: 'gestao' },
+      { id: 'relatorio-espiritual', label: 'Relatório Espiritual', icon: '🕊️', path: '/secretaria/relatorio-espiritual', modulo: 'gestao' },
+    ]
+  },
+  {
     groupName: "SECRETARIA",
     items: [
       { id: 'membros', label: 'Membros', icon: '👥', path: '/secretaria/membros', modulo: 'secretaria' },
@@ -51,8 +58,6 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
       { id: 'cartas-pedidos', label: 'Pedidos de Cartas', icon: '✉️', path: '/secretaria/cartas/pedidos', modulo: 'secretaria_local' },
       { id: 'certificados', label: 'Certificados', icon: '🎓', path: '/secretaria/certificados', modulo: 'gestao' },
       { id: 'relatorios-secretaria', label: 'Relatórios', icon: '📋', path: '/secretaria/relatorios', modulo: 'gestao' },
-      { id: 'cultos', label: 'Cultos', icon: '⛪', path: '/secretaria/cultos', modulo: 'gestao' },
-      { id: 'relatorio-espiritual', label: 'Relatório Espiritual', icon: '🕊️', path: '/secretaria/relatorio-espiritual', modulo: 'gestao' },
       { id: 'funcionarios', label: 'Funcionários', icon: '👔', path: '/secretaria/funcionarios', modulo: 'gestao' },
       { id: 'achados-perdidos', label: 'Achados e Perdidos', icon: '🔍', path: '/secretaria/achados-perdidos', modulo: 'gestao' },
       { id: 'sorteios', label: 'Sorteios', icon: '🎰', path: '/secretaria/sorteios', modulo: 'secretaria_local' },
