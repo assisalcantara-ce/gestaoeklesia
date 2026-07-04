@@ -95,8 +95,8 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
     groupName: "ACOLHIMENTO",
     items: [
       { id: 'cultos', label: 'Cultos', icon: '⛪', path: '/secretaria/cultos', modulo: 'gestao' },
-      { id: 'relatorio-espiritual', label: 'Relatório Espiritual', icon: '🕊️', path: '/secretaria/relatorio-espiritual', modulo: 'gestao' },
       { id: 'visitantes', label: 'Visitantes', icon: '👥', path: '/acolhimento/visitantes', modulo: 'secretaria_local' },
+      { id: 'relatorio-espiritual', label: 'Relatório Espiritual', icon: '🕊️', path: '/secretaria/relatorio-espiritual', modulo: 'gestao' },
     ]
   },
   {

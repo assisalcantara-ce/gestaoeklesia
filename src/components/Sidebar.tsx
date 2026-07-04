@@ -156,8 +156,8 @@ export default function Sidebar() {
       modulo: 'secretaria',
       submenu: [
         { id: 'cultos',                label: 'Cultos',                  icon: '⛪', path: '/secretaria/cultos',                 modulo: 'gestao'          },
-        { id: 'relatorio-espiritual',  label: 'Relatório Espiritual',    icon: '🕊️', path: '/secretaria/relatorio-espiritual',   modulo: 'gestao'          },
         { id: 'visitantes',            label: 'Visitantes',              icon: '👥', path: '/acolhimento/visitantes',            modulo: 'secretaria_local' },
+        { id: 'relatorio-espiritual',  label: 'Relatório Espiritual',    icon: '🕊️', path: '/secretaria/relatorio-espiritual',   modulo: 'gestao'          },
       ]
     },
     { id: 'agenda',           label: 'Agenda',             icon: '📅', path: '/agenda',      modulo: 'agenda'     },
