@@ -21,7 +21,8 @@ import {
   History,
   Clock,
   Sparkles,
-  UserPlus
+  UserPlus,
+  MessageSquare
 } from 'lucide-react';
 
 interface VisitanteOriginal {
@@ -328,6 +329,13 @@ export default function VisitantesPage() {
     setFilterCargo('TODOS');
   };
 
+  const getWhatsappLink = (nome: string, telefone: string | null) => {
+    if (!telefone) return '#';
+    const numLimpo = telefone.replace(/\D/g, '');
+    const msg = `Olá, ${nome}! A Paz do Senhor. Ficamos muito felizes com sua visita em nossa igreja. Queremos agradecer sua presença e nos colocar à disposição.`;
+    return `https://wa.me/55${numLimpo}?text=${encodeURIComponent(msg)}`;
+  };
+
   const labelDivPrincipal = nomenclaturas.divisaoPrincipal.opcao1 || 'CONGREGAÇÃO';
 
   return (
@@ -509,7 +517,7 @@ export default function VisitantesPage() {
           </div>
         </DashboardSection>
 
-        {/* Grid de Cards de Visitantes */}
+        {/* Tabela de Visitantes */}
         <DashboardSection title="Painel de Acompanhamento Pastoral">
           {loading ? (
             <div className="flex items-center justify-center py-12">
@@ -522,139 +530,150 @@ export default function VisitantesPage() {
               description="Não encontramos registros de visitantes consolidados com base nos critérios aplicados."
             />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredVisitantes.map(v => (
-                <div
-                  key={v.key}
-                  className="bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-300 flex flex-col justify-between overflow-hidden group"
-                >
-                  {/* Topo do Card: Identificação */}
-                  <div className="p-6 space-y-4">
-                    <div className="flex justify-between items-start gap-2">
-                      <div>
-                        <h4 className="font-extrabold text-slate-800 text-base leading-snug group-hover:text-[#062E6F] transition-colors duration-200">
-                          {v.nome}
-                        </h4>
-                        {v.telefone ? (
-                          <div className="text-slate-500 font-semibold text-xs flex items-center gap-1.5 mt-1.5">
-                            <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                            {v.telefone}
-                          </div>
-                        ) : (
-                          <div className="text-slate-400 italic text-xs mt-1.5">
-                            Sem telefone cadastrado
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Status Badge */}
-                      <div className="shrink-0">
-                        {v.status === 'Primeira Visita' ? (
-                          <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2.5 py-0.5 font-bold text-[9px] uppercase tracking-wide">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Primeira Visita
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-750 border border-blue-100 rounded-full px-2.5 py-0.5 font-bold text-[9px] uppercase tracking-wide">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                            Retornando
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <hr className="border-slate-100/80" />
-
-                    {/* Informações de Perfil e Histórico */}
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4 relative">
-                        <div className="absolute left-1/2 top-1 bottom-1 w-[1px] bg-slate-100" />
+            <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100 text-slate-650 uppercase font-bold tracking-wider">
+                      <th className="px-5 py-3.5">Visitante</th>
+                      <th className="px-5 py-3.5">Contato</th>
+                      <th className="px-5 py-3.5">{labelDivPrincipal} Origem</th>
+                      <th className="px-5 py-3.5">Primeira Visita</th>
+                      <th className="px-5 py-3.5">Última Visita</th>
+                      <th className="px-5 py-3.5 text-center">Total de Visitas</th>
+                      <th className="px-5 py-3.5">Status</th>
+                      <th className="px-5 py-3.5 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredVisitantes.map(v => (
+                      <tr key={v.key} className="hover:bg-slate-50/50 transition">
                         
-                        <div className="space-y-0.5">
-                          <span className="text-slate-400 block text-[9px] uppercase tracking-wider font-extrabold">
-                            Primeira Visita
-                          </span>
-                          <span className="text-slate-800 font-extrabold block text-sm">
-                            {new Date(v.data_primeira_visita).toLocaleDateString('pt-BR')}
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-semibold block truncate" title={v.congregacao_origem || ''}>
-                            em {v.congregacao_origem}
-                          </span>
-                        </div>
-                        
-                        <div className="space-y-0.5 pl-2">
-                          <span className="text-slate-400 block text-[9px] uppercase tracking-wider font-extrabold">
-                            Última Visita
-                          </span>
-                          <span className="text-slate-800 font-extrabold block text-sm">
+                        {/* Visitante */}
+                        <td className="px-5 py-4">
+                          <div className="font-extrabold text-slate-800 text-sm">{v.nome}</div>
+                          {v.is_ministro && (
+                            <div className="text-[10px] text-blue-600 font-semibold mt-0.5">
+                              👑 Ministro {v.cargo_ministerial ? `— ${v.cargo_ministerial}` : ''}
+                              {v.igreja_origem ? ` (Origem: ${v.igreja_origem})` : ''}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Contato */}
+                        <td className="px-5 py-4 text-slate-600 whitespace-nowrap">
+                          {v.telefone ? (
+                            <div className="flex items-center gap-1.5 font-medium">
+                              <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                              {v.telefone}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic font-medium">Sem telefone</span>
+                          )}
+                        </td>
+
+                        {/* Congregação de Origem */}
+                        <td className="px-5 py-4 whitespace-nowrap font-semibold text-slate-700">
+                          {v.congregacao_origem}
+                        </td>
+
+                        {/* Primeira Visita */}
+                        <td className="px-5 py-4 whitespace-nowrap font-semibold text-slate-600">
+                          {new Date(v.data_primeira_visita).toLocaleDateString('pt-BR')}
+                        </td>
+
+                        {/* Última Visita */}
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <div className="font-semibold text-slate-750">
                             {new Date(v.data_ultima_visita).toLocaleDateString('pt-BR')}
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-semibold block truncate">
-                            Total: <strong className="text-slate-800 font-black">{v.total_visitas} culto(s)</strong>
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Bloco Obreiro/Ministro */}
-                      {v.is_ministro && (
-                        <div className="bg-blue-50/40 border border-blue-100/50 rounded-xl p-3 text-[11.5px] font-semibold text-slate-700 space-y-1">
-                          <div className="text-blue-700 font-bold flex items-center gap-1.5">
-                            <span className="text-xs">👑</span> Ministro / Obreiro
                           </div>
-                          {v.cargo_ministerial && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-slate-400 font-medium">Cargo:</span>
-                              <span className="text-slate-800 font-bold">{v.cargo_ministerial}</span>
-                            </div>
-                          )}
-                          {v.igreja_origem && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-slate-400 font-medium">Origem:</span>
-                              <span className="text-slate-800 font-semibold truncate block max-w-full" title={v.igreja_origem}>{v.igreja_origem}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                          <div className="text-[10px] text-slate-500 font-medium mt-0.5">
+                            {v.ultimo_culto}
+                          </div>
+                        </td>
 
-                  {/* Rodapé do Card: Origem Discreta e Ações */}
-                  <div className="bg-slate-50/80 border-t border-slate-100 p-5 space-y-3.5">
-                    <div className="text-[10px] font-semibold text-slate-400 flex items-center justify-between">
-                      <span className="uppercase tracking-wider">Último culto visto</span>
-                      <span className="text-slate-750 font-bold max-w-[150px] truncate" title={v.ultimo_culto || ''}>
-                        {v.ultimo_culto}
-                      </span>
-                    </div>
+                        {/* Total de Visitas */}
+                        <td className="px-5 py-4 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center justify-center bg-slate-100 text-slate-800 font-black text-xs px-2.5 py-1 rounded-lg">
+                            {v.total_visitas}
+                          </span>
+                        </td>
 
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        onClick={() => setSelectedVisitante(v)}
-                        className="px-2.5 py-2.5 bg-[#062E6F] hover:bg-[#154A92] text-white rounded-xl text-[10px] font-black shadow-sm transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer hover:shadow active:scale-95"
-                      >
-                        <History className="h-3.5 w-3.5 shrink-0" />
-                        Histórico
-                      </button>
-                      <button
-                        disabled
-                        title="Disponível em breve"
-                        className="px-2.5 py-2.5 bg-slate-100 text-slate-400 border border-slate-200/80 rounded-xl text-[10px] font-bold cursor-not-allowed opacity-70 flex items-center justify-center gap-1"
-                      >
-                        <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                        Acompanhar
-                      </button>
-                      <button
-                        disabled
-                        title="Disponível em breve"
-                        className="px-2.5 py-2.5 bg-slate-100 text-slate-400 border border-slate-200/80 rounded-xl text-[10px] font-bold cursor-not-allowed opacity-70 flex items-center justify-center gap-1"
-                      >
-                        <UserPlus className="h-3.5 w-3.5 shrink-0" />
-                        Membro
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                        {/* Status */}
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          {v.status === 'Primeira Visita' ? (
+                            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2.5 py-0.5 font-bold text-[9px] uppercase tracking-wide">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Primeira Visita
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-750 border border-blue-100 rounded-full px-2.5 py-0.5 font-bold text-[9px] uppercase tracking-wide">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                              Retornando
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Ações */}
+                        <td className="px-5 py-4 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            
+                            {/* WhatsApp */}
+                            {v.telefone ? (
+                              <a
+                                href={getWhatsappLink(v.nome, v.telefone)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Enviar mensagem no WhatsApp"
+                                className="inline-flex items-center justify-center p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl transition border border-emerald-200/50 cursor-pointer"
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                              </a>
+                            ) : (
+                              <button
+                                disabled
+                                title="Sem telefone para WhatsApp"
+                                className="inline-flex items-center justify-center p-2 bg-slate-50 text-slate-300 rounded-xl border border-slate-200/50 cursor-not-allowed opacity-60"
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                              </button>
+                            )}
+
+                            {/* Histórico */}
+                            <button
+                              onClick={() => setSelectedVisitante(v)}
+                              title="Visualizar histórico"
+                              className="inline-flex items-center justify-center p-2 bg-[#062E6F]/5 hover:bg-[#062E6F]/10 text-[#062E6F] rounded-xl transition border border-blue-200/30 cursor-pointer"
+                            >
+                              <History className="h-4 w-4" />
+                            </button>
+
+                            {/* Contato Realizado */}
+                            <button
+                              onClick={() => showNotification('info', 'Acompanhamento Pastoral', 'Função de acompanhamento pastoral será ativada em breve.')}
+                              title="Registrar Contato Realizado"
+                              className="inline-flex items-center justify-center p-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition border border-slate-205 cursor-pointer"
+                            >
+                              <Sparkles className="h-4 w-4" />
+                            </button>
+
+                            {/* Encaminhar */}
+                            <button
+                              onClick={() => showNotification('info', 'Encaminhamento', 'Encaminhamento pastoral será ativado em breve.')}
+                              title="Encaminhar Visitante"
+                              className="inline-flex items-center justify-center p-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition border border-slate-205 cursor-pointer"
+                            >
+                              <UserPlus className="h-4 w-4" />
+                            </button>
+
+                          </div>
+                        </td>
+
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </DashboardSection>
