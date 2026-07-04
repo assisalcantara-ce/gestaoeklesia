@@ -44,6 +44,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
     items: [
       { id: 'cultos', label: 'Cultos', icon: '⛪', path: '/secretaria/cultos', modulo: 'gestao' },
       { id: 'relatorio-espiritual', label: 'Relatório Espiritual', icon: '🕊️', path: '/secretaria/relatorio-espiritual', modulo: 'gestao' },
+      { id: 'visitantes', label: 'Visitantes', icon: '👥', path: '/acolhimento/visitantes', modulo: 'secretaria_local' },
     ]
   },
   {

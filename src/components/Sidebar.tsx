@@ -23,6 +23,7 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
   { path: '/secretaria/departamentos',         id: 'departamentos'        },
   { path: '/secretaria/casamento',             id: 'casamento'            },
   { path: '/secretaria/relatorio-espiritual',  id: 'relatorio-espiritual' },
+  { path: '/acolhimento/visitantes',           id: 'visitantes'           },
   { path: '/secretaria/cultos',                id: 'cultos'               },
   { path: '/secretaria/relatorios',            id: 'relatorios-secretaria'},
   { path: '/secretaria/cartas',                id: 'cartas'               },
@@ -103,6 +104,7 @@ export default function Sidebar() {
     'certificados': 'secretaria',
     'relatorio-espiritual': 'acolhimento',
     'cultos': 'acolhimento',
+    'visitantes': 'acolhimento',
     'sorteios': 'secretaria',
     'config-geral': 'configuracoes',
     'config-cartoes': 'configuracoes',
@@ -134,6 +136,7 @@ export default function Sidebar() {
       submenu: [
         { id: 'cultos',                label: 'Cultos',                  icon: '⛪', path: '/secretaria/cultos',                 modulo: 'gestao'          },
         { id: 'relatorio-espiritual',  label: 'Relatório Espiritual',    icon: '🕊️', path: '/secretaria/relatorio-espiritual',   modulo: 'gestao'          },
+        { id: 'visitantes',            label: 'Visitantes',              icon: '👥', path: '/acolhimento/visitantes',            modulo: 'secretaria_local' },
       ]
     },
     {
