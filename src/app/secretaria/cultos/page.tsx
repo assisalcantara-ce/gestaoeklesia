@@ -748,8 +748,19 @@ export default function CultosPage() {
       showNotification('success', isOrfao ? 'Reconsolidado com Sucesso!' : 'Consolidado com Sucesso!', `O culto foi consolidado no Relatório Espiritual com status Enviado.`);
       await loadRegistros();
     } catch (err: any) {
-      console.error(err);
-      showNotification('error', 'Erro', 'Erro ao consolidar: ' + (err.message || 'Tente novamente.'));
+      console.error('[Consolidação] Erro:', err);
+      // Distinguir causas comuns de falha
+      const msg = err?.message || '';
+      const code = err?.code || '';
+      if (code === '42501' || msg.includes('permission denied') || msg.includes('violates row-level security')) {
+        showNotification('error', 'Permissão Negada', 'Você não tem permissão para criar registros no Relatório Espiritual. Verifique seu nível de acesso com o administrador.');
+      } else if (code === '42703') {
+        showNotification('error', 'Coluna Ausente', 'Erro de schema no banco de dados. Contate o suporte técnico.');
+      } else if (code === '23503') {
+        showNotification('error', 'Referência Inválida', 'Referência inválida ao banco de dados. Verifique se o culto está vinculado a um ministério e congregação válidos.');
+      } else {
+        showNotification('error', 'Erro', 'Erro ao consolidar: ' + (msg || 'Tente novamente.'));
+      }
     } finally {
       setLoadingData(false);
     }
