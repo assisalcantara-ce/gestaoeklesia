@@ -2,10 +2,11 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
+import ReportTemplate, { ReportTemplateRef } from '@/components/ReportTemplate';
 import {
   BarChart,
   Bar,
@@ -53,6 +54,7 @@ const MESES_PT = [
 export default function RelatoriosAcolhimentoPage() {
   const { ctx, bloqueado } = useRequireModulo('gestao');
   const supabase = useMemo(() => createClient(), []);
+  const reportRef = useRef<ReportTemplateRef>(null);
 
   // Filtros
   const [dashMes, setDashMes] = useState<number>(new Date().getMonth() + 1);
@@ -292,47 +294,18 @@ export default function RelatoriosAcolhimentoPage() {
       activeMenu="relatorios-acolhimento"
       headerExtra={
         <button
-          onClick={() => window.print()}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition shadow-md print:hidden flex items-center gap-1.5 cursor-pointer"
+          onClick={() => {
+            const filename = `relatorio_${tipoRelatorio}_${MESES_PT[dashMes - 1].toLowerCase()}_${dashAno}.pdf`;
+            reportRef.current?.exportToPDF(filename);
+          }}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition shadow-md flex items-center gap-1.5 cursor-pointer"
         >
-          🖨️ Imprimir PDF
+          📄 Gerar PDF Oficial
         </button>
       }
     >
-      {/* Estilo para impressão A4 */}
-      <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #print-area, #print-area * {
-            visibility: visible;
-          }
-          #print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            background: white !important;
-            color: black !important;
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-          .print-no-break {
-            page-break-inside: avoid;
-          }
-          .print-header {
-            border-bottom: 2px solid #062e6f !important;
-          }
-          .print-footer {
-            border-top: 1px solid #e2e8f0 !important;
-            position: running(footer);
-          }
-        }
-      `}</style>
-
       {/* Controles de Filtros da Tela (Escondidos na Impressão) */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4 mb-6 print:hidden">
+      <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4 mb-6">
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-black text-slate-400 uppercase tracking-wider">Mês / Ano</label>
@@ -399,39 +372,35 @@ export default function RelatoriosAcolhimentoPage() {
         </div>
       </div>
 
-      {/* ÁREA DE IMPRESSÃO / PRÉ-VISUALIZAÇÃO */}
-      <div id="print-area" className="bg-white border border-slate-200 rounded-3xl p-8 md:p-12 shadow-md min-h-[1123px] text-slate-800">
-        
-        {/* Cabeçalho Institucional */}
-        <div className="print-header pb-6 border-b-2 border-[#062E6F] flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            {ministry?.logo_url ? (
-              <img src={ministry.logo_url} alt="Logo" className="h-16 w-auto object-contain" />
-            ) : (
-              <div className="h-14 w-14 bg-[#062E6F] text-white rounded-xl flex items-center justify-center font-black text-xl">
-                EK
-              </div>
-            )}
-            <div>
-              <h2 className="text-xl font-black text-[#062E6F] uppercase tracking-wide">{ministry?.name || 'Gestão Eklésia'}</h2>
-              <p className="text-xs font-bold text-slate-400">SECRETARIA GERAL DE ACOLHIMENTO</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Competência</span>
-            <strong className="text-base font-extrabold text-[#062E6F]">{MESES_PT[dashMes - 1]} de {dashAno}</strong>
-          </div>
-        </div>
-
+      {/* ÁREA DO TEMPLATE DE RELATÓRIO PADRONIZADO */}
+      <ReportTemplate
+        ref={reportRef}
+        title={
+          tipoRelatorio === 'geral'
+            ? 'Relatório Consolidado do Ministério'
+            : tipoRelatorio === 'congregacao'
+            ? `Relatório de Acolhimento — ${congregacaoSelecionadaData.local?.nome || 'Unidade'}`
+            : 'Relatório de Evolução e Crescimento Espiritual'
+        }
+        competencia={`${MESES_PT[dashMes - 1]} de ${dashAno}`}
+        dadosIgreja={
+          ministry
+            ? {
+                name: ministry.name,
+                logo_url: ministry.logo_url,
+                phone: ministry.phone,
+                email_admin: ministry.email_admin
+              }
+            : undefined
+        }
+        usuarioResponsavel="Secretaria Geral"
+      >
         {/* ─── TIPO 1: RELATÓRIO GERAL DO MINISTÉRIO ─── */}
         {tipoRelatorio === 'geral' && (
-          <div className="mt-8 space-y-8">
-            <div>
-              <h3 className="text-lg font-black text-[#062E6F] uppercase tracking-wider mb-4">Relatório Consolidado do Ministério</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Este documento apresenta a consolidação espiritual e de atividades de todas as congregações pertencentes ao ministério durante a competência selecionada. Os dados representam decisões de fé, Santa Ceia e frentes pastorais.
-              </p>
-            </div>
+          <div className="space-y-6">
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Este documento apresenta a consolidação espiritual e de atividades de todas as congregações pertencentes ao ministério durante a competência selecionada. Os dados representam decisões de fé, Santa Ceia e frentes pastorais.
+            </p>
 
             {/* Resumo Executivo KPIs */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -454,7 +423,7 @@ export default function RelatoriosAcolhimentoPage() {
             </div>
 
             {/* Outros KPIs Menores */}
-            <div className="grid grid-cols-3 gap-4 text-xs font-semibold text-slate-650">
+            <div className="grid grid-cols-3 gap-4 text-xs font-semibold text-slate-600">
               <div className="border border-slate-100 rounded-xl p-3 flex justify-between items-center">
                 <span>Batismos no Espírito:</span>
                 <strong className="font-extrabold text-[#062E6F]">{totalAtual.batismos}</strong>
@@ -482,7 +451,7 @@ export default function RelatoriosAcolhimentoPage() {
             </div>
 
             {/* Tabela de congregações */}
-            <div className="print-no-break">
+            <div>
               <h4 className="text-sm font-bold text-[#062E6F] uppercase tracking-wide mb-3">Tabela Consolidada por Unidade</h4>
               <div className="border border-slate-200 rounded-2xl overflow-hidden">
                 <table className="w-full text-left border-collapse text-xs">
@@ -518,15 +487,10 @@ export default function RelatoriosAcolhimentoPage() {
 
         {/* ─── TIPO 2: RELATÓRIO POR CONGREGAÇÃO ─── */}
         {tipoRelatorio === 'congregacao' && (
-          <div className="mt-8 space-y-8">
-            <div>
-              <h3 className="text-lg font-black text-[#062E6F] uppercase tracking-wider mb-1">
-                Relatório de Acolhimento — {congregacaoSelecionadaData.local?.nome || 'Unidade Selecionada'}
-              </h3>
-              <p className="text-xs text-slate-500">
-                Resumo específico e histórico de reuniões e cultos realizados nesta congregação.
-              </p>
-            </div>
+          <div className="space-y-6">
+            <p className="text-xs text-slate-500">
+              Resumo específico e histórico de reuniões e cultos realizados nesta congregação.
+            </p>
 
             {/* Totais do Mês */}
             <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -549,7 +513,7 @@ export default function RelatoriosAcolhimentoPage() {
             </div>
 
             {/* Detalhe da lista de cultos */}
-            <div className="print-no-break">
+            <div>
               <h4 className="text-sm font-bold text-[#062E6F] uppercase tracking-wide mb-3">Lista de Cultos na Competência</h4>
               <div className="border border-slate-200 rounded-2xl overflow-hidden">
                 <table className="w-full text-left border-collapse text-xs">
@@ -573,7 +537,7 @@ export default function RelatoriosAcolhimentoPage() {
                         <tr key={c.id}>
                           <td className="p-3 font-semibold">{new Date(c.data_culto + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
                           <td className="p-3 font-bold text-[#062E6F]">{c.tipo_culto}</td>
-                          <td className="p-3 text-slate-650">{c.pregador || '—'}</td>
+                          <td className="p-3 text-slate-600">{c.pregador || '—'}</td>
                           <td className="p-3 text-center">{c.visitantes_presentes}</td>
                           <td className="p-3 text-center">{c.almas_alcancadas}</td>
                           <td className="p-3 text-center">{c.membros_cearam}</td>
@@ -589,13 +553,10 @@ export default function RelatoriosAcolhimentoPage() {
 
         {/* ─── TIPO 3: RELATÓRIO DE CRESCIMENTO & COMPARATIVOS ─── */}
         {tipoRelatorio === 'crescimento' && (
-          <div className="mt-8 space-y-8">
-            <div>
-              <h3 className="text-lg font-black text-[#062E6F] uppercase tracking-wider mb-2">Relatório de Evolução e Crescimento Espiritual</h3>
-              <p className="text-xs text-slate-500">
-                Análise de crescimento comparativa com a competência do mês anterior.
-              </p>
-            </div>
+          <div className="space-y-6">
+            <p className="text-xs text-slate-500">
+              Análise de crescimento comparativa com a competência do mês anterior.
+            </p>
 
             {/* Tabela de Variação Mês Anterior vs Atual */}
             <div className="border border-slate-200 rounded-2xl overflow-hidden">
@@ -646,7 +607,7 @@ export default function RelatoriosAcolhimentoPage() {
             </div>
 
             {/* Gráficos para impressão (usando SVG simples de barras em Recharts) */}
-            <div className="print-no-break grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
                 <span className="text-[10px] text-slate-400 font-bold block uppercase mb-2">Decisões & Reconciliações</span>
                 <div className="h-44 w-full">
@@ -684,7 +645,7 @@ export default function RelatoriosAcolhimentoPage() {
             </div>
 
             {/* Conclusão automática baseada em dados */}
-            <div className="print-no-break bg-slate-50 border border-slate-100 rounded-2xl p-5">
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5">
               <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5">Conclusão Analítica</h4>
               <p className="text-xs text-slate-700 leading-relaxed font-medium">
                 {conclusaoCrescimento}
@@ -692,13 +653,7 @@ export default function RelatoriosAcolhimentoPage() {
             </div>
           </div>
         )}
-
-        {/* Rodapé Institucional */}
-        <div className="print-footer mt-12 pt-4 border-t border-slate-200 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-          <span>Emitido em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-          <span>Gestão Eklésia — Acolhimento v1.0</span>
-        </div>
-      </div>
+      </ReportTemplate>
     </PageLayout>
   );
 }
