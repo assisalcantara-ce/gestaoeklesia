@@ -72,6 +72,9 @@ export default function PreCadastroPage() {
   const [leadLoading, setLeadLoading]     = useState(false);
   const [leadError, setLeadError]         = useState('');
 
+  const [isOnboarding, setIsOnboarding]         = useState(false);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+
   const [planos, setPlanos] = useState<PlanoDB[]>([]);
   const [planoAtivo, setPlanoAtivo] = useState<PlanoDB | null>(null);
 
@@ -363,13 +366,41 @@ export default function PreCadastroPage() {
         return;
       }
 
-      setSuccess(true);
-      setSuccessInfo({
-        isTrial,
-        emailSent: data?.data?.email_sent ?? false,
-        trialExpiresAt: data?.data?.trial_expires_at ?? null,
-        plan: data?.data?.plan ?? 'starter',
-      });
+      if (isTrial) {
+        // Fluxo com Onboarding animado
+        setIsOnboarding(true);
+        setCurrentStepIndex(0);
+
+        const stepsLength = 5; // 5 etapas no total
+        const runSteps = (index: number) => {
+          if (index < stepsLength) {
+            setTimeout(() => {
+              setCurrentStepIndex(index + 1);
+              runSteps(index + 1);
+            }, 900);
+          } else {
+            setIsOnboarding(false);
+            setSuccess(true);
+            setSuccessInfo({
+              isTrial,
+              emailSent: data?.data?.email_sent ?? false,
+              trialExpiresAt: data?.data?.trial_expires_at ?? null,
+              plan: data?.data?.plan ?? 'starter',
+            });
+          }
+        };
+        runSteps(0);
+      } else {
+        // Fluxo normal/manual direto para o sucesso
+        setSuccess(true);
+        setSuccessInfo({
+          isTrial,
+          emailSent: data?.data?.email_sent ?? false,
+          trialExpiresAt: data?.data?.trial_expires_at ?? null,
+          plan: data?.data?.plan ?? 'starter',
+        });
+      }
+
       setFormData((prev) => ({
         ...prev,
         ministry_name: '',
@@ -557,20 +588,57 @@ export default function PreCadastroPage() {
             )}
 
 
-            {success && successInfo && (
+            {isOnboarding && (
+              <div className="space-y-6 py-6 flex flex-col items-center justify-center">
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <div className="w-12 h-12 rounded-full border-4 border-emerald-200 border-t-emerald-700 animate-spin" />
+                  <h3 className="text-xl font-bold text-slate-800 mt-4">Estamos preparando seu ambiente...</h3>
+                  <p className="text-sm text-slate-500">Configurando tudo para sua igreja iniciar.</p>
+                </div>
+
+                <div className="w-full max-w-sm space-y-3 mt-4">
+                  {[
+                    'Criando ministério',
+                    'Configurando ambiente',
+                    'Aplicando plano Starter',
+                    'Ativando trial de 7 dias',
+                    'Finalizando acesso',
+                  ].map((step, idx) => {
+                    const isDone = currentStepIndex > idx;
+                    const isActive = currentStepIndex === idx;
+                    return (
+                      <div key={step} className="flex items-center gap-3 text-sm transition-all duration-300">
+                        {isDone ? (
+                          <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                        ) : isActive ? (
+                          <span className="w-5 h-5 rounded-full border-2 border-emerald-600 border-t-transparent animate-spin" />
+                        ) : (
+                          <span className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200" />
+                        )}
+                        <span className={`font-medium ${isDone ? 'text-slate-700' : isActive ? 'text-emerald-700 font-bold' : 'text-slate-400'}`}>
+                          {step}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {success && successInfo && !isOnboarding && (
               <div ref={successMessageRef} className="space-y-5 py-2">
                 {/* ─── Cabeçalho ─── */}
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="mt-0.5 h-7 w-7 shrink-0 text-emerald-600" />
                   <div>
-                    <p className="text-lg font-bold text-slate-900">
+                    <p className="text-xl font-bold text-slate-900">
                       {successInfo.isTrial
-                        ? 'Teste grátis criado com sucesso!'
+                        ? '🎉 Tudo pronto! Bem-vindo ao Gestão Eklésia.'
                         : 'Dados enviados com sucesso!'}
                     </p>
                     <p className="text-sm text-slate-600 mt-0.5">
                       {successInfo.isTrial
-                        ? 'Enviamos as instruções de acesso para o seu e-mail.'
+                        ? 'Seu acesso de testes está configurado e pronto para uso!'
                         : 'Nosso time vai entrar em contato em breve.'}
                     </p>
                   </div>
@@ -608,6 +676,7 @@ export default function PreCadastroPage() {
                       Acessar meu painel →
                     </a>
 
+
                     <p className="text-xs text-center text-slate-400">
                       Se o e-mail não chegar, verifique a pasta de spam ou entre em contato com o suporte.
                     </p>
@@ -616,7 +685,7 @@ export default function PreCadastroPage() {
               </div>
             )}
 
-            {!success && (<>
+            {!success && !isOnboarding && (<>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">

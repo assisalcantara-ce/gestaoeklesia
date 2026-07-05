@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
           await resend.emails.send({
             from: resendFrom,
             to: existing.email,
-            subject: 'Seu teste grátis do Gestão Eklésia está pronto',
+            subject: 'Seu acesso ao Gestão Eklésia está liberado! 🎉',
             html: buildTrialEmail({ pastorName, activationLink }),
           }).catch(e => console.warn('[CONTACT] Resend re-send error:', e))
         }
@@ -344,7 +344,7 @@ export async function POST(request: NextRequest) {
         await resend.emails.send({
           from: resendFrom,
           to: emailValue,
-          subject: 'Seu teste grátis do Gestão Eklésia está pronto',
+          subject: 'Seu acesso ao Gestão Eklésia está liberado! 🎉',
           html: buildTrialEmail({ pastorName, activationLink }),
         })
         emailSent = true
@@ -420,8 +420,8 @@ function buildTrialEmail({
         <tr>
           <td style="background:linear-gradient(135deg,#064e3b 0%,#065f46 100%);padding:32px 40px;text-align:center;">
             <p style="margin:0 0 8px;font-size:12px;color:#6ee7b7;letter-spacing:0.2em;text-transform:uppercase;">Gestão Eklésia</p>
-            <h1 style="margin:0;font-size:26px;font-weight:700;color:#ffffff;line-height:1.3;">Seu teste grátis está pronto! 🎉</h1>
-            <p style="margin:10px 0 0;font-size:14px;color:#a7f3d0;">7 dias para explorar tudo, sem compromisso.</p>
+            <h1 style="margin:0;font-size:26px;font-weight:700;color:#ffffff;line-height:1.3;">Seu acesso está liberado! 🎉</h1>
+            <p style="margin:10px 0 0;font-size:14px;color:#a7f3d0;">O ambiente de testes da sua igreja já está reservado.</p>
           </td>
         </tr>
 
@@ -430,10 +430,10 @@ function buildTrialEmail({
           <td style="padding:36px 40px;color:#1e293b;">
             <p style="margin:0 0 16px;font-size:16px;">Olá, <strong>${firstName}</strong>!</p>
             <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
-              Obrigado pelo seu interesse no <strong>Gestão Eklésia</strong> — o sistema de gestão ministerial completo para igrejas e ministérios de todos os tamanhos.
+              Excelente decisão! O ambiente de testes para a sua igreja já está reservado no <strong>Gestão Eklésia</strong>.
             </p>
             <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
-              Preparamos um acesso exclusivo de <strong>7 dias gratuitos</strong> para que você e sua equipe possam explorar tudo: membros, finanças, agenda, relatórios, EBD e muito mais.
+              Você tem <strong>7 dias grátis</strong> de acesso ilimitado para conhecer na prática todas as ferramentas que vão revolucionar a organização e o dia a dia do seu ministério.
             </p>
 
             <!-- CTA -->
@@ -442,7 +442,7 @@ function buildTrialEmail({
                 <td style="border-radius:10px;background:#059669;">
                   <a href="${activationLink}"
                      style="display:inline-block;padding:15px 36px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">
-                    Acessar meu teste grátis →
+                    Iniciar meu teste grátis →
                   </a>
                 </td>
               </tr>
