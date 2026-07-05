@@ -153,7 +153,7 @@ export default function Sidebar() {
     {
       id: 'acolhimento',
       label: 'Acolhimento',
-      icon: '🤝',
+      icon: '🤗',
       path: '/secretaria/cultos',
       modulo: 'secretaria',
       submenu: [
