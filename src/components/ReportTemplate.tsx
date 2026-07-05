@@ -28,6 +28,31 @@ const ReportTemplate = forwardRef<ReportTemplateRef, ReportTemplateProps>(
     const exportToPDF = async (filename?: string) => {
       if (!reportRef.current) return;
 
+      // Sanitizar temporariamente regras CSS contendo a função de cor 'lab('
+      // que o parser do html2canvas não suporta.
+      const problemRules: { sheet: CSSStyleSheet; index: number; ruleText: string }[] = [];
+      try {
+        for (let i = 0; i < document.styleSheets.length; i++) {
+          try {
+            const sheet = document.styleSheets[i];
+            const rules = sheet.cssRules || sheet.rules;
+            if (!rules) continue;
+            for (let j = rules.length - 1; j >= 0; j--) {
+              const rule = rules[j];
+              // Também busca oklab para garantir cobertura total contra cores modernas
+              if (rule.cssText.includes('lab(') || rule.cssText.includes('oklab(')) {
+                problemRules.push({ sheet, index: j, ruleText: rule.cssText });
+                sheet.deleteRule(j);
+              }
+            }
+          } catch {
+            // Ignora folhas de estilo externas protegidas por CORS
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao varrer folhas de estilo para sanitização:', err);
+      }
+
       try {
         // Pequeno timeout para garantir que os gráficos e imagens estejam prontos
         await new Promise((resolve) => setTimeout(resolve, 300));
@@ -70,6 +95,15 @@ const ReportTemplate = forwardRef<ReportTemplateRef, ReportTemplateProps>(
         pdf.save(filename || fallbackName);
       } catch (error) {
         console.error('Erro ao gerar PDF do relatório:', error);
+      } finally {
+        // Restaura as regras CSS removidas para não afetar o visual da aplicação na tela
+        for (const item of problemRules.reverse()) {
+          try {
+            item.sheet.insertRule(item.ruleText, item.index);
+          } catch (e) {
+            // Falha silenciosa na restauração de regras individuais
+          }
+        }
       }
     };
 
