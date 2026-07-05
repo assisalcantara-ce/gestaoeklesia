@@ -24,6 +24,7 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
   { path: '/secretaria/casamento',             id: 'casamento'            },
   { path: '/secretaria/relatorio-espiritual',  id: 'relatorio-espiritual' },
   { path: '/acolhimento/visitantes',           id: 'visitantes'           },
+  { path: '/acolhimento/relatorios',           id: 'relatorios-acolhimento' },
   { path: '/secretaria/cultos',                id: 'cultos'               },
   { path: '/secretaria/relatorios',            id: 'relatorios-secretaria'},
   { path: '/secretaria/cartas',                id: 'cartas'               },
@@ -103,6 +104,7 @@ export default function Sidebar() {
     'cartas-pedidos': 'secretaria',
     'certificados': 'secretaria',
     'relatorio-espiritual': 'acolhimento',
+    'relatorios-acolhimento': 'acolhimento',
     'cultos': 'acolhimento',
     'visitantes': 'acolhimento',
     'sorteios': 'secretaria',
@@ -158,6 +160,7 @@ export default function Sidebar() {
         { id: 'cultos',                label: 'Cultos',                  icon: '⛪', path: '/secretaria/cultos',                 modulo: 'gestao'          },
         { id: 'visitantes',            label: 'Visitantes',              icon: '👥', path: '/acolhimento/visitantes',            modulo: 'secretaria_local' },
         { id: 'relatorio-espiritual',  label: 'Relatório Espiritual',    icon: '🕊️', path: '/secretaria/relatorio-espiritual',   modulo: 'gestao'          },
+        { id: 'relatorios-acolhimento', label: 'Relatórios',              icon: '📋', path: '/acolhimento/relatorios',            modulo: 'gestao'          },
       ]
     },
     { id: 'agenda',           label: 'Agenda',             icon: '📅', path: '/agenda',      modulo: 'agenda'     },
