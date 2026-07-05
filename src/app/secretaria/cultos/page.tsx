@@ -640,8 +640,10 @@ export default function CultosPage() {
       showNotification('warning', 'Acesso Negado', 'Permissão insuficiente.');
       return;
     }
-    if (culto.status !== 'Encerrado') {
-      showNotification('warning', 'Não Permitido', 'Apenas cultos encerrados podem ser consolidados.');
+    // Permite consolidar cultos Encerrados OU cultos Consolidados órfãos (sem relatorio_espiritual_id)
+    const isOrfao = culto.status === 'Consolidado' && !culto.relatorio_espiritual_id;
+    if (culto.status !== 'Encerrado' && !isOrfao) {
+      showNotification('warning', 'Não Permitido', 'Apenas cultos encerrados (ou consolidados sem vínculo) podem ser consolidados.');
       return;
     }
     // Abre o modal de confirmação estilizado
@@ -654,6 +656,8 @@ export default function CultosPage() {
     setCultoParaConsolidar(null);
     setLoadingData(true);
     try {
+      const isOrfao = culto.status === 'Consolidado' && !culto.relatorio_espiritual_id;
+
       // Verificar duplicidade: já existe registro espiritual vinculado a este culto?
       const { data: existing } = await supabase
         .from('relatorio_espiritual_registros')
@@ -661,8 +665,22 @@ export default function CultosPage() {
         .eq('culto_id', culto.id)
         .maybeSingle();
 
-      if (existing) {
+      if (existing && !isOrfao) {
+        // Culto normal já consolidado: bloquear
         showNotification('warning', 'Já Consolidado', 'Este culto já possui um registro no Relatório Espiritual.');
+        return;
+      }
+
+      if (existing && isOrfao) {
+        // Culto órfão mas registro espiritual existe no banco (índice único sobreviveu):
+        // Apenas reconectar o vínculo em culto_registros
+        const { error: errLink } = await supabase
+          .from('culto_registros')
+          .update({ relatorio_espiritual_id: existing.id, updated_at: new Date().toISOString() })
+          .eq('id', culto.id);
+        if (errLink) throw errLink;
+        showNotification('success', 'Vínculo Restaurado!', `O vínculo entre o culto e o Relatório Espiritual foi restaurado com sucesso.`);
+        await loadRegistros();
         return;
       }
 
@@ -719,13 +737,15 @@ export default function CultosPage() {
             area: 'Secretaria',
             tabela_afetada: 'culto_registros',
             registro_id: culto.id,
-            descricao: `Culto consolidado no Relatório Espiritual: ${culto.tipo_culto} em ${formatDate(culto.data_culto)}`,
+            descricao: isOrfao
+              ? `Culto reconsolidado no Relatório Espiritual (vínculo restaurado): ${culto.tipo_culto} em ${formatDate(culto.data_culto)}`
+              : `Culto consolidado no Relatório Espiritual: ${culto.tipo_culto} em ${formatDate(culto.data_culto)}`,
             dados_novos: { status: 'Consolidado', relatorio_espiritual_id: novoRegistro?.id }
           })
         });
       } catch { /* audit não bloqueia */ }
 
-      showNotification('success', 'Consolidado com Sucesso!', `O culto foi consolidado no Relatório Espiritual com status Enviado.`);
+      showNotification('success', isOrfao ? 'Reconsolidado com Sucesso!' : 'Consolidado com Sucesso!', `O culto foi consolidado no Relatório Espiritual com status Enviado.`);
       await loadRegistros();
     } catch (err: any) {
       console.error(err);
@@ -1231,9 +1251,14 @@ export default function CultosPage() {
                                 Encerrado
                               </span>
                             )}
-                            {reg.status === 'Consolidado' && (
+                            {reg.status === 'Consolidado' && reg.relatorio_espiritual_id && (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
                                 Consolidado
+                              </span>
+                            )}
+                            {reg.status === 'Consolidado' && !reg.relatorio_espiritual_id && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800" title="Consolidado sem vínculo com Relatório Espiritual. Clique em Reconsolidar.">
+                                ⚠️ Órfão
                               </span>
                             )}
                           </td>
@@ -1275,6 +1300,16 @@ export default function CultosPage() {
                                 >
                                   <BookCheck className="h-3.5 w-3.5" />
                                   Consolidar
+                                </button>
+                              )}
+                              {reg.status === 'Consolidado' && !reg.relatorio_espiritual_id && isEscritaPermitida && (
+                                <button
+                                  onClick={() => handleConsolidar(reg)}
+                                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                                  title="Reconsolidar: criar vínculo com o Relatório Espiritual (dados não foram registrados)"
+                                >
+                                  <RefreshCw className="h-3.5 w-3.5" />
+                                  Reconsolidar
                                 </button>
                               )}
                               {isEscritaPermitida && (

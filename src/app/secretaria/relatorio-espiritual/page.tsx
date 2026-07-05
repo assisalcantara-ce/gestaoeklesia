@@ -1255,6 +1255,23 @@ export default function RelatorioEspiritualPage() {
           </div>
         </div>
 
+        {/* Aviso: Competência vazia mas existem registros em outros meses */}
+        {registrosMesAtual.length === 0 && registros.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start gap-3">
+            <span className="text-amber-500 text-xl mt-0.5">⚠️</span>
+            <div>
+              <p className="text-sm font-bold text-amber-800">
+                Nenhum registro encontrado para {MESES_NOMES[dashMes - 1]}/{dashAno}.
+              </p>
+              <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                Existem <strong>{registros.length} registro(s)</strong> em outras competências. Verifique se os cultos foram consolidados com a <strong>data correta</strong>:
+                a competência de um culto é determinada pela data em que ele ocorreu.
+                Um culto realizado em <strong>30/06/2026</strong> pertence à competência <strong>Junho/2026</strong>, não Julho/2026.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* ABA 1: DASHBOARD EXECUTIVO ANALÍTICO */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
