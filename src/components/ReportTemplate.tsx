@@ -59,7 +59,7 @@ const ReportTemplate = forwardRef<ReportTemplateRef, ReportTemplateProps>(
         pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
 
-        while (heightLeft >= 0) {
+        while (heightLeft > 2) {
           position = heightLeft - imgHeight;
           pdf.addPage();
           pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
