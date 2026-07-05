@@ -63,7 +63,14 @@ export default function PreCadastroPage() {
   // isTrial: fluxo originado pelo botão "Teste grátis" da home.
   // Quando true, o plano é fixado em Starter e não pode ser alterado pelo usuário.
   const isTrial    = useMemo(() => searchParams.get('trial') === 'true', [searchParams]);
+  // lead_id + token: link vindo do e-mail de ativação do trial
+  const leadId     = useMemo(() => searchParams.get('lead_id')?.trim() || '', [searchParams]);
+  const leadToken  = useMemo(() => searchParams.get('token')?.trim()   || '', [searchParams]);
   const supabase   = useMemo(() => createClient(), []);
+
+  const [leadPrefilled, setLeadPrefilled] = useState(false);
+  const [leadLoading, setLeadLoading]     = useState(false);
+  const [leadError, setLeadError]         = useState('');
 
   const [planos, setPlanos] = useState<PlanoDB[]>([]);
   const [planoAtivo, setPlanoAtivo] = useState<PlanoDB | null>(null);
@@ -120,6 +127,36 @@ export default function PreCadastroPage() {
   const [cepLoading, setCepLoading] = useState(false);
   const [cepError, setCepError] = useState('');
   const lastCepLookup = useRef('');
+
+  // Busca dados do lead pelo link do e-mail de ativação do trial (lead_id + token)
+  useEffect(() => {
+    if (!leadId || !leadToken) return;
+    setLeadLoading(true);
+    setLeadError('');
+    fetch(`/api/v1/trial/activate?lead_id=${encodeURIComponent(leadId)}&token=${encodeURIComponent(leadToken)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data?.lead) {
+          setFormData(prev => ({
+            ...prev,
+            ministry_name:    data.lead.ministry_name    || prev.ministry_name,
+            responsible_name: data.lead.responsible_name || prev.responsible_name,
+            cpf_cnpj:         data.lead.cpf_cnpj         || prev.cpf_cnpj,
+            whatsapp:         data.lead.whatsapp         || prev.whatsapp,
+            email:            data.lead.email            || prev.email,
+            phone:            data.lead.phone            || prev.phone,
+            website:          data.lead.website          || prev.website,
+            plan:             data.lead.plan             || prev.plan,
+          }));
+          setLeadPrefilled(true);
+        } else {
+          setLeadError(data?.error || 'Link inválido ou expirado.');
+        }
+      })
+      .catch(() => setLeadError('Erro ao carregar seus dados. Preencha o formulário manualmente.'))
+      .finally(() => setLeadLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadId, leadToken]);
 
   // Busca planos ativos do banco
   useEffect(() => {
@@ -489,6 +526,25 @@ export default function PreCadastroPage() {
               <h2 className="text-2xl font-bold text-slate-900 mt-2">Formulário de pré-cadastro</h2>
             </div>
 
+            {leadLoading && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 animate-pulse flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
+                Carregando seus dados com segurança...
+              </div>
+            )}
+
+            {leadPrefilled && !leadLoading && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                ✨ Seus dados de contato foram carregados automaticamente. Complete os campos abaixo para ativar sua conta de 7 dias grátis!
+              </div>
+            )}
+
+            {leadError && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                ⚠️ {leadError} Preencha o formulário abaixo manualmente para criar seu cadastro.
+              </div>
+            )}
+
             {error && (
               <div
                 ref={errorMessageRef}
@@ -499,6 +555,7 @@ export default function PreCadastroPage() {
                 {error}
               </div>
             )}
+
 
             {success && successInfo && (
               <div ref={successMessageRef} className="space-y-5 py-2">

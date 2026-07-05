@@ -1,0 +1,1 @@
+ALTER TABLE pre_registrations ADD COLUMN IF NOT EXISTS trial_activation_token text; CREATE UNIQUE INDEX IF NOT EXISTS pre_registrations_trial_activation_token_idx ON pre_registrations (trial_activation_token) WHERE trial_activation_token IS NOT NULL;

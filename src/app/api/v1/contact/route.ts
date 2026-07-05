@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { Resend } from 'resend'
 import { getClientIp } from '@/lib/public-request'
 import { logPublicApiEvent } from '@/lib/public-api-audit'
 import { consumeRateLimit } from '@/lib/rate-limit-db'
@@ -140,30 +141,62 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     )
 
-    // Checagem (case-insensitive / cpf digits-only). Se falhar, seguimos e deixamos o banco validar.
+    // Checagem de duplicidade pelo e-mail para tratamento de reenvio amigável
     try {
-      const { data: dupData, error: dupError } = await supabaseAdmin.rpc(
-        'check_pre_registration_duplicate',
-        {
-          p_email: emailValue,
-          p_cpf_cnpj: cpfCnpj,
+      const { data: existing } = await supabaseAdmin
+        .from('pre_registrations')
+        .select('id, status, trial_activation_token, email, ministry_name, pastor_name')
+        .eq('email', emailValue)
+        .maybeSingle()
+
+      if (existing && ['trial', 'pending', 'new'].includes(existing.status || '')) {
+        // Lead já existe mas ainda não ativou a conta — reenviar link de ativação
+        const resendKey  = process.env.RESEND_API_KEY
+        const resendFrom = process.env.RESEND_FROM || 'noreply@gestaoeklesia.com.br'
+        const siteUrl    = process.env.NEXT_PUBLIC_SITE_URL || 'https://gestaoeklesia.com.br'
+
+        // Garantir que o token existe; gerar um novo se necessário
+        let activationToken = existing.trial_activation_token
+        if (!activationToken) {
+          activationToken = crypto.randomUUID()
+          await supabaseAdmin
+            .from('pre_registrations')
+            .update({ trial_activation_token: activationToken })
+            .eq('id', existing.id)
         }
-      )
 
-      const hasConflict =
-        !dupError &&
-        (dupData?.conflict === true ||
-          (typeof (dupData as any)?.field === 'string' && String((dupData as any).field).length > 0))
-
-      if (hasConflict) {
-        const field = String(dupData.field || '')
-        const msg =
-          field === 'cpf_cnpj'
-            ? 'Já existe um pré-cadastro em andamento para este CPF/CNPJ.'
-            : 'Já existe um pré-cadastro em andamento para este email.'
+        if (resendKey) {
+          const activationLink = `${siteUrl}/pre-cadastro?plan=starter&trial=true&lead_id=${existing.id}&token=${activationToken}`
+          const resend = new Resend(resendKey)
+          const pastorName = existing.pastor_name || emailValue
+          await resend.emails.send({
+            from: resendFrom,
+            to: existing.email,
+            subject: 'Seu teste grátis do Gestão Eklésia está pronto',
+            html: buildTrialEmail({ pastorName, activationLink }),
+          }).catch(e => console.warn('[CONTACT] Resend re-send error:', e))
+        }
 
         return NextResponse.json(
-          { error: msg },
+          {
+            success: true,
+            resent: true,
+            message: 'Reenviamos o link de ativação para o seu e-mail!',
+          },
+          { status: 200 }
+        )
+      }
+
+      // Verificar duplicidade de CPF/CNPJ
+      const { data: dupCpf } = await supabaseAdmin
+        .from('pre_registrations')
+        .select('id')
+        .eq('cpf_cnpj', cpfCnpj)
+        .maybeSingle()
+
+      if (dupCpf) {
+        return NextResponse.json(
+          { error: 'Já existe um pré-cadastro em andamento para este CPF/CNPJ.' },
           { status: 409 }
         )
       }
@@ -182,6 +215,9 @@ export async function POST(request: NextRequest) {
     const membersValue = Number.isFinite(Number(quantity_members))
       ? Number(quantity_members)
       : 0
+
+    // Gerar token seguro de ativação do trial
+    const activationToken = crypto.randomUUID()
 
     // Salvar solicitação de contato em pre_registrations
     const { data: contact, error: contactError } = await supabaseClient
@@ -206,9 +242,10 @@ export async function POST(request: NextRequest) {
         address_zip: addressZip,
         description: descriptionValue,
         plan: planValue,
-        trial_expires_at: new Date().toISOString(), // Data de hoje para pendente; será atualizada quando aprovado
+        trial_expires_at: new Date().toISOString(),
         trial_days: 0,
         status: 'trial',
+        trial_activation_token: activationToken,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -294,11 +331,34 @@ export async function POST(request: NextRequest) {
       // Não falha o request por causa disso
     }
 
+    // Enviar e-mail de ativação do trial via Resend
+    const resendKey  = process.env.RESEND_API_KEY
+    const resendFrom = process.env.RESEND_FROM || 'noreply@gestaoeklesia.com.br'
+    const siteUrl    = process.env.NEXT_PUBLIC_SITE_URL || 'https://gestaoeklesia.com.br'
+    let emailSent = false
+
+    if (resendKey) {
+      try {
+        const activationLink = `${siteUrl}/pre-cadastro?plan=starter&trial=true&lead_id=${contact.id}&token=${activationToken}`
+        const resend = new Resend(resendKey)
+        await resend.emails.send({
+          from: resendFrom,
+          to: emailValue,
+          subject: 'Seu teste grátis do Gestão Eklésia está pronto',
+          html: buildTrialEmail({ pastorName, activationLink }),
+        })
+        emailSent = true
+      } catch (emailErr) {
+        console.warn('[CONTACT] Resend error:', emailErr)
+      }
+    }
+
     // Resposta de sucesso
     return NextResponse.json(
       {
         success: true,
         message: 'Solicitação de contato registrada com sucesso',
+        email_sent: emailSent,
         data: {
           id: contact.id,
           email: contact.email,
@@ -330,4 +390,102 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// ---------------------------------------------------------------------------
+// E-mail template helpers
+// ---------------------------------------------------------------------------
+
+function buildTrialEmail({
+  pastorName,
+  activationLink,
+}: {
+  pastorName: string
+  activationLink: string
+}): string {
+  const firstName = pastorName.split(' ')[0]
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seu teste grátis do Gestão Eklésia está pronto</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(15,23,42,0.10);max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#064e3b 0%,#065f46 100%);padding:32px 40px;text-align:center;">
+            <p style="margin:0 0 8px;font-size:12px;color:#6ee7b7;letter-spacing:0.2em;text-transform:uppercase;">Gestão Eklésia</p>
+            <h1 style="margin:0;font-size:26px;font-weight:700;color:#ffffff;line-height:1.3;">Seu teste grátis está pronto! 🎉</h1>
+            <p style="margin:10px 0 0;font-size:14px;color:#a7f3d0;">7 dias para explorar tudo, sem compromisso.</p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:36px 40px;color:#1e293b;">
+            <p style="margin:0 0 16px;font-size:16px;">Olá, <strong>${firstName}</strong>!</p>
+            <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+              Obrigado pelo seu interesse no <strong>Gestão Eklésia</strong> — o sistema de gestão ministerial completo para igrejas e ministérios de todos os tamanhos.
+            </p>
+            <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
+              Preparamos um acesso exclusivo de <strong>7 dias gratuitos</strong> para que você e sua equipe possam explorar tudo: membros, finanças, agenda, relatórios, EBD e muito mais.
+            </p>
+
+            <!-- CTA -->
+            <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 28px;">
+              <tr>
+                <td style="border-radius:10px;background:#059669;">
+                  <a href="${activationLink}"
+                     style="display:inline-block;padding:15px 36px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">
+                    Acessar meu teste grátis →
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Features -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f0fdf4;border-radius:12px;padding:4px;margin-bottom:24px;">
+              <tr>
+                <td style="padding:16px 20px;">
+                  <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#064e3b;">O que você pode testar gratuitamente:</p>
+                  <p style="margin:0 0 6px;font-size:13px;color:#374151;">✅ Gestão completa de membros e congregações</p>
+                  <p style="margin:0 0 6px;font-size:13px;color:#374151;">✅ Módulo financeiro e tesouraria</p>
+                  <p style="margin:0 0 6px;font-size:13px;color:#374151;">✅ Agenda e planejamento ministerial</p>
+                  <p style="margin:0 0 6px;font-size:13px;color:#374151;">✅ Relatórios espirituais e cultos</p>
+                  <p style="margin:0;font-size:13px;color:#374151;">✅ Escola Bíblica Dominical (EBD)</p>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0 0 8px;font-size:13px;color:#64748b;">
+              Precisa de ajuda para começar? Nossa equipe está disponível:
+            </p>
+            <p style="margin:0;font-size:13px;color:#374151;">
+              📱 WhatsApp: <a href="https://wa.me/5585991823050" style="color:#059669;text-decoration:none;font-weight:600;">(85) 99182-3050</a>
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center;">
+            <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;">
+              Gestão Eklésia · Sistema de Gestão Ministerial
+            </p>
+            <p style="margin:0;font-size:11px;color:#cbd5e1;">
+              Se você não solicitou este e-mail, pode ignorá-lo com segurança.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
 }

@@ -368,7 +368,14 @@ export default function LandingPage() {
       }
 
       setError('');
-      setSuccessModal({ isOpen: true, email: contactData.email });
+      if (result.resent) {
+        setSuccessModal({
+          isOpen: true,
+          email: `${contactData.email} (Link reenviado!)`
+        });
+      } else {
+        setSuccessModal({ isOpen: true, email: contactData.email });
+      }
       setContactData({ ministerio: '', pastor: '', cpf: '', whatsapp: '', email: '' });
       setLoading(false);
     } catch (err) {
@@ -438,9 +445,9 @@ export default function LandingPage() {
         isOpen={successModal.isOpen}
         type="success"
         title="Solicitação recebida!"
-        message={`Obrigado pelo interesse. Entraremos em contato em breve.\n\nEmail: ${successModal.email}`}
+        message={`Solicitação recebida! Enviamos para seu e-mail o link para iniciar seu teste grátis de 7 dias.\n\nEmail: ${successModal.email}`}
         onClose={() => setSuccessModal({ isOpen: false, email: '' })}
-        autoClose={5000}
+        autoClose={7000}
       />
 
       <NotificationModal
