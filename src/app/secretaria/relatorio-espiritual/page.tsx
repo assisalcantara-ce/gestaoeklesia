@@ -29,9 +29,9 @@ import {
   Activity,
   Lock,
   Unlock,
-  ClipboardCopy,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  MessageSquare
 } from 'lucide-react';
 import { runIntegrityCheck, IntegrityReport } from '@/services/SystemIntegrityService';
 import { acolhimentoChecks } from '@/services/integrity/acolhimentoChecks';
@@ -135,6 +135,7 @@ export default function RelatorioEspiritualPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [registros, setRegistros] = useState<RelatorioEspiritualRegistro[]>([]);
   const [locais, setLocais] = useState<LocalOption[]>([]);
+  const [contatosSecretarios, setContatosSecretarios] = useState<Record<string, { nome: string; telefone: string }>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const labelDivPrincipal = 'Congregação';
@@ -348,6 +349,52 @@ export default function RelatorioEspiritualPage() {
       const { data, error } = await query;
       if (!error && data) {
         setLocais(data as LocalOption[]);
+
+        // Buscar contatos dos secretários locais
+        try {
+          const { data: users } = await supabase
+            .from('ministry_users')
+            .select('user_id, role, congregacao_id')
+            .eq('ministry_id', ctx.ministryId)
+            .in('role', ['operator', 'manager'])
+            .not('congregacao_id', 'is', null);
+
+          if (users && users.length > 0) {
+            const mapa: Record<string, { nome: string; telefone: string }> = {};
+            for (const u of users) {
+              const { data: prof } = await supabase
+                .from('profiles')
+                .select('display_name, phone')
+                .eq('id', u.user_id)
+                .maybeSingle();
+
+              let nome = prof?.display_name || '';
+              let phone = prof?.phone || '';
+
+              if (!phone && prof?.display_name) {
+                const { data: memb } = await supabase
+                  .from('members')
+                  .select('phone')
+                  .eq('ministry_id', ctx.ministryId)
+                  .ilike('name', `%${prof.display_name}%`)
+                  .maybeSingle();
+                if (memb?.phone) {
+                  phone = memb.phone;
+                }
+              }
+
+              if (u.congregacao_id && (phone || nome)) {
+                if (!mapa[u.congregacao_id] || u.role === 'operator') {
+                  mapa[u.congregacao_id] = { nome: nome || 'Secretário', telefone: phone || '' };
+                }
+              }
+            }
+            setContatosSecretarios(mapa);
+          }
+        } catch (e) {
+          console.error('Erro ao buscar contatos:', e);
+        }
+
         if (isLocalUser && ctx.congregacaoId) {
           setFormData(prev => ({ ...prev, congregacao_id: ctx.congregacaoId || '' }));
           setFiltroCongregacao(ctx.congregacaoId || '');
@@ -934,10 +981,24 @@ export default function RelatorioEspiritualPage() {
     return new Date(maxTime).toLocaleString('pt-BR');
   }, [registrosMesAtual]);
 
-  const handleCopiarLembrete = (nomeCongregacao: string) => {
-    const msg = `A Paz do Senhor.\n\nA competência ${MESES_NOMES[dashMes - 1]}/${dashAno} ainda encontra-se pendente.\n\nSolicitamos o envio do Relatório Espiritual para que seja possível realizar o fechamento mensal.\n\nSecretaria Geral`;
-    navigator.clipboard.writeText(msg);
-    showNotification('success', 'Lembrete Copiado', `Lembrete de pendência para a congregação ${nomeCongregacao} copiado para a área de transferência!`);
+  const handleEnviarWhatsApp = (nomeCongregacao: string, congregacaoId: string) => {
+    const contato = contatosSecretarios[congregacaoId];
+    if (!contato || !contato.telefone) {
+      showNotification('error', 'Contato não localizado', 'Secretário ou telefone não cadastrado.');
+      return;
+    }
+
+    const telLimpo = contato.telefone.replace(/\D/g, '');
+    if (!telLimpo) {
+      showNotification('error', 'Telefone inválido', 'O telefone cadastrado não é válido.');
+      return;
+    }
+
+    const mesNome = MESES_NOMES[dashMes - 1];
+    const msg = `Olá, tudo bem?\n\nIdentificamos que o envio do Livro Espiritual da competência *${mesNome}/${dashAno}* para a congregação *${nomeCongregacao}* está pendente.\n\nPor favor, realize o encerramento dos cultos e envie o relatório para que possamos fazer o fechamento mensal.\n\nFicamos no aguardo!`;
+
+    const url = `https://wa.me/${telLimpo.startsWith('55') ? telLimpo : '55' + telLimpo}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
   };
 
   // --- LÓGICA DE CADASTRO E LANÇAMENTO ---
@@ -1422,13 +1483,26 @@ export default function RelatorioEspiritualPage() {
                                   </span>
                                 </td>
                                 <td className="px-5 py-3 text-right">
-                                  <button
-                                    onClick={() => handleCopiarLembrete(l.nome)}
-                                    className="p-1.5 text-[#062E6F] hover:bg-slate-100 rounded-lg transition inline-flex items-center gap-1 cursor-pointer font-bold text-[10px] uppercase border border-slate-200"
-                                  >
-                                    <ClipboardCopy className="h-3.5 w-3.5" />
-                                    Copiar lembrete
-                                  </button>
+                                  {(() => {
+                                    const contato = contatosSecretarios[l.id];
+                                    const temTelefone = !!(contato && contato.telefone && contato.telefone.replace(/\D/g, ''));
+                                    
+                                    return (
+                                      <button
+                                        disabled={!temTelefone}
+                                        onClick={() => handleEnviarWhatsApp(l.nome, l.id)}
+                                        title={!temTelefone ? "Secretário ou telefone não cadastrado" : "Enviar lembrete por WhatsApp"}
+                                        className={`p-1.5 rounded-lg transition inline-flex items-center gap-1 cursor-pointer font-bold text-[10px] uppercase border ${
+                                          temTelefone 
+                                            ? 'text-emerald-700 hover:bg-emerald-50 border-emerald-200 bg-white' 
+                                            : 'text-slate-400 bg-slate-50 border-slate-200 cursor-not-allowed'
+                                        }`}
+                                      >
+                                        <MessageSquare className="h-3.5 w-3.5" />
+                                        Enviar WhatsApp
+                                      </button>
+                                    );
+                                  })()}
                                 </td>
                               </tr>
                             ))}
