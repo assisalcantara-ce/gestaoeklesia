@@ -37,6 +37,7 @@ interface RelatorioEspiritualRegistro {
   reconciliacoes: number;
   batismos_espirito_santo: number;
   curas_divinas: number;
+  evangelismos_realizados: number;
 }
 
 interface MinistryData {
@@ -67,6 +68,7 @@ export default function RelatoriosAcolhimentoPage() {
   const [ministry, setMinistry] = useState<MinistryData | null>(null);
   const [tipoRelatorio, setTipoRelatorio] = useState<'geral' | 'congregacao' | 'crescimento'>('geral');
   const [cultosDetalhe, setCultosDetalhe] = useState<any[]>([]);
+  const [gerandoPDF, setGerandoPDF] = useState(false);
 
   const isLocalUser = useMemo(() => {
     return !!(ctx?.nivel && ['admin_local', 'financeiro_local', 'secretaria_local'].includes(ctx.nivel));
@@ -172,7 +174,9 @@ export default function RelatoriosAcolhimentoPage() {
 
   // Consolidar totais mês atual
   const totalAtual = useMemo(() => {
-    const res = { cultos: 0, visitas: 0, almas: 0, batismos: 0, reconciliacoes: 0, visitantes: 0, cearam: 0, biblias: 0, literaturas: 0, curas: 0 };
+    const res = { cultos: 0, visitas: 0, almas: 0, batismos: 0, reconciliacoes: 0, visitantes: 0, cearam: 0, biblias: 0, literaturas: 0, curas: 0, evangelismos: 0, membros: 0 };
+    
+    // Somar dados do relatorio espiritual registros
     registrosMesAtual.forEach(r => {
       res.cultos += r.cultos_realizados || 0;
       res.visitas += r.visitas_realizadas || 0;
@@ -184,13 +188,28 @@ export default function RelatoriosAcolhimentoPage() {
       res.biblias += r.biblias_doadas || 0;
       res.literaturas += r.literaturas_entregues || 0;
       res.curas += r.curas_divinas || 0;
+      res.evangelismos += r.evangelismos_realizados || 0;
     });
+
+    // Somar membros_presentes de cultos consolidados no período
+    const cultosMes = cultosDetalhe.filter(c => {
+      const d = new Date(c.data_culto);
+      return (d.getUTCMonth() + 1) === dashMes && d.getUTCFullYear() === dashAno && c.status === 'Consolidado';
+    });
+    cultosMes.forEach(c => {
+      res.membros += c.membros_presentes || 0;
+    });
+
     return res;
-  }, [registrosMesAtual]);
+  }, [registrosMesAtual, cultosDetalhe, dashMes, dashAno]);
 
   // Consolidar totais mês anterior
   const totalAnterior = useMemo(() => {
-    const res = { cultos: 0, visitas: 0, almas: 0, batismos: 0, reconciliacoes: 0, visitantes: 0, cearam: 0, biblias: 0, literaturas: 0, curas: 0 };
+    const res = { cultos: 0, visitas: 0, almas: 0, batismos: 0, reconciliacoes: 0, visitantes: 0, cearam: 0, biblias: 0, literaturas: 0, curas: 0, evangelismos: 0, membros: 0 };
+    const prevMes = dashMes === 1 ? 12 : dashMes - 1;
+    const prevAno = dashMes === 1 ? dashAno - 1 : dashAno;
+
+    // Somar dados do relatorio espiritual registros
     registrosMesAnterior.forEach(r => {
       res.cultos += r.cultos_realizados || 0;
       res.visitas += r.visitas_realizadas || 0;
@@ -202,14 +221,26 @@ export default function RelatoriosAcolhimentoPage() {
       res.biblias += r.biblias_doadas || 0;
       res.literaturas += r.literaturas_entregues || 0;
       res.curas += r.curas_divinas || 0;
+      res.evangelismos += r.evangelismos_realizados || 0;
     });
+
+    // Somar membros_presentes de cultos consolidados no período anterior
+    const cultosMes = cultosDetalhe.filter(c => {
+      const d = new Date(c.data_culto);
+      return (d.getUTCMonth() + 1) === prevMes && d.getUTCFullYear() === prevAno && c.status === 'Consolidado';
+    });
+    cultosMes.forEach(c => {
+      res.membros += c.membros_presentes || 0;
+    });
+
     return res;
-  }, [registrosMesAnterior]);
+  }, [registrosMesAnterior, cultosDetalhe, dashMes, dashAno]);
 
   // Tabela consolidada por congregação
   const consolidadoPorCongregacao = useMemo(() => {
     return locais.map(l => {
-      let cultos = 0, almas = 0, batismos = 0, reconciliacoes = 0, visitantes = 0, visitas = 0, cearam = 0;
+      let cultos = 0, almas = 0, batismos = 0, reconciliacoes = 0, visitantes = 0, visitas = 0, cearam = 0, curas = 0, biblias = 0, literaturas = 0, evangelismos = 0, membros = 0;
+      
       registrosMesAtual.forEach(r => {
         if (r.congregacao_id === l.id) {
           cultos += r.cultos_realizados || 0;
@@ -219,18 +250,32 @@ export default function RelatoriosAcolhimentoPage() {
           visitantes += r.visitantes_presentes || 0;
           visitas += r.visitas_realizadas || 0;
           cearam += r.membros_cearam || 0;
+          curas += r.curas_divinas || 0;
+          biblias += r.biblias_doadas || 0;
+          literaturas += r.literaturas_entregues || 0;
+          evangelismos += r.evangelismos_realizados || 0;
         }
       });
-      return { id: l.id, nome: l.nome, cultos, almas, batismos, reconciliacoes, visitantes, visitas, cearam };
+
+      // Calcular membros de cultos consolidados da congregação
+      const cultosLocal = cultosDetalhe.filter(c => {
+        const d = new Date(c.data_culto);
+        return c.congregacao_id === l.id && (d.getUTCMonth() + 1) === dashMes && d.getUTCFullYear() === dashAno && c.status === 'Consolidado';
+      });
+      cultosLocal.forEach(c => {
+        membros += c.membros_presentes || 0;
+      });
+
+      return { id: l.id, nome: l.nome, cultos, almas, batismos, reconciliacoes, visitantes, visitas, cearam, curas, biblias, literaturas, evangelismos, membros };
     });
-  }, [locais, registrosMesAtual]);
+  }, [locais, registrosMesAtual, cultosDetalhe, dashMes, dashAno]);
 
   // Dados para Relatório por Congregação
   const congregacaoSelecionadaData = useMemo(() => {
     const local = locais.find(l => l.id === selectedCongregacao);
     const regs = registrosMesAtual.filter(r => r.congregacao_id === selectedCongregacao);
     
-    const totais = { cultos: 0, visitas: 0, almas: 0, batismos: 0, reconciliacoes: 0, visitantes: 0, cearam: 0, biblias: 0, literaturas: 0, curas: 0 };
+    const totais = { cultos: 0, visitas: 0, almas: 0, batismos: 0, reconciliacoes: 0, visitantes: 0, cearam: 0, biblias: 0, literaturas: 0, curas: 0, evangelismos: 0, membros: 0 };
     regs.forEach(r => {
       totais.cultos += r.cultos_realizados || 0;
       totais.visitas += r.visitas_realizadas || 0;
@@ -242,6 +287,7 @@ export default function RelatoriosAcolhimentoPage() {
       totais.biblias += r.biblias_doadas || 0;
       totais.literaturas += r.literaturas_entregues || 0;
       totais.curas += r.curas_divinas || 0;
+      totais.evangelismos += r.evangelismos_realizados || 0;
     });
 
     const cultosList = cultosDetalhe.filter(c => {
@@ -249,6 +295,12 @@ export default function RelatoriosAcolhimentoPage() {
       const m = d.getUTCMonth() + 1;
       const y = d.getUTCFullYear();
       return c.congregacao_id === selectedCongregacao && m === dashMes && y === dashAno;
+    });
+
+    cultosList.forEach(c => {
+      if (c.status === 'Consolidado') {
+        totais.membros += c.membros_presentes || 0;
+      }
     });
 
     return { local, totais, cultos: cultosList };
@@ -294,13 +346,19 @@ export default function RelatoriosAcolhimentoPage() {
       activeMenu="relatorios-acolhimento"
       headerExtra={
         <button
-          onClick={() => {
-            const filename = `relatorio_${tipoRelatorio}_${MESES_PT[dashMes - 1].toLowerCase()}_${dashAno}.pdf`;
-            reportRef.current?.exportToPDF(filename);
+          onClick={async () => {
+            setGerandoPDF(true);
+            try {
+              const filename = `relatorio_${tipoRelatorio}_${MESES_PT[dashMes - 1].toLowerCase()}_${dashAno}.pdf`;
+              await reportRef.current?.exportToPDF(filename);
+            } finally {
+              setGerandoPDF(false);
+            }
           }}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition shadow-md flex items-center gap-1.5 cursor-pointer"
+          disabled={gerandoPDF}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-350 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl transition shadow-md flex items-center gap-1.5 cursor-pointer"
         >
-          📄 Gerar PDF Oficial
+          {gerandoPDF ? '⏳ Gerando PDF...' : '📄 Gerar PDF Oficial'}
         </button>
       }
     >
@@ -393,89 +451,130 @@ export default function RelatoriosAcolhimentoPage() {
               }
             : undefined
         }
-        usuarioResponsavel="Secretaria Geral"
-      >
+        >
         {/* ─── TIPO 1: RELATÓRIO GERAL DO MINISTÉRIO ─── */}
         {tipoRelatorio === 'geral' && (
           <div className="space-y-6">
             <p className="text-xs text-slate-500 leading-relaxed">
-              Este documento apresenta a consolidação espiritual e de atividades de todas as congregações pertencentes ao ministério durante a competência selecionada. Os dados representam decisões de fé, Santa Ceia e frentes pastorais.
+              Este documento apresenta a consolidação espiritual e de frentes ministeriais de todas as congregações pertencentes ao ministério durante a competência selecionada. Os dados representam decisões de fé, Santa Ceia, participações e frentes ativas de acolhimento.
             </p>
 
-            {/* Resumo Executivo KPIs */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Decisões / Almas</span>
-                <strong className="text-2xl font-black text-[#062E6F]">{totalAtual.almas}</strong>
-              </div>
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Novos Visitantes</span>
-                <strong className="text-2xl font-black text-[#062E6F]">{totalAtual.visitantes}</strong>
-              </div>
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Total de Cultos</span>
-                <strong className="text-2xl font-black text-[#062E6F]">{totalAtual.cultos}</strong>
-              </div>
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Reconciliações</span>
-                <strong className="text-2xl font-black text-[#062E6F]">{totalAtual.reconciliacoes}</strong>
-              </div>
-            </div>
-
-            {/* Outros KPIs Menores */}
-            <div className="grid grid-cols-3 gap-4 text-xs font-semibold text-slate-600">
-              <div className="border border-slate-100 rounded-xl p-3 flex justify-between items-center">
-                <span>Batismos no Espírito:</span>
-                <strong className="font-extrabold text-[#062E6F]">{totalAtual.batismos}</strong>
-              </div>
-              <div className="border border-slate-100 rounded-xl p-3 flex justify-between items-center">
-                <span>Curas Divinas:</span>
-                <strong className="font-extrabold text-[#062E6F]">{totalAtual.curas}</strong>
-              </div>
-              <div className="border border-slate-100 rounded-xl p-3 flex justify-between items-center">
-                <span>Membros Cearam:</span>
-                <strong className="font-extrabold text-[#062E6F]">{totalAtual.cearam}</strong>
-              </div>
-              <div className="border border-slate-100 rounded-xl p-3 flex justify-between items-center">
-                <span>Bíblias Doadas:</span>
-                <strong className="font-extrabold text-[#062E6F]">{totalAtual.biblias}</strong>
-              </div>
-              <div className="border border-slate-100 rounded-xl p-3 flex justify-between items-center">
-                <span>Literaturas Entregues:</span>
-                <strong className="font-extrabold text-[#062E6F]">{totalAtual.literaturas}</strong>
-              </div>
-              <div className="border border-slate-100 rounded-xl p-3 flex justify-between items-center">
-                <span>Evangelismos/Visitas:</span>
-                <strong className="font-extrabold text-[#062E6F]">{totalAtual.visitas}</strong>
-              </div>
-            </div>
-
-            {/* Tabela de congregações */}
+            {/* Resumo Executivo - 12 Indicadores em Mini Grid */}
             <div>
-              <h4 className="text-sm font-bold text-[#062E6F] uppercase tracking-wide mb-3">Tabela Consolidada por Unidade</h4>
-              <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                <table className="w-full text-left border-collapse text-xs">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Resumo Consolidado do Período</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Decisões (Almas)</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{totalAtual.almas}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Novos Visitantes</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{totalAtual.visitantes}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Membros Presentes</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{totalAtual.membros}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Participantes Ceantes</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{totalAtual.cearam}</strong>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Cultos Realizados</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{totalAtual.cultos}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Visitas Efetuadas</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{totalAtual.visitas}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Evangelismos</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{totalAtual.evangelismos}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Reconciliados</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{totalAtual.reconciliacoes}</strong>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Batismos Espírito</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{totalAtual.batismos}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Curas Divinas</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{totalAtual.curas}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Bíblias Doadas</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{totalAtual.biblias}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Literaturas Doadas</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{totalAtual.literaturas}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-tabela 1: Participação e Frentes */}
+            <div>
+              <h4 className="text-xs font-bold text-[#062E6F] uppercase tracking-wide mb-2">1. Participação e Frentes de Acolhimento</h4>
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-left border-collapse text-[10px]">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 font-bold text-slate-500">
-                      <th className="p-3">Congregação</th>
-                      <th className="p-3 text-center">Cultos</th>
-                      <th className="p-3 text-center">Almas</th>
-                      <th className="p-3 text-center">Visitantes</th>
-                      <th className="p-3 text-center">Reconciliações</th>
-                      <th className="p-3 text-center">Batismos Espírito</th>
-                      <th className="p-3 text-center">Cearam</th>
+                      <th className="p-2">Congregação</th>
+                      <th className="p-2 text-center">Cultos</th>
+                      <th className="p-2 text-center">Visitantes</th>
+                      <th className="p-2 text-center">Membros Pres.</th>
+                      <th className="p-2 text-center">Ceantes</th>
+                      <th className="p-2 text-center">Visitas</th>
+                      <th className="p-2 text-center">Evangelismos</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {consolidadoPorCongregacao.map(c => (
-                      <tr key={c.id} className="hover:bg-slate-50/50">
-                        <td className="p-3 font-semibold text-slate-800">{c.nome}</td>
-                        <td className="p-3 text-center">{c.cultos}</td>
-                        <td className="p-3 text-center">{c.almas}</td>
-                        <td className="p-3 text-center">{c.visitantes}</td>
-                        <td className="p-3 text-center">{c.reconciliacoes}</td>
-                        <td className="p-3 text-center">{c.batismos}</td>
-                        <td className="p-3 text-center">{c.cearam}</td>
+                      <tr key={c.id}>
+                        <td className="p-2 font-semibold text-slate-800">{c.nome}</td>
+                        <td className="p-2 text-center">{c.cultos}</td>
+                        <td className="p-2 text-center">{c.visitantes}</td>
+                        <td className="p-2 text-center">{c.membros}</td>
+                        <td className="p-2 text-center">{c.cearam}</td>
+                        <td className="p-2 text-center">{c.visitas}</td>
+                        <td className="p-2 text-center">{c.evangelismos}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Sub-tabela 2: Resultados Espirituais */}
+            <div>
+              <h4 className="text-xs font-bold text-[#062E6F] uppercase tracking-wide mb-2">2. Resultados e Frutos Espirituais</h4>
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-left border-collapse text-[10px]">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 font-bold text-slate-500">
+                      <th className="p-2">Congregação</th>
+                      <th className="p-2 text-center">Almas (Decisões)</th>
+                      <th className="p-2 text-center">Reconciliações</th>
+                      <th className="p-2 text-center">Batismos Espírito</th>
+                      <th className="p-2 text-center">Curas Divinas</th>
+                      <th className="p-2 text-center">Bíblias</th>
+                      <th className="p-2 text-center">Literaturas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {consolidadoPorCongregacao.map(c => (
+                      <tr key={c.id}>
+                        <td className="p-2 font-semibold text-slate-800">{c.nome}</td>
+                        <td className="p-2 text-center">{c.almas}</td>
+                        <td className="p-2 text-center">{c.reconciliacoes}</td>
+                        <td className="p-2 text-center">{c.batismos}</td>
+                        <td className="p-2 text-center">{c.curas}</td>
+                        <td className="p-2 text-center">{c.biblias}</td>
+                        <td className="p-2 text-center">{c.literaturas}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -492,37 +591,75 @@ export default function RelatoriosAcolhimentoPage() {
               Resumo específico e histórico de reuniões e cultos realizados nesta congregação.
             </p>
 
-            {/* Totais do Mês */}
-            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold block uppercase">Cultos Realizados</span>
-                <strong className="text-xl font-bold text-[#062E6F]">{congregacaoSelecionadaData.totais.cultos}</strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold block uppercase">Visitantes Recebidos</span>
-                <strong className="text-xl font-bold text-[#062E6F]">{congregacaoSelecionadaData.totais.visitantes}</strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold block uppercase">Almas Alcançadas</span>
-                <strong className="text-xl font-bold text-[#062E6F]">{congregacaoSelecionadaData.totais.almas}</strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold block uppercase">Reconciliados</span>
-                <strong className="text-xl font-bold text-[#062E6F]">{congregacaoSelecionadaData.totais.reconciliacoes}</strong>
+            {/* Totais do Mês - 12 Indicadores */}
+            <div>
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Resumo da Congregação</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Decisões (Almas)</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{congregacaoSelecionadaData.totais.almas}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Novos Visitantes</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{congregacaoSelecionadaData.totais.visitantes}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Membros Pres.</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{congregacaoSelecionadaData.totais.membros}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Participantes Ceantes</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{congregacaoSelecionadaData.totais.cearam}</strong>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Cultos Realizados</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{congregacaoSelecionadaData.totais.cultos}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Visitas Efetuadas</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{congregacaoSelecionadaData.totais.visitas}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Evangelismos</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{congregacaoSelecionadaData.totais.evangelismos}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Reconciliados</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{congregacaoSelecionadaData.totais.reconciliacoes}</strong>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Batismos Espírito</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{congregacaoSelecionadaData.totais.batismos}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Curas Divinas</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{congregacaoSelecionadaData.totais.curas}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Bíblias Doadas</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{congregacaoSelecionadaData.totais.biblias}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase block">Literaturas Doadas</span>
+                  <strong className="text-lg font-black text-[#062E6F]">{congregacaoSelecionadaData.totais.literaturas}</strong>
+                </div>
               </div>
             </div>
 
             {/* Detalhe da lista de cultos */}
             <div>
-              <h4 className="text-sm font-bold text-[#062E6F] uppercase tracking-wide mb-3">Lista de Cultos na Competência</h4>
+              <h4 className="text-xs font-bold text-[#062E6F] uppercase tracking-wide mb-3">Lista de Cultos na Competência</h4>
               <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="w-full text-left border-collapse text-[10px]">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 font-bold text-slate-500">
                       <th className="p-3">Data</th>
                       <th className="p-3">Tipo</th>
                       <th className="p-3">Pregador</th>
                       <th className="p-3 text-center">Visitantes</th>
+                      <th className="p-3 text-center">Membros</th>
                       <th className="p-3 text-center">Almas</th>
                       <th className="p-3 text-center">Cearam</th>
                     </tr>
@@ -530,7 +667,7 @@ export default function RelatoriosAcolhimentoPage() {
                   <tbody className="divide-y divide-slate-100">
                     {congregacaoSelecionadaData.cultos.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="p-4 text-center text-slate-400">Nenhum culto registrado para esta competência.</td>
+                        <td colSpan={7} className="p-4 text-center text-slate-400">Nenhum culto registrado para esta competência.</td>
                       </tr>
                     ) : (
                       congregacaoSelecionadaData.cultos.map((c: any) => (
@@ -539,6 +676,7 @@ export default function RelatoriosAcolhimentoPage() {
                           <td className="p-3 font-bold text-[#062E6F]">{c.tipo_culto}</td>
                           <td className="p-3 text-slate-600">{c.pregador || '—'}</td>
                           <td className="p-3 text-center">{c.visitantes_presentes}</td>
+                          <td className="p-3 text-center">{c.membros_presentes}</td>
                           <td className="p-3 text-center">{c.almas_alcancadas}</td>
                           <td className="p-3 text-center">{c.membros_cearam}</td>
                         </tr>
@@ -555,10 +693,10 @@ export default function RelatoriosAcolhimentoPage() {
         {tipoRelatorio === 'crescimento' && (
           <div className="space-y-6">
             <p className="text-xs text-slate-500">
-              Análise de crescimento comparativa com a competência do mês anterior.
+              Análise de crescimento comparativa com a competência do mês anterior abrangendo participação e resultados.
             </p>
 
-            {/* Tabela de Variação Mês Anterior vs Atual */}
+            {/* Tabela de Variação Mês Anterior vs Atual - Todos os 12 Indicadores */}
             <div className="border border-slate-200 rounded-2xl overflow-hidden">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
@@ -571,35 +709,67 @@ export default function RelatoriosAcolhimentoPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   <tr>
-                    <td className="p-3 font-bold text-[#062E6F]">Decisões (Almas)</td>
-                    <td className="p-3 text-center">{totalAnterior.almas}</td>
-                    <td className="p-3 text-center">{totalAtual.almas}</td>
-                    <td className={`p-3 text-center font-bold ${totalAtual.almas >= totalAnterior.almas ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    <td className="p-2.5 font-bold text-[#062E6F]">Decisões (Almas)</td>
+                    <td className="p-2.5 text-center">{totalAnterior.almas}</td>
+                    <td className="p-2.5 text-center">{totalAtual.almas}</td>
+                    <td className={`p-2.5 text-center font-bold ${totalAtual.almas >= totalAnterior.almas ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {calcPercent(totalAtual.almas, totalAnterior.almas)}
                     </td>
                   </tr>
                   <tr>
-                    <td className="p-3 font-bold text-[#062E6F]">Visitantes Presentes</td>
-                    <td className="p-3 text-center">{totalAnterior.visitantes}</td>
-                    <td className="p-3 text-center">{totalAtual.visitantes}</td>
-                    <td className={`p-3 text-center font-bold ${totalAtual.visitantes >= totalAnterior.visitantes ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    <td className="p-2.5 font-bold text-[#062E6F]">Reconciliações</td>
+                    <td className="p-2.5 text-center">{totalAnterior.reconciliacoes}</td>
+                    <td className="p-2.5 text-center">{totalAtual.reconciliacoes}</td>
+                    <td className={`p-2.5 text-center font-bold ${totalAtual.reconciliacoes >= totalAnterior.reconciliacoes ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {calcPercent(totalAtual.reconciliacoes, totalAnterior.reconciliacoes)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="p-2.5 font-bold text-[#062E6F]">Visitantes Presentes</td>
+                    <td className="p-2.5 text-center">{totalAnterior.visitantes}</td>
+                    <td className="p-2.5 text-center">{totalAtual.visitantes}</td>
+                    <td className={`p-2.5 text-center font-bold ${totalAtual.visitantes >= totalAnterior.visitantes ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {calcPercent(totalAtual.visitantes, totalAnterior.visitantes)}
                     </td>
                   </tr>
                   <tr>
-                    <td className="p-3 font-bold text-[#062E6F]">Batismos Espírito Santo</td>
-                    <td className="p-3 text-center">{totalAnterior.batismos}</td>
-                    <td className="p-3 text-center">{totalAtual.batismos}</td>
-                    <td className={`p-3 text-center font-bold ${totalAtual.batismos >= totalAnterior.batismos ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {calcPercent(totalAtual.batismos, totalAnterior.batismos)}
+                    <td className="p-2.5 font-bold text-[#062E6F]">Membros Presentes</td>
+                    <td className="p-2.5 text-center">{totalAnterior.membros}</td>
+                    <td className="p-2.5 text-center">{totalAtual.membros}</td>
+                    <td className={`p-2.5 text-center font-bold ${totalAtual.membros >= totalAnterior.membros ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {calcPercent(totalAtual.membros, totalAnterior.membros)}
                     </td>
                   </tr>
                   <tr>
-                    <td className="p-3 font-bold text-[#062E6F]">Membros Cearam</td>
-                    <td className="p-3 text-center">{totalAnterior.cearam}</td>
-                    <td className="p-3 text-center">{totalAtual.cearam}</td>
-                    <td className={`p-3 text-center font-bold ${totalAtual.cearam >= totalAnterior.cearam ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    <td className="p-2.5 font-bold text-[#062E6F]">Participantes Santa Ceia</td>
+                    <td className="p-2.5 text-center">{totalAnterior.cearam}</td>
+                    <td className="p-2.5 text-center">{totalAtual.cearam}</td>
+                    <td className={`p-2.5 text-center font-bold ${totalAtual.cearam >= totalAnterior.cearam ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {calcPercent(totalAtual.cearam, totalAnterior.cearam)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="p-2.5 font-bold text-[#062E6F]">Cultos Realizados</td>
+                    <td className="p-2.5 text-center">{totalAnterior.cultos}</td>
+                    <td className="p-2.5 text-center">{totalAtual.cultos}</td>
+                    <td className={`p-2.5 text-center font-bold ${totalAtual.cultos >= totalAnterior.cultos ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {calcPercent(totalAtual.cultos, totalAnterior.cultos)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="p-2.5 font-bold text-[#062E6F]">Visitas Efetuadas</td>
+                    <td className="p-2.5 text-center">{totalAnterior.visitas}</td>
+                    <td className="p-2.5 text-center">{totalAtual.visitas}</td>
+                    <td className={`p-2.5 text-center font-bold ${totalAtual.visitas >= totalAnterior.visitas ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {calcPercent(totalAtual.visitas, totalAnterior.visitas)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="p-2.5 font-bold text-[#062E6F]">Evangelismos Realizados</td>
+                    <td className="p-2.5 text-center">{totalAnterior.evangelismos}</td>
+                    <td className="p-2.5 text-center">{totalAtual.evangelismos}</td>
+                    <td className={`p-2.5 text-center font-bold ${totalAtual.evangelismos >= totalAnterior.evangelismos ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {calcPercent(totalAtual.evangelismos, totalAnterior.evangelismos)}
                     </td>
                   </tr>
                 </tbody>
