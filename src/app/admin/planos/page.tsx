@@ -57,6 +57,7 @@ export default function PlanosPage() {
     has_custom_domain: false,
     has_white_label: false,
     has_automation: false,
+    is_price_on_request: false,
     modulos: '' as string, // um módulo por linha
   })
 
@@ -115,8 +116,8 @@ export default function PlanosPage() {
         body: JSON.stringify({
           ...formData,
           slug: slugValue,
-          price_monthly: parseFloat(formData.price_monthly),
-          price_annually: parseFloat(formData.price_annually || '0'),
+          price_monthly: formData.is_price_on_request ? 0 : parseFloat(formData.price_monthly || '0'),
+          price_annually: formData.is_price_on_request ? 0 : parseFloat(formData.price_annually || '0'),
           max_users: parseInt(formData.max_users),
           max_members: formData.members_unlimited ? 0 : parseInt(formData.max_members || '0'),
           max_ministerios: parseInt(formData.max_ministerios),
@@ -166,6 +167,7 @@ export default function PlanosPage() {
       has_custom_domain: false,
       has_white_label: false,
       has_automation: false,
+      is_price_on_request: false,
       modulos: '',
     })
     setSelectedPlan(null)
@@ -196,6 +198,7 @@ export default function PlanosPage() {
       has_custom_domain: (plan as any).has_custom_domain || false,
       has_white_label: (plan as any).has_white_label || false,
       has_automation: (plan as any).has_automation || false,
+      is_price_on_request: plan.is_price_on_request || false,
       modulos: Array.isArray((plan as any).modulos) ? (plan as any).modulos.join('\n') : '',
     })
     setShowForm(true)
@@ -321,15 +324,29 @@ export default function PlanosPage() {
                     />
                   </div>
 
+                  <div className="md:col-span-3 flex items-center pt-6">
+                    <label className="flex items-center space-x-2 text-sm font-medium text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.is_price_on_request}
+                        onChange={(e) => setFormData({ ...formData, is_price_on_request: e.target.checked })}
+                        className="rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span>Preço sob consulta (Consulte-nos)</span>
+                    </label>
+                  </div>
+
                   <div className="md:col-span-3">
                     <label className="block text-sm font-medium text-gray-300 mb-2">Preço Mensal (R$)</label>
                     <input
                       type="number"
                       step="0.01"
-                      value={formData.price_monthly}
+                      value={formData.is_price_on_request ? '' : formData.price_monthly}
                       onChange={(e) => setFormData({ ...formData, price_monthly: e.target.value })}
-                      required
-                      className="w-full px-4 py-2 border rounded-lg"
+                      required={!formData.is_price_on_request}
+                      disabled={formData.is_price_on_request}
+                      placeholder={formData.is_price_on_request ? 'Consulte-nos' : '0.00'}
+                      className="w-full px-4 py-2 border rounded-lg bg-gray-800 disabled:opacity-50 text-white"
                     />
                   </div>
 
@@ -379,8 +396,14 @@ export default function PlanosPage() {
 
                     <div className="p-6 border-b border-gray-800">
                       <div className="text-3xl font-bold text-white">
-                        R$ {plan.price_monthly.toFixed(2)}
-                        <span className="text-base text-gray-300">/mês</span>
+                        {plan.is_price_on_request ? (
+                          <span>Consulte-nos</span>
+                        ) : (
+                          <>
+                            R$ {plan.price_monthly.toFixed(2)}
+                            <span className="text-base text-gray-300">/mês</span>
+                          </>
+                        )}
                       </div>
                     </div>
 

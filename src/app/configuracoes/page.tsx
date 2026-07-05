@@ -854,7 +854,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
         // 3) Buscar dados do ministério com JOIN no plano (coluna subscription_plan_id existe após migration 20260403200000)
         const { data: mData } = await supabase
           .from('ministries')
-          .select('plan, subscription_plan_id, subscription_status, subscription_start_date, subscription_end_date, created_at, subscription_plans:subscription_plan_id(id, slug, name, price_monthly, price_annually, description, max_users, max_members, max_ministerios, additional_church_monthly_fee, additional_admin_users_per_church, has_api_access, has_custom_domain, has_advanced_reports, has_priority_support, has_white_label, has_automation, has_modulo_financeiro, has_modulo_eventos, has_modulo_reunioes, is_active, display_order)')
+          .select('plan, subscription_plan_id, subscription_status, subscription_start_date, subscription_end_date, created_at, subscription_plans:subscription_plan_id(id, slug, name, price_monthly, price_annually, description, max_users, max_members, max_ministerios, additional_church_monthly_fee, additional_admin_users_per_church, has_api_access, has_custom_domain, has_advanced_reports, has_priority_support, has_white_label, has_automation, has_modulo_financeiro, has_modulo_eventos, has_modulo_reunioes, is_active, display_order, is_price_on_request)')
           .eq('id', mId)
           .maybeSingle();
 
@@ -917,7 +917,8 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
       }
 
       const titulo = `Solicitação de Upgrade de Plano: ${planoSelecionado?.name || 'Desconhecido'}`;
-      const descricao = `Solicitação de upgrade do plano "${planoAtual?.name || 'Atual'}" para "${planoSelecionado?.name || 'Desconhecido'}".\n\nNovo plano: ${formatarPreco(planoSelecionado?.price_monthly || 0)}/mês\n\nFavor processar esta solicitação comercial.`;
+      const precoStr = planoSelecionado?.is_price_on_request ? 'Consulte-nos' : `${formatarPreco(planoSelecionado?.price_monthly || 0)}/mês`;
+      const descricao = `Solicitação de upgrade do plano "${planoAtual?.name || 'Atual'}" para "${planoSelecionado?.name || 'Desconhecido'}".\n\nNovo plano: ${precoStr}\n\nFavor processar esta solicitação comercial.`;
 
       const { error: ticketError } = await supabase
         .from('support_tickets')
@@ -981,9 +982,15 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pb-6 border-b border-white/20">
             <div>
               <p className="text-teal-200 text-xs mb-1">Valor mensal</p>
-              <p className="text-2xl font-bold">{formatarPreco(planoAtual.price_monthly)}</p>
-              {(planoAtual.price_annually ?? 0) > 0 && (
-                <p className="text-teal-300 text-xs mt-0.5">{formatarPreco(planoAtual.price_annually ?? 0)}/ano</p>
+              {planoAtual.is_price_on_request ? (
+                <p className="text-2xl font-bold">Consulte-nos</p>
+              ) : (
+                <>
+                  <p className="text-2xl font-bold">{formatarPreco(planoAtual.price_monthly)}</p>
+                  {(planoAtual.price_annually ?? 0) > 0 && (
+                    <p className="text-teal-300 text-xs mt-0.5">{formatarPreco(planoAtual.price_annually ?? 0)}/ano</p>
+                  )}
+                </>
               )}
             </div>
             <div>
@@ -1039,9 +1046,15 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
                     {plano.description && <p className="text-gray-400 text-xs mb-3 leading-relaxed">{plano.description}</p>}
 
                     <div className="mb-4">
-                      <p className="text-3xl font-bold text-teal-600">{formatarPreco(plano.price_monthly)}<span className="text-sm font-normal text-gray-400">/mês</span></p>
-                      {(plano.price_annually ?? 0) > 0 && (
-                        <p className="text-gray-400 text-xs mt-0.5">{formatarPreco(plano.price_annually ?? 0)}/ano</p>
+                      {plano.is_price_on_request ? (
+                        <p className="text-3xl font-bold text-teal-600">Consulte-nos</p>
+                      ) : (
+                        <>
+                          <p className="text-3xl font-bold text-teal-600">{formatarPreco(plano.price_monthly)}<span className="text-sm font-normal text-gray-400">/mês</span></p>
+                          {(plano.price_annually ?? 0) > 0 && (
+                            <p className="text-gray-400 text-xs mt-0.5">{formatarPreco(plano.price_annually ?? 0)}/ano</p>
+                          )}
+                        </>
                       )}
                     </div>
 
@@ -1078,13 +1091,24 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
                     </div>
 
                     <button
-                      onClick={() => { if (!isAtual) handleUpgradeClick(plano); }}
+                      onClick={() => {
+                        if (isAtual) return;
+                        if (plano.is_price_on_request) {
+                          window.open(`https://wa.me/5585991823050?text=Olá,%20gostaria%20de%20saber%20mais%20sobre%20o%2520plano%2520${encodeURIComponent(plano.name)}%2520do%2520Gestão%2520Eklésia.`, '_blank');
+                        } else {
+                          handleUpgradeClick(plano);
+                        }
+                      }}
                       disabled={isAtual}
                       className={`w-full mt-4 py-2.5 rounded-lg font-semibold text-sm transition ${
-                        isAtual ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-teal-600 text-white hover:bg-teal-700'
+                        isAtual 
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                          : plano.is_price_on_request 
+                            ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                            : 'bg-teal-600 text-white hover:bg-teal-700'
                       }`}
                     >
-                      {isAtual ? '✓ Plano Atual' : 'Solicitar Upgrade'}
+                      {isAtual ? '✓ Plano Atual' : plano.is_price_on_request ? 'Falar com consultor' : 'Solicitar Upgrade'}
                     </button>
                   </div>
                 </div>
@@ -1104,7 +1128,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
             </p>
             <div className="bg-gray-50 rounded-lg p-4 mb-4 text-sm text-gray-700">
               <p>📦 <strong>{planoAtual?.name}</strong> → <strong>{planoSelecionado.name}</strong></p>
-              <p className="mt-1">💰 {formatarPreco(planoSelecionado.price_monthly)}/mês</p>
+              <p className="mt-1">💰 {planoSelecionado.is_price_on_request ? 'Consulte-nos' : `${formatarPreco(planoSelecionado.price_monthly)}/mês`}</p>
             </div>
             <p className="text-sm text-gray-500 mb-6">Você receberá uma resposta por email em breve com os próximos passos.</p>
             <div className="flex gap-4">

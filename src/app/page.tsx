@@ -200,6 +200,7 @@ type PlanoDB = {
   has_modulo_eventos: boolean;
   has_modulo_reunioes: boolean;
   modulos: string[];
+  is_price_on_request?: boolean;
 };
 
 function buildHighlights(plan: PlanoDB): string[] {
@@ -257,7 +258,7 @@ export default function LandingPage() {
     const supabase = createClient();
     supabase
       .from('subscription_plans')
-      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,additional_church_monthly_fee,additional_admin_users_per_church,max_divisao2,max_divisao3,is_active,display_order,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes,modulos')
+      .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,additional_church_monthly_fee,additional_admin_users_per_church,max_divisao2,max_divisao3,is_active,display_order,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes,modulos,is_price_on_request')
       .eq('is_active', true)
       .order('display_order', { ascending: true })
       .order('price_monthly', { ascending: true })
@@ -783,11 +784,17 @@ export default function LandingPage() {
                   {plan.description || ''}
                 </p>
                 <div className="mt-4">
-                  <p className="text-3xl font-bold">{formatarPreco(plan.price_monthly)}</p>
-                  {Number(plan.price_annually) > 0 && (
-                    <p className={`text-xs mt-1 ${featured ? 'text-blue-100' : 'text-slate-500'}`}>
-                      {formatarPreco(plan.price_annually ?? 0)}/ano
-                    </p>
+                  {plan.is_price_on_request ? (
+                    <p className="text-2xl font-bold">Consulte-nos</p>
+                  ) : (
+                    <>
+                      <p className="text-3xl font-bold">{formatarPreco(plan.price_monthly)}</p>
+                      {Number(plan.price_annually) > 0 && (
+                        <p className={`text-xs mt-1 ${featured ? 'text-blue-100' : 'text-slate-500'}`}>
+                          {formatarPreco(plan.price_annually ?? 0)}/ano
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
                 <ul className="mt-6 space-y-2 text-sm">
@@ -799,14 +806,17 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <a
-                  href={`/pre-cadastro?plan=${plan.slug}`}
+                  href={plan.is_price_on_request ? `https://wa.me/5585991823050?text=Olá,%20gostaria%20de%20saber%20mais%20sobre%20o%20plano%20${encodeURIComponent(plan.name)}%20do%20Gestão%20Eklésia.` : `/pre-cadastro?plan=${plan.slug}`}
+                  target={plan.is_price_on_request ? "_blank" : undefined}
                   className={`mt-6 inline-flex w-full justify-center px-4 py-2 rounded-full font-semibold transition ${
                     featured
                       ? 'bg-amber-300 text-slate-900 hover:bg-amber-200'
-                      : 'bg-emerald-700 text-white hover:bg-emerald-800'
+                      : plan.is_price_on_request
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-emerald-700 text-white hover:bg-emerald-800'
                   }`}
                 >
-                  Assinar agora
+                  {plan.is_price_on_request ? 'Falar com consultor' : 'Assinar agora'}
                 </a>
                 <button
                   type="button"

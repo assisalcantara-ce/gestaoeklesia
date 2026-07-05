@@ -33,6 +33,7 @@ export interface SubscriptionPlan {
   has_modulo_reunioes: boolean;
   modulos: string[];
   is_active: boolean;
+  is_price_on_request?: boolean;
   display_order: number;
   created_at: string;
   updated_at: string;

@@ -84,6 +84,7 @@ export async function PATCH(
       has_automation: body.has_automation || false,
       modulos: Array.isArray(body.modulos) ? body.modulos : [],
       display_order: body.display_order || 0,
+      is_price_on_request: body.is_price_on_request || false,
       updated_at: new Date().toISOString(),
     };
 

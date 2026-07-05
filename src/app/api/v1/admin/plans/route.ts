@@ -133,6 +133,7 @@ export async function POST(request: NextRequest) {
         has_white_label: body.has_white_label || false,
         has_automation: body.has_automation || false,
         modulos: Array.isArray(body.modulos) ? body.modulos : [],
+        is_price_on_request: body.is_price_on_request || false,
         is_active: true,
         display_order: body.display_order || 0,
       }])
