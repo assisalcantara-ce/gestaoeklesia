@@ -314,7 +314,7 @@ export default function PublicRelatorioEspiritualPage({ params }: { params: Prom
         {/* Header */}
         <div className="text-center space-y-2">
           <span className="text-blue-500 text-xs font-bold tracking-widest uppercase block">{ministryName}</span>
-          <h1 className="text-2xl md:text-3xl font-black text-white">Relatório Espiritual</h1>
+          <h1 className="text-2xl md:text-3xl font-black text-white">Livro Espiritual</h1>
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-800 text-slate-300 rounded-full text-xs font-bold border border-slate-700">
             🏢 {congregacaoNome}
           </div>
@@ -627,7 +627,7 @@ export default function PublicRelatorioEspiritualPage({ params }: { params: Prom
                 Enviando relatório...
               </>
             ) : (
-              'Enviar Relatório Espiritual'
+              'Enviar Livro Espiritual'
             )}
           </button>
         </form>

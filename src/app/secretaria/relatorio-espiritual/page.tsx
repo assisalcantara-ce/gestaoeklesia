@@ -1158,8 +1158,8 @@ export default function RelatorioEspiritualPage() {
   return (
     <DashboardContainer>
       <DashboardHeader
-        title="Relatório Espiritual"
-        description="Acompanhamento consolidado das atividades espirituais e engajamento da igreja"
+        title="Livro Espiritual"
+        description="Acompanhamento consolidado do livro de atividades espirituais e engajamento da igreja"
         contextSubtitle="Gestão Ministerial"
         actions={
           !isLocalUser ? (
