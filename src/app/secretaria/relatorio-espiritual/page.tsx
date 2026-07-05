@@ -33,6 +33,9 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
+import { runIntegrityCheck, IntegrityReport } from '@/services/SystemIntegrityService';
+import { acolhimentoChecks } from '@/services/integrity/acolhimentoChecks';
+
 import {
   LineChart,
   Line,
@@ -160,6 +163,12 @@ export default function RelatorioEspiritualPage() {
 
   // Congregação selecionada para visualização de evolução detalhada (Modal)
   const [selectedCongregacaoEvolucao, setSelectedCongregacaoEvolucao] = useState<{ id: string; nome: string } | null>(null);
+
+  // Integridade do Sistema (Sprint Final)
+  const [integrityResult, setIntegrityResult] = useState<IntegrityReport | null>(null);
+  const podeVisualizarIntegridade = useMemo(() => {
+    return !!(ctx?.nivel && ['administrador', 'presidencia'].includes(ctx.nivel));
+  }, [ctx?.nivel]);
 
   // Estados da Central de Coleta
   const [isCentralColetaOpen, setIsCentralColetaOpen] = useState(false);
@@ -375,6 +384,21 @@ export default function RelatorioEspiritualPage() {
   useEffect(() => {
     if (!ctx?.loading && ctx?.ministryId) {
       loadRegistros();
+      
+      // Executar silenciosamente a integridade do acolhimento
+      const executeCheck = async () => {
+        try {
+          const report = await runIntegrityCheck(supabase, 'acolhimento', ctx.ministryId as string, acolhimentoChecks);
+          setIntegrityResult(report);
+          if (report.autoFixed > 0) {
+            // Se corrigiu, recarrega os dados para refletir no Dashboard
+            loadRegistros();
+          }
+        } catch (err) {
+          console.error('[IntegrityCheck] Erro silencioso:', err);
+        }
+      };
+      executeCheck();
     }
   }, [ctx?.loading, ctx?.ministryId, isLocalUser, ctx?.congregacaoId]);
 
@@ -1275,6 +1299,56 @@ export default function RelatorioEspiritualPage() {
         {/* ABA 1: DASHBOARD EXECUTIVO ANALÍTICO */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
+            {/* Seção de Integridade do Sistema (Sprint Final) - Somente Administradores */}
+            {podeVisualizarIntegridade && integrityResult && (
+              <DashboardSection title="🛡️ Integridade do Sistema">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Se nenhuma inconsistência foi encontrada e nada foi corrigido */}
+                  {integrityResult.totalIssues === 0 && (
+                    <div className="md:col-span-3 bg-emerald-50/50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-3">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                      <div>
+                        <h4 className="text-sm font-bold text-emerald-950">Nenhuma inconsistência encontrada.</h4>
+                        <p className="text-xs text-emerald-700 mt-0.5 leading-relaxed">
+                          O banco de dados e as relações do módulo de Acolhimento estão íntegros e consistentes.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Se inconsistências foram corrigidas automaticamente */}
+                  {integrityResult.autoFixed > 0 && (
+                    <div className="md:col-span-3 bg-blue-50/50 border border-blue-100 rounded-2xl p-5 flex items-center gap-3">
+                      <Activity className="h-5 w-5 text-blue-500 shrink-0" />
+                      <div>
+                        <h4 className="text-sm font-bold text-blue-950">
+                          {integrityResult.autoFixed} {integrityResult.autoFixed === 1 ? 'inconsistência foi corrigida' : 'inconsistências foram corrigidas'} automaticamente.
+                        </h4>
+                        <p className="text-xs text-blue-700 mt-0.5 leading-relaxed">
+                          O sistema detectou e restaurou automaticamente os registros espirituais vinculados que estavam corrompidos ou desconectados.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Se existem problemas que requerem atenção manual */}
+                  {integrityResult.requiresAttention > 0 && (
+                    <div className="md:col-span-3 bg-amber-50/50 border border-amber-100 rounded-2xl p-5 flex items-center gap-3">
+                      <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
+                      <div>
+                        <h4 className="text-sm font-bold text-amber-950">
+                          Existe {integrityResult.requiresAttention} {integrityResult.requiresAttention === 1 ? 'inconsistência que requer' : 'inconsistências que requerem'} atenção administrativa.
+                        </h4>
+                        <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                          Algumas inconsistências de dados não puderam ser corrigidas automaticamente pelo sistema e foram registradas nos logs de integridade.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </DashboardSection>
+            )}
+
             {/* Linha 0 (Sprint 10): Checklist de Fechamento & Congregações Pendentes */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Checklist de Fechamento */}
