@@ -806,8 +806,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <a
-                  href={plan.is_price_on_request ? `https://wa.me/5585991823050?text=Olá,%20gostaria%20de%20saber%20mais%20sobre%20o%20plano%20${encodeURIComponent(plan.name)}%20do%20Gestão%20Eklésia.` : `/pre-cadastro?plan=${plan.slug}`}
-                  target={plan.is_price_on_request ? "_blank" : undefined}
+                  href={plan.is_price_on_request ? '#contato' : `/pre-cadastro?plan=${plan.slug}`}
                   className={`mt-6 inline-flex w-full justify-center px-4 py-2 rounded-full font-semibold transition ${
                     featured
                       ? 'bg-amber-300 text-slate-900 hover:bg-amber-200'
@@ -816,7 +815,7 @@ export default function LandingPage() {
                         : 'bg-emerald-700 text-white hover:bg-emerald-800'
                   }`}
                 >
-                  {plan.is_price_on_request ? 'Falar com consultor' : 'Assinar agora'}
+                  {plan.is_price_on_request ? 'Falar com consultor' : 'Teste grátis por 7 dias'}
                 </a>
                 <button
                   type="button"
