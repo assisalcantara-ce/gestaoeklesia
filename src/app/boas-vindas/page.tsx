@@ -107,14 +107,28 @@ export default function BoasVindasPage() {
           .eq('auth_user_id', uid)
           .maybeSingle()
 
-        const { data: tenantData } = await supabase
-          .from('tenants')
-          .select('name')
-          .single()
+        // Busca o ministry_id do usuário para filtrar o tenant correto
+        const { data: ministryUser } = await supabase
+          .from('ministry_users')
+          .select('ministry_id')
+          .eq('user_id', uid)
+          .maybeSingle()
+
+        let ministryName = 'Seu Ministério'
+        if (ministryUser?.ministry_id) {
+          const { data: tenantData } = await supabase
+            .from('tenants')
+            .select('name')
+            .eq('id', ministryUser.ministry_id)
+            .maybeSingle()
+          if (tenantData?.name) {
+            ministryName = tenantData.name
+          }
+        }
 
         setProfile({
           name: userData?.name || session.user.email?.split('@')[0] || 'Líder',
-          ministry_name: tenantData?.name || 'Seu Ministério'
+          ministry_name: ministryName
         })
 
         const data = await fetchOnboarding(uid, session.access_token)
