@@ -24,6 +24,8 @@ export default function MinisteriosPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [tempPasswords, setTempPasswords] = useState<Record<string, string>>({})
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(15)
   
   // === Gerar Faturas ASAAS ===
   const [billingMinistry, setBillingMinistry] = useState<SupabaseMinistry | null>(null)
@@ -1464,71 +1466,120 @@ export default function MinisteriosPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700">
-                    {ministerios.map((ministerio) => {
-                      const statusDetail = getDetailedStatus(ministerio);
-                      return (
-                        <tr key={ministerio.id} className="hover:bg-gray-700/40">
-                          <td className="px-6 py-4 text-sm text-gray-100">{ministerio.name}</td>
-                          <td className="px-6 py-4 text-sm text-gray-300">{ministerio.email_admin}</td>
-                          <td className="px-6 py-4 text-sm text-gray-300">{formatPhoneDisplay(ministerio.phone)}</td>
-                          <td className="px-6 py-4 text-sm">
-                            <div className="flex flex-col gap-1">
-                              <span className={`px-2 py-0.5 rounded text-xs font-semibold self-start border ${statusDetail.class}`}>
-                                {statusDetail.label}
-                              </span>
-                              {ministerio.plan && (
-                                <span className="text-[10px] text-gray-400 uppercase tracking-wider">
-                                  Plano: {ministerio.plan}
+                    {(() => {
+                      const startIndex = (currentPage - 1) * itemsPerPage
+                      const paginated = ministerios.slice(startIndex, startIndex + itemsPerPage)
+                      return paginated.map((ministerio) => {
+                        const statusDetail = getDetailedStatus(ministerio);
+                        return (
+                          <tr key={ministerio.id} className="hover:bg-gray-700/40">
+                            <td className="px-6 py-4 text-sm text-gray-100">{ministerio.name}</td>
+                            <td className="px-6 py-4 text-sm text-gray-300">{ministerio.email_admin}</td>
+                            <td className="px-6 py-4 text-sm text-gray-300">{formatPhoneDisplay(ministerio.phone)}</td>
+                            <td className="px-6 py-4 text-sm">
+                              <div className="flex flex-col gap-1">
+                                <span className={`px-2 py-0.5 rounded text-xs font-semibold self-start border ${statusDetail.class}`}>
+                                  {statusDetail.label}
                                 </span>
+                                {ministerio.plan && (
+                                  <span className="text-[10px] text-gray-400 uppercase tracking-wider">
+                                    Plano: {ministerio.plan}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm flex items-center gap-2">
+                              <button
+                                onClick={() => handleEdit(ministerio)}
+                                className="p-1.5 bg-blue-900/40 text-blue-400 hover:text-blue-300 hover:bg-blue-900/60 rounded transition flex items-center justify-center"
+                                title="Editar"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              {(statusDetail.type === 'TRIAL_ATIVO' || statusDetail.type === 'TRIAL_EXPIRADO' || statusDetail.type === 'SUSPENSO') && (
+                                <button
+                                  onClick={() => handleOpenActivate(ministerio)}
+                                  className="p-1.5 bg-yellow-900/40 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/60 rounded transition flex items-center justify-center"
+                                  title="Ativar"
+                                >
+                                  <Play className="h-4 w-4" />
+                                </button>
                               )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-sm flex items-center gap-2">
-                            <button
-                              onClick={() => handleEdit(ministerio)}
-                              className="p-1.5 bg-blue-900/40 text-blue-400 hover:text-blue-300 hover:bg-blue-900/60 rounded transition flex items-center justify-center"
-                              title="Editar"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            {(statusDetail.type === 'TRIAL_ATIVO' || statusDetail.type === 'TRIAL_EXPIRADO' || statusDetail.type === 'SUSPENSO') && (
+                              {(!(ministerio as any).platform_billing_invoices || (ministerio as any).platform_billing_invoices.length === 0) && (
+                                <button
+                                  onClick={() => handleOpenBilling(ministerio)}
+                                  className="p-1.5 bg-green-900/40 text-green-400 hover:text-green-300 hover:bg-green-900/60 rounded transition flex items-center justify-center"
+                                  title="Gerar Fatura"
+                                >
+                                  <Coins className="h-4 w-4" />
+                                </button>
+                              )}
                               <button
-                                onClick={() => handleOpenActivate(ministerio)}
-                                className="p-1.5 bg-yellow-900/40 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/60 rounded transition flex items-center justify-center"
-                                title="Ativar"
+                                onClick={() => handlePrintLabel(ministerio)}
+                                className="p-1.5 bg-purple-900/40 text-purple-400 hover:text-purple-300 hover:bg-purple-900/60 rounded transition flex items-center justify-center"
+                                title="Imprimir Etiqueta"
                               >
-                                <Play className="h-4 w-4" />
+                                <Tag className="h-4 w-4" />
                               </button>
-                            )}
-                            {(!(ministerio as any).platform_billing_invoices || (ministerio as any).platform_billing_invoices.length === 0) && (
                               <button
-                                onClick={() => handleOpenBilling(ministerio)}
-                                className="p-1.5 bg-green-900/40 text-green-400 hover:text-green-300 hover:bg-green-900/60 rounded transition flex items-center justify-center"
-                                title="Gerar Fatura"
+                                onClick={() => handleDelete(ministerio)}
+                                className="p-1.5 bg-red-900/40 text-red-400 hover:text-red-300 hover:bg-red-900/60 rounded transition flex items-center justify-center"
+                                title="Remover"
                               >
-                                <Coins className="h-4 w-4" />
+                                <Trash2 className="h-4 w-4" />
                               </button>
-                            )}
-                            <button
-                              onClick={() => handlePrintLabel(ministerio)}
-                              className="p-1.5 bg-purple-900/40 text-purple-400 hover:text-purple-300 hover:bg-purple-900/60 rounded transition flex items-center justify-center"
-                              title="Imprimir Etiqueta"
-                            >
-                              <Tag className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(ministerio)}
-                              className="p-1.5 bg-red-900/40 text-red-400 hover:text-red-300 hover:bg-red-900/60 rounded transition flex items-center justify-center"
-                              title="Remover"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    })()}
                   </tbody>
                 </table>
+
+                {/* Paginação */}
+                {ministerios.length > itemsPerPage && (() => {
+                  const totalPages = Math.ceil(ministerios.length / itemsPerPage);
+                  return (
+                    <div className="px-6 py-4 bg-gray-900/50 border-t border-gray-700 flex items-center justify-between gap-4 flex-wrap">
+                      <span className="text-xs text-gray-400">
+                        Mostrando {Math.min(ministerios.length, (currentPage - 1) * itemsPerPage + 1)} a {Math.min(ministerios.length, currentPage * itemsPerPage)} de {ministerios.length} ministérios
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-bold rounded-lg border border-gray-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Anterior
+                        </button>
+                        {Array.from({ length: totalPages }).map((_, idx) => {
+                          const p = idx + 1;
+                          const isCurrent = p === currentPage;
+                          return (
+                            <button
+                              key={p}
+                              onClick={() => setCurrentPage(p)}
+                              className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                                isCurrent 
+                                  ? 'bg-blue-600 text-white border border-blue-500' 
+                                  : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 hover:text-white'
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          );
+                        })}
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-bold rounded-lg border border-gray-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Próximo
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
               </>
