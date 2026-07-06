@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import { useAuditLog } from '@/hooks/useAuditLog'
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth'
@@ -39,6 +40,7 @@ interface NovoTicket {
 }
 
 export default function SuportePage() {
+  const router = useRouter()
   const supabase = createClient()
   const { registrarAcao } = useAuditLog()
   const { user, loading: authLoading } = useRequireSupabaseAuth()
@@ -62,7 +64,6 @@ export default function SuportePage() {
   const [podeEditarDescricao, setPodeEditarDescricao] = useState(false)
   const [descricaoEditada, setDescricaoEditada] = useState('')
   const [salvandoDescricao, setSalvandoDescricao] = useState(false)
-  const [apagandoTicketId, setApagandoTicketId] = useState<string | null>(null)
   const [novoTicket, setNovoTicket] = useState<NovoTicket>({
     titulo: '',
     descricao: '',
@@ -186,27 +187,12 @@ export default function SuportePage() {
     }
   }
 
-  const mapStatusToDb = (status: TicketStatus) => {
-    switch (status) {
-      case 'aberto':
-        return 'open'
-      case 'em_progresso':
-        return 'in_progress'
-      case 'resolvido':
-        return 'resolved'
-      case 'fechado':
-        return 'closed'
-      case 'aguardando_cliente':
-        return 'waiting_customer'
-      default:
-        return 'open'
-    }
-  }
-
   const mapPriorityToDb = (priority: TicketPriority) => {
     switch (priority) {
       case 'baixa':
         return 'low'
+      case 'media':
+        return 'medium'
       case 'alta':
         return 'high'
       case 'critica':
@@ -217,353 +203,92 @@ export default function SuportePage() {
   }
 
   const carregarTickets = async () => {
+    if (!user || !ministryId) return
     try {
-      setLoading(true)
-      if (!user) return
-
-      // Buscar tickets do usuário
-      const { data, error } = await supabase
-        .from('support_tickets')
+      const { data, error: fetchErr } = await supabase
+        .from('tickets_suporte')
         .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+        .eq('ministry_id', ministryId)
+        .order('data_atualizacao', { ascending: false })
 
-      if (error) {
-        console.error('[SUPORTE] Erro ao carregar tickets:', {
-          codigo: error.code,
-          mensagem: error.message,
-          detalhes: JSON.stringify(error),
-        })
-        setError('Erro ao carregar tickets: ' + (error.message || 'Erro desconhecido'))
-        return
-      }
+      if (fetchErr) throw fetchErr
 
-      // Sucesso! Limpar erro se houver
-      setError('')
-
-      const ticketIds = (data || []).map((row: any) => row.id)
-      const ticketOwnerById: Record<string, string> = (data || []).reduce((acc: any, row: any) => {
-        if (row?.id && row?.user_id) {
-          acc[row.id] = row.user_id
-        }
-        return acc
-      }, {})
-      let lastMessageByTicket: Record<
-        string,
-        { user_id: string; created_at: string; sender_role?: 'support' | 'user' | null }
-      > = {}
-      let suporteRespondeuPorTicket: Record<string, boolean> = {}
-
-      if (ticketIds.length > 0) {
-        const { data: lastMessages } = await supabase
-          .from('support_ticket_messages')
-          .select('ticket_id,user_id,created_at,sender_role')
-          .in('ticket_id', ticketIds)
-          .eq('is_internal', false)
-          .order('created_at', { ascending: false })
-
-        lastMessageByTicket = (lastMessages || []).reduce((acc: any, msg: any) => {
-          if (!acc[msg.ticket_id]) {
-            acc[msg.ticket_id] = { user_id: msg.user_id, created_at: msg.created_at, sender_role: msg.sender_role }
-          }
-          return acc
-        }, {})
-
-        suporteRespondeuPorTicket = (lastMessages || []).reduce((acc: any, msg: any) => {
-          const ownerId = ticketOwnerById[msg.ticket_id]
-          const role = msg.sender_role
-          if (role === 'support') {
-            acc[msg.ticket_id] = true
-            return acc
-          }
-          if (!role && ownerId && (!msg.user_id || msg.user_id !== ownerId)) {
-            acc[msg.ticket_id] = true
-          }
-          return acc
-        }, {})
-      }
-
-      const mapped: Ticket[] = (data || []).map((row: any) => ({
-        id: row.id,
-        titulo: row.subject,
-        descricao: row.description,
-        status: mapStatusFromDb(row.status),
-        prioridade: mapPriorityFromDb(row.priority),
-        categoria: row.category,
-        data_criacao: row.created_at,
-        data_atualizacao: row.updated_at,
-        respondido_em: row.response_at || row.resolved_at,
-        usuario_id: row.user_id,
-        ultimo_autor_id: lastMessageByTicket[row.id]?.user_id || null,
-        ultimo_autor_role: lastMessageByTicket[row.id]?.sender_role ?? null,
-        suporte_respondeu: Boolean(suporteRespondeuPorTicket[row.id]),
-        ministry_id: row.ministry_id,
-        ticket_number: row.ticket_number,
+      const mapped: Ticket[] = (data || []).map((t: any) => ({
+        id: t.id,
+        titulo: t.titulo,
+        descricao: t.descricao,
+        status: mapStatusFromDb(t.status),
+        prioridade: mapPriorityFromDb(t.prioridade),
+        categoria: t.categoria || 'Geral',
+        data_criacao: t.data_criacao,
+        data_atualizacao: t.data_atualizacao,
+        respondido_em: t.respondido_em,
+        usuario_id: t.usuario_id,
+        ultimo_autor_id: t.ultimo_autor_id,
+        ultimo_autor_role: t.ultimo_autor_role,
+        suporte_respondeu: t.suporte_respondeu,
+        ministry_id: t.ministry_id,
+        ticket_number: t.ticket_number,
       }))
-      const statusOrder: Record<TicketStatus, number> = {
-        aberto: 0,
-        em_progresso: 1,
-        aguardando_cliente: 2,
-        resolvido: 3,
-        fechado: 4,
-      }
-      const sorted = [...mapped].sort((a, b) => {
-        const orderDiff = statusOrder[a.status] - statusOrder[b.status]
-        if (orderDiff !== 0) return orderDiff
-        return new Date(b.data_criacao).getTime() - new Date(a.data_criacao).getTime()
-      })
-      setTickets(sorted)
 
-      if (!ministryId && sorted.length > 0 && sorted[0]?.ministry_id) {
-        setMinistryId(sorted[0].ministry_id)
-      }
-
-      if (selecionado) {
-        const updatedSelected = mapped.find((ticket) => ticket.id === selecionado.id)
-        if (updatedSelected) {
-          setSelecionado(updatedSelected)
-        }
-      }
-      
-      // Registrar ação de visualização de tickets
-      if (data && data.length > 0) {
-        await registrarAcao({
-          acao: 'visualizar',
-          modulo: 'suporte',
-          area: 'tickets',
-          tabela_afetada: 'support_tickets',
-          descricao: `Visualizou ${data.length} ticket(s)`,
-          status: 'sucesso'
-        })
-      }
-    } catch (err) {
+      setTickets(mapped)
+      setError('')
+    } catch (err: any) {
       console.error('Erro ao carregar tickets:', err)
-      setError('Erro ao carregar tickets. Tente recarregar a página.')
+      setError('Erro ao atualizar lista de chamados.')
     } finally {
       setLoading(false)
     }
   }
 
   const carregarMensagens = async (ticketId: string) => {
+    setCarregandoMensagens(true)
     try {
-      setCarregandoMensagens(true)
-      const { data, error } = await supabase
-        .from('support_ticket_messages')
+      const { data, error: fetchErr } = await supabase
+        .from('tickets_suporte_mensagens')
         .select('*')
         .eq('ticket_id', ticketId)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: true })
 
-      if (error) {
-        console.error('[SUPORTE] Erro ao carregar mensagens:', error)
-        return
-      }
-
-      const visible: Array<{ id: string; user_id: string; message: string; created_at: string; sender_role?: 'support' | 'user' | null }> = (data || [])
-        .filter((msg: any) => msg.is_internal !== true)
-        .map((msg: any) => ({
-          id: msg.id,
-          user_id: msg.user_id,
-          message: msg.message,
-          created_at: msg.created_at,
-          sender_role: msg.sender_role ?? null,
-        }))
-      setMensagens(visible)
-      const suporteRespondeuLocal =
-        visible.some((msg) => msg.sender_role === 'support') ||
-        Boolean(selecionado && ticketTemRespostaDoSuporte(selecionado)) ||
-        visible.some((msg) => msg.sender_role == null && msg.user_id !== user?.id)
-      const podeEditar = selecionado?.status === 'aberto' && !suporteRespondeuLocal
-      setPodeEditarDescricao(Boolean(podeEditar))
+      if (fetchErr) throw fetchErr
+      setMensagens(data || [])
+    } catch (err) {
+      console.error('Erro ao carregar mensagens:', err)
     } finally {
       setCarregandoMensagens(false)
     }
   }
 
-  const salvarDescricao = async () => {
-    if (!selecionado || !user) return
-    if (!descricaoEditada.trim()) {
-      await dialog.alert({ title: 'Atenção', type: 'warning', message: 'A descrição não pode ficar vazia.' })
-      return
-    }
-
-    try {
-      setSalvandoDescricao(true)
-      const { error: updateError } = await supabase
-        .from('support_tickets')
-        .update({ description: descricaoEditada.trim(), updated_at: new Date().toISOString() })
-        .eq('id', selecionado.id)
-
-      if (updateError) {
-        await dialog.alert({ title: 'Erro', type: 'error', message: updateError.message })
-        return
-      }
-
-      setSelecionado({ ...selecionado, descricao: descricaoEditada.trim(), data_atualizacao: new Date().toISOString() })
-      setTickets((prev) =>
-        prev.map((ticket) =>
-          ticket.id === selecionado.id
-            ? { ...ticket, descricao: descricaoEditada.trim(), data_atualizacao: new Date().toISOString() }
-            : ticket,
-        ),
-      )
-    } finally {
-      setSalvandoDescricao(false)
-    }
-  }
-
-  const enviarResposta = async () => {
-    if (!user || !selecionado || !resposta.trim()) return
-
-    try {
-      setEnviandoResposta(true)
-      const { error: insertError } = await supabase
-        .from('support_ticket_messages')
-        .insert({
-          ticket_id: selecionado.id,
-          user_id: user.id,
-          message: resposta,
-          is_internal: false,
-          sender_role: 'user',
-        })
-
-      if (insertError) {
-        await dialog.alert({ title: 'Erro', type: 'error', message: insertError.message })
-        return
-      }
-
-      const { error: updateError } = await supabase
-        .from('support_tickets')
-        .update({ status: mapStatusToDb('em_progresso'), updated_at: new Date().toISOString() })
-        .eq('id', selecionado.id)
-
-      if (updateError) {
-        await dialog.alert({ title: 'Erro', type: 'error', message: updateError.message })
-        return
-      }
-
-      setResposta('')
-      await carregarMensagens(selecionado.id)
-      await carregarTickets()
-    } finally {
-      setEnviandoResposta(false)
-    }
-  }
-
-  const apagarTicket = async (ticket: Ticket) => {
-    if (!user) return
-
-    const ok = await dialog.confirm({
-      title: 'Confirmar',
-      type: 'warning',
-      message: `Deseja apagar o ticket ${ticket.ticket_number || ticket.id.slice(0, 7).toUpperCase()}?`,
-      confirmText: 'Apagar',
-      cancelText: 'Cancelar',
-    })
-
-    if (!ok) return
-
-    try {
-      setApagandoTicketId(ticket.id)
-
-      const { error: deleteError } = await supabase
-        .from('support_tickets')
-        .delete()
-        .eq('id', ticket.id)
-        .eq('user_id', user.id)
-
-      if (deleteError) {
-        await dialog.alert({ title: 'Erro', type: 'error', message: `Não foi possível apagar o ticket: ${deleteError.message}` })
-        return
-      }
-
-      setTickets((prev) => prev.filter((t) => t.id !== ticket.id))
-      if (selecionado?.id === ticket.id) {
-        setSelecionado(null)
-      }
-
-      await registrarAcao({
-        acao: 'deletar',
-        modulo: 'suporte',
-        area: 'tickets',
-        tabela_afetada: 'support_tickets',
-        registro_id: ticket.id,
-        descricao: `Apagou ticket ${ticket.ticket_number || ticket.id.slice(0, 7).toUpperCase()}`,
-        status: 'sucesso',
-      })
-    } finally {
-      setApagandoTicketId(null)
-    }
-  }
-
   const handleAbrirTicket = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!novoTicket.titulo.trim() || !novoTicket.descricao.trim() || !user || !ministryId) return
+
     setEnviando(true)
-
     try {
-      if (!user) {
-        await dialog.alert({ title: 'Atenção', type: 'warning', message: 'Você precisa estar logado para abrir um ticket' })
-        return
-      }
-
-      // Validação básica
-      if (!novoTicket.titulo.trim() || !novoTicket.descricao.trim()) {
-        await dialog.alert({ title: 'Atenção', type: 'warning', message: 'Por favor, preencha todos os campos' })
-        setEnviando(false)
-        return
-      }
-
-      if (!ministryId) {
-        await dialog.alert({ title: 'Erro', type: 'error', message: 'Ministério não encontrado para este usuário.' })
-        return
-      }
-
-      // Criar novo ticket
-      const { error } = await supabase
-        .from('support_tickets')
-        .insert([
-          {
-            ministry_id: ministryId,
-            user_id: user.id,
-            subject: novoTicket.titulo,
-            description: novoTicket.descricao,
-            category: novoTicket.categoria,
-            priority: mapPriorityToDb(novoTicket.prioridade),
-            status: mapStatusToDb('aberto'),
-          },
-        ])
-        .select()
-
-      if (error) {
-        // Registrar erro na auditoria
-        await registrarAcao({
-          acao: 'criar',
-          modulo: 'suporte',
-          area: 'tickets',
-          tabela_afetada: 'support_tickets',
-          descricao: `Tentativa de abrir novo ticket falhou`,
-          status: 'erro',
-          mensagem_erro: error.message
+      const { data, error: insertErr } = await supabase
+        .from('tickets_suporte')
+        .insert({
+          titulo: novoTicket.titulo.trim(),
+          descricao: novoTicket.descricao.trim(),
+          categoria: novoTicket.categoria,
+          prioridade: mapPriorityToDb(novoTicket.prioridade),
+          status: 'open',
+          usuario_id: user.id,
+          ministry_id: ministryId,
+          ultimo_autor_id: user.id,
+          ultimo_autor_role: 'user',
         })
-        await dialog.alert({ title: 'Erro', type: 'error', message: 'Erro ao abrir ticket: ' + error.message })
-        return
-      }
+        .select()
+        .single()
 
-      // Registrar sucesso na criação
+      if (insertErr) throw insertErr
+
       await registrarAcao({
         acao: 'criar',
+        descricao: `Abriu chamado sobre '${novoTicket.titulo.trim()}'`,
         modulo: 'suporte',
-        area: 'tickets',
-        tabela_afetada: 'support_tickets',
-        descricao: `Novo ticket aberto: "${novoTicket.titulo}"`,
-        dados_novos: {
-          titulo: novoTicket.titulo,
-          categoria: novoTicket.categoria,
-          prioridade: novoTicket.prioridade
-        },
-        status: 'sucesso'
       })
 
-      await dialog.alert({ title: 'Sucesso', type: 'success', message: 'Ticket aberto com sucesso!' })
       setNovoTicket({
         titulo: '',
         descricao: '',
@@ -572,28 +297,114 @@ export default function SuportePage() {
       })
       setMostrarFormulario(false)
       carregarTickets()
+      if (data) {
+        const mappedTicket: Ticket = {
+          id: data.id,
+          titulo: data.titulo,
+          descricao: data.descricao,
+          status: mapStatusFromDb(data.status),
+          prioridade: mapPriorityFromDb(data.prioridade),
+          categoria: data.categoria || 'Geral',
+          data_criacao: data.data_criacao,
+          data_atualizacao: data.data_atualizacao,
+          usuario_id: data.usuario_id,
+          ultimo_autor_id: data.ultimo_autor_id,
+          ultimo_autor_role: data.ultimo_autor_role,
+          ministry_id: data.ministry_id,
+          ticket_number: data.ticket_number,
+        }
+        setSelecionado(mappedTicket)
+      }
     } catch (err) {
-      console.error('Erro ao criar ticket:', err)
-      await dialog.alert({ title: 'Erro', type: 'error', message: 'Erro ao abrir ticket' })
+      console.error('Erro ao abrir ticket:', err)
+      setError('Não foi possível abrir o chamado.')
     } finally {
       setEnviando(false)
     }
   }
 
-  const getStatusColor = (status: TicketStatus) => {
-    switch (status) {
-      case 'aberto':
-        return 'bg-blue-100 text-blue-800'
-      case 'em_progresso':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'resolvido':
-        return 'bg-green-100 text-green-800'
-      case 'fechado':
-        return 'bg-red-50 text-red-700'
-      case 'aguardando_cliente':
-        return 'bg-purple-100 text-purple-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
+  const handleResponder = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resposta.trim() || !selecionado || !user) return
+
+    setEnviandoResposta(true)
+    try {
+      const { error: msgErr } = await supabase.from('tickets_suporte_mensagens').insert({
+        ticket_id: selecionado.id,
+        user_id: user.id,
+        message: resposta.trim(),
+        sender_role: 'user',
+      })
+
+      if (msgErr) throw msgErr
+
+      const { error: ticketErr } = await supabase
+        .from('tickets_suporte')
+        .update({
+          status: 'open',
+          ultimo_autor_id: user.id,
+          ultimo_autor_role: 'user',
+          data_atualizacao: new Date().toISOString(),
+        })
+        .eq('id', selecionado.id)
+
+      if (ticketErr) throw ticketErr
+
+      setResposta('')
+      carregarMensagens(selecionado.id)
+      carregarTickets()
+    } catch (err) {
+      console.error('Erro ao enviar mensagem:', err)
+    } finally {
+      setEnviandoResposta(false)
+    }
+  }
+
+  const handleSalvarDescricao = async () => {
+    if (!selecionado || !descricaoEditada.trim()) return
+    setSalvandoDescricao(true)
+    try {
+      const { error: updateErr } = await supabase
+        .from('tickets_suporte')
+        .update({ descricao: descricaoEditada.trim(), data_atualizacao: new Date().toISOString() })
+        .eq('id', selecionado.id)
+
+      if (updateErr) throw updateErr
+
+      setSelecionado({ ...selecionado, descricao: descricaoEditada.trim() })
+      setPodeEditarDescricao(false)
+      carregarTickets()
+    } catch (err) {
+      console.error('Erro ao editar descrição:', err)
+    } finally {
+      setSalvandoDescricao(false)
+    }
+  }
+
+  const handleApagarTicket = async (ticketId: string) => {
+    const confirmar = await dialog.confirm({
+      message: 'Tem certeza que deseja excluir permanentemente este chamado e todo o seu histórico de mensagens?'
+    })
+    if (!confirmar) return
+
+    try {
+      const { error: delMsgsErr } = await supabase
+        .from('tickets_suporte_mensagens')
+        .delete()
+        .eq('ticket_id', ticketId)
+
+      if (delMsgsErr) throw delMsgsErr
+
+      const { error: delErr } = await supabase.from('tickets_suporte').delete().eq('id', ticketId)
+      if (delErr) throw delErr
+
+      if (selecionado?.id === ticketId) {
+        setSelecionado(null)
+      }
+      carregarTickets()
+    } catch (err) {
+      console.error('Erro ao apagar ticket:', err)
+      setError('Não foi possível excluir o chamado.')
     }
   }
 
@@ -647,12 +458,6 @@ export default function SuportePage() {
     return 'bg-[#eceff3] text-[#2f3f52]'
   }
 
-  const getStatusColorExibicao = (ticket: Ticket) => {
-    if (ticketTemRespostaDoCliente(ticket)) return 'bg-emerald-100 text-emerald-800'
-    if (ticketTemRespostaDoSuporte(ticket)) return 'bg-orange-100 text-orange-800'
-    return getStatusColor(ticket.status)
-  }
-
   if (authLoading || ctx.loading) return <div className="p-8">Carregando...</div>
   if (bloqueado) return null
 
@@ -669,7 +474,6 @@ export default function SuportePage() {
   })
 
   const chamadosEmAberto = tickets.filter((ticket) => ticket.status === 'aberto').length
-  const selecionadoTemResposta = Boolean(selecionado && ticketTemRespostaDoSuporte(selecionado))
 
   return (
     <PageLayout
@@ -678,6 +482,25 @@ export default function SuportePage() {
       activeMenu="suporte"
     >
       <div className="bg-white rounded-lg shadow-lg p-6">
+        
+        {/* Assistente de Implantação */}
+        <div className="mb-6 p-5 bg-gradient-to-r from-amber-50 to-amber-100/30 border border-amber-200 rounded-xl flex items-center justify-between gap-4 flex-wrap">
+          <div className="space-y-1">
+            <h4 className="text-sm font-bold text-amber-900 flex items-center gap-1.5">
+              <span>🚀</span> Assistente de Implantação
+            </h4>
+            <p className="text-xs text-amber-800">
+              Precisa de ajuda para configurar o sistema? Acompanhe o checklist e complete a implantação.
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/boas-vindas?show=true')}
+            className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-lg text-xs font-bold transition shadow-sm"
+          >
+            Abrir Assistente
+          </button>
+        </div>
+
         {/* ERRO */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 rounded-lg">
@@ -760,10 +583,10 @@ export default function SuportePage() {
                     }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7] focus:ring-2 focus:ring-[#0284c7]/20"
                   >
-                    <option value="baixa">🟢 Baixa</option>
-                    <option value="media">🟡 Média</option>
-                    <option value="alta">🟠 Alta</option>
-                    <option value="critica">🔴 Crítica</option>
+                    <option value="baixa">Baixa</option>
+                    <option value="media">Média</option>
+                    <option value="alta">Alta</option>
+                    <option value="critica">Crítica</option>
                   </select>
                 </div>
               </div>
@@ -774,7 +597,7 @@ export default function SuportePage() {
                   disabled={enviando}
                   className="flex-1 px-6 py-3 bg-[#0284c7] text-white rounded-lg font-semibold hover:bg-[#0270b0] transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {enviando ? '⏳ Enviando...' : '✓ Abrir Ticket'}
+                  {enviando ? 'Enviando...' : 'Abrir Ticket'}
                 </button>
                 <button
                   type="button"
@@ -801,7 +624,7 @@ export default function SuportePage() {
                     filtroGrupo === 'todos' ? 'bg-[#e8eef5] text-[#2f4a66] font-semibold' : 'text-[#2f4a66] hover:bg-gray-100'
                   }`}
                 >
-                  ✓ Todos
+                  Todos
                 </button>
                 <button
                   onClick={() => setFiltroGrupo('abertos')}
@@ -861,7 +684,7 @@ export default function SuportePage() {
           </div>
         ) : ticketsFiltrados.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg shadow">
-            <p className="text-gray-600 text-lg">📭 Nenhum ticket encontrado para os filtros aplicados.</p>
+            <p className="text-gray-600 text-lg">Nenhum ticket encontrado para os filtros aplicados.</p>
             <button
               onClick={() => setMostrarFormulario(true)}
               className="mt-4 px-6 py-2 bg-[#0284c7] text-white rounded-lg hover:bg-[#0270b0] transition"
@@ -873,7 +696,7 @@ export default function SuportePage() {
           <div className="border border-gray-200 rounded-md overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 bg-[#f8fafc] border-b border-gray-200">
               <div className="flex items-center gap-3 text-[#2d3e50]">
-                <span className="text-lg">ℹ</span>
+                <span className="text-lg">i</span>
                 <span className="text-base">
                   {chamadosEmAberto > 0
                     ? `Você possui ${chamadosEmAberto} chamado${chamadosEmAberto > 1 ? 's' : ''} em aberto.`
@@ -899,262 +722,187 @@ export default function SuportePage() {
             {ticketsFiltrados.map((ticket) => (
               <div
                 key={ticket.id}
-                className={`px-4 py-4 border-b border-gray-200 last:border-b-0 ${
-                  ticketTemRespostaDoCliente(ticket)
-                    ? 'bg-emerald-50'
-                    : ticketTemRespostaDoSuporte(ticket)
-                    ? 'bg-orange-50'
-                    : 'bg-white'
-                }`}
+                className="grid grid-cols-1 lg:grid-cols-[minmax(0,4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] items-start lg:items-center gap-2 lg:gap-4 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition"
               >
-                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] items-center gap-4">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-base text-[#1e2948]">◔</span>
-                    <p
-                      className={`text-base leading-tight font-semibold truncate ${
-                        ticketTemRespostaDoSuporte(ticket) ? 'text-[#b45309]' : 'text-[#1f2d3d]'
-                      }`}
-                    >
-                      {ticket.titulo}
-                    </p>
-                  </div>
+                <div className="flex flex-col">
+                  <button
+                    onClick={() => setSelecionado(ticket)}
+                    className="text-left font-semibold text-[#2d3e50] hover:text-[#0074e8] transition"
+                  >
+                    {ticket.titulo}
+                  </button>
+                  <span className="text-xs text-gray-400 mt-0.5">
+                    Categoria: {ticket.categoria} · Prioridade:{' '}
+                    <span className="capitalize">{ticket.prioridade}</span>
+                  </span>
+                </div>
 
-                  <div>
-                    <span className={`inline-flex px-3 py-1 rounded-md font-semibold text-xs uppercase ${getStatusBadgeClass(ticket)}`}>
-                      {getStatusLabelExibicao(ticket)}
-                    </span>
-                  </div>
+                <div>
+                  <span
+                    className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${getStatusBadgeClass(
+                      ticket
+                    )}`}
+                  >
+                    {getStatusLabelExibicao(ticket)}
+                  </span>
+                </div>
 
-                  <div>
-                    <p className="text-base leading-none font-bold text-[#283848]">{ticket.ticket_number || ticket.id.slice(0, 7).toUpperCase()}</p>
-                    <p className="text-xs text-gray-500 mt-1">Número chamado</p>
-                  </div>
+                <div className="text-xs text-gray-500 font-medium">
+                  {ticket.ticket_number || '-'}
+                </div>
 
-                  <div>
-                    <p className="text-base leading-none font-bold text-[#283848]">{new Date(ticket.data_criacao).toLocaleDateString('pt-BR')}</p>
-                    <p className="text-xs text-gray-500 mt-1">Abertura</p>
-                  </div>
+                <div className="text-xs text-gray-500">
+                  {new Date(ticket.data_criacao).toLocaleDateString('pt-BR')}
+                </div>
 
-                  <div className="flex justify-start lg:justify-end gap-2">
-                    <button
-                      onClick={() => {
-                        setSelecionado(ticket)
-                      }}
-                      className="px-6 py-2 border border-[#2681e5] rounded-full text-[#006ed8] text-sm font-semibold hover:bg-[#f1f7ff] transition"
-                    >
-                      Ver chamado
-                    </button>
-                    <button
-                      onClick={() => {
-                        apagarTicket(ticket)
-                      }}
-                      disabled={apagandoTicketId === ticket.id}
-                      aria-label="Apagar ticket"
-                      title="Apagar"
-                      className="h-10 w-10 border border-red-300 rounded-full text-red-600 hover:bg-red-50 transition flex items-center justify-center disabled:opacity-50"
-                    >
-                      {apagandoTicketId === ticket.id ? (
-                        <svg
-                          className="h-5 w-5 animate-spin"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <circle className="opacity-25" cx="12" cy="12" r="10" />
-                          <path className="opacity-75" d="M4 12a8 8 0 0 1 8-8" />
-                        </svg>
-                      ) : (
-                        <svg
-                          className="h-5 w-5"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M3 6h18" />
-                          <path d="M8 6v-2h8v2" />
-                          <path d="M6 6l1 14h10l1-14" />
-                          <path d="M10 11v6" />
-                          <path d="M14 11v6" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelecionado(ticket)}
+                    className="px-3 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition text-xs font-bold"
+                  >
+                    Visualizar
+                  </button>
+                  <button
+                    onClick={() => handleApagarTicket(ticket.id)}
+                    className="px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition text-xs font-bold"
+                  >
+                    Excluir
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
+      </div>
 
-        {/* DETALHES DO TICKET SELECIONADO */}
-        {selecionado && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden">
-              <div className="relative bg-gradient-to-r from-[#0f2f4d] via-[#123b63] to-[#1b6aa5] text-white px-8 py-7">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-white/70">Ticket</p>
-                    <h2 className="text-2xl font-bold">{selecionado.titulo}</h2>
-                    <p className="text-sm text-white/80 mt-1">#{selecionado.ticket_number || selecionado.id.slice(0, 8).toUpperCase()}</p>
-                  </div>
-                  <button
-                    onClick={() => setSelecionado(null)}
-                    className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-2 transition"
-                  >
-                    ✕
-                  </button>
+      {/* DETALHES E MENSAGENS (MODAL/DETALHE) */}
+      {selecionado && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-xl border border-gray-100 max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-gray-150 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-[#123b63]">{selecionado.titulo}</h3>
+                <p className="text-xs text-gray-400 mt-1">
+                  Ticket #{selecionado.ticket_number} · Criado em{' '}
+                  {new Date(selecionado.data_criacao).toLocaleDateString('pt-BR')} às{' '}
+                  {new Date(selecionado.data_criacao).toLocaleTimeString('pt-BR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelecionado(null)}
+                className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+              >
+                ✖
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Descrição Principal */}
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Descrição</h4>
+                  {podeEditarDescricao ? (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSalvarDescricao}
+                        disabled={salvandoDescricao}
+                        className="text-xs font-bold text-emerald-700 hover:underline disabled:opacity-50"
+                      >
+                        Salvar
+                      </button>
+                      <button
+                        onClick={() => setPodeEditarDescricao(false)}
+                        className="text-xs font-bold text-gray-500 hover:underline"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setPodeEditarDescricao(true)}
+                      className="text-xs font-bold text-blue-600 hover:underline"
+                    >
+                      Editar
+                    </button>
+                  )}
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColorExibicao(selecionado)}`}>
-                    {getStatusLabelExibicao(selecionado)}
-                  </span>
-                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white">
-                    Prioridade {selecionado.prioridade.toUpperCase()}
-                  </span>
-                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white">
-                    Categoria {selecionado.categoria}
-                  </span>
-                </div>
+                {podeEditarDescricao ? (
+                  <textarea
+                    value={descricaoEditada}
+                    onChange={(e) => setDescricaoEditada(e.target.value)}
+                    className="w-full p-2 border rounded focus:outline-none focus:border-[#0284c7] h-20 text-sm"
+                    maxLength={500}
+                  />
+                ) : (
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{selecionado.descricao}</p>
+                )}
               </div>
 
-              <div className="px-6 lg:px-8 pb-8">
-                <div className="mx-auto grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-0">
-                  <div className="p-6 border-b lg:border-b-0 lg:border-r border-gray-100 space-y-6">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Resumo</h3>
-                      {podeEditarDescricao && (
-                        <span className="text-xs text-gray-400">Editável antes da resposta do suporte</span>
-                      )}
-                    </div>
-                    {podeEditarDescricao ? (
-                      <div className="space-y-3">
-                        <textarea
-                          value={descricaoEditada}
-                          onChange={(e) => setDescricaoEditada(e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-[#0284c7] focus:ring-2 focus:ring-[#0284c7]/20 h-28 resize-none leading-relaxed"
-                          placeholder="Descreva seu problema"
-                        />
-                        <div className="flex justify-end">
-                          <button
-                            onClick={salvarDescricao}
-                            disabled={salvandoDescricao}
-                            className="px-4 py-2 bg-[#123b63] text-white rounded-lg font-semibold hover:bg-[#0f2f4d] transition disabled:opacity-50"
-                          >
-                            {salvandoDescricao ? 'Salvando...' : 'Salvar alterações'}
-                          </button>
+              {/* Mensagens de Conversa */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Histórico de Atendimento</h4>
+
+                {carregandoMensagens ? (
+                  <div className="text-center py-4 text-gray-500 text-sm">Carregando histórico...</div>
+                ) : mensagens.length === 0 ? (
+                  <div className="text-center py-4 text-gray-400 text-sm">Aguardando atendimento.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {mensagens.map((msg) => {
+                      const isMe = msg.sender_role === 'user'
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`flex flex-col max-w-[80%] rounded-2xl p-4 ${
+                            isMe
+                              ? 'bg-slate-100 text-slate-800 self-end ml-auto'
+                              : 'bg-blue-50 border border-blue-100 text-slate-800 self-start mr-auto'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-6 mb-1 text-[10px] font-bold text-slate-400">
+                            <span>{isMe ? 'Você' : 'Suporte Gestão Eklésia'}</span>
+                            <span>
+                              {new Date(msg.created_at).toLocaleDateString('pt-BR')} às{' '}
+                              {new Date(msg.created_at).toLocaleTimeString('pt-BR', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
                         </div>
-                      </div>
-                    ) : (
-                      <p className="text-gray-700 bg-gray-50 border border-gray-100 rounded-xl p-4 leading-relaxed">
-                        {selecionado.descricao}
-                      </p>
-                    )}
+                      )
+                    })}
                   </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Conversas</h3>
-                      <span className="text-xs text-gray-400">Atualiza automaticamente</span>
-                    </div>
-                    {carregandoMensagens ? (
-                      <p className="text-gray-500 text-sm">Carregando mensagens...</p>
-                    ) : mensagens.length === 0 ? (
-                      <p className="text-gray-500 text-sm">Nenhuma mensagem ainda.</p>
-                    ) : (
-                      <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                        {mensagens.map((msg) => {
-                          const ownerId = selecionado?.usuario_id
-                          const currentUserId = user?.id
-                          const baseUserId = ownerId || currentUserId
-                          const isSupportMessage = msg.sender_role
-                            ? msg.sender_role === 'support'
-                            : baseUserId
-                              ? msg.user_id !== baseUserId
-                              : true
-
-                          return (
-                            <div
-                              key={msg.id}
-                              className={`rounded-xl p-3 border ${
-                                isSupportMessage ? 'bg-orange-50 border-orange-200' : 'bg-emerald-50 border-emerald-200'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
-                                <span className="inline-flex items-center gap-2 font-semibold">
-                                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${isSupportMessage ? 'bg-orange-200 text-orange-800' : 'bg-emerald-200 text-emerald-800'}`}>
-                                    {isSupportMessage ? 'SP' : 'US'}
-                                  </span>
-                                  {isSupportMessage ? 'SUPORTE' : 'USUARIO'}
-                                </span>
-                                <span>{new Date(msg.created_at).toLocaleString('pt-BR')}</span>
-                              </div>
-                              <p className="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">{msg.message}</p>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                  <div className="p-6 space-y-6">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="rounded-xl border border-gray-100 p-3">
-                      <p className="text-xs text-gray-400 uppercase tracking-widest">Criado em</p>
-                      <p className="font-semibold text-gray-700 mt-1">
-                        {new Date(selecionado.data_criacao).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-gray-100 p-3">
-                      <p className="text-xs text-gray-400 uppercase tracking-widest">Atualizado</p>
-                      <p className="font-semibold text-gray-700 mt-1">
-                        {new Date(selecionado.data_atualizacao).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Responder</h3>
-                      <span className="text-xs text-gray-400">Envie sua mensagem</span>
-                    </div>
-                    {selecionadoTemResposta ? (
-                      <>
-                        <textarea
-                          value={resposta}
-                          onChange={(e) => setResposta(e.target.value)}
-                          className="w-full px-5 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:border-[#0284c7] focus:ring-2 focus:ring-[#0284c7]/20 h-44 resize-none leading-relaxed"
-                          placeholder="Digite sua resposta"
-                        />
-                        <div className="flex justify-end">
-                          <button
-                            onClick={enviarResposta}
-                            disabled={enviandoResposta}
-                            className="px-5 py-2 bg-[#0284c7] text-white rounded-lg font-semibold hover:bg-[#0270b0] transition disabled:opacity-50"
-                          >
-                            {enviandoResposta
-                              ? 'Enviando...'
-                              : selecionado.status === 'fechado'
-                                ? 'Reabrir e enviar mensagem'
-                                : 'Enviar'}
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="text-sm text-gray-500">Aguardando resposta do suporte.</p>
-                    )}
-                  </div>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
+
+            {/* Nova Resposta */}
+            <div className="p-6 border-t border-gray-150 bg-gray-50 rounded-b-2xl">
+              <form onSubmit={handleResponder} className="flex gap-3">
+                <input
+                  type="text"
+                  value={resposta}
+                  onChange={(e) => setResposta(e.target.value)}
+                  placeholder="Escreva sua resposta..."
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:border-[#0284c7]"
+                />
+                <button
+                  type="submit"
+                  disabled={enviandoResposta || !resposta.trim()}
+                  className="px-6 py-2.5 bg-[#0284c7] text-white rounded-xl font-bold hover:bg-[#0270b0] transition disabled:opacity-50"
+                >
+                  Enviar
+                </button>
+              </form>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </PageLayout>
   )
 }

@@ -6,6 +6,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
 import { useUserContext } from '@/hooks/useUserContext';
+import { ProductExperienceService } from '@/lib/services/product-experience';
+import { ExperienceCenter } from '@/services/experience/ExperienceCenter';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -121,6 +123,14 @@ export default function DashboardPage() {
   const [authLoading, setAuthLoading] = useState(true);
   const [dash, setDash] = useState<DashData>(EMPTY);
   const [loadingDash, setLoadingDash] = useState(true);
+  const [onboardingProgress, setOnboardingProgress] = useState<{
+    progressPercent: number;
+    isCompleted: boolean;
+    stepsRemaining: number;
+    showAssistant: boolean;
+    trialDaysRemaining: number;
+  } | null>(null);
+  const [widgetVersion, setWidgetVersion] = useState(0);
 
   // data/hora
   useEffect(() => {
@@ -520,6 +530,35 @@ export default function DashboardPage() {
         crescimentoMembros,
         nomeMinisterio: (ministerioRes.data as any)?.name ?? '',
       });
+
+      // Busca o status do onboarding
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const uid = session.user.id;
+          const tourCompleted = ProductExperienceService.isTourCompleted(uid);
+          const showAssistant = ProductExperienceService.shouldShowAssistant(uid);
+
+          const res = await fetch(`/api/v1/onboarding/status?tourCompleted=${tourCompleted}`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+          });
+          if (res.ok) {
+            const statusData = await res.json();
+            const stepsRemaining = (statusData.steps || []).filter((s: any) => !s.completed).length;
+
+            setOnboardingProgress({
+              progressPercent: statusData.progressPercent,
+              isCompleted: statusData.isCompleted,
+              stepsRemaining,
+              showAssistant,
+              trialDaysRemaining: statusData.trialDaysRemaining || 0
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao buscar status do onboarding:', err);
+      }
+
       setLoadingDash(false);
     };
 
@@ -602,6 +641,63 @@ export default function DashboardPage() {
         </div>
 
         <div className="p-5 space-y-5">
+
+          {/* ── EXPERIENCE WIDGET DE MAIOR PRIORIDADE ─────────────────────── */}
+          {onboardingProgress && (() => {
+            const uid = userCtx.userId || '';
+            if (!uid) return null;
+
+            const ctx = {
+              userId: uid,
+              trialDaysRemaining: onboardingProgress.trialDaysRemaining,
+              progressPercent: onboardingProgress.progressPercent,
+              hasCongregacao: dash.totalCongregacoes > 0
+            };
+
+            const activeWidgets = ExperienceCenter.getInstance().getActiveWidgets(ctx);
+            if (activeWidgets.length === 0) return null;
+
+            const widget = activeWidgets[0];
+            return (
+              <div key={widgetVersion}>
+                {widget.render(ctx, () => {
+                  ExperienceCenter.getInstance().dismissWidget(uid, widget.id);
+                  setWidgetVersion(prev => prev + 1);
+                })}
+              </div>
+            );
+          })()}
+
+          {/* ── CARD DE IMPLANTAÇÃO ───────────────────────────────────────── */}
+          {onboardingProgress && onboardingProgress.showAssistant && !onboardingProgress.isCompleted && (() => {
+            const numBlocks = Math.round(onboardingProgress.progressPercent / 10);
+            const barStr = '█'.repeat(numBlocks) + '░'.repeat(10 - numBlocks);
+            return (
+              <div className="bg-gradient-to-r from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🚀</span>
+                    <h3 className="text-sm font-bold text-slate-800">Implantação do Ministério</h3>
+                    <span className="text-xs font-mono font-bold text-amber-800 bg-amber-200/50 px-2 py-0.5 rounded-full">
+                      {barStr} {onboardingProgress.progressPercent}%
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 font-medium">
+                    "{onboardingProgress.stepsRemaining} {onboardingProgress.stepsRemaining === 1 ? 'etapa restante' : 'etapas restantes'}"
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Complete as etapas recomendadas para configurar a gestão completa do seu ministério.
+                  </p>
+                </div>
+                <button
+                  onClick={() => router.push('/boas-vindas?show=true')}
+                  className="px-5 py-2.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-bold transition shadow-sm self-start md:self-auto shrink-0"
+                >
+                  Continuar Implantação
+                </button>
+              </div>
+            );
+          })()}
 
           {/* ── ATALHOS RÁPIDOS (centralizados) ──────────────────────────── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
