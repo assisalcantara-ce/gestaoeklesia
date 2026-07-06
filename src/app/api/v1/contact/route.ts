@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
       ministerio,
       pastor,
       cpf,
+      mensagem,
       whatsapp,
       email,
       phone,
@@ -76,14 +77,18 @@ export async function POST(request: NextRequest) {
     const addressCity = upperText(address_city) || null
     const addressState = upperText(address_state) || null
     const addressZip = onlyDigits(address_zip) || null
-    const descriptionValue = upperText(description) || null
+
+    const mensagemValue = (mensagem as string | undefined)?.trim() || null
+    const descriptionValue = mensagemValue
+      ? mensagemValue.toUpperCase()
+      : upperText(description) || null
 
     console.log('[CONTACT] Recebido:', {
       ministerio: ministryName,
       pastor: pastorName,
-      cpf: cpfCnpj,
       whatsapp: whatsappNumber,
       email: emailValue,
+      mensagem: mensagemValue ? mensagemValue.substring(0, 50) + '...' : null,
     })
 
     // Validações básicas
@@ -97,13 +102,6 @@ export async function POST(request: NextRequest) {
     if (!pastorName) {
       return NextResponse.json(
         { error: 'Nome do pastor é obrigatório' },
-        { status: 400 }
-      )
-    }
-
-    if (!cpfCnpj) {
-      return NextResponse.json(
-        { error: 'CPF/CNPJ é obrigatório' },
         { status: 400 }
       )
     }
@@ -187,19 +185,7 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Verificar duplicidade de CPF/CNPJ
-      const { data: dupCpf } = await supabaseAdmin
-        .from('pre_registrations')
-        .select('id')
-        .eq('cpf_cnpj', cpfCnpj)
-        .maybeSingle()
-
-      if (dupCpf) {
-        return NextResponse.json(
-          { error: 'Já existe um pré-cadastro em andamento para este CPF/CNPJ.' },
-          { status: 409 }
-        )
-      }
+      // Não verifica mais duplicidade de CPF/CNPJ (campo opcional)
     } catch {
       // ignore
     }
@@ -331,9 +317,10 @@ export async function POST(request: NextRequest) {
       // Não falha o request por causa disso
     }
 
-    // Enviar e-mail de ativação do trial via Resend
+    // Enviar e-mail de notificação para a equipe comercial via Resend
     const resendKey  = process.env.RESEND_API_KEY
     const resendFrom = process.env.RESEND_FROM || 'noreply@gestaoeklesia.com.br'
+    const comercialEmail = process.env.COMERCIAL_EMAIL || process.env.RESEND_COMERCIAL_TO || 'contato@gestaoeklesia.com.br'
     const siteUrl    = process.env.NEXT_PUBLIC_SITE_URL || 'https://gestaoeklesia.com.br'
     let emailSent = false
 
@@ -341,12 +328,30 @@ export async function POST(request: NextRequest) {
       try {
         const activationLink = `${siteUrl}/pre-cadastro?plan=starter&trial=true&lead_id=${contact.id}&token=${activationToken}`
         const resend = new Resend(resendKey)
+
+        // E-mail de ativação do trial para o lead
         await resend.emails.send({
           from: resendFrom,
           to: emailValue,
-          subject: 'Seu acesso ao Gestão Eklésia está liberado! 🎉',
-          html: buildTrialEmail({ pastorName, activationLink }),
+          subject: 'Recebemos sua mensagem — Gestão Eklésia 👋',
+          html: buildLeadContactEmail({ pastorName, ministryName, activationLink }),
         })
+
+        // E-mail de notificação para a equipe comercial
+        await resend.emails.send({
+          from: resendFrom,
+          to: comercialEmail,
+          subject: `📩 Novo contato comercial: ${ministryName}`,
+          html: buildComercialNotificationEmail({
+            ministryName,
+            pastorName,
+            email: emailValue,
+            whatsapp: whatsappNumber,
+            mensagem: mensagemValue,
+            ticketNumber: landingTicketNumber,
+          }),
+        })
+
         emailSent = true
       } catch (emailErr) {
         console.warn('[CONTACT] Resend error:', emailErr)
@@ -479,6 +484,203 @@ function buildTrialEmail({
             </p>
             <p style="margin:0;font-size:11px;color:#cbd5e1;">
               Se você não solicitou este e-mail, pode ignorá-lo com segurança.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+}
+
+// ---------------------------------------------------------------------------
+// E-mail de confirmação para o lead (substitui buildTrialEmail no fluxo consultivo)
+// ---------------------------------------------------------------------------
+
+function buildLeadContactEmail({
+  pastorName,
+  ministryName,
+  activationLink,
+}: {
+  pastorName: string
+  ministryName: string
+  activationLink: string
+}): string {
+  const firstName = pastorName.split(' ')[0]
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recebemos sua mensagem - Gestão Eklésia</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(15,23,42,0.10);max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#064e3b 0%,#065f46 100%);padding:32px 40px;text-align:center;">
+            <p style="margin:0 0 8px;font-size:12px;color:#6ee7b7;letter-spacing:0.2em;text-transform:uppercase;">Gestão Eklésia</p>
+            <h1 style="margin:0;font-size:26px;font-weight:700;color:#ffffff;line-height:1.3;">Recebemos sua mensagem! 👋</h1>
+            <p style="margin:10px 0 0;font-size:14px;color:#a7f3d0;">Nossa equipe entrará em contato em breve.</p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:36px 40px;color:#1e293b;">
+            <p style="margin:0 0 16px;font-size:16px;">Olá, <strong>${firstName}</strong>!</p>
+            <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+              Obrigado pelo interesse no <strong>Gestão Eklésia</strong> para ${ministryName}.
+              Nossa equipe comercial já recebeu sua solicitação e entrará em contato em até <strong>24 horas úteis</strong>.
+            </p>
+            <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
+              Enquanto isso, você já pode explorar o sistema gratuitamente por 7 dias, sem necessidade de cartão de crédito.
+            </p>
+
+            <!-- CTA -->
+            <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 28px;">
+              <tr>
+                <td style="border-radius:10px;background:#059669;">
+                  <a href="${activationLink}"
+                     style="display:inline-block;padding:15px 36px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">
+                    Começar meu trial de 7 dias →
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Features -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f0fdf4;border-radius:12px;padding:4px;margin-bottom:24px;">
+              <tr>
+                <td style="padding:16px 20px;">
+                  <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#064e3b;">O que nossa equipe vai fazer por você:</p>
+                  <p style="margin:0 0 6px;font-size:13px;color:#374151;">✦ Demonstração personalizada do sistema</p>
+                  <p style="margin:0 0 6px;font-size:13px;color:#374151;">✦ Acompanhamento durante o trial de 7 dias</p>
+                  <p style="margin:0 0 6px;font-size:13px;color:#374151;">✦ Apoio na implantação e configuração inicial</p>
+                  <p style="margin:0;font-size:13px;color:#374151;">✦ Treinamento da equipe administrativa</p>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0 0 8px;font-size:13px;color:#64748b;">
+              Prefere falar agora? Entre em contato diretamente:
+            </p>
+            <p style="margin:0;font-size:13px;color:#374151;">
+              📱 WhatsApp: <a href="https://wa.me/5585991823050" style="color:#059669;text-decoration:none;font-weight:600;">(85) 99182-3050</a>
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center;">
+            <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;">
+              Gestão Eklésia · Sistema de Gestão Ministerial
+            </p>
+            <p style="margin:0;font-size:11px;color:#cbd5e1;">
+              Se você não solicitou este e-mail, pode ignorá-lo com segurança.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+}
+
+// ---------------------------------------------------------------------------
+// E-mail de notificação interna para a equipe comercial
+// ---------------------------------------------------------------------------
+
+function buildComercialNotificationEmail({
+  ministryName,
+  pastorName,
+  email,
+  whatsapp,
+  mensagem,
+  ticketNumber,
+}: {
+  ministryName: string
+  pastorName: string
+  email: string
+  whatsapp: string
+  mensagem: string | null
+  ticketNumber: string
+}): string {
+  const mensagemHtml = mensagem
+    ? `<tr>
+        <td style="padding:12px 20px;border-bottom:1px solid #e2e8f0;">
+          <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;">Mensagem do lead</p>
+          <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.6;white-space:pre-wrap;">${mensagem}</p>
+        </td>
+      </tr>`
+    : ''
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Novo contato comercial - ${ministryName}</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(15,23,42,0.10);max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#1e3a5f 0%,#1e40af 100%);padding:24px 40px;">
+            <p style="margin:0 0 4px;font-size:12px;color:#93c5fd;letter-spacing:0.2em;text-transform:uppercase;">Equipe Comercial · Gestão Eklésia</p>
+            <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">📩 Novo Contato Comercial</h1>
+            <p style="margin:6px 0 0;font-size:12px;color:#bfdbfe;">Ticket: ${ticketNumber}</p>
+          </td>
+        </tr>
+
+        <!-- Lead Info -->
+        <tr>
+          <td style="padding:0;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+              <tr>
+                <td style="padding:12px 20px;border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;">Igreja / Ministério</p>
+                  <p style="margin:0;font-size:15px;font-weight:700;color:#1e293b;">${ministryName}</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:12px 20px;border-bottom:1px solid #e2e8f0;">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;">Responsável</p>
+                  <p style="margin:0;font-size:14px;color:#1e293b;">${pastorName}</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:12px 20px;border-bottom:1px solid #e2e8f0;">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;">E-mail</p>
+                  <p style="margin:0;font-size:14px;color:#1e293b;"><a href="mailto:${email}" style="color:#1d4ed8;text-decoration:none;">${email}</a></p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:12px 20px;border-bottom:1px solid #e2e8f0;">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;">WhatsApp</p>
+                  <p style="margin:0;font-size:14px;color:#1e293b;"><a href="https://wa.me/55${whatsapp}" style="color:#059669;text-decoration:none;font-weight:600;">${whatsapp}</a></p>
+                </td>
+              </tr>
+              ${mensagemHtml}
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 40px;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#94a3b8;">
+              Este e-mail é gerado automaticamente pelo sistema Gestão Eklésia.
             </p>
           </td>
         </tr>

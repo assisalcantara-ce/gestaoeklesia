@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { BRAND } from '@/config/brand';
 import NotificationModal from '@/components/NotificationModal';
-import { formatCpfOrCnpj, formatPhone } from '@/lib/mascaras';
+import { formatPhone } from '@/lib/mascaras';
 import { createClient } from '@/lib/supabase-client';
 import { formatarPreco } from '@/config/plans';
 
@@ -242,7 +242,7 @@ export default function LandingPage() {
   const [contactData, setContactData] = useState({
     ministerio: '',
     pastor: '',
-    cpf: '',
+    mensagem: '',
     whatsapp: '',
     email: ''
   });
@@ -287,13 +287,11 @@ export default function LandingPage() {
     ? planosLanding
     : (planosDestaque.length > 0 ? planosDestaque : planosLanding.slice(0, 4));
 
-  const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleContactChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    const nextValue = name === 'cpf'
-      ? formatCpfOrCnpj(value)
-      : name === 'whatsapp'
-        ? formatPhone(value)
-        : value;
+    const nextValue = name === 'whatsapp'
+      ? formatPhone(value)
+      : value;
     setContactData(prev => ({
       ...prev,
       [name]: nextValue
@@ -314,12 +312,6 @@ export default function LandingPage() {
 
       if (!contactData.pastor.trim()) {
         setError('Nome do Pastor é obrigatório');
-        setLoading(false);
-        return;
-      }
-
-      if (!contactData.cpf.trim()) {
-        setError('CPF/CNPJ é obrigatório');
         setLoading(false);
         return;
       }
@@ -348,7 +340,7 @@ export default function LandingPage() {
         body: JSON.stringify({
           ministerio: contactData.ministerio,
           pastor: contactData.pastor,
-          cpf: contactData.cpf,
+          mensagem: contactData.mensagem,
           whatsapp: contactData.whatsapp,
           email: contactData.email,
         }),
@@ -376,7 +368,7 @@ export default function LandingPage() {
       } else {
         setSuccessModal({ isOpen: true, email: contactData.email });
       }
-      setContactData({ ministerio: '', pastor: '', cpf: '', whatsapp: '', email: '' });
+      setContactData({ ministerio: '', pastor: '', mensagem: '', whatsapp: '', email: '' });
       setLoading(false);
     } catch (err) {
       console.error('Erro ao registrar contato:', err);
@@ -885,16 +877,40 @@ export default function LandingPage() {
       <section id="contato" className="max-w-6xl mx-auto px-6 py-16">
         <div className="grid gap-10 lg:grid-cols-[1fr_1fr] items-start">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Ainda tem dúvidas?</p>
-            <h2 className="landing-title text-3xl">Vamos conversar</h2>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Fale com nossa equipe</p>
+            <h2 className="landing-title text-3xl">Atendimento consultivo, do início ao fim</h2>
             <p className="text-slate-600 mt-3">
-              Nossa equipe responde em até 24h úteis. Agendamos uma demonstração, liberamos acesso ao trial e guiamos sua implementação.
+              Nosso time está pronto para entender a realidade da sua igreja e ajudar você a tirar o máximo do Gestão Eklésia — desde a demonstração até a implantação completa.
             </p>
-            <div className="mt-8 space-y-3 text-sm text-slate-600">
-              <p>Atendimento: Segunda a sexta, 9h às 18h (horário Brasília)</p>
-              <p>Demonstração via vídeo call - 30 minutos</p>
-              <p>Consultoria de implementação incluída</p>
-              <p>Onboarding com sua equipe</p>
+            <div className="mt-8 space-y-4 text-sm text-slate-700">
+              <div className="flex items-start gap-3">
+                <span className="text-emerald-600 text-base mt-0.5">✦</span>
+                <div>
+                  <p className="font-semibold">Demonstração personalizada</p>
+                  <p className="text-slate-500 text-xs mt-0.5">Mostramos o sistema funcionando com os dados da sua realidade — via videochamada, sem compromisso.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-emerald-600 text-base mt-0.5">✦</span>
+                <div>
+                  <p className="font-semibold">Trial de 7 dias acompanhado</p>
+                  <p className="text-slate-500 text-xs mt-0.5">Você experimenta o sistema completo enquanto nossa equipe te guia nas configurações iniciais.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-emerald-600 text-base mt-0.5">✦</span>
+                <div>
+                  <p className="font-semibold">Implantação estruturada</p>
+                  <p className="text-slate-500 text-xs mt-0.5">Apoio no cadastro de membros, configuração de módulos e treinamento da equipe administrativa.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-emerald-600 text-base mt-0.5">✦</span>
+                <div>
+                  <p className="font-semibold">Suporte contínuo</p>
+                  <p className="text-slate-500 text-xs mt-0.5">Segunda a sexta, 9h às 18h (Brasília). Respondemos em até 24h úteis.</p>
+                </div>
+              </div>
             </div>
           </div>
           <div className="bg-white border border-[#e7e0d6] rounded-2xl p-6 shadow-lg">
@@ -909,7 +925,7 @@ export default function LandingPage() {
                 name="ministerio"
                 value={contactData.ministerio}
                 onChange={handleContactChange}
-                placeholder="Nome da Instituição"
+                placeholder="Nome da sua igreja ou ministério"
                 className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
               <input
@@ -917,39 +933,41 @@ export default function LandingPage() {
                 name="pastor"
                 value={contactData.pastor}
                 onChange={handleContactChange}
-                placeholder="Seu Nome Completo"
+                placeholder="Seu nome completo"
                 className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <input
-                type="text"
-                name="cpf"
-                value={contactData.cpf}
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  name="whatsapp"
+                  value={contactData.whatsapp}
+                  onChange={handleContactChange}
+                  placeholder="WhatsApp (com DDD)"
+                  className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <input
+                  type="email"
+                  name="email"
+                  value={contactData.email}
+                  onChange={handleContactChange}
+                  placeholder="Email para contato"
+                  className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <textarea
+                name="mensagem"
+                value={contactData.mensagem}
                 onChange={handleContactChange}
-                placeholder="CPF / CNPJ"
-                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-              <input
-                type="text"
-                name="whatsapp"
-                value={contactData.whatsapp}
-                onChange={handleContactChange}
-                placeholder="WhatsApp (com DDD)"
-                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-              <input
-                type="email"
-                name="email"
-                value={contactData.email}
-                onChange={handleContactChange}
-                placeholder="Email para contato"
-                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                rows={4}
+                placeholder="Conte-nos um pouco sobre sua igreja ou como podemos ajudar..."
+                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
               />
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full px-4 py-3 bg-emerald-700 text-white rounded-lg font-bold hover:bg-emerald-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Enviando...' : 'Quero ver o sistema funcionando'}
+                {loading ? 'Enviando...' : 'Quero falar com um consultor'}
               </button>
               <p className="text-xs text-slate-500">
                 Ao enviar, você concorda com nossa política de privacidade.
