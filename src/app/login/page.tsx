@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { BRAND } from '@/config/brand'
 import { createClient } from '@/lib/supabase-client'
@@ -16,6 +16,8 @@ import Link from 'next/link';
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const nextParam = searchParams.get('next') || searchParams.get('redirectTo') || ''
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
   
   const [email, setEmail] = useState('')
@@ -91,7 +93,11 @@ export default function LoginPage() {
             console.error('Erro ao verificar status do trial:', e)
           }
         }
-        router.push('/dashboard')
+        if (nextParam) {
+          router.push(nextParam)
+        } else {
+          router.push('/dashboard')
+        }
         return
       }
 
