@@ -26,6 +26,7 @@ export default function MinisteriosPage() {
   const [tempPasswords, setTempPasswords] = useState<Record<string, string>>({})
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(15)
+  const [totalItems, setTotalItems] = useState(0)
   
   // === Gerar Faturas ASAAS ===
   const [billingMinistry, setBillingMinistry] = useState<SupabaseMinistry | null>(null)
@@ -363,7 +364,7 @@ export default function MinisteriosPage() {
       fetchMinisterios()
       fetchPlanos()
     }
-  }, [isAuthenticated, adminUser])
+  }, [isAuthenticated, adminUser, currentPage])
 
   const fetchPlanos = async () => {
     try {
@@ -534,7 +535,7 @@ export default function MinisteriosPage() {
     const timeoutId = setTimeout(() => controller.abort(), 15000)
     try {
       setLoading(true)
-      const response = await authenticatedFetch('/api/v1/admin/ministries', {
+      const response = await authenticatedFetch(`/api/v1/admin/ministries?page=${currentPage}&limit=${itemsPerPage}`, {
         signal: controller.signal,
       })
       if (!response.ok) {
@@ -550,7 +551,8 @@ export default function MinisteriosPage() {
       }
 
       const data = await response.json()
-      setMinisterios(data.data)
+      setMinisterios(data.data || [])
+      setTotalItems(data.count || 0)
     } catch (err: any) {
       if (err?.name === 'AbortError') {
         setError('Tempo limite ao carregar ministérios. Tente novamente.')
@@ -1466,83 +1468,79 @@ export default function MinisteriosPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700">
-                    {(() => {
-                      const startIndex = (currentPage - 1) * itemsPerPage
-                      const paginated = ministerios.slice(startIndex, startIndex + itemsPerPage)
-                      return paginated.map((ministerio) => {
-                        const statusDetail = getDetailedStatus(ministerio);
-                        return (
-                          <tr key={ministerio.id} className="hover:bg-gray-700/40">
-                            <td className="px-6 py-4 text-sm text-gray-100">{ministerio.name}</td>
-                            <td className="px-6 py-4 text-sm text-gray-300">{ministerio.email_admin}</td>
-                            <td className="px-6 py-4 text-sm text-gray-300">{formatPhoneDisplay(ministerio.phone)}</td>
-                            <td className="px-6 py-4 text-sm">
-                              <div className="flex flex-col gap-1">
-                                <span className={`px-2 py-0.5 rounded text-xs font-semibold self-start border ${statusDetail.class}`}>
-                                  {statusDetail.label}
+                    {ministerios.map((ministerio) => {
+                      const statusDetail = getDetailedStatus(ministerio);
+                      return (
+                        <tr key={ministerio.id} className="hover:bg-gray-700/40">
+                          <td className="px-6 py-4 text-sm text-gray-100">{ministerio.name}</td>
+                          <td className="px-6 py-4 text-sm text-gray-300">{ministerio.email_admin}</td>
+                          <td className="px-6 py-4 text-sm text-gray-300">{formatPhoneDisplay(ministerio.phone)}</td>
+                          <td className="px-6 py-4 text-sm">
+                            <div className="flex flex-col gap-1">
+                              <span className={`px-2 py-0.5 rounded text-xs font-semibold self-start border ${statusDetail.class}`}>
+                                {statusDetail.label}
+                              </span>
+                              {ministerio.plan && (
+                                <span className="text-[10px] text-gray-400 uppercase tracking-wider">
+                                  Plano: {ministerio.plan}
                                 </span>
-                                {ministerio.plan && (
-                                  <span className="text-[10px] text-gray-400 uppercase tracking-wider">
-                                    Plano: {ministerio.plan}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 text-sm flex items-center gap-2">
-                              <button
-                                onClick={() => handleEdit(ministerio)}
-                                className="p-1.5 bg-blue-900/40 text-blue-400 hover:text-blue-300 hover:bg-blue-900/60 rounded transition flex items-center justify-center"
-                                title="Editar"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                              {(statusDetail.type === 'TRIAL_ATIVO' || statusDetail.type === 'TRIAL_EXPIRADO' || statusDetail.type === 'SUSPENSO') && (
-                                <button
-                                  onClick={() => handleOpenActivate(ministerio)}
-                                  className="p-1.5 bg-yellow-900/40 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/60 rounded transition flex items-center justify-center"
-                                  title="Ativar"
-                                >
-                                  <Play className="h-4 w-4" />
-                                </button>
                               )}
-                              {(!(ministerio as any).platform_billing_invoices || (ministerio as any).platform_billing_invoices.length === 0) && (
-                                <button
-                                  onClick={() => handleOpenBilling(ministerio)}
-                                  className="p-1.5 bg-green-900/40 text-green-400 hover:text-green-300 hover:bg-green-900/60 rounded transition flex items-center justify-center"
-                                  title="Gerar Fatura"
-                                >
-                                  <Coins className="h-4 w-4" />
-                                </button>
-                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm flex items-center gap-2">
+                            <button
+                              onClick={() => handleEdit(ministerio)}
+                              className="p-1.5 bg-blue-900/40 text-blue-400 hover:text-blue-300 hover:bg-blue-900/60 rounded transition flex items-center justify-center"
+                              title="Editar"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            {(statusDetail.type === 'TRIAL_ATIVO' || statusDetail.type === 'TRIAL_EXPIRADO' || statusDetail.type === 'SUSPENSO') && (
                               <button
-                                onClick={() => handlePrintLabel(ministerio)}
-                                className="p-1.5 bg-purple-900/40 text-purple-400 hover:text-purple-300 hover:bg-purple-900/60 rounded transition flex items-center justify-center"
-                                title="Imprimir Etiqueta"
+                                onClick={() => handleOpenActivate(ministerio)}
+                                className="p-1.5 bg-yellow-900/40 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/60 rounded transition flex items-center justify-center"
+                                title="Ativar"
                               >
-                                <Tag className="h-4 w-4" />
+                                <Play className="h-4 w-4" />
                               </button>
+                            )}
+                            {(!(ministerio as any).platform_billing_invoices || (ministerio as any).platform_billing_invoices.length === 0) && (
                               <button
-                                onClick={() => handleDelete(ministerio)}
-                                className="p-1.5 bg-red-900/40 text-red-400 hover:text-red-300 hover:bg-red-900/60 rounded transition flex items-center justify-center"
-                                title="Remover"
+                                onClick={() => handleOpenBilling(ministerio)}
+                                className="p-1.5 bg-green-900/40 text-green-400 hover:text-green-300 hover:bg-green-900/60 rounded transition flex items-center justify-center"
+                                title="Gerar Fatura"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Coins className="h-4 w-4" />
                               </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    })()}
+                            )}
+                            <button
+                              onClick={() => handlePrintLabel(ministerio)}
+                              className="p-1.5 bg-purple-900/40 text-purple-400 hover:text-purple-300 hover:bg-purple-900/60 rounded transition flex items-center justify-center"
+                              title="Imprimir Etiqueta"
+                            >
+                              <Tag className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(ministerio)}
+                              className="p-1.5 bg-red-900/40 text-red-400 hover:text-red-300 hover:bg-red-900/60 rounded transition flex items-center justify-center"
+                              title="Remover"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
 
                 {/* Paginação */}
-                {ministerios.length > itemsPerPage && (() => {
-                  const totalPages = Math.ceil(ministerios.length / itemsPerPage);
+                {totalItems > itemsPerPage && (() => {
+                  const totalPages = Math.ceil(totalItems / itemsPerPage);
                   return (
                     <div className="px-6 py-4 bg-gray-900/50 border-t border-gray-700 flex items-center justify-between gap-4 flex-wrap">
                       <span className="text-xs text-gray-400">
-                        Mostrando {Math.min(ministerios.length, (currentPage - 1) * itemsPerPage + 1)} a {Math.min(ministerios.length, currentPage * itemsPerPage)} de {ministerios.length} ministérios
+                        Mostrando {Math.min(totalItems, (currentPage - 1) * itemsPerPage + 1)} a {Math.min(totalItems, currentPage * itemsPerPage)} de {totalItems} ministérios
                       </span>
                       <div className="flex items-center gap-1.5">
                         <button
