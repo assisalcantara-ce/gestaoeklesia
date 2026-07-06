@@ -64,9 +64,10 @@ const TOUR_STEPS = [
   }
 ]
 
+const supabase = createClient()
+
 export default function BoasVindasPage() {
   const router = useRouter()
-  const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
   const [profile, setProfile] = useState<{ name: string; ministry_name: string } | null>(null)
@@ -154,7 +155,7 @@ export default function BoasVindasPage() {
     }
 
     checkOnboarding()
-  }, [supabase, router])
+  }, [])
 
   const startTour = () => {
     setCurrentTourStep(0)
