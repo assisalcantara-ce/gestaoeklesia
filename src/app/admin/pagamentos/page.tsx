@@ -323,10 +323,27 @@ export default function PagamentosPage() {
       }
       groups[mId].invoices.push(inv)
     }
-    return Object.entries(groups).map(([ministryId, data]) => ({
-      ministryId,
-      ...data,
-    }))
+    
+    return Object.entries(groups).map(([ministryId, data]) => {
+      // Ordena as faturas: abertas (pending/overdue) primeiro, ordenadas por vencimento (mais próximo/antigo primeiro)
+      const sortedInvoices = [...data.invoices].sort((a, b) => {
+        const isAOpen = a.status === 'pending' || a.status === 'pendente' || a.status === 'overdue' || a.status === 'vencido'
+        const isBOpen = b.status === 'pending' || b.status === 'pendente' || b.status === 'overdue' || b.status === 'vencido'
+
+        if (isAOpen && !isBOpen) return -1
+        if (!isAOpen && isBOpen) return 1
+
+        const dateA = a.due_date ? new Date(a.due_date).getTime() : Infinity
+        const dateB = b.due_date ? new Date(b.due_date).getTime() : Infinity
+        return dateA - dateB
+      })
+
+      return {
+        ministryId,
+        ministryName: data.ministryName,
+        invoices: sortedInvoices,
+      }
+    })
   }, [invoices])
 
   const toggleGroup = (id: string) => {
@@ -482,8 +499,19 @@ export default function PagamentosPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-800/30 text-xs">
-                            {group.invoices.map((inv) => (
-                              <tr key={inv.id} className="hover:bg-gray-800/20 transition">
+                            {group.invoices.map((inv) => {
+                              const isOverdue = inv.status === 'overdue' || inv.status === 'vencido'
+                              const isPending = inv.status === 'pending' || inv.status === 'pendente'
+                              let rowClass = "hover:bg-gray-800/20 transition"
+                              
+                              if (isOverdue) {
+                                rowClass = "bg-rose-900/10 border-l-2 border-l-rose-500 hover:bg-rose-900/15 transition"
+                              } else if (isPending) {
+                                rowClass = "bg-amber-900/5 border-l-2 border-l-amber-500 hover:bg-amber-900/10 transition"
+                              }
+
+                              return (
+                                <tr key={inv.id} className={rowClass}>
                                 <td className="px-6 py-3.5">
                                   <span className="px-2 py-0.5 text-[11px] font-mono rounded bg-gray-800 text-gray-300 border border-gray-700 uppercase">
                                     {inv.plano_slug}
@@ -539,8 +567,9 @@ export default function PagamentosPage() {
                                     )}
                                   </div>
                                 </td>
-                              </tr>
-                            ))}
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
