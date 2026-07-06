@@ -11,55 +11,90 @@ export async function GET(request: NextRequest) {
     const { ministryId, userId } = authContext
     const supabase = createServerClient()
 
-    // 1. Dados do Ministério (verificar se preencheu CNPJ ou telefone ou se alterou o nome padrão)
-    const { data: ministry } = await supabase
-      .from('tenants')
-      .select('cnpj, telefone, responsavel, name')
-      .eq('id', ministryId)
-      .maybeSingle()
-
-    const hasMinistryData = !!(
-      ministry?.cnpj ||
-      ministry?.telefone ||
-      ministry?.responsavel ||
-      (ministry?.name && !ministry.name.toLowerCase().includes('eklésia') && !ministry.name.toLowerCase().includes('igreja provisória'))
-    )
-
-    // 2. Primeira Congregação
-    const { count: countCongregacoes } = await supabase
-      .from('congregacoes')
-      .select('*', { count: 'exact', head: true })
-      .eq('ministry_id', ministryId)
-
-    const hasCongregacao = (countCongregacoes || 0) > 0
-
-    // 3. Convidar Usuários (contagem em ministry_users > 1)
-    const { count: countUsers } = await supabase
-      .from('ministry_users')
-      .select('*', { count: 'exact', head: true })
-      .eq('ministry_id', ministryId)
-
-    const hasInvitedUsers = (countUsers || 0) > 1
-
-    // 4. Cadastrar primeiro membro
-    const { count: countMembers } = await supabase
-      .from('members')
-      .select('*', { count: 'exact', head: true })
-      .eq('ministry_id', ministryId)
-
-    const hasMembers = (countMembers || 0) > 0
-
-    // 5. Registrar primeiro culto
-    const { count: countCultos } = await supabase
-      .from('culto_registros')
-      .select('*', { count: 'exact', head: true })
-      .eq('ministry_id', ministryId)
-
-    const hasCultos = (countCultos || 0) > 0
-
-    // Obter parâmetros da URL
+    // Parâmetros da URL
     const { searchParams } = new URL(request.url)
     const tourCompleted = searchParams.get('tourCompleted') === 'true'
+
+    // Todas as queries em paralelo para evitar latência sequencial
+    const [
+      ministryResult,
+      congregacoesResult,
+      usersResult,
+      membersResult,
+      cultosResult,
+      preRegResult,
+      configResult,
+    ] = await Promise.all([
+      // 1. Dados do Ministério — tabela correta é 'ministries'
+      supabase
+        .from('ministries')
+        .select('name, cnpj_cpf, phone, description, email_admin')
+        .eq('id', ministryId)
+        .maybeSingle(),
+
+      // 2. Primeira Congregação
+      supabase
+        .from('congregacoes')
+        .select('*', { count: 'exact', head: true })
+        .eq('ministry_id', ministryId),
+
+      // 3. Usuários do ministério
+      supabase
+        .from('ministry_users')
+        .select('*', { count: 'exact', head: true })
+        .eq('ministry_id', ministryId),
+
+      // 4. Membros
+      supabase
+        .from('members')
+        .select('*', { count: 'exact', head: true })
+        .eq('ministry_id', ministryId),
+
+      // 5. Cultos
+      supabase
+        .from('culto_registros')
+        .select('*', { count: 'exact', head: true })
+        .eq('ministry_id', ministryId),
+
+      // 6. Trial
+      supabase
+        .from('pre_registrations')
+        .select('trial_expires_at, status')
+        .eq('user_id', userId)
+        .maybeSingle(),
+
+      // 7. Responsável (salvo em configurations.church_profile)
+      supabase
+        .from('configurations')
+        .select('church_profile')
+        .eq('ministry_id', ministryId)
+        .maybeSingle(),
+    ])
+
+    const ministry = ministryResult.data
+    const responsavel = (configResult.data as any)?.church_profile?.responsavel || null
+
+    // Considera dados preenchidos se: CNPJ, telefone, responsável, e-mail ou nome alterado do padrão
+    const nomeAlterado = ministry?.name
+      ? !ministry.name.toLowerCase().includes('eklésia') &&
+        !ministry.name.toLowerCase().includes('eklesia') &&
+        !ministry.name.toLowerCase().includes('provisória') &&
+        !ministry.name.toLowerCase().includes('provisoria') &&
+        ministry.name.trim().length > 3
+      : false
+
+    const hasMinistryData = !!(
+      ministry?.cnpj_cpf ||
+      ministry?.phone ||
+      ministry?.email_admin ||
+      responsavel ||
+      nomeAlterado
+    )
+
+    const hasCongregacao = (congregacoesResult.count || 0) > 0
+    const hasInvitedUsers = (usersResult.count || 0) > 1
+    const hasMembers = (membersResult.count || 0) > 0
+    const hasCultos = (cultosResult.count || 0) > 0
 
     // Checklist final estruturado
     const steps = [
@@ -74,13 +109,8 @@ export async function GET(request: NextRequest) {
     const completedCount = steps.filter(s => s.completed).length
     const progressPercent = Math.round((completedCount / steps.length) * 100)
 
-    // Período restante do trial
-    const { data: preReg } = await supabase
-      .from('pre_registrations')
-      .select('trial_expires_at, status')
-      .eq('user_id', userId)
-      .maybeSingle()
-
+    // Trial
+    const preReg = preRegResult.data
     let trialDaysRemaining = 0
     if (preReg?.trial_expires_at) {
       const expires = new Date(preReg.trial_expires_at)
@@ -93,7 +123,8 @@ export async function GET(request: NextRequest) {
       progressPercent,
       trialDaysRemaining,
       trialStatus: preReg?.status || 'trial',
-      isCompleted: progressPercent === 100
+      isCompleted: progressPercent === 100,
+      ministryName: ministry?.name || null,
     })
   } catch (error: any) {
     console.error('Erro na API de status do onboarding:', error)

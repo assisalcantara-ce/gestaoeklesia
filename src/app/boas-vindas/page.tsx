@@ -34,6 +34,7 @@ interface OnboardingData {
   trialDaysRemaining: number
   trialStatus: string
   isCompleted: boolean
+  ministryName?: string | null
 }
 
 // Passos do Tour Guiado
@@ -69,6 +70,7 @@ const supabase = createClient()
 export default function BoasVindasPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [profile, setProfile] = useState<{ name: string; ministry_name: string } | null>(null)
   const [onboarding, setOnboarding] = useState<OnboardingData | null>(null)
@@ -79,13 +81,25 @@ export default function BoasVindasPage() {
 
   const fetchOnboarding = async (uid: string, token: string) => {
     const isCompleted = ProductExperienceService.isTourCompleted(uid)
-    const res = await fetch(`/api/v1/onboarding/status?tourCompleted=${isCompleted}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    if (res.ok) {
-      const data = await res.json()
-      setOnboarding(data)
-      return data
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
+    try {
+      const res = await fetch(`/api/v1/onboarding/status?tourCompleted=${isCompleted}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+      if (res.ok) {
+        const data = await res.json()
+        setOnboarding(data)
+        return data
+      }
+    } catch (err: any) {
+      clearTimeout(timeoutId)
+      if (err?.name === 'AbortError') {
+        throw new Error('TIMEOUT')
+      }
+      throw err
     }
     return null
   }
@@ -102,38 +116,29 @@ export default function BoasVindasPage() {
         const uid = session.user.id
         setUserId(uid)
 
+        // Busca nome do usuário
         const { data: userData } = await supabase
           .from('users')
           .select('name, role')
           .eq('auth_user_id', uid)
           .maybeSingle()
 
-        // Busca o ministry_id do usuário para filtrar o tenant correto
-        const { data: ministryUser } = await supabase
-          .from('ministry_users')
-          .select('ministry_id')
-          .eq('user_id', uid)
-          .maybeSingle()
-
-        let ministryName = 'Seu Ministério'
-        if (ministryUser?.ministry_id) {
-          const { data: tenantData } = await supabase
-            .from('tenants')
-            .select('name')
-            .eq('id', ministryUser.ministry_id)
-            .maybeSingle()
-          if (tenantData?.name) {
-            ministryName = tenantData.name
-          }
-        }
-
+        // Define perfil provisório enquanto a API carrega
         setProfile({
           name: userData?.name || session.user.email?.split('@')[0] || 'Líder',
-          ministry_name: ministryName
+          ministry_name: 'Carregando...'
         })
 
         const data = await fetchOnboarding(uid, session.access_token)
-        
+
+        // Usa o nome do ministério retornado pela API (tabela ministries correta)
+        if (data) {
+          setProfile(prev => ({
+            name: prev?.name || session.user.email?.split('@')[0] || 'Líder',
+            ministry_name: data.ministryName || prev?.ministry_name || 'Seu Ministério'
+          }))
+        }
+
         // Verifica se o assistente foi ocultado
         const forceShow = new URLSearchParams(window.location.search).get('show') === 'true'
         const hasOcultado = !ProductExperienceService.shouldShowAssistant(uid)
@@ -147,8 +152,12 @@ export default function BoasVindasPage() {
           router.replace('/dashboard')
           return
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Erro ao obter dados do assistente:', err)
+        const msg = err?.message === 'TIMEOUT'
+          ? 'O servidor demorou para responder. Verifique sua conexão e tente novamente.'
+          : 'Não foi possível carregar o assistente. Tente novamente.'
+        setError(msg)
       } finally {
         setLoading(false)
       }
@@ -218,6 +227,33 @@ export default function BoasVindasPage() {
   }
 
   const isFullyCompleted = onboarding?.isCompleted || false
+
+  // Tela de erro amigável
+  if (!loading && error) {
+    return (
+      <div className="min-h-screen bg-[#f6f2ea] flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-xl border border-[#e7e0d6] text-center space-y-4">
+          <div className="inline-flex items-center justify-center p-3 bg-red-50 rounded-2xl text-red-500">
+            <X className="h-8 w-8" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-800">Não foi possível carregar</h2>
+          <p className="text-sm text-slate-500">{error}</p>
+          <button
+            onClick={() => { setError(null); setLoading(true); window.location.reload() }}
+            className="w-full px-6 py-3 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800 transition"
+          >
+            Tentar novamente
+          </button>
+          <button
+            onClick={() => router.replace('/dashboard')}
+            className="w-full px-6 py-2 text-sm text-slate-500 hover:text-slate-700 transition"
+          >
+            Ir para o Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#f6f2ea] text-[#1f1b16] py-16 px-6 relative overflow-hidden">
