@@ -471,7 +471,7 @@ function buildTrialEmail({
               Precisa de ajuda para começar? Nossa equipe está disponível:
             </p>
             <p style="margin:0;font-size:13px;color:#374151;">
-              📱 WhatsApp: <a href="https://wa.me/5585991823050" style="color:#059669;text-decoration:none;font-weight:600;">(85) 99182-3050</a>
+              📱 WhatsApp: <a href="https://wa.me/5591981755021" style="color:#059669;text-decoration:none;font-weight:600;">(91) 98175-5021</a>
             </p>
           </td>
         </tr>
@@ -571,7 +571,7 @@ function buildLeadContactEmail({
               Prefere falar agora? Entre em contato diretamente:
             </p>
             <p style="margin:0;font-size:13px;color:#374151;">
-              📱 WhatsApp: <a href="https://wa.me/5585991823050" style="color:#059669;text-decoration:none;font-weight:600;">(85) 99182-3050</a>
+              📱 WhatsApp: <a href="https://wa.me/5591981755021" style="color:#059669;text-decoration:none;font-weight:600;">(91) 98175-5021</a>
             </p>
           </td>
         </tr>
