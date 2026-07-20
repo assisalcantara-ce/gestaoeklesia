@@ -2,9 +2,13 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { SubscriptionPlan } from './types'
 
 export class SubscriptionService {
-  async getPlanBySlug(_slug: string): Promise<SubscriptionPlan | null> {
-    // Esqueleto inicial para consulta futura
-    return null
+  async getPlanBySlug(supabaseAdmin: SupabaseClient, slug: string): Promise<SubscriptionPlan | null> {
+    const { data } = await supabaseAdmin
+      .from('subscription_plans')
+      .select('*')
+      .eq('slug', slug)
+      .maybeSingle()
+    return data
   }
 
   async activateSubscription(
@@ -21,35 +25,84 @@ export class SubscriptionService {
     endDateAnterior: string | null
   } | null> {
     // 1. Buscar ministério atual para auditoria
-    const { data: ministry, error: fetchError } = await supabaseAdmin
+    const ministry = await this.fetchMinistry(supabaseAdmin, ministryId)
+    
+    // 2. Resolver o ID do plano cadastrado
+    const planRow = await this.resolvePlan(supabaseAdmin, planSlug)
+
+    // 3. Calcular o período de vigência
+    const { startDate, endDate } = this.calculateSubscriptionPeriod(validityMonths)
+
+    // 4. Salvar atualização da licença comercial no banco
+    const updatedMinistry = await this.updateMinistrySubscription(
+      supabaseAdmin,
+      ministryId,
+      planSlug,
+      planRow?.id || null,
+      startDate,
+      endDate
+    )
+
+    // 5. Efetivar cadastro na tabela pre_registrations
+    const hasPreRegUpdated = await this.markPreRegistrationAsConverted(
+      supabaseAdmin,
+      ministryId,
+      ministry.user_id
+    )
+
+    // 6. Montar dados consolidados
+    return this.buildSubscriptionData(
+      updatedMinistry,
+      hasPreRegUpdated,
+      ministry
+    )
+  }
+
+  // --- MÉTODOS DE APOIO / RESPONSABILIDADES PRIVADAS ---
+
+  private async fetchMinistry(supabaseAdmin: SupabaseClient, ministryId: string): Promise<any> {
+    const { data: ministry, error } = await supabaseAdmin
       .from('ministries')
       .select('*')
       .eq('id', ministryId)
       .single()
 
-    if (fetchError || !ministry) {
+    if (error || !ministry) {
       throw new Error('Ministério não encontrado')
     }
+    return ministry
+  }
 
-    // 2. Buscar plano correspondente para associar subscription_plan_id
-    const { data: planRow } = await supabaseAdmin
+  private async resolvePlan(supabaseAdmin: SupabaseClient, planSlug: string): Promise<{ id: string } | null> {
+    const { data } = await supabaseAdmin
       .from('subscription_plans')
       .select('id')
       .eq('slug', planSlug)
       .maybeSingle()
+    return data
+  }
 
-    // Calcular datas
+  private calculateSubscriptionPeriod(validityMonths: number): { startDate: Date; endDate: Date } {
     const startDate = new Date()
     const endDate = new Date()
     endDate.setMonth(endDate.getMonth() + validityMonths)
+    return { startDate, endDate }
+  }
 
-    // Atualizar ministério
-    const { data: updatedMinistry, error: updateError } = await supabaseAdmin
+  private async updateMinistrySubscription(
+    supabaseAdmin: SupabaseClient,
+    ministryId: string,
+    planSlug: string,
+    planId: string | null,
+    startDate: Date,
+    endDate: Date
+  ): Promise<any> {
+    const { data: updatedMinistry, error } = await supabaseAdmin
       .from('ministries')
       .update({
         subscription_status: 'active',
         plan: planSlug,
-        subscription_plan_id: planRow?.id || null,
+        subscription_plan_id: planId,
         subscription_start_date: startDate.toISOString(),
         subscription_end_date: endDate.toISOString(),
         is_active: true,
@@ -59,11 +112,18 @@ export class SubscriptionService {
       .select()
       .single()
 
-    if (updateError) {
-      throw new Error(`Erro ao atualizar ministério: ${updateError.message}`)
+    if (error || !updatedMinistry) {
+      throw new Error(`Erro ao atualizar ministério: ${error?.message || 'Erro de persistência'}`)
     }
 
-    // 3. Buscar e atualizar pre_registrations usando robustez (ministry_id com fallback para user_id)
+    return updatedMinistry
+  }
+
+  private async markPreRegistrationAsConverted(
+    supabaseAdmin: SupabaseClient,
+    ministryId: string,
+    userId: string | null
+  ): Promise<boolean> {
     let preRegData = null
     try {
       const { data } = await supabaseAdmin
@@ -73,36 +133,51 @@ export class SubscriptionService {
         .maybeSingle()
       preRegData = data
     } catch {
-      // Ignorar erro se coluna ministry_id não existir
+      // Ignora erro se coluna ministry_id não existir
     }
 
-    if (!preRegData && ministry.user_id) {
+    if (!preRegData && userId) {
       const { data } = await supabaseAdmin
         .from('pre_registrations')
         .select('id, user_id')
-        .eq('user_id', ministry.user_id)
+        .eq('user_id', userId)
         .maybeSingle()
       preRegData = data
     }
 
     let hasPreRegUpdated = false
     if (preRegData?.id) {
-      const { error: preRegUpdateError } = await supabaseAdmin
+      const { error } = await supabaseAdmin
         .from('pre_registrations')
         .update({ status: 'efetivado' })
         .eq('id', preRegData.id)
-      if (!preRegUpdateError) {
+      if (!error) {
         hasPreRegUpdated = true
       }
     }
 
+    return hasPreRegUpdated
+  }
+
+  private buildSubscriptionData(
+    updatedMinistry: any,
+    hasPreRegUpdated: boolean,
+    previousMinistryData: any
+  ): {
+    success: boolean
+    updatedMinistry: any
+    hasPreRegUpdated: boolean
+    statusAnterior: string | null
+    planAnterior: string | null
+    endDateAnterior: string | null
+  } {
     return {
       success: true,
       updatedMinistry,
       hasPreRegUpdated,
-      statusAnterior: ministry.subscription_status,
-      planAnterior: ministry.plan,
-      endDateAnterior: ministry.subscription_end_date
+      statusAnterior: previousMinistryData.subscription_status,
+      planAnterior: previousMinistryData.plan,
+      endDateAnterior: previousMinistryData.subscription_end_date
     }
   }
 }
