@@ -388,7 +388,7 @@ export default function TrialExpiradoPage() {
                         <p className="text-sm text-slate-500 font-medium">Este é o plano recomendado para continuar utilizando todos os recursos do seu ministério.</p>
                       </div>
 
-                      <div className="max-w-md">
+                      <div className="max-w-lg md:max-w-xl mx-auto md:mx-0 w-full">
                         <PremiumCard
                           key={plan.id}
                           hoverable
@@ -397,27 +397,43 @@ export default function TrialExpiradoPage() {
                             setCheckoutInfo(null)
                             setCheckoutError('')
                           }}
-                          className={`relative pt-8 pb-6 px-6 transition-all flex flex-col justify-between h-full overflow-visible ${
-                            isSelected ? 'border-2 border-emerald-600 bg-white shadow-xl' : 'border border-emerald-400 bg-white shadow-md'
+                          className={`relative pt-10 pb-8 px-8 transition-all duration-300 transform hover:scale-[1.02] flex flex-col justify-between h-full overflow-visible ${
+                            isSelected ? 'border-2 border-emerald-600 bg-white shadow-2xl' : 'border-2 border-emerald-500 bg-white shadow-xl'
                           } cursor-pointer`}
                         >
-                          <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 inline-flex items-center px-3 py-1 rounded-full bg-emerald-600 text-white text-[9px] font-black uppercase tracking-wider shadow z-10 whitespace-nowrap">
+                          <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 inline-flex items-center px-4 py-1 rounded-full bg-emerald-600 text-white text-[9px] font-black uppercase tracking-widest shadow z-10 whitespace-nowrap">
                             Mais escolhido
                           </span>
 
                           <div className="flex-1 flex flex-col">
                             <div className="flex items-start justify-between gap-4">
                               <div>
-                                <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Plano</p>
-                                <h2 className="text-xl font-bold text-slate-800 mt-2">{plan.name}</h2>
+                                <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Plano Principal</p>
+                                <h2 className="text-2xl font-black text-slate-800 mt-2">{plan.name}</h2>
                               </div>
                               <div className="text-right">
                                 <p className="text-xs font-bold text-slate-400">Mensal</p>
-                                <p className="text-lg font-bold text-[#062E6F]">{formatarPreco(plan.price_monthly)}/mês</p>
+                                <p className="text-2xl font-black text-[#062E6F]">{formatarPreco(plan.price_monthly)}/mês</p>
                               </div>
                             </div>
 
-                            <p className="text-xs text-slate-500 mt-3 font-medium">{plan.description || ''}</p>
+                            {/* Bloco de benefícios adicionados */}
+                            <div className="bg-emerald-50/50 rounded-xl p-4 border border-emerald-100 mt-4 space-y-2.5 text-xs text-emerald-950">
+                              <div className="flex items-start gap-2.5 font-semibold">
+                                <span className="text-emerald-600 font-black text-sm leading-none">✓</span>
+                                <span className="leading-tight">Ativação imediata após a confirmação do pagamento</span>
+                              </div>
+                              <div className="flex items-start gap-2.5 font-semibold">
+                                <span className="text-emerald-600 font-black text-sm leading-none">✓</span>
+                                <span className="leading-tight">Continue utilizando todos os módulos já cadastrados</span>
+                              </div>
+                              <div className="flex items-start gap-2.5 font-semibold">
+                                <span className="text-emerald-600 font-black text-sm leading-none">✓</span>
+                                <span className="leading-tight">Seus dados permanecem preservados</span>
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-slate-500 mt-4 font-medium">{plan.description || ''}</p>
 
                             <ul className="space-y-2 text-xs text-slate-600 mt-4 flex-1">
                               {buildHighlights(plan).map((item) => (
@@ -432,7 +448,7 @@ export default function TrialExpiradoPage() {
                           <div className="mt-6 pt-4 border-t border-slate-50">
                             <PremiumButton
                               variant="success"
-                              className="w-full text-xs"
+                              className="w-full text-xs py-3"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setSelectedPlanId(plan.id)
@@ -442,9 +458,15 @@ export default function TrialExpiradoPage() {
                             >
                               {btnLabel}
                             </PremiumButton>
+                            
+                            {/* Observação discreta de rodapé */}
+                            <p className="text-[10px] text-center text-slate-400 mt-3 font-semibold leading-normal">
+                              "A cobrança será gerada na próxima etapa e poderá ser paga via PIX, boleto ou cartão."
+                            </p>
                           </div>
                         </PremiumCard>
                       </div>
+
                     </div>
                   )
                 })()}
