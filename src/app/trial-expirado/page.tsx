@@ -76,6 +76,22 @@ export default function TrialExpiradoPage() {
     status?: string | null
   } | null>(null)
 
+  // Estados do Modal de Proposta
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [modalPlan, setModalPlan] = useState<PlanoDB | null>(null)
+  const [observacao, setObservacao] = useState('')
+  const [solicitando, setSolicitando] = useState(false)
+  const [solicitacaoSucesso, setSolicitacaoSucesso] = useState(false)
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null)
+  const [profileData, setProfileData] = useState<{
+    ministry_id: string
+    ministry_name: string
+    responsavel: string
+    email: string
+    telefone: string
+  } | null>(null)
+
+
   useEffect(() => {
     const loadPlans = async () => {
       try {
@@ -102,6 +118,116 @@ export default function TrialExpiradoPage() {
 
     loadPlans()
   }, [supabase])
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession()
+        const user = sessionData?.session?.user
+        if (!user) return
+
+        setSessionUserId(user.id)
+
+        // Busca o ministry_id do usuário em ministry_users ou ministries
+        let mId = ''
+        const { data: ministryUser } = await supabase
+          .from('ministry_users')
+          .select('ministry_id')
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (ministryUser?.ministry_id) {
+          mId = ministryUser.ministry_id
+        } else {
+          const { data: ownedM } = await supabase
+            .from('ministries')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle()
+          if (ownedM?.id) mId = ownedM.id
+        }
+
+        if (!mId) return
+
+        // Busca informações do ministério
+        const { data: mData } = await supabase
+          .from('ministries')
+          .select('name, email_admin, phone')
+          .eq('id', mId)
+          .maybeSingle()
+
+        // Busca informações de configurações adicionais (como responsável)
+        const { data: configData } = await supabase
+          .from('configurations')
+          .select('church_profile')
+          .eq('ministry_id', mId)
+          .maybeSingle()
+
+        const churchProfile = (configData as any)?.church_profile || {}
+
+        setProfileData({
+          ministry_id: mId,
+          ministry_name: mData?.name || 'Seu Ministério',
+          responsavel: churchProfile.responsavel || user.user_metadata?.full_name || 'Líder Responsável',
+          email: mData?.email_admin || user.email || '',
+          telefone: mData?.phone || churchProfile.telefone || '',
+        })
+      } catch (err) {
+        console.error('Erro ao carregar perfil de trial expirado:', err)
+      }
+    }
+    loadProfile()
+  }, [supabase])
+
+  const handleSendSolicitacao = async () => {
+    if (!modalPlan || !profileData || solicitando) return
+    setSolicitando(true)
+    try {
+      // 1. Tenta inserir na tabela de oportunidades comerciais
+      const { error: optError } = await supabase
+        .from('oportunidades_comerciais')
+        .insert([{
+          ministry_id: profileData.ministry_id,
+          plano_solicitado: modalPlan.name,
+          observacao: observacao,
+          created_at: new Date().toISOString(),
+          status: 'novo'
+        }])
+
+      if (optError) {
+        console.warn('oportunidades_comerciais falhou/não existe. Usando fallback de suporte:', optError.message)
+        
+        // 2. Fallback para support_tickets (solicitações administrativas)
+        const { error: ticketError } = await supabase
+          .from('support_tickets')
+          .insert([{
+            ministry_id: profileData.ministry_id,
+            user_id: sessionUserId,
+            subject: `Solicitação de Proposta: Plano ${modalPlan.name}`,
+            description: `Solicitação de proposta personalizada enviada pelo trial expirado.\n\nPlano solicitado: ${modalPlan.name}\nResponsável: ${profileData.responsavel}\nE-mail: ${profileData.email}\nTelefone: ${profileData.telefone}\n\nObservações:\n${observacao || 'Nenhuma'}`,
+            category: 'billing',
+            priority: 'high',
+            status: 'open'
+          }])
+          
+        if (ticketError) {
+          throw new Error(ticketError.message)
+        }
+      }
+
+      setSolicitacaoSucesso(true)
+      setTimeout(() => {
+        setIsModalOpen(false)
+        setSolicitacaoSucesso(false)
+        setObservacao('')
+      }, 3000)
+    } catch (err: any) {
+      alert('Erro ao enviar solicitação: ' + (err?.message || 'Tente novamente.'))
+    } finally {
+      setSolicitando(false)
+    }
+  }
+
 
   const selectedPlan = planos.find((plan) => plan.id === selectedPlanId) || null
 
@@ -265,14 +391,21 @@ export default function TrialExpiradoPage() {
                     key={plan.id}
                     hoverable
                     onClick={() => {
-                      setSelectedPlanId(plan.id)
-                      setCheckoutInfo(null)
-                      setCheckoutError('')
+                      if (isStarter) {
+                        setSelectedPlanId(plan.id)
+                        setCheckoutInfo(null)
+                        setCheckoutError('')
+                      } else {
+                        setModalPlan(plan)
+                        setIsModalOpen(true)
+                        setSolicitacaoSucesso(false)
+                        setObservacao('')
+                      }
                     }}
                     className={`relative p-6 transition-all ${
                       isStarter
-                        ? `border-2 ${isSelected ? 'border-emerald-600' : 'border-emerald-400'} bg-white shadow-md`
-                        : `border ${isSelected ? 'border-emerald-400 bg-emerald-50/10' : 'border-slate-100 bg-white'}`
+                        ? `border-2 ${isSelected ? 'border-emerald-600' : 'border-emerald-400'} bg-white shadow-md cursor-pointer`
+                        : `border ${isSelected ? 'border-emerald-400 bg-emerald-50/10' : 'border-slate-100 bg-white'} cursor-pointer`
                     }`}
                   >
                     {/* Selo "Mais escolhido" — apenas Starter */}
@@ -317,9 +450,16 @@ export default function TrialExpiradoPage() {
                       className="mt-6 w-full text-xs"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedPlanId(plan.id)
-                        setCheckoutInfo(null)
-                        setCheckoutError('')
+                        if (isStarter) {
+                          setSelectedPlanId(plan.id)
+                          setCheckoutInfo(null)
+                          setCheckoutError('')
+                        } else {
+                          setModalPlan(plan)
+                          setIsModalOpen(true)
+                          setSolicitacaoSucesso(false)
+                          setObservacao('')
+                        }
                       }}
                     >
                       {btnLabel}
@@ -330,11 +470,12 @@ export default function TrialExpiradoPage() {
             </div>
           )}
 
-          {!loading && !error && selectedPlanId && (
+          {!loading && !error && selectedPlanId && selectedPlan && selectedPlan.price_monthly > 0 && (
             <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5 text-emerald-950 space-y-3">
               <p className="text-sm font-semibold">
                 Plano selecionado: <strong>{selectedPlan?.name || 'Plano'}</strong>. Gere o boleto para concluir a assinatura.
               </p>
+
               <PremiumButton
                 onClick={handleCheckout}
                 disabled={checkoutLoading}
@@ -396,6 +537,112 @@ export default function TrialExpiradoPage() {
           </PremiumButton>
         </div>
       </div>
+
+      {/* Modal de Solicitação de Proposta */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 md:p-8 border border-[#e7e0d6] shadow-2xl space-y-6">
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl font-bold text-slate-800">Solicitar proposta personalizada</h2>
+              <p className="text-xs text-slate-500">
+                Nossa equipe comercial entrará em contato para apresentar a melhor solução para seu ministério.
+              </p>
+            </div>
+
+            {solicitacaoSucesso ? (
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-center space-y-2">
+                <p className="text-emerald-800 font-bold text-sm">✓ Solicitação enviada com sucesso.</p>
+                <p className="text-emerald-600 text-xs">Nossa equipe entrará em contato em breve.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ministério</label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={profileData?.ministry_name || ''}
+                      className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-xs outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Plano Escolhido</label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={modalPlan?.name || ''}
+                      className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-emerald-800 font-bold text-xs outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Responsável</label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={profileData?.responsavel || ''}
+                      className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-xs outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Telefone</label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={profileData?.telefone || ''}
+                      className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-xs outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">E-mail</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={profileData?.email || ''}
+                    className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-xs outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Observações (opcional)</label>
+                  <textarea
+                    rows={3}
+                    value={observacao}
+                    onChange={(e) => setObservacao(e.target.value)}
+                    placeholder="Escreva alguma observação ou dúvida adicional..."
+                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-700 text-xs focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <PremiumButton
+                    variant="secondary"
+                    className="flex-1 text-xs"
+                    onClick={() => setIsModalOpen(false)}
+                    disabled={solicitando}
+                  >
+                    Cancelar
+                  </PremiumButton>
+                  <PremiumButton
+                    variant="success"
+                    className="flex-1 text-xs"
+                    onClick={handleSendSolicitacao}
+                    disabled={solicitando}
+                  >
+                    {solicitando ? 'Enviando...' : 'Enviar Solicitação'}
+                  </PremiumButton>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
