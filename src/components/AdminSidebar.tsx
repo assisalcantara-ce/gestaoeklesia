@@ -68,8 +68,9 @@ export default function AdminSidebar() {
     { label: 'Dashboard', href: '/admin/dashboard', icon: Home },
     ...(temAcessoAdmin(role, 'ministerios') ? [
       { label: 'Ministérios', href: '/admin/ministerios', icon: Building2 },
-      { label: `Comercial ${newCount > 0 ? `(${newCount})` : ''}`, href: '/admin/comercial/oportunidades', icon: Briefcase, badge: newCount }
+      { label: `Comercial ${newCount > 0 ? `(${newCount})` : ''}`, href: '/admin/comercial', icon: Briefcase, badge: newCount }
     ] : []),
+
     ...(temAcessoAdmin(role, 'pagamentos') ? [{ label: 'Pagamentos', href: '/admin/pagamentos', icon: CreditCard }] : []),
     ...(temAcessoAdmin(role, 'planos') ? [{ label: 'Planos', href: '/admin/planos', icon: BarChart3 }] : []),
     { label: 'Suporte', href: '/admin/suporte', icon: HeadphonesIcon },
