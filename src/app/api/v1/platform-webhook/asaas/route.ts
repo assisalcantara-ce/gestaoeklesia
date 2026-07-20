@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
+import { SubscriptionService } from '@/lib/platform'
+
 
 export const dynamic = 'force-dynamic';
 
@@ -78,41 +80,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Erro ao atualizar fatura: ${updateErrorObj.message}` }, { status: 400 })
     }
 
-    // 4. Ativar ministry
-    const { data: ministry } = await supabase
-      .from('ministries')
-      .select('user_id')
-      .eq('id', invoice.ministry_id)
-      .maybeSingle()
+    // 4. Ativar o inquilino e efetivar pré-cadastro via camada de domínio da plataforma
+    const subscriptionService = new SubscriptionService()
+    const activationResult = await subscriptionService.activateSubscription(
+      supabase,
+      invoice.ministry_id,
+      invoice.plano_slug,
+      12 // Vigência padrão de 12 meses
+    )
 
-    if (ministry) {
-      await supabase
-        .from('ministries')
-        .update({
-          subscription_status: 'active',
-          plan: invoice.plano_slug,
-          subscription_plan_id: invoice.subscription_plan_id,
-          subscription_start_date: new Date().toISOString(),
-          subscription_end_date: invoice.period_end,
-          is_active: true,
-        })
-        .eq('id', invoice.ministry_id)
+    if (!activationResult || !activationResult.success) {
+      return NextResponse.json({ error: 'Erro ao processar ativação de assinatura via domínio no webhook' }, { status: 400 })
+    }
 
-      // 5. Atualizar pre_registrations se existir
-      if (ministry.user_id) {
-        const { data: preReg } = await supabase
-          .from('pre_registrations')
-          .select('id, status')
-          .eq('user_id', ministry.user_id)
-          .maybeSingle()
 
-        if (preReg && preReg.status !== 'efetivado') {
-          await supabase
-            .from('pre_registrations')
-            .update({ status: 'efetivado' })
-            .eq('id', preReg.id)
-        }
-      }
 
       // 5b. Atualizar oportunidade comercial para "Convertido" e registrar no histórico
       try {
@@ -188,7 +169,7 @@ export async function POST(request: NextRequest) {
       } catch (err) {
         console.warn('Erro ao atualizar oportunidade/ticket no webhook Asaas:', err)
       }
-    }
+
 
 
     // 6. Registrar admin_audit_logs se existir
