@@ -17,10 +17,12 @@ import {
   Database,
   Users,
   Link2,
+  Briefcase,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import { temAcessoAdmin } from '@/lib/access-control'
+import { useEffect } from 'react'
 
 export default function AdminSidebar() {
   const { adminUser } = useAdminAuth()
@@ -28,6 +30,28 @@ export default function AdminSidebar() {
   const router = useRouter()
   const [isOpen, _setIsOpen] = useState(true)
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null)
+  const [newCount, setNewCount] = useState(0)
+
+  useEffect(() => {
+    const fetchNewCount = async () => {
+      try {
+        const response = await fetch('/api/v1/admin/oportunidades')
+        if (response.ok) {
+          const data = await response.json()
+          setNewCount(data.new_count || 0)
+        }
+      } catch (err) {
+        console.error('Erro ao buscar contagem de oportunidades:', err)
+      }
+    }
+    
+    if (adminUser) {
+      fetchNewCount()
+      const interval = setInterval(fetchNewCount, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [adminUser])
+
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
 
   const handleLogout = async () => {
@@ -42,7 +66,10 @@ export default function AdminSidebar() {
 
   const menuItems = [
     { label: 'Dashboard', href: '/admin/dashboard', icon: Home },
-    ...(temAcessoAdmin(role, 'ministerios') ? [{ label: 'Ministérios', href: '/admin/ministerios', icon: Building2 }] : []),
+    ...(temAcessoAdmin(role, 'ministerios') ? [
+      { label: 'Ministérios', href: '/admin/ministerios', icon: Building2 },
+      { label: `Comercial ${newCount > 0 ? `(${newCount})` : ''}`, href: '/admin/comercial/oportunidades', icon: Briefcase, badge: newCount }
+    ] : []),
     ...(temAcessoAdmin(role, 'pagamentos') ? [{ label: 'Pagamentos', href: '/admin/pagamentos', icon: CreditCard }] : []),
     ...(temAcessoAdmin(role, 'planos') ? [{ label: 'Planos', href: '/admin/planos', icon: BarChart3 }] : []),
     { label: 'Suporte', href: '/admin/suporte', icon: HeadphonesIcon },
@@ -129,8 +156,24 @@ export default function AdminSidebar() {
                     }`}
                     title={!isOpen ? item.label : ''}
                   >
-                    <Icon size={20} />
-                    {isOpen && <span className="text-sm">{item.label}</span>}
+                    <div className="relative">
+                      <Icon size={20} />
+                      {!isOpen && item.badge > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                    {isOpen && (
+                      <span className="text-sm flex-1 flex items-center justify-between">
+                        {item.label}
+                        {item.badge > 0 && (
+                          <span className="px-2 py-0.5 rounded-full bg-red-500 text-[10px] font-bold text-white">
+                            {item.badge}
+                          </span>
+                        )}
+                      </span>
+                    )}
                   </Link>
                 )}
 
