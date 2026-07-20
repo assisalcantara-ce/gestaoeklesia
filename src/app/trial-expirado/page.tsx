@@ -327,14 +327,15 @@ export default function TrialExpiradoPage() {
             Avaliação encerrada
           </span>
           <h1 className="landing-title text-4xl md:text-5xl font-bold leading-tight mt-4">
-            Seu período de avaliação terminou
+            Continue de onde parou.
           </h1>
           <p className="text-lg text-slate-600 mt-4">
-            Seu ministério continua salvo e todos os dados cadastrados permanecem preservados.
+            Seu ministério continua ativo em nossa plataforma e todas as informações permanecem preservadas.
           </p>
           <p className="text-base text-slate-500 mt-2">
-            Escolha abaixo como deseja continuar utilizando o Gestão Eklésia.
+            Escolha abaixo a melhor forma de continuar utilizando o Gestão Eklésia.
           </p>
+
 
           {/* Card informativo — dados preservados */}
           <div className="mt-6 rounded-2xl bg-emerald-50 border border-emerald-100 px-6 py-5 flex flex-wrap gap-x-8 gap-y-2">
@@ -446,6 +447,11 @@ export default function TrialExpiradoPage() {
                           </div>
 
                           <div className="mt-6 pt-4 border-t border-slate-50">
+                            {/* Faixa discreta acima do botão */}
+                            <div className="text-center text-xs font-semibold text-emerald-800 bg-emerald-50 rounded-lg py-2 border border-emerald-100/50 mb-3">
+                              Recomendado para a maioria dos ministérios.
+                            </div>
+
                             <PremiumButton
                               variant="success"
                               className="w-full text-xs py-3"
@@ -463,6 +469,25 @@ export default function TrialExpiradoPage() {
                             <p className="text-[10px] text-center text-slate-400 mt-3 font-semibold leading-normal">
                               "A cobrança será gerada na próxima etapa e poderá ser paga via PIX, boleto ou cartão."
                             </p>
+
+                            {/* O que acontece após a contratação */}
+                            <div className="mt-5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+                              <p className="font-bold text-slate-800 text-[10px] uppercase tracking-wider mb-1">O que acontece após a contratação?</p>
+                              <div className="flex items-center gap-2 text-slate-700 font-semibold">
+                                <span className="text-emerald-600 font-black">✓</span>
+                                <span>Pagamento confirmado</span>
+                              </div>
+                              <div className="text-slate-400 font-black text-center text-[10px] py-0.5 leading-none">↓</div>
+                              <div className="flex items-center gap-2 text-slate-700 font-semibold">
+                                <span className="text-emerald-600 font-black">✓</span>
+                                <span>Sistema liberado automaticamente</span>
+                              </div>
+                              <div className="text-slate-400 font-black text-center text-[10px] py-0.5 leading-none">↓</div>
+                              <div className="flex items-center gap-2 text-slate-700 font-semibold">
+                                <span className="text-emerald-600 font-black">✓</span>
+                                <span>Continue trabalhando normalmente</span>
+                              </div>
+                            </div>
                           </div>
                         </PremiumCard>
                       </div>
@@ -475,9 +500,10 @@ export default function TrialExpiradoPage() {
                 {planosSecundarios.length > 0 && (
                   <div className="pt-10 border-t border-slate-100 space-y-6">
                     <div className="space-y-1 text-center md:text-left">
-                      <h3 className="text-lg font-bold text-slate-800">Precisa de uma solução personalizada?</h3>
-                      <p className="text-sm text-slate-500 font-medium">Para ministérios maiores ou com necessidades específicas, nossa equipe poderá montar uma proposta personalizada.</p>
+                      <h3 className="text-lg font-bold text-slate-800">Sua igreja precisa de uma solução personalizada?</h3>
+                      <p className="text-sm text-slate-500 font-medium">Se o seu ministério possui uma estrutura maior, múltiplas congregações ou necessidades específicas, nossa equipe poderá preparar uma proposta exclusiva.</p>
                     </div>
+
 
                     <div className="grid gap-6 md:grid-cols-2 max-w-3xl">
                       {planosSecundarios.map((plan) => {
@@ -602,25 +628,48 @@ export default function TrialExpiradoPage() {
           )}
         </div>
 
-        <div className="mt-10 flex flex-wrap gap-4">
-          <a
-            href="https://wa.me/5591981755021"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <PremiumButton variant="secondary" className="text-xs border-none bg-white shadow-md">
-              💬 Falar com a equipe comercial
+        {/* Bloco Institucional de dúvidas no Rodapé */}
+        <div className="mt-16 bg-white border border-[#e7e0d6] rounded-3xl p-6 md:p-8 text-center space-y-4 max-w-3xl mx-auto shadow-sm">
+          <h4 className="text-xl font-bold text-[#062E6F]">Ainda tem dúvidas?</h4>
+          <p className="text-sm text-slate-600 max-w-xl mx-auto font-medium">
+            Nossa equipe está pronta para ajudar você a escolher a melhor solução para o seu ministério.
+          </p>
+          <div className="flex flex-wrap justify-center gap-3 pt-2">
+            <PremiumButton
+              variant="secondary"
+              className="text-xs px-6"
+              onClick={() => {
+                const firstPlan = planos.find(p => p.slug?.toLowerCase().includes('inter')) || planos[0]
+                setModalPlan(firstPlan)
+                setIsModalOpen(true)
+                setSolicitacaoSucesso(false)
+                setObservacao('')
+              }}
+            >
+              Falar com Especialista
             </PremiumButton>
-          </a>
+            <a
+              href="https://wa.me/5591981755021"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-md cursor-pointer"
+            >
+              WhatsApp
+            </a>
+          </div>
+        </div>
+
+        <div className="mt-8 flex justify-center">
           <PremiumButton
             variant="danger"
             onClick={handleLogout}
-            className="text-xs shadow-md"
+            className="text-xs shadow-md opacity-60 hover:opacity-100 transition"
           >
             Sair da conta e voltar ao início
           </PremiumButton>
         </div>
       </div>
+
 
       {/* Modal de Solicitação de Proposta */}
       {isModalOpen && (
