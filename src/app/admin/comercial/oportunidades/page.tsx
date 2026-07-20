@@ -34,6 +34,14 @@ type Oportunidade = {
   updated_at?: string
   updated_by?: string | null
   status: string
+  historico?: Array<{
+    id: string
+    status_anterior: string
+    status_novo: string
+    usuario: string
+    observacao: string
+    created_at: string
+  }>
 }
 
 export default function OportunidadesPage() {
@@ -115,18 +123,35 @@ export default function OportunidadesPage() {
 
       setSuccess('Oportunidade atualizada com sucesso!')
       
-      // Atualiza lista localmente
+      // Atualiza lista localmente, gravando reativamente a entrada de histórico
       setOportunidades(prev =>
-        prev.map(item =>
-          item.id === selectedOpt.id
-            ? { ...item, status: editStatus, observacao_interna: editObservacaoInterna }
-            : item
-        )
+        prev.map(item => {
+          if (item.id === selectedOpt.id) {
+            const novoHistorico = [
+              {
+                id: Math.random().toString(),
+                status_anterior: selectedOpt.status,
+                status_novo: editStatus,
+                usuario: 'Você (Admin)',
+                observacao: editObservacaoInterna,
+                created_at: new Date().toISOString()
+              },
+              ...(item.historico || [])
+            ]
+            return {
+              ...item,
+              status: editStatus,
+              observacao_interna: editObservacaoInterna,
+              historico: novoHistorico
+            }
+          }
+          return item
+        })
       )
 
       setTimeout(() => {
         setSelectedOpt(null)
-      }, 1000)
+      }, 1500)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -149,12 +174,18 @@ export default function OportunidadesPage() {
     switch (status.toLowerCase().trim()) {
       case 'novo':
         return 'bg-red-100 text-red-800'
-      case 'em atendimento':
-      case 'em_atendimento':
+      case 'primeiro contato':
+      case 'primeiro_contato':
+        return 'bg-indigo-100 text-indigo-800'
+      case 'em negociação':
+      case 'em_negociacao':
         return 'bg-blue-100 text-blue-800'
       case 'proposta enviada':
       case 'proposta_enviada':
         return 'bg-amber-100 text-amber-800'
+      case 'aguardando cliente':
+      case 'aguardando_cliente':
+        return 'bg-purple-100 text-purple-800'
       case 'convertido':
         return 'bg-green-100 text-green-800'
       case 'perdido':
@@ -163,6 +194,7 @@ export default function OportunidadesPage() {
         return 'bg-gray-100 text-gray-800'
     }
   }
+
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -218,12 +250,15 @@ export default function OportunidadesPage() {
               >
                 <option value="all">Todos os Status</option>
                 <option value="novo">Novo</option>
-                <option value="em atendimento">Em Atendimento</option>
+                <option value="primeiro contato">Primeiro Contato</option>
+                <option value="em negociação">Em Negociação</option>
                 <option value="proposta enviada">Proposta Enviada</option>
+                <option value="aguardando cliente">Aguardando Cliente</option>
                 <option value="convertido">Convertido</option>
                 <option value="perdido">Perdido</option>
               </select>
             </div>
+
 
             <div>
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Plano solicitado</label>
@@ -392,8 +427,10 @@ export default function OportunidadesPage() {
                   className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 cursor-pointer"
                 >
                   <option value="Novo">Novo</option>
-                  <option value="Em Atendimento">Em Atendimento</option>
+                  <option value="Primeiro Contato">Primeiro Contato</option>
+                  <option value="Em Negociação">Em Negociação</option>
                   <option value="Proposta Enviada">Proposta Enviada</option>
+                  <option value="Aguardando Cliente">Aguardando Cliente</option>
                   <option value="Convertido">Convertido</option>
                   <option value="Perdido">Perdido</option>
                 </select>
@@ -417,7 +454,35 @@ export default function OportunidadesPage() {
                   Atualizado em {new Date(selectedOpt.updated_at).toLocaleDateString('pt-BR')} por {selectedOpt.updated_by || 'Sistema'}
                 </div>
               )}
+
+              {/* Histórico da Negociação */}
+              <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 border-b border-gray-700 pb-2">Histórico da Negociação</h4>
+                {selectedOpt.historico && selectedOpt.historico.length > 0 ? (
+                  <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                    {selectedOpt.historico.map((h) => (
+                      <div key={h.id} className="text-xs bg-gray-900/60 p-2.5 rounded-lg border border-gray-750 space-y-1">
+                        <div className="flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase">
+                          <span>{h.usuario || 'Sistema'}</span>
+                          <span>{new Date(h.created_at).toLocaleDateString('pt-BR')} às {new Date(h.created_at).toLocaleTimeString('pt-BR')}</span>
+                        </div>
+                        {h.status_anterior && h.status_novo && (
+                          <div className="text-slate-300 font-semibold mt-0.5">
+                            Status: <span className="text-red-400">{h.status_anterior}</span> → <span className="text-emerald-400">{h.status_novo}</span>
+                          </div>
+                        )}
+                        {h.observacao && (
+                          <p className="text-gray-400 mt-1 italic whitespace-pre-wrap">{h.observacao}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 italic">Nenhuma movimentação comercial registrada ainda.</p>
+                )}
+              </div>
             </div>
+
 
             <div className="flex gap-3 pt-6 border-t border-gray-800 mt-6">
               <button

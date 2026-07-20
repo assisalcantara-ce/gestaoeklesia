@@ -67,31 +67,84 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // 3. Enriquecer as oportunidades com informações completas do Ministério
+    // 3. Enriquecer as oportunidades com informações completas do Ministério e Histórico
     const enriched = await Promise.all(
       oportunidades.map(async (opt: any) => {
-        const [ministryResult, configResult] = await Promise.all([
+        const [ministryResult, configResult, histResult] = await Promise.all([
+          // Detalhes do ministério
           supabaseAdmin
             .from('ministries')
             .select('name, email_admin, phone')
             .eq('id', opt.ministry_id)
             .maybeSingle(),
+          // Configurações (onde fica o responsável)
           supabaseAdmin
             .from('configurations')
             .select('church_profile')
             .eq('ministry_id', opt.ministry_id)
-            .maybeSingle()
+            .maybeSingle(),
+          // Histórico (tabela customizada ou mensagens)
+          opt.is_ticket
+            ? supabaseAdmin
+                .from('support_ticket_messages')
+                .select('*')
+                .eq('ticket_id', opt.id)
+                .order('created_at', { ascending: false })
+            : supabaseAdmin
+                .from('oportunidades_comerciais_historico')
+                .select('*')
+                .eq('oportunidade_id', opt.id)
+                .order('created_at', { ascending: false })
         ])
 
         const mData = ministryResult.data
         const churchProfile = (configResult.data as any)?.church_profile || {}
+
+        // Mapear histórico para formato padrão
+        let historicoFormatado: any[] = []
+        const rawHistory = histResult.data || []
+
+        if (opt.is_ticket) {
+          historicoFormatado = rawHistory.map((msg: any) => {
+            // Se for mensagem de sistema que gravamos no PATCH
+            if (msg.message?.startsWith('[Histórico Comercial]')) {
+              // Parse simples ou exibir a mensagem
+              return {
+                id: msg.id,
+                status_anterior: '',
+                status_novo: '',
+                usuario: 'Admin',
+                observacao: msg.message.replace('[Histórico Comercial]', '').trim(),
+                created_at: msg.created_at
+              }
+            }
+            return {
+              id: msg.id,
+              status_anterior: '',
+              status_novo: '',
+              usuario: 'Mensagem do Ticket',
+              observacao: msg.message,
+              created_at: msg.created_at
+            }
+          })
+        } else {
+          historicoFormatado = rawHistory.map((h: any) => ({
+            id: h.id,
+            status_anterior: h.status_anterior || '',
+            status_novo: h.status_novo || '',
+            usuario: h.usuario || 'Sistema',
+            observacao: h.observacao || '',
+            created_at: h.created_at
+          }))
+        }
 
         return {
           ...opt,
           ministry_name: mData?.name || 'Ministério Desconhecido',
           email: mData?.email_admin || '',
           telefone: mData?.phone || churchProfile.telefone || '',
-          responsavel: churchProfile.responsavel || 'Não Informado'
+          responsavel: churchProfile.responsavel || 'Não Informado',
+          historico: historicoFormatado
         }
       })
     )
