@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-guard'
+import { SubscriptionService } from '@/lib/platform'
 
 export async function POST(
   request: NextRequest,
@@ -28,93 +29,32 @@ export async function POST(
       return NextResponse.json({ error: 'Plano inválido selecionado' }, { status: 400 })
     }
 
-    // 1. Buscar ministério atual para auditoria
-    const { data: ministry, error: fetchError } = await supabaseAdmin
-      .from('ministries')
-      .select('*')
-      .eq('id', id)
-      .single()
+    // 1. Invoca o serviço da camada de domínio da plataforma
+    const subscriptionService = new SubscriptionService()
+    const activationResult = await subscriptionService.activateSubscription(
+      supabaseAdmin,
+      id,
+      planSlug,
+      validityMonths
+    )
 
-    if (fetchError || !ministry) {
-      return NextResponse.json({ error: 'Ministério não encontrado' }, { status: 404 })
+    if (!activationResult || !activationResult.success) {
+      return NextResponse.json({ error: 'Falha ao processar ativação de assinatura via domínio' }, { status: 400 })
     }
 
-    // 2. Buscar plano correspondente para associar subscription_plan_id
-    const { data: planRow } = await supabaseAdmin
-      .from('subscription_plans')
-      .select('id')
-      .eq('slug', planSlug)
-      .maybeSingle()
+    const { updatedMinistry, hasPreRegUpdated, statusAnterior, planAnterior, endDateAnterior } = activationResult
 
-    // Calcular datas
-    const startDate = new Date()
-    const endDate = new Date()
-    endDate.setMonth(endDate.getMonth() + validityMonths)
-
-    // Atualizar ministério
-    const { data: updatedMinistry, error: updateError } = await supabaseAdmin
-      .from('ministries')
-      .update({
-        subscription_status: 'active',
-        plan: planSlug,
-        subscription_plan_id: planRow?.id || null,
-        subscription_start_date: startDate.toISOString(),
-        subscription_end_date: endDate.toISOString(),
-        is_active: true,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (updateError) {
-      return NextResponse.json({ error: `Erro ao atualizar ministério: ${updateError.message}` }, { status: 400 })
-    }
-
-    // 3. Buscar e atualizar pre_registrations usando robustez (ministry_id com fallback para user_id)
-    let preRegData = null
-    try {
-      const { data } = await supabaseAdmin
-        .from('pre_registrations')
-        .select('id, user_id')
-        .eq('ministry_id', id)
-        .maybeSingle()
-      preRegData = data
-    } catch {
-      // Ignorar erro se coluna ministry_id não existir
-    }
-
-    if (!preRegData && ministry.user_id) {
-      const { data } = await supabaseAdmin
-        .from('pre_registrations')
-        .select('id, user_id')
-        .eq('user_id', ministry.user_id)
-        .maybeSingle()
-      preRegData = data
-    }
-
-    let hasPreRegUpdated = false
-    if (preRegData?.id) {
-      const { error: preRegUpdateError } = await supabaseAdmin
-        .from('pre_registrations')
-        .update({ status: 'efetivado' })
-        .eq('id', preRegData.id)
-      if (!preRegUpdateError) {
-        hasPreRegUpdated = true
-      }
-    }
-
-    // 4. Registrar logs detalhados
+    // 2. Registrar logs detalhados de auditoria administrativa
     const changesLog = {
-      status_anterior: ministry.subscription_status,
-      plano_anterior: ministry.plan,
-      subscription_end_date_anterior: ministry.subscription_end_date,
+      status_anterior: statusAnterior,
+      plano_anterior: planAnterior,
+      subscription_end_date_anterior: endDateAnterior,
       novo_plano: planSlug,
       nova_validade_meses: validityMonths,
       admin_responsavel: adminUser.email,
       modo: 'direto',
       observacao: body.observacao || '',
-      pre_registration_vinculado_atualizado: hasPreRegUpdated
+      pre_registration_vinculado_updated: hasPreRegUpdated
     }
 
     await supabaseAdmin
@@ -137,3 +77,4 @@ export async function POST(
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+
