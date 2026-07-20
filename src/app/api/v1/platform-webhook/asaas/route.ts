@@ -113,7 +113,83 @@ export async function POST(request: NextRequest) {
             .eq('id', preReg.id)
         }
       }
+
+      // 5b. Atualizar oportunidade comercial para "Convertido" e registrar no histórico
+      try {
+        const { data: opt } = await supabase
+          .from('oportunidades_comerciais')
+          .select('id, status')
+          .eq('ministry_id', invoice.ministry_id)
+          .maybeSingle()
+
+        if (opt && opt.status !== 'Convertido') {
+          const statusAnterior = opt.status || 'Novo'
+          const obs = 'Conversão comercial concluída automaticamente após confirmação do pagamento ASAAS.'
+          
+          await supabase
+            .from('oportunidades_comerciais')
+            .update({
+              status: 'Convertido',
+              observacao_interna: obs,
+              updated_at: new Date().toISOString(),
+              updated_by: 'Asaas Webhook'
+            })
+            .eq('id', opt.id)
+
+          await supabase
+            .from('oportunidades_comerciais_historico')
+            .insert([{
+              oportunidade_id: opt.id,
+              status_anterior: statusAnterior,
+              status_novo: 'Convertido',
+              usuario: 'Asaas Webhook',
+              observacao: obs,
+              created_at: new Date().toISOString()
+            }])
+        } else {
+          // Fallback para support_tickets
+          const { data: ticket } = await supabase
+            .from('support_tickets')
+            .select('id, status')
+            .eq('ministry_id', invoice.ministry_id)
+            .or('category.eq.billing,subject.ilike.%Proposta%')
+            .maybeSingle()
+
+          if (ticket && ticket.status !== 'resolved' && ticket.status !== 'closed') {
+            const rawStatusAnterior = ticket.status || 'open'
+            let statusAnteriorFunil = 'Novo'
+            if (rawStatusAnterior === 'resolved' || rawStatusAnterior === 'closed') {
+              statusAnteriorFunil = 'Convertido'
+            } else if (rawStatusAnterior === 'in_progress') {
+              statusAnteriorFunil = 'Em Atendimento'
+            }
+
+            await supabase
+              .from('support_tickets')
+              .update({
+                status: 'resolved',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', ticket.id)
+
+            const obs = 'Conversão comercial concluída automaticamente após confirmação do pagamento ASAAS.'
+            const systemMessage = `[Histórico Comercial] Status alterado de "${statusAnteriorFunil}" para "Convertido".\nUsuário: Asaas Webhook\n\nObservação:\n${obs}`
+            
+            await supabase
+              .from('support_ticket_messages')
+              .insert([{
+                ticket_id: ticket.id,
+                user_id: '00000000-0000-0000-0000-000000000000',
+                message: systemMessage,
+                created_at: new Date().toISOString()
+              }])
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao atualizar oportunidade/ticket no webhook Asaas:', err)
+      }
     }
+
 
     // 6. Registrar admin_audit_logs se existir
     try {

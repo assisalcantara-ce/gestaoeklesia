@@ -65,6 +65,12 @@ export default function OportunidadesPage() {
   const [editObservacaoInterna, setEditObservacaoInterna] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Estados do Modal de Conversão Comercial
+  const [showConvertModal, setShowConvertModal] = useState(false)
+  const [convertPlano, setConvertPlano] = useState<'starter' | 'intermediario' | 'profissional'>('starter')
+  const [convertFormaAtivacao, setConvertFormaAtivacao] = useState<'direto' | 'asaas'>('direto')
+  const [converting, setConverting] = useState(false)
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/admin/login')
@@ -99,7 +105,18 @@ export default function OportunidadesPage() {
     setEditObservacaoInterna(opt.observacao_interna || '')
     setSuccess('')
     setError('')
+
+    // Sugere o plano correspondente ao plano solicitado
+    const planName = String(opt.plano_solicitado).toLowerCase()
+    if (planName.includes('inter')) {
+      setConvertPlano('intermediario')
+    } else if (planName.includes('profis')) {
+      setConvertPlano('profissional')
+    } else {
+      setConvertPlano('starter')
+    }
   }
+
 
   const handleSaveStatus = async () => {
     if (!selectedOpt) return
@@ -158,6 +175,68 @@ export default function OportunidadesPage() {
       setSaving(false)
     }
   }
+
+  const handleConfirmConvert = async () => {
+    if (!selectedOpt || converting) return
+    setConverting(true)
+    setError('')
+    setSuccess('')
+    try {
+      const response = await authenticatedFetch(`/api/v1/admin/oportunidades/${selectedOpt.id}/converter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plano_slug: convertPlano,
+          forma_ativacao: convertFormaAtivacao,
+          validade_meses: 12
+        })
+      })
+
+      if (!response.ok) {
+        const payload = await response.json()
+        throw new Error(payload.error || 'Erro ao converter oportunidade em cliente')
+      }
+
+      const nextStatus = convertFormaAtivacao === 'direto' ? 'Convertido' : 'Aguardando Pagamento'
+      setSuccess(`Oportunidade convertida com sucesso (${convertFormaAtivacao === 'direto' ? 'Ativada' : 'Aguardando Pagamento'})!`)
+      
+      // Atualiza lista localmente, injetando reativamente o histórico
+      setOportunidades(prev =>
+        prev.map(item => {
+          if (item.id === selectedOpt.id) {
+            const novoHistorico = [
+              {
+                id: Math.random().toString(),
+                status_anterior: selectedOpt.status,
+                status_novo: nextStatus,
+                usuario: 'Você (Admin)',
+                observacao: `Conversão efetuada via ${convertFormaAtivacao === 'direto' ? 'Ativação Direta' : 'Cobrança ASAAS'} no plano ${convertPlano}.`,
+                created_at: new Date().toISOString()
+              },
+              ...(item.historico || [])
+            ]
+            return {
+              ...item,
+              status: nextStatus,
+              historico: novoHistorico
+            }
+          }
+          return item
+        })
+      )
+
+      setTimeout(() => {
+        setShowConvertModal(false)
+        setSelectedOpt(null)
+      }, 2000)
+
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setConverting(false)
+    }
+  }
+
 
   // Filtragem local
   const filteredOportunidades = oportunidades.filter((opt) => {
@@ -484,21 +563,105 @@ export default function OportunidadesPage() {
             </div>
 
 
-            <div className="flex gap-3 pt-6 border-t border-gray-800 mt-6">
+            <div className="flex flex-col gap-3 pt-6 border-t border-gray-800 mt-6">
+              {['proposta enviada', 'aguardando cliente'].includes(selectedOpt.status.toLowerCase()) && (
+                <button
+                  onClick={() => setShowConvertModal(true)}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-lg transition cursor-pointer"
+                >
+                  🚀 Converter em Cliente
+                </button>
+              )}
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setSelectedOpt(null)}
+                  className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-750 text-white rounded-lg text-sm font-semibold transition cursor-pointer"
+                  disabled={saving}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveStatus}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition cursor-pointer"
+                  disabled={saving}
+                >
+                  {saving ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Conversão Comercial */}
+      {showConvertModal && selectedOpt && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-gray-900 border border-gray-800 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-xl font-bold text-white">Converter em Cliente</h3>
+                <p className="text-xs text-gray-400 mt-1">Defina os parâmetros de ativação para {selectedOpt.ministry_name}.</p>
+              </div>
               <button
-                onClick={() => setSelectedOpt(null)}
-                className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-750 text-white rounded-lg text-sm font-semibold transition cursor-pointer"
-                disabled={saving}
+                onClick={() => setShowConvertModal(false)}
+                className="p-1 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition cursor-pointer"
               >
-                Cancelar
+                <X size={18} />
               </button>
-              <button
-                onClick={handleSaveStatus}
-                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition cursor-pointer"
-                disabled={saving}
-              >
-                {saving ? 'Salvando...' : 'Salvar Alterações'}
-              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Plano</label>
+                <select
+                  value={convertPlano}
+                  onChange={(e) => setConvertPlano(e.target.value as any)}
+                  className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="starter">Starter</option>
+                  <option value="intermediario">Intermediário</option>
+                  <option value="profissional">Profissional</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Forma de ativação</label>
+                <select
+                  value={convertFormaAtivacao}
+                  onChange={(e) => setConvertFormaAtivacao(e.target.value as any)}
+                  className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="direto">Ativação imediata</option>
+                  <option value="asaas">Gerar cobrança ASAAS</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Vigência</label>
+                <input
+                  type="text"
+                  readOnly
+                  value="12 meses (padrão)"
+                  className="w-full px-3 py-2.5 bg-gray-800 border border-gray-750 text-gray-400 rounded-lg text-sm outline-none cursor-not-allowed"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-gray-800">
+                <button
+                  onClick={() => setShowConvertModal(false)}
+                  className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-750 text-white rounded-lg text-sm font-semibold transition cursor-pointer"
+                  disabled={converting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmConvert}
+                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition cursor-pointer"
+                  disabled={converting}
+                >
+                  {converting ? 'Convertendo...' : 'Confirmar'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -506,3 +669,4 @@ export default function OportunidadesPage() {
     </div>
   )
 }
+
