@@ -367,118 +367,170 @@ export default function TrialExpiradoPage() {
             </div>
           )}
 
-          {!loading && !error && (
-            <div className="grid gap-6 md:grid-cols-3">
-              {planos.map((plan) => {
-                const isSelected = selectedPlanId === plan.id
-                const isStarter = plan.slug?.toLowerCase().includes('starter') || plan.price_monthly > 0
-                const isProfissional = plan.slug?.toLowerCase().includes('profis')
+          {!loading && !error && (() => {
+            const planosExibidos = planos.filter((p) => !p.slug?.toLowerCase().includes('basic'))
+            const planoStarter = planosExibidos.find((p) => p.slug?.toLowerCase().includes('starter') || p.price_monthly === 59.90 || p.price_monthly > 0)
+            const planosSecundarios = planosExibidos.filter((p) => p.id !== planoStarter?.id)
 
-                // Texto do botão por tipo de plano
-                const btnLabel = isSelected
-                  ? '✓ Selecionado'
-                  : isProfissional
-                    ? 'Falar com Especialista'
-                    : !isStarter
-                      ? 'Solicitar Proposta'
-                      : 'Selecionar Plano'
+            return (
+              <div className="space-y-10">
+                {/* Seção Protagonista: Plano Starter */}
+                {planoStarter && (() => {
+                  const plan = planoStarter
+                  const isSelected = selectedPlanId === plan.id
+                  const btnLabel = isSelected ? '✓ Selecionado' : 'Selecionar Plano'
 
-                // Preço: apenas Starter exibe; demais mostram "Preço sob consulta"
-                const showPrice = isStarter && plan.price_monthly > 0
+                  return (
 
-                return (
-                  <PremiumCard
-                    key={plan.id}
-                    hoverable
-                    onClick={() => {
-                      if (isStarter) {
-                        setSelectedPlanId(plan.id)
-                        setCheckoutInfo(null)
-                        setCheckoutError('')
-                      } else {
-                        setModalPlan(plan)
-                        setIsModalOpen(true)
-                        setSolicitacaoSucesso(false)
-                        setObservacao('')
-                      }
-                    }}
-                    className={`relative pt-8 pb-6 px-6 transition-all flex flex-col justify-between h-full overflow-visible ${
-                      isStarter
-                        ? `border-2 ${isSelected ? 'border-emerald-600' : 'border-emerald-400'} bg-white shadow-lg cursor-pointer`
-                        : `border ${isSelected ? 'border-emerald-400 bg-emerald-50/10' : 'border-slate-100 bg-white'} cursor-pointer`
-                    }`}
-                  >
-                    {/* Selos superiores absolutos */}
-                    {isStarter && (
-                      <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 inline-flex items-center px-3 py-1 rounded-full bg-emerald-600 text-white text-[9px] font-black uppercase tracking-wider shadow z-10 whitespace-nowrap">
-                        Mais escolhido
-                      </span>
-                    )}
-                    {!isStarter && !isProfissional && (
-                      <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 inline-flex items-center px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-black uppercase tracking-wider shadow z-10 whitespace-nowrap">
-                        Recomendado
-                      </span>
-                    )}
-
-                    <div className="flex-1 flex flex-col">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Plano</p>
-                          <h2 className="text-xl font-bold text-slate-800 mt-2">{plan.name}</h2>
-                        </div>
-                        <div className="text-right">
-                          {showPrice ? (
-                            <>
-                              <p className="text-xs font-bold text-slate-400">Mensal</p>
-                              <p className="text-lg font-bold text-[#062E6F]">{formatarPreco(plan.price_monthly)}/mês</p>
-                            </>
-                          ) : (
-                            <p className="text-xs font-semibold text-slate-500 mt-1 leading-tight">
-                              Preço sob<br />consulta
-                            </p>
-                          )}
-                        </div>
+                    <div className="space-y-5">
+                      <div className="space-y-1 text-center md:text-left">
+                        <h3 className="text-xl font-bold text-[#062E6F]">Continue utilizando o Gestão Eklésia</h3>
+                        <p className="text-sm text-slate-500 font-medium">Este é o plano recomendado para continuar utilizando todos os recursos do seu ministério.</p>
                       </div>
 
-                      <p className="text-xs text-slate-500 mt-3 font-medium">{plan.description || ''}</p>
-
-                      <ul className="space-y-2 text-xs text-slate-600 mt-4 flex-1">
-                        {buildHighlights(plan).map((item) => (
-                          <li key={item} className="flex items-center gap-2 font-medium">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            {item}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="mt-6 pt-4 border-t border-slate-50">
-                      <PremiumButton
-                        variant={isSelected || isStarter ? 'success' : 'secondary'}
-                        className="w-full text-xs"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isStarter) {
+                      <div className="max-w-md">
+                        <PremiumCard
+                          key={plan.id}
+                          hoverable
+                          onClick={() => {
                             setSelectedPlanId(plan.id)
                             setCheckoutInfo(null)
                             setCheckoutError('')
-                          } else {
-                            setModalPlan(plan)
-                            setIsModalOpen(true)
-                            setSolicitacaoSucesso(false)
-                            setObservacao('')
-                          }
-                        }}
-                      >
-                        {btnLabel}
-                      </PremiumButton>
-                    </div>
-                  </PremiumCard>
+                          }}
+                          className={`relative pt-8 pb-6 px-6 transition-all flex flex-col justify-between h-full overflow-visible ${
+                            isSelected ? 'border-2 border-emerald-600 bg-white shadow-xl' : 'border border-emerald-400 bg-white shadow-md'
+                          } cursor-pointer`}
+                        >
+                          <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 inline-flex items-center px-3 py-1 rounded-full bg-emerald-600 text-white text-[9px] font-black uppercase tracking-wider shadow z-10 whitespace-nowrap">
+                            Mais escolhido
+                          </span>
 
-                )
-              })}
-            </div>
-          )}
+                          <div className="flex-1 flex flex-col">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Plano</p>
+                                <h2 className="text-xl font-bold text-slate-800 mt-2">{plan.name}</h2>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs font-bold text-slate-400">Mensal</p>
+                                <p className="text-lg font-bold text-[#062E6F]">{formatarPreco(plan.price_monthly)}/mês</p>
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-slate-500 mt-3 font-medium">{plan.description || ''}</p>
+
+                            <ul className="space-y-2 text-xs text-slate-600 mt-4 flex-1">
+                              {buildHighlights(plan).map((item) => (
+                                <li key={item} className="flex items-center gap-2 font-medium">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                  {item}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          <div className="mt-6 pt-4 border-t border-slate-50">
+                            <PremiumButton
+                              variant="success"
+                              className="w-full text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedPlanId(plan.id)
+                                setCheckoutInfo(null)
+                                setCheckoutError('')
+                              }}
+                            >
+                              {btnLabel}
+                            </PremiumButton>
+                          </div>
+                        </PremiumCard>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Seção Secundária: Intermediário & Profissional */}
+                {planosSecundarios.length > 0 && (
+                  <div className="pt-10 border-t border-slate-100 space-y-6">
+                    <div className="space-y-1 text-center md:text-left">
+                      <h3 className="text-lg font-bold text-slate-800">Precisa de uma solução personalizada?</h3>
+                      <p className="text-sm text-slate-500 font-medium">Para ministérios maiores ou com necessidades específicas, nossa equipe poderá montar uma proposta personalizada.</p>
+                    </div>
+
+                    <div className="grid gap-6 md:grid-cols-2 max-w-3xl">
+                      {planosSecundarios.map((plan) => {
+                        const isSelected = selectedPlanId === plan.id
+                        const isProfissional = plan.slug?.toLowerCase().includes('profis')
+                        const btnLabel = isProfissional ? 'Falar com Especialista' : 'Solicitar Proposta'
+
+                        return (
+                          <PremiumCard
+                            key={plan.id}
+                            hoverable
+                            onClick={() => {
+                              setModalPlan(plan)
+                              setIsModalOpen(true)
+                              setSolicitacaoSucesso(false)
+                              setObservacao('')
+                            }}
+                            className={`relative pt-8 pb-6 px-6 transition-all flex flex-col justify-between h-full overflow-visible ${
+                              isSelected ? 'border border-emerald-400 bg-emerald-50/10' : 'border border-slate-150 bg-white'
+                            } cursor-pointer`}
+                          >
+                            <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 inline-flex items-center px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-black uppercase tracking-wider shadow z-10 whitespace-nowrap">
+                              Recomendado
+                            </span>
+
+                            <div className="flex-1 flex flex-col">
+                              <div className="flex items-start justify-between gap-4">
+                                <div>
+                                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Plano</p>
+                                  <h2 className="text-xl font-bold text-slate-800 mt-2">{plan.name}</h2>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xs font-semibold text-slate-500 mt-1 leading-tight">
+                                    Preço sob<br />consulta
+                                  </p>
+                                </div>
+                              </div>
+
+                              <p className="text-xs text-slate-500 mt-3 font-medium">{plan.description || ''}</p>
+
+                              <ul className="space-y-2 text-xs text-slate-600 mt-4 flex-1">
+                                {buildHighlights(plan).map((item) => (
+                                  <li key={item} className="flex items-center gap-2 font-medium">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+
+                            <div className="mt-6 pt-4 border-t border-slate-50">
+                              <PremiumButton
+                                variant="secondary"
+                                className="w-full text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setModalPlan(plan)
+                                  setIsModalOpen(true)
+                                  setSolicitacaoSucesso(false)
+                                  setObservacao('')
+                                }}
+                              >
+                                {btnLabel}
+                              </PremiumButton>
+                            </div>
+                          </PremiumCard>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
 
           {!loading && !error && selectedPlanId && selectedPlan && selectedPlan.price_monthly > 0 && (
             <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5 text-emerald-950 space-y-3">
