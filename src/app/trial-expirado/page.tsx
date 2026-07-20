@@ -198,14 +198,34 @@ export default function TrialExpiradoPage() {
       <div className="max-w-6xl mx-auto px-6 py-16 relative">
         <div className="max-w-3xl">
           <span className="inline-flex items-center px-4 py-1 rounded-full bg-amber-50 text-xs uppercase tracking-[0.4em] text-amber-700 border border-amber-100">
-            Teste encerrado
+            Avaliação encerrada
           </span>
           <h1 className="landing-title text-4xl md:text-5xl font-bold leading-tight mt-4">
-            Seu periodo de teste terminou.
+            Seu período de avaliação terminou
           </h1>
           <p className="text-lg text-slate-600 mt-4">
-            Para continuar usando o Gestao Eklesia, escolha um plano abaixo. O boleto sera enviado por email na proxima etapa.
+            Seu ministério continua salvo e todos os dados cadastrados permanecem preservados.
           </p>
+          <p className="text-base text-slate-500 mt-2">
+            Escolha abaixo como deseja continuar utilizando o Gestão Eklésia.
+          </p>
+
+          {/* Card informativo — dados preservados */}
+          <div className="mt-6 rounded-2xl bg-emerald-50 border border-emerald-100 px-6 py-5 flex flex-wrap gap-x-8 gap-y-2">
+            {[
+              'Nenhum membro será perdido',
+              'Financeiro preservado',
+              'Eventos preservados',
+              'Configurações preservadas',
+            ].map((item) => (
+              <span key={item} className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+                <svg className="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                {item}
+              </span>
+            ))}
+          </div>
         </div>
 
         <div className="mt-10">
