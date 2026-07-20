@@ -242,9 +242,24 @@ export default function TrialExpiradoPage() {
           )}
 
           {!loading && !error && (
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-3">
               {planos.map((plan) => {
                 const isSelected = selectedPlanId === plan.id
+                const isStarter = plan.slug?.toLowerCase().includes('starter') || plan.price_monthly > 0
+                const isProfissional = plan.slug?.toLowerCase().includes('profis')
+
+                // Texto do botão por tipo de plano
+                const btnLabel = isSelected
+                  ? '✓ Selecionado'
+                  : isProfissional
+                    ? 'Falar com Especialista'
+                    : !isStarter
+                      ? 'Solicitar Proposta'
+                      : 'Selecionar Plano'
+
+                // Preço: apenas Starter exibe; demais mostram "Preço sob consulta"
+                const showPrice = isStarter && plan.price_monthly > 0
+
                 return (
                   <PremiumCard
                     key={plan.id}
@@ -254,16 +269,35 @@ export default function TrialExpiradoPage() {
                       setCheckoutInfo(null)
                       setCheckoutError('')
                     }}
-                    className={`p-6 border transition-all ${isSelected ? 'border-emerald-500 bg-emerald-50/10' : 'border-slate-100 bg-white'}`}
+                    className={`relative p-6 transition-all ${
+                      isStarter
+                        ? `border-2 ${isSelected ? 'border-emerald-600' : 'border-emerald-400'} bg-white shadow-md`
+                        : `border ${isSelected ? 'border-emerald-400 bg-emerald-50/10' : 'border-slate-100 bg-white'}`
+                    }`}
                   >
+                    {/* Selo "Mais escolhido" — apenas Starter */}
+                    {isStarter && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center px-3 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest shadow">
+                        Mais escolhido
+                      </span>
+                    )}
+
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Plano</p>
                         <h2 className="text-xl font-bold text-slate-800 mt-2">{plan.name}</h2>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-bold text-slate-400">Mensal</p>
-                        <p className="text-lg font-bold text-[#062E6F]">{formatarPreco(plan.price_monthly)}/mês</p>
+                        {showPrice ? (
+                          <>
+                            <p className="text-xs font-bold text-slate-400">Mensal</p>
+                            <p className="text-lg font-bold text-[#062E6F]">{formatarPreco(plan.price_monthly)}/mês</p>
+                          </>
+                        ) : (
+                          <p className="text-xs font-semibold text-slate-500 mt-1 leading-tight">
+                            Preço sob<br />consulta
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -279,7 +313,7 @@ export default function TrialExpiradoPage() {
                     </ul>
 
                     <PremiumButton
-                      variant={isSelected ? 'success' : 'secondary'}
+                      variant={isSelected || isStarter ? 'success' : 'secondary'}
                       className="mt-6 w-full text-xs"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -288,7 +322,7 @@ export default function TrialExpiradoPage() {
                         setCheckoutError('')
                       }}
                     >
-                      {isSelected ? '✓ Plano Selecionado' : 'Selecionar Plano'}
+                      {btnLabel}
                     </PremiumButton>
                   </PremiumCard>
                 )
