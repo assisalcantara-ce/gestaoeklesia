@@ -27,9 +27,14 @@ import {
   Calendar as CalendarIcon,
   FileText,
   Plus,
+  Clock,
+  DollarSign,
+  CheckCircle2,
+  Lock,
 } from 'lucide-react'
 import { CrmActivityData } from '@/components/crm/CrmActivities'
 import { InteractionRecord } from '@/components/crm/CrmActivityDrawer'
+import { CrmTimelineData } from '@/components/crm/CrmTimeline'
 
 function formatDate(iso?: string): string {
   if (!iso) return '—'
@@ -57,6 +62,25 @@ function formatRelativeDate(iso?: string): string {
   if (diffDays === 0) return 'Hoje'
   if (diffDays === 1) return 'Ontem'
   return `Há ${diffDays} dias`
+}
+
+// Retorna marcador de agrupamento relativo
+function getRelativePeriodMarker(dateIso: string): 'Hoje' | 'Ontem' | 'Esta semana' | 'Este mês' | 'Anterior' {
+  const date = new Date(dateIso)
+  const today = new Date()
+  
+  today.setHours(0, 0, 0, 0)
+  const itemDate = new Date(date)
+  itemDate.setHours(0, 0, 0, 0)
+
+  const diffTime = today.getTime() - itemDate.getTime()
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return 'Hoje'
+  if (diffDays === 1) return 'Ontem'
+  if (diffDays <= 7) return 'Esta semana'
+  if (diffDays <= 30) return 'Este mês'
+  return 'Anterior'
 }
 
 // ─── Componentes de Skeletons ────────────────────────────────────────────────
@@ -124,6 +148,23 @@ function InteracoesSkeleton() {
   )
 }
 
+function TimelineSkeleton() {
+  return (
+    <div className="flex-1 p-6 space-y-6 animate-pulse">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="flex gap-4">
+          <div className="w-8 h-8 rounded-full bg-gray-900 shrink-0" />
+          <div className="flex-1 bg-gray-900/40 p-4 border border-gray-800 rounded-xl space-y-2.5">
+            <div className="h-4 bg-gray-800 rounded w-1/4" />
+            <div className="h-3.5 bg-gray-800 rounded w-2/3" />
+            <div className="h-3 bg-gray-900 rounded w-16" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function SidebarSkeleton() {
   return (
     <div className="space-y-4 animate-pulse">
@@ -155,6 +196,11 @@ export default function OportunidadePerfilPage() {
   const [interactions, setInteractions] = useState<InteractionRecord[]>([])
   const [loadingInteractions, setLoadingInteractions] = useState<boolean>(false)
   const [interactionsError, setInteractionsError] = useState<string | null>(null)
+
+  // Dados da Timeline
+  const [timeline, setTimeline] = useState<CrmTimelineData[]>([])
+  const [loadingTimeline, setLoadingTimeline] = useState<boolean>(false)
+  const [timelineError, setTimelineError] = useState<string | null>(null)
 
   // Modal de Nova Interação
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
@@ -201,12 +247,30 @@ export default function OportunidadePerfilPage() {
     }
   }, [id])
 
+  // Fetch Timeline
+  const fetchTimeline = useCallback(async () => {
+    if (!id) return
+    setLoadingTimeline(true)
+    setTimelineError(null)
+    try {
+      const res = await authenticatedFetch(`/api/v1/admin/crm/timeline?ministryId=${encodeURIComponent(id)}`)
+      if (!res.ok) throw new Error('Erro ao obter linha do tempo comercial')
+      const data = await res.json()
+      setTimeline(data || [])
+    } catch (err: any) {
+      setTimelineError(err?.message || 'Erro ao carregar linha do tempo comercial')
+    } finally {
+      setLoadingTimeline(false)
+    }
+  }, [id])
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchDetails()
       fetchInteractions()
+      fetchTimeline()
     }
-  }, [isAuthenticated, fetchDetails, fetchInteractions])
+  }, [isAuthenticated, fetchDetails, fetchInteractions, fetchTimeline])
 
   // Localiza a oportunidade correspondente
   const opportunity = useMemo(() => {
@@ -221,7 +285,91 @@ export default function OportunidadePerfilPage() {
     // Atualiza tudo localmente sem F5 completo
     fetchInteractions()
     fetchDetails()
-  }, [fetchInteractions, fetchDetails])
+    fetchTimeline()
+  }, [fetchInteractions, fetchDetails, fetchTimeline])
+
+  // Agrupamento cronológico da timeline por período relativo
+  const groupedTimeline = useMemo(() => {
+    const sorted = [...timeline].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+    const groups: Record<'Hoje' | 'Ontem' | 'Esta semana' | 'Este mês' | 'Anterior', CrmTimelineData[]> = {
+      Hoje: [],
+      Ontem: [],
+      'Esta semana': [],
+      'Este mês': [],
+      Anterior: [],
+    }
+
+    sorted.forEach((item) => {
+      const marker = getRelativePeriodMarker(item.data)
+      groups[marker].push(item)
+    })
+
+    return groups
+  }, [timeline])
+
+  // Helpers de Icones e Classes da Timeline
+  const getTimelineIcon = (evento: string) => {
+    const s = String(evento).toLowerCase()
+    if (s.includes('ativada') || s.includes('convertida') || s.includes('cliente ativo')) {
+      return <CheckCircle2 className="h-4 w-4" />
+    }
+    if (s.includes('cobrança') || s.includes('pago') || s.includes('pagamento') || s.includes('compensada')) {
+      return <DollarSign className="h-4 w-4" />
+    }
+    if (s.includes('interação') || s.includes('registrada')) {
+      return <MessageSquare className="h-4 w-4" />
+    }
+    if (s.includes('responsável') || s.includes('atribuído')) {
+      return <User className="h-4 w-4" />
+    }
+    if (s.includes('plano') || s.includes('upgrade') || s.includes('contrato')) {
+      return <Briefcase className="h-4 w-4" />
+    }
+    if (s.includes('cancelamento') || s.includes('perdido') || s.includes('bloqueada')) {
+      return <Lock className="h-4 w-4" />
+    }
+    return <Clock className="h-4 w-4" />
+  }
+
+  const getTimelineIconColors = (evento: string) => {
+    const s = String(evento).toLowerCase()
+    if (s.includes('ativada') || s.includes('convertida') || s.includes('cliente ativo')) {
+      return 'text-emerald-500 bg-emerald-950 border-emerald-900/60'
+    }
+    if (s.includes('cobrança') || s.includes('pago') || s.includes('pagamento') || s.includes('compensada')) {
+      return 'text-pink-500 bg-pink-950 border-pink-900/60'
+    }
+    if (s.includes('interação') || s.includes('registrada')) {
+      return 'text-blue-500 bg-blue-950 border-blue-900/60'
+    }
+    if (s.includes('cancelamento') || s.includes('perdido') || s.includes('bloqueada')) {
+      return 'text-rose-500 bg-rose-950 border-rose-900/60'
+    }
+    return 'text-gray-400 bg-gray-900 border-gray-800'
+  }
+
+  const getTimelineBadgeColors = (evento: string) => {
+    const s = String(evento).toLowerCase()
+    if (s.includes('ativada') || s.includes('convertida')) {
+      return 'bg-emerald-950/40 text-emerald-450 border-emerald-900/30'
+    }
+    if (s.includes('interação')) {
+      return 'bg-blue-950/40 text-blue-450 border-blue-900/30'
+    }
+    if (s.includes('cobrança') || s.includes('fatura')) {
+      return 'bg-pink-950/40 text-pink-450 border-pink-900/30'
+    }
+    return 'bg-gray-900 text-gray-400 border-gray-800'
+  }
+
+  const getTimelineBadgeLabel = (evento: string) => {
+    const s = String(evento).toLowerCase()
+    if (s.includes('ativada') || s.includes('convertida')) return 'Conversão'
+    if (s.includes('interação')) return 'Interação'
+    if (s.includes('cobrança') || s.includes('emitida') || s.includes('fatura')) return 'Financeiro'
+    if (s.includes('responsável')) return 'Designação'
+    return 'Lifecycle'
+  }
 
   const getTipoIcon = (tipo: string) => {
     switch (tipo.toLowerCase()) {
@@ -277,7 +425,7 @@ export default function OportunidadePerfilPage() {
 
   if (!isAuthenticated) return null
 
-  const isProfileLoading = loadingDetails || loadingInteractions
+  const isProfileLoading = loadingDetails || loadingInteractions || loadingTimeline
 
   return (
     <div className="flex h-screen bg-gray-900">
@@ -339,6 +487,7 @@ export default function OportunidadePerfilPage() {
                   onClick={() => {
                     fetchDetails()
                     fetchInteractions()
+                    fetchTimeline()
                   }}
                   className="flex items-center gap-2 px-3.5 py-2 bg-gray-800 hover:bg-gray-750 text-gray-300 hover:text-white border border-gray-700 rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
@@ -542,12 +691,12 @@ export default function OportunidadePerfilPage() {
                         <Inbox className="h-5 w-5 text-gray-600" />
                       </div>
                       <h4 className="text-xs font-bold text-gray-400">Nenhuma interação registrada</h4>
-                      <p className="text-[10px] text-gray-600 mt-1 max-w-[200px]">
+                      <p className="text-[10px] text-gray-650 mt-1 max-w-[200px]">
                         Registre o primeiro contato, proposta ou whatsapp enviado.
                       </p>
                       <button
                         onClick={() => setIsModalOpen(true)}
-                        className="mt-4 flex items-center gap-1.5 px-4 py-2 bg-blue-650 hover:bg-blue-600 border border-blue-700/30 text-white rounded-xl text-xs font-bold cursor-pointer transition select-none outline-none focus:ring-1 focus:ring-blue-650"
+                        className="mt-4 flex items-center gap-1.5 px-4 py-2 bg-blue-650 hover:bg-blue-650 border border-blue-700/30 text-white rounded-xl text-xs font-bold cursor-pointer transition select-none outline-none focus:ring-1 focus:ring-blue-650"
                       >
                         <Plus className="h-3.5 w-3.5" />
                         Registrar primeira interação
@@ -558,7 +707,7 @@ export default function OportunidadePerfilPage() {
                       {interactions.map((rec) => (
                         <div 
                           key={rec.id}
-                          className="p-4 bg-gray-950 border border-gray-850 hover:border-gray-800 rounded-xl space-y-3 shadow-2xs relative"
+                          className="p-4 bg-gray-950 border border-gray-850 hover:border-gray-850 rounded-xl space-y-3 shadow-2xs relative"
                         >
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2.5">
@@ -592,6 +741,91 @@ export default function OportunidadePerfilPage() {
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )
+                ) : activeTab === 'timeline' ? (
+                  loadingTimeline ? (
+                    <TimelineSkeleton />
+                  ) : timelineError ? (
+                    <div className="flex-1 p-6 flex flex-col items-center justify-center text-center">
+                      <AlertTriangle className="h-8 w-8 text-rose-500 mb-2" />
+                      <h4 className="text-xs font-bold text-gray-400">Falha ao carregar linha do tempo</h4>
+                      <p className="text-[10px] text-gray-650 mt-1 max-w-[240px]">{timelineError}</p>
+                      <button onClick={fetchTimeline} className="mt-3.5 px-3.5 py-2 bg-gray-900 border border-gray-800 hover:bg-gray-800 text-gray-400 hover:text-white rounded-xl text-[10px] font-semibold transition cursor-pointer">
+                        Tentar novamente
+                      </button>
+                    </div>
+                  ) : timeline.length === 0 ? (
+                    <div className="flex-1 p-6 flex flex-col items-center justify-center py-16 text-center">
+                      <Inbox className="h-10 w-10 text-gray-600 mb-2" />
+                      <h4 className="text-xs font-bold text-gray-400">Nenhum histórico disponível</h4>
+                      <p className="text-[10px] text-gray-600 mt-1">Nenhum evento registrado nesta linha do tempo.</p>
+                    </div>
+                  ) : (
+                    <div className="flex-1 p-6 overflow-y-auto space-y-8 relative max-h-[calc(100vh-360px)]">
+                      {/* Linha vertical centralizada */}
+                      <div className="absolute left-[31px] top-6 bottom-6 w-0.5 bg-gray-900 z-0"></div>
+
+                      {(Object.keys(groupedTimeline) as Array<keyof typeof groupedTimeline>).map((period) => {
+                        const items = groupedTimeline[period]
+                        if (items.length === 0) return null
+
+                        return (
+                          <div key={period} className="space-y-6 relative z-10">
+                            {/* Marcador Temporal */}
+                            <span className="text-[10px] font-black uppercase text-blue-400/85 tracking-widest bg-blue-950/20 border border-blue-900/30 px-3 py-1 rounded-xl block w-max ml-1.5 select-none shadow-2xs">
+                              {period}
+                            </span>
+
+                            {/* Eventos do Período */}
+                            <div className="space-y-5">
+                              {items.map((evt) => {
+                                const hasUser = evt.usuario && evt.usuario.toLowerCase() !== 'sistema'
+                                const iconColors = getTimelineIconColors(evt.evento)
+                                const badgeColors = getTimelineBadgeColors(evt.evento)
+
+                                return (
+                                  <div key={evt.id} className="flex gap-4 items-start relative group">
+                                    {/* Icon Node */}
+                                    <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 z-10 shadow-xs ${iconColors}`}>
+                                      {getTimelineIcon(evt.evento)}
+                                    </div>
+
+                                    {/* Card de Informações */}
+                                    <div className="flex-1 bg-gray-950 border border-gray-850 hover:border-gray-800 rounded-xl p-4 transition duration-200 flex flex-col justify-between shadow-2xs">
+                                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-gray-900 pb-2 mb-2.5">
+                                        <div>
+                                          <h4 className="text-xs font-bold text-white leading-tight">
+                                            {evt.evento}
+                                          </h4>
+                                          <span className="text-[9px] font-semibold text-gray-500 mt-1 block">
+                                            {new Date(evt.data).toLocaleString('pt-BR')}
+                                          </span>
+                                        </div>
+
+                                        <span className={`text-[8.5px] font-extrabold px-2 py-0.5 rounded border uppercase tracking-wider block w-max shrink-0 ${badgeColors}`}>
+                                          {getTimelineBadgeLabel(evt.evento)}
+                                        </span>
+                                      </div>
+
+                                      <p className="text-xs text-gray-400 font-medium leading-relaxed bg-gray-950/40 p-2.5 border border-gray-900 rounded-lg">
+                                        {evt.descricao}
+                                      </p>
+
+                                      {hasUser && (
+                                        <div className="mt-2.5 pt-2 border-t border-gray-900 flex items-center gap-1.5 text-[9px] text-gray-500 font-semibold select-none">
+                                          <User className="h-3.5 w-3.5 text-gray-650" />
+                                          <span>Executor: {evt.usuario}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   )
                 ) : (
