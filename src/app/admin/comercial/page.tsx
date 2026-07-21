@@ -11,6 +11,7 @@ import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
 import CrmSummaryCards from '@/components/crm/CrmSummaryCards'
 import CrmNextActions from '@/components/crm/CrmNextActions'
 import CrmTimeline from '@/components/crm/CrmTimeline'
+import CrmActivities from '@/components/crm/CrmActivities'
 import {
   Briefcase,
   TrendingUp,
@@ -250,6 +251,7 @@ export default function ComercialDashboardPage() {
           <CrmSummaryCards />
           <CrmNextActions />
           <CrmTimeline />
+          <CrmActivities />
           
           {/* MENU COMERCIAL */}
           <div className="flex flex-wrap gap-2 border-b border-gray-800 pb-4">
