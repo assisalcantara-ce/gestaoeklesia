@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { OportunidadeComercial, HistoricoComercial, CrmActivity, CrmTimelineItem, CrmNextAction, CrmSummary } from './types'
+import { CommercialService } from '../commercial/CommercialService'
 
 export interface ConvertOpportunityInput {
   oportunidadeId: string
@@ -25,6 +26,43 @@ export interface ResolvedOpportunity {
 }
 
 export class CrmService {
+  /**
+   * Retorna o resumo consolidado de métricas do CRM com base no CommercialService.
+   */
+  async getSummary(supabase: SupabaseClient): Promise<CrmSummary> {
+    const commercialService = new CommercialService();
+    const list = await commercialService.list(supabase);
+
+    let totalLeads = 0;
+    let totalTrials = 0;
+    let totalClientesAtivos = 0;
+    let totalRenovacoes = 0;
+    let totalCobrancasPendentes = 0;
+    let totalNegociacoes = 0;
+    let totalCancelados = 0;
+
+    list.forEach(item => {
+      const status = item.lifecycle.status;
+      if (status === 'LEAD') totalLeads++;
+      else if (status === 'TRIAL' || status === 'TRIAL_EXPIRING') totalTrials++;
+      else if (status === 'ACTIVE') totalClientesAtivos++;
+      else if (status === 'RENEWAL') totalRenovacoes++;
+      else if (status === 'PAYMENT_PENDING') totalCobrancasPendentes++;
+      else if (status === 'NEGOTIATION') totalNegociacoes++;
+      else if (status === 'CANCELED' || status === 'TRIAL_EXPIRED') totalCancelados++;
+    });
+
+    return {
+      totalLeads,
+      totalTrials,
+      totalClientesAtivos,
+      totalRenovacoes,
+      totalCobrancasPendentes,
+      totalNegociacoes,
+      totalCancelados
+    };
+  }
+
   async getOportunidade(_id: string): Promise<OportunidadeComercial | null> {
     // Esqueleto para obter oportunidade comercial no futuro
     return null
@@ -203,18 +241,6 @@ export class CrmService {
     }
   }
 
-  /**
-   * Retorna o resumo consolidado de métricas do CRM.
-   */
-  async getSummary(_supabase: SupabaseClient): Promise<CrmSummary> {
-    return {
-      totalLeads: 0,
-      totalNegotiations: 0,
-      totalConversions: 0,
-      conversionRate: 0,
-      estimatedRevenue: 0
-    };
-  }
 
   /**
    * Retorna a linha do tempo comercial (histórico) de um determinado lead ou cliente.

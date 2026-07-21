@@ -59,9 +59,12 @@ export interface CrmNextAction {
 
 export interface CrmSummary {
   totalLeads: number;
-  totalNegotiations: number;
-  totalConversions: number;
-  conversionRate: number;
-  estimatedRevenue: number;
+  totalTrials: number;
+  totalClientesAtivos: number;
+  totalRenovacoes: number;
+  totalCobrancasPendentes: number;
+  totalNegociacoes: number;
+  totalCancelados: number;
 }
+
 
