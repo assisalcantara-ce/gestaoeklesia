@@ -251,8 +251,18 @@ export default function ComercialDashboardPage() {
 
   if (isLoading || !isAuthenticated) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-900 text-white">
-        Carregando...
+      <div className="flex h-screen bg-gray-900">
+        <div className="w-64 bg-gray-950 border-r border-gray-800 shrink-0 animate-pulse" />
+        <div className="flex-1 p-8 space-y-6">
+          <div className="h-10 bg-gray-800 rounded-2xl w-72 animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-800 rounded-2xl border border-gray-700 animate-pulse" />
+            ))}
+          </div>
+          <div className="h-48 bg-gray-800 rounded-2xl border border-gray-700 animate-pulse" />
+          <div className="h-64 bg-gray-800 rounded-2xl border border-gray-700 animate-pulse" />
+        </div>
       </div>
     )
   }
@@ -293,26 +303,41 @@ export default function ComercialDashboardPage() {
           <CrmActivities />
           
           {/* MENU COMERCIAL */}
-          <div className="flex flex-wrap gap-2 border-b border-gray-800 pb-4">
-            <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold transition">
+          <nav aria-label="Menu comercial" className="flex flex-wrap gap-2 border-b border-gray-800 pb-4">
+            <button
+              aria-current="page"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold transition"
+            >
               Dashboard
             </button>
             <button
               onClick={() => router.push('/admin/comercial/oportunidades')}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-750 text-gray-300 rounded-lg text-sm font-semibold transition cursor-pointer"
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg text-sm font-semibold transition cursor-pointer"
             >
               Oportunidades
             </button>
-            <button className="px-4 py-2 bg-gray-800 hover:bg-gray-750 text-gray-400 rounded-lg text-sm font-semibold cursor-not-allowed">
+            <button
+              disabled
+              title="Disponível em breve"
+              className="px-4 py-2 bg-gray-800 text-gray-500 rounded-lg text-sm font-semibold cursor-not-allowed opacity-50 select-none"
+            >
               Cobranças
             </button>
-            <button className="px-4 py-2 bg-gray-800 hover:bg-gray-750 text-gray-400 rounded-lg text-sm font-semibold cursor-not-allowed">
+            <button
+              disabled
+              title="Disponível em breve"
+              className="px-4 py-2 bg-gray-800 text-gray-500 rounded-lg text-sm font-semibold cursor-not-allowed opacity-50 select-none"
+            >
               Renovações
             </button>
-            <button className="px-4 py-2 bg-gray-800 hover:bg-gray-750 text-gray-400 rounded-lg text-sm font-semibold cursor-not-allowed">
+            <button
+              disabled
+              title="Disponível em breve"
+              className="px-4 py-2 bg-gray-800 text-gray-500 rounded-lg text-sm font-semibold cursor-not-allowed opacity-50 select-none"
+            >
               Relatórios
             </button>
-          </div>
+          </nav>
 
           {/* INDICADORES COMERCIAIS */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -334,7 +359,7 @@ export default function ComercialDashboardPage() {
               title="Receita Prevista"
               value={indicadores.receitaPrevista}
               subtitle="LTV comercial + Ativos"
-              icon={DollarSign}
+              icon={TrendingUp}
               color="blue"
             />
             <ExecutiveMetricCard
@@ -347,27 +372,39 @@ export default function ComercialDashboardPage() {
           </div>
 
           {/* KPIS DE FUNIL */}
-          <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700 space-y-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Activity className="text-blue-500" />
-              Volume de Oportunidades por Status
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-              {[
-                { label: 'Novo', count: kpis.novo, color: 'border-red-500/20 text-red-400 bg-red-950/20' },
-                { label: '1º Contato', count: kpis.primeiro_contato, color: 'border-indigo-500/20 text-indigo-400 bg-indigo-950/20' },
-                { label: 'Em Negociação', count: kpis.em_negociacao, color: 'border-blue-500/20 text-blue-400 bg-blue-950/20' },
-                { label: 'Propostas', count: kpis.proposta_enviada, color: 'border-amber-500/20 text-amber-400 bg-amber-950/20' },
-                { label: 'Aguard. Cliente', count: kpis.aguardando_cliente, color: 'border-purple-500/20 text-purple-400 bg-purple-950/20' },
-                { label: 'Aguard. Pgto', count: kpis.aguardando_pagamento, color: 'border-pink-500/20 text-pink-400 bg-pink-950/20' },
-                { label: 'Convertidas', count: kpis.convertido, color: 'border-green-500/20 text-green-400 bg-green-950/20' },
-                { label: 'Perdidas', count: kpis.perdido, color: 'border-slate-500/20 text-slate-400 bg-slate-950/20' }
-              ].map((k) => (
-                <div key={k.label} className={`border p-4 rounded-xl text-center space-y-1 ${k.color}`}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider opacity-70">{k.label}</p>
-                  <p className="text-2xl font-black">{k.count}</p>
+          <div className="bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-800 bg-gray-900/40 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-950/60 border border-blue-900/60 rounded-xl text-blue-400">
+                  <Activity className="h-4 w-4" />
                 </div>
-              ))}
+                <div>
+                  <h3 className="text-sm font-bold text-white">Volume de Oportunidades por Status</h3>
+                  <p className="text-[11px] text-gray-400">Distribuição de todas as negociações no funil</p>
+                </div>
+              </div>
+              <span className="text-[11px] bg-gray-900 text-gray-400 border border-gray-800 font-semibold px-3 py-1 rounded-full">
+                {oportunidades.length} total
+              </span>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+                {[
+                  { label: 'Novo', count: kpis.novo, color: 'border-indigo-500/20 text-indigo-400 bg-indigo-950/20' },
+                  { label: '1º Contato', count: kpis.primeiro_contato, color: 'border-blue-500/20 text-blue-400 bg-blue-950/20' },
+                  { label: 'Negociação', count: kpis.em_negociacao, color: 'border-cyan-500/20 text-cyan-400 bg-cyan-950/20' },
+                  { label: 'Proposta', count: kpis.proposta_enviada, color: 'border-amber-500/20 text-amber-400 bg-amber-950/20' },
+                  { label: 'Ag. Cliente', count: kpis.aguardando_cliente, color: 'border-purple-500/20 text-purple-400 bg-purple-950/20' },
+                  { label: 'Ag. Pgto', count: kpis.aguardando_pagamento, color: 'border-pink-500/20 text-pink-400 bg-pink-950/20' },
+                  { label: 'Convertidas', count: kpis.convertido, color: 'border-emerald-500/20 text-emerald-400 bg-emerald-950/20' },
+                  { label: 'Perdidas', count: kpis.perdido, color: 'border-slate-500/20 text-slate-400 bg-slate-950/20' }
+                ].map((k) => (
+                  <div key={k.label} className={`border p-4 rounded-xl text-center space-y-1.5 ${k.color}`}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider opacity-70 leading-tight">{k.label}</p>
+                    <p className="text-2xl font-black">{k.count}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -471,110 +508,44 @@ export default function ComercialDashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* OPORTUNIDADES PRIORITÁRIAS */}
-            <div className="lg:col-span-2 bg-gray-800 p-6 rounded-2xl border border-gray-700 space-y-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Building2 className="text-blue-500" />
-                Oportunidades Prioritárias
-              </h3>
-              {oportunidadesPrioritarias.length === 0 ? (
-                <p className="text-xs text-gray-500 italic p-6 text-center">Nenhuma oportunidade prioritária pendente.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-gray-300">
-                    <thead className="bg-gray-900/60 text-gray-400 font-bold uppercase border-b border-gray-700">
-                      <tr>
-                        <th className="px-4 py-3">Ministério</th>
-                        <th className="px-4 py-3">Plano</th>
-                        <th className="px-4 py-3">Responsável</th>
-                        <th className="px-4 py-3">Expirado há</th>
-                        <th className="px-4 py-3 text-right">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-700">
-                      {oportunidadesPrioritarias.map((opt) => (
-                        <tr key={opt.id} className="hover:bg-gray-750/30 transition">
-                          <td className="px-4 py-3 font-bold text-white">{opt.ministry_name}</td>
-                          <td className="px-4 py-3 text-blue-400 font-bold">{opt.plano_solicitado}</td>
-                          <td className="px-4 py-3 font-semibold">{opt.responsavel}</td>
-                          <td className="px-4 py-3 text-red-400 font-bold">{opt.dias_expirado} dias</td>
-                          <td className="px-4 py-3 text-right">
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                              opt.status.toLowerCase().trim() === 'aguardando cliente' || opt.status.toLowerCase().trim() === 'aguardando_cliente'
-                                ? 'bg-purple-950/40 text-purple-400 border border-purple-900/30'
-                                : opt.status.toLowerCase().trim() === 'proposta enviada' || opt.status.toLowerCase().trim() === 'proposta_enviada'
-                                  ? 'bg-amber-950/40 text-amber-400 border border-amber-900/30'
-                                  : 'bg-blue-950/40 text-blue-400 border border-blue-900/30'
-                            }`}>
-                              {opt.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
 
-            {/* AÇÕES PENDENTES */}
-            <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700 space-y-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <ShieldAlert className="text-red-500" />
-                Ações Pendentes
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3.5 bg-gray-900 border border-gray-750 rounded-xl">
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-bold text-white">Trials Expirando</p>
-                    <p className="text-[10px] text-gray-500 font-semibold">Expiram nos próximos 3 dias</p>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-lg bg-amber-950/40 text-amber-400 border border-amber-900/30 text-xs font-black">
-                    {acoesPendentes.trialsExpirando}
-                  </span>
+            {/* AÇÕES PENDENTES — coluna lateral */}
+            <div className="lg:col-span-1 bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-5 py-4 border-b border-gray-800 bg-gray-900/40 flex items-center gap-3">
+                <div className="p-2 bg-rose-950/60 border border-rose-900/60 rounded-xl text-rose-400">
+                  <ShieldAlert className="h-4 w-4" />
                 </div>
-
-                <div className="flex items-center justify-between p-3.5 bg-gray-900 border border-gray-750 rounded-xl">
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-bold text-white">Trials Expirados</p>
-                    <p className="text-[10px] text-gray-500 font-semibold">Salvos sem assinatura ativa</p>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-lg bg-red-950/40 text-red-400 border border-red-900/30 text-xs font-black">
-                    {acoesPendentes.trialsExpirados}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3.5 bg-gray-900 border border-gray-750 rounded-xl">
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-bold text-white">Cobranças Pendentes</p>
-                    <p className="text-[10px] text-gray-500 font-semibold">Boletos gerados aguardando</p>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-lg bg-purple-950/40 text-purple-400 border border-purple-900/30 text-xs font-black">
-                    {acoesPendentes.cobrancasPendentes}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3.5 bg-gray-900 border border-gray-750 rounded-xl">
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-bold text-white">Renovações Próximas</p>
-                    <p className="text-[10px] text-gray-500 font-semibold">Contratos vencendo em breve</p>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-lg bg-blue-950/40 text-blue-400 border border-blue-900/30 text-xs font-black">
-                    {acoesPendentes.renovacoesProximas}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3.5 bg-gray-900 border border-gray-750 rounded-xl">
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-bold text-white">Webhooks com erro</p>
-                    <p className="text-[10px] text-gray-500 font-semibold">Logs de falhas do gateway</p>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-lg bg-slate-950/40 text-slate-400 border border-slate-900/30 text-xs font-black">
-                    {acoesPendentes.webhooksErro}
-                  </span>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Ações Pendentes</h3>
+                  <p className="text-[11px] text-gray-400">Alertas comerciais ativos</p>
                 </div>
               </div>
+              <div className="p-4 space-y-2.5">
+                {[
+                  { label: 'Trials Expirando',    desc: 'Nos próximos 3 dias',     value: acoesPendentes.trialsExpirando,   badge: 'bg-amber-950/40 text-amber-400 border-amber-900/30' },
+                  { label: 'Trials Expirados',    desc: 'Sem assinatura ativa',     value: acoesPendentes.trialsExpirados,   badge: 'bg-red-950/40 text-red-400 border-red-900/30' },
+                  { label: 'Cobranças Pendentes', desc: 'Boletos aguardando pgto',  value: acoesPendentes.cobrancasPendentes, badge: 'bg-purple-950/40 text-purple-400 border-purple-900/30' },
+                  { label: 'Renovações Próximas', desc: 'Contratos a vencer',       value: acoesPendentes.renovacoesProximas, badge: 'bg-blue-950/40 text-blue-400 border-blue-900/30' },
+                  { label: 'Webhooks com Erro',   desc: 'Falhas de gateway',        value: acoesPendentes.webhooksErro,      badge: 'bg-slate-950/40 text-slate-400 border-slate-900/30' },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center justify-between p-3 bg-gray-900/60 border border-gray-800 rounded-xl">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-bold text-white">{item.label}</p>
+                      <p className="text-[10px] text-gray-500">{item.desc}</p>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-lg border text-xs font-black ${item.badge}`}>
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* COLUNA RESERVADA — futura expansão CRM 2.0 */}
+            <div className="lg:col-span-2 bg-gray-950 border border-gray-800 border-dashed rounded-2xl flex flex-col items-center justify-center gap-3 p-10 text-center opacity-40">
+              <Building2 className="h-8 w-8 text-gray-600" />
+              <p className="text-xs font-bold text-gray-500">Área reservada</p>
+              <p className="text-[11px] text-gray-600">Painel de relatórios avançados — CRM 2.0</p>
             </div>
 
           </div>

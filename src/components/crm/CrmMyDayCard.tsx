@@ -91,7 +91,7 @@ export default function CrmMyDayCard({ onStartDay }: CrmMyDayCardProps) {
   }
 
   return (
-    <div className="bg-linear-to-r from-gray-950 via-gray-900 to-gray-950 border border-gray-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+    <div className="bg-gradient-to-r from-gray-950 via-gray-900 to-gray-950 border border-gray-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
       
       {/* Toast de notificação amigável */}
       {toastMessage && (

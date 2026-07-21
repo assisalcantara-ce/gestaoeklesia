@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { authenticatedFetch } from '@/lib/api-client';
-import { Activity, Clock, ShieldAlert, User, ArrowRight } from 'lucide-react';
+import { Activity, Clock, ShieldAlert, User, ArrowRight, DollarSign, CheckCircle2 } from 'lucide-react';
 
 export interface CrmTimelineData {
   id: string;
@@ -47,16 +47,22 @@ export default function CrmTimeline({ ministryId }: CrmTimelineProps) {
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-pulse p-4">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="flex gap-4">
-            <div className="w-8 h-8 rounded-full bg-gray-800 shrink-0"></div>
-            <div className="flex-1 space-y-2">
-              <div className="h-4 bg-gray-800 rounded w-1/4"></div>
-              <div className="h-10 bg-gray-800 rounded w-full"></div>
+      <div className="bg-gray-950 border border-gray-800 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-800 bg-gray-950 flex items-center justify-between">
+          <div className="h-4 w-52 bg-gray-800 rounded animate-pulse" />
+          <div className="h-5 w-20 bg-gray-800 rounded-full animate-pulse" />
+        </div>
+        <div className="p-6 space-y-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="flex gap-4 animate-pulse">
+              <div className="w-8 h-8 rounded-full bg-gray-800 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-gray-800 rounded w-1/4" />
+                <div className="h-16 bg-gray-800 rounded w-full" />
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   }
@@ -110,7 +116,15 @@ export default function CrmTimeline({ ministryId }: CrmTimelineProps) {
               <div key={item.id} className="flex gap-4 relative items-start group">
                 {/* Indicador / Icon Node */}
                 <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 z-10 ${iconColor}`}>
-                  <Clock className="h-4 w-4" />
+                  {item.evento.includes('Ativada') || item.evento.includes('Convertida') ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : item.evento.includes('Cobrança') || item.evento.includes('Emitida') || item.evento.includes('Pago') ? (
+                    <DollarSign className="h-4 w-4" />
+                  ) : item.evento.includes('Interação') || item.evento.includes('Registrada') ? (
+                    <Activity className="h-4 w-4" />
+                  ) : (
+                    <Clock className="h-4 w-4" />
+                  )}
                 </div>
 
                 <div className="flex-1 bg-gray-900/40 hover:bg-gray-900/70 border border-gray-800 rounded-xl p-4 transition duration-200">
