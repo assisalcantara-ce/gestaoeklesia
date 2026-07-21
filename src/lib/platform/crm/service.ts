@@ -349,11 +349,53 @@ export class CrmService {
 
 
   /**
-   * Retorna a lista de atividades executadas no CRM para um cliente.
+   * Retorna a lista de oportunidades abertas (Novo, Em Atendimento, Aguardando Pagamento) mapeadas como atividades.
    */
-  async getActivities(_supabase: SupabaseClient, _id: string): Promise<CrmActivity[]> {
-    return [];
+  async getActivities(supabase: SupabaseClient, id?: string): Promise<CrmActivity[]> {
+    // 1. Carregar oportunidades comerciais do banco filtrando pelos status abertos informados
+    const { data, error } = await supabase
+      .from('oportunidades_comerciais')
+      .select('*')
+      .in('status', ['Novo', 'Em Atendimento', 'Em Negociação', 'Aguardando Pagamento']);
+
+    if (error) {
+      console.error('[CrmService.getActivities] Erro:', error.message);
+      return [];
+    }
+
+    let list = data || [];
+
+    // 2. Se um id de filtro for fornecido, filtra as ocorrências associadas
+    if (id) {
+      list = list.filter(o => o.id === id || o.ministry_id === id);
+    }
+
+    // 3. Mapear para DTO CrmActivity
+    return list.map((opt: any) => {
+      // Prioridade heurística baseada no tempo de expiração ou criação
+      let prioridade = 'média';
+      const diffTime = Math.abs(Date.now() - new Date(opt.created_at).getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays > 15) {
+        prioridade = 'alta';
+      } else if (diffDays < 3) {
+        prioridade = 'baixa';
+      }
+
+      return {
+        id: opt.id,
+        oportunidadeId: opt.id,
+        ministryId: opt.ministry_id || null,
+        nome: opt.ministry_name || 'Negociação Comercial',
+        responsavel: opt.responsavel || 'Não Informado',
+        status: opt.status,
+        prioridade,
+        dataCriacao: opt.created_at,
+        ultimaAtualizacao: opt.updated_at || opt.created_at
+      };
+    });
   }
+
 
   /**
    * Retorna as próximas ações planejadas para um lead ou negociação comercial.

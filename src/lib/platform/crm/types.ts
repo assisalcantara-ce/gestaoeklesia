@@ -27,11 +27,19 @@ export interface HistoricoComercial {
 export interface CrmActivity {
   id: string;
   oportunidadeId: string;
-  tipo: 'contato' | 'proposta' | 'followup' | 'outro' | string;
-  descricao: string;
-  dataExecucao: string;
-  usuarioResponsavel: string;
+  ministryId: string | null;
+  nome: string;
+  responsavel: string;
+  status: string;
+  prioridade: string;
+  dataCriacao: string;
+  ultimaAtualizacao: string;
+  tipo?: string;
+  descricao?: string;
+  dataExecucao?: string;
+  usuarioResponsavel?: string;
 }
+
 
 export interface CrmTimelineItem {
   id: string;
