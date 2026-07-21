@@ -21,6 +21,7 @@ import {
   User,
   Clock,
   AlertTriangle,
+  MessageSquare,
 } from 'lucide-react'
 import { CrmActivityData } from '@/components/crm/CrmActivities'
 
@@ -50,8 +51,42 @@ function getPrioridadeWeight(p: string): number {
   return 1
 }
 
-function isVencido(iso: string): boolean {
-  return new Date(iso).getTime() < Date.now()
+function formatDate(iso: string): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('pt-BR')
+}
+
+// Retorna se a data está estritamente no passado
+function isAtrasada(iso: string): boolean {
+  const date = new Date(iso)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return date.getTime() < today.getTime()
+}
+
+// Retorna se a data é hoje
+function isHoje(iso: string): boolean {
+  const date = new Date(iso).toLocaleDateString('pt-BR')
+  const today = new Date().toLocaleDateString('pt-BR')
+  return date === today
+}
+
+// Formatação de data relativa de última interação
+function formatRelativeDate(iso: string): string {
+  if (!iso) return 'Sem registro'
+  const date = new Date(iso)
+  const today = new Date()
+  
+  today.setHours(0, 0, 0, 0)
+  const dateMidnight = new Date(date)
+  dateMidnight.setHours(0, 0, 0, 0)
+
+  const diffTime = today.getTime() - dateMidnight.getTime()
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return 'Hoje'
+  if (diffDays === 1) return 'Ontem'
+  return `Há ${diffDays} dias`
 }
 
 // ─── Mapeamento de Lifecycle para as raias ────────────────────────────────────
@@ -59,11 +94,8 @@ function mapLifecycleToKanbanKey(status?: string): string {
   if (!status) return 'lead'
   const s = status.toUpperCase().trim()
 
-  // Mapeamentos específicos do backend / CRM comercial
   if (s === 'LEAD') return 'lead'
-  
   if (s === 'TRIAL' || s === 'TRIAL_EXPIRING') return 'trial'
-  
   if (
     s === 'NOVO' || 
     s === 'PRIMEIRO_CONTATO' || 
@@ -71,13 +103,9 @@ function mapLifecycleToKanbanKey(status?: string): string {
     s === 'PROPOSTA_ENVIADA' || 
     s === 'AGUARDANDO_CLIENTE'
   ) return 'negociacao'
-  
   if (s === 'PAYMENT_PENDING' || s === 'AGUARDANDO_PAGAMENTO') return 'pagamento'
-  
   if (s === 'ACTIVE' || s === 'CONVERTIDO') return 'cliente_ativo'
-  
   if (s === 'RENEWAL' || s === 'RENOVACAO') return 'renovacao'
-  
   if (s === 'CANCELLED' || s === 'CANCELADO' || s === 'TRIAL_EXPIRED') return 'cancelado'
 
   return 'lead'
@@ -95,8 +123,32 @@ function PrioridadeBadge({ prioridade }: { prioridade: string }) {
   }
   const key = (prioridade || '').toLowerCase()
   return (
-    <span className={`text-[8px] font-bold px-2 py-0.5 rounded border uppercase ${styles[key] || styles.baixa}`}>
+    <span className={`text-[8px] font-bold px-2 py-0.5 rounded border uppercase shrink-0 ${styles[key] || styles.baixa}`}>
       {label[key] || prioridade || '—'}
+    </span>
+  )
+}
+
+// ─── Badge de Situação Financeira ─────────────────────────────────────────────
+function FinanceiroBadge({ status }: { status?: string }) {
+  if (!status) return <span className="text-gray-500 font-semibold">Sem dados</span>
+  const s = status.toLowerCase()
+
+  const map: Record<string, string> = {
+    ok:       'bg-emerald-950/40 text-emerald-400 border-emerald-900/30',
+    pendente: 'bg-amber-950/40 text-amber-400 border-amber-900/30',
+    atrasado: 'bg-rose-950/40 text-rose-400 border-rose-900/30',
+    isento:   'bg-gray-900 text-gray-400 border-gray-800',
+  }
+  const labels: Record<string, string> = {
+    ok:       'Em dia',
+    pendente: 'Pendente',
+    atrasado: 'Inadimplente',
+    isento:   'Isento',
+  }
+  return (
+    <span className={`text-[8px] font-bold px-2 py-0.5 rounded border uppercase shrink-0 ${map[s] || map.isento}`}>
+      {labels[s] || status}
     </span>
   )
 }
@@ -134,19 +186,16 @@ export default function PipelinePage() {
   const { isLoading, isAuthenticated } = useAdminAuth()
   const router = useRouter()
 
-  // ── Dados do CRM ───────────────────────────────────────────────────────────
   const [activities, setActivities] = useState<CrmActivityData[]>([])
   const [tableLoading, setTableLoading] = useState<boolean>(true)
   const [tableError, setTableError] = useState<string | null>(null)
 
-  // ── Auth guard ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/admin/login')
     }
   }, [isLoading, isAuthenticated, router])
 
-  // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchActivities = useCallback(async () => {
     setTableLoading(true)
     setTableError(null)
@@ -166,28 +215,23 @@ export default function PipelinePage() {
     if (isAuthenticated) fetchActivities()
   }, [isAuthenticated, fetchActivities])
 
-  // ── Cálculos Locais dos KPIs ──────────────────────────────────────────────
   const kpis = useMemo(() => {
     const total = activities.length
     
-    // 1. Total estimado (Soma do valor financeiro do plano de cada oportunidade ativa)
     const valorEstimado = activities.reduce((acc, act) => {
       const status = (act.lifecycle?.status || act.status || '').toLowerCase()
-      // Ignorar cancelados no cálculo estimado
       if (status === 'cancelled' || status === 'cancelado' || status === 'trial_expired') {
         return acc
       }
       return acc + getPlanoPrice(act.lifecycle?.plano)
     }, 0)
 
-    // 2. Taxa de conversão: (Clientes convertidos / Total) * 100
     const convertidos = activities.filter((act) => {
       const status = (act.lifecycle?.status || act.status || '').toLowerCase()
       return status === 'active' || status === 'convertido'
     }).length
     const conversao = total > 0 ? (convertidos / total) * 100 : 0
 
-    // 3. Ticket médio: Valor Estimado / Oportunidades com valor
     const oportunidadesComValor = activities.filter((act) => {
       const status = (act.lifecycle?.status || act.status || '').toLowerCase()
       return status !== 'cancelled' && status !== 'cancelado' && status !== 'trial_expired'
@@ -202,9 +246,7 @@ export default function PipelinePage() {
     }
   }, [activities])
 
-  // ── Agrupamento e Ordenação por Colunas ─────────────────────────────────────
   const kanbanData = useMemo(() => {
-    // Inicia raias vazias
     const groups: Record<string, CrmActivityData[]> = {
       lead: [],
       trial: [],
@@ -215,22 +257,15 @@ export default function PipelinePage() {
       cancelado: [],
     }
 
-    // Agrupa nas raias baseando-se no mapeamento de status
     activities.forEach((act) => {
       const statusKey = mapLifecycleToKanbanKey(act.lifecycle?.status || act.status)
       if (groups[statusKey]) {
         groups[statusKey].push(act)
       } else {
-        groups.lead.push(act) // Fallback seguro
+        groups.lead.push(act)
       }
     })
 
-    // Ordenação interna de cada raia:
-    // 1. Alta prioridade
-    // 2. Próxima ação vencida
-    // 3. Próxima ação mais próxima
-    // 4. Data de criação
-    // 5. Nome do ministério
     Object.keys(groups).forEach((key) => {
       groups[key].sort((a, b) => {
         const wA = getPrioridadeWeight(a.prioridade)
@@ -256,7 +291,6 @@ export default function PipelinePage() {
     return groups
   }, [activities])
 
-  // Loading skeleton global de autenticação
   if (isLoading || !isAuthenticated) {
     return (
       <div className="flex h-screen bg-gray-900">
@@ -414,7 +448,7 @@ export default function PipelinePage() {
                 return (
                   <div 
                     key={column.key}
-                    className={`w-72 shrink-0 border-t-2 ${column.color} border-x border-b border-gray-850 bg-gray-950/20 rounded-2xl flex flex-col max-h-full overflow-hidden shadow-xs`}
+                    className={`w-76 shrink-0 border-t-2 ${column.color} border-x border-b border-gray-850 bg-gray-950/20 rounded-2xl flex flex-col max-h-full overflow-hidden shadow-xs`}
                   >
                     {/* Cabeçalho da coluna */}
                     <div className="px-4 py-3.5 border-b border-gray-850/60 bg-gray-950/60 flex items-center justify-between shrink-0">
@@ -425,7 +459,7 @@ export default function PipelinePage() {
                     </div>
 
                     {/* Área para cards */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-2.5 max-h-[calc(100vh-360px)]">
+                    <div className="flex-1 overflow-y-auto p-3 space-y-3 max-h-[calc(100vh-360px)]">
                       {list.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
                           <div className="w-10 h-10 bg-gray-900 border border-gray-850 rounded-xl flex items-center justify-center mb-2">
@@ -437,40 +471,85 @@ export default function PipelinePage() {
                       ) : (
                         list.map((act) => {
                           const vencimento = act.nextAction?.vencimento
-                          const vencido = vencimento && isVencido(vencimento)
+                          const atrasado = vencimento && isAtrasada(vencimento)
+                          const hoje = vencimento && isHoje(vencimento)
+                          const isHighPrior = act.prioridade === 'alta'
+                          const isConverted = (act.lifecycle?.status || act.status || '').toLowerCase() === 'active' || (act.lifecycle?.status || act.status || '').toLowerCase() === 'convertido'
                           
                           return (
                             <div
                               key={act.id}
-                              className="p-3 bg-gray-900/40 hover:bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-xl space-y-2.5 transition group shadow-2xs relative"
+                              className={`p-3.5 bg-gray-950 hover:bg-gray-900 border ${
+                                isHighPrior 
+                                  ? 'border-rose-900/50 hover:border-rose-800/60 shadow-[0_0_8px_rgba(244,63,94,0.04)]' 
+                                  : 'border-gray-850 hover:border-gray-800'
+                              } rounded-xl flex flex-col justify-between h-44 transition group cursor-pointer duration-200 select-none relative`}
                             >
-                              {/* Nome do ministério */}
-                              <h3 className="text-xs font-bold text-white group-hover:text-blue-400 transition leading-tight">
-                                {act.nome}
-                              </h3>
-
-                              {/* Plano pretendido */}
-                              <div className="flex justify-between items-center text-[10px] text-gray-400">
-                                <span>{act.lifecycle?.plano || 'Sem plano'}</span>
-                                <PrioridadeBadge prioridade={act.prioridade} />
+                              
+                              {/* Indicadores no canto direito superior do card */}
+                              <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5">
+                                {isConverted && (
+                                  <span className="w-2 h-2 bg-emerald-500 rounded-full" title="Cliente ativo" />
+                                )}
+                                {atrasado && (
+                                  <span className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" title="Ação atrasada" />
+                                )}
                               </div>
 
-                              {/* Responsável e Próxima ação */}
-                              <div className="pt-2 border-t border-gray-800/80 space-y-1.5 text-[9px] text-gray-500">
-                                <div className="flex items-center gap-1">
-                                  <User className="h-3 w-3 text-gray-600 shrink-0" />
-                                  <span className="truncate">{act.responsavel || 'Sem responsável'}</span>
+                              <div className="space-y-2">
+                                {/* Nome do ministério */}
+                                <h3 className="text-xs font-bold text-white group-hover:text-blue-400 transition leading-tight pr-6 truncate" title={act.nome}>
+                                  {act.nome}
+                                </h3>
+
+                                {/* Plano pretendido + Situação financeira */}
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] text-gray-400 font-semibold truncate max-w-[100px]">
+                                    {act.lifecycle?.plano || 'Sem plano'}
+                                  </span>
+                                  <FinanceiroBadge status={act.lifecycle?.statusFinanceiro} />
                                 </div>
-                                <div className="flex items-center gap-1 truncate">
-                                  <Clock className={`h-3 w-3 shrink-0 ${vencido ? 'text-rose-500 animate-pulse' : 'text-gray-600'}`} />
+
+                                {/* Badges extras de prioridade */}
+                                <div className="flex gap-1.5 pt-0.5">
+                                  <PrioridadeBadge prioridade={act.prioridade} />
+                                </div>
+                              </div>
+
+                              {/* Responsável, Próxima ação e Última Interação */}
+                              <div className="pt-2.5 border-t border-gray-900 space-y-1.5 text-[9px] text-gray-500 shrink-0">
+                                
+                                {/* Responsável */}
+                                <div className="flex items-center gap-1.5">
+                                  <User className="h-3.5 w-3.5 text-gray-600 shrink-0" />
+                                  <span className="truncate max-w-[140px]" title={act.responsavel || 'Sem responsável'}>
+                                    {act.responsavel || 'Sem responsável'}
+                                  </span>
+                                </div>
+
+                                {/* Próxima Ação */}
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <Clock className={`h-3.5 w-3.5 shrink-0 ${atrasado ? 'text-rose-500' : 'text-gray-600'}`} />
                                   {act.nextAction ? (
-                                    <span className={vencido ? 'text-rose-400 font-semibold' : 'text-gray-400'}>
-                                      {act.nextAction.acao}
+                                    <span 
+                                      className={`truncate max-w-[150px] font-medium ${
+                                        atrasado ? 'text-rose-400 font-semibold' : hoje ? 'text-amber-400 font-semibold' : 'text-gray-400'
+                                      }`}
+                                      title={`${act.nextAction.acao} (${formatDate(vencimento!)})`}
+                                    >
+                                      {act.nextAction.acao} ({formatDate(vencimento!)})
                                     </span>
                                   ) : (
                                     <span>Sem próxima ação</span>
                                   )}
                                 </div>
+
+                                {/* Última Interação */}
+                                <div className="flex items-center gap-1.5 text-[8.5px] text-gray-650">
+                                  <MessageSquare className="h-3 w-3 shrink-0 text-gray-700" />
+                                  <span>Int. {formatRelativeDate(act.ultimaAtualizacao)}</span>
+                                </div>
+
                               </div>
                             </div>
                           )
