@@ -200,7 +200,7 @@ export default function OportunidadesPage() {
   const { isLoading, isAuthenticated } = useAdminAuth()
   const router = useRouter()
 
-  // ── Filtros — estado local (Fase 2b: conectar à tabela) ───────────────────
+  // ── Filtros ───────────────────────────────────────────────────────────────
   const [filtros, setFiltros] = useState<OportunidadeFiltros>(FILTROS_INICIAIS)
 
   // ── Dados da tabela ────────────────────────────────────────────────────────
@@ -236,18 +236,76 @@ export default function OportunidadesPage() {
     if (isAuthenticated) fetchActivities()
   }, [isAuthenticated, fetchActivities])
 
-  // ── Atualiza item selecionado no drawer após refresh ──────────────────────
   const handleSuccess = useCallback(() => {
     fetchActivities()
   }, [fetchActivities])
 
-  // ── Ordenação:
-  // 1. Prioridade (alta → baixa)
-  // 2. Próxima ação vencida
-  // 3. Próxima ação mais próxima
-  // 4. Nome do ministério
+  // ── Filtragem em memória (cumulativa) via useMemo ───────────────────────
+  const filteredActivities = useMemo(() => {
+    return activities.filter((act) => {
+      // 1. Pesquisa (ministério, email, telefone, responsável)
+      if (filtros.pesquisa) {
+        const query = filtros.pesquisa.toLowerCase().trim()
+        const matchNome = act.nome?.toLowerCase().includes(query)
+        const matchEmail = act.email?.toLowerCase().includes(query)
+        const matchTelefone = act.telefone?.toLowerCase().includes(query)
+        const matchResponsavel = act.responsavel?.toLowerCase().includes(query)
+
+        if (!matchNome && !matchEmail && !matchTelefone && !matchResponsavel) {
+          return false
+        }
+      }
+
+      // 2. Lifecycle
+      if (filtros.lifecycle) {
+        const status = (act.lifecycle?.status || act.status || '').toLowerCase()
+        if (status !== filtros.lifecycle.toLowerCase()) {
+          return false
+        }
+      }
+
+      // 3. Prioridade
+      if (filtros.prioridade) {
+        const prioridade = (act.prioridade || '').toLowerCase()
+        if (prioridade !== filtros.prioridade.toLowerCase()) {
+          return false
+        }
+      }
+
+      // 4. Responsável
+      if (filtros.responsavel) {
+        // Se escolheu 'equipe', filtramos registros que possuem responsável preenchido
+        // (Ou se futuramente tivéssemos nomes específicos, compararia com o campo)
+        if (filtros.responsavel === 'equipe') {
+          if (!act.responsavel) return false
+        }
+      }
+
+      // 5. Período (filtrar pela data da próxima ação)
+      if (filtros.periodoInicio || filtros.periodoFim) {
+        const vencAction = act.nextAction?.vencimento
+        if (!vencAction) return false
+
+        const timeAction = new Date(vencAction).getTime()
+
+        if (filtros.periodoInicio) {
+          const timeInicio = new Date(`${filtros.periodoInicio}T00:00:00`).getTime()
+          if (timeAction < timeInicio) return false
+        }
+
+        if (filtros.periodoFim) {
+          const timeFim = new Date(`${filtros.periodoFim}T23:59:59`).getTime()
+          if (timeAction > timeFim) return false
+        }
+      }
+
+      return true
+    })
+  }, [activities, filtros])
+
+  // ── Ordenação final aplicada sobre os dados filtrados ───────────────────
   const sortedActivities = useMemo(() => {
-    return [...activities].sort((a, b) => {
+    return [...filteredActivities].sort((a, b) => {
       const wA = getPrioridadeWeight(a.prioridade)
       const wB = getPrioridadeWeight(b.prioridade)
       if (wB !== wA) return wB - wA
@@ -262,7 +320,7 @@ export default function OportunidadesPage() {
 
       return a.nome.localeCompare(b.nome, 'pt-BR')
     })
-  }, [activities])
+  }, [filteredActivities])
 
   // ── Handlers dos filtros ───────────────────────────────────────────────────
   const handleChange = useCallback(
@@ -514,8 +572,8 @@ export default function OportunidadesPage() {
             {/* ── Loading skeleton ── */}
             {tableLoading && !tableError && <TableSkeleton />}
 
-            {/* ── Empty state ── */}
-            {!tableLoading && !tableError && sortedActivities.length === 0 && (
+            {/* ── Empty state (Se a base estiver vazia) ── */}
+            {!tableLoading && !tableError && activities.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 px-6 text-center space-y-4">
                 <div className="w-16 h-16 bg-gray-900 border border-gray-800 rounded-2xl flex items-center justify-center">
                   <Inbox className="h-7 w-7 text-gray-600" />
@@ -526,6 +584,22 @@ export default function OportunidadesPage() {
                 </div>
                 <button onClick={fetchActivities} className="px-4 py-2 bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-400 hover:text-white rounded-xl text-xs font-semibold transition cursor-pointer">
                   Recarregar
+                </button>
+              </div>
+            )}
+
+            {/* ── Empty state específico de filtros (Se houver registros na base mas a busca resultar em 0) ── */}
+            {!tableLoading && !tableError && activities.length > 0 && sortedActivities.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 px-6 text-center space-y-4">
+                <div className="w-16 h-16 bg-gray-900 border border-gray-800 rounded-2xl flex items-center justify-center">
+                  <Search className="h-7 w-7 text-gray-600" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-sm font-bold text-white">Nenhuma oportunidade encontrada para os filtros selecionados</h3>
+                  <p className="text-xs text-gray-500">Tente ajustar seus termos de busca ou filtros aplicados.</p>
+                </div>
+                <button onClick={handleLimpar} className="px-4 py-2 bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-400 hover:text-white rounded-xl text-xs font-semibold transition cursor-pointer">
+                  Limpar filtros
                 </button>
               </div>
             )}
