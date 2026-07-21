@@ -12,7 +12,11 @@ import { temAcessoAdmin } from '@/lib/access-control'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 import type { SubscriptionPlan } from '@/types/admin'
 import { onlyDigits, formatCnpj, formatCpf, formatPhone, validarCnpj, validarCpf } from '@/lib/mascaras'
-import { CheckCircle2, ExternalLink, Copy, Pencil, Trash2, Play, Tag, Coins } from 'lucide-react'
+import { CheckCircle2, ExternalLink, Copy } from 'lucide-react'
+import MinisteriosHeader from '@/components/admin/ministerios/MinisteriosHeader'
+import MinisteriosToolbar from '@/components/admin/ministerios/MinisteriosToolbar'
+import MinisteriosTable from '@/components/admin/ministerios/MinisteriosTable'
+
 export default function MinisteriosPage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
   const [ministerios, setMinisterios] = useState<SupabaseMinistry[]>([])
@@ -383,12 +387,6 @@ export default function MinisteriosPage() {
     }
   }
 
-  const formatCep = (value: string) => {
-    const digits = onlyDigits(value).slice(0, 8)
-    if (digits.length <= 5) return digits
-    return `${digits.slice(0, 5)}-${digits.slice(5)}`
-  }
-
   const formatPhoneDisplay = (value: string | null | undefined) => {
     const digits = onlyDigits(value || '')
     if (!digits) return '-'
@@ -518,16 +516,6 @@ export default function MinisteriosPage() {
 
     const payload = await response.json()
     return payload?.url || null
-  }
-
-  const handleUseLogoUrl = () => {
-    const url = formData.logo_url?.trim()
-    if (!url) return
-
-    if (logoPreviewObjectUrl) URL.revokeObjectURL(logoPreviewObjectUrl)
-    setLogoPreviewObjectUrl('')
-    setLogoFile(null)
-    setLogoPreviewSrc(url)
   }
 
   const fetchMinisterios = async () => {
@@ -875,10 +863,10 @@ export default function MinisteriosPage() {
       <AdminSidebar />
 
       <main className="flex-1 overflow-auto">
-        <div className="sticky top-0 bg-gray-950 border-b border-gray-800 px-6 py-4 z-10">
-          <h2 className="text-2xl font-bold text-white">PAINEL ADMINISTRATIVO: MINISTÉRIOS</h2>
-          <p className="text-gray-400 text-sm mt-1">Gerencie todos os ministérios/clientes</p>
-        </div>
+        <MinisteriosHeader
+          titulo="PAINEL ADMINISTRATIVO: MINISTÉRIOS"
+          descricao="Gerencie todos os ministérios/clientes"
+        />
 
         <div className="p-6 space-y-6">
           <div className="max-w-7xl mx-auto">
@@ -924,35 +912,27 @@ export default function MinisteriosPage() {
         {/* TAB: Ministérios Ativos */}
         {activeTab === 'ativos' && (
           <>
-            {/* Botões de ação */}
-              <div className="mb-6 flex items-center gap-3 flex-wrap">
-                <button
-                  onClick={() => {
-                    if (showForm) {
-                      setShowForm(false)
-                      setEditingId(null)
-                      resetForm()
-                    } else {
-                      setShowForm(true)
-                    }
-                  }}
-                  className={`px-6 py-2 text-white rounded transition ${
-                    showForm
-                      ? editingId
-                        ? 'bg-red-600 hover:bg-red-700'
-                        : 'bg-gray-700 hover:bg-gray-600'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                >
-                  {showForm ? (editingId ? 'Cancelar edição' : 'Cancelar') : '+ Novo Ministério'}
-                </button>
-                <button
-                  onClick={() => { setShowImport(true); setImportResult(null); setImportRows([]); setImportHeaders([]); setImportFile(null); setImportMinistryId('') }}
-                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded transition text-sm font-medium"
-                >
-                  📥 Importar CSV
-                </button>
-              </div>
+            <MinisteriosToolbar
+              showForm={showForm}
+              editingId={editingId}
+              onToggleForm={() => {
+                if (showForm) {
+                  setShowForm(false)
+                  setEditingId(null)
+                  resetForm()
+                } else {
+                  setShowForm(true)
+                }
+              }}
+              onOpenImport={() => {
+                setShowImport(true)
+                setImportResult(null)
+                setImportRows([])
+                setImportHeaders([])
+                setImportFile(null)
+                setImportMinistryId('')
+              }}
+            />
 
             {/* Formulário */}
               {showForm && (
@@ -990,7 +970,7 @@ export default function MinisteriosPage() {
                               className={`px-2.5 py-0.5 text-[10px] font-bold rounded transition ${
                                 formData.documento_tipo === 'cnpj'
                                   ? 'bg-blue-600 text-white'
-                                  : 'text-gray-400 hover:text-gray-200'
+                                  : 'text-gray-400 hover:text-gray-250'
                               }`}
                             >
                               CNPJ
@@ -1001,7 +981,7 @@ export default function MinisteriosPage() {
                               className={`px-2.5 py-0.5 text-[10px] font-bold rounded transition ${
                                 formData.documento_tipo === 'cpf'
                                   ? 'bg-blue-600 text-white'
-                                  : 'text-gray-400 hover:text-gray-200'
+                                  : 'text-gray-400 hover:text-gray-250'
                               }`}
                             >
                               CPF
@@ -1100,488 +1080,333 @@ export default function MinisteriosPage() {
                                 {logoFile ? logoFile.name : 'Nenhum arquivo selecionado'}
                               </span>
                             </div>
-
-                            <p className="text-sm text-gray-600 mt-2">
-                              Envie uma foto do seu dispositivo. Se preferir, cole uma URL pública abaixo.
-                            </p>
-
-                            <div className="mt-3 flex items-center gap-2">
-                              <input
-                                type="url"
-                                value={formData.logo_url}
-                                onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                              />
-                              <button
-                                type="button"
-                                onClick={handleUseLogoUrl}
-                                className="px-4 py-2 border border-gray-300 rounded"
-                              >
-                                Usar URL
-                              </button>
-                            </div>
-
-                            <p className="text-xs text-gray-500 mt-2">A imagem é otimizada automaticamente.</p>
                           </div>
 
-                          <div>
-                            <p className="text-sm font-medium text-gray-700 mb-2">Pré-visualização</p>
-                            <div className="border border-gray-200 rounded bg-gray-50 h-44 flex items-center justify-center overflow-hidden">
-                              {logoPreviewSrc ? (
-                                <img src={logoPreviewSrc} alt="Pré-visualização da logo" className="w-full h-full object-contain" />
-                              ) : (
-                                <span className="text-sm text-gray-500">Sem foto</span>
-                              )}
+                          {logoPreviewSrc && (
+                            <div className="flex flex-col gap-2">
+                              <span className="text-sm font-medium text-gray-300">Pré-visualização da Logo</span>
+                              <div className="w-24 h-24 rounded-lg overflow-hidden border border-gray-700 bg-gray-900 flex items-center justify-center">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={logoPreviewSrc}
+                                  alt="Preview da Logo"
+                                  className="w-full h-full object-contain"
+                                />
+                              </div>
                             </div>
-                            <p className="text-xs text-gray-500 mt-2">
-                              Se enviar arquivo, vamos reduzir para 512×512 e comprimir (JPG).
-                            </p>
-                          </div>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Seção 2: Contatos */}
+                  {/* Seção 2: Informações de Contato */}
                   <div className="mb-6">
-                    <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">Dados de Contato</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email de Contato *</label>
-                    <input
-                      type="email"
-                      value={formData.contact_email}
-                      onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                      required
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
-                    <input
-                      type="tel"
-                      value={formatPhone(formData.contact_phone)}
-                      onChange={(e) => {
-                        const digits = onlyDigits(e.target.value).slice(0, 11)
-                        setFormData({ ...formData, contact_phone: digits })
-                      }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">WhatsApp</label>
-                    <input
-                      type="tel"
-                      value={formatPhone(formData.whatsapp)}
-                      onChange={(e) => {
-                        const digits = onlyDigits(e.target.value).slice(0, 11)
-                        setFormData({ ...formData, whatsapp: digits })
-                      }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Website</label>
-                    <input
-                      type="text"
-                      value={formData.website}
-                      onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Seção 3: Responsável */}
-              <div className="mb-6">
-                <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">Responsável</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nome do Responsável</label>
-                    <input
-                      type="text"
-                      value={formData.responsible_name}
-                      onChange={(e) => setFormData({ ...formData, responsible_name: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Seção 3.1: Credenciais de Acesso */}
-              <div className="mb-6">
-                <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">
-                  {editingId ? 'Alterar Credenciais de Acesso' : 'Credenciais de Acesso'}
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {editingId ? 'Novo Email de Acesso' : 'Email de Acesso'}
-                      {!editingId && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.access_email}
-                      onChange={(e) => setFormData({ ...formData, access_email: e.target.value })}
-                      placeholder="admin@ministerio.com"
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {editingId ? 'Nova Senha de Acesso' : 'Senha de Acesso'}
-                      {!editingId && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                    <input
-                      type="password"
-                      value={formData.access_password}
-                      onChange={(e) => setFormData({ ...formData, access_password: e.target.value })}
-                      placeholder={editingId ? 'Deixe em branco para manter' : 'Mínimo 8 caracteres'}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {editingId
-                    ? 'Se preencher, o email/senha de acesso do tenant será atualizado.'
-                    : 'Email e senha que o administrador do ministério usará para acessar o sistema.'}
-                </p>
-              </div>
-
-              {/* Seção 4: Endereço */}
-              <div className="mb-6">
-                <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">Endereço</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">CEP</label>
-                    <input
-                      type="text"
-                      value={formatCep(formData.address_zip)}
-                      onChange={(e) => {
-                        const formatted = formatCep(e.target.value)
-                        const digits = onlyDigits(formatted)
-                        setFormData({ ...formData, address_zip: formatted })
-                        setCepLookupError('')
-                        if (digits.length < 8) setCepResolved('')
-                      }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      maxLength={9}
-                    />
-                    {cepLookupLoading && (
-                      <p className="mt-1 text-xs text-blue-600">Buscando endereço pelo CEP...</p>
-                    )}
-                    {!cepLookupLoading && cepLookupError && (
-                      <p className="mt-1 text-xs text-red-600">{cepLookupError}</p>
-                    )}
-                    {!cepLookupLoading && !cepLookupError && cepResolved === onlyDigits(formData.address_zip || '') && (
-                      <p className="mt-1 text-xs text-green-600">CEP localizado e endereço preenchido automaticamente.</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Rua</label>
-                    <input
-                      type="text"
-                      value={formData.address_street}
-                      onChange={(e) => setFormData({ ...formData, address_street: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Número</label>
-                    <input
-                      type="text"
-                      value={formData.address_number}
-                      onChange={(e) => setFormData({ ...formData, address_number: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Complemento</label>
-                    <input
-                      type="text"
-                      value={formData.address_complement}
-                      onChange={(e) => setFormData({ ...formData, address_complement: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
-                    <input
-                      type="text"
-                      value={formData.address_city}
-                      onChange={(e) => setFormData({ ...formData, address_city: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Estado (UF)</label>
-                    <select
-                      value={formData.address_state}
-                      onChange={(e) => setFormData({ ...formData, address_state: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="">Selecione...</option>
-                      <option value="AC">AC</option>
-                      <option value="AL">AL</option>
-                      <option value="AP">AP</option>
-                      <option value="AM">AM</option>
-                      <option value="BA">BA</option>
-                      <option value="CE">CE</option>
-                      <option value="DF">DF</option>
-                      <option value="ES">ES</option>
-                      <option value="GO">GO</option>
-                      <option value="MA">MA</option>
-                      <option value="MT">MT</option>
-                      <option value="MS">MS</option>
-                      <option value="MG">MG</option>
-                      <option value="PA">PA</option>
-                      <option value="PB">PB</option>
-                      <option value="PR">PR</option>
-                      <option value="PE">PE</option>
-                      <option value="PI">PI</option>
-                      <option value="RJ">RJ</option>
-                      <option value="RN">RN</option>
-                      <option value="RS">RS</option>
-                      <option value="RO">RO</option>
-                      <option value="RR">RR</option>
-                      <option value="SC">SC</option>
-                      <option value="SP">SP</option>
-                      <option value="SE">SE</option>
-                      <option value="TO">TO</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Seção 5: Descrição e Plano */}
-              <div className="mb-6">
-                <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">Informações Adicionais</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                      rows={4}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Plano de Inscrição</label>
-                    <select
-                      value={formData.subscription_plan_id}
-                      onChange={(e) => setFormData({ ...formData, subscription_plan_id: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="">Selecione um plano...</option>
-                      {planosLoading && (
-                        <option value="" disabled>Carregando planos...</option>
-                      )}
-                      {!planosLoading && planos.map((plano) => (
-                        <option key={plano.id} value={plano.id}>
-                          {plano.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                    <select
-                      value={formData.is_active ? 'ativo' : 'inativo'}
-                      onChange={(e) => setFormData({ ...formData, is_active: e.target.value === 'ativo' })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="ativo">Ativo</option>
-                      <option value="inativo">Inativo</option>
-                    </select>
-                  </div>
-                  {/* Trial */}
-                  {!editingId && (
-                    <div className="md:col-span-2">
-                      <div className="flex items-center gap-3 p-4 rounded-lg border-2 transition"
-                        style={{ borderColor: isTrial ? '#2563eb' : '#e5e7eb', background: isTrial ? '#eff6ff' : '#f9fafb' }}
-                      >
+                    <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">Informações de Contato</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-750 mb-2">E-mail Principal *</label>
                         <input
-                          type="checkbox"
-                          id="chk-trial"
-                          checked={isTrial}
-                          onChange={e => setIsTrial(e.target.checked)}
-                          className="w-5 h-5 accent-blue-600 cursor-pointer"
+                          type="email"
+                          value={formData.contact_email}
+                          onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                          required
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                         />
-                        <label htmlFor="chk-trial" className="font-semibold text-gray-800 cursor-pointer select-none">
-                          Período Trial
-                        </label>
-                        <span className="text-xs text-gray-500">— o ministério iniciará em modo trial e será desativado após o prazo</span>
                       </div>
-                      {isTrial && (
-                        <div className="mt-3 flex items-center gap-3">
-                          <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Duração do trial:</label>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-750 mb-2">Telefone</label>
+                        <input
+                          type="text"
+                          placeholder="(00) 0000-0000"
+                          value={formatPhone(formData.contact_phone)}
+                          onChange={(e) => setFormData({ ...formData, contact_phone: onlyDigits(e.target.value) })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-750 mb-2">WhatsApp</label>
+                        <input
+                          type="text"
+                          placeholder="(00) 00000-0000"
+                          value={formatPhone(formData.whatsapp)}
+                          onChange={(e) => setFormData({ ...formData, whatsapp: onlyDigits(e.target.value) })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-750 mb-2">Nome do Responsável</label>
+                        <input
+                          type="text"
+                          value={formData.responsible_name}
+                          onChange={(e) => setFormData({ ...formData, responsible_name: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-750 mb-2">Site Oficial (URL)</label>
+                        <input
+                          type="text"
+                          placeholder="https://..."
+                          value={formData.website}
+                          onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Seção 3: Credenciais de Acesso */}
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">Credenciais de Acesso</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          E-mail de Acesso {editingId ? '' : '*'}
+                        </label>
+                        <input
+                          type="email"
+                          value={formData.access_email}
+                          onChange={(e) => setFormData({ ...formData, access_email: e.target.value })}
+                          required={!editingId}
+                          placeholder={editingId ? 'Mantenha em branco para não alterar' : ''}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Senha de Acesso {editingId ? '' : '*'}
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.access_password}
+                          onChange={(e) => setFormData({ ...formData, access_password: e.target.value })}
+                          required={!editingId}
+                          placeholder={editingId ? 'Mantenha em branco para não alterar' : 'Mínimo 6 caracteres'}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Seção 4: Endereço */}
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">Endereço / Localização</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">CEP</label>
+                        <div className="relative">
                           <input
-                            type="number"
-                            min={1}
-                            max={90}
-                            value={trialDays}
-                            onChange={e => setTrialDays(Math.max(1, Math.min(90, Number(e.target.value))))}
-                            className="w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500 text-sm"
+                            type="text"
+                            placeholder="00000-000"
+                            value={formData.address_zip}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              const digits = onlyDigits(value).slice(0, 8)
+                              setFormData({ ...formData, address_zip: digits })
+                            }}
+                            className={`w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500 ${
+                              cepLookupError ? 'border-red-500 bg-red-50/10' : ''
+                            }`}
+                            maxLength={9}
                           />
-                          <span className="text-sm text-gray-600">dias</span>
-                          <span className="text-xs text-blue-600 ml-1">
-                            (expira em {new Date(Date.now() + trialDays * 86400000).toLocaleDateString('pt-BR')})
-                          </span>
+                          {cepLookupLoading && (
+                            <span className="absolute right-3 top-2.5 text-xs text-gray-400 animate-pulse">Buscando...</span>
+                          )}
+                        </div>
+                        {cepLookupError && (
+                          <p className="mt-1 text-xs text-red-400">{cepLookupError}</p>
+                        )}
+                        {cepResolved && (
+                          <p className="mt-1 text-xs text-green-500">{cepResolved}</p>
+                        )}
+                      </div>
+                      <div className="md:col-span-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Logradouro (Rua/Av)</label>
+                        <input
+                          type="text"
+                          value={formData.address_street}
+                          onChange={(e) => setFormData({ ...formData, address_street: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Número</label>
+                        <input
+                          type="text"
+                          value={formData.address_number}
+                          onChange={(e) => setFormData({ ...formData, address_number: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Complemento</label>
+                        <input
+                          type="text"
+                          value={formData.address_complement}
+                          onChange={(e) => setFormData({ ...formData, address_complement: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="md:col-span-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
+                        <input
+                          type="text"
+                          value={formData.address_city}
+                          onChange={(e) => setFormData({ ...formData, address_city: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Estado (UF)</label>
+                        <select
+                          value={formData.address_state}
+                          onChange={(e) => setFormData({ ...formData, address_state: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500 bg-gray-900 border-gray-700 text-gray-100"
+                        >
+                          <option value="">UF</option>
+                          <option value="AC">AC</option>
+                          <option value="AL">AL</option>
+                          <option value="AP">AP</option>
+                          <option value="AM">AM</option>
+                          <option value="BA">BA</option>
+                          <option value="CE">CE</option>
+                          <option value="DF">DF</option>
+                          <option value="ES">ES</option>
+                          <option value="GO">GO</option>
+                          <option value="MA">MA</option>
+                          <option value="MT">MT</option>
+                          <option value="MS">MS</option>
+                          <option value="MG">MG</option>
+                          <option value="PA">PA</option>
+                          <option value="PB">PB</option>
+                          <option value="PR">PR</option>
+                          <option value="PE">PE</option>
+                          <option value="PI">PI</option>
+                          <option value="RJ">RJ</option>
+                          <option value="RN">RN</option>
+                          <option value="RS">RS</option>
+                          <option value="RO">RO</option>
+                          <option value="RR">RR</option>
+                          <option value="SC">SC</option>
+                          <option value="SP">SP</option>
+                          <option value="SE">SE</option>
+                          <option value="TO">TO</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Seção 5: Descrição e Plano */}
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold text-gray-700 mb-4 pb-2 border-b">Informações Adicionais</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
+                        <textarea
+                          value={formData.description}
+                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                          rows={4}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Plano de Inscrição</label>
+                        <select
+                          value={formData.subscription_plan_id}
+                          onChange={(e) => setFormData({ ...formData, subscription_plan_id: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="">Selecione um plano...</option>
+                          {planosLoading && (
+                            <option value="" disabled>Carregando planos...</option>
+                          )}
+                          {!planosLoading && planos.map((plano) => (
+                            <option key={plano.id} value={plano.id}>
+                              {plano.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                        <select
+                          value={formData.is_active ? 'ativo' : 'inativo'}
+                          onChange={(e) => setFormData({ ...formData, is_active: e.target.value === 'ativo' })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="ativo">Ativo</option>
+                          <option value="inativo">Inativo</option>
+                        </select>
+                      </div>
+                      {/* Trial */}
+                      {!editingId && (
+                        <div className="md:col-span-2">
+                          <div className="flex items-center gap-3 p-4 rounded-lg border-2 transition"
+                            style={{ borderColor: isTrial ? '#2563eb' : '#e5e7eb', background: isTrial ? '#eff6ff' : '#f9fafb' }}
+                          >
+                            <input
+                              type="checkbox"
+                              id="chk-trial"
+                              checked={isTrial}
+                              onChange={e => setIsTrial(e.target.checked)}
+                              className="w-5 h-5 accent-blue-600 cursor-pointer"
+                            />
+                            <label htmlFor="chk-trial" className="font-semibold text-gray-800 cursor-pointer select-none">
+                              Período Trial
+                            </label>
+                            <span className="text-xs text-gray-500">— o ministério iniciará em modo trial e será desativado após o prazo</span>
+                          </div>
+                          {isTrial && (
+                            <div className="mt-3 flex items-center gap-3">
+                              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Duração do trial:</label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={90}
+                                value={trialDays}
+                                onChange={e => setTrialDays(Math.max(1, Math.min(90, Number(e.target.value))))}
+                                className="w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500 text-sm"
+                              />
+                              <span className="text-sm text-gray-600">dias</span>
+                              <span className="text-xs text-blue-600 ml-1">
+                                (expira em {new Date(Date.now() + trialDays * 86400000).toLocaleDateString('pt-BR')})
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
+                  </div>
 
-              <button
-                type="submit"
-                className="mt-6 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium"
-              >
-                {editingId ? 'Atualizar Ministério' : 'Criar Ministério'}
-              </button>
-            </form>
-          </div>
+                  <button
+                    type="submit"
+                    className="mt-6 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium"
+                  >
+                    {editingId ? 'Atualizar Ministério' : 'Criar Ministério'}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Lista de ministérios */}
+            <MinisteriosTable
+              loading={loading}
+              ministerios={ministerios}
+              totalItems={totalItems}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              onPageChange={(page) => setCurrentPage(page)}
+              getDetailedStatus={getDetailedStatus}
+              formatPhoneDisplay={formatPhoneDisplay}
+              onEdit={handleEdit}
+              onActivate={handleOpenActivate}
+              onBilling={handleOpenBilling}
+              onPrintLabel={handlePrintLabel}
+              onDelete={handleDelete}
+            />
+          </>
         )}
-
-        {/* Lista de ministérios */}
-            {loading ? (
-              <div className="text-center text-gray-400 py-12">Carregando...</div>
-            ) : ministerios.length === 0 ? (
-              <div className="text-center text-gray-400 py-12">
-                Nenhum ministério cadastrado
-              </div>
-            ) : (
-              <div className="bg-gray-800 border border-gray-700 rounded-lg shadow overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-900">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Nome</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Email</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Telefone</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Status</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-700">
-                    {ministerios.map((ministerio) => {
-                      const statusDetail = getDetailedStatus(ministerio);
-                      return (
-                        <tr key={ministerio.id} className="hover:bg-gray-700/40">
-                          <td className="px-6 py-4 text-sm text-gray-100">{ministerio.name}</td>
-                          <td className="px-6 py-4 text-sm text-gray-300">{ministerio.email_admin}</td>
-                          <td className="px-6 py-4 text-sm text-gray-300">{formatPhoneDisplay(ministerio.phone)}</td>
-                          <td className="px-6 py-4 text-sm">
-                            <div className="flex flex-col gap-1">
-                              <span className={`px-2 py-0.5 rounded text-xs font-semibold self-start border ${statusDetail.class}`}>
-                                {statusDetail.label}
-                              </span>
-                              {ministerio.plan && (
-                                <span className="text-[10px] text-gray-400 uppercase tracking-wider">
-                                  Plano: {ministerio.plan}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-sm flex items-center gap-2">
-                            <button
-                              onClick={() => handleEdit(ministerio)}
-                              className="p-1.5 bg-blue-900/40 text-blue-400 hover:text-blue-300 hover:bg-blue-900/60 rounded transition flex items-center justify-center"
-                              title="Editar"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            {(statusDetail.type === 'TRIAL_ATIVO' || statusDetail.type === 'TRIAL_EXPIRADO' || statusDetail.type === 'SUSPENSO') && (
-                              <button
-                                onClick={() => handleOpenActivate(ministerio)}
-                                className="p-1.5 bg-yellow-900/40 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/60 rounded transition flex items-center justify-center"
-                                title="Ativar"
-                              >
-                                <Play className="h-4 w-4" />
-                              </button>
-                            )}
-                            {(!(ministerio as any).platform_billing_invoices || (ministerio as any).platform_billing_invoices.length === 0) && (
-                              <button
-                                onClick={() => handleOpenBilling(ministerio)}
-                                className="p-1.5 bg-green-900/40 text-green-400 hover:text-green-300 hover:bg-green-900/60 rounded transition flex items-center justify-center"
-                                title="Gerar Fatura"
-                              >
-                                <Coins className="h-4 w-4" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handlePrintLabel(ministerio)}
-                              className="p-1.5 bg-purple-900/40 text-purple-400 hover:text-purple-300 hover:bg-purple-900/60 rounded transition flex items-center justify-center"
-                              title="Imprimir Etiqueta"
-                            >
-                              <Tag className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(ministerio)}
-                              className="p-1.5 bg-red-900/40 text-red-400 hover:text-red-300 hover:bg-red-900/60 rounded transition flex items-center justify-center"
-                              title="Remover"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-
-                {/* Paginação */}
-                {totalItems > itemsPerPage && (() => {
-                  const totalPages = Math.ceil(totalItems / itemsPerPage);
-                  return (
-                    <div className="px-6 py-4 bg-gray-900/50 border-t border-gray-700 flex items-center justify-between gap-4 flex-wrap">
-                      <span className="text-xs text-gray-400">
-                        Mostrando {Math.min(totalItems, (currentPage - 1) * itemsPerPage + 1)} a {Math.min(totalItems, currentPage * itemsPerPage)} de {totalItems} ministérios
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                          disabled={currentPage === 1}
-                          className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-bold rounded-lg border border-gray-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          Anterior
-                        </button>
-                        {Array.from({ length: totalPages }).map((_, idx) => {
-                          const p = idx + 1;
-                          const isCurrent = p === currentPage;
-                          return (
-                            <button
-                              key={p}
-                              onClick={() => setCurrentPage(p)}
-                              className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
-                                isCurrent 
-                                  ? 'bg-blue-600 text-white border border-blue-500' 
-                                  : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 hover:text-white'
-                              }`}
-                            >
-                              {p}
-                            </button>
-                          );
-                        })}
-                        <button
-                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                          disabled={currentPage === totalPages}
-                          className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-bold rounded-lg border border-gray-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          Próximo
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-              </>
-            )}
 
         {/* TAB: Pré-Cadastros */}
             {activeTab === 'precadastros' && (
