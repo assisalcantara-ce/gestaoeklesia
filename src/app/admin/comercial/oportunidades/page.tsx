@@ -27,6 +27,8 @@ import {
   CheckCircle2,
   CreditCard,
   AlertTriangle,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 
 // ─── Tipos dos filtros ─────────────────────────────────────────────────────────
@@ -47,6 +49,9 @@ const FILTROS_INICIAIS: OportunidadeFiltros = {
   periodoInicio: '',
   periodoFim: '',
 }
+
+type SortField = 'nome' | 'responsavel' | 'lifecycle' | 'prioridade' | 'nextAction' | 'dataCriacao' | null
+type SortDirection = 'asc' | 'desc' | null
 
 // ─── Opções dos selects ────────────────────────────────────────────────────────
 const LIFECYCLE_OPTIONS = [
@@ -203,6 +208,10 @@ export default function OportunidadesPage() {
   // ── Filtros ───────────────────────────────────────────────────────────────
   const [filtros, setFiltros] = useState<OportunidadeFiltros>(FILTROS_INICIAIS)
 
+  // ── Ordenação ─────────────────────────────────────────────────────────────
+  const [sortField, setSortField] = useState<SortField>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>(null)
+
   // ── Dados da tabela ────────────────────────────────────────────────────────
   const [activities, setActivities] = useState<CrmActivityData[]>([])
   const [tableLoading, setTableLoading] = useState<boolean>(true)
@@ -240,6 +249,50 @@ export default function OportunidadesPage() {
     fetchActivities()
   }, [fetchActivities])
 
+  // ── Handler para alternar ordenação por coluna ─────────────────────────────
+  const handleSort = useCallback((field: SortField) => {
+    setSortField((currentField) => {
+      if (currentField !== field) {
+        setSortDirection('asc')
+        return field
+      }
+      
+      setSortDirection((currentDir) => {
+        if (currentDir === 'asc') return 'desc'
+        return null // Remove ordenação no 3º clique
+      })
+      
+      return field
+    })
+  }, [])
+
+  // Limpa o campo de ordenação se a direção foi resetada para null
+  useEffect(() => {
+    if (sortDirection === null) {
+      setSortField(null)
+    }
+  }, [sortDirection])
+
+  // ── Componente de cabeçalho ordenável com indicador visual ─────────────────
+  const HeaderCell = ({ field, label }: { field: SortField; label: string }) => {
+    const isCurrent = sortField === field
+    return (
+      <th 
+        onClick={() => handleSort(field)}
+        className="py-3 px-4 font-bold cursor-pointer hover:bg-gray-800 hover:text-white transition group select-none"
+      >
+        <span className="flex items-center gap-1">
+          {label}
+          <span className="inline-flex shrink-0">
+            {isCurrent && sortDirection === 'asc' && <ArrowUp className="h-3 w-3 text-blue-400" />}
+            {isCurrent && sortDirection === 'desc' && <ArrowDown className="h-3 w-3 text-blue-400" />}
+            {!isCurrent && <ArrowUp className="h-3 w-3 text-gray-700 opacity-0 group-hover:opacity-100 transition" />}
+          </span>
+        </span>
+      </th>
+    )
+  }
+
   // ── Filtragem em memória (cumulativa) via useMemo ───────────────────────
   const filteredActivities = useMemo(() => {
     return activities.filter((act) => {
@@ -274,8 +327,6 @@ export default function OportunidadesPage() {
 
       // 4. Responsável
       if (filtros.responsavel) {
-        // Se escolheu 'equipe', filtramos registros que possuem responsável preenchido
-        // (Ou se futuramente tivéssemos nomes específicos, compararia com o campo)
         if (filtros.responsavel === 'equipe') {
           if (!act.responsavel) return false
         }
@@ -303,9 +354,67 @@ export default function OportunidadesPage() {
     })
   }, [activities, filtros])
 
-  // ── Ordenação final aplicada sobre os dados filtrados ───────────────────
+  // ── Ordenação final (Padrão ou Dinâmica) via useMemo ────────────────────
   const sortedActivities = useMemo(() => {
-    return [...filteredActivities].sort((a, b) => {
+    const list = [...filteredActivities]
+
+    // Se houver campo e direção definidos, aplica a ordenação dinâmica
+    if (sortField && sortDirection) {
+      const isAsc = sortDirection === 'asc'
+
+      list.sort((a, b) => {
+        let valA: any = ''
+        let valB: any = ''
+
+        switch (sortField) {
+          case 'nome':
+            valA = a.nome || ''
+            valB = b.nome || ''
+            return isAsc ? valA.localeCompare(valB, 'pt-BR') : valB.localeCompare(valA, 'pt-BR')
+
+          case 'responsavel':
+            valA = a.responsavel || ''
+            valB = b.responsavel || ''
+            return isAsc ? valA.localeCompare(valB, 'pt-BR') : valB.localeCompare(valA, 'pt-BR')
+
+          case 'lifecycle':
+            valA = a.lifecycle?.status || a.status || ''
+            valB = b.lifecycle?.status || b.status || ''
+            return isAsc ? valA.localeCompare(valB, 'pt-BR') : valB.localeCompare(valA, 'pt-BR')
+
+          case 'prioridade':
+            valA = getPrioridadeWeight(a.prioridade)
+            valB = getPrioridadeWeight(b.prioridade)
+            return isAsc ? valA - valB : valB - valA
+
+          case 'nextAction':
+            valA = a.nextAction ? new Date(a.nextAction.vencimento).getTime() : Infinity
+            valB = b.nextAction ? new Date(b.nextAction.vencimento).getTime() : Infinity
+            // Deixa nulos ou infinitos sempre no final
+            if (valA === Infinity && valB === Infinity) return 0
+            if (valA === Infinity) return 1
+            if (valB === Infinity) return -1
+            return isAsc ? valA - valB : valB - valA
+
+          case 'dataCriacao':
+            valA = a.dataCriacao ? new Date(a.dataCriacao).getTime() : 0
+            valB = b.dataCriacao ? new Date(b.dataCriacao).getTime() : 0
+            return isAsc ? valA - valB : valB - valA
+
+          default:
+            return 0
+        }
+      })
+
+      return list
+    }
+
+    // Ordenação padrão da central comercial:
+    // 1. Prioridade (alta → baixa)
+    // 2. Próxima ação vencida
+    // 3. Próxima ação mais próxima
+    // 4. Nome do ministério
+    return list.sort((a, b) => {
       const wA = getPrioridadeWeight(a.prioridade)
       const wB = getPrioridadeWeight(b.prioridade)
       if (wB !== wA) return wB - wA
@@ -320,7 +429,7 @@ export default function OportunidadesPage() {
 
       return a.nome.localeCompare(b.nome, 'pt-BR')
     })
-  }, [filteredActivities])
+  }, [filteredActivities, sortField, sortDirection])
 
   // ── Handlers dos filtros ───────────────────────────────────────────────────
   const handleChange = useCallback(
@@ -329,7 +438,11 @@ export default function OportunidadesPage() {
         setFiltros((prev) => ({ ...prev, [field]: e.target.value })),
     []
   )
-  const handleLimpar = useCallback(() => setFiltros(FILTROS_INICIAIS), [])
+  const handleLimpar = useCallback(() => {
+    setFiltros(FILTROS_INICIAIS)
+    setSortField(null)
+    setSortDirection(null)
+  }, [])
   const filtrosAtivos = hasFiltrosAtivos(filtros)
 
   // ── Loading skeleton de autenticação ──────────────────────────────────────
@@ -409,13 +522,13 @@ export default function OportunidadesPage() {
             <div className="px-5 py-3.5 border-b border-gray-800 bg-gray-900/40 flex items-center gap-2">
               <Search className="h-3.5 w-3.5 text-gray-500" />
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Filtros</span>
-              {filtrosAtivos && (
+              {(filtrosAtivos || sortField) && (
                 <span className="ml-1 flex items-center gap-1 bg-blue-950/60 text-blue-400 border border-blue-900/60 text-[10px] font-bold px-2 py-0.5 rounded-full">
                   <span className="w-1 h-1 bg-blue-400 rounded-full" />
                   Ativos
                 </span>
               )}
-              {filtrosAtivos ? (
+              {(filtrosAtivos || sortField) ? (
                 <button onClick={handleLimpar} className="ml-auto flex items-center gap-1.5 text-[10px] font-bold text-gray-500 hover:text-rose-400 transition cursor-pointer" title="Limpar todos os filtros">
                   <FilterX className="h-3.5 w-3.5" />
                   Limpar filtros
@@ -488,8 +601,8 @@ export default function OportunidadesPage() {
               <div className="ml-auto">
                 <button
                   onClick={handleLimpar}
-                  disabled={!filtrosAtivos}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border transition ${filtrosAtivos ? 'bg-gray-900 hover:bg-rose-950/40 text-gray-400 hover:text-rose-400 border-gray-800 hover:border-rose-900/60 cursor-pointer' : 'bg-gray-900/40 text-gray-700 border-gray-800 cursor-not-allowed opacity-50 select-none'}`}
+                  disabled={!filtrosAtivos && !sortField}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border transition ${(filtrosAtivos || sortField) ? 'bg-gray-900 hover:bg-rose-950/40 text-gray-400 hover:text-rose-400 border-gray-800 hover:border-rose-900/60 cursor-pointer' : 'bg-gray-900/40 text-gray-700 border-gray-800 cursor-not-allowed opacity-50 select-none'}`}
                 >
                   <FilterX className="h-3.5 w-3.5" />
                   Limpar filtros
@@ -545,7 +658,9 @@ export default function OportunidadesPage() {
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-white">Lista de Oportunidades</h2>
-                  <p className="text-[11px] text-gray-400">Ordenadas por prioridade e vencimento da próxima ação</p>
+                  <p className="text-[11px] text-gray-400">
+                    {sortField ? 'Ordenação personalizada ativa' : 'Ordenação padrão do CRM ativo'}
+                  </p>
                 </div>
               </div>
               {!tableLoading && !tableError && (
@@ -610,14 +725,14 @@ export default function OportunidadesPage() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-gray-800 text-[10px] text-gray-500 uppercase tracking-wider bg-gray-900/40">
-                      <th className="py-3 px-5 font-bold">Ministério</th>
-                      <th className="py-3 px-4 font-bold">Lifecycle</th>
+                      <HeaderCell field="nome" label="Ministério" />
+                      <HeaderCell field="lifecycle" label="Lifecycle" />
                       <th className="py-3 px-4 font-bold">Plano</th>
-                      <th className="py-3 px-4 font-bold">Responsável</th>
+                      <HeaderCell field="responsavel" label="Responsável" />
                       <th className="py-3 px-4 font-bold">Próxima Ação</th>
-                      <th className="py-3 px-4 font-bold">Vencimento</th>
-                      <th className="py-3 px-4 font-bold">Última Interação</th>
-                      <th className="py-3 px-4 font-bold">Prioridade</th>
+                      <HeaderCell field="nextAction" label="Vencimento" />
+                      <HeaderCell field="dataCriacao" label="Data de Criação" />
+                      <HeaderCell field="prioridade" label="Prioridade" />
                       <th className="py-3 px-4 font-bold">Situação Fin.</th>
                       <th className="py-3 px-4 font-bold text-right">Ações</th>
                     </tr>
@@ -633,7 +748,7 @@ export default function OportunidadesPage() {
                           className="hover:bg-gray-900/50 transition group"
                         >
                           {/* Ministério */}
-                          <td className="py-3.5 px-5">
+                          <td className="py-3.5 px-4">
                             <p className="font-bold text-white group-hover:text-blue-400 transition">{act.nome}</p>
                             {act.email && <p className="text-gray-600 text-[10px] mt-0.5 truncate max-w-[160px]">{act.email}</p>}
                           </td>
@@ -679,9 +794,9 @@ export default function OportunidadesPage() {
                             )}
                           </td>
 
-                          {/* Última Interação */}
+                          {/* Data de Criação */}
                           <td className="py-3.5 px-4 text-gray-500">
-                            {formatDate(act.ultimaAtualizacao)}
+                            {formatDate(act.dataCriacao)}
                           </td>
 
                           {/* Prioridade */}
