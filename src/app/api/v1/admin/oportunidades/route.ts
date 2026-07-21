@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-guard'
+import { LifecycleService } from '@/lib/platform'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,14 +68,16 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // 3. Enriquecer as oportunidades com informações completas do Ministério e Histórico
+    const lifecycleService = new LifecycleService()
+
+    // 3. Enriquecer as oportunidades com informações completas do Ministério, Faturas, PreReg e Histórico
     const enriched = await Promise.all(
       oportunidades.map(async (opt: any) => {
-        const [ministryResult, configResult, histResult] = await Promise.all([
+        const [ministryResult, configResult, invoicesResult, histResult] = await Promise.all([
           // Detalhes do ministério
           supabaseAdmin
             .from('ministries')
-            .select('name, email_admin, phone')
+            .select('*')
             .eq('id', opt.ministry_id)
             .maybeSingle(),
           // Configurações (onde fica o responsável)
@@ -83,6 +86,11 @@ export async function GET(request: NextRequest) {
             .select('church_profile')
             .eq('ministry_id', opt.ministry_id)
             .maybeSingle(),
+          // Faturas de faturamento
+          supabaseAdmin
+            .from('platform_billing_invoices')
+            .select('*')
+            .eq('ministry_id', opt.ministry_id),
           // Histórico (tabela customizada ou mensagens)
           opt.is_ticket
             ? supabaseAdmin
@@ -99,6 +107,37 @@ export async function GET(request: NextRequest) {
 
         const mData = ministryResult.data
         const churchProfile = (configResult.data as any)?.church_profile || {}
+        const invoices = invoicesResult.data || []
+
+        // Carregar pré-cadastro pelo user_id do ministério (se houver)
+        let preReg = null
+        if (mData?.user_id) {
+          const { data: preRegData } = await supabaseAdmin
+            .from('pre_registrations')
+            .select('*')
+            .eq('user_id', mData.user_id)
+            .maybeSingle()
+          preReg = preRegData
+        }
+
+        // Se não achou por user_id, tenta carregar o pre_registration_id correspondente
+        if (!preReg && opt.id) {
+          const { data: preRegData } = await supabaseAdmin
+            .from('pre_registrations')
+            .select('*')
+            .eq('id', opt.id)
+            .maybeSingle()
+          preReg = preRegData
+        }
+
+        // Calcular Lifecycle comercial
+        const lifecycle = lifecycleService.calculate({
+          ministry: mData,
+          preRegistration: preReg,
+          billingInvoices: invoices,
+          opportunity: opt
+        })
+
 
         // Mapear histórico para formato padrão
         let historicoFormatado: any[] = []
@@ -144,7 +183,8 @@ export async function GET(request: NextRequest) {
           email: mData?.email_admin || '',
           telefone: mData?.phone || churchProfile.telefone || '',
           responsavel: churchProfile.responsavel || 'Não Informado',
-          historico: historicoFormatado
+          historico: historicoFormatado,
+          lifecycle
         }
       })
     )
