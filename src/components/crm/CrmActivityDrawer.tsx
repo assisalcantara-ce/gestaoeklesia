@@ -113,6 +113,39 @@ export default function CrmActivityDrawer({ activity, onClose }: CrmActivityDraw
               </div>
             </div>
 
+            {/* Informações do Cliente */}
+            <div className="p-4 bg-gray-900/40 border border-gray-800 rounded-xl space-y-3">
+              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Informações do Cliente</span>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-semibold">Nome</span>
+                  <span className="font-semibold text-white">{activity.nome || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-semibold">Responsável</span>
+                  <span className="font-semibold text-white">{activity.responsavel || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-semibold">E-mail</span>
+                  <span className="font-medium text-gray-300 select-all">{activity.email || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-semibold">Telefone</span>
+                  <span className="font-medium text-gray-300 select-all">{activity.telefone || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-semibold">Origem</span>
+                  <span className="font-semibold text-gray-300">{activity.origem || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-semibold">Data Cadastro</span>
+                  <span className="font-semibold text-gray-300">
+                    {activity.dataCriacao ? new Date(activity.dataCriacao).toLocaleDateString('pt-BR') : '-'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* Resumo Comercial */}
             {activity.lifecycle && (
               <div className="p-4 bg-gray-900/40 border border-gray-800 rounded-xl space-y-3">

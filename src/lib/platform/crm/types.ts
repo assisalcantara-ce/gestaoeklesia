@@ -40,6 +40,9 @@ export interface CrmActivity {
   descricao?: string;
   dataExecucao?: string;
   usuarioResponsavel?: string;
+  email?: string;
+  telefone?: string;
+  origem?: string;
   lifecycle?: {
     status: string;
     plano?: string;

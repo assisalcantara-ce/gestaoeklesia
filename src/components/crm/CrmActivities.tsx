@@ -15,6 +15,9 @@ export interface CrmActivityData {
   prioridade: string;
   dataCriacao: string;
   ultimaAtualizacao: string;
+  email?: string;
+  telefone?: string;
+  origem?: string;
   lifecycle?: {
     status: string;
     plano?: string;
