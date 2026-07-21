@@ -2,9 +2,10 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
+import { authenticatedFetch } from '@/lib/api-client'
 import AdminSidebar from '@/components/AdminSidebar'
 import {
   GitBranch,
@@ -17,9 +18,13 @@ import {
   PieChart,
   Target,
   Inbox,
+  User,
+  Clock,
+  AlertTriangle,
 } from 'lucide-react'
+import { CrmActivityData } from '@/components/crm/CrmActivities'
 
-// ─── Colunas Fixas do Kanban ──────────────────────────────────────────────────
+// ─── Colunas do Kanban ────────────────────────────────────────────────────────
 const KANBAN_COLUMNS = [
   { key: 'lead',           label: 'Lead',            color: 'border-t-indigo-500 bg-indigo-950/5' },
   { key: 'trial',          label: 'Trial',           color: 'border-t-blue-500 bg-blue-950/5' },
@@ -30,16 +35,228 @@ const KANBAN_COLUMNS = [
   { key: 'cancelado',      label: 'Cancelado',       color: 'border-t-slate-500 bg-slate-950/5' },
 ]
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function getPlanoPrice(planoName?: string): number {
+  if (!planoName) return 49.90
+  const plan = String(planoName).toLowerCase()
+  if (plan.includes('profis')) return 299.90
+  if (plan.includes('inter')) return 149.90
+  return 49.90
+}
+
+function getPrioridadeWeight(p: string): number {
+  if (p === 'alta')  return 3
+  if (p === 'media') return 2
+  return 1
+}
+
+function isVencido(iso: string): boolean {
+  return new Date(iso).getTime() < Date.now()
+}
+
+// ─── Mapeamento de Lifecycle para as raias ────────────────────────────────────
+function mapLifecycleToKanbanKey(status?: string): string {
+  if (!status) return 'lead'
+  const s = status.toUpperCase().trim()
+
+  // Mapeamentos específicos do backend / CRM comercial
+  if (s === 'LEAD') return 'lead'
+  
+  if (s === 'TRIAL' || s === 'TRIAL_EXPIRING') return 'trial'
+  
+  if (
+    s === 'NOVO' || 
+    s === 'PRIMEIRO_CONTATO' || 
+    s === 'EM_NEGOCIACAO' || 
+    s === 'PROPOSTA_ENVIADA' || 
+    s === 'AGUARDANDO_CLIENTE'
+  ) return 'negociacao'
+  
+  if (s === 'PAYMENT_PENDING' || s === 'AGUARDANDO_PAGAMENTO') return 'pagamento'
+  
+  if (s === 'ACTIVE' || s === 'CONVERTIDO') return 'cliente_ativo'
+  
+  if (s === 'RENEWAL' || s === 'RENOVACAO') return 'renovacao'
+  
+  if (s === 'CANCELLED' || s === 'CANCELADO' || s === 'TRIAL_EXPIRED') return 'cancelado'
+
+  return 'lead'
+}
+
+// ─── Badge de Prioridade ──────────────────────────────────────────────────────
+function PrioridadeBadge({ prioridade }: { prioridade: string }) {
+  const styles: Record<string, string> = {
+    alta:  'bg-rose-950/60 text-rose-400 border-rose-900/60',
+    media: 'bg-amber-950/60 text-amber-400 border-amber-900/60',
+    baixa: 'bg-gray-800 text-gray-400 border-gray-700',
+  }
+  const label: Record<string, string> = {
+    alta: 'Alta', media: 'Média', baixa: 'Baixa',
+  }
+  const key = (prioridade || '').toLowerCase()
+  return (
+    <span className={`text-[8px] font-bold px-2 py-0.5 rounded border uppercase ${styles[key] || styles.baixa}`}>
+      {label[key] || prioridade || '—'}
+    </span>
+  )
+}
+
+// ─── Skeleton Loader das Colunas ──────────────────────────────────────────────
+function KanbanSkeleton() {
+  return (
+    <div className="flex-1 min-h-[450px] flex gap-4 overflow-x-auto pb-4">
+      {KANBAN_COLUMNS.map((_, colIdx) => (
+        <div 
+          key={colIdx}
+          className="w-72 shrink-0 border border-gray-850 bg-gray-950/10 rounded-2xl flex flex-col h-full overflow-hidden"
+        >
+          <div className="px-4 py-3.5 border-b border-gray-850/60 bg-gray-950/40 flex items-center justify-between animate-pulse">
+            <div className="h-3.5 bg-gray-800 rounded w-24" />
+            <div className="h-5 bg-gray-800 rounded-full w-8" />
+          </div>
+          <div className="flex-1 p-4 space-y-3">
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className="p-3 bg-gray-900/30 border border-gray-800 rounded-xl space-y-2 animate-pulse">
+                <div className="h-3.5 bg-gray-800 rounded w-2/3" />
+                <div className="h-3 bg-gray-800 rounded w-1/3" />
+                <div className="h-4 bg-gray-800 rounded w-16" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Página ───────────────────────────────────────────────────────────────────
 export default function PipelinePage() {
   const { isLoading, isAuthenticated } = useAdminAuth()
   const router = useRouter()
 
+  // ── Dados do CRM ───────────────────────────────────────────────────────────
+  const [activities, setActivities] = useState<CrmActivityData[]>([])
+  const [tableLoading, setTableLoading] = useState<boolean>(true)
+  const [tableError, setTableError] = useState<string | null>(null)
+
+  // ── Auth guard ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/admin/login')
     }
   }, [isLoading, isAuthenticated, router])
 
+  // ── Fetch ─────────────────────────────────────────────────────────────────
+  const fetchActivities = useCallback(async () => {
+    setTableLoading(true)
+    setTableError(null)
+    try {
+      const res = await authenticatedFetch('/api/v1/admin/crm/activities')
+      if (!res.ok) throw new Error('Erro ao carregar oportunidades')
+      const data = await res.json()
+      setActivities(data || [])
+    } catch (err: any) {
+      setTableError(err?.message || 'Erro ao carregar oportunidades')
+    } finally {
+      setTableLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isAuthenticated) fetchActivities()
+  }, [isAuthenticated, fetchActivities])
+
+  // ── Cálculos Locais dos KPIs ──────────────────────────────────────────────
+  const kpis = useMemo(() => {
+    const total = activities.length
+    
+    // 1. Total estimado (Soma do valor financeiro do plano de cada oportunidade ativa)
+    const valorEstimado = activities.reduce((acc, act) => {
+      const status = (act.lifecycle?.status || act.status || '').toLowerCase()
+      // Ignorar cancelados no cálculo estimado
+      if (status === 'cancelled' || status === 'cancelado' || status === 'trial_expired') {
+        return acc
+      }
+      return acc + getPlanoPrice(act.lifecycle?.plano)
+    }, 0)
+
+    // 2. Taxa de conversão: (Clientes convertidos / Total) * 100
+    const convertidos = activities.filter((act) => {
+      const status = (act.lifecycle?.status || act.status || '').toLowerCase()
+      return status === 'active' || status === 'convertido'
+    }).length
+    const conversao = total > 0 ? (convertidos / total) * 100 : 0
+
+    // 3. Ticket médio: Valor Estimado / Oportunidades com valor
+    const oportunidadesComValor = activities.filter((act) => {
+      const status = (act.lifecycle?.status || act.status || '').toLowerCase()
+      return status !== 'cancelled' && status !== 'cancelado' && status !== 'trial_expired'
+    }).length
+    const ticketMedio = oportunidadesComValor > 0 ? valorEstimado / oportunidadesComValor : 0
+
+    return {
+      total,
+      valorEstimado,
+      conversao,
+      ticketMedio,
+    }
+  }, [activities])
+
+  // ── Agrupamento e Ordenação por Colunas ─────────────────────────────────────
+  const kanbanData = useMemo(() => {
+    // Inicia raias vazias
+    const groups: Record<string, CrmActivityData[]> = {
+      lead: [],
+      trial: [],
+      negociacao: [],
+      pagamento: [],
+      cliente_ativo: [],
+      renovacao: [],
+      cancelado: [],
+    }
+
+    // Agrupa nas raias baseando-se no mapeamento de status
+    activities.forEach((act) => {
+      const statusKey = mapLifecycleToKanbanKey(act.lifecycle?.status || act.status)
+      if (groups[statusKey]) {
+        groups[statusKey].push(act)
+      } else {
+        groups.lead.push(act) // Fallback seguro
+      }
+    })
+
+    // Ordenação interna de cada raia:
+    // 1. Alta prioridade
+    // 2. Próxima ação vencida
+    // 3. Próxima ação mais próxima
+    // 4. Data de criação
+    // 5. Nome do ministério
+    Object.keys(groups).forEach((key) => {
+      groups[key].sort((a, b) => {
+        const wA = getPrioridadeWeight(a.prioridade)
+        const wB = getPrioridadeWeight(b.prioridade)
+        if (wB !== wA) return wB - wA
+
+        const now = Date.now()
+        const vA = a.nextAction ? new Date(a.nextAction.vencimento).getTime() : Infinity
+        const vB = b.nextAction ? new Date(b.nextAction.vencimento).getTime() : Infinity
+        const expA = vA < now
+        const expB = vB < now
+        if (expA !== expB) return expA ? -1 : 1
+        if (vA !== vB) return vA - vB
+
+        const cA = a.dataCriacao ? new Date(a.dataCriacao).getTime() : 0
+        const cB = b.dataCriacao ? new Date(b.dataCriacao).getTime() : 0
+        if (cA !== cB) return cA - cB
+
+        return a.nome.localeCompare(b.nome, 'pt-BR')
+      })
+    })
+
+    return groups
+  }, [activities])
+
+  // Loading skeleton global de autenticação
   if (isLoading || !isAuthenticated) {
     return (
       <div className="flex h-screen bg-gray-900">
@@ -65,27 +282,14 @@ export default function PipelinePage() {
 
         {/* ── HEADER STICKY ───────────────────────────────────────────── */}
         <div className="sticky top-0 bg-gray-950 border-b border-gray-800 px-6 py-4 z-20 shrink-0">
-
-          {/* Breadcrumb */}
           <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[11px] text-gray-500 font-semibold mb-3">
-            <button
-              onClick={() => router.push('/admin')}
-              className="hover:text-gray-300 transition cursor-pointer"
-            >
-              Admin
-            </button>
+            <button onClick={() => router.push('/admin')} className="hover:text-gray-300 transition cursor-pointer">Admin</button>
             <ChevronRight className="h-3 w-3 text-gray-700" />
-            <button
-              onClick={() => router.push('/admin/comercial')}
-              className="hover:text-gray-300 transition cursor-pointer"
-            >
-              Comercial
-            </button>
+            <button onClick={() => router.push('/admin/comercial')} className="hover:text-gray-300 transition cursor-pointer">Comercial</button>
             <ChevronRight className="h-3 w-3 text-gray-700" />
             <span className="text-gray-300">Pipeline</span>
           </nav>
 
-          {/* Título + Ações */}
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-xl font-bold text-white flex items-center gap-2.5">
@@ -101,17 +305,15 @@ export default function PipelinePage() {
 
             <div className="flex items-center gap-2 shrink-0">
               <button
-                onClick={() => window.location.reload()}
+                onClick={fetchActivities}
                 className="flex items-center gap-2 px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white border border-gray-700 rounded-xl text-xs font-semibold transition cursor-pointer"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
                 Atualizar
               </button>
-
               <div className="relative group">
                 <button
                   disabled
-                  aria-disabled="true"
                   title="Disponível em breve"
                   className="flex items-center gap-2 px-4 py-2 bg-blue-700/40 text-blue-400/60 border border-blue-800/40 rounded-xl text-xs font-bold cursor-not-allowed select-none opacity-60"
                 >
@@ -130,68 +332,156 @@ export default function PipelinePage() {
         {/* ── CONTENT AREA ──────────────────────────────────────────────── */}
         <div className="p-6 space-y-6 flex-1 flex flex-col min-h-0">
 
-          {/* ── CARDS INFORMATIVOS VAZIOS ─────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
-            {[
-              { label: 'Total de Oportunidades', icon: <TrendingUp className="h-4 w-4" />, value: '—', desc: 'Negociações ativas' },
-              { label: 'Valor Estimado',        icon: <DollarSign className="h-4 w-4" />, value: '—', desc: 'Volume financeiro previsto' },
-              { label: 'Conversão',             icon: <PieChart className="h-4 w-4" />,  value: '—', desc: 'Taxa média de fechamento' },
-              { label: 'Ticket Médio',          icon: <Target className="h-4 w-4" />,    value: '—', desc: 'Valor por contrato ativo' },
-            ].map((kpi, idx) => (
-              <div 
-                key={idx} 
-                className="bg-gray-950 border border-gray-800 rounded-2xl p-4 md:p-5 flex flex-col justify-between shadow-xs transition hover:shadow-md duration-200"
-              >
+          {/* ── Estado de erro ── */}
+          {tableError && (
+            <div className="flex items-center gap-3 p-4 bg-rose-950/30 border border-rose-900/50 text-rose-400 rounded-2xl text-xs shrink-0">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-bold">Erro ao carregar o pipeline</p>
+                <p className="text-rose-500 mt-0.5">{tableError}</p>
+              </div>
+              <button onClick={fetchActivities} className="ml-auto px-3.5 py-2 bg-rose-950/60 hover:bg-rose-900/60 border border-rose-900/60 text-rose-400 rounded-xl text-xs font-semibold transition cursor-pointer">
+                Tentar novamente
+              </button>
+            </div>
+          )}
+
+          {/* ── CARDS INFORMATIVOS (MÉTRICAS) ─────────────────────────────── */}
+          {!tableError && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
+              <div className="bg-gray-950 border border-gray-800 rounded-2xl p-4 md:p-5 flex flex-col justify-between shadow-xs transition hover:shadow-md duration-200">
                 <div className="flex justify-between items-start gap-2">
                   <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                      {kpi.label}
-                    </span>
-                    <p className="text-xl font-black text-gray-400 tracking-tight leading-none">
-                      {kpi.value}
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Total de Oportunidades</span>
+                    <p className="text-xl font-black text-white tracking-tight leading-none">
+                      {tableLoading ? '—' : kpis.total}
                     </p>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-gray-900 text-gray-500 shrink-0">
-                    {kpi.icon}
-                  </div>
+                  <div className="p-2.5 rounded-xl bg-gray-900 text-gray-400 shrink-0"><TrendingUp className="h-4 w-4" /></div>
                 </div>
-                <div className="text-[10px] text-gray-500 font-medium truncate mt-3 pt-2.5 border-t border-gray-900">
-                  {kpi.desc}
-                </div>
+                <div className="text-[10px] text-gray-500 font-medium truncate mt-3 pt-2.5 border-t border-gray-900">Negociações ativas</div>
               </div>
-            ))}
-          </div>
 
-          {/* ── KANBAN BOARD ──────────────────────────────────────────── */}
-          <div className="flex-1 min-h-[450px] flex gap-4 overflow-x-auto pb-4">
-            {KANBAN_COLUMNS.map((column) => (
-              <div 
-                key={column.key}
-                className={`w-72 shrink-0 border-t-2 ${column.color} border-x border-b border-gray-850 bg-gray-950/20 rounded-2xl flex flex-col h-full overflow-hidden shadow-xs`}
-              >
-                {/* Cabeçalho da coluna */}
-                <div className="px-4 py-3.5 border-b border-gray-850/60 bg-gray-950/60 flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-300">
-                    {column.label}
-                  </span>
-                  <span className="text-[10px] font-bold bg-gray-900 text-gray-500 border border-gray-800 px-2 py-0.5 rounded-full">
-                    0
-                  </span>
-                </div>
-
-                {/* Área para cards com Empty State */}
-                <div className="flex-1 p-4 flex flex-col items-center justify-center text-center">
-                  <div className="w-12 h-12 bg-gray-900 border border-gray-850 rounded-2xl flex items-center justify-center mb-2.5">
-                    <Inbox className="h-5 w-5 text-gray-600" />
+              <div className="bg-gray-950 border border-gray-800 rounded-2xl p-4 md:p-5 flex flex-col justify-between shadow-xs transition hover:shadow-md duration-200">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Valor Estimado</span>
+                    <p className="text-xl font-black text-white tracking-tight leading-none">
+                      {tableLoading ? '—' : `R$ ${kpis.valorEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                    </p>
                   </div>
-                  <h4 className="text-xs font-bold text-gray-400">Nenhuma oportunidade</h4>
-                  <p className="text-[10px] text-gray-600 mt-1 max-w-[160px]">
-                    Nenhum registro ativo nesta etapa.
-                  </p>
+                  <div className="p-2.5 rounded-xl bg-gray-900 text-gray-400 shrink-0"><DollarSign className="h-4 w-4" /></div>
                 </div>
+                <div className="text-[10px] text-gray-500 font-medium truncate mt-3 pt-2.5 border-t border-gray-900">Volume financeiro previsto</div>
               </div>
-            ))}
-          </div>
+
+              <div className="bg-gray-950 border border-gray-800 rounded-2xl p-4 md:p-5 flex flex-col justify-between shadow-xs transition hover:shadow-md duration-200">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Conversão</span>
+                    <p className="text-xl font-black text-white tracking-tight leading-none">
+                      {tableLoading ? '—' : `${kpis.conversao.toFixed(1)}%`}
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-gray-900 text-gray-400 shrink-0"><PieChart className="h-4 w-4" /></div>
+                </div>
+                <div className="text-[10px] text-gray-500 font-medium truncate mt-3 pt-2.5 border-t border-gray-900">Taxa média de fechamento</div>
+              </div>
+
+              <div className="bg-gray-950 border border-gray-800 rounded-2xl p-4 md:p-5 flex flex-col justify-between shadow-xs transition hover:shadow-md duration-200">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Ticket Médio</span>
+                    <p className="text-xl font-black text-white tracking-tight leading-none">
+                      {tableLoading ? '—' : `R$ ${kpis.ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-gray-900 text-gray-400 shrink-0"><Target className="h-4 w-4" /></div>
+                </div>
+                <div className="text-[10px] text-gray-500 font-medium truncate mt-3 pt-2.5 border-t border-gray-900">Valor por contrato ativo</div>
+              </div>
+            </div>
+          )}
+
+          {/* ── KANBAN BOARD ── */}
+          {tableLoading && !tableError && <KanbanSkeleton />}
+
+          {!tableLoading && !tableError && (
+            <div className="flex-1 min-h-[450px] flex gap-4 overflow-x-auto pb-4 items-start">
+              {KANBAN_COLUMNS.map((column) => {
+                const list = kanbanData[column.key] || []
+                
+                return (
+                  <div 
+                    key={column.key}
+                    className={`w-72 shrink-0 border-t-2 ${column.color} border-x border-b border-gray-850 bg-gray-950/20 rounded-2xl flex flex-col max-h-full overflow-hidden shadow-xs`}
+                  >
+                    {/* Cabeçalho da coluna */}
+                    <div className="px-4 py-3.5 border-b border-gray-850/60 bg-gray-950/60 flex items-center justify-between shrink-0">
+                      <span className="text-xs font-bold text-gray-300">{column.label}</span>
+                      <span className="text-[10px] font-bold bg-gray-900 text-gray-400 border border-gray-800 px-2 py-0.5 rounded-full">
+                        {list.length}
+                      </span>
+                    </div>
+
+                    {/* Área para cards */}
+                    <div className="flex-1 overflow-y-auto p-3 space-y-2.5 max-h-[calc(100vh-360px)]">
+                      {list.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                          <div className="w-10 h-10 bg-gray-900 border border-gray-850 rounded-xl flex items-center justify-center mb-2">
+                            <Inbox className="h-4 w-4 text-gray-600" />
+                          </div>
+                          <h4 className="text-[11px] font-bold text-gray-500">Nenhuma oportunidade</h4>
+                          <p className="text-[9px] text-gray-600 mt-0.5">Sem registros nesta etapa.</p>
+                        </div>
+                      ) : (
+                        list.map((act) => {
+                          const vencimento = act.nextAction?.vencimento
+                          const vencido = vencimento && isVencido(vencimento)
+                          
+                          return (
+                            <div
+                              key={act.id}
+                              className="p-3 bg-gray-900/40 hover:bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-xl space-y-2.5 transition group shadow-2xs relative"
+                            >
+                              {/* Nome do ministério */}
+                              <h3 className="text-xs font-bold text-white group-hover:text-blue-400 transition leading-tight">
+                                {act.nome}
+                              </h3>
+
+                              {/* Plano pretendido */}
+                              <div className="flex justify-between items-center text-[10px] text-gray-400">
+                                <span>{act.lifecycle?.plano || 'Sem plano'}</span>
+                                <PrioridadeBadge prioridade={act.prioridade} />
+                              </div>
+
+                              {/* Responsável e Próxima ação */}
+                              <div className="pt-2 border-t border-gray-800/80 space-y-1.5 text-[9px] text-gray-500">
+                                <div className="flex items-center gap-1">
+                                  <User className="h-3 w-3 text-gray-600 shrink-0" />
+                                  <span className="truncate">{act.responsavel || 'Sem responsável'}</span>
+                                </div>
+                                <div className="flex items-center gap-1 truncate">
+                                  <Clock className={`h-3 w-3 shrink-0 ${vencido ? 'text-rose-500 animate-pulse' : 'text-gray-600'}`} />
+                                  {act.nextAction ? (
+                                    <span className={vencido ? 'text-rose-400 font-semibold' : 'text-gray-400'}>
+                                      {act.nextAction.acao}
+                                    </span>
+                                  ) : (
+                                    <span>Sem próxima ação</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
 
         </div>
       </main>
