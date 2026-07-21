@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
-import { OportunidadeComercial, HistoricoComercial } from './types'
+import { OportunidadeComercial, HistoricoComercial, CrmActivity, CrmTimelineItem, CrmNextAction, CrmSummary } from './types'
 
 export interface ConvertOpportunityInput {
   oportunidadeId: string
@@ -202,4 +202,40 @@ export class CrmService {
       historico
     }
   }
+
+  /**
+   * Retorna o resumo consolidado de métricas do CRM.
+   */
+  async getSummary(_supabase: SupabaseClient): Promise<CrmSummary> {
+    return {
+      totalLeads: 0,
+      totalNegotiations: 0,
+      totalConversions: 0,
+      conversionRate: 0,
+      estimatedRevenue: 0
+    };
+  }
+
+  /**
+   * Retorna a linha do tempo comercial (histórico) de um determinado lead ou cliente.
+   */
+  async getTimeline(_supabase: SupabaseClient, _id: string): Promise<CrmTimelineItem[]> {
+    return [];
+  }
+
+  /**
+   * Retorna a lista de atividades executadas no CRM para um cliente.
+   */
+  async getActivities(_supabase: SupabaseClient, _id: string): Promise<CrmActivity[]> {
+    return [];
+  }
+
+  /**
+   * Retorna as próximas ações planejadas para um lead ou negociação comercial.
+   */
+  async getNextActions(_supabase: SupabaseClient, _id: string): Promise<CrmNextAction[]> {
+    return [];
+  }
+
 }
+

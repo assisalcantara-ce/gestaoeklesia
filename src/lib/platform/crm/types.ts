@@ -23,3 +23,37 @@ export interface HistoricoComercial {
   observacao: string
   created_at: string
 }
+
+export interface CrmActivity {
+  id: string;
+  oportunidadeId: string;
+  tipo: 'contato' | 'proposta' | 'followup' | 'outro' | string;
+  descricao: string;
+  dataExecucao: string;
+  usuarioResponsavel: string;
+}
+
+export interface CrmTimelineItem {
+  id: string;
+  data: string;
+  evento: string;
+  usuario: string;
+  descricao: string;
+}
+
+export interface CrmNextAction {
+  id: string;
+  oportunidadeId: string;
+  descricao: string;
+  dataPrevista: string;
+  prioridade: 'baixa' | 'media' | 'alta' | string;
+}
+
+export interface CrmSummary {
+  totalLeads: number;
+  totalNegotiations: number;
+  totalConversions: number;
+  conversionRate: number;
+  estimatedRevenue: number;
+}
+
