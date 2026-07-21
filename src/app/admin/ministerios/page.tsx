@@ -12,11 +12,15 @@ import { temAcessoAdmin } from '@/lib/access-control'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 import type { SubscriptionPlan } from '@/types/admin'
 import { onlyDigits, formatPhone, validarCnpj, validarCpf } from '@/lib/mascaras'
-import { CheckCircle2, ExternalLink, Copy } from 'lucide-react'
+
 import MinisteriosHeader from '@/components/admin/ministerios/MinisteriosHeader'
 import MinisteriosToolbar from '@/components/admin/ministerios/MinisteriosToolbar'
 import MinisteriosTable from '@/components/admin/ministerios/MinisteriosTable'
 import MinistryForm from '@/components/admin/ministerios/forms/MinistryForm'
+import BillingModal from '@/components/admin/ministerios/modals/BillingModal'
+import ActivationModal from '@/components/admin/ministerios/modals/ActivationModal'
+import CsvImportModal from '@/components/admin/ministerios/modals/CsvImportModal'
+import DeleteConfirmationDialog from '@/components/admin/ministerios/modals/DeleteConfirmationDialog'
 
 export default function MinisteriosPage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
@@ -982,609 +986,89 @@ export default function MinisteriosPage() {
         )}
 
         {/* TAB: Pré-Cadastros */}
-            {activeTab === 'precadastros' && (
-              <TrialSignupsWidget />
-            )}
-          </div>
-        </div>
-      </main>
-
-      {/* Modal: Importar CSV de membros */}
-      {showImport && (
-        <div className="fixed inset-0 bg-black/75 flex items-start justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-3xl my-8 text-gray-100">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
-              <h2 className="text-lg font-bold text-white">📥 Importar Membros via CSV</h2>
-              <button
-                onClick={() => { setShowImport(false); setImportResult(null); setImportRows([]); setImportHeaders([]); setImportFile(null) }}
-                className="text-gray-400 hover:text-white transition text-xl leading-none"
-              >✕</button>
-            </div>
-
-            <div className="p-6 space-y-5">
-              {/* Passo 1: Baixar modelo */}
-              <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-                <p className="text-sm font-semibold text-gray-200 mb-1">Passo 1 — Baixe o modelo CSV</p>
-                <p className="text-xs text-gray-400 mb-3">O modelo contém todas as colunas suportadas com um exemplo de linha. Use ponto-e-vírgula como separador no Excel se necessário.</p>
-                <button
-                  onClick={downloadTemplate}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition font-medium"
-                >
-                  📄 Baixar modelo CSV
-                </button>
-              </div>
-
-              {/* Passo 2: Selecionar ministério */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Passo 2 — Selecione o ministério destino <span className="text-red-400">*</span>
-                </label>
-                <select
-                  value={importMinistryId}
-                  onChange={(e) => setImportMinistryId(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-gray-100 text-sm focus:outline-none focus:border-blue-500"
-                >
-                  <option value="">— Selecione o ministério —</option>
-                  {ministerios.map(m => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Passo 3: Selecionar arquivo */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Passo 3 — Selecione o arquivo CSV <span className="text-red-400">*</span>
-                </label>
-                <input
-                  ref={importFileRef}
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFile(f) }}
-                  className="block w-full text-sm text-gray-300 file:mr-3 file:px-4 file:py-2 file:rounded file:bg-gray-700 file:text-gray-100 file:border-0 hover:file:bg-gray-600 cursor-pointer"
-                />
-                {importFile && (
-                  <p className="mt-1 text-xs text-gray-400">{importFile.name} — {importRows.length} linha{importRows.length !== 1 ? 's' : ''} encontrada{importRows.length !== 1 ? 's' : ''}</p>
-                )}
-              </div>
-
-              {/* Preview */}
-              {importRows.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pré-visualização (primeiras 5 linhas)</p>
-                  <div className="overflow-x-auto rounded border border-gray-700">
-                    <table className="text-xs w-full">
-                      <thead className="bg-gray-800">
-                        <tr>
-                          <th className="px-2 py-1 text-gray-400 font-medium text-left">#</th>
-                          {importHeaders.slice(0, 8).map(h => (
-                            <th key={h} className="px-2 py-1 text-gray-300 font-medium text-left whitespace-nowrap">{h}</th>
-                          ))}
-                          {importHeaders.length > 8 && <th className="px-2 py-1 text-gray-500">+{importHeaders.length - 8} cols</th>}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-700/50">
-                        {importRows.slice(0, 5).map((row, idx) => (
-                          <tr key={idx} className="hover:bg-gray-800/40">
-                            <td className="px-2 py-1 text-gray-500">{idx + 2}</td>
-                            {importHeaders.slice(0, 8).map(h => (
-                              <td key={h} className="px-2 py-1 text-gray-300 max-w-[120px] truncate" title={row[h]}>{row[h] || <span className="text-gray-600">—</span>}</td>
-                            ))}
-                            {importHeaders.length > 8 && <td />}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Resultado */}
-              {importResult && (
-                <div className={`rounded-xl p-4 border ${importResult.inserted > 0 ? 'bg-green-950/40 border-green-800' : 'bg-red-950/40 border-red-800'}`}>
-                  {importResult.inserted > 0 && (
-                    <p className="text-green-300 font-semibold text-sm mb-1">
-                      ✅ {importResult.inserted} membro{importResult.inserted !== 1 ? 's' : ''} importado{importResult.inserted !== 1 ? 's' : ''} com sucesso em <strong>{importResult.ministry_name}</strong>!
-                    </p>
-                  )}
-                  {importResult.skipped > 0 && (
-                    <p className="text-yellow-400 text-xs">⚠️ {importResult.skipped} linha{importResult.skipped !== 1 ? 's' : ''} ignorada{importResult.skipped !== 1 ? 's' : ''} (sem nome)</p>
-                  )}
-                  {importResult.errors.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-red-400 text-xs font-semibold mb-1">Erros ({importResult.errors.length}):</p>
-                      <ul className="space-y-1 max-h-40 overflow-y-auto">
-                        {importResult.errors.map((e, i) => (
-                          <li key={i} className="text-xs text-red-300">Linha {e.row} {e.name ? `"${e.name}"` : ''}: {e.reason}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Botão importar */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={doImport}
-                  disabled={!importFile || !importMinistryId || importLoading || importRows.length === 0}
-                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded transition text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {importLoading ? 'Importando...' : `📥 Importar ${importRows.length > 0 ? importRows.length + ' membro' + (importRows.length !== 1 ? 's' : '') : 'membros'}`}
-                </button>
-                <button
-                  onClick={() => { setShowImport(false); setImportResult(null); setImportRows([]); setImportHeaders([]); setImportFile(null) }}
-                  className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded transition text-sm"
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Confirmar remoção de ministério */}
-      {confirmDeleteMinisterio && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 border border-red-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-gray-100">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-900/60 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </div>
-              <h2 className="text-lg font-bold text-white">Remover ministério?</h2>
-            </div>
-            <p className="text-sm text-gray-300 mb-1">
-              Você está prestes a remover permanentemente:
-            </p>
-            <div className="bg-gray-800 rounded-lg px-4 py-3 mb-4">
-              <p className="font-semibold text-white text-sm">{confirmDeleteMinisterio.name}</p>
-              {confirmDeleteMinisterio.email_admin && (
-                <p className="text-xs text-gray-400">{confirmDeleteMinisterio.email_admin}</p>
-              )}
-            </div>
-            <div className="bg-red-950/40 border border-red-800/50 rounded-lg px-4 py-3 mb-5">
-              <p className="text-xs text-red-400 font-medium">⚠️ Esta ação é irreversível. Todos os dados do ministério serão excluídos.</p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmDeleteMinisterio(null)}
-                disabled={deleteLoading}
-                className="flex-1 px-4 py-2 bg-gray-700 text-gray-100 rounded-lg hover:bg-gray-600 transition text-sm font-medium disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={doDelete}
-                disabled={deleteLoading}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-semibold disabled:opacity-50"
-              >
-                {deleteLoading ? 'Removendo...' : 'Sim, remover'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Ativar Ministério */}
-      {activatingMinistry && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 text-gray-100 max-h-[90vh] overflow-y-auto flex flex-col">
-            <h2 className="text-xl font-bold text-white mb-4">Ativar Ministério</h2>
-            
-            {asaasSuccessData ? (
-              <div className="space-y-6 py-4">
-                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-xl flex items-start gap-3">
-                  <CheckCircle2 className="h-6 w-6 text-emerald-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold text-sm">Fatura ASAAS Gerada com Sucesso!</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      A ativação do ministério ocorrerá automaticamente após a confirmação do pagamento.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  {asaasSuccessData.invoiceUrl && (
-                    <>
-                      <a
-                        href={asaasSuccessData.invoiceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-center font-semibold text-sm transition flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        Abrir fatura
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(asaasSuccessData.invoiceUrl)
-                          alert('Link da fatura copiado para a área de transferência!')
-                        }}
-                        className="w-full py-3 bg-gray-800 hover:bg-gray-750 text-gray-100 rounded-lg text-center font-semibold text-sm transition border border-gray-700 flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        Copiar link
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    </>
-                  )}
-                  <a
-                    href="/admin/pagamentos"
-                    className="w-full py-3 bg-gray-900 hover:bg-gray-850 text-gray-400 hover:text-white rounded-lg text-center font-semibold text-sm transition border border-gray-800 flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    Ver em /admin/pagamentos
-                  </a>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActivatingMinistry(null)
-                    setAsaasSuccessData(null)
-                  }}
-                  className="w-full py-2.5 bg-gray-800 hover:bg-gray-750 text-gray-300 rounded-lg text-center font-medium text-sm transition"
-                >
-                  Fechar
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-4 mb-6">
-                  <div className="grid grid-cols-2 gap-4 bg-gray-800/40 p-4 rounded-xl border border-gray-800">
-                    <div>
-                      <span className="text-xs text-gray-400 block mb-0.5">Ministério:</span>
-                      <span className="font-semibold text-white text-sm">{activatingMinistry.name}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-gray-400 block mb-0.5">E-mail:</span>
-                      <span className="text-gray-300 text-sm">{activatingMinistry.email_admin}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-gray-400 block mb-0.5">Plano Atual:</span>
-                      <span className="text-gray-300 text-sm uppercase">{activatingMinistry.plan || 'Nenhum'}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-gray-400 block mb-0.5">Expiração Trial:</span>
-                      <span className="text-gray-300 text-sm">
-                        {activatingMinistry.subscription_end_date 
-                          ? new Date(activatingMinistry.subscription_end_date).toLocaleDateString('pt-BR') 
-                          : 'Nenhum'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Tipo de liberação */}
-                  <div>
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
-                      Tipo de Liberação
-                    </label>
-                    <div className="space-y-3">
-                      <label className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/30 bg-blue-950/20 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="modo_liberacao"
-                          checked={activationMode === 'direto'}
-                          onChange={() => setActivationMode('direto')}
-                          className="mt-1 accent-blue-500"
-                        />
-                        <div>
-                          <span className="text-sm font-semibold text-white block">Ativação Direta</span>
-                          <span className="text-xs text-gray-400">
-                            Libera o ministério imediatamente sem gerar cobrança.
-                          </span>
-                        </div>
-                      </label>
-
-                      <label className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/30 bg-blue-950/20 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="modo_liberacao"
-                          checked={activationMode === 'asaas'}
-                          onChange={() => setActivationMode('asaas')}
-                          className="mt-1 accent-blue-500"
-                        />
-                        <div>
-                          <span className="text-sm font-semibold text-white block">
-                            Ativação com Pagamento ASAAS — 12 meses
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            Gera assinatura/cobrança anual no ASAAS.
-                          </span>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Plano Definitivo */}
-                  <div>
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
-                      Plano Definitivo
-                    </label>
-                    <select
-                      value={activationPlan}
-                      onChange={(e) => setActivationPlan(e.target.value)}
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="starter">Starter</option>
-                      <option value="intermediario">Intermediário</option>
-                      <option value="profissional">Profissional</option>
-                    </select>
-                  </div>
-
-                  {/* Validade / Vencimento */}
-                  {activationMode === 'direto' ? (
-                    <div>
-                      <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
-                        Validade da ativação
-                      </label>
-                      <div className="flex gap-4 items-center">
-                        <select
-                          value={activationValidity}
-                          onChange={(e) => setActivationValidity(e.target.value)}
-                          className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500"
-                        >
-                          <option value="12">12 meses</option>
-                          <option value="custom">Personalizado (Meses)</option>
-                        </select>
-                        
-                        {activationValidity === 'custom' && (
-                          <input
-                            type="number"
-                            min="1"
-                            max="120"
-                            value={customValidity}
-                            onChange={(e) => setCustomValidity(e.target.value)}
-                            className="w-24 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500"
-                          />
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
-                        Data de Vencimento da Fatura *
-                      </label>
-                      <input
-                        type="date"
-                        required
-                        value={asaasDueDate}
-                        onChange={(e) => setAsaasDueDate(e.target.value)}
-                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-                  )}
-
-                  {/* Campo observação admin */}
-                  {activationMode === 'direto' && (
-                    <div>
-                      <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
-                        Observações Administrativas (Opcional)
-                      </label>
-                      <textarea
-                        value={activationObservation}
-                        onChange={(e) => setActivationObservation(e.target.value)}
-                        placeholder="Motivo da liberação, contrato manual, etc..."
-                        className="w-full h-20 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500 resize-none"
-                      />
-                    </div>
-                  )}
-
-                  {/* Aviso de Preservação de Dados */}
-                  <div className="bg-blue-950/30 border border-blue-900/50 rounded-lg px-4 py-3 text-xs text-blue-300">
-                    ℹ️ <strong>Preservação de Dados:</strong> Todos os dados cadastrados durante o teste gratuito (membros, financeiro, eventos) serão preservados. Nenhum dado será excluído.
-                  </div>
-
-                  {/* Checkbox de Confirmação */}
-                  <label className="flex items-start gap-3 cursor-pointer mt-4 select-none">
-                    <input
-                      type="checkbox"
-                      checked={confirmActivation}
-                      onChange={(e) => setConfirmActivation(e.target.checked)}
-                      className="mt-1 w-4 h-4 accent-blue-500 rounded border-gray-700 text-blue-500 focus:ring-0 focus:ring-offset-0 bg-gray-800"
-                    />
-                    <span className="text-xs text-gray-300 leading-snug">
-                      {activationMode === 'direto'
-                        ? 'Confirmo que desejo ativar este ministério sem gerar cobrança automática.'
-                        : 'Confirmo que desejo gerar a fatura de cobrança no ASAAS para este ministério.'}
-                    </span>
-                  </label>
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setActivatingMinistry(null)}
-                    disabled={activationLoading}
-                    className="flex-1 px-4 py-2.5 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-755 transition text-sm font-medium disabled:opacity-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleActivateSubmit}
-                    disabled={activationLoading || !confirmActivation}
-                    className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {activationLoading ? 'Processando...' : 'Confirmar Ativação'}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Gerar Faturas ASAAS */}
-      {billingMinistry && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 text-gray-100">
-            <h2 className="text-xl font-bold text-white mb-4">Gerar Faturas ASAAS</h2>
-            
-            {billingSuccessData ? (
-              <div className="space-y-6 py-4">
-                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-xl flex items-start gap-3">
-                  <CheckCircle2 className="h-6 w-6 text-emerald-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold text-sm">Fatura(s) ASAAS Gerada(s) com Sucesso!</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      A ativação do ministério ocorrerá automaticamente após a confirmação do pagamento.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  {billingSuccessData.invoiceUrl && (
-                    <>
-                      <a
-                        href={billingSuccessData.invoiceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-center font-semibold text-sm transition flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        Abrir 1ª fatura
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(billingSuccessData.invoiceUrl)
-                          alert('Link da primeira fatura copiado!')
-                        }}
-                        className="w-full py-3 bg-gray-800 hover:bg-gray-750 text-gray-100 rounded-lg text-center font-semibold text-sm transition border border-gray-700 flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        Copiar link da 1ª fatura
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    </>
-                  )}
-                  <a
-                    href="/admin/pagamentos"
-                    className="w-full py-3 bg-gray-900 hover:bg-gray-850 text-gray-400 hover:text-white rounded-lg text-center font-semibold text-sm transition border border-gray-800 flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    Ver em /admin/pagamentos
-                  </a>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBillingMinistry(null)
-                    setBillingSuccessData(null)
-                  }}
-                  className="w-full py-2.5 bg-gray-800 hover:bg-gray-750 text-gray-300 rounded-lg text-center font-medium text-sm transition"
-                >
-                  Fechar
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleCreateBillingSubmit} className="space-y-4">
-                <div className="space-y-4 mb-6">
-                  <div className="grid grid-cols-2 gap-4 bg-gray-800/40 p-4 rounded-xl border border-gray-800">
-                    <div className="col-span-2">
-                      <span className="text-xs text-gray-400 block mb-0.5">Ministério:</span>
-                      <span className="font-semibold text-white text-sm">{billingMinistry.name}</span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-xs text-gray-400 block mb-0.5">E-mail Administrativo:</span>
-                      <span className="text-gray-300 text-sm">{billingMinistry.email_admin}</span>
-                    </div>
-                  </div>
-
-                  {/* Plano Definitivo */}
-                  <div>
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
-                      Plano Escolhido
-                    </label>
-                    <select
-                      value={billingPlan}
-                      onChange={(e) => setBillingPlan(e.target.value)}
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="starter">Starter</option>
-                      <option value="intermediario">Intermediário</option>
-                      <option value="profissional">Profissional</option>
-                    </select>
-                  </div>
-
-                  {/* Data de Vencimento da 1ª Parcela */}
-                  <div>
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
-                      Data de Vencimento da 1ª Parcela *
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={billingDueDate}
-                      onChange={(e) => setBillingDueDate(e.target.value)}
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  {/* Quantidade de Parcelas */}
-                  <div>
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
-                      Quantidade de Parcelas
-                    </label>
-                    <select
-                      value={billingInstallments}
-                      onChange={(e) => setBillingInstallments(e.target.value)}
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-blue-500"
-                    >
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
-                        <option key={n} value={String(n)}>
-                          {n === 1 ? '1x (À vista)' : `${n}x`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Resumo Financeiro */}
-                  <div className="bg-gray-800/60 border border-gray-700/50 rounded-xl p-4 text-xs space-y-2">
-                    <span className="font-semibold text-white block mb-1 text-xs uppercase tracking-wider">Resumo Financeiro (Anual)</span>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Mensalidade do Plano:</span>
-                      <span className="text-gray-200 font-medium">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(getPlanPrice(billingPlan))}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Total Anual (12 meses):</span>
-                      <span className="text-gray-250 font-semibold">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(getPlanPrice(billingPlan) * 12)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-t border-gray-700/50 pt-2 text-sm">
-                      <span className="text-gray-300 font-medium">Valor por Parcela ({billingInstallments}x):</span>
-                      <span className="text-emerald-400 font-bold">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((getPlanPrice(billingPlan) * 12) / Math.max(1, Number(billingInstallments)))}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setBillingMinistry(null)}
-                    disabled={billingLoading}
-                    className="flex-1 px-4 py-2.5 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-755 transition text-sm font-medium disabled:opacity-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={billingLoading}
-                    className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {billingLoading ? 'Processando...' : 'Gerar Faturas'}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
+        {activeTab === 'precadastros' && (
+          <TrialSignupsWidget />
+        )}
+      </div>
     </div>
-  )
+  </main>
+
+  {/* Modais Refatorados */}
+  <CsvImportModal
+    showImport={showImport}
+    importMinistryId={importMinistryId}
+    setImportMinistryId={setImportMinistryId}
+    importFile={importFile}
+    importRows={importRows}
+    importHeaders={importHeaders}
+    importLoading={importLoading}
+    importResult={importResult}
+    ministerios={ministerios}
+    onClose={() => {
+      setShowImport(false)
+      setImportResult(null)
+      setImportRows([])
+      setImportHeaders([])
+      setImportFile(null)
+    }}
+    onDownloadTemplate={downloadTemplate}
+    onFileChange={(e) => {
+      const f = e.target.files?.[0]
+      if (f) handleImportFile(f)
+    }}
+    onImport={doImport}
+    importFileRef={importFileRef}
+  />
+
+  <DeleteConfirmationDialog
+    confirmDeleteMinisterio={confirmDeleteMinisterio}
+    deleteLoading={deleteLoading}
+    onCancel={() => setConfirmDeleteMinisterio(null)}
+    onDelete={doDelete}
+  />
+
+  <ActivationModal
+    activatingMinistry={activatingMinistry}
+    asaasSuccessData={asaasSuccessData}
+    activationMode={activationMode}
+    setActivationMode={setActivationMode}
+    activationPlan={activationPlan}
+    setActivationPlan={setActivationPlan}
+    activationValidity={activationValidity}
+    setActivationValidity={setActivationValidity}
+    customValidity={customValidity}
+    setCustomValidity={setCustomValidity}
+    asaasDueDate={asaasDueDate}
+    setAsaasDueDate={setAsaasDueDate}
+    activationObservation={activationObservation}
+    setActivationObservation={setActivationObservation}
+    confirmActivation={confirmActivation}
+    setConfirmActivation={setConfirmActivation}
+    activationLoading={activationLoading}
+    onClose={() => {
+      setActivatingMinistry(null)
+      setAsaasSuccessData(null)
+    }}
+    onSubmit={handleActivateSubmit}
+  />
+
+  <BillingModal
+    billingMinistry={billingMinistry}
+    billingSuccessData={billingSuccessData}
+    billingPlan={billingPlan}
+    setBillingPlan={setBillingPlan}
+    billingDueDate={billingDueDate}
+    setBillingDueDate={setBillingDueDate}
+    billingInstallments={billingInstallments}
+    setBillingInstallments={setBillingInstallments}
+    billingLoading={billingLoading}
+    onClose={() => {
+      setBillingMinistry(null)
+      setBillingSuccessData(null)
+    }}
+    onSubmit={handleCreateBillingSubmit}
+    getPlanPrice={getPlanPrice}
+  />
+</div>
+)
 }
