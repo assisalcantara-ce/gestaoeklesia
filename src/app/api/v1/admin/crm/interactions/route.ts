@@ -4,6 +4,40 @@ import { InteractionTypes } from '@/lib/platform/crm';
 
 export const dynamic = 'force-dynamic';
 
+export async function GET(request: NextRequest) {
+  try {
+    const result = await requireAdmin(request);
+    if (!result.ok) return result.response;
+    const { supabaseAdmin } = result.ctx;
+
+    const { searchParams } = new URL(request.url);
+    const ministryId = searchParams.get('ministryId') || '';
+
+    let query = supabaseAdmin
+      .from('crm_interactions')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (ministryId) {
+      query = query.or(`ministry_id.eq.${ministryId},id.eq.${ministryId}`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      if (error.code === '42P01') {
+        return NextResponse.json([]);
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data || []);
+  } catch (error: any) {
+    console.error('[GET /api/v1/admin/crm/interactions] Erro:', error);
+    return NextResponse.json({ error: error?.message || 'Erro ao consultar interações' }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // 1. Validar Autenticação
