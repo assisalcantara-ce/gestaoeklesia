@@ -8,7 +8,10 @@ export class CommercialRepository {
     const { data, error } = await supabase
       .from('ministries')
       .select('*');
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') return [];
+      throw error;
+    }
     return data || [];
   }
 
@@ -19,7 +22,10 @@ export class CommercialRepository {
     const { data, error } = await supabase
       .from('pre_registrations')
       .select('*');
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') return [];
+      throw error;
+    }
     return data || [];
   }
 
@@ -30,7 +36,10 @@ export class CommercialRepository {
     const { data, error } = await supabase
       .from('platform_billing_invoices')
       .select('*');
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') return [];
+      throw error;
+    }
     return data || [];
   }
 
@@ -41,7 +50,10 @@ export class CommercialRepository {
     const { data, error } = await supabase
       .from('oportunidades_comerciais')
       .select('*');
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') return [];
+      throw error;
+    }
     return data || [];
   }
 
@@ -52,7 +64,10 @@ export class CommercialRepository {
     const { data, error } = await supabase
       .from('oportunidades_comerciais_historico')
       .select('*');
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') return [];
+      throw error;
+    }
     return data || [];
   }
 
@@ -63,7 +78,10 @@ export class CommercialRepository {
     const { data, error } = await supabase
       .from('configurations')
       .select('ministry_id, church_profile');
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') return [];
+      throw error;
+    }
     return data || [];
   }
 }

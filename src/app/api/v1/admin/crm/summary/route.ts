@@ -6,8 +6,8 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    // 1. Validar autenticação e capability
-    const result = await requireAdmin(request, { requiredCapability: 'can_view_analytics' });
+    // 1. Validar autenticação
+    const result = await requireAdmin(request);
     if (!result.ok) return result.response;
     const { supabaseAdmin } = result.ctx;
 
