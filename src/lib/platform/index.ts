@@ -4,4 +4,5 @@ export * from './crm'
 export * from './trial'
 export * from './lifecycle'
 export * from './commercial'
+export * from './commercial-cache'
 
