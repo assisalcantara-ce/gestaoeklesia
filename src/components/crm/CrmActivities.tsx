@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { authenticatedFetch } from '@/lib/api-client';
 import { AlertCircle, ShieldAlert, CheckCircle } from 'lucide-react';
+import CrmActivityDrawer from './CrmActivityDrawer';
 
 export interface CrmActivityData {
   id: string;
@@ -20,6 +21,7 @@ export default function CrmActivities() {
   const [activities, setActivities] = useState<CrmActivityData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<CrmActivityData | null>(null);
 
   useEffect(() => {
     async function fetchActivities() {
@@ -94,7 +96,11 @@ export default function CrmActivities() {
             {activities.map((act) => {
               const isAlta = act.prioridade === 'alta';
               return (
-                <tr key={act.id} className="hover:bg-gray-900/40 transition">
+                <tr 
+                  key={act.id} 
+                  className="hover:bg-gray-900/40 transition cursor-pointer"
+                  onClick={() => setSelectedActivity(act)}
+                >
                   <td className="py-3 px-5 font-semibold text-white">{act.nome}</td>
                   <td className="py-3 px-5">{act.responsavel}</td>
                   <td className="py-3 px-5">
@@ -121,6 +127,11 @@ export default function CrmActivities() {
           </tbody>
         </table>
       </div>
+
+      <CrmActivityDrawer 
+        activity={selectedActivity} 
+        onClose={() => setSelectedActivity(null)} 
+      />
     </div>
   );
 }
