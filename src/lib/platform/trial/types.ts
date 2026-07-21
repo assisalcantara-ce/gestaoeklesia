@@ -15,3 +15,29 @@ export interface TrialStatus {
   days_remaining: number
   pre_registration: PreRegistration | null
 }
+
+/** DTO de resposta do getTrialStatus — espelha o contrato da rota /trial/status */
+export interface TrialStatusResponse {
+  expired: boolean
+  status: string | null
+  trial_expires_at: string | null
+  trial_days: number | null
+}
+
+/** Dados seguros retornados por activateTrial para pré-preenchimento do formulário */
+export interface TrialLeadData {
+  ministry_name: string
+  responsible_name: string
+  cpf_cnpj: string
+  whatsapp: string
+  email: string
+  phone: string
+  website: string
+  plan: string
+}
+
+/** Resultado da validação do link de ativação de trial */
+export interface ActivateTrialResult {
+  success: boolean
+  lead: TrialLeadData
+}

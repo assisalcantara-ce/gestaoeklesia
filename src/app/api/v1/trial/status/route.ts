@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { TrialService } from '@/lib/platform'
 
 export async function GET(request: NextRequest) {
+  // Autenticação — responsabilidade da rota
   const authHeader = request.headers.get('Authorization') || request.headers.get('authorization') || ''
   const token = authHeader.replace(/^Bearer\s+/i, '').trim()
 
@@ -23,57 +25,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('pre_registrations')
-    .select('id, trial_expires_at, trial_days, status')
-    .eq('user_id', authData.user.id)
-    .maybeSingle()
+  // Delega ao TrialService a lógica de negócio do status do trial
+  const trialService = new TrialService()
+  const status = await trialService.getTrialStatus(supabaseAdmin, authData.user.id)
 
-  if (error || !data) {
-    return NextResponse.json({ expired: false })
-  }
-
-  // Pagamento confirmado via webhook: nunca considerar expirado
-  if (data.status === 'efetivado') {
-    return NextResponse.json({
-      expired: false,
-      status: data.status,
-      trial_expires_at: data.trial_expires_at,
-      trial_days: data.trial_days ?? null,
-    })
-  }
-
-  // Assinatura ativa no ministério (ex: ativação manual pelo admin do sistema)
-  // Cobre edge case onde pre_registrations.status='encerrado' mas ministries.subscription_status='active'
-  const { data: ministry } = await supabaseAdmin
-    .from('ministries')
-    .select('subscription_status')
-    .eq('user_id', authData.user.id)
-    .maybeSingle()
-
-  if (ministry?.subscription_status === 'active') {
-    return NextResponse.json({
-      expired: false,
-      status: 'active',
-      trial_expires_at: data.trial_expires_at,
-      trial_days: data.trial_days ?? null,
-    })
-  }
-
-  const expiresAt = data.trial_expires_at ? new Date(data.trial_expires_at) : null
-  const isExpired = data.status === 'encerrado' || (expiresAt && expiresAt.getTime() <= Date.now())
-
-  if (isExpired && data.status !== 'encerrado') {
-    await supabaseAdmin
-      .from('pre_registrations')
-      .update({ status: 'encerrado' })
-      .eq('id', data.id)
-  }
-
-  return NextResponse.json({
-    expired: isExpired,
-    status: data.status,
-    trial_expires_at: data.trial_expires_at,
-    trial_days: data.trial_days ?? null,
-  })
+  return NextResponse.json(status)
 }
