@@ -31,10 +31,25 @@ import {
   DollarSign,
   CheckCircle2,
   Lock,
+  ExternalLink,
+  Copy,
+  CreditCard,
 } from 'lucide-react'
 import { CrmActivityData } from '@/components/crm/CrmActivities'
 import { InteractionRecord } from '@/components/crm/CrmActivityDrawer'
 import { CrmTimelineData } from '@/components/crm/CrmTimeline'
+
+// Interface de Billing Invoice da plataforma
+interface BillingInvoice {
+  id: string
+  ministry_id: string
+  plano_slug: string
+  status: string
+  amount: number
+  due_date: string
+  asaas_invoice_url?: string
+  created_at: string
+}
 
 function formatDate(iso?: string): string {
   if (!iso) return '—'
@@ -64,7 +79,14 @@ function formatRelativeDate(iso?: string): string {
   return `Há ${diffDays} dias`
 }
 
-// Retorna marcador de agrupamento relativo
+function getPlanoPrice(planoName?: string): number {
+  if (!planoName) return 49.90
+  const plan = String(planoName).toLowerCase()
+  if (plan.includes('profis')) return 299.90
+  if (plan.includes('inter')) return 149.90
+  return 49.90
+}
+
 function getRelativePeriodMarker(dateIso: string): 'Hoje' | 'Ontem' | 'Esta semana' | 'Este mês' | 'Anterior' {
   const date = new Date(dateIso)
   const today = new Date()
@@ -165,6 +187,20 @@ function TimelineSkeleton() {
   )
 }
 
+function FinanceiroSkeleton() {
+  return (
+    <div className="flex-1 p-6 space-y-6 animate-pulse">
+      <div className="h-28 bg-gray-900/30 border border-gray-800 rounded-xl" />
+      <div className="space-y-3">
+        <div className="h-4 bg-gray-800 rounded w-32" />
+        {[...Array(2)].map((_, i) => (
+          <div key={i} className="h-14 bg-gray-900/30 border border-gray-800 rounded-xl" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function SidebarSkeleton() {
   return (
     <div className="space-y-4 animate-pulse">
@@ -201,6 +237,11 @@ export default function OportunidadePerfilPage() {
   const [timeline, setTimeline] = useState<CrmTimelineData[]>([])
   const [loadingTimeline, setLoadingTimeline] = useState<boolean>(false)
   const [timelineError, setTimelineError] = useState<string | null>(null)
+
+  // Dados Financeiros
+  const [invoices, setInvoices] = useState<BillingInvoice[]>([])
+  const [loadingFinanceiro, setLoadingFinanceiro] = useState<boolean>(false)
+  const [financeiroError, setFinanceiroError] = useState<string | null>(null)
 
   // Modal de Nova Interação
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
@@ -264,13 +305,30 @@ export default function OportunidadePerfilPage() {
     }
   }, [id])
 
+  // Fetch Financeiro
+  const fetchFinanceiro = useCallback(async () => {
+    setLoadingFinanceiro(true)
+    setFinanceiroError(null)
+    try {
+      const res = await authenticatedFetch('/api/v1/admin/billing-invoices')
+      if (!res.ok) throw new Error('Erro ao obter faturas')
+      const json = await res.json()
+      setInvoices(json.data || [])
+    } catch (err: any) {
+      setFinanceiroError(err?.message || 'Erro ao carregar dados financeiros')
+    } finally {
+      setLoadingFinanceiro(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchDetails()
       fetchInteractions()
       fetchTimeline()
+      fetchFinanceiro()
     }
-  }, [isAuthenticated, fetchDetails, fetchInteractions, fetchTimeline])
+  }, [isAuthenticated, fetchDetails, fetchInteractions, fetchTimeline, fetchFinanceiro])
 
   // Localiza a oportunidade correspondente
   const opportunity = useMemo(() => {
@@ -278,15 +336,28 @@ export default function OportunidadePerfilPage() {
     return activities.find((a) => a.id === id || a.oportunidadeId === id) || null
   }, [activities, id])
 
+  // Filtra as faturas associadas a este ministério
+  const filteredInvoices = useMemo(() => {
+    if (!opportunity?.ministryId || invoices.length === 0) return []
+    return invoices.filter((inv) => inv.ministry_id === opportunity.ministryId)
+  }, [invoices, opportunity])
+
   const handleInteractionSaved = useCallback(() => {
     setSuccessToast('Interação registrada com sucesso!')
     setTimeout(() => setSuccessToast(null), 3500)
     
-    // Atualiza tudo localmente sem F5 completo
     fetchInteractions()
     fetchDetails()
     fetchTimeline()
   }, [fetchInteractions, fetchDetails, fetchTimeline])
+
+  // Copiar link de pagamento
+  const handleCopyPaymentLink = useCallback((url?: string) => {
+    if (!url) return
+    navigator.clipboard.writeText(url)
+    setSuccessToast('Link de pagamento copiado!')
+    setTimeout(() => setSuccessToast(null), 3000)
+  }, [])
 
   // Agrupamento cronológico da timeline por período relativo
   const groupedTimeline = useMemo(() => {
@@ -405,6 +476,18 @@ export default function OportunidadePerfilPage() {
     }
   }
 
+  // Cor correspondente ao status da fatura
+  const getInvoiceStatusColor = (status: string) => {
+    const s = String(status).toLowerCase()
+    if (s.includes('pago') || s.includes('paga') || s === 'paid' || s === 'received') {
+      return 'bg-emerald-955/20 text-emerald-400 border-emerald-900/30'
+    }
+    if (s.includes('vencida') || s === 'overdue') {
+      return 'bg-rose-955/20 text-rose-400 border-rose-900/30'
+    }
+    return 'bg-amber-955/20 text-amber-400 border-amber-900/30'
+  }
+
   if (isLoading) {
     return (
       <div className="flex h-screen bg-gray-900">
@@ -425,7 +508,7 @@ export default function OportunidadePerfilPage() {
 
   if (!isAuthenticated) return null
 
-  const isProfileLoading = loadingDetails || loadingInteractions || loadingTimeline
+  const isProfileLoading = loadingDetails || loadingInteractions || loadingTimeline || loadingFinanceiro
 
   return (
     <div className="flex h-screen bg-gray-900">
@@ -488,6 +571,7 @@ export default function OportunidadePerfilPage() {
                     fetchDetails()
                     fetchInteractions()
                     fetchTimeline()
+                    fetchFinanceiro()
                   }}
                   className="flex items-center gap-2 px-3.5 py-2 bg-gray-800 hover:bg-gray-750 text-gray-300 hover:text-white border border-gray-700 rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
@@ -696,7 +780,7 @@ export default function OportunidadePerfilPage() {
                       </p>
                       <button
                         onClick={() => setIsModalOpen(true)}
-                        className="mt-4 flex items-center gap-1.5 px-4 py-2 bg-blue-650 hover:bg-blue-650 border border-blue-700/30 text-white rounded-xl text-xs font-bold cursor-pointer transition select-none outline-none focus:ring-1 focus:ring-blue-650"
+                        className="mt-4 flex items-center gap-1.5 px-4 py-2 bg-blue-650 hover:bg-blue-600 border border-blue-700/30 text-white rounded-xl text-xs font-bold cursor-pointer transition select-none outline-none focus:ring-1 focus:ring-blue-650"
                       >
                         <Plus className="h-3.5 w-3.5" />
                         Registrar primeira interação
@@ -759,11 +843,10 @@ export default function OportunidadePerfilPage() {
                     <div className="flex-1 p-6 flex flex-col items-center justify-center py-16 text-center">
                       <Inbox className="h-10 w-10 text-gray-600 mb-2" />
                       <h4 className="text-xs font-bold text-gray-400">Nenhum histórico disponível</h4>
-                      <p className="text-[10px] text-gray-600 mt-1">Nenhum evento registrado nesta linha do tempo.</p>
+                      <p className="text-[10px] text-gray-650 mt-1">Nenhum evento registrado nesta linha do tempo.</p>
                     </div>
                   ) : (
                     <div className="flex-1 p-6 overflow-y-auto space-y-8 relative max-h-[calc(100vh-360px)]">
-                      {/* Linha vertical centralizada */}
                       <div className="absolute left-[31px] top-6 bottom-6 w-0.5 bg-gray-900 z-0"></div>
 
                       {(Object.keys(groupedTimeline) as Array<keyof typeof groupedTimeline>).map((period) => {
@@ -772,12 +855,10 @@ export default function OportunidadePerfilPage() {
 
                         return (
                           <div key={period} className="space-y-6 relative z-10">
-                            {/* Marcador Temporal */}
                             <span className="text-[10px] font-black uppercase text-blue-400/85 tracking-widest bg-blue-950/20 border border-blue-900/30 px-3 py-1 rounded-xl block w-max ml-1.5 select-none shadow-2xs">
                               {period}
                             </span>
 
-                            {/* Eventos do Período */}
                             <div className="space-y-5">
                               {items.map((evt) => {
                                 const hasUser = evt.usuario && evt.usuario.toLowerCase() !== 'sistema'
@@ -786,12 +867,10 @@ export default function OportunidadePerfilPage() {
 
                                 return (
                                   <div key={evt.id} className="flex gap-4 items-start relative group">
-                                    {/* Icon Node */}
                                     <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 z-10 shadow-xs ${iconColors}`}>
                                       {getTimelineIcon(evt.evento)}
                                     </div>
 
-                                    {/* Card de Informações */}
                                     <div className="flex-1 bg-gray-950 border border-gray-850 hover:border-gray-800 rounded-xl p-4 transition duration-200 flex flex-col justify-between shadow-2xs">
                                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-gray-900 pb-2 mb-2.5">
                                         <div>
@@ -826,6 +905,115 @@ export default function OportunidadePerfilPage() {
                           </div>
                         )
                       })}
+                    </div>
+                  )
+                ) : activeTab === 'financeiro' ? (
+                  loadingFinanceiro ? (
+                    <FinanceiroSkeleton />
+                  ) : financeiroError ? (
+                    <div className="flex-1 p-6 flex flex-col items-center justify-center text-center">
+                      <AlertTriangle className="h-8 w-8 text-rose-500 mb-2" />
+                      <h4 className="text-xs font-bold text-gray-400">Falha ao carregar faturamento</h4>
+                      <p className="text-[10px] text-gray-650 mt-1 max-w-[240px]">{financeiroError}</p>
+                      <button onClick={fetchFinanceiro} className="mt-3.5 px-3.5 py-2 bg-gray-900 border border-gray-800 hover:bg-gray-800 text-gray-400 hover:text-white rounded-xl text-[10px] font-semibold transition cursor-pointer">
+                        Tentar novamente
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex-1 p-6 overflow-y-auto space-y-6 max-h-[calc(100vh-360px)]">
+                      
+                      {/* ── Resumo Financeiro ── */}
+                      <div className="p-4 bg-gray-950 border border-gray-850 rounded-xl space-y-4 shadow-2xs">
+                        <h3 className="text-xs font-bold text-white border-b border-gray-900 pb-2">Resumo de Faturamento</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+                          <div>
+                            <span className="text-gray-500 block font-semibold">Assinatura / Status</span>
+                            <span className="text-gray-300 font-bold uppercase tracking-wider text-[11px] block mt-0.5">
+                              {opportunity?.lifecycle?.status || 'Sem status'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 block font-semibold">Valor da Assinatura</span>
+                            <span className="text-white font-black text-[11px] block mt-0.5">
+                              R$ {getPlanoPrice(opportunity?.lifecycle?.plano).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / mês
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 block font-semibold">Plano Contratado</span>
+                            <span className="text-gray-300 font-bold text-[11px] block mt-0.5">
+                              {opportunity?.lifecycle?.plano || '—'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 block font-semibold">Situação Financeira</span>
+                            <span className="text-gray-300 font-bold text-[11px] block mt-0.5">
+                              {opportunity?.lifecycle?.statusFinanceiro ? String(opportunity.lifecycle.statusFinanceiro).toUpperCase() : 'SEM DADOS'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 block font-semibold">Método de Assinatura</span>
+                            <span className="text-gray-300 font-semibold text-[11px] block mt-0.5">ASAAS Recorrência</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ── Histórico de Cobranças ── */}
+                      <div className="space-y-3">
+                        <h3 className="text-xs font-bold text-white">Histórico de Cobranças</h3>
+                        
+                        {filteredInvoices.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center p-8 bg-gray-950/40 border border-gray-900 rounded-xl text-center">
+                            <CreditCard className="h-8 w-8 text-gray-700 mb-2" />
+                            <h5 className="text-[10px] font-bold text-gray-500">Nenhum registro financeiro disponível</h5>
+                            <p className="text-[9px] text-gray-600 mt-0.5">Nenhuma cobrança emitida para este ministério.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {filteredInvoices.map((inv) => (
+                              <div 
+                                key={inv.id} 
+                                className="p-4.5 bg-gray-950 border border-gray-850 hover:border-gray-800 rounded-xl flex items-center justify-between gap-4 transition duration-150"
+                              >
+                                <div className="space-y-1 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-black text-white">
+                                      R$ {inv.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </span>
+                                    <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded border uppercase ${getInvoiceStatusColor(inv.status)}`}>
+                                      {inv.status}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-gray-500 font-medium">
+                                    Plano: <span className="text-gray-300 font-bold uppercase">{inv.plano_slug}</span> • Vencimento: {formatDate(inv.due_date)}
+                                  </div>
+                                </div>
+
+                                {inv.asaas_invoice_url && (
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => handleCopyPaymentLink(inv.asaas_invoice_url)}
+                                      className="p-2 bg-gray-900 border border-gray-800 text-gray-400 hover:text-white rounded-xl transition cursor-pointer hover:bg-gray-800"
+                                      title="Copiar link de pagamento"
+                                    >
+                                      <Copy className="h-3.5 w-3.5" />
+                                    </button>
+                                    <a
+                                      href={inv.asaas_invoice_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-2 bg-blue-950/40 border border-blue-900/60 text-blue-400 hover:text-blue-300 rounded-xl transition cursor-pointer hover:bg-blue-950/70 flex items-center gap-1.5 text-[10px] font-bold"
+                                    >
+                                      <ExternalLink className="h-3.5 w-3.5" />
+                                      Visualizar
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
                     </div>
                   )
                 ) : (
