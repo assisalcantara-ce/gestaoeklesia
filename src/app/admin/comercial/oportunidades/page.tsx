@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import { authenticatedFetch } from '@/lib/api-client'
@@ -22,7 +22,6 @@ import {
   Inbox,
   X,
   FilterX,
-  ArrowUpRight,
   Clock,
   CheckCircle2,
   CreditCard,
@@ -32,6 +31,11 @@ import {
   ChevronLeft,
   ChevronsLeft,
   ChevronsRight,
+  MoreHorizontal,
+  FolderOpen,
+  MessageSquarePlus,
+  Copy,
+  History,
 } from 'lucide-react'
 
 // ─── Tipos dos filtros ─────────────────────────────────────────────────────────
@@ -203,6 +207,136 @@ function TableSkeleton() {
   )
 }
 
+// ─── Componente ActionMenu (Dropdown •••) ──────────────────────────────────────
+interface ActionMenuProps {
+  act: CrmActivityData
+  onOpenAtendimento: () => void
+  onRegisterInteraction: () => void
+  onViewHistory: () => void
+  onTriggerToast: (msg: string) => void
+}
+
+function ActionMenu({
+  act,
+  onOpenAtendimento,
+  onRegisterInteraction,
+  onViewHistory,
+  onTriggerToast,
+}: ActionMenuProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  const toggle = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsOpen((prev) => !prev)
+  }, [])
+
+  // Fechar ao clicar fora
+  useEffect(() => {
+    if (!isOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isOpen])
+
+  const handleCopyEmail = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (!act.email) return
+      navigator.clipboard.writeText(act.email)
+      onTriggerToast('E-mail copiado para a área de transferência!')
+      setIsOpen(false)
+    },
+    [act.email, onTriggerToast]
+  )
+
+  const handleCopyPhone = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (!act.telefone) return
+      navigator.clipboard.writeText(act.telefone)
+      onTriggerToast('Telefone copiado para a área de transferência!')
+      setIsOpen(false)
+    },
+    [act.telefone, onTriggerToast]
+  )
+
+  return (
+    <div className="relative inline-block text-left" ref={menuRef}>
+      <button
+        onClick={toggle}
+        className="p-2 bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white border border-gray-800 rounded-xl transition cursor-pointer shadow-xs"
+        aria-label="Opções da oportunidade"
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-2.5 w-52 bg-gray-950 border border-gray-800 rounded-2xl shadow-xl z-30 overflow-hidden divide-y divide-gray-800/60 animate-in fade-in slide-in-from-top-1 duration-100">
+          <div className="py-1.5">
+            <button
+              onClick={() => {
+                onOpenAtendimento()
+                setIsOpen(false)
+              }}
+              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2"
+            >
+              <FolderOpen className="h-3.5 w-3.5 text-blue-400" />
+              Abrir atendimento
+            </button>
+            
+            <button
+              onClick={() => {
+                onRegisterInteraction()
+                setIsOpen(false)
+              }}
+              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2"
+            >
+              <MessageSquarePlus className="h-3.5 w-3.5 text-emerald-400" />
+              Registrar interação
+            </button>
+
+            <button
+              onClick={() => {
+                onViewHistory()
+                setIsOpen(false)
+              }}
+              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2"
+            >
+              <History className="h-3.5 w-3.5 text-indigo-400" />
+              Ver histórico
+            </button>
+          </div>
+
+          <div className="py-1.5">
+            <button
+              onClick={handleCopyEmail}
+              disabled={!act.email}
+              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2 disabled:opacity-35 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+            >
+              <Copy className="h-3.5 w-3.5 text-gray-500" />
+              Copiar e-mail
+            </button>
+
+            <button
+              onClick={handleCopyPhone}
+              disabled={!act.telefone}
+              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2 disabled:opacity-35 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+            >
+              <Copy className="h-3.5 w-3.5 text-gray-500" />
+              Copiar telefone
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Página ───────────────────────────────────────────────────────────────────
 export default function OportunidadesPage() {
   const { isLoading, isAuthenticated } = useAdminAuth()
@@ -219,6 +353,9 @@ export default function OportunidadesPage() {
   const [pagina, setPagina] = useState<number>(1)
   const [itensPorPagina, setItensPorPagina] = useState<number>(10)
 
+  // ── Toast comercial ────────────────────────────────────────────────────────
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
   // ── Dados da tabela ────────────────────────────────────────────────────────
   const [activities, setActivities] = useState<CrmActivityData[]>([])
   const [tableLoading, setTableLoading] = useState<boolean>(true)
@@ -226,6 +363,23 @@ export default function OportunidadesPage() {
 
   // ── Drawer ────────────────────────────────────────────────────────────────
   const [selectedActivity, setSelectedActivity] = useState<CrmActivityData | null>(null)
+
+  // ── Helpers reativos de filtros ──────────────────────────────────────────
+  const filtrosAtivos = hasFiltrosAtivos(filtros)
+
+  const handleChange = useCallback(
+    (field: keyof OportunidadeFiltros) =>
+      (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+        setFiltros((prev) => ({ ...prev, [field]: e.target.value })),
+    []
+  )
+
+  const handleLimpar = useCallback(() => {
+    setFiltros(FILTROS_INICIAIS)
+    setSortField(null)
+    setSortDirection(null)
+    setPagina(1)
+  }, [])
 
   // ── Auth guard ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -256,6 +410,13 @@ export default function OportunidadesPage() {
     fetchActivities()
   }, [fetchActivities])
 
+  // ── Toast trigger ──────────────────────────────────────────────────────────
+  const triggerToast = useCallback((msg: string) => {
+    setToastMessage(msg)
+    const t = setTimeout(() => setToastMessage(null), 3500)
+    return () => clearTimeout(t)
+  }, [])
+
   // ── Handler para alternar ordenação por coluna ─────────────────────────────
   const handleSort = useCallback((field: SortField) => {
     setSortField((currentField) => {
@@ -279,7 +440,7 @@ export default function OportunidadesPage() {
     }
   }, [sortDirection])
 
-  // ── Componente de cabeçalho ordenável com indicador visual ─────────────────
+  // ── Componente de cabeçalho ordenável ──────────────────────────────────────
   const HeaderCell = ({ field, label }: { field: SortField; label: string }) => {
     const isCurrent = sortField === field
     return (
@@ -299,7 +460,7 @@ export default function OportunidadesPage() {
     )
   }
 
-  // Resetar página sempre que qualquer filtro mudar
+  // ── Resetar página no filtro ───────────────────────────────────────────────
   useEffect(() => {
     setPagina(1)
   }, [filtros])
@@ -307,7 +468,6 @@ export default function OportunidadesPage() {
   // ── Filtragem em memória (cumulativa) via useMemo ───────────────────────
   const filteredActivities = useMemo(() => {
     return activities.filter((act) => {
-      // 1. Pesquisa
       if (filtros.pesquisa) {
         const query = filtros.pesquisa.toLowerCase().trim()
         const matchNome = act.nome?.toLowerCase().includes(query)
@@ -320,30 +480,22 @@ export default function OportunidadesPage() {
         }
       }
 
-      // 2. Lifecycle
       if (filtros.lifecycle) {
         const status = (act.lifecycle?.status || act.status || '').toLowerCase()
-        if (status !== filtros.lifecycle.toLowerCase()) {
-          return false
-        }
+        if (status !== filtros.lifecycle.toLowerCase()) return false
       }
 
-      // 3. Prioridade
       if (filtros.prioridade) {
         const prioridade = (act.prioridade || '').toLowerCase()
-        if (prioridade !== filtros.prioridade.toLowerCase()) {
-          return false
-        }
+        if (prioridade !== filtros.prioridade.toLowerCase()) return false
       }
 
-      // 4. Responsável
       if (filtros.responsavel) {
         if (filtros.responsavel === 'equipe') {
           if (!act.responsavel) return false
         }
       }
 
-      // 5. Período
       if (filtros.periodoInicio || filtros.periodoFim) {
         const vencAction = act.nextAction?.vencimento
         if (!vencAction) return false
@@ -438,8 +590,6 @@ export default function OportunidadesPage() {
   // ── Paginação Local via useMemo ─────────────────────────────────────────
   const totalItens = sortedActivities.length
   const totalPaginas = Math.ceil(totalItens / itensPorPagina) || 1
-
-  // Garante que o indicador da página atual seja sempre válido após mudanças de filtro ou tamanho
   const paginaCorreta = Math.min(pagina, totalPaginas)
 
   const paginatedActivities = useMemo(() => {
@@ -450,21 +600,6 @@ export default function OportunidadesPage() {
 
   const mostrarDe = totalItens === 0 ? 0 : (paginaCorreta - 1) * itensPorPagina + 1
   const mostrarAte = Math.min(paginaCorreta * itensPorPagina, totalItens)
-
-  // Handlers dos filtros
-  const handleChange = useCallback(
-    (field: keyof OportunidadeFiltros) =>
-      (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-        setFiltros((prev) => ({ ...prev, [field]: e.target.value })),
-    []
-  )
-  const handleLimpar = useCallback(() => {
-    setFiltros(FILTROS_INICIAIS)
-    setSortField(null)
-    setSortDirection(null)
-    setPagina(1)
-  }, [])
-  const filtrosAtivos = hasFiltrosAtivos(filtros)
 
   // Skeleton de loading de autenticação
   if (isLoading || !isAuthenticated) {
@@ -481,7 +616,16 @@ export default function OportunidadesPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className="flex h-screen bg-gray-900 relative">
+      
+      {/* Toast flutuante de notificação */}
+      {toastMessage && (
+        <div className="fixed top-6 right-6 z-50 bg-emerald-950 border border-emerald-800 text-emerald-300 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 animate-in fade-in slide-in-from-top-3 duration-200">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+          <span className="text-xs font-semibold">{toastMessage}</span>
+        </div>
+      )}
+
       <AdminSidebar />
 
       <main className="flex-1 overflow-auto">
@@ -559,7 +703,6 @@ export default function OportunidadesPage() {
               )}
             </div>
 
-            {/* Linha 1 */}
             <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="lg:col-span-2">
                 <FieldLabel icon={<Search className="h-3 w-3" />} label="Pesquisa" />
@@ -609,7 +752,6 @@ export default function OportunidadesPage() {
               </div>
             </div>
 
-            {/* Linha 2 — Período */}
             <div className="px-5 pb-5 flex flex-wrap items-end gap-4">
               <div className="min-w-[160px]">
                 <FieldLabel icon={<Calendar className="h-3 w-3" />} label="Período — de" />
@@ -631,7 +773,6 @@ export default function OportunidadesPage() {
               </div>
             </div>
 
-            {/* Pills dos filtros ativos */}
             {filtrosAtivos && (
               <div className="px-5 pb-4 flex flex-wrap gap-2">
                 {filtros.pesquisa && (
@@ -671,7 +812,6 @@ export default function OportunidadesPage() {
           {/* ── TABELA DE OPORTUNIDADES ────────────────────────────────── */}
           <div className="bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden shadow-sm">
 
-            {/* Cabeçalho do card */}
             <div className="px-6 py-4 border-b border-gray-800 bg-gray-900/40 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-950/60 border border-blue-900/60 rounded-xl text-blue-400">
@@ -691,7 +831,6 @@ export default function OportunidadesPage() {
               )}
             </div>
 
-            {/* ── Estado de erro ── */}
             {tableError && (
               <div className="m-6 flex items-center gap-3 p-4 bg-rose-950/30 border border-rose-900/50 text-rose-400 rounded-xl text-xs">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -705,10 +844,8 @@ export default function OportunidadesPage() {
               </div>
             )}
 
-            {/* ── Loading skeleton ── */}
             {tableLoading && !tableError && <TableSkeleton />}
 
-            {/* ── Empty state (Se a base estiver vazia) ── */}
             {!tableLoading && !tableError && activities.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 px-6 text-center space-y-4">
                 <div className="w-16 h-16 bg-gray-900 border border-gray-800 rounded-2xl flex items-center justify-center">
@@ -724,7 +861,6 @@ export default function OportunidadesPage() {
               </div>
             )}
 
-            {/* ── Empty state específico de filtros ── */}
             {!tableLoading && !tableError && activities.length > 0 && totalItens === 0 && (
               <div className="flex flex-col items-center justify-center py-20 px-6 text-center space-y-4">
                 <div className="w-16 h-16 bg-gray-900 border border-gray-800 rounded-2xl flex items-center justify-center">
@@ -740,7 +876,6 @@ export default function OportunidadesPage() {
               </div>
             )}
 
-            {/* ── Tabela ── */}
             {!tableLoading && !tableError && paginatedActivities.length > 0 && (
               <>
                 <div className="overflow-x-auto">
@@ -765,10 +900,7 @@ export default function OportunidadesPage() {
                         const vencidoHoje = vencimento && isVencido(vencimento)
 
                         return (
-                          <tr
-                            key={act.id}
-                            className="hover:bg-gray-900/50 transition group"
-                          >
+                          <tr key={act.id} className="hover:bg-gray-900/50 transition group">
                             <td className="py-3.5 px-4">
                               <p className="font-bold text-white group-hover:text-blue-400 transition">{act.nome}</p>
                               {act.email && <p className="text-gray-600 text-[10px] mt-0.5 truncate max-w-[160px]">{act.email}</p>}
@@ -802,13 +934,13 @@ export default function OportunidadesPage() {
                             <td className="py-3.5 px-4"><PrioridadeBadge prioridade={act.prioridade} /></td>
                             <td className="py-3.5 px-4"><FinanceiroBadge status={act.lifecycle?.statusFinanceiro} /></td>
                             <td className="py-3.5 px-4 text-right">
-                              <button
-                                onClick={() => setSelectedActivity(act)}
-                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-900 hover:bg-blue-600 text-gray-400 hover:text-white border border-gray-800 hover:border-blue-500 rounded-xl text-xs font-semibold transition cursor-pointer shadow-xs"
-                              >
-                                Abrir
-                                <ArrowUpRight className="h-3.5 w-3.5" />
-                              </button>
+                              <ActionMenu
+                                act={act}
+                                onOpenAtendimento={() => setSelectedActivity(act)}
+                                onRegisterInteraction={() => setSelectedActivity(act)}
+                                onViewHistory={() => setSelectedActivity(act)}
+                                onTriggerToast={triggerToast}
+                              />
                             </td>
                           </tr>
                         )
@@ -819,36 +951,28 @@ export default function OportunidadesPage() {
 
                 {/* ── PAINEL DE PAGINAÇÃO ─────────────────────────────────── */}
                 <div className="px-6 py-4 border-t border-gray-800 bg-gray-900/20 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  
-                  {/* Informações de linhas */}
                   <div className="flex items-center gap-4 text-xs text-gray-400">
                     <span>
                       Mostrando <strong className="text-gray-200">{mostrarDe}–{mostrarAte}</strong> de <strong className="text-gray-200">{totalItens}</strong> oportunidades
                     </span>
-                    
-                    {/* Seleção de quantidade por página */}
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-gray-500">Exibir:</span>
                       <select
                         value={itensPorPagina}
                         onChange={(e) => {
                           setItensPorPagina(Number(e.target.value))
-                          setPagina(1) // Volta para a página 1 ao mudar limite
+                          setPagina(1)
                         }}
                         className="bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 text-xs px-2 py-1 rounded-lg focus:outline-none focus:border-blue-500 cursor-pointer"
                       >
                         {[10, 25, 50, 100].map((size) => (
-                          <option key={size} value={size}>
-                            {size} itens
-                          </option>
+                          <option key={size} value={size}>{size} itens</option>
                         ))}
                       </select>
                     </div>
                   </div>
 
-                  {/* Botões de navegação */}
                   <div className="flex items-center gap-1">
-                    {/* Primeira página */}
                     <button
                       onClick={() => setPagina(1)}
                       disabled={paginaCorreta === 1}
@@ -857,8 +981,6 @@ export default function OportunidadesPage() {
                     >
                       <ChevronsLeft className="h-4 w-4" />
                     </button>
-
-                    {/* Anterior */}
                     <button
                       onClick={() => setPagina((p) => Math.max(p - 1, 1))}
                       disabled={paginaCorreta === 1}
@@ -867,13 +989,9 @@ export default function OportunidadesPage() {
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
-
-                    {/* Rótulo de página atual */}
                     <span className="px-3 text-xs text-gray-400 font-semibold">
                       Página <strong className="text-gray-200">{paginaCorreta}</strong> de <strong className="text-gray-200">{totalPaginas}</strong>
                     </span>
-
-                    {/* Próxima */}
                     <button
                       onClick={() => setPagina((p) => Math.min(p + 1, totalPaginas))}
                       disabled={paginaCorreta === totalPaginas}
@@ -882,8 +1000,6 @@ export default function OportunidadesPage() {
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>
-
-                    {/* Última página */}
                     <button
                       onClick={() => setPagina(totalPaginas)}
                       disabled={paginaCorreta === totalPaginas}
@@ -893,7 +1009,6 @@ export default function OportunidadesPage() {
                       <ChevronsRight className="h-4 w-4" />
                     </button>
                   </div>
-
                 </div>
               </>
             )}
@@ -901,7 +1016,6 @@ export default function OportunidadesPage() {
         </div>
       </main>
 
-      {/* ── DRAWER COMERCIAL REUTILIZADO ──────────────────────────────── */}
       <CrmActivityDrawer
         activity={selectedActivity}
         onClose={() => setSelectedActivity(null)}
