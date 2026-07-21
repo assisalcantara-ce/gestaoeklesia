@@ -61,3 +61,19 @@ export interface PrepareCheckoutResult {
   } | null
 }
 
+export interface ApproveTrialInput {
+  preRegistrationId: string
+  approve: boolean
+  planOverride?: string
+}
+
+export interface ApproveTrialResult {
+  success: boolean
+  action: 'rejected' | 'approved'
+  message: string
+  preReg?: any
+  planFinal?: string
+  subEndDate?: Date
+}
+
+

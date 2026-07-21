@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getAsaasPayment } from '@/lib/asaas'
-import { TrialStatusResponse, ActivateTrialResult, PrepareCheckoutInput, PrepareCheckoutResult } from './types'
+import { TrialStatusResponse, ActivateTrialResult, PrepareCheckoutInput, PrepareCheckoutResult, ApproveTrialInput, ApproveTrialResult } from './types'
 
 export class TrialService {
   /**
@@ -271,6 +271,66 @@ export class TrialService {
       .maybeSingle()
     return data
   }
+
+  /**
+   * Executa a aprovação ou rejeição de um lead experimental (Trial).
+   * Se rejeitado (approve = false), remove o pré-cadastro do banco.
+   * Se aprovado, valida elegibilidade do lead e planeja o contexto para a ativação.
+   */
+  async approveTrial(
+    supabaseAdmin: SupabaseClient,
+    input: ApproveTrialInput
+  ): Promise<ApproveTrialResult> {
+    const { preRegistrationId, approve, planOverride } = input
+
+    // 1. Carregar pré-cadastro
+    const { data: preReg, error: fetchError } = await supabaseAdmin
+      .from('pre_registrations')
+      .select('*')
+      .eq('id', preRegistrationId)
+      .maybeSingle()
+
+    if (fetchError || !preReg) {
+      throw new TrialError('Pré-cadastro não encontrado', 404)
+    }
+
+    // 2. Fluxo de Rejeição (approve = false)
+    if (!approve) {
+      const { error: deleteError } = await supabaseAdmin
+        .from('pre_registrations')
+        .delete()
+        .eq('id', preRegistrationId)
+
+      if (deleteError) {
+        throw new TrialError('Erro ao rejeitar pré-cadastro', 400)
+      }
+
+      return {
+        success: true,
+        action: 'rejected',
+        message: 'Pré-cadastro rejeitado com sucesso'
+      }
+    }
+
+    // 3. Fluxo de Aprovação: Valida usuário associado
+    if (!preReg.user_id) {
+      throw new TrialError('Pré-cadastro sem usuário associado. Gere credenciais antes de aprovar.', 400)
+    }
+
+    const planFinal = planOverride || preReg.plan || 'basic'
+    const subEndDate = new Date()
+    subEndDate.setFullYear(subEndDate.getFullYear() + 1) // vigência de 1 ano
+
+    return {
+      success: true,
+      action: 'approved',
+      message: 'Acesso liberado com sucesso! Usuário pode fazer login.',
+      preReg,
+      planFinal,
+      subEndDate
+    }
+  }
+
 
   private async findActivePlan(
     supabaseAdmin: SupabaseClient,

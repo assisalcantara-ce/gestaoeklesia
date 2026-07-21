@@ -24,22 +24,34 @@ export class BillingService {
     supabaseAdmin: SupabaseClient,
     input: GenerateInvoiceInput
   ): Promise<GenerateInvoiceResult> {
-    const { ministry, plan, validityMonths, dueDays = INVOICE_DUE_DAYS, externalReference, persistLocal = true } = input
+    const { 
+      ministry, 
+      plan, 
+      validityMonths, 
+      dueDays = INVOICE_DUE_DAYS, 
+      externalReference, 
+      persistLocal = true, 
+      customAmount, 
+      customDueDate, 
+      customDescription 
+    } = input
 
     // 1. Garantir que o cliente existe no Asaas (cria se necessário)
     const asaasCustomerId = await this.resolveAsaasCustomer(supabaseAdmin, ministry, persistLocal)
 
     // 2. Calcular datas
-    const { startDate, endDate, dueDateStr } = this.calculateBillingDates(validityMonths, dueDays)
+    const { startDate, endDate, dueDateStr: calculatedDueDate } = this.calculateBillingDates(validityMonths, dueDays)
+    const finalDueDate = customDueDate || calculatedDueDate
 
     // 3. Criar cobrança no gateway Asaas
     const paymentResult = await this.createGatewayPayment({
       customerId: asaasCustomerId,
       planName: plan.name,
-      planPrice: plan.price_monthly,
+      planPrice: customAmount !== undefined ? customAmount : plan.price_monthly,
       validityMonths,
-      dueDateStr,
-      externalReference
+      dueDateStr: finalDueDate,
+      externalReference,
+      customDescription
     })
 
     let invoiceId: string | null = null
@@ -50,12 +62,12 @@ export class BillingService {
         ministry_id: ministry.id,
         plano_slug: plan.slug,
         subscription_plan_id: plan.id,
-        amount: plan.price_monthly,
+        amount: customAmount !== undefined ? customAmount : plan.price_monthly,
         asaas_payment_id: paymentResult.id,
         asaas_invoice_url: paymentResult.invoiceUrl || null,
         period_start: startDate.toISOString(),
         period_end: endDate.toISOString(),
-        due_date: dueDateStr
+        due_date: finalDueDate
       })
     }
 
@@ -65,7 +77,7 @@ export class BillingService {
       asaasPaymentId: paymentResult.id,
       invoiceUrl: paymentResult.invoiceUrl || null,
       bankSlipUrl: paymentResult.bankSlipUrl || null,
-      dueDate: dueDateStr
+      dueDate: finalDueDate
     }
   }
 
@@ -128,18 +140,21 @@ export class BillingService {
     validityMonths: number
     dueDateStr: string
     externalReference?: string
+    customDescription?: string
   }): Promise<{ id: string; invoiceUrl?: string | null; bankSlipUrl?: string | null }> {
-    const { customerId, planName, planPrice, validityMonths, dueDateStr, externalReference } = params
+    const { customerId, planName, planPrice, validityMonths, dueDateStr, externalReference, customDescription } = params
 
-    if (!Number.isFinite(planPrice) || planPrice <= 0) {
+    if (!Number.isFinite(planPrice) || planPrice < 0) {
       throw new Error('Plano selecionado não possui valor mensal configurado')
     }
+
+    const description = customDescription || `Assinatura Plano ${planName} - Vigência de ${validityMonths} meses`
 
     const paymentResult = await createAsaasPayment({
       customer: customerId,
       value: planPrice,
       dueDate: dueDateStr,
-      description: `Assinatura Plano ${planName} - Vigência de ${validityMonths} meses`,
+      description,
       billingType: 'BOLETO',
       externalReference
     })
@@ -150,6 +165,7 @@ export class BillingService {
 
     return paymentResult
   }
+
 
   private async persistLocalInvoice(
     supabaseAdmin: SupabaseClient,

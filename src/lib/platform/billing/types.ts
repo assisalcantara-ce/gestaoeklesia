@@ -45,6 +45,12 @@ export interface GenerateInvoiceInput {
   externalReference?: string
   /** Se deve persistir a fatura localmente em platform_billing_invoices (padrão: true) */
   persistLocal?: boolean
+  /** Valor customizado para substituir o valor padrão do plano */
+  customAmount?: number
+  /** Vencimento customizado (formato YYYY-MM-DD) para substituir o padrão */
+  customDueDate?: string
+  /** Descrição customizada da cobrança para o Asaas */
+  customDescription?: string
 }
 
 export interface GenerateInvoiceResult {
