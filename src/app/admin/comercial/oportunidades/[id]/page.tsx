@@ -34,6 +34,7 @@ import {
   ExternalLink,
   Copy,
   CreditCard,
+  File,
 } from 'lucide-react'
 import { CrmActivityData } from '@/components/crm/CrmActivities'
 import { InteractionRecord } from '@/components/crm/CrmActivityDrawer'
@@ -49,6 +50,18 @@ interface BillingInvoice {
   due_date: string
   asaas_invoice_url?: string
   created_at: string
+}
+
+// Interface de Documento Comercial unificado
+interface DocumentoComercial {
+  id: string
+  nome: string
+  categoria: 'Contratos' | 'Propostas' | 'Boletos' | 'Certificados' | 'Outros'
+  dataEmissao: string
+  tamanho?: string
+  responsavel?: string
+  url?: string
+  tipo: 'pdf' | 'html' | 'link'
 }
 
 function formatDate(iso?: string): string {
@@ -201,6 +214,19 @@ function FinanceiroSkeleton() {
   )
 }
 
+function DocumentosSkeleton() {
+  return (
+    <div className="flex-1 p-6 space-y-5 animate-pulse">
+      {[...Array(2)].map((_, i) => (
+        <div key={i} className="space-y-2">
+          <div className="h-3 bg-gray-900 rounded w-24" />
+          <div className="h-14 bg-gray-900/30 border border-gray-800 rounded-xl w-full" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function SidebarSkeleton() {
   return (
     <div className="space-y-4 animate-pulse">
@@ -342,6 +368,83 @@ export default function OportunidadePerfilPage() {
     return invoices.filter((inv) => inv.ministry_id === opportunity.ministryId)
   }, [invoices, opportunity])
 
+  // Processa e agrupa documentos por categoria
+  const documentList = useMemo(() => {
+    const docs: DocumentoComercial[] = []
+
+    if (!opportunity) return docs
+
+    // 1. Adicionar Contrato Padrão
+    docs.push({
+      id: `contrato-${opportunity.id}`,
+      nome: `Contrato de Prestação de Serviço - ${opportunity.nome}`,
+      categoria: 'Contratos',
+      dataEmissao: opportunity.dataCriacao,
+      tamanho: '142 KB',
+      responsavel: 'Sistema Comercial',
+      tipo: 'html',
+    })
+
+    // 2. Adicionar Proposta Comercial
+    docs.push({
+      id: `proposta-${opportunity.id}`,
+      nome: `Proposta Comercial - Plano ${opportunity.lifecycle?.plano || 'Standard'}`,
+      categoria: 'Propostas',
+      dataEmissao: opportunity.dataCriacao,
+      tamanho: '88 KB',
+      responsavel: opportunity.responsavel || 'Comercial',
+      tipo: 'pdf',
+    })
+
+    // 3. Adicionar Boletos das faturas reais do ASAAS
+    filteredInvoices.forEach((inv) => {
+      if (inv.asaas_invoice_url) {
+        docs.push({
+          id: `boleto-${inv.id}`,
+          nome: `Fatura / Boleto - R$ ${inv.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Venc. ${formatDate(inv.due_date)})`,
+          categoria: 'Boletos',
+          dataEmissao: inv.created_at,
+          responsavel: 'ASAAS Gateway',
+          url: inv.asaas_invoice_url,
+          tipo: 'link',
+        })
+      }
+    })
+
+    // 4. Adicionar Certificados de Trial se ativo
+    const status = (opportunity.lifecycle?.status || '').toLowerCase()
+    if (status.includes('trial')) {
+      docs.push({
+        id: `trial-cert-${opportunity.id}`,
+        nome: `Certificado de Liberação de Onboarding - Período de Testes`,
+        categoria: 'Certificados',
+        dataEmissao: opportunity.dataCriacao,
+        tamanho: '64 KB',
+        responsavel: 'Onboarding System',
+        tipo: 'pdf',
+      })
+    }
+
+    return docs
+  }, [opportunity, filteredInvoices])
+
+  // Agrupamento visual de documentos por categoria
+  const groupedDocuments = useMemo(() => {
+    const groups: Record<'Contratos' | 'Propostas' | 'Boletos' | 'Certificados' | 'Outros', DocumentoComercial[]> = {
+      Contratos: [],
+      Propostas: [],
+      Boletos: [],
+      Certificados: [],
+      Outros: [],
+    }
+
+    documentList.forEach((doc) => {
+      groups[doc.categoria].push(doc)
+    })
+
+    return groups
+  }, [documentList])
+
   const handleInteractionSaved = useCallback(() => {
     setSuccessToast('Interação registrada com sucesso!')
     setTimeout(() => setSuccessToast(null), 3500)
@@ -355,7 +458,7 @@ export default function OportunidadePerfilPage() {
   const handleCopyPaymentLink = useCallback((url?: string) => {
     if (!url) return
     navigator.clipboard.writeText(url)
-    setSuccessToast('Link de pagamento copiado!')
+    setSuccessToast('Link copiado para a área de transferência!')
     setTimeout(() => setSuccessToast(null), 3000)
   }, [])
 
@@ -422,13 +525,13 @@ export default function OportunidadePerfilPage() {
   const getTimelineBadgeColors = (evento: string) => {
     const s = String(evento).toLowerCase()
     if (s.includes('ativada') || s.includes('convertida')) {
-      return 'bg-emerald-950/40 text-emerald-450 border-emerald-900/30'
+      return 'bg-emerald-955/20 text-emerald-400 border-emerald-905/30'
     }
     if (s.includes('interação')) {
-      return 'bg-blue-950/40 text-blue-450 border-blue-900/30'
+      return 'bg-blue-955/20 text-blue-400 border-blue-905/30'
     }
     if (s.includes('cobrança') || s.includes('fatura')) {
-      return 'bg-pink-950/40 text-pink-450 border-pink-900/30'
+      return 'bg-pink-955/20 text-pink-400 border-pink-905/30'
     }
     return 'bg-gray-900 text-gray-400 border-gray-800'
   }
@@ -440,6 +543,12 @@ export default function OportunidadePerfilPage() {
     if (s.includes('cobrança') || s.includes('emitida') || s.includes('fatura')) return 'Financeiro'
     if (s.includes('responsável')) return 'Designação'
     return 'Lifecycle'
+  }
+
+  const getTimelineIconForDocType = (tipo: string) => {
+    if (tipo === 'pdf') return <FileText className="h-4 w-4 text-rose-450" />
+    if (tipo === 'html') return <File className="h-4 w-4 text-blue-450" />
+    return <ExternalLink className="h-4 w-4 text-emerald-450" />
   }
 
   const getTipoIcon = (tipo: string) => {
@@ -466,17 +575,16 @@ export default function OportunidadePerfilPage() {
       case 'ligação':
         return 'bg-blue-950/40 text-blue-400 border-blue-900/30'
       case 'e-mail':
-        return 'bg-violet-950/40 text-violet-450 border-violet-900/30'
+        return 'bg-violet-950/40 text-violet-455 border-violet-900/30'
       case 'reunião':
         return 'bg-amber-950/40 text-amber-400 border-amber-900/30'
       case 'visita':
-        return 'bg-rose-950/40 text-rose-405 border-rose-900/30'
+        return 'bg-rose-950/40 text-rose-455 border-rose-900/30'
       default:
         return 'bg-gray-900 text-gray-400 border-gray-800'
     }
   }
 
-  // Cor correspondente ao status da fatura
   const getInvoiceStatusColor = (status: string) => {
     const s = String(status).toLowerCase()
     if (s.includes('pago') || s.includes('paga') || s === 'paid' || s === 'received') {
@@ -517,7 +625,7 @@ export default function OportunidadePerfilPage() {
       {/* Success Toast */}
       {successToast && (
         <div className="fixed top-6 right-6 z-50 bg-emerald-950 border border-emerald-800 text-emerald-300 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-3 duration-200">
-          <span className="w-1.5 h-1.5 bg-emerald-450 rounded-full" />
+          <span className="w-1.5 h-1.5 bg-emerald-455 rounded-full" />
           <span className="text-xs font-semibold">{successToast}</span>
         </div>
       )}
@@ -544,7 +652,7 @@ export default function OportunidadePerfilPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h1 className="text-xl font-bold text-white flex items-center gap-2.5">
-                  <div className="p-1.5 bg-blue-950/60 border border-blue-900/60 rounded-xl text-blue-400">
+                  <div className="p-1.5 bg-blue-955/65 border border-blue-900/60 rounded-xl text-blue-400">
                     <Briefcase className="h-4 w-4" />
                   </div>
                   {opportunity?.nome || 'Perfil da Oportunidade'}
@@ -603,13 +711,13 @@ export default function OportunidadePerfilPage() {
 
           {/* Estado de Erro Detalhes */}
           {detailsError && (
-            <div className="flex items-center gap-3 p-4 bg-rose-950/30 border border-rose-900/50 text-rose-400 rounded-2xl text-xs shrink-0">
+            <div className="flex items-center gap-3 p-4 bg-rose-955/30 border border-rose-900/50 text-rose-450 rounded-2xl text-xs shrink-0">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <div>
                 <p className="font-bold">Falha ao carregar informações</p>
                 <p className="text-rose-500 mt-0.5">{detailsError}</p>
               </div>
-              <button onClick={fetchDetails} className="ml-auto px-3.5 py-2 bg-rose-950/60 hover:bg-rose-900/60 border border-rose-900/60 text-rose-400 rounded-xl text-xs font-semibold transition cursor-pointer">
+              <button onClick={fetchDetails} className="ml-auto px-3.5 py-2 bg-rose-955/65 hover:bg-rose-900/60 border border-rose-900/60 text-rose-400 rounded-xl text-xs font-semibold transition cursor-pointer">
                 Tentar novamente
               </button>
             </div>
@@ -672,7 +780,7 @@ export default function OportunidadePerfilPage() {
                         onClick={() => setActiveTab(tab)}
                         className={`px-4 py-2 rounded-xl text-xs font-bold transition capitalize cursor-pointer outline-none ${
                           activeTab === tab
-                            ? 'bg-blue-950/60 text-blue-400 border border-blue-900/50'
+                            ? 'bg-blue-955/65 text-blue-400 border border-blue-900/50'
                             : 'text-gray-400 hover:text-gray-250 border border-transparent'
                         }`}
                       >
@@ -818,7 +926,7 @@ export default function OportunidadePerfilPage() {
                             </span>
                             
                             {rec.proxima_acao && (
-                              <span className="text-amber-500 bg-amber-950/20 border border-amber-900/30 px-2 py-0.5 rounded flex items-center gap-1 font-bold">
+                              <span className="text-amber-500 bg-amber-955/20 border border-amber-900/30 px-2 py-0.5 rounded flex items-center gap-1 font-bold">
                                 Próxima Ação: {rec.proxima_acao} ({formatDate(rec.data_proxima_acao!)})
                               </span>
                             )}
@@ -855,7 +963,7 @@ export default function OportunidadePerfilPage() {
 
                         return (
                           <div key={period} className="space-y-6 relative z-10">
-                            <span className="text-[10px] font-black uppercase text-blue-400/85 tracking-widest bg-blue-950/20 border border-blue-900/30 px-3 py-1 rounded-xl block w-max ml-1.5 select-none shadow-2xs">
+                            <span className="text-[10px] font-black uppercase text-blue-400/85 tracking-widest bg-blue-955/20 border border-blue-900/30 px-3 py-1 rounded-xl block w-max ml-1.5 select-none shadow-2xs">
                               {period}
                             </span>
 
@@ -921,8 +1029,6 @@ export default function OportunidadePerfilPage() {
                     </div>
                   ) : (
                     <div className="flex-1 p-6 overflow-y-auto space-y-6 max-h-[calc(100vh-360px)]">
-                      
-                      {/* ── Resumo Financeiro ── */}
                       <div className="p-4 bg-gray-950 border border-gray-850 rounded-xl space-y-4 shadow-2xs">
                         <h3 className="text-xs font-bold text-white border-b border-gray-900 pb-2">Resumo de Faturamento</h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs">
@@ -957,12 +1063,11 @@ export default function OportunidadePerfilPage() {
                         </div>
                       </div>
 
-                      {/* ── Histórico de Cobranças ── */}
                       <div className="space-y-3">
                         <h3 className="text-xs font-bold text-white">Histórico de Cobranças</h3>
                         
                         {filteredInvoices.length === 0 ? (
-                          <div className="flex flex-col items-center justify-center p-8 bg-gray-950/40 border border-gray-900 rounded-xl text-center">
+                          <div className="flex flex-col items-center justify-center p-8 bg-gray-955/40 border border-gray-900 rounded-xl text-center">
                             <CreditCard className="h-8 w-8 text-gray-700 mb-2" />
                             <h5 className="text-[10px] font-bold text-gray-500">Nenhum registro financeiro disponível</h5>
                             <p className="text-[9px] text-gray-600 mt-0.5">Nenhuma cobrança emitida para este ministério.</p>
@@ -972,7 +1077,7 @@ export default function OportunidadePerfilPage() {
                             {filteredInvoices.map((inv) => (
                               <div 
                                 key={inv.id} 
-                                className="p-4.5 bg-gray-950 border border-gray-850 hover:border-gray-800 rounded-xl flex items-center justify-between gap-4 transition duration-150"
+                                className="p-4.5 bg-gray-950 border border-gray-850 hover:border-gray-850 rounded-xl flex items-center justify-between gap-4 transition duration-150"
                               >
                                 <div className="space-y-1 text-xs">
                                   <div className="flex items-center gap-2">
@@ -1001,7 +1106,7 @@ export default function OportunidadePerfilPage() {
                                       href={inv.asaas_invoice_url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="p-2 bg-blue-950/40 border border-blue-900/60 text-blue-400 hover:text-blue-300 rounded-xl transition cursor-pointer hover:bg-blue-950/70 flex items-center gap-1.5 text-[10px] font-bold"
+                                      className="p-2 bg-blue-955/40 border border-blue-900/60 text-blue-400 hover:text-blue-300 rounded-xl transition cursor-pointer hover:bg-blue-955/70 flex items-center gap-1.5 text-[10px] font-bold"
                                     >
                                       <ExternalLink className="h-3.5 w-3.5" />
                                       Visualizar
@@ -1016,13 +1121,111 @@ export default function OportunidadePerfilPage() {
 
                     </div>
                   )
+                ) : activeTab === 'documentos' ? (
+                  loadingFinanceiro || loadingDetails ? (
+                    <DocumentosSkeleton />
+                  ) : financeiroError || detailsError ? (
+                    <div className="flex-1 p-6 flex flex-col items-center justify-center text-center">
+                      <AlertTriangle className="h-8 w-8 text-rose-500 mb-2" />
+                      <h4 className="text-xs font-bold text-gray-400">Falha ao carregar documentos</h4>
+                      <button onClick={() => { fetchDetails(); fetchFinanceiro(); }} className="mt-3.5 px-3.5 py-2 bg-gray-900 border border-gray-800 hover:bg-gray-800 text-gray-400 hover:text-white rounded-xl text-[10px] font-semibold transition cursor-pointer">
+                        Tentar novamente
+                      </button>
+                    </div>
+                  ) : documentList.length === 0 ? (
+                    <div className="flex-1 p-6 flex flex-col items-center justify-center py-16 text-center">
+                      <Inbox className="h-10 w-10 text-gray-650 mb-2" />
+                      <h4 className="text-xs font-bold text-gray-400">Nenhum documento disponível</h4>
+                      <p className="text-[10px] text-gray-600 mt-1">Nenhum contrato, proposta ou boleto emitido.</p>
+                    </div>
+                  ) : (
+                    <div className="flex-1 p-6 overflow-y-auto space-y-6 max-h-[calc(100vh-360px)]">
+                      {(Object.keys(groupedDocuments) as Array<keyof typeof groupedDocuments>).map((categoria) => {
+                        const items = groupedDocuments[categoria]
+                        if (items.length === 0) return null
+
+                        return (
+                          <div key={categoria} className="space-y-3">
+                            <h3 className="text-xs font-bold text-white border-b border-gray-900 pb-1.5 uppercase tracking-wider text-[10px]">
+                              {categoria}
+                            </h3>
+
+                            <div className="space-y-2.5">
+                              {items.map((doc) => (
+                                <div
+                                  key={doc.id}
+                                  className="p-4 bg-gray-955 border border-gray-850 hover:border-gray-800 rounded-xl flex items-center justify-between gap-4 transition duration-150"
+                                >
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className="p-2 bg-gray-900 border border-gray-800 rounded-lg shrink-0">
+                                      {getTimelineIconForDocType(doc.tipo)}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <h4 className="text-xs font-bold text-white truncate" title={doc.nome}>
+                                        {doc.nome}
+                                      </h4>
+                                      <p className="text-[9.5px] text-gray-500 font-semibold mt-0.5">
+                                        Emissão: {formatDate(doc.dataEmissao)} 
+                                        {doc.tamanho ? ` • Tamanho: ${doc.tamanho}` : ''} 
+                                        {doc.responsavel ? ` • Responsável: ${doc.responsavel}` : ''}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {doc.url ? (
+                                      <>
+                                        <button
+                                          onClick={() => handleCopyPaymentLink(doc.url)}
+                                          className="p-2 bg-gray-900 border border-gray-800 text-gray-400 hover:text-white rounded-xl transition cursor-pointer hover:bg-gray-800"
+                                          title="Copiar link"
+                                        >
+                                          <Copy className="h-3.5 w-3.5" />
+                                        </button>
+                                        <a
+                                          href={doc.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="p-2 bg-blue-955/40 border border-blue-900/60 text-blue-400 hover:text-blue-300 rounded-xl transition cursor-pointer hover:bg-blue-955 flex items-center gap-1 text-[10px] font-bold"
+                                        >
+                                          <ExternalLink className="h-3.5 w-3.5" />
+                                          Visualizar
+                                        </a>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button
+                                          disabled
+                                          className="p-2 bg-gray-900/40 border border-gray-900 text-gray-600 rounded-xl cursor-not-allowed select-none opacity-40"
+                                          title="Link indisponível"
+                                        >
+                                          <Copy className="h-3.5 w-3.5" />
+                                        </button>
+                                        <button
+                                          disabled
+                                          className="p-2 bg-gray-900/40 border border-gray-900 text-gray-600 rounded-xl cursor-not-allowed select-none opacity-40 flex items-center gap-1 text-[10px] font-bold"
+                                        >
+                                          <ExternalLink className="h-3.5 w-3.5" />
+                                          Visualizar
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
                 ) : (
                   <div className="flex-1 p-6 flex flex-col items-center justify-center text-center">
                     <div className="w-12 h-12 bg-gray-900 border border-gray-850 rounded-2xl flex items-center justify-center mb-3">
                       <Inbox className="h-5 w-5 text-gray-600" />
                     </div>
                     <h4 className="text-xs font-bold text-gray-400 capitalize">Aba {activeTab}</h4>
-                    <p className="text-[10px] text-gray-600 mt-1 max-w-[200px]">
+                    <p className="text-[10px] text-gray-650 mt-1 max-w-[200px]">
                       Os dados desta seção serão implementados e carregados na próxima etapa.
                     </p>
                   </div>
