@@ -9,9 +9,10 @@ import CrmInteractionModal from './CrmInteractionModal';
 interface CrmActivityDrawerProps {
   activity: CrmActivityData | null;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-export default function CrmActivityDrawer({ activity, onClose }: CrmActivityDrawerProps) {
+export default function CrmActivityDrawer({ activity, onClose, onSuccess }: CrmActivityDrawerProps) {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
   if (!activity) return null;
@@ -207,11 +208,13 @@ export default function CrmActivityDrawer({ activity, onClose }: CrmActivityDraw
 
       </div>
 
-      {/* Modal de Registro de Interação (Visual Draft) */}
+      {/* Modal de Registro de Interação */}
       <CrmInteractionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         clienteNome={activity.nome}
+        ministryId={activity.id}
+        onSuccess={onSuccess}
       />
     </div>
   );

@@ -32,30 +32,44 @@ export interface CrmActivityData {
   };
 }
 
-export default function CrmActivities() {
+interface CrmActivitiesProps {
+  onRefresh?: () => void;
+}
+
+export default function CrmActivities({ onRefresh }: CrmActivitiesProps = {}) {
   const [activities, setActivities] = useState<CrmActivityData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<CrmActivityData | null>(null);
 
-  useEffect(() => {
-    async function fetchActivities() {
-      try {
-        const res = await authenticatedFetch('/api/v1/admin/crm/activities');
-        if (!res.ok) {
-          throw new Error('Erro ao carregar oportunidades abertas (atividades)');
-        }
-        const data = await res.json();
-        setActivities(data);
-      } catch (err: any) {
-        setError(err instanceof Error ? err : new Error(err?.message || 'Erro desconhecido'));
-      } finally {
-        setLoading(false);
+  const fetchActivities = async () => {
+    try {
+      const res = await authenticatedFetch('/api/v1/admin/crm/activities');
+      if (!res.ok) {
+        throw new Error('Erro ao carregar oportunidades abertas (atividades)');
       }
+      const data = await res.json();
+      setActivities(data);
+      // Se tiver uma atividade selecionada no Drawer, atualizar o objeto em tempo real
+      if (selectedActivity) {
+        const updated = data.find((a: CrmActivityData) => a.id === selectedActivity.id);
+        if (updated) setSelectedActivity(updated);
+      }
+    } catch (err: any) {
+      setError(err instanceof Error ? err : new Error(err?.message || 'Erro desconhecido'));
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     fetchActivities();
   }, []);
+
+  const handleSuccess = () => {
+    fetchActivities();
+    onRefresh?.();
+  };
 
   if (loading) {
     return (
@@ -146,6 +160,7 @@ export default function CrmActivities() {
       <CrmActivityDrawer 
         activity={selectedActivity} 
         onClose={() => setSelectedActivity(null)} 
+        onSuccess={handleSuccess}
       />
     </div>
   );

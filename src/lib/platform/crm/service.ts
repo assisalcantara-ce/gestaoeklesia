@@ -309,9 +309,31 @@ export class CrmService {
       invoices = minInvoices || [];
     }
 
+    // 5. Consultar Interações Comerciais Registradas (crm_interactions)
+    let interactions: any[] = [];
+    const targetQueryId = ministryId || preRegId;
+    if (targetQueryId) {
+      const { data: interData } = await supabase
+        .from('crm_interactions')
+        .select('*')
+        .or(`ministry_id.eq.${targetQueryId},id.eq.${targetQueryId}`);
+      interactions = interData || [];
+    }
+
     // -- MAPEAR EVENTOS --
 
-    // A. Evento de Criação do Lead
+    // A. Eventos de Interação Registrada (crm_interactions)
+    interactions.forEach((inter: any) => {
+      timeline.push({
+        id: `inter_${inter.id}`,
+        data: inter.created_at,
+        evento: `Interação (${inter.tipo})`,
+        usuario: inter.created_by || 'Administrador',
+        descricao: inter.descricao + (inter.proxima_acao ? ` (Próxima Ação: "${inter.proxima_acao}")` : '')
+      });
+    });
+
+    // B. Evento de Criação do Lead
     if (preReg) {
       timeline.push({
         id: `pr_create_${preReg.id}`,
@@ -322,7 +344,7 @@ export class CrmService {
       });
     }
 
-    // B. Evento de Ativação do Ministério
+    // C. Evento de Ativação do Ministério
     if (ministry) {
       timeline.push({
         id: `min_active_${ministry.id}`,
@@ -333,7 +355,7 @@ export class CrmService {
       });
     }
 
-    // C. Eventos de Histórico Comercial do CRM
+    // D. Eventos de Histórico Comercial do CRM
     if (crmHistory) {
       crmHistory.forEach((h: any) => {
         timeline.push({
@@ -346,7 +368,7 @@ export class CrmService {
       });
     }
 
-    // D. Eventos de Faturamento
+    // E. Eventos de Faturamento
     invoices.forEach((inv: any) => {
       // Evento de Emissão
       timeline.push({
