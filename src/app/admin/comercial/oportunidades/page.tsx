@@ -231,7 +231,7 @@ function ActionMenu({
     setIsOpen((prev) => !prev)
   }, [])
 
-  // Fechar ao clicar fora
+  // Fechar ao clicar fora ou ao pressionar Escape
   useEffect(() => {
     if (!isOpen) return
     const handleClickOutside = (e: MouseEvent) => {
@@ -239,8 +239,17 @@ function ActionMenu({
         setIsOpen(false)
       }
     }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
   }, [isOpen])
 
   const handleCopyEmail = useCallback(
@@ -269,21 +278,27 @@ function ActionMenu({
     <div className="relative inline-block text-left" ref={menuRef}>
       <button
         onClick={toggle}
-        className="p-2 bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white border border-gray-800 rounded-xl transition cursor-pointer shadow-xs"
-        aria-label="Opções da oportunidade"
+        className="p-2 bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white border border-gray-800 rounded-xl transition cursor-pointer shadow-xs focus:ring-1 focus:ring-blue-600/55 outline-none"
+        aria-label={`Opções da oportunidade de ${act.nome}`}
+        aria-haspopup="true"
+        aria-expanded={isOpen}
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2.5 w-52 bg-gray-950 border border-gray-800 rounded-2xl shadow-xl z-30 overflow-hidden divide-y divide-gray-800/60 animate-in fade-in slide-in-from-top-1 duration-100">
-          <div className="py-1.5">
+        <div 
+          className="absolute right-0 mt-2.5 w-52 bg-gray-950 border border-gray-800 rounded-2xl shadow-xl z-30 overflow-hidden divide-y divide-gray-800/60 animate-in fade-in slide-in-from-top-1 duration-100"
+          role="menu"
+        >
+          <div className="py-1.5" role="none">
             <button
               onClick={() => {
                 onOpenAtendimento()
                 setIsOpen(false)
               }}
-              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2"
+              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2 outline-none focus:bg-gray-900"
+              role="menuitem"
             >
               <FolderOpen className="h-3.5 w-3.5 text-blue-400" />
               Abrir atendimento
@@ -294,7 +309,8 @@ function ActionMenu({
                 onRegisterInteraction()
                 setIsOpen(false)
               }}
-              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2"
+              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2 outline-none focus:bg-gray-900"
+              role="menuitem"
             >
               <MessageSquarePlus className="h-3.5 w-3.5 text-emerald-400" />
               Registrar interação
@@ -305,18 +321,21 @@ function ActionMenu({
                 onViewHistory()
                 setIsOpen(false)
               }}
-              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2"
+              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2 outline-none focus:bg-gray-900"
+              role="menuitem"
             >
               <History className="h-3.5 w-3.5 text-indigo-400" />
               Ver histórico
             </button>
           </div>
 
-          <div className="py-1.5">
+          <div className="py-1.5" role="none">
             <button
               onClick={handleCopyEmail}
               disabled={!act.email}
-              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2 disabled:opacity-35 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2 disabled:opacity-35 disabled:hover:bg-transparent disabled:cursor-not-allowed outline-none focus:bg-gray-900"
+              role="menuitem"
+              aria-disabled={!act.email}
             >
               <Copy className="h-3.5 w-3.5 text-gray-500" />
               Copiar e-mail
@@ -325,7 +344,9 @@ function ActionMenu({
             <button
               onClick={handleCopyPhone}
               disabled={!act.telefone}
-              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2 disabled:opacity-35 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-900 transition flex items-center gap-2 disabled:opacity-35 disabled:hover:bg-transparent disabled:cursor-not-allowed outline-none focus:bg-gray-900"
+              role="menuitem"
+              aria-disabled={!act.telefone}
             >
               <Copy className="h-3.5 w-3.5 text-gray-500" />
               Copiar telefone
