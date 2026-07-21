@@ -113,6 +113,37 @@ export default function CrmActivityDrawer({ activity, onClose }: CrmActivityDraw
               </div>
             </div>
 
+            {/* Resumo Comercial */}
+            {activity.lifecycle && (
+              <div className="p-4 bg-gray-900/40 border border-gray-800 rounded-xl space-y-3">
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Resumo Comercial</span>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] text-gray-400 block font-semibold">Lifecycle</span>
+                    <span className="font-bold text-indigo-400">{activity.lifecycle.status}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 block font-semibold">Plano</span>
+                    <span className="font-bold text-gray-200">{activity.lifecycle.plano}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 block font-semibold">Faturamento</span>
+                    <span className="font-semibold text-gray-300">{activity.lifecycle.statusFinanceiro}</span>
+                  </div>
+                  {activity.lifecycle.daysRemaining !== undefined && activity.lifecycle.daysRemaining !== null && (
+                    <div>
+                      <span className="text-[10px] text-gray-400 block font-semibold">Dias Restantes</span>
+                      <span className="font-bold text-amber-400">{activity.lifecycle.daysRemaining} dias</span>
+                    </div>
+                  )}
+                </div>
+                <div className="pt-2 border-t border-gray-800/80">
+                  <span className="text-[10px] text-gray-400 block font-semibold">Motivo do Status</span>
+                  <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{activity.lifecycle.reason}</p>
+                </div>
+              </div>
+            )}
+
             {/* Próxima Ação */}
             <div className="p-4 bg-blue-950/20 border border-blue-900/40 rounded-xl space-y-2">
               <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider block flex items-center gap-1.5">

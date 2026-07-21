@@ -15,6 +15,13 @@ export interface CrmActivityData {
   prioridade: string;
   dataCriacao: string;
   ultimaAtualizacao: string;
+  lifecycle?: {
+    status: string;
+    plano?: string;
+    statusFinanceiro?: string;
+    daysRemaining?: number;
+    reason: string;
+  };
 }
 
 export default function CrmActivities() {

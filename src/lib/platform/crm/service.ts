@@ -396,7 +396,11 @@ export class CrmService {
       list = list.filter(o => o.id === id || o.ministry_id === id);
     }
 
-    // 3. Mapear para DTO CrmActivity
+    // 3. Obter os ComercialViewModels via CommercialService (que usa cache)
+    const commercialService = new CommercialService();
+    const commercialList = await commercialService.list(supabase);
+
+    // 4. Mapear para DTO CrmActivity enriquecido com lifecycle
     return list.map((opt: any) => {
       // Prioridade heurística baseada no tempo de expiração ou criação
       let prioridade = 'média';
@@ -408,6 +412,9 @@ export class CrmService {
         prioridade = 'baixa';
       }
 
+      // Procurar o ComercialViewModel correspondente
+      const vm = commercialList.find(c => c.id === opt.id || (opt.ministry_id && c.id === opt.ministry_id));
+
       return {
         id: opt.id,
         oportunidadeId: opt.id,
@@ -417,7 +424,14 @@ export class CrmService {
         status: opt.status,
         prioridade,
         dataCriacao: opt.created_at,
-        ultimaAtualizacao: opt.updated_at || opt.created_at
+        ultimaAtualizacao: opt.updated_at || opt.created_at,
+        lifecycle: vm ? {
+          status: vm.lifecycle.status,
+          plano: vm.plano || 'Nenhum',
+          statusFinanceiro: vm.statusFinanceiro || 'Sem faturamento',
+          daysRemaining: vm.daysRemaining,
+          reason: vm.lifecycle.reason
+        } : undefined
       };
     });
   }
