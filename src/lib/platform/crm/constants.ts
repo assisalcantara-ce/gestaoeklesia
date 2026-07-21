@@ -1,10 +1,13 @@
-export const PIPELINE_STATUS = {
-  NOVO: 'Novo',
-  PRIMEIRO_CONTATO: 'Primeiro Contato',
-  EM_NEGOCIACAO: 'Em Negociação',
-  PROPOSTA_ENVIADA: 'Proposta Enviada',
-  AGUARDANDO_CLIENTE: 'Aguardando Cliente',
-  AGUARDANDO_PAGAMENTO: 'Aguardando Pagamento',
-  CONVERTIDO: 'Convertido',
-  PERDIDO: 'Perdido',
-} as const;
+/**
+ * Tipos de interação suportados para registro no CRM Comercial
+ */
+export const InteractionTypes = [
+  'Ligação',
+  'WhatsApp',
+  'E-mail',
+  'Reunião',
+  'Visita',
+  'Outro'
+] as const;
+
+export type InteractionType = typeof InteractionTypes[number];

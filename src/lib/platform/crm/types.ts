@@ -79,6 +79,13 @@ export interface CrmNextAction {
   dataPrevista?: string;
 }
 
+export interface CrmInteractionDraft {
+  tipo: string;
+  descricao: string;
+  proximaAcao?: string;
+  dataProximaAcao?: string;
+}
+
 
 export interface CrmSummary {
   totalLeads: number;
