@@ -103,6 +103,42 @@ export default function ComercialDashboardPage() {
     return counts
   }, [oportunidades])
 
+  // --- HELPER: PREÇO ESTIMADO POR PLANO ---
+  const getPlanoPrice = (slug: string) => {
+    const plan = String(slug).toLowerCase()
+    if (plan.includes('profis')) return 299.90
+    if (plan.includes('inter')) return 149.90
+    return 49.90
+  }
+
+  // --- PIPELINE STAGES com valores financeiros estimados ---
+  const pipelineStages = useMemo(() => {
+    const stages = [
+      { key: 'novo',                label: 'Novos',          desc: 'Identificados',       statusMatch: ['novo'],                                                  accent: '#6366f1', bg: 'rgba(99,102,241,0.08)',  border: 'rgba(99,102,241,0.3)'  },
+      { key: 'primeiro_contato',   label: '1º Contato',     desc: 'Interação inicial',   statusMatch: ['primeiro contato', 'primeiro_contato'],                   accent: '#3b82f6', bg: 'rgba(59,130,246,0.08)',  border: 'rgba(59,130,246,0.3)'  },
+      { key: 'em_negociacao',      label: 'Negociação',     desc: 'Alinhando plano',     statusMatch: ['em negociação', 'em_negociacao'],                         accent: '#06b6d4', bg: 'rgba(6,182,212,0.08)',   border: 'rgba(6,182,212,0.3)'   },
+      { key: 'proposta_enviada',   label: 'Proposta',       desc: 'Boleto/Customizado',  statusMatch: ['proposta enviada', 'proposta_enviada'],                   accent: '#f59e0b', bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.3)'  },
+      { key: 'aguardando_pagamento', label: 'Pagamento',    desc: 'Aguardando ASAAS',    statusMatch: ['aguardando pagamento', 'aguardando_pagamento'],            accent: '#ec4899', bg: 'rgba(236,72,153,0.08)',  border: 'rgba(236,72,153,0.3)'  },
+      { key: 'convertido',         label: 'Convertidos',    desc: 'Clientes ativos',     statusMatch: ['convertido'],                                            accent: '#10b981', bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.3)'  },
+    ]
+
+    const withData = stages.map((stage) => {
+      const matching = oportunidades.filter(o =>
+        stage.statusMatch.includes(o.status.toLowerCase().trim())
+      )
+      const count = matching.length
+      const valor = matching.reduce((acc, o) => acc + getPlanoPrice(o.plano_solicitado), 0)
+      return { ...stage, count, valor }
+    })
+
+    const totalCount = withData.reduce((s, st) => s + st.count, 0)
+
+    return withData.map((stage) => ({
+      ...stage,
+      percentual: totalCount > 0 ? Math.round((stage.count / totalCount) * 100) : 0
+    }))
+  }, [oportunidades])
+
   // --- CÁLCULOS DOS INDICADORES COMERCIAIS ---
   const indicadores = useMemo(() => {
     const convertidas = kpis.convertido
@@ -113,7 +149,7 @@ export default function ComercialDashboardPage() {
     const taxaConversao = decididas > 0 ? (convertidas / decididas) * 100 : 0
 
     // Mapeamento de receitas estimadas mensais por plano
-    const getPlanoPrice = (slug: string) => {
+    const getPlanoValue = (slug: string) => {
       const plan = String(slug).toLowerCase()
       if (plan.includes('profis')) return 299.90
       if (plan.includes('inter')) return 149.90
@@ -126,7 +162,7 @@ export default function ComercialDashboardPage() {
     let contConversõesComTempo = 0
 
     oportunidades.forEach((opt) => {
-      const price = getPlanoPrice(opt.plano_solicitado)
+      const price = getPlanoValue(opt.plano_solicitado)
       const status = opt.status.toLowerCase().trim()
 
       if (status === 'convertido') {
@@ -335,37 +371,102 @@ export default function ComercialDashboardPage() {
             </div>
           </div>
 
-          {/* PIPELINE / FUNIL COMERCIAL */}
-          <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700 space-y-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <TrendingUp className="text-blue-500" />
-              Pipeline Funil Comercial (Conversão)
-            </h3>
-            <div className="flex flex-col md:flex-row items-stretch justify-between gap-4 pt-4">
-              {[
-                { label: 'Novos', count: kpis.novo, desc: 'Identificados' },
-                { label: 'Primeiro Contato', count: kpis.primeiro_contato, desc: 'Interação inicial' },
-                { label: 'Negociação', count: kpis.em_negociacao, desc: 'Alinhando plano' },
-                { label: 'Proposta', count: kpis.proposta_enviada, desc: 'Boleto/Customizado' },
-                { label: 'Pagamento', count: kpis.aguardando_pagamento, desc: 'Boleto ASAAS' },
-                { label: 'Convertidos', count: kpis.convertido, desc: 'Clientes ativos' }
-              ].map((step, idx) => (
-                <div key={step.label} className="flex-1 flex flex-col md:flex-row items-center gap-3">
-                  <div className="w-full bg-gray-900 border border-gray-750 p-4 rounded-xl text-center space-y-1 relative">
-                    <span className="absolute -top-2 left-3 px-1.5 py-0.5 rounded-md bg-gray-850 border border-gray-700 text-[8px] font-black text-gray-500">
-                      {idx + 1}
-                    </span>
-                    <p className="text-sm font-bold text-white">{step.label}</p>
-                    <p className="text-xs text-gray-400 font-semibold">{step.desc}</p>
-                    <p className="text-lg font-black text-blue-400 mt-2">{step.count}</p>
-                  </div>
-                  {idx < 5 && (
-                    <div className="text-gray-600 rotate-90 md:rotate-0 flex items-center justify-center shrink-0">
-                      <ArrowRight size={20} />
-                    </div>
-                  )}
+          {/* PIPELINE / FUNIL COMERCIAL — Painel Executivo */}
+          <div className="bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
+            {/* Cabeçalho */}
+            <div className="px-6 py-4 border-b border-gray-800 bg-gray-900/40 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-950/60 border border-blue-900/60 rounded-xl text-blue-400">
+                  <TrendingUp className="h-4 w-4" />
                 </div>
-              ))}
+                <div>
+                  <h3 className="text-sm font-bold text-white">Pipeline Funil Comercial</h3>
+                  <p className="text-[11px] text-gray-400">{oportunidades.filter(o => o.status.toLowerCase() !== 'perdido').length} oportunidades acompanhadas no funil de conversão</p>
+                </div>
+              </div>
+              <button
+                onClick={() => router.push('/admin/comercial/oportunidades')}
+                className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-gray-300 hover:text-white border border-gray-800 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+              >
+                Ver todas
+                <ArrowRight className="h-3 w-3" />
+              </button>
+            </div>
+
+            {/* Stages do Funil */}
+            <div className="p-6">
+              <div className="flex flex-col md:flex-row items-stretch gap-2 md:gap-0">
+                {pipelineStages.map((stage, idx) => (
+                  <div key={stage.key} className="flex flex-col md:flex-row items-stretch flex-1">
+
+                    {/* Card da etapa */}
+                    <button
+                      onClick={() => router.push(`/admin/comercial/oportunidades?status=${stage.key}`)}
+                      className="group w-full text-left rounded-xl md:rounded-none md:first:rounded-l-xl md:last:rounded-r-xl p-4 transition-all duration-200 cursor-pointer border border-transparent hover:border-opacity-60 hover:shadow-lg relative overflow-hidden"
+                      style={{
+                        background: stage.bg,
+                        borderColor: stage.border,
+                      }}
+                    >
+                      {/* Faixa de cor no topo */}
+                      <div
+                        className="absolute top-0 left-0 right-0 h-0.5 rounded-t-xl opacity-70 group-hover:opacity-100 transition-opacity"
+                        style={{ background: stage.accent }}
+                      />
+
+                      {/* Número da etapa */}
+                      <span
+                        className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-black mb-3"
+                        style={{ background: stage.accent + '25', color: stage.accent, border: `1px solid ${stage.accent}40` }}
+                      >
+                        {idx + 1}
+                      </span>
+
+                      {/* Nome e descrição */}
+                      <p className="text-xs font-bold text-white group-hover:text-white leading-tight">{stage.label}</p>
+                      <p className="text-[10px] mt-0.5 mb-3" style={{ color: stage.accent + 'aa' }}>{stage.desc}</p>
+
+                      {/* Contador principal */}
+                      <p
+                        className="text-3xl font-black leading-none"
+                        style={{ color: stage.accent }}
+                      >
+                        {stage.count}
+                      </p>
+
+                      {/* Percentual do total */}
+                      <div className="mt-2 h-1 rounded-full bg-gray-800">
+                        <div
+                          className="h-1 rounded-full transition-all duration-500"
+                          style={{ width: `${stage.percentual}%`, background: stage.accent }}
+                        />
+                      </div>
+                      <p className="text-[10px] mt-1 font-semibold" style={{ color: stage.accent + '99' }}>
+                        {stage.percentual}% do funil
+                      </p>
+
+                      {/* Divisor */}
+                      <div className="mt-3 pt-3 border-t" style={{ borderColor: stage.border }}>
+                        <p className="text-[10px] font-bold text-gray-400">
+                          {stage.count} {stage.count === 1 ? 'oportunidade' : 'oportunidades'}
+                        </p>
+                        {stage.valor > 0 && (
+                          <p className="text-[11px] font-black" style={{ color: stage.accent }}>
+                            {stage.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Conector entre etapas */}
+                    {idx < pipelineStages.length - 1 && (
+                      <div className="flex items-center justify-center px-1 shrink-0 text-gray-700 rotate-90 md:rotate-0 my-2 md:my-0">
+                        <ArrowRight size={16} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
