@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { X, User, Clock, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { CrmActivityData } from './CrmActivities';
 import CrmTimeline from './CrmTimeline';
+import CrmInteractionModal from './CrmInteractionModal';
 
 interface CrmActivityDrawerProps {
   activity: CrmActivityData | null;
@@ -10,6 +12,8 @@ interface CrmActivityDrawerProps {
 }
 
 export default function CrmActivityDrawer({ activity, onClose }: CrmActivityDrawerProps) {
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+
   if (!activity) return null;
 
   return (
@@ -187,18 +191,12 @@ export default function CrmActivityDrawer({ activity, onClose }: CrmActivityDraw
 
         {/* Bottom Actions */}
         <div className="pt-6 border-t border-gray-800 space-y-2">
-          <div className="relative group">
-            <button
-              disabled
-              title="Disponível na próxima atualização."
-              className="w-full py-2.5 bg-blue-600/50 text-gray-300 rounded-xl text-xs font-semibold cursor-not-allowed opacity-60 flex items-center justify-center gap-2"
-            >
-              Registrar Interação
-            </button>
-            <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:flex bg-gray-900 text-gray-200 border border-gray-700 text-[10px] py-1 px-2.5 rounded-md shadow-xl whitespace-nowrap z-20 pointer-events-none">
-              Disponível na próxima atualização.
-            </div>
-          </div>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-2"
+          >
+            Registrar Interação
+          </button>
           <button
             onClick={onClose}
             className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
@@ -208,6 +206,13 @@ export default function CrmActivityDrawer({ activity, onClose }: CrmActivityDraw
         </div>
 
       </div>
+
+      {/* Modal de Registro de Interação (Visual Draft) */}
+      <CrmInteractionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        clienteNome={activity.nome}
+      />
     </div>
   );
 }
