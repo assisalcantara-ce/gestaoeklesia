@@ -1,21 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createServerClient } from '@/lib/supabase-server';
+import { SubscriptionService } from '@/lib/platform';
 
 const ASAAS_WEBHOOK_TOKEN = process.env.ASAAS_WEBHOOK_TOKEN;
 
-const upperText = (value?: string | null) => (value ? value.trim().toUpperCase() : null);
-const lowerText = (value?: string | null) => (value ? value.trim().toLowerCase() : null);
-const onlyDigits = (value?: string | null) => (value ? value.replace(/\D/g, '') : null);
-
-const buildSlug = (name: string) =>
-  String(name || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .slice(0, 80) || `ministerio-${Date.now()}`;
+// --- Helpers de autenticação do webhook (responsabilidade exclusiva do transporte) ---
 
 const resolveToken = (request: NextRequest) => {
   const direct = request.headers.get('asaas-access-token') || request.headers.get('access_token');
@@ -28,6 +18,7 @@ const resolveToken = (request: NextRequest) => {
 
 export async function POST(request: NextRequest) {
   try {
+    // 1. Validar autenticidade do webhook
     if (!ASAAS_WEBHOOK_TOKEN) {
       console.error('[ASAAS WEBHOOK] ASAAS_WEBHOOK_TOKEN não configurado — request rejeitado');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -37,6 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // 2. Interpretar payload recebido
     const payload = await request.json();
     const eventId = payload?.id ? String(payload.id) : null;
     const event = String(payload?.event || '').toUpperCase();
@@ -63,6 +55,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServerClient();
 
+    // 3. Verificar idempotência — evitar processar o mesmo evento duas vezes
     if (eventId) {
       const { data: existingEvent } = await supabase
         .from('asaas_webhook_events')
@@ -75,6 +68,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Log de recebimento do evento (responsabilidade de auditoria do webhook)
     const { data: webhookEvent } = await supabase
       .from('asaas_webhook_events')
       .upsert({
@@ -88,6 +82,7 @@ export async function POST(request: NextRequest) {
       .select('id')
       .maybeSingle();
 
+    // 4. Localizar a cobrança correspondente em payments (legado)
     const updatePayload: Record<string, any> = {
       asaas_response: payload,
       asaas_status: payment?.status || nextStatus || null,
@@ -100,13 +95,8 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    if (nextStatus) {
-      updatePayload.status = nextStatus;
-    }
-
-    if (paymentDate) {
-      updatePayload.payment_date = paymentDate;
-    }
+    if (nextStatus) updatePayload.status = nextStatus;
+    if (paymentDate) updatePayload.payment_date = paymentDate;
 
     const { error } = await supabase
       .from('payments')
@@ -127,6 +117,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    // 5. Localizar pré-cadastro vinculado a este pagamento
     const { data: preReg } = await supabase
       .from('pre_registrations')
       .select('*')
@@ -134,115 +125,31 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (preReg?.id) {
-      const preRegUpdate: Record<string, any> = {
-        asaas_status: payment?.status || nextStatus || preReg.asaas_status || null,
-        asaas_invoice_url: payment?.invoiceUrl || preReg.asaas_invoice_url || null,
-        asaas_bank_slip_url: payment?.bankSlipUrl || preReg.asaas_bank_slip_url || null,
-        payment_amount: payment?.value ?? preReg.payment_amount,
-        payment_due_date: payment?.dueDate || preReg.payment_due_date,
-      };
-
+      // Sincronizar dados de pagamento no pre_registration (responsabilidade do webhook)
       await supabase
         .from('pre_registrations')
-        .update(preRegUpdate)
+        .update({
+          asaas_status: payment?.status || nextStatus || preReg.asaas_status || null,
+          asaas_invoice_url: payment?.invoiceUrl || preReg.asaas_invoice_url || null,
+          asaas_bank_slip_url: payment?.bankSlipUrl || preReg.asaas_bank_slip_url || null,
+          payment_amount: payment?.value ?? preReg.payment_amount,
+          payment_due_date: payment?.dueDate || preReg.payment_due_date,
+        })
         .eq('id', preReg.id);
 
+      // 6. Se o pagamento foi confirmado, acionar o serviço de domínio para ativação
       if (isPaid && preReg.user_id) {
-        const planSlug = String(preReg.plan || 'basic').toLowerCase();
-        const { data: planRow } = await supabase
-          .from('subscription_plans')
-          .select('id, slug, name')
-          .eq('slug', planSlug)
-          .maybeSingle();
+        const subscriptionService = new SubscriptionService();
 
-        const planFinal = planRow?.slug || planSlug || 'basic';
-        const now = new Date();
-        const subEndDate = new Date();
-        subEndDate.setDate(subEndDate.getDate() + 30);
-        const subEndDateISO = subEndDate.toISOString();
+        const activationResult = await subscriptionService.activateFromPreRegistration(
+          supabase,
+          preReg,
+          30 // vigência padrão do Trial: 30 dias
+        );
 
-        const { data: existingMinistry } = await supabase
-          .from('ministries')
-          .select('id')
-          .eq('user_id', preReg.user_id)
-          .maybeSingle();
-
-        let ministryId = existingMinistry?.id || null;
-
-        if (!ministryId) {
-          const { data: ministry, error: ministryError } = await supabase
-            .from('ministries')
-            .insert({
-              user_id: preReg.user_id,
-              name: upperText(preReg.ministry_name) || 'MINISTERIO',
-              slug: buildSlug(preReg.ministry_name || 'ministerio'),
-              email_admin: lowerText(preReg.email),
-              cnpj_cpf: onlyDigits(preReg.cpf_cnpj),
-              phone: onlyDigits(preReg.phone),
-              whatsapp: onlyDigits(preReg.whatsapp),
-              website: lowerText(preReg.website),
-              description: upperText(preReg.description),
-              plan: planFinal,
-              subscription_plan_id: planRow?.id || null,
-              subscription_status: 'active',
-              subscription_start_date: now.toISOString(),
-              subscription_end_date: subEndDateISO,
-              is_active: true,
-              address_street: upperText(preReg.address_street),
-              address_number: upperText(preReg.address_number),
-              address_complement: upperText(preReg.address_complement),
-              address_city: upperText(preReg.address_city),
-              address_state: upperText(preReg.address_state),
-              address_zip: onlyDigits(preReg.address_zip),
-              asaas_customer_id: preReg.asaas_customer_id || null,
-            })
-            .select('id')
-            .single();
-
-          if (ministryError) {
-            throw new Error(ministryError.message);
-          }
-
-          ministryId = ministry?.id || null;
-        } else {
-          await supabase
-            .from('ministries')
-            .update({
-              plan: planFinal,
-              subscription_plan_id: planRow?.id || null,
-              subscription_status: 'active',
-              subscription_start_date: now.toISOString(),
-              subscription_end_date: subEndDateISO,
-              is_active: true,
-            })
-            .eq('id', ministryId);
-        }
-
-        if (ministryId) {
-          const { data: existingLink } = await supabase
-            .from('ministry_users')
-            .select('id')
-            .eq('ministry_id', ministryId)
-            .eq('user_id', preReg.user_id)
-            .maybeSingle();
-
-          if (!existingLink) {
-            await supabase
-              .from('ministry_users')
-              .insert({
-                ministry_id: ministryId,
-                user_id: preReg.user_id,
-                role: 'admin',
-                is_active: true,
-              });
-          }
-        }
-
-        if (preReg.status !== 'efetivado') {
-          await supabase
-            .from('pre_registrations')
-            .update({ status: 'efetivado' })
-            .eq('id', preReg.id);
+        // Notificação interna admin (responsabilidade de auditoria/notificação do webhook)
+        if (activationResult.hasPreRegUpdated) {
+          const planFinal = String(preReg.plan || 'basic').toLowerCase();
 
           await supabase
             .from('admin_notifications')
@@ -254,6 +161,7 @@ export async function POST(request: NextRequest) {
               created_at: new Date().toISOString(),
             });
 
+          // Envio de email de liberação de acesso (responsabilidade de notificação do webhook)
           const resendKey = process.env.RESEND_API_KEY;
           const resendFrom = process.env.RESEND_FROM || 'noreply@gestaoeklesia.com.br';
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -326,6 +234,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 7. Registrar evento como processado com sucesso (log de auditoria do webhook)
     if (webhookEvent?.id) {
       await supabase
         .from('asaas_webhook_events')
