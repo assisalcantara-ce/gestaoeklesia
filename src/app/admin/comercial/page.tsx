@@ -8,6 +8,7 @@ import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import AdminSidebar from '@/components/AdminSidebar'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
+import CrmMyDayCard from '@/components/crm/CrmMyDayCard'
 import CrmSummaryCards from '@/components/crm/CrmSummaryCards'
 import CrmNextActions from '@/components/crm/CrmNextActions'
 import CrmTimeline from '@/components/crm/CrmTimeline'
@@ -248,6 +249,8 @@ export default function ComercialDashboardPage() {
         {/* Content Area */}
         <div className="p-6 space-y-8">
           
+          {/* O Card "Meu Dia" como primeiro elemento visual */}
+          <CrmMyDayCard />
           <CrmSummaryCards />
           <CrmNextActions />
           <CrmTimeline />
