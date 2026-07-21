@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { authenticatedFetch } from '@/lib/api-client';
 import { X, User, Clock, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { CrmActivityData } from './CrmActivities';
+import CrmTimeline from './CrmTimeline';
 
 export interface CrmNextActionItem {
   id: string;
@@ -143,6 +144,12 @@ export default function CrmActivityDrawer({ activity, onClose }: CrmActivityDraw
                   {new Date(activity.ultimaAtualizacao).toLocaleString('pt-BR')}
                 </span>
               </div>
+            </div>
+
+            {/* Histórico Comercial (Timeline) */}
+            <div className="pt-2">
+              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">Histórico Comercial</span>
+              <CrmTimeline ministryId={activity.id} />
             </div>
 
           </div>
