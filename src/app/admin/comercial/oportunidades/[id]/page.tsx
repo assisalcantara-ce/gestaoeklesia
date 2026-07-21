@@ -773,10 +773,12 @@ export default function OportunidadePerfilPage() {
                 
                 {/* Abas */}
                 <div className="border-b border-gray-850/80 bg-gray-950/60 px-4 py-2 flex items-center justify-between gap-1.5 shrink-0 overflow-x-auto">
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-1.5" role="tablist" aria-label="Abas de navegação da oportunidade">
                     {(['resumo', 'interacoes', 'timeline', 'financeiro', 'documentos'] as const).map((tab) => (
                       <button
                         key={tab}
+                        role="tab"
+                        aria-selected={activeTab === tab}
                         onClick={() => setActiveTab(tab)}
                         className={`px-4 py-2 rounded-xl text-xs font-bold transition capitalize cursor-pointer outline-none ${
                           activeTab === tab
@@ -792,6 +794,7 @@ export default function OportunidadePerfilPage() {
                   {activeTab === 'interacoes' && !loadingInteractions && !interactionsError && (
                     <button
                       onClick={() => setIsModalOpen(true)}
+                      aria-label="Registrar nova interação"
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-650 hover:bg-blue-600 border border-blue-700/30 text-white rounded-xl text-xs font-bold cursor-pointer transition select-none mr-2 outline-none focus:ring-1 focus:ring-blue-650"
                     >
                       <Plus className="h-3.5 w-3.5" />
