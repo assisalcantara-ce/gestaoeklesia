@@ -218,10 +218,135 @@ export class CrmService {
 
   /**
    * Retorna a linha do tempo comercial (histórico) de um determinado lead ou cliente.
+   * Une eventos cadastrais, comerciais e financeiros do Supabase em uma ordenação cronológica decrescente.
    */
-  async getTimeline(_supabase: SupabaseClient, _id: string): Promise<CrmTimelineItem[]> {
-    return [];
+  async getTimeline(supabase: SupabaseClient, id: string): Promise<CrmTimelineItem[]> {
+    const timeline: CrmTimelineItem[] = [];
+
+    // 1. Localizar pre_registration
+    let preReg: any = null;
+    const { data: preRegDirect } = await supabase
+      .from('pre_registrations')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (preRegDirect) {
+      preReg = preRegDirect;
+    }
+
+    // 2. Localizar ministry
+    let ministry: any = null;
+    if (preRegDirect?.user_id) {
+      const { data: minData } = await supabase
+        .from('ministries')
+        .select('*')
+        .eq('user_id', preRegDirect.user_id)
+        .maybeSingle();
+      ministry = minData;
+    } else {
+      const { data: minDirect } = await supabase
+        .from('ministries')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (minDirect) {
+        ministry = minDirect;
+        // Se achou ministério, tenta achar preReg pelo user_id do ministério
+        if (minDirect.user_id) {
+          const { data: preRegData } = await supabase
+            .from('pre_registrations')
+            .select('*')
+            .eq('user_id', minDirect.user_id)
+            .maybeSingle();
+          preReg = preRegData;
+        }
+      }
+    }
+
+    const preRegId = preReg?.id || id;
+    const ministryId = ministry?.id || null;
+
+    // 3. Consultar Histórico do CRM (oportunidades_comerciais_historico)
+    const { data: crmHistory } = await supabase
+      .from('oportunidades_comerciais_historico')
+      .select('*')
+      .eq('oportunidade_id', preRegId);
+
+    // 4. Consultar Faturas de faturamento (platform_billing_invoices)
+    let invoices: any[] = [];
+    if (ministryId) {
+      const { data: minInvoices } = await supabase
+        .from('platform_billing_invoices')
+        .select('*')
+        .eq('ministry_id', ministryId);
+      invoices = minInvoices || [];
+    }
+
+    // -- MAPEAR EVENTOS --
+
+    // A. Evento de Criação do Lead
+    if (preReg) {
+      timeline.push({
+        id: `pr_create_${preReg.id}`,
+        data: preReg.created_at,
+        evento: 'Lead Criado',
+        usuario: 'Sistema',
+        descricao: `Pré-cadastro experimental no plano "${preReg.plan || 'starter'}" registrado com sucesso.`
+      });
+    }
+
+    // B. Evento de Ativação do Ministério
+    if (ministry) {
+      timeline.push({
+        id: `min_active_${ministry.id}`,
+        data: ministry.subscription_start_date || ministry.created_at,
+        evento: 'Assinatura Ativada',
+        usuario: 'Sistema/Administrador',
+        descricao: `Ministério "${ministry.name}" ativado com vigência comercial até ${new Date(ministry.subscription_end_date).toLocaleDateString('pt-BR')}.`
+      });
+    }
+
+    // C. Eventos de Histórico Comercial do CRM
+    if (crmHistory) {
+      crmHistory.forEach((h: any) => {
+        timeline.push({
+          id: `crm_hist_${h.id}`,
+          data: h.created_at,
+          evento: `Funil: ${h.status_anterior} ➔ ${h.status_novo}`,
+          usuario: h.usuario || 'Sistema',
+          descricao: h.observacao || 'Transição de status efetuada.'
+        });
+      });
+    }
+
+    // D. Eventos de Faturamento
+    invoices.forEach((inv: any) => {
+      // Evento de Emissão
+      timeline.push({
+        id: `inv_create_${inv.id}`,
+        data: inv.created_at,
+        evento: 'Fatura Emitida',
+        usuario: 'Sistema/Billing',
+        descricao: `Cobrança de R$ ${Number(inv.amount).toFixed(2).replace('.', ',')} gerada com vencimento para ${new Date(inv.due_date).toLocaleDateString('pt-BR')}.`
+      });
+
+      // Evento de Compensação (se paga)
+      if (inv.status === 'paid' && inv.updated_at) {
+        timeline.push({
+          id: `inv_paid_${inv.id}`,
+          data: inv.updated_at,
+          evento: 'Fatura Compensada',
+          usuario: 'Gateway/Asaas',
+          descricao: `Pagamento compensado com sucesso. Assinatura confirmada.`
+        });
+      }
+    });
+
+    // Ordenação cronológica decrescente (mais recente primeiro)
+    return timeline.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
   }
+
 
   /**
    * Retorna a lista de atividades executadas no CRM para um cliente.
