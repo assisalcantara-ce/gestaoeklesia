@@ -424,11 +424,91 @@ export class CrmService {
 
 
   /**
-   * Retorna as próximas ações planejadas para um lead ou negociação comercial.
+   * Retorna as próximas ações planejadas para um lead ou negociação comercial com base no Lifecycle.
+   * Filtra, mapeia tarefas operacionais e ordena por prioridade, data de vencimento e nome.
    */
-  async getNextActions(_supabase: SupabaseClient, _id: string): Promise<CrmNextAction[]> {
-    return [];
+  async getNextActions(supabase: SupabaseClient, id?: string): Promise<CrmNextAction[]> {
+    const commercialService = new CommercialService();
+    const list = await commercialService.list(supabase);
+
+    const actions: CrmNextAction[] = [];
+
+    list.forEach(item => {
+      // Filtrar opcionalmente por ID de cliente se fornecido
+      if (id && item.id !== id) {
+        return;
+      }
+
+      const status = item.lifecycle.status;
+      let acao = '';
+      let prioridade: 'alta' | 'media' | 'baixa' = 'media';
+      let vencimentoDate = new Date();
+
+      if (status === 'NEGOTIATION') {
+        acao = 'Realizar follow-up';
+        prioridade = 'alta';
+        const lastRef = item.ultimaInteracao ? new Date(item.ultimaInteracao) : new Date(item.created_at);
+        vencimentoDate = new Date(lastRef.getTime() + 3 * 24 * 60 * 60 * 1000);
+      } else if (status === 'TRIAL_EXPIRING') {
+        acao = 'Entrar em contato antes do fim do trial';
+        prioridade = 'alta';
+        const daysLeft = item.daysRemaining || 3;
+        vencimentoDate = new Date(Date.now() + daysLeft * 24 * 60 * 60 * 1000);
+      } else if (status === 'PAYMENT_PENDING') {
+        acao = 'Cobrar pagamento';
+        prioridade = 'alta';
+        vencimentoDate = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000); // 1 dia útil para cobrança
+      } else if (status === 'RENEWAL') {
+        acao = 'Iniciar renovação';
+        prioridade = 'media';
+        const daysLeft = item.daysRemaining || 30;
+        vencimentoDate = new Date(Date.now() + daysLeft * 24 * 60 * 60 * 1000);
+      } else if (status === 'LEAD') {
+        acao = 'Primeiro contato';
+        prioridade = 'media';
+        const lastRef = new Date(item.created_at);
+        vencimentoDate = new Date(lastRef.getTime() + 1 * 24 * 60 * 60 * 1000);
+      } else {
+        // Ignora status que não exigem ações comerciais pendentes (ACTIVE, CANCELED, TRIAL_EXPIRED)
+        return;
+      }
+
+      actions.push({
+        id: `action_${item.id}_${status.toLowerCase()}`,
+        oportunidadeId: item.id,
+        ministryId: item.origem === 'ministries' ? item.id : null,
+        nome: item.nome,
+        acao,
+        prioridade,
+        vencimento: vencimentoDate.toISOString(),
+        lifecycle: item.lifecycle,
+        descricao: `${acao} para o cliente ${item.nome}.`,
+        dataPrevista: vencimentoDate.toISOString()
+      });
+    });
+
+    // Ordenação:
+    // 1. Prioridade (Alta primeiro)
+    // 2. Data de Vencimento (Mais próxima/antiga primeiro)
+    // 3. Nome (Alfabético)
+    return actions.sort((a, b) => {
+      // Prioridade weight
+      const weightA = a.prioridade === 'alta' ? 3 : a.prioridade === 'media' ? 2 : 1;
+      const weightB = b.prioridade === 'alta' ? 3 : b.prioridade === 'media' ? 2 : 1;
+
+      if (weightB !== weightA) {
+        return weightB - weightA;
+      }
+
+      // Vencimento
+      const timeA = new Date(a.vencimento).getTime();
+      const timeB = new Date(b.vencimento).getTime();
+      if (timeA !== timeB) {
+        return timeA - timeB;
+      }
+
+      // Nome
+      return a.nome.localeCompare(b.nome);
+    });
   }
-
 }
-

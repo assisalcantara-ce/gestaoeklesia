@@ -1,3 +1,5 @@
+import { LifecycleResult } from '../lifecycle/types'
+
 export interface OportunidadeComercial {
   id: string
   ministry_id: string
@@ -52,10 +54,16 @@ export interface CrmTimelineItem {
 export interface CrmNextAction {
   id: string;
   oportunidadeId: string;
-  descricao: string;
-  dataPrevista: string;
+  ministryId: string | null;
+  nome: string;
+  acao: string;
   prioridade: 'baixa' | 'media' | 'alta' | string;
+  vencimento: string;
+  lifecycle: LifecycleResult;
+  descricao?: string;
+  dataPrevista?: string;
 }
+
 
 export interface CrmSummary {
   totalLeads: number;
