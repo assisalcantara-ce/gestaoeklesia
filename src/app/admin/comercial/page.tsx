@@ -8,6 +8,7 @@ import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import AdminSidebar from '@/components/AdminSidebar'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
+import CrmSummaryCards from '@/components/crm/CrmSummaryCards'
 import {
   Briefcase,
   TrendingUp,
@@ -243,6 +244,8 @@ export default function ComercialDashboardPage() {
 
         {/* Content Area */}
         <div className="p-6 space-y-8">
+          
+          <CrmSummaryCards />
           
           {/* MENU COMERCIAL */}
           <div className="flex flex-wrap gap-2 border-b border-gray-800 pb-4">
