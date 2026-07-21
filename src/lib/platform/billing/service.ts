@@ -17,17 +17,17 @@ export class BillingService {
   }
 
   /**
-   * Gera uma cobrança completa no gateway Asaas e persiste a fatura local.
+   * Gera uma cobrança completa no gateway Asaas e persiste a fatura local (se persistLocal for true).
    * Encapsula: ensureAsaasCustomer, createAsaasPayment, cálculo de datas e persistência.
    */
   async generateInvoice(
     supabaseAdmin: SupabaseClient,
     input: GenerateInvoiceInput
   ): Promise<GenerateInvoiceResult> {
-    const { ministry, plan, validityMonths, dueDays = INVOICE_DUE_DAYS, externalReference } = input
+    const { ministry, plan, validityMonths, dueDays = INVOICE_DUE_DAYS, externalReference, persistLocal = true } = input
 
     // 1. Garantir que o cliente existe no Asaas (cria se necessário)
-    const asaasCustomerId = await this.resolveAsaasCustomer(supabaseAdmin, ministry)
+    const asaasCustomerId = await this.resolveAsaasCustomer(supabaseAdmin, ministry, persistLocal)
 
     // 2. Calcular datas
     const { startDate, endDate, dueDateStr } = this.calculateBillingDates(validityMonths, dueDays)
@@ -42,18 +42,22 @@ export class BillingService {
       externalReference
     })
 
-    // 4. Persistir fatura localmente em platform_billing_invoices
-    const invoiceId = await this.persistLocalInvoice(supabaseAdmin, {
-      ministry_id: ministry.id,
-      plano_slug: plan.slug,
-      subscription_plan_id: plan.id,
-      amount: plan.price_monthly,
-      asaas_payment_id: paymentResult.id,
-      asaas_invoice_url: paymentResult.invoiceUrl || null,
-      period_start: startDate.toISOString(),
-      period_end: endDate.toISOString(),
-      due_date: dueDateStr
-    })
+    let invoiceId: string | null = null
+
+    // 4. Persistir fatura localmente apenas se persistLocal for true
+    if (persistLocal) {
+      invoiceId = await this.persistLocalInvoice(supabaseAdmin, {
+        ministry_id: ministry.id,
+        plano_slug: plan.slug,
+        subscription_plan_id: plan.id,
+        amount: plan.price_monthly,
+        asaas_payment_id: paymentResult.id,
+        asaas_invoice_url: paymentResult.invoiceUrl || null,
+        period_start: startDate.toISOString(),
+        period_end: endDate.toISOString(),
+        due_date: dueDateStr
+      })
+    }
 
     return {
       success: true,
@@ -69,7 +73,8 @@ export class BillingService {
 
   private async resolveAsaasCustomer(
     supabaseAdmin: SupabaseClient,
-    ministry: GenerateInvoiceInput['ministry']
+    ministry: GenerateInvoiceInput['ministry'],
+    persistLocal: boolean
   ): Promise<string> {
     const asaasCustomerId = await ensureAsaasCustomer(supabaseAdmin, {
       id: ministry.id,
@@ -84,8 +89,8 @@ export class BillingService {
       throw new Error('Erro ao criar/identificar cliente Asaas')
     }
 
-    // Sincroniza o customer_id se foi criado agora
-    if (asaasCustomerId !== ministry.asaas_customer_id) {
+    // Sincroniza o customer_id localmente apenas se não for checkout provisório
+    if (persistLocal && asaasCustomerId !== ministry.asaas_customer_id) {
       await supabaseAdmin
         .from('ministries')
         .update({ asaas_customer_id: asaasCustomerId })
@@ -94,6 +99,7 @@ export class BillingService {
 
     return asaasCustomerId
   }
+
 
   private calculateBillingDates(
     validityMonths: number,

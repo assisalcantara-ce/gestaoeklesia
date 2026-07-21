@@ -41,3 +41,23 @@ export interface ActivateTrialResult {
   success: boolean
   lead: TrialLeadData
 }
+
+export interface PrepareCheckoutInput {
+  userId: string
+  planId?: string
+  planSlug?: string
+}
+
+export interface PrepareCheckoutResult {
+  preReg: any
+  planRow: any
+  planPrice: number
+  existingPayment?: {
+    status: string
+    invoice_url: string | null
+    bank_slip_url: string | null
+    due_date: string | null
+    amount: number
+  } | null
+}
+

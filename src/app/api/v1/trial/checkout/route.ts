@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-import { createAsaasCustomer, findAsaasCustomer, createAsaasPayment, getAsaasPayment } from '@/lib/asaas'
+import { TrialService, BillingService, TrialError } from '@/lib/platform'
 
 const onlyDigits = (value?: string | null) => (value ? String(value).replace(/\D/g, '') : '')
 
-const formatDate = (date: Date) => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 export async function POST(request: NextRequest) {
   try {
+    // 1. Validar autenticação (responsabilidade da rota)
     const authHeader = request.headers.get('Authorization') || request.headers.get('authorization') || ''
     const token = authHeader.replace(/^Bearer\s+/i, '').trim()
 
@@ -39,151 +33,65 @@ export async function POST(request: NextRequest) {
     const planId = String(body?.plan_id || body?.planId || '').trim()
     const planSlug = String(body?.plan_slug || body?.planSlug || '').trim()
 
-    if (!planId && !planSlug) {
-      return NextResponse.json({ error: 'Plano obrigatorio' }, { status: 400 })
-    }
-
-    const { data: preReg, error: preRegError } = await supabaseAdmin
-      .from('pre_registrations')
-      .select('*')
-      .eq('user_id', authData.user.id)
-      .maybeSingle()
-
-    if (preRegError || !preReg) {
-      return NextResponse.json({ error: 'Pre-cadastro nao encontrado' }, { status: 404 })
-    }
-
-    // Usuário que já assinou (pagamento confirmado via webhook) não precisa gerar novo boleto
-    if (preReg.status === 'efetivado') {
-      return NextResponse.json({ error: 'Assinatura ja efetivada para este cadastro' }, { status: 409 })
-    }
-
-    let planRow: any = null
-    if (planId) {
-      const { data } = await supabaseAdmin
-        .from('subscription_plans')
-        .select('id,name,slug,price_monthly')
-        .eq('id', planId)
-        .eq('is_active', true)
-        .maybeSingle()
-      planRow = data
-    }
-
-    if (!planRow && planSlug) {
-      const { data } = await supabaseAdmin
-        .from('subscription_plans')
-        .select('id,name,slug,price_monthly')
-        .eq('slug', planSlug)
-        .eq('is_active', true)
-        .maybeSingle()
-      planRow = data
-    }
-
-    if (!planRow?.id) {
-      return NextResponse.json({ error: 'Plano nao encontrado' }, { status: 404 })
-    }
-
-    const planPrice = Number(planRow.price_monthly || 0)
-    if (!Number.isFinite(planPrice) || planPrice <= 0) {
-      return NextResponse.json({ error: 'Plano sem valor mensal valido' }, { status: 400 })
-    }
-
-    if (preReg.asaas_payment_id) {
-      try {
-        const payment = await getAsaasPayment(preReg.asaas_payment_id)
-        const nextStatus = String(payment.status || '').trim()
-
-        await supabaseAdmin
-          .from('pre_registrations')
-          .update({
-            asaas_status: nextStatus || preReg.asaas_status,
-            asaas_invoice_url: payment.invoiceUrl || preReg.asaas_invoice_url,
-            asaas_bank_slip_url: payment.bankSlipUrl || preReg.asaas_bank_slip_url,
-            payment_amount: payment.value ?? preReg.payment_amount,
-            payment_due_date: payment.dueDate || preReg.payment_due_date,
-          })
-          .eq('id', preReg.id)
-
-        return NextResponse.json({
-          success: true,
-          existing: true,
-          payment: {
-            status: nextStatus,
-            invoice_url: payment.invoiceUrl || null,
-            bank_slip_url: payment.bankSlipUrl || null,
-            due_date: payment.dueDate || null,
-            amount: payment.value || planPrice,
-          }
-        })
-      } catch {
-        // se falhar, tentamos gerar um novo boleto
-      }
-    }
-
-    let customerId = preReg.asaas_customer_id || ''
-    if (!customerId) {
-      const existing = await findAsaasCustomer({
-        cpfCnpj: onlyDigits(preReg.cpf_cnpj) || null,
-        email: preReg.email || null,
-      })
-
-      if (existing?.id) {
-        customerId = existing.id
-      } else {
-        const customer = await createAsaasCustomer({
-          name: preReg.ministry_name || preReg.pastor_name || 'Ministerio',
-          email: preReg.email || `no-email-${preReg.id}@gestaoeklesia.local`,
-          cpfCnpj: onlyDigits(preReg.cpf_cnpj) || null,
-          phone: onlyDigits(preReg.phone) || null,
-          mobilePhone: onlyDigits(preReg.whatsapp) || null,
-          address: preReg.address_street || null,
-          addressNumber: preReg.address_number || null,
-          complement: preReg.address_complement || null,
-          province: preReg.address_neighborhood || preReg.address_city || null,
-          postalCode: onlyDigits(preReg.address_zip) || null,
-        })
-        customerId = customer.id
-      }
-
-      if (customerId) {
-        await supabaseAdmin
-          .from('pre_registrations')
-          .update({ asaas_customer_id: customerId })
-          .eq('id', preReg.id)
-      }
-    }
-
-    if (!customerId) {
-      return NextResponse.json({ error: 'Nao foi possivel criar cliente no Asaas' }, { status: 400 })
-    }
-
-    const dueDate = new Date()
-    dueDate.setDate(dueDate.getDate() + 3)
-
-    const payment = await createAsaasPayment({
-      customer: customerId,
-      value: planPrice,
-      dueDate: formatDate(dueDate),
-      description: `${preReg.ministry_name} - Plano ${planRow.name}`,
-      billingType: 'BOLETO',
-      externalReference: `pre-${preReg.id}`,
+    // 2. TrialService: Preparar checkout (valida preReg, status, planos e pagamento existente)
+    const trialService = new TrialService()
+    const checkoutContext = await trialService.prepareCheckout(supabaseAdmin, {
+      userId: authData.user.id,
+      planId,
+      planSlug
     })
 
+    const { preReg, planRow, planPrice, existingPayment } = checkoutContext
+
+    // Se já existia uma cobrança ativa e válida no Asaas, ela já foi atualizada e retornada pelo serviço
+    if (existingPayment) {
+      return NextResponse.json({
+        success: true,
+        existing: true,
+        payment: existingPayment
+      })
+    }
+
+    // 3. BillingService: Gerar cobrança no gateway (com persistLocal: false por ser lead temporário)
+    const billingService = new BillingService()
+    const invoiceResult = await billingService.generateInvoice(supabaseAdmin, {
+      ministry: {
+        id: preReg.id, // provisoriamente passamos o id de pre_registrations
+        name: preReg.ministry_name || preReg.pastor_name || 'Ministerio',
+        cnpj_cpf: onlyDigits(preReg.cpf_cnpj) || null,
+        phone: onlyDigits(preReg.phone) || null,
+        email_admin: preReg.email || null,
+        asaas_customer_id: preReg.asaas_customer_id || null
+      },
+      plan: {
+        id: planRow.id,
+        slug: planRow.slug,
+        name: planRow.name,
+        price_monthly: planPrice
+      },
+      validityMonths: 1, // checkout padrão do trial
+      dueDays: 3, // vencimento em 3 dias
+      externalReference: `pre-${preReg.id}`,
+      persistLocal: false // impede inserção em platform_billing_invoices (not-null ministry_id)
+    })
+
+    // 4. Salvar informações do boleto em pre_registrations
     await supabaseAdmin
       .from('pre_registrations')
       .update({
         plan: planRow.slug,
-        asaas_payment_id: payment.id,
-        asaas_status: payment.status || 'PENDING',
-        asaas_invoice_url: payment.invoiceUrl || null,
-        asaas_bank_slip_url: payment.bankSlipUrl || null,
+        asaas_payment_id: invoiceResult.asaasPaymentId,
+        asaas_status: 'PENDING',
+        asaas_invoice_url: invoiceResult.invoiceUrl || null,
+        asaas_bank_slip_url: invoiceResult.bankSlipUrl || null,
         payment_amount: planPrice,
-        payment_due_date: payment.dueDate || formatDate(dueDate),
+        payment_due_date: invoiceResult.dueDate,
         boleto_sent_at: new Date().toISOString(),
       })
       .eq('id', preReg.id)
 
-    const boletoUrl = payment.bankSlipUrl || payment.invoiceUrl || ''
+    // 5. Enviar e-mail de aviso com o boleto via Resend (se configurado)
+    const boletoUrl = invoiceResult.bankSlipUrl || invoiceResult.invoiceUrl || ''
     const resendKey = process.env.RESEND_API_KEY
     const resendFrom = process.env.RESEND_FROM || 'noreply@gestaoeklesia.com.br'
 
@@ -217,7 +125,7 @@ export async function POST(request: NextRequest) {
                           </p>
                           <div style="background:#f3f4f1;border-radius:12px;padding:16px;margin-bottom:16px;">
                             <p style="margin:0 0 6px;font-size:14px;color:#1f1b16;"><strong>Valor:</strong> R$ ${planPrice.toFixed(2).replace('.', ',')}</p>
-                            <p style="margin:0;font-size:13px;color:#5f6b66;">Vencimento: ${new Date(payment.dueDate || dueDate).toLocaleDateString('pt-BR')}</p>
+                            <p style="margin:0;font-size:13px;color:#5f6b66;">Vencimento: ${new Date(invoiceResult.dueDate).toLocaleDateString('pt-BR')}</p>
                           </div>
                           ${boletoUrl ? `<a href="${boletoUrl}" style="display:inline-block;background:#0f766e;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:bold;">Abrir boleto</a>` : ''}
                           <p style="margin:16px 0 0;font-size:12px;color:#5f6b66;">Se precisar de ajuda, fale com nosso suporte.</p>
@@ -253,14 +161,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       payment: {
-        status: payment.status,
-        invoice_url: payment.invoiceUrl || null,
-        bank_slip_url: payment.bankSlipUrl || null,
-        due_date: payment.dueDate || formatDate(dueDate),
+        status: 'PENDING',
+        invoice_url: invoiceResult.invoiceUrl || null,
+        bank_slip_url: invoiceResult.bankSlipUrl || null,
+        due_date: invoiceResult.dueDate,
         amount: planPrice,
       }
     })
   } catch (error: any) {
+    if (error instanceof TrialError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
     return NextResponse.json(
       { error: error?.message || 'Erro ao gerar boleto' },
       { status: 500 }

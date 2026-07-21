@@ -43,12 +43,14 @@ export interface GenerateInvoiceInput {
   dueDays?: number
   /** Referência externa para rastreamento no gateway (ex: id da oportunidade) */
   externalReference?: string
+  /** Se deve persistir a fatura localmente em platform_billing_invoices (padrão: true) */
+  persistLocal?: boolean
 }
 
 export interface GenerateInvoiceResult {
   success: boolean
-  /** ID local da fatura criada em platform_billing_invoices */
-  invoiceId: string
+  /** ID local da fatura criada em platform_billing_invoices (nulo se persistLocal=false) */
+  invoiceId: string | null
   /** ID da cobrança criada no gateway Asaas */
   asaasPaymentId: string
   /** URL da fatura para visualização do cliente */

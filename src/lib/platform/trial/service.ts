@@ -1,7 +1,81 @@
 import { SupabaseClient } from '@supabase/supabase-js'
-import { TrialStatusResponse, ActivateTrialResult } from './types'
+import { getAsaasPayment } from '@/lib/asaas'
+import { TrialStatusResponse, ActivateTrialResult, PrepareCheckoutInput, PrepareCheckoutResult } from './types'
 
 export class TrialService {
+  /**
+   * Prepara o contexto de checkout de um lead experimental (Trial).
+   * Valida elegibilidade do lead, localiza o plano comercial ativo e verifica se já existe uma cobrança no Asaas.
+   */
+  async prepareCheckout(
+    supabaseAdmin: SupabaseClient,
+    input: PrepareCheckoutInput
+  ): Promise<PrepareCheckoutResult> {
+    const { userId, planId, planSlug } = input
+
+    if (!planId && !planSlug) {
+      throw new TrialError('Plano obrigatorio', 400)
+    }
+
+    // 1. Carregar pré-cadastro por user_id
+    const preReg = await this.findPreRegistrationByUserFull(supabaseAdmin, userId)
+    if (!preReg) {
+      throw new TrialError('Pre-cadastro nao encontrado', 404)
+    }
+
+    // 2. Validar situação do trial (se já está efetivado, rejeita)
+    if (preReg.status === 'efetivado') {
+      throw new TrialError('Assinatura ja efetivada para este cadastro', 409)
+    }
+
+    // 3. Localizar plano comercial solicitado
+    const planRow = await this.findActivePlan(supabaseAdmin, planId, planSlug)
+    if (!planRow?.id) {
+      throw new TrialError('Plano nao encontrado', 404)
+    }
+
+    const planPrice = Number(planRow.price_monthly || 0)
+    if (!Number.isFinite(planPrice) || planPrice <= 0) {
+      throw new TrialError('Plano sem valor mensal valido', 400)
+    }
+
+    // 4. Se já existir um pagamento registrado, tentar sincronizá-lo e devolvê-lo
+    if (preReg.asaas_payment_id) {
+      try {
+        const payment = await getAsaasPayment(preReg.asaas_payment_id)
+        const nextStatus = String(payment.status || '').trim()
+
+        await supabaseAdmin
+          .from('pre_registrations')
+          .update({
+            asaas_status: nextStatus || preReg.asaas_status,
+            asaas_invoice_url: payment.invoiceUrl || preReg.asaas_invoice_url,
+            asaas_bank_slip_url: payment.bankSlipUrl || preReg.asaas_bank_slip_url,
+            payment_amount: payment.value ?? preReg.payment_amount,
+            payment_due_date: payment.dueDate || preReg.payment_due_date,
+          })
+          .eq('id', preReg.id)
+
+        return {
+          preReg,
+          planRow,
+          planPrice,
+          existingPayment: {
+            status: nextStatus,
+            invoice_url: payment.invoiceUrl || null,
+            bank_slip_url: payment.bankSlipUrl || null,
+            due_date: payment.dueDate || null,
+            amount: payment.value || planPrice,
+          }
+        }
+      } catch {
+        // Se falhar na busca (ex: expirou ou erro), continua para gerar novo boleto
+      }
+    }
+
+    return { preReg, planRow, planPrice, existingPayment: null }
+  }
+
   /**
    * Retorna o status atual do trial de um usuário.
    * Verifica pre_registration + edge case de ativação manual pelo admin.
@@ -184,6 +258,46 @@ export class TrialService {
     }
 
     return data
+  }
+
+  private async findPreRegistrationByUserFull(
+    supabaseAdmin: SupabaseClient,
+    userId: string
+  ): Promise<any> {
+    const { data } = await supabaseAdmin
+      .from('pre_registrations')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle()
+    return data
+  }
+
+  private async findActivePlan(
+    supabaseAdmin: SupabaseClient,
+    planId?: string,
+    planSlug?: string
+  ): Promise<any> {
+    if (planId) {
+      const { data } = await supabaseAdmin
+        .from('subscription_plans')
+        .select('id, name, slug, price_monthly')
+        .eq('id', planId)
+        .eq('is_active', true)
+        .maybeSingle()
+      return data
+    }
+
+    if (planSlug) {
+      const { data } = await supabaseAdmin
+        .from('subscription_plans')
+        .select('id, name, slug, price_monthly')
+        .eq('slug', planSlug)
+        .eq('is_active', true)
+        .maybeSingle()
+      return data
+    }
+
+    return null
   }
 }
 
