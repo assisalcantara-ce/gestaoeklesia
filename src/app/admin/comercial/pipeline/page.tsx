@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import { authenticatedFetch } from '@/lib/api-client'
 import AdminSidebar from '@/components/AdminSidebar'
+import CrmActivityDrawer from '@/components/crm/CrmActivityDrawer'
 import {
   GitBranch,
   RefreshCw,
@@ -22,6 +23,7 @@ import {
   Clock,
   AlertTriangle,
   MessageSquare,
+  Loader2,
 } from 'lucide-react'
 import { CrmActivityData } from '@/components/crm/CrmActivities'
 
@@ -56,7 +58,6 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('pt-BR')
 }
 
-// Retorna se a data está estritamente no passado
 function isAtrasada(iso: string): boolean {
   const date = new Date(iso)
   const today = new Date()
@@ -64,14 +65,12 @@ function isAtrasada(iso: string): boolean {
   return date.getTime() < today.getTime()
 }
 
-// Retorna se a data é hoje
 function isHoje(iso: string): boolean {
   const date = new Date(iso).toLocaleDateString('pt-BR')
   const today = new Date().toLocaleDateString('pt-BR')
   return date === today
 }
 
-// Formatação de data relativa de última interação
 function formatRelativeDate(iso: string): string {
   if (!iso) return 'Sem registro'
   const date = new Date(iso)
@@ -89,7 +88,6 @@ function formatRelativeDate(iso: string): string {
   return `Há ${diffDays} dias`
 }
 
-// ─── Mapeamento de Lifecycle para as raias ────────────────────────────────────
 function mapLifecycleToKanbanKey(status?: string): string {
   if (!status) return 'lead'
   const s = status.toUpperCase().trim()
@@ -111,7 +109,6 @@ function mapLifecycleToKanbanKey(status?: string): string {
   return 'lead'
 }
 
-// ─── Badge de Prioridade ──────────────────────────────────────────────────────
 function PrioridadeBadge({ prioridade }: { prioridade: string }) {
   const styles: Record<string, string> = {
     alta:  'bg-rose-950/60 text-rose-400 border-rose-900/60',
@@ -129,7 +126,6 @@ function PrioridadeBadge({ prioridade }: { prioridade: string }) {
   )
 }
 
-// ─── Badge de Situação Financeira ─────────────────────────────────────────────
 function FinanceiroBadge({ status }: { status?: string }) {
   if (!status) return <span className="text-gray-500 font-semibold">Sem dados</span>
   const s = status.toLowerCase()
@@ -153,7 +149,6 @@ function FinanceiroBadge({ status }: { status?: string }) {
   )
 }
 
-// ─── Skeleton Loader das Colunas ──────────────────────────────────────────────
 function KanbanSkeleton() {
   return (
     <div className="flex-1 min-h-[450px] flex gap-4 overflow-x-auto pb-4">
@@ -190,6 +185,10 @@ export default function PipelinePage() {
   const [tableLoading, setTableLoading] = useState<boolean>(true)
   const [tableError, setTableError] = useState<string | null>(null)
 
+  // Estados do Drawer e Carregamento do Card
+  const [selectedActivity, setSelectedActivity] = useState<CrmActivityData | null>(null)
+  const [loadingCardId, setLoadingCardId] = useState<string | null>(null)
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/admin/login')
@@ -214,6 +213,23 @@ export default function PipelinePage() {
   useEffect(() => {
     if (isAuthenticated) fetchActivities()
   }, [isAuthenticated, fetchActivities])
+
+  const handleSuccess = useCallback(() => {
+    fetchActivities()
+  }, [fetchActivities])
+
+  // Abertura segura do Drawer
+  const handleCardClick = useCallback((act: CrmActivityData) => {
+    if (loadingCardId) return // Impede múltiplos cliques
+    setLoadingCardId(act.id)
+    
+    // Feedback visual sutil simulando carregamento/abertura
+    const t = setTimeout(() => {
+      setSelectedActivity(act)
+      setLoadingCardId(null)
+    }, 200)
+    return () => clearTimeout(t)
+  }, [loadingCardId])
 
   const kpis = useMemo(() => {
     const total = activities.length
@@ -475,19 +491,32 @@ export default function PipelinePage() {
                           const hoje = vencimento && isHoje(vencimento)
                           const isHighPrior = act.prioridade === 'alta'
                           const isConverted = (act.lifecycle?.status || act.status || '').toLowerCase() === 'active' || (act.lifecycle?.status || act.status || '').toLowerCase() === 'convertido'
-                          
+                          const isThisCardLoading = loadingCardId === act.id
+
                           return (
                             <div
                               key={act.id}
+                              onClick={() => handleCardClick(act)}
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  handleCardClick(act)
+                                }
+                              }}
                               className={`p-3.5 bg-gray-950 hover:bg-gray-900 border ${
                                 isHighPrior 
-                                  ? 'border-rose-900/50 hover:border-rose-800/60 shadow-[0_0_8px_rgba(244,63,94,0.04)]' 
+                                  ? 'border-rose-900/50 hover:border-rose-700/60 shadow-[0_0_8px_rgba(244,63,94,0.04)]' 
                                   : 'border-gray-850 hover:border-gray-800'
-                              } rounded-xl flex flex-col justify-between h-44 transition group cursor-pointer duration-200 select-none relative`}
+                              } rounded-xl flex flex-col justify-between h-44 transition group cursor-pointer duration-200 select-none relative focus:ring-1 focus:ring-blue-650 outline-none`}
+                              aria-label={`Oportunidade de ${act.nome}. Aperte Enter para abrir atendimento.`}
                             >
                               
                               {/* Indicadores no canto direito superior do card */}
                               <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5">
+                                {isThisCardLoading && (
+                                  <Loader2 className="h-3 w-3 text-blue-500 animate-spin shrink-0" />
+                                )}
                                 {isConverted && (
                                   <span className="w-2 h-2 bg-emerald-500 rounded-full" title="Cliente ativo" />
                                 )}
@@ -564,6 +593,13 @@ export default function PipelinePage() {
 
         </div>
       </main>
+
+      {/* ── DRAWER COMERCIAL REUTILIZADO ──────────────────────────────── */}
+      <CrmActivityDrawer
+        activity={selectedActivity}
+        onClose={() => setSelectedActivity(null)}
+        onSuccess={handleSuccess}
+      />
     </div>
   )
 }
