@@ -29,6 +29,9 @@ import {
   AlertTriangle,
   ArrowUp,
   ArrowDown,
+  ChevronLeft,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react'
 
 // ─── Tipos dos filtros ─────────────────────────────────────────────────────────
@@ -212,6 +215,10 @@ export default function OportunidadesPage() {
   const [sortField, setSortField] = useState<SortField>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>(null)
 
+  // ── Paginação ─────────────────────────────────────────────────────────────
+  const [pagina, setPagina] = useState<number>(1)
+  const [itensPorPagina, setItensPorPagina] = useState<number>(10)
+
   // ── Dados da tabela ────────────────────────────────────────────────────────
   const [activities, setActivities] = useState<CrmActivityData[]>([])
   const [tableLoading, setTableLoading] = useState<boolean>(true)
@@ -259,14 +266,13 @@ export default function OportunidadesPage() {
       
       setSortDirection((currentDir) => {
         if (currentDir === 'asc') return 'desc'
-        return null // Remove ordenação no 3º clique
+        return null
       })
       
       return field
     })
   }, [])
 
-  // Limpa o campo de ordenação se a direção foi resetada para null
   useEffect(() => {
     if (sortDirection === null) {
       setSortField(null)
@@ -279,7 +285,7 @@ export default function OportunidadesPage() {
     return (
       <th 
         onClick={() => handleSort(field)}
-        className="py-3 px-4 font-bold cursor-pointer hover:bg-gray-800 hover:text-white transition group select-none"
+        className="py-3 px-4 font-bold cursor-pointer hover:bg-gray-800 hover:text-white transition group select-none text-[10px] text-gray-500 uppercase tracking-wider"
       >
         <span className="flex items-center gap-1">
           {label}
@@ -293,10 +299,15 @@ export default function OportunidadesPage() {
     )
   }
 
+  // Resetar página sempre que qualquer filtro mudar
+  useEffect(() => {
+    setPagina(1)
+  }, [filtros])
+
   // ── Filtragem em memória (cumulativa) via useMemo ───────────────────────
   const filteredActivities = useMemo(() => {
     return activities.filter((act) => {
-      // 1. Pesquisa (ministério, email, telefone, responsável)
+      // 1. Pesquisa
       if (filtros.pesquisa) {
         const query = filtros.pesquisa.toLowerCase().trim()
         const matchNome = act.nome?.toLowerCase().includes(query)
@@ -332,7 +343,7 @@ export default function OportunidadesPage() {
         }
       }
 
-      // 5. Período (filtrar pela data da próxima ação)
+      // 5. Período
       if (filtros.periodoInicio || filtros.periodoFim) {
         const vencAction = act.nextAction?.vencimento
         if (!vencAction) return false
@@ -354,11 +365,10 @@ export default function OportunidadesPage() {
     })
   }, [activities, filtros])
 
-  // ── Ordenação final (Padrão ou Dinâmica) via useMemo ────────────────────
+  // ── Ordenação final via useMemo ─────────────────────────────────────────
   const sortedActivities = useMemo(() => {
     const list = [...filteredActivities]
 
-    // Se houver campo e direção definidos, aplica a ordenação dinâmica
     if (sortField && sortDirection) {
       const isAsc = sortDirection === 'asc'
 
@@ -390,7 +400,6 @@ export default function OportunidadesPage() {
           case 'nextAction':
             valA = a.nextAction ? new Date(a.nextAction.vencimento).getTime() : Infinity
             valB = b.nextAction ? new Date(b.nextAction.vencimento).getTime() : Infinity
-            // Deixa nulos ou infinitos sempre no final
             if (valA === Infinity && valB === Infinity) return 0
             if (valA === Infinity) return 1
             if (valB === Infinity) return -1
@@ -409,11 +418,6 @@ export default function OportunidadesPage() {
       return list
     }
 
-    // Ordenação padrão da central comercial:
-    // 1. Prioridade (alta → baixa)
-    // 2. Próxima ação vencida
-    // 3. Próxima ação mais próxima
-    // 4. Nome do ministério
     return list.sort((a, b) => {
       const wA = getPrioridadeWeight(a.prioridade)
       const wB = getPrioridadeWeight(b.prioridade)
@@ -431,7 +435,23 @@ export default function OportunidadesPage() {
     })
   }, [filteredActivities, sortField, sortDirection])
 
-  // ── Handlers dos filtros ───────────────────────────────────────────────────
+  // ── Paginação Local via useMemo ─────────────────────────────────────────
+  const totalItens = sortedActivities.length
+  const totalPaginas = Math.ceil(totalItens / itensPorPagina) || 1
+
+  // Garante que o indicador da página atual seja sempre válido após mudanças de filtro ou tamanho
+  const paginaCorreta = Math.min(pagina, totalPaginas)
+
+  const paginatedActivities = useMemo(() => {
+    const start = (paginaCorreta - 1) * itensPorPagina
+    const end = start + itensPorPagina
+    return sortedActivities.slice(start, end)
+  }, [sortedActivities, paginaCorreta, itensPorPagina])
+
+  const mostrarDe = totalItens === 0 ? 0 : (paginaCorreta - 1) * itensPorPagina + 1
+  const mostrarAte = Math.min(paginaCorreta * itensPorPagina, totalItens)
+
+  // Handlers dos filtros
   const handleChange = useCallback(
     (field: keyof OportunidadeFiltros) =>
       (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -442,10 +462,11 @@ export default function OportunidadesPage() {
     setFiltros(FILTROS_INICIAIS)
     setSortField(null)
     setSortDirection(null)
+    setPagina(1)
   }, [])
   const filtrosAtivos = hasFiltrosAtivos(filtros)
 
-  // ── Loading skeleton de autenticação ──────────────────────────────────────
+  // Skeleton de loading de autenticação
   if (isLoading || !isAuthenticated) {
     return (
       <div className="flex h-screen bg-gray-900">
@@ -665,7 +686,7 @@ export default function OportunidadesPage() {
               </div>
               {!tableLoading && !tableError && (
                 <span className="text-[10px] bg-gray-900 text-gray-400 border border-gray-800 font-semibold px-3 py-1 rounded-full">
-                  {sortedActivities.length} {sortedActivities.length === 1 ? 'registro' : 'registros'}
+                  {totalItens} {totalItens === 1 ? 'registro' : 'registros'}
                 </span>
               )}
             </div>
@@ -703,8 +724,8 @@ export default function OportunidadesPage() {
               </div>
             )}
 
-            {/* ── Empty state específico de filtros (Se houver registros na base mas a busca resultar em 0) ── */}
-            {!tableLoading && !tableError && activities.length > 0 && sortedActivities.length === 0 && (
+            {/* ── Empty state específico de filtros ── */}
+            {!tableLoading && !tableError && activities.length > 0 && totalItens === 0 && (
               <div className="flex flex-col items-center justify-center py-20 px-6 text-center space-y-4">
                 <div className="w-16 h-16 bg-gray-900 border border-gray-800 rounded-2xl flex items-center justify-center">
                   <Search className="h-7 w-7 text-gray-600" />
@@ -720,111 +741,161 @@ export default function OportunidadesPage() {
             )}
 
             {/* ── Tabela ── */}
-            {!tableLoading && !tableError && sortedActivities.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-800 text-[10px] text-gray-500 uppercase tracking-wider bg-gray-900/40">
-                      <HeaderCell field="nome" label="Ministério" />
-                      <HeaderCell field="lifecycle" label="Lifecycle" />
-                      <th className="py-3 px-4 font-bold">Plano</th>
-                      <HeaderCell field="responsavel" label="Responsável" />
-                      <th className="py-3 px-4 font-bold">Próxima Ação</th>
-                      <HeaderCell field="nextAction" label="Vencimento" />
-                      <HeaderCell field="dataCriacao" label="Data de Criação" />
-                      <HeaderCell field="prioridade" label="Prioridade" />
-                      <th className="py-3 px-4 font-bold">Situação Fin.</th>
-                      <th className="py-3 px-4 font-bold text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-800/60 text-xs text-gray-300">
-                    {sortedActivities.map((act) => {
-                      const vencimento = act.nextAction?.vencimento
-                      const vencidoHoje = vencimento && isVencido(vencimento)
+            {!tableLoading && !tableError && paginatedActivities.length > 0 && (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-800 bg-gray-900/40">
+                        <HeaderCell field="nome" label="Ministério" />
+                        <HeaderCell field="lifecycle" label="Lifecycle" />
+                        <th className="py-3 px-4 font-bold text-[10px] text-gray-500 uppercase tracking-wider">Plano</th>
+                        <HeaderCell field="responsavel" label="Responsável" />
+                        <th className="py-3 px-4 font-bold text-[10px] text-gray-500 uppercase tracking-wider">Próxima Ação</th>
+                        <HeaderCell field="nextAction" label="Vencimento" />
+                        <HeaderCell field="dataCriacao" label="Data de Criação" />
+                        <HeaderCell field="prioridade" label="Prioridade" />
+                        <th className="py-3 px-4 font-bold text-[10px] text-gray-500 uppercase tracking-wider">Situação Fin.</th>
+                        <th className="py-3 px-4 font-bold text-right text-[10px] text-gray-500 uppercase tracking-wider">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800/60 text-xs text-gray-300">
+                      {paginatedActivities.map((act) => {
+                        const vencimento = act.nextAction?.vencimento
+                        const vencidoHoje = vencimento && isVencido(vencimento)
 
-                      return (
-                        <tr
-                          key={act.id}
-                          className="hover:bg-gray-900/50 transition group"
-                        >
-                          {/* Ministério */}
-                          <td className="py-3.5 px-4">
-                            <p className="font-bold text-white group-hover:text-blue-400 transition">{act.nome}</p>
-                            {act.email && <p className="text-gray-600 text-[10px] mt-0.5 truncate max-w-[160px]">{act.email}</p>}
-                          </td>
-
-                          {/* Lifecycle */}
-                          <td className="py-3.5 px-4">
-                            <LifecycleBadge status={act.lifecycle?.status || act.status} />
-                          </td>
-
-                          {/* Plano */}
-                          <td className="py-3.5 px-4">
-                            <span className="font-semibold text-gray-200">
-                              {act.lifecycle?.plano || '—'}
-                            </span>
-                          </td>
-
-                          {/* Responsável */}
-                          <td className="py-3.5 px-4">
-                            <span className="flex items-center gap-1.5">
-                              <User className="h-3 w-3 text-gray-600 shrink-0" />
-                              {act.responsavel || '—'}
-                            </span>
-                          </td>
-
-                          {/* Próxima Ação */}
-                          <td className="py-3.5 px-4 max-w-[180px]">
-                            {act.nextAction ? (
-                              <p className="truncate text-gray-200 font-medium">{act.nextAction.acao}</p>
-                            ) : (
-                              <span className="text-gray-600">—</span>
-                            )}
-                          </td>
-
-                          {/* Data da Próxima Ação */}
-                          <td className="py-3.5 px-4">
-                            {vencimento ? (
-                              <span className={`flex items-center gap-1 font-semibold ${vencidoHoje ? 'text-rose-400' : 'text-gray-300'}`}>
-                                {vencidoHoje && <Clock className="h-3 w-3 text-rose-400 shrink-0" />}
-                                {formatDate(vencimento)}
+                        return (
+                          <tr
+                            key={act.id}
+                            className="hover:bg-gray-900/50 transition group"
+                          >
+                            <td className="py-3.5 px-4">
+                              <p className="font-bold text-white group-hover:text-blue-400 transition">{act.nome}</p>
+                              {act.email && <p className="text-gray-600 text-[10px] mt-0.5 truncate max-w-[160px]">{act.email}</p>}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <LifecycleBadge status={act.lifecycle?.status || act.status} />
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="font-semibold text-gray-200">{act.lifecycle?.plano || '—'}</span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="flex items-center gap-1.5">
+                                <User className="h-3 w-3 text-gray-600 shrink-0" />
+                                {act.responsavel || '—'}
                               </span>
-                            ) : (
-                              <span className="text-gray-600">—</span>
-                            )}
-                          </td>
+                            </td>
+                            <td className="py-3.5 px-4 max-w-[180px]">
+                              {act.nextAction ? <p className="truncate text-gray-200 font-medium">{act.nextAction.acao}</p> : <span className="text-gray-600">—</span>}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              {vencimento ? (
+                                <span className={`flex items-center gap-1 font-semibold ${vencidoHoje ? 'text-rose-400' : 'text-gray-300'}`}>
+                                  {vencidoHoje && <Clock className="h-3 w-3 text-rose-400 shrink-0" />}
+                                  {formatDate(vencimento)}
+                                </span>
+                              ) : (
+                                <span className="text-gray-600">—</span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-gray-500">{formatDate(act.dataCriacao)}</td>
+                            <td className="py-3.5 px-4"><PrioridadeBadge prioridade={act.prioridade} /></td>
+                            <td className="py-3.5 px-4"><FinanceiroBadge status={act.lifecycle?.statusFinanceiro} /></td>
+                            <td className="py-3.5 px-4 text-right">
+                              <button
+                                onClick={() => setSelectedActivity(act)}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-900 hover:bg-blue-600 text-gray-400 hover:text-white border border-gray-800 hover:border-blue-500 rounded-xl text-xs font-semibold transition cursor-pointer shadow-xs"
+                              >
+                                Abrir
+                                <ArrowUpRight className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
-                          {/* Data de Criação */}
-                          <td className="py-3.5 px-4 text-gray-500">
-                            {formatDate(act.dataCriacao)}
-                          </td>
+                {/* ── PAINEL DE PAGINAÇÃO ─────────────────────────────────── */}
+                <div className="px-6 py-4 border-t border-gray-800 bg-gray-900/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  
+                  {/* Informações de linhas */}
+                  <div className="flex items-center gap-4 text-xs text-gray-400">
+                    <span>
+                      Mostrando <strong className="text-gray-200">{mostrarDe}–{mostrarAte}</strong> de <strong className="text-gray-200">{totalItens}</strong> oportunidades
+                    </span>
+                    
+                    {/* Seleção de quantidade por página */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500">Exibir:</span>
+                      <select
+                        value={itensPorPagina}
+                        onChange={(e) => {
+                          setItensPorPagina(Number(e.target.value))
+                          setPagina(1) // Volta para a página 1 ao mudar limite
+                        }}
+                        className="bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 text-xs px-2 py-1 rounded-lg focus:outline-none focus:border-blue-500 cursor-pointer"
+                      >
+                        {[10, 25, 50, 100].map((size) => (
+                          <option key={size} value={size}>
+                            {size} itens
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
-                          {/* Prioridade */}
-                          <td className="py-3.5 px-4">
-                            <PrioridadeBadge prioridade={act.prioridade} />
-                          </td>
+                  {/* Botões de navegação */}
+                  <div className="flex items-center gap-1">
+                    {/* Primeira página */}
+                    <button
+                      onClick={() => setPagina(1)}
+                      disabled={paginaCorreta === 1}
+                      className="p-2 bg-gray-900 border border-gray-800 hover:bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:bg-gray-900 disabled:hover:text-gray-400 disabled:cursor-not-allowed rounded-lg transition"
+                      title="Primeira página"
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </button>
 
-                          {/* Situação Financeira */}
-                          <td className="py-3.5 px-4">
-                            <FinanceiroBadge status={act.lifecycle?.statusFinanceiro} />
-                          </td>
+                    {/* Anterior */}
+                    <button
+                      onClick={() => setPagina((p) => Math.max(p - 1, 1))}
+                      disabled={paginaCorreta === 1}
+                      className="p-2 bg-gray-900 border border-gray-800 hover:bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:bg-gray-900 disabled:hover:text-gray-400 disabled:cursor-not-allowed rounded-lg transition"
+                      title="Página anterior"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
 
-                          {/* Ações */}
-                          <td className="py-3.5 px-4 text-right">
-                            <button
-                              onClick={() => setSelectedActivity(act)}
-                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-900 hover:bg-blue-600 text-gray-400 hover:text-white border border-gray-800 hover:border-blue-500 rounded-xl text-xs font-semibold transition cursor-pointer shadow-xs"
-                            >
-                              Abrir
-                              <ArrowUpRight className="h-3.5 w-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                    {/* Rótulo de página atual */}
+                    <span className="px-3 text-xs text-gray-400 font-semibold">
+                      Página <strong className="text-gray-200">{paginaCorreta}</strong> de <strong className="text-gray-200">{totalPaginas}</strong>
+                    </span>
+
+                    {/* Próxima */}
+                    <button
+                      onClick={() => setPagina((p) => Math.min(p + 1, totalPaginas))}
+                      disabled={paginaCorreta === totalPaginas}
+                      className="p-2 bg-gray-900 border border-gray-800 hover:bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:bg-gray-900 disabled:hover:text-gray-400 disabled:cursor-not-allowed rounded-lg transition"
+                      title="Próxima página"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+
+                    {/* Última página */}
+                    <button
+                      onClick={() => setPagina(totalPaginas)}
+                      disabled={paginaCorreta === totalPaginas}
+                      className="p-2 bg-gray-900 border border-gray-800 hover:bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:bg-gray-900 disabled:hover:text-gray-400 disabled:cursor-not-allowed rounded-lg transition"
+                      title="Última página"
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                </div>
+              </>
             )}
           </div>
         </div>
