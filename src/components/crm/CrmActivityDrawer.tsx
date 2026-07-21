@@ -1,17 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { authenticatedFetch } from '@/lib/api-client';
 import { X, User, Clock, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { CrmActivityData } from './CrmActivities';
 import CrmTimeline from './CrmTimeline';
-
-export interface CrmNextActionItem {
-  id: string;
-  acao: string;
-  vencimento: string;
-  prioridade: string;
-}
 
 interface CrmActivityDrawerProps {
   activity: CrmActivityData | null;
@@ -19,38 +10,6 @@ interface CrmActivityDrawerProps {
 }
 
 export default function CrmActivityDrawer({ activity, onClose }: CrmActivityDrawerProps) {
-  const [nextAction, setNextAction] = useState<CrmNextActionItem | null>(null);
-  const [loadingAction, setLoadingAction] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (!activity) {
-      setNextAction(null);
-      return;
-    }
-
-    async function fetchNextAction() {
-      if (!activity) return;
-      setLoadingAction(true);
-      try {
-        const res = await authenticatedFetch(`/api/v1/admin/crm/next-actions?ministryId=${encodeURIComponent(activity.id)}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            setNextAction(data[0]);
-          } else {
-            setNextAction(null);
-          }
-        }
-      } catch (err) {
-        console.error('Erro ao carregar próxima ação no Drawer:', err);
-      } finally {
-        setLoadingAction(false);
-      }
-    }
-
-    fetchNextAction();
-  }, [activity]);
-
   if (!activity) return null;
 
   return (
@@ -178,22 +137,29 @@ export default function CrmActivityDrawer({ activity, onClose }: CrmActivityDraw
             )}
 
             {/* Próxima Ação */}
-            <div className="p-4 bg-blue-950/20 border border-blue-900/40 rounded-xl space-y-2">
+            <div className="p-4 bg-blue-950/20 border border-blue-900/40 rounded-xl space-y-3">
               <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider block flex items-center gap-1.5">
                 <ArrowRight className="h-3 w-3" />
                 Próxima Ação
               </span>
-              {loadingAction ? (
-                <div className="h-4 bg-gray-800 rounded animate-pulse w-3/4"></div>
-              ) : nextAction ? (
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-white">{nextAction.acao}</p>
-                  <span className="text-[11px] text-gray-400 block">
-                    Vencimento: {new Date(nextAction.vencimento).toLocaleDateString('pt-BR')}
+              {activity.nextAction ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-white">{activity.nextAction.acao}</p>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase ${
+                      activity.nextAction.prioridade === 'alta'
+                        ? 'bg-rose-950/60 text-rose-400 border-rose-900/60'
+                        : 'bg-gray-800 text-gray-300 border-gray-700'
+                    }`}>
+                      {activity.nextAction.prioridade}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-gray-400 block font-medium">
+                    Vencimento: {new Date(activity.nextAction.vencimento).toLocaleDateString('pt-BR')}
                   </span>
                 </div>
               ) : (
-                <p className="text-xs text-gray-400 italic">Nenhuma ação imediata agendada para esta oportunidade.</p>
+                <p className="text-xs text-gray-400 italic">Nenhuma ação pendente.</p>
               )}
             </div>
 
@@ -220,7 +186,13 @@ export default function CrmActivityDrawer({ activity, onClose }: CrmActivityDraw
         </div>
 
         {/* Bottom Actions */}
-        <div className="pt-6 border-t border-gray-800">
+        <div className="pt-6 border-t border-gray-800 space-y-2">
+          <button
+            disabled
+            className="w-full py-2.5 bg-blue-600/50 text-gray-400 rounded-xl text-xs font-semibold cursor-not-allowed opacity-60 flex items-center justify-center gap-2"
+          >
+            Registrar Interação
+          </button>
           <button
             onClick={onClose}
             className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-semibold transition cursor-pointer"

@@ -18,6 +18,11 @@ export interface CrmActivityData {
   email?: string;
   telefone?: string;
   origem?: string;
+  nextAction?: {
+    acao: string;
+    prioridade: string;
+    vencimento: string;
+  };
   lifecycle?: {
     status: string;
     plano?: string;

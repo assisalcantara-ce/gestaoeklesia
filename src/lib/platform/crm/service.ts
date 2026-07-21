@@ -399,8 +399,9 @@ export class CrmService {
     // 3. Obter os ComercialViewModels via CommercialService (que usa cache)
     const commercialService = new CommercialService();
     const commercialList = await commercialService.list(supabase);
+    const allNextActions = await this.getNextActions(supabase);
 
-    // 4. Mapear para DTO CrmActivity enriquecido com lifecycle
+    // 4. Mapear para DTO CrmActivity enriquecido com lifecycle e nextAction
     return list.map((opt: any) => {
       // Prioridade heurística baseada no tempo de expiração ou criação
       let prioridade = 'média';
@@ -414,6 +415,7 @@ export class CrmService {
 
       // Procurar o ComercialViewModel correspondente
       const vm = commercialList.find(c => c.id === opt.id || (opt.ministry_id && c.id === opt.ministry_id));
+      const actionItem = allNextActions.find(a => a.oportunidadeId === opt.id || (opt.ministry_id && a.ministryId === opt.ministry_id));
 
       return {
         id: opt.id,
@@ -428,6 +430,11 @@ export class CrmService {
         prioridade,
         dataCriacao: opt.created_at,
         ultimaAtualizacao: opt.updated_at || opt.created_at,
+        nextAction: actionItem ? {
+          acao: actionItem.acao,
+          prioridade: actionItem.prioridade,
+          vencimento: actionItem.vencimento
+        } : undefined,
         lifecycle: vm ? {
           status: vm.lifecycle.status,
           plano: vm.plano || 'Nenhum',
