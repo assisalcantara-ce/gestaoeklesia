@@ -9,7 +9,7 @@ import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import AdminSidebar from '@/components/AdminSidebar'
 import { temAcessoAdmin } from '@/lib/access-control'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
-import { ExternalLink, Copy, Check, Filter, RefreshCw, AlertCircle, Coins, Plus, Search, ChevronDown, ChevronRight, ShieldCheck, TrendingUp, CreditCard } from 'lucide-react'
+import { ExternalLink, Copy, Check, Filter, RefreshCw, AlertCircle, Coins, Plus, Search, ChevronDown, ChevronRight, ShieldCheck, TrendingUp, CreditCard, BarChart3 } from 'lucide-react'
 
 interface BillingInvoice {
   id: string
@@ -393,6 +393,14 @@ export default function PagamentosPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push('/admin/pagamentos/relatorios')}
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 hover:border-gray-600 px-4 py-2.5 rounded-lg text-sm font-semibold transition"
+            >
+              <BarChart3 className="h-4 w-4 text-blue-400" />
+              📊 Relatórios
+            </button>
+
             {hasMinistriesAccess && (
               <button
                 onClick={handleOpenAvulsaModal}
