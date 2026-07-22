@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
@@ -24,6 +24,8 @@ import { useMinisterios } from '@/hooks/admin/ministerios/useMinisterios'
 import { useCsvImport } from '@/hooks/admin/ministerios/useCsvImport'
 import { useBillingActions } from '@/hooks/admin/ministerios/useBillingActions'
 import { friendlyError, getDetailedStatus, formatPhoneDisplay } from '@/lib/admin/ministerios/helpers'
+import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
+import { Users, ShieldCheck, Clock, Lock, CreditCard } from 'lucide-react'
 
 export default function MinisteriosPage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
@@ -283,6 +285,32 @@ export default function MinisteriosPage() {
     printWindow.document.close();
   };
 
+  const stats = useMemo(() => {
+    let ativos = 0
+    let trials = 0
+    let suspensos = 0
+    let pendentes = 0
+
+    ministerios.forEach((m) => {
+      const statusDetail = getDetailedStatus(m)
+      if (statusDetail.type === 'ATIVO') ativos++
+      if (statusDetail.type === 'TRIAL_ATIVO') trials++
+      if (statusDetail.type === 'SUSPENSO') suspensos++
+
+      const faturas = (m as any).platform_billing_invoices || []
+      const temPendencia = faturas.some((f: any) => f.status !== 'RECEIVED' && f.status !== 'CONFIRMED')
+      if (temPendencia) pendentes++
+    })
+
+    return {
+      total: totalItems,
+      ativos,
+      trials,
+      suspensos,
+      pendentes,
+    }
+  }, [ministerios, totalItems])
+
   return (
     <div className="flex h-screen bg-gray-900">
       <AdminSidebar />
@@ -307,6 +335,49 @@ export default function MinisteriosPage() {
                 {success}
               </div>
             )}
+
+            {/* Painel Executivo (Executive Summary) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+              <ExecutiveMetricCard
+                title="Total de Ministérios"
+                value={stats.total}
+                subtitle="Clientes cadastrados"
+                icon={Users}
+                color="indigo"
+              />
+
+              <ExecutiveMetricCard
+                title="Licenças Ativas"
+                value={stats.ativos}
+                subtitle="Acesso liberado"
+                icon={ShieldCheck}
+                color="emerald"
+              />
+
+              <ExecutiveMetricCard
+                title="Trials Ativos"
+                value={stats.trials}
+                subtitle="Período de avaliação"
+                icon={Clock}
+                color="blue"
+              />
+
+              <ExecutiveMetricCard
+                title="Licenças Suspensas"
+                value={stats.suspensos}
+                subtitle="Inadimplentes/Inativos"
+                icon={Lock}
+                color="rose"
+              />
+
+              <ExecutiveMetricCard
+                title="Cobranças Pendentes"
+                value={stats.pendentes}
+                subtitle="Faturas em aberto"
+                icon={CreditCard}
+                color="amber"
+              />
+            </div>
 
             {/* Abas */}
             <div className="mb-6 border-b border-gray-800">
