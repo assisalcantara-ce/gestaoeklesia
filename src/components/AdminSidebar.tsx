@@ -67,7 +67,7 @@ export default function AdminSidebar() {
   const menuItems = [
     { label: 'Dashboard', href: '/admin/dashboard', icon: Home },
     ...(temAcessoAdmin(role, 'ministerios') ? [
-      { label: 'Ministérios', href: '/admin/ministerios', icon: Building2 },
+      { label: 'Clientes', href: '/admin/ministerios', icon: Building2 },
       { label: `Comercial ${newCount > 0 ? `(${newCount})` : ''}`, href: '/admin/comercial', icon: Briefcase, badge: newCount }
     ] : []),
 
