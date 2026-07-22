@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 import Link from 'next/link'
+import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState'
+import { Inbox } from 'lucide-react'
 
 interface MinisteriosTableProps {
   loading: boolean
@@ -47,8 +49,21 @@ export default function MinisteriosTable({
 
   if (ministerios.length === 0) {
     return (
-      <div className="text-center text-gray-400 py-12">
-        Nenhum ministério cadastrado
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-8 flex items-center justify-center">
+        <div className="text-gray-300 dark-theme-empty w-full max-w-lg">
+          <DashboardEmptyState
+            icon={Inbox}
+            title="Nenhum Ministério Cadastrado"
+            description="Não há registros de clientes ou tenants cadastrados na plataforma para a consulta selecionada. Inicie adicionando o primeiro!"
+            action={{
+              label: "+ Novo Ministério",
+              onClick: () => {
+                window.location.href = '/admin/ministerios/novo'
+              },
+              icon: Inbox
+            }}
+          />
+        </div>
       </div>
     )
   }
