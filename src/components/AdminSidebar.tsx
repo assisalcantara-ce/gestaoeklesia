@@ -71,7 +71,7 @@ export default function AdminSidebar() {
       { label: `Comercial ${newCount > 0 ? `(${newCount})` : ''}`, href: '/admin/comercial', icon: Briefcase, badge: newCount }
     ] : []),
 
-    ...(temAcessoAdmin(role, 'pagamentos') ? [{ label: 'Pagamentos', href: '/admin/pagamentos', icon: CreditCard }] : []),
+    ...(temAcessoAdmin(role, 'pagamentos') ? [{ label: 'Financeiro', href: '/admin/pagamentos', icon: CreditCard }] : []),
     ...(temAcessoAdmin(role, 'planos') ? [{ label: 'Planos', href: '/admin/planos', icon: BarChart3 }] : []),
     { label: 'Suporte', href: '/admin/suporte', icon: HeadphonesIcon },
     ...(temAcessoAdmin(role, 'configuracoes_supabase') || temAcessoAdmin(role, 'configuracoes_usuarios') || temAcessoAdmin(role, 'configuracoes_gateway')

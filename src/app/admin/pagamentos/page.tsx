@@ -362,10 +362,10 @@ export default function PagamentosPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
               <Coins className="text-blue-500 h-7 w-7" />
-              Faturamento da Plataforma
+              Gestão Financeira da Plataforma
             </h1>
             <p className="text-sm text-gray-400 mt-1">
-              Gerencie e visualize as faturas de cobranças geradas para os ministérios.
+              Gerencie a receita, faturas e lançamentos financeiros de todos os clientes.
             </p>
           </div>
           <div className="flex items-center gap-3">
