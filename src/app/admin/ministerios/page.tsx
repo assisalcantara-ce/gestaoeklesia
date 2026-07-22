@@ -14,7 +14,6 @@ import type { SubscriptionPlan } from '@/types/admin'
 
 
 import MinisteriosHeader from '@/components/admin/ministerios/MinisteriosHeader'
-import MinisteriosToolbar from '@/components/admin/ministerios/MinisteriosToolbar'
 import MinisteriosTable from '@/components/admin/ministerios/MinisteriosTable'
 import BillingModal from '@/components/admin/ministerios/modals/BillingModal'
 import ActivationModal from '@/components/admin/ministerios/modals/ActivationModal'
@@ -408,21 +407,65 @@ export default function MinisteriosPage() {
         {/* TAB: Ministérios Ativos */}
         {activeTab === 'ativos' && (
           <>
-            <MinisteriosToolbar
-              showForm={false}
-              editingId={null}
-              onToggleForm={() => {
-                router.push('/admin/ministerios/novo')
-              }}
-              onOpenImport={() => {
-                setShowImport(true)
-                setImportResult(null)
-                setImportRows([])
-                setImportHeaders([])
-                setImportFile(null)
-                setImportMinistryId('')
-              }}
-            />
+            {/* Nova Toolbar Executiva */}
+            <div className="mb-6 bg-gray-800/40 border border-gray-700/50 rounded-xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              {/* Lado Esquerdo: Filtros e Pesquisa */}
+              <div className="flex flex-wrap items-center gap-3 flex-1 max-w-4xl">
+                <div className="relative flex-1 min-w-[240px]">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Pesquisar ministério..."
+                    className="w-full pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 hover:border-gray-650 focus:border-blue-500 rounded-lg text-sm text-gray-100 placeholder-gray-400 focus:outline-none transition"
+                    disabled
+                  />
+                </div>
+
+                <select className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer" disabled>
+                  <option value="">Filtro: Todos os Status</option>
+                  <option value="ativo">Ativo</option>
+                  <option value="suspenso">Suspenso</option>
+                </select>
+
+                <select className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer" disabled>
+                  <option value="">Filtro: Todos os Planos</option>
+                  <option value="starter">Starter</option>
+                  <option value="expert">Expert</option>
+                </select>
+
+                <select className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer" disabled>
+                  <option value="">Filtro: Todos os Trials</option>
+                  <option value="sim">Sim</option>
+                  <option value="nao">Não</option>
+                </select>
+              </div>
+
+              {/* Lado Direito: Ações */}
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  onClick={() => {
+                    setShowImport(true)
+                    setImportResult(null)
+                    setImportRows([])
+                    setImportHeaders([])
+                    setImportFile(null)
+                    setImportMinistryId('')
+                  }}
+                  className="px-4 py-2 bg-gray-750 hover:bg-gray-700 border border-gray-600/55 text-white text-sm font-semibold rounded-lg transition"
+                >
+                  📥 Importar CSV
+                </button>
+
+                <button
+                  onClick={() => {
+                    router.push('/admin/ministerios/novo')
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition"
+                >
+                  + Novo Ministério
+                </button>
+              </div>
+            </div>
 
             {/* Lista de ministérios */}
             <MinisteriosTable
