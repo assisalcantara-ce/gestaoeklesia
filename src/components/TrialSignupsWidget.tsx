@@ -260,7 +260,7 @@ export default function TrialSignupsWidget() {
                             className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition"
                           >
                             <CheckCircle className="w-3 h-3" />
-                            Efetivar
+                            Converter em Cliente
                           </button>
 
                           <button
@@ -353,16 +353,16 @@ export default function TrialSignupsWidget() {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl max-w-md w-full p-6 text-gray-100">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-white">Efetivar em Plano</h2>
+              <h2 className="text-xl font-bold text-white">Converter Lead em Cliente</h2>
               <button onClick={() => setShowEfetivarModal(false)} className="text-gray-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <p className="text-sm text-gray-300 mb-1">
-              Ministério: <span className="font-semibold text-white">{efetivarSignup.ministry_name}</span>
+              Lead: <span className="font-semibold text-white">{efetivarSignup.ministry_name}</span>
             </p>
             <p className="text-xs text-gray-500 mb-4">
-              Isso criará o ministério na base de produção com acesso ativo.
+              Selecione o plano comercial para converter este Lead em um cliente ativo na plataforma.
             </p>
             <div className="mb-6">
               <label className="block text-sm font-semibold text-gray-300 mb-2">Selecionar plano</label>
@@ -390,7 +390,7 @@ export default function TrialSignupsWidget() {
                 disabled={!!actionLoading}
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium disabled:opacity-50"
               >
-                {actionLoading ? 'Processando...' : 'Confirmar Efetivação'}
+                {actionLoading ? 'Convertendo...' : 'Converter em Cliente'}
               </button>
             </div>
           </div>
