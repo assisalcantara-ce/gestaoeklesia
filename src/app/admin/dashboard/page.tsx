@@ -19,18 +19,22 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
+import Link from 'next/link'
 import {
   Building2,
   CreditCard,
   Users,
   TrendingUp,
   AlertCircle,
+  Inbox,
+  Lock,
 } from 'lucide-react'
 import type { DashboardMetrics } from '@/types/admin'
 
 export default function AdminDashboardPage() {
   const { adminUser, isLoading, isAuthenticated, isAdmin } = useAdminAuth()
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
+  const [execStats, setExecStats] = useState<{ total: number; ativos: number; trials: number; suspensos: number; pendentes: number; leads?: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -52,10 +56,19 @@ export default function AdminDashboardPage() {
 
     const fetchData = async () => {
       try {
-        const metricsResponse = await authenticatedFetch('/api/v1/admin/metrics')
+        const [metricsResponse, statsResponse] = await Promise.all([
+          authenticatedFetch('/api/v1/admin/metrics'),
+          authenticatedFetch('/api/v1/admin/ministries/stats'),
+        ])
         if (metricsResponse.ok) {
           const metricsData = await metricsResponse.json()
           setMetrics(metricsData)
+        }
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json()
+          if (statsData.data) {
+            setExecStats(statsData.data)
+          }
         }
         setLoading(false)
       } catch (err: any) {
@@ -100,12 +113,6 @@ export default function AdminDashboardPage() {
 
   const ticketsData = metrics?.tickets_by_month || []
   const deploymentsData = metrics?.deployments_by_month || []
-  const ticketStats = metrics?.ticket_stats || {
-    received: 0,
-    resolved: 0,
-    waiting: 0,
-    high_priority: 0,
-  }
 
   const StatCard = ({
     icon: Icon,
@@ -209,28 +216,81 @@ export default function AdminDashboardPage() {
               </ResponsiveContainer>
             </div>
 
-            {/* Tickets Management */}
+            {/* Painel de Alertas Executivos */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-              <h3 className="text-white font-bold text-lg mb-4">
-                Gerenciamento de Chamados
+              <h3 className="text-white font-bold text-lg mb-4 flex items-center justify-between">
+                <span>🚨 Alertas Executivos</span>
+                <span className="text-xs font-semibold text-gray-400">Monitoramento em Tempo Real</span>
               </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
-                  <p className="text-gray-400 text-sm mb-2">Chamados Recebidos</p>
-                  <p className="text-white text-3xl font-bold">{ticketStats.received}</p>
-                </div>
-                <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
-                  <p className="text-gray-400 text-sm mb-2">Chamados Atendidos</p>
-                  <p className="text-white text-3xl font-bold">{ticketStats.resolved}</p>
-                </div>
-                <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
-                  <p className="text-gray-400 text-sm mb-2">Chamados em Espera</p>
-                  <p className="text-white text-3xl font-bold">{ticketStats.waiting}</p>
-                </div>
-                <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
-                  <p className="text-gray-400 text-sm mb-2">Prioridade Alta</p>
-                  <p className="text-white text-3xl font-bold">{ticketStats.high_priority}</p>
-                </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* 1. ⚠️ Trials Expirados */}
+                <Link
+                  href="/admin/ministerios"
+                  className="bg-gray-900 hover:bg-gray-850 rounded-lg p-4 border border-rose-900/40 hover:border-rose-600/60 transition block group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-rose-400 text-xs font-extrabold uppercase tracking-wider">⚠️ Trials Expirados</p>
+                      <p className="text-white text-3xl font-black mt-1">{execStats?.trials ? 0 : (execStats?.suspensos || 0)}</p>
+                      <p className="text-[11px] text-gray-400 mt-1 group-hover:text-rose-300 transition">Ver clientes expirados →</p>
+                    </div>
+                    <div className="p-3 bg-rose-950/80 text-rose-400 rounded-lg border border-rose-800/50 group-hover:scale-105 transition">
+                      <AlertCircle className="w-5 h-5" />
+                    </div>
+                  </div>
+                </Link>
+
+                {/* 2. 💳 Cobranças Pendentes */}
+                <Link
+                  href="/admin/pagamentos"
+                  className="bg-gray-900 hover:bg-gray-850 rounded-lg p-4 border border-amber-900/40 hover:border-amber-600/60 transition block group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-amber-400 text-xs font-extrabold uppercase tracking-wider">💳 Cobranças Pendentes</p>
+                      <p className="text-white text-3xl font-black mt-1">{execStats?.pendentes || 0}</p>
+                      <p className="text-[11px] text-gray-400 mt-1 group-hover:text-amber-300 transition">Ver faturas abertas →</p>
+                    </div>
+                    <div className="p-3 bg-amber-950/80 text-amber-400 rounded-lg border border-amber-800/50 group-hover:scale-105 transition">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                  </div>
+                </Link>
+
+                {/* 3. 📥 Leads Aguardando Conversão */}
+                <Link
+                  href="/admin/ministerios"
+                  className="bg-gray-900 hover:bg-gray-850 rounded-lg p-4 border border-blue-900/40 hover:border-blue-600/60 transition block group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-blue-400 text-xs font-extrabold uppercase tracking-wider">📥 Leads Pendentes</p>
+                      <p className="text-white text-3xl font-black mt-1">{execStats?.leads || 0}</p>
+                      <p className="text-[11px] text-gray-400 mt-1 group-hover:text-blue-300 transition">Ver central de leads →</p>
+                    </div>
+                    <div className="p-3 bg-blue-950/80 text-blue-400 rounded-lg border border-blue-800/50 group-hover:scale-105 transition">
+                      <Inbox className="w-5 h-5" />
+                    </div>
+                  </div>
+                </Link>
+
+                {/* 4. 🚨 Clientes Suspensos */}
+                <Link
+                  href="/admin/ministerios"
+                  className="bg-gray-900 hover:bg-gray-850 rounded-lg p-4 border border-red-900/40 hover:border-red-600/60 transition block group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-red-400 text-xs font-extrabold uppercase tracking-wider">🚨 Clientes Suspensos</p>
+                      <p className="text-white text-3xl font-black mt-1">{execStats?.suspensos || 0}</p>
+                      <p className="text-[11px] text-gray-400 mt-1 group-hover:text-red-300 transition">Ver clientes suspensos →</p>
+                    </div>
+                    <div className="p-3 bg-red-950/80 text-red-400 rounded-lg border border-red-800/50 group-hover:scale-105 transition">
+                      <Lock className="w-5 h-5" />
+                    </div>
+                  </div>
+                </Link>
               </div>
             </div>
           </div>
