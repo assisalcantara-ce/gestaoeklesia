@@ -223,32 +223,32 @@ export default function RelatoriosFinanceirosPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <ExecutiveMetricCard
                 title="Receita Consolidada Anual"
-                value="Em implantação"
-                subtitle="Faturamento total acumulado no ano"
+                value="Disponível em breve"
+                subtitle="Aguardando consolidação"
                 icon={DollarSign}
                 color="emerald"
               />
 
               <ExecutiveMetricCard
                 title="Inadimplência Média"
-                value="Em implantação"
-                subtitle="Percentual de faturas em atraso"
+                value="Disponível em breve"
+                subtitle="Aguardando consolidação"
                 icon={AlertTriangle}
                 color="rose"
               />
 
               <ExecutiveMetricCard
                 title="Ticket Médio por Cliente"
-                value="Em implantação"
-                subtitle="Valor médio mensal por contrato"
+                value="Disponível em breve"
+                subtitle="Aguardando consolidação"
                 icon={PieChart}
                 color="blue"
               />
 
               <ExecutiveMetricCard
                 title="Projeção de Receita Semestral"
-                value="Em implantação"
-                subtitle="Estimativa recorrente futura"
+                value="Disponível em breve"
+                subtitle="Aguardando consolidação"
                 icon={Calendar}
                 color="indigo"
               />
@@ -272,9 +272,9 @@ export default function RelatoriosFinanceirosPage() {
 
                 <div className="my-8 flex flex-col items-center justify-center p-8 bg-gray-950/60 rounded-lg border border-gray-800/80 text-center">
                   <BarChart3 className="w-10 h-10 text-gray-600 mb-2 animate-pulse" />
-                  <p className="text-sm font-semibold text-gray-300">Gráfico em Implantação</p>
+                  <p className="text-sm font-semibold text-gray-300">Sem dados para o período</p>
                   <p className="text-xs text-gray-500 mt-1 max-w-sm">
-                    A visualização gráfica consolidada da curva de faturamento estará disponível na próxima atualização.
+                    Aguardando consolidação do histórico financeiro para este filtro.
                   </p>
                 </div>
               </div>
@@ -288,9 +288,9 @@ export default function RelatoriosFinanceirosPage() {
 
                 <div className="my-8 flex flex-col items-center justify-center p-8 bg-gray-950/60 rounded-lg border border-gray-800/80 text-center">
                   <PieChart className="w-10 h-10 text-gray-600 mb-2 animate-pulse" />
-                  <p className="text-sm font-semibold text-gray-300">Gráfico em Implantação</p>
+                  <p className="text-sm font-semibold text-gray-300">Sem dados para o período</p>
                   <p className="text-xs text-gray-500 mt-1 max-w-sm">
-                    O relatório de aging e faixa de atraso de faturas será ativado na próxima sprint do módulo.
+                    Aguardando consolidação do histórico financeiro para este filtro.
                   </p>
                 </div>
               </div>
@@ -319,7 +319,7 @@ export default function RelatoriosFinanceirosPage() {
                       <p className="text-[10px] text-gray-400">Extrato completo de cobranças</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-semibold bg-gray-800 text-gray-400 px-2 py-1 rounded">Em implantação</span>
+                  <span className="text-[10px] font-semibold bg-gray-800/80 text-blue-400 border border-blue-900/40 px-2 py-1 rounded">Disponível em breve</span>
                 </div>
 
                 <div className="bg-gray-950/60 p-4 rounded-lg border border-gray-800 flex items-center justify-between">
@@ -330,7 +330,7 @@ export default function RelatoriosFinanceirosPage() {
                       <p className="text-[10px] text-gray-400">Análise de conciliação</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-semibold bg-gray-800 text-gray-400 px-2 py-1 rounded">Em implantação</span>
+                  <span className="text-[10px] font-semibold bg-gray-800/80 text-blue-400 border border-blue-900/40 px-2 py-1 rounded">Disponível em breve</span>
                 </div>
 
                 <div className="bg-gray-950/60 p-4 rounded-lg border border-gray-800 flex items-center justify-between">
@@ -341,7 +341,7 @@ export default function RelatoriosFinanceirosPage() {
                       <p className="text-[10px] text-gray-400">Resumo executivo impresso</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-semibold bg-gray-800 text-gray-400 px-2 py-1 rounded">Em implantação</span>
+                  <span className="text-[10px] font-semibold bg-gray-800/80 text-blue-400 border border-blue-900/40 px-2 py-1 rounded">Disponível em breve</span>
                 </div>
               </div>
             </div>
