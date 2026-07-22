@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-guard'
-import { getDetailedStatus } from '@/lib/admin/ministerios/helpers'
+import { getDetailedStatus } from '@/lib/admin/ministerios/status'
 
 export async function GET(request: NextRequest) {
   try {

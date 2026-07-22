@@ -22,7 +22,8 @@ import DeleteConfirmationDialog from '@/components/admin/ministerios/modals/Dele
 import { useMinisterios } from '@/hooks/admin/ministerios/useMinisterios'
 import { useCsvImport } from '@/hooks/admin/ministerios/useCsvImport'
 import { useBillingActions } from '@/hooks/admin/ministerios/useBillingActions'
-import { friendlyError, getDetailedStatus, formatPhoneDisplay } from '@/lib/admin/ministerios/helpers'
+import { friendlyError, formatPhoneDisplay } from '@/lib/admin/ministerios/helpers'
+import { getDetailedStatus } from '@/lib/admin/ministerios/status'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
 import { Users, ShieldCheck, Clock, Lock, CreditCard } from 'lucide-react'
 
