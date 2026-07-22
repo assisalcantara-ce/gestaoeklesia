@@ -16,13 +16,11 @@ import type { SubscriptionPlan } from '@/types/admin'
 import MinisteriosHeader from '@/components/admin/ministerios/MinisteriosHeader'
 import MinisteriosToolbar from '@/components/admin/ministerios/MinisteriosToolbar'
 import MinisteriosTable from '@/components/admin/ministerios/MinisteriosTable'
-import MinistryForm from '@/components/admin/ministerios/forms/MinistryForm'
 import BillingModal from '@/components/admin/ministerios/modals/BillingModal'
 import ActivationModal from '@/components/admin/ministerios/modals/ActivationModal'
 import CsvImportModal from '@/components/admin/ministerios/modals/CsvImportModal'
 import DeleteConfirmationDialog from '@/components/admin/ministerios/modals/DeleteConfirmationDialog'
 import { useMinisterios } from '@/hooks/admin/ministerios/useMinisterios'
-import { useMinistryForm } from '@/hooks/admin/ministerios/useMinistryForm'
 import { useCsvImport } from '@/hooks/admin/ministerios/useCsvImport'
 import { useBillingActions } from '@/hooks/admin/ministerios/useBillingActions'
 import { friendlyError, getDetailedStatus, formatPhoneDisplay } from '@/lib/admin/ministerios/helpers'
@@ -30,10 +28,9 @@ import { friendlyError, getDetailedStatus, formatPhoneDisplay } from '@/lib/admi
 export default function MinisteriosPage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
   const [planos, setPlanos] = useState<SubscriptionPlan[]>([])
-  const [planosLoading, setPlanosLoading] = useState(false)
+
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [tempPasswords, setTempPasswords] = useState<Record<string, string>>({})
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(15)
   const [activeTab, setActiveTab] = useState<'ativos' | 'precadastros'>('ativos')
@@ -62,37 +59,7 @@ export default function MinisteriosPage() {
     setError,
   })
 
-  // Hook 2: Formulário
-  const {
-    showForm,
-    setShowForm,
-    editingId,
-    setEditingId,
-    formData,
-    setFormData,
-    isTrial,
-    setIsTrial,
-    trialDays,
-    setTrialDays,
-    logoFile,
-    setLogoFile,
-    logoPreviewSrc,
-    setLogoPreviewSrc,
-    logoPreviewObjectUrl,
-    setLogoPreviewObjectUrl,
-    cepLookupLoading,
-    cepLookupError,
-    cepResolved,
-    resetForm,
-    handleSubmit,
-    handleEdit,
-  } = useMinistryForm({
-    showError,
-    setSuccess,
-    setError,
-    fetchMinisterios,
-    setTempPasswords,
-  })
+
 
   // Hook 3: Importação CSV
   const {
@@ -213,7 +180,6 @@ export default function MinisteriosPage() {
 
   const fetchPlanos = async () => {
     try {
-      setPlanosLoading(true)
       const response = await authenticatedFetch('/api/v1/admin/plans')
       if (!response.ok) {
         throw new Error('Erro ao carregar planos')
@@ -223,15 +189,13 @@ export default function MinisteriosPage() {
       setPlanos(data.data || [])
     } catch (err: any) {
       setError(err.message)
-    } finally {
-      setPlanosLoading(false)
     }
   }
 
 
 
   const handlePrintLabel = async (m: SupabaseMinistry) => {
-    let password = tempPasswords[m.id] || '';
+    let password = '';
 
     try {
       const response = await authenticatedFetch('/api/v1/admin/ministries/decrypt-password', {
@@ -374,16 +338,10 @@ export default function MinisteriosPage() {
         {activeTab === 'ativos' && (
           <>
             <MinisteriosToolbar
-              showForm={showForm}
-              editingId={editingId}
+              showForm={false}
+              editingId={null}
               onToggleForm={() => {
-                if (showForm) {
-                  setShowForm(false)
-                  setEditingId(null)
-                  resetForm()
-                } else {
-                  setShowForm(true)
-                }
+                router.push('/admin/ministerios/novo')
               }}
               onOpenImport={() => {
                 setShowImport(true)
@@ -395,33 +353,6 @@ export default function MinisteriosPage() {
               }}
             />
 
-            {/* Formulário */}
-            {showForm && (
-              <MinistryForm
-                formData={formData}
-                editingId={editingId}
-                onSubmit={handleSubmit}
-                planos={planos}
-                planosLoading={planosLoading}
-                isTrial={isTrial}
-                setIsTrial={setIsTrial}
-                trialDays={trialDays}
-                setTrialDays={setTrialDays}
-                logoPreviewSrc={logoPreviewSrc}
-                logoFile={logoFile}
-                onFileChange={(file, objectUrl) => {
-                  setLogoFile(file)
-                  setLogoPreviewObjectUrl(objectUrl)
-                  setLogoPreviewSrc(objectUrl)
-                }}
-                logoPreviewObjectUrl={logoPreviewObjectUrl}
-                cepLookupLoading={cepLookupLoading}
-                cepLookupError={cepLookupError}
-                cepResolved={cepResolved}
-                onChangeFormData={(data) => setFormData({ ...formData, ...data })}
-              />
-            )}
-
             {/* Lista de ministérios */}
             <MinisteriosTable
               loading={loading}
@@ -432,7 +363,7 @@ export default function MinisteriosPage() {
               onPageChange={(page) => setCurrentPage(page)}
               getDetailedStatus={getDetailedStatus}
               formatPhoneDisplay={formatPhoneDisplay}
-              onEdit={handleEdit}
+              onEdit={(m) => router.push(`/admin/ministerios/${m.id}/editar`)}
               onActivate={handleOpenActivate}
               onBilling={handleOpenBilling}
               onPrintLabel={handlePrintLabel}
