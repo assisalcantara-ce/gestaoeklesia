@@ -37,8 +37,23 @@ export default function MinisteriosPage() {
   const [activeTab, setActiveTab] = useState<'ativos' | 'precadastros'>('ativos')
   const [confirmDeleteMinisterio, setConfirmDeleteMinisterio] = useState<SupabaseMinistry | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [globalStats, setGlobalStats] = useState<{ total: number; ativos: number; trials: number; suspensos: number; pendentes: number } | null>(null)
   const errorRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+
+  const fetchGlobalStats = async () => {
+    try {
+      const response = await authenticatedFetch('/api/v1/admin/ministries/stats')
+      if (response.ok) {
+        const resData = await response.json()
+        if (resData.data) {
+          setGlobalStats(resData.data)
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao buscar estatísticas globais:', err)
+    }
+  }
 
   const showError = (msg: string) => {
     setError(friendlyError(msg))
@@ -153,6 +168,7 @@ export default function MinisteriosPage() {
 
       setConfirmDeleteMinisterio(null)
       fetchMinisterios()
+      fetchGlobalStats()
     } catch (err: any) {
       setError(err.message)
       setConfirmDeleteMinisterio(null)
@@ -176,6 +192,7 @@ export default function MinisteriosPage() {
   useEffect(() => {
     if (isAuthenticated && temAcessoAdmin(adminUser?.role, 'ministerios')) {
       fetchPlanos()
+      fetchGlobalStats()
     }
   }, [isAuthenticated, adminUser])
 
@@ -285,30 +302,17 @@ export default function MinisteriosPage() {
   };
 
   const stats = useMemo(() => {
-    let ativos = 0
-    let trials = 0
-    let suspensos = 0
-    let pendentes = 0
-
-    ministerios.forEach((m) => {
-      const statusDetail = getDetailedStatus(m)
-      if (statusDetail.type === 'ATIVO') ativos++
-      if (statusDetail.type === 'TRIAL_ATIVO') trials++
-      if (statusDetail.type === 'SUSPENSO') suspensos++
-
-      const faturas = (m as any).platform_billing_invoices || []
-      const temPendencia = faturas.some((f: any) => f.status !== 'RECEIVED' && f.status !== 'CONFIRMED')
-      if (temPendencia) pendentes++
-    })
-
+    if (globalStats) {
+      return globalStats
+    }
     return {
       total: totalItems,
-      ativos,
-      trials,
-      suspensos,
-      pendentes,
+      ativos: 0,
+      trials: 0,
+      suspensos: 0,
+      pendentes: 0,
     }
-  }, [ministerios, totalItems])
+  }, [globalStats, totalItems])
 
   return (
     <div className="flex h-screen bg-gray-900">
