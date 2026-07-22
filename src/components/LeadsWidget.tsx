@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Eye, X, CheckCircle, Trash2, XCircle } from 'lucide-react'
+import { Eye, X, CheckCircle, Trash2, XCircle, MoreVertical } from 'lucide-react'
 import { authenticatedFetch } from '@/lib/api-client'
 
 interface PreRegistration {
@@ -37,6 +37,11 @@ export default function LeadsWidget() {
   const [planoSelecionado, setPlanoSelecionado] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [confirmDeleteSignup, setConfirmDeleteSignup] = useState<PreRegistration | null>(null)
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
+
+  const toggleDropdown = (id: string) => {
+    setOpenDropdownId(openDropdownId === id ? null : id)
+  }
 
   const isExpired = (s: PreRegistration) => new Date(s.trial_expires_at) < new Date()
 
@@ -225,53 +230,79 @@ export default function LeadsWidget() {
                   <td className="px-4 py-3 text-gray-400 text-xs">
                     {new Date(signup.created_at).toLocaleDateString('pt-BR')}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1.5 justify-center flex-wrap">
-                      {/* Ver detalhes — ambas as abas */}
-                      <button
-                        onClick={() => { setSelectedSignup(signup); setShowDetailModal(true) }}
-                        className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500 text-white text-xs font-medium rounded hover:bg-blue-600 transition"
-                      >
-                        <Eye className="w-3 h-3" />
-                        Ver
-                      </button>
-
-                      {/* Cancelar Trial — apenas na aba Em Teste */}
-                      {activeTab === 'trial' && (
+                  <td className="px-4 py-3 text-right">
+                    <div className="relative inline-flex items-center gap-2 justify-end">
+                      {/* Ação Principal: Converter em Cliente (quando na aba Expirado) */}
+                      {activeTab === 'encerrado' && (
                         <button
-                          onClick={() => handleCancelarTrial(signup.id)}
-                          disabled={!!actionLoading}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white text-xs font-medium rounded hover:bg-yellow-700 transition disabled:opacity-50"
+                          onClick={() => {
+                            setEfetivarSignup(signup)
+                            setPlanoSelecionado(signup.plan || (planos[0]?.slug ?? ''))
+                            setShowEfetivarModal(true)
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-semibold rounded-lg shadow-2xs transition"
                         >
-                          <XCircle className="w-3 h-3" />
-                          {actionLoading === signup.id + '_cancelar' ? '...' : 'Cancelar'}
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          Converter em Cliente
                         </button>
                       )}
 
-                      {/* Efetivar + Deletar — só na aba Expirado */}
-                      {activeTab === 'encerrado' && (
-                        <>
-                          <button
-                            onClick={() => {
-                              setEfetivarSignup(signup)
-                              setPlanoSelecionado(signup.plan || (planos[0]?.slug ?? ''))
-                              setShowEfetivarModal(true)
-                            }}
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition"
-                          >
-                            <CheckCircle className="w-3 h-3" />
-                            Converter em Cliente
-                          </button>
+                      {/* Menu de Ações (⋮) */}
+                      <div className="relative">
+                        <button
+                          onClick={() => toggleDropdown(signup.id)}
+                          className="p-1.5 bg-gray-750 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg border border-gray-650 transition text-xs font-bold"
+                          title="Mais Ações"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
 
-                          <button
-                              onClick={() => setConfirmDeleteSignup(signup)}
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-red-700 text-white text-xs font-medium rounded hover:bg-red-800 transition"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              Deletar
-                            </button>
-                        </>
-                      )}
+                        {openDropdownId === signup.id && (
+                          <>
+                            <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownId(null)} />
+                            <div className="absolute right-0 mt-2 w-44 bg-gray-900 border border-gray-750 rounded-lg shadow-xl py-1.5 z-20 text-left">
+                              <button
+                                onClick={() => {
+                                  setSelectedSignup(signup)
+                                  setShowDetailModal(true)
+                                  setOpenDropdownId(null)
+                                }}
+                                className="w-full px-4 py-2 text-xs font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition text-left flex items-center gap-2"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-blue-400" />
+                                Ver Detalhes
+                              </button>
+
+                              {activeTab === 'trial' && (
+                                <button
+                                  onClick={() => {
+                                    handleCancelarTrial(signup.id)
+                                    setOpenDropdownId(null)
+                                  }}
+                                  disabled={!!actionLoading}
+                                  className="w-full px-4 py-2 text-xs font-medium text-yellow-400 hover:bg-gray-800 transition text-left flex items-center gap-2"
+                                >
+                                  <XCircle className="w-3.5 h-3.5" />
+                                  Cancelar Teste
+                                </button>
+                              )}
+
+                              <hr className="border-gray-800 my-1" />
+
+                              <button
+                                onClick={() => {
+                                  setConfirmDeleteSignup(signup)
+                                  setOpenDropdownId(null)
+                                }}
+                                className="w-full px-4 py-2 text-xs font-medium text-red-400 hover:bg-red-950/20 transition text-left flex items-center gap-2"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Excluir Lead
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>
