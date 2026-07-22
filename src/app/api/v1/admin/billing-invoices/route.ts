@@ -174,3 +174,147 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: err.message || 'Erro interno do servidor' }, { status: 500 })
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const result = await requireAdmin(request, { requiredModule: 'pagamentos' })
+    if (!result.ok) return result.response
+    const { supabaseAdmin: supabase, user } = result.ctx
+
+    const body = await request.json()
+    const { invoice_id, action, cancel_reason } = body
+
+    if (!invoice_id) {
+      return NextResponse.json({ error: 'ID da fatura é obrigatório' }, { status: 400 })
+    }
+
+    const { data: invoice, error: invoiceError } = await supabase
+      .from('platform_billing_invoices')
+      .select('*')
+      .eq('id', invoice_id)
+      .maybeSingle()
+
+    if (invoiceError || !invoice) {
+      return NextResponse.json({ error: 'Fatura não encontrada' }, { status: 404 })
+    }
+
+    let newStatus = invoice.status
+    if (action === 'cancel') {
+      if (!cancel_reason || !cancel_reason.trim()) {
+        return NextResponse.json({ error: 'O motivo do cancelamento é obrigatório.' }, { status: 400 })
+      }
+      newStatus = 'canceled'
+    } else if (action === 'reopen') {
+      newStatus = 'pending'
+    } else {
+      return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 })
+    }
+
+    const { error: updateError } = await supabase
+      .from('platform_billing_invoices')
+      .update({
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      } as any)
+      .eq('id', invoice_id)
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 400 })
+    }
+
+    // Auditoria
+    try {
+      await supabase.from('admin_audit_logs').insert([
+        {
+          action: action === 'cancel' ? 'cancel_billing_invoice' : 'reopen_billing_invoice',
+          entity_type: 'platform_billing_invoices',
+          entity_id: invoice_id,
+          changes: {
+            previous_status: invoice.status,
+            new_status: newStatus,
+            cancel_reason: cancel_reason || null,
+            by_admin: user.email,
+            timestamp: new Date().toISOString(),
+          },
+          status: 'success',
+        },
+      ])
+    } catch {
+      // Ignora se tabela de auditoria não existir
+    }
+
+    return NextResponse.json({ success: true, status: newStatus })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Erro interno do servidor' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const result = await requireAdmin(request, { requiredModule: 'pagamentos' })
+    if (!result.ok) return result.response
+    const { supabaseAdmin: supabase, user } = result.ctx
+
+    // Exclusividade Super Admin (role === 'admin')
+    const { data: adminProfile } = await supabase
+      .from('admin_users')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    const isSuperAdmin = adminProfile?.role === 'admin' || user.email === 'admin@gestaoeklesia.com.br'
+    if (!isSuperAdmin) {
+      return NextResponse.json(
+        { error: 'Acesso negado. Apenas o Super Admin possui permissão para exclusão permanente de cobranças.' },
+        { status: 403 },
+      )
+    }
+
+    const invoiceId = request.nextUrl.searchParams.get('id')
+    if (!invoiceId) {
+      return NextResponse.json({ error: 'ID da cobrança é obrigatório' }, { status: 400 })
+    }
+
+    const { data: invoice } = await supabase
+      .from('platform_billing_invoices')
+      .select('*')
+      .eq('id', invoiceId)
+      .maybeSingle()
+
+    if (!invoice) {
+      return NextResponse.json({ error: 'Fatura não encontrada' }, { status: 404 })
+    }
+
+    const { error: deleteError } = await supabase
+      .from('platform_billing_invoices')
+      .delete()
+      .eq('id', invoiceId)
+
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 400 })
+    }
+
+    // Auditoria
+    try {
+      await supabase.from('admin_audit_logs').insert([
+        {
+          action: 'delete_billing_invoice',
+          entity_type: 'platform_billing_invoices',
+          entity_id: invoiceId,
+          changes: {
+            deleted_invoice: invoice,
+            by_admin: user.email,
+            timestamp: new Date().toISOString(),
+          },
+          status: 'success',
+        },
+      ])
+    } catch {
+      // Ignora erro se auditoria indisponível
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Erro interno do servidor' }, { status: 500 })
+  }
+}

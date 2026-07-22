@@ -9,7 +9,27 @@ import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import AdminSidebar from '@/components/AdminSidebar'
 import { temAcessoAdmin } from '@/lib/access-control'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
-import { ExternalLink, Copy, Check, Filter, RefreshCw, AlertCircle, Coins, Plus, Search, ChevronDown, ChevronRight, ShieldCheck, TrendingUp, CreditCard, BarChart3 } from 'lucide-react'
+import {
+  Coins,
+  Search,
+  ExternalLink,
+  Copy,
+  Check,
+  RefreshCw,
+  AlertCircle,
+  TrendingUp,
+  ShieldCheck,
+  Plus,
+  BarChart3,
+  ChevronDown,
+  ChevronRight,
+  MoreVertical,
+  Ban,
+  Trash2,
+  RotateCcw,
+  CreditCard,
+  Filter,
+} from 'lucide-react'
 
 interface BillingInvoice {
   id: string
@@ -37,6 +57,14 @@ export default function PagamentosPage() {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [openMenuInvoiceId, setOpenMenuInvoiceId] = useState<string | null>(null)
+
+  // Financeiro 2.1: Cancelamento e Exclusão Segura
+  const [cancelingInvoice, setCancelingInvoice] = useState<BillingInvoice | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelingLoading, setCancelingLoading] = useState(false)
+  const [deletingInvoice, setDeletingInvoice] = useState<BillingInvoice | null>(null)
+  const [deletingLoading, setDeletingLoading] = useState(false)
   const [error, setError] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   
@@ -144,6 +172,94 @@ export default function PagamentosPage() {
       setError(err.message || 'Erro ao processar pagamento.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Financeiro 2.1 — Cancelamento com motivo e registro de auditoria
+  const handleCancelInvoiceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!cancelingInvoice || !cancelReason.trim()) return
+
+    try {
+      setCancelingLoading(true)
+      setError('')
+
+      const response = await authenticatedFetch('/api/v1/admin/billing-invoices', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoice_id: cancelingInvoice.id,
+          action: 'cancel',
+          cancel_reason: cancelReason,
+        }),
+      })
+
+      if (!response.ok) {
+        const resErr = await response.json()
+        throw new Error(resErr.error || 'Erro ao cancelar cobrança')
+      }
+
+      setCancelingInvoice(null)
+      setCancelReason('')
+      await fetchInvoices()
+    } catch (err: any) {
+      setError(err.message || 'Erro ao cancelar cobrança.')
+    } finally {
+      setCancelingLoading(false)
+    }
+  }
+
+  // Financeiro 2.1 — Reabertura de cobrança cancelada
+  const handleReopenInvoice = async (invoiceId: string) => {
+    try {
+      setLoading(true)
+      setError('')
+
+      const response = await authenticatedFetch('/api/v1/admin/billing-invoices', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoice_id: invoiceId,
+          action: 'reopen',
+        }),
+      })
+
+      if (!response.ok) {
+        const resErr = await response.json()
+        throw new Error(resErr.error || 'Erro ao reabrir cobrança')
+      }
+
+      await fetchInvoices()
+    } catch (err: any) {
+      setError(err.message || 'Erro ao reabrir cobrança.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Financeiro 2.1 — Exclusão permanente exclusiva para Super Admin
+  const handleDeleteInvoiceSubmit = async () => {
+    if (!deletingInvoice) return
+
+    try {
+      setDeletingLoading(true)
+      setError('')
+
+      const response = await authenticatedFetch(`/api/v1/admin/billing-invoices?id=${deletingInvoice.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const resErr = await response.json()
+        throw new Error(resErr.error || 'Erro ao excluir cobrança')
+      }
+
+      setDeletingInvoice(null)
+      await fetchInvoices()
+    } catch (err: any) {
+      setError(err.message || 'Erro ao excluir cobrança.')
+    } finally {
+      setDeletingLoading(false)
     }
   }
 
@@ -273,6 +389,14 @@ export default function PagamentosPage() {
             Vencido
           </span>
         )
+      case 'canceled':
+      case 'cancelada':
+      case 'cancelado':
+        return (
+          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-500/10 text-slate-400 border border-slate-500/20">
+            Cancelada
+          </span>
+        )
       default:
         return (
           <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-500/10 text-gray-400 border border-gray-500/20">
@@ -355,23 +479,30 @@ export default function PagamentosPage() {
   }
 
   const financialStats = useMemo(() => {
-    // 1. Receita Prevista: Faturas projetadas / a receber (ou 'Em implantação' se não houver faturas)
-    const previstaTotal = invoices.reduce((acc, inv) => acc + (inv.amount || 0), 0)
-    
-    // 2. Receita Recebida: Faturas pagas (RECEIVED / CONFIRMED)
-    const recebidaTotal = invoices
-      .filter(inv => inv.status === 'RECEIVED' || inv.status === 'CONFIRMED')
+    // Faturas ativas (excluindo canceladas)
+    const activeInvoices = invoices.filter((inv) => inv.status !== 'canceled' && inv.status !== 'cancelada')
+
+    // 1. Receita Prevista: Faturas projetadas / a receber (exclui canceladas)
+    const previstaTotal = activeInvoices.reduce((acc, inv) => acc + (inv.amount || 0), 0)
+
+    // 2. Receita Recebida: Faturas pagas (RECEIVED / CONFIRMED / paid)
+    const recebidaTotal = activeInvoices
+      .filter((inv) => inv.status === 'RECEIVED' || inv.status === 'CONFIRMED' || inv.status === 'paid' || inv.status === 'pago')
       .reduce((acc, inv) => acc + (inv.amount || 0), 0)
 
-    // 3. Cobranças em Aberto: Faturas PENDING
-    const emAberto = invoices.filter(inv => inv.status === 'PENDING').length
+    // 3. Cobranças em Aberto: Faturas PENDING / pending (exclui canceladas)
+    const emAberto = activeInvoices.filter((inv) => inv.status === 'PENDING' || inv.status === 'pending').length
 
-    // 4. Faturas Vencidas: Faturas OVERDUE ou vencidas
-    const vencidas = invoices.filter(inv => inv.status === 'OVERDUE').length
+    // 4. Faturas Vencidas: Faturas OVERDUE / overdue (exclui canceladas)
+    const vencidas = activeInvoices.filter((inv) => inv.status === 'OVERDUE' || inv.status === 'overdue').length
 
     return {
-      receitaPrevista: previstaTotal > 0 ? `R$ ${recebidaTotal ? ((previstaTotal + recebidaTotal) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : (previstaTotal / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Em implantação',
-      receitaRecebida: recebidaTotal > 0 ? `R$ ${(recebidaTotal / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00',
+      receitaPrevista:
+        previstaTotal > 0
+          ? `R$ ${((previstaTotal + recebidaTotal) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+          : 'R$ 0,00',
+      receitaRecebida:
+        recebidaTotal > 0 ? `R$ ${(recebidaTotal / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00',
       cobrancasEmAberto: emAberto,
       faturasVencidas: vencidas,
     }
@@ -471,7 +602,7 @@ export default function PagamentosPage() {
               <span className="font-semibold text-sm text-gray-300">Filtrar por Status:</span>
             </div>
             <div className="flex gap-2">
-              {['all', 'pending', 'paid', 'overdue'].map((status) => (
+              {['all', 'pending', 'paid', 'overdue', 'canceled'].map((status) => (
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status)}
@@ -485,6 +616,7 @@ export default function PagamentosPage() {
                   {status === 'pending' && 'Pendente'}
                   {status === 'paid' && 'Pago'}
                   {status === 'overdue' && 'Vencido'}
+                  {status === 'canceled' && 'Canceladas'}
                 </button>
               ))}
             </div>
@@ -631,48 +763,99 @@ export default function PagamentosPage() {
                                 <td className="px-6 py-3.5">{getStatusBadge(inv.status)}</td>
                                 <td className="px-6 py-3.5 text-gray-300">{formatDate(inv.due_date)}</td>
                                 <td className="px-6 py-3.5 text-gray-400">{formatDateTime(inv.created_at)}</td>
-                                <td className="px-6 py-3.5 text-right">
+                                <td className="px-6 py-3.5 text-right relative">
                                   <div className="flex justify-end items-center gap-1.5">
-                                    {inv.status !== 'paid' && (
-                                      <button
-                                        onClick={() => handleMarkAsPaid(inv.id)}
-                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-semibold transition cursor-pointer whitespace-nowrap"
+                                    {inv.asaas_invoice_url && (
+                                      <a
+                                        href={inv.asaas_invoice_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-medium transition cursor-pointer"
                                       >
-                                        <Check className="h-3 w-3" />
-                                        Marcar pago
+                                        Abrir
+                                        <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                    )}
+
+                                    {/* Menu de Ações (⋮) */}
+                                    <div className="relative">
+                                      <button
+                                        onClick={() => setOpenMenuInvoiceId(openMenuInvoiceId === inv.id ? null : inv.id)}
+                                        className="p-1.5 text-gray-400 hover:text-white bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-lg transition cursor-pointer"
+                                        title="Mais opções"
+                                      >
+                                        <MoreVertical className="h-3.5 w-3.5" />
                                       </button>
-                                    )}
-                                    {inv.asaas_invoice_url ? (
-                                      <>
-                                        <a
-                                          href={inv.asaas_invoice_url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-medium transition cursor-pointer"
-                                        >
-                                          Abrir
-                                          <ExternalLink className="h-3 w-3" />
-                                        </a>
-                                        <button
-                                          onClick={() => handleCopyLink(inv.asaas_invoice_url!, inv.id)}
-                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-gray-800 hover:bg-gray-755 text-gray-300 hover:text-white rounded text-[11px] font-medium border border-gray-700 hover:border-gray-650 transition cursor-pointer"
-                                        >
-                                          {copiedId === inv.id ? (
-                                            <>
-                                              Copiado
-                                              <Check className="h-3 w-3 text-emerald-400" />
-                                            </>
-                                          ) : (
-                                            <>
-                                              Copiar
-                                              <Copy className="h-3 w-3" />
-                                            </>
+
+                                      {openMenuInvoiceId === inv.id && (
+                                        <div className="absolute right-0 mt-1 w-48 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-30 text-left">
+                                          {inv.asaas_invoice_url && (
+                                            <button
+                                              onClick={() => {
+                                                handleCopyLink(inv.asaas_invoice_url!, inv.id)
+                                                setOpenMenuInvoiceId(null)
+                                              }}
+                                              className="w-full px-4 py-2 text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-2 transition"
+                                            >
+                                              <Copy className="h-3.5 w-3.5 text-blue-400" />
+                                              {copiedId === inv.id ? 'Copiado!' : 'Copiar Link'}
+                                            </button>
                                           )}
-                                        </button>
-                                      </>
-                                    ) : (
-                                      <span className="text-[11px] text-gray-500 italic pr-2">Sem link</span>
-                                    )}
+
+                                          {inv.status !== 'paid' && inv.status !== 'canceled' && (
+                                            <button
+                                              onClick={() => {
+                                                handleMarkAsPaid(inv.id)
+                                                setOpenMenuInvoiceId(null)
+                                              }}
+                                              className="w-full px-4 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-950/40 flex items-center gap-2 transition"
+                                            >
+                                              <Check className="h-3.5 w-3.5" />
+                                              Marcar como Pago
+                                            </button>
+                                          )}
+
+                                          {inv.status !== 'canceled' ? (
+                                            <button
+                                              onClick={() => {
+                                                setCancelingInvoice(inv)
+                                                setCancelReason('')
+                                                setOpenMenuInvoiceId(null)
+                                              }}
+                                              className="w-full px-4 py-2 text-xs font-semibold text-amber-400 hover:bg-amber-950/40 flex items-center gap-2 transition"
+                                            >
+                                              <Ban className="h-3.5 w-3.5" />
+                                              Cancelar Cobrança
+                                            </button>
+                                          ) : (
+                                            <button
+                                              onClick={() => {
+                                                handleReopenInvoice(inv.id)
+                                                setOpenMenuInvoiceId(null)
+                                              }}
+                                              className="w-full px-4 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-950/40 flex items-center gap-2 transition"
+                                            >
+                                              <RotateCcw className="h-3.5 w-3.5" />
+                                              Reabrir Cobrança
+                                            </button>
+                                          )}
+
+                                          {/* Exclusão Permanente — Apenas Super Admin */}
+                                          {adminUser?.role === 'admin' && (
+                                            <button
+                                              onClick={() => {
+                                                setDeletingInvoice(inv)
+                                                setOpenMenuInvoiceId(null)
+                                              }}
+                                              className="w-full px-4 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-950/40 flex items-center gap-2 transition border-t border-gray-800/80 mt-1"
+                                            >
+                                              <Trash2 className="h-3.5 w-3.5" />
+                                              Excluir Permanentemente
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </td>
                               </tr>
@@ -941,6 +1124,100 @@ export default function PagamentosPage() {
                   )}
                 </form>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal: Cancelamento de Cobrança (Financeiro 2.1) */}
+      {cancelingInvoice && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 text-gray-100 space-y-4">
+            <div className="flex items-center gap-3 text-amber-400">
+              <Ban className="h-6 w-6" />
+              <h3 className="text-lg font-bold text-white">Cancelar Cobrança</h3>
+            </div>
+
+            <p className="text-xs text-gray-300">
+              A cobrança do plano <span className="font-mono text-blue-400">{cancelingInvoice.plano_slug}</span> de valor{' '}
+              <span className="font-bold text-white">{formatCurrency(cancelingInvoice.amount)}</span> será removida dos totais em aberto.
+            </p>
+
+            <form onSubmit={handleCancelInvoiceSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
+                  Motivo do Cancelamento *
+                </label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Informe o motivo do cancelamento para fins de auditoria..."
+                  required
+                  rows={3}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl p-3 text-xs text-gray-200 placeholder-gray-500 focus:border-blue-500 focus:outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCancelingInvoice(null)
+                    setCancelReason('')
+                  }}
+                  disabled={cancelingLoading}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="submit"
+                  disabled={cancelingLoading || !cancelReason.trim()}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold shadow-sm transition disabled:opacity-50"
+                >
+                  {cancelingLoading ? 'Cancelando...' : 'Confirmar Cancelamento'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Exclusão Permanente de Cobrança - Super Admin (Financeiro 2.1) */}
+      {deletingInvoice && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
+          <div className="bg-gray-900 border border-red-800/60 rounded-2xl shadow-2xl max-w-md w-full p-6 text-gray-100 space-y-4">
+            <div className="flex items-center gap-3 text-rose-500">
+              <AlertCircle className="h-6 w-6" />
+              <h3 className="text-lg font-bold text-white">Exclusão Permanente de Cobrança</h3>
+            </div>
+
+            <div className="bg-rose-950/40 border border-rose-800/50 rounded-xl p-3 text-xs text-rose-200 space-y-1">
+              <p className="font-bold">⚠️ ATENÇÃO: AÇÃO IRREVERSÍVEL!</p>
+              <p>Esta cobrança será removida fisicamente do banco de dados e todos os seus registros associados serão apagados.</p>
+            </div>
+
+            <p className="text-xs text-gray-300">
+              Fatura do plano <span className="font-mono text-blue-400">{deletingInvoice.plano_slug}</span> de valor{' '}
+              <span className="font-bold text-white">{formatCurrency(deletingInvoice.amount)}</span>.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingInvoice(null)}
+                disabled={deletingLoading}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteInvoiceSubmit}
+                disabled={deletingLoading}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold shadow-sm transition disabled:opacity-50"
+              >
+                {deletingLoading ? 'Excluindo...' : 'Excluir Permanentemente'}
+              </button>
             </div>
           </div>
         </div>
