@@ -8,7 +8,8 @@ import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import AdminSidebar from '@/components/AdminSidebar'
 import { temAcessoAdmin } from '@/lib/access-control'
-import { ExternalLink, Copy, Check, Filter, RefreshCw, AlertCircle, Coins, Plus, Search, ChevronDown, ChevronRight } from 'lucide-react'
+import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
+import { ExternalLink, Copy, Check, Filter, RefreshCw, AlertCircle, Coins, Plus, Search, ChevronDown, ChevronRight, ShieldCheck, TrendingUp, CreditCard } from 'lucide-react'
 
 interface BillingInvoice {
   id: string
@@ -353,6 +354,29 @@ export default function PagamentosPage() {
     }))
   }
 
+  const financialStats = useMemo(() => {
+    // 1. Receita Prevista: Faturas projetadas / a receber (ou 'Em implantação' se não houver faturas)
+    const previstaTotal = invoices.reduce((acc, inv) => acc + (inv.amount || 0), 0)
+    
+    // 2. Receita Recebida: Faturas pagas (RECEIVED / CONFIRMED)
+    const recebidaTotal = invoices
+      .filter(inv => inv.status === 'RECEIVED' || inv.status === 'CONFIRMED')
+      .reduce((acc, inv) => acc + (inv.amount || 0), 0)
+
+    // 3. Cobranças em Aberto: Faturas PENDING
+    const emAberto = invoices.filter(inv => inv.status === 'PENDING').length
+
+    // 4. Faturas Vencidas: Faturas OVERDUE ou vencidas
+    const vencidas = invoices.filter(inv => inv.status === 'OVERDUE').length
+
+    return {
+      receitaPrevista: previstaTotal > 0 ? `R$ ${recebidaTotal ? ((previstaTotal + recebidaTotal) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : (previstaTotal / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Em implantação',
+      receitaRecebida: recebidaTotal > 0 ? `R$ ${(recebidaTotal / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00',
+      cobrancasEmAberto: emAberto,
+      faturasVencidas: vencidas,
+    }
+  }, [invoices])
+
   return (
     <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden">
       <AdminSidebar />
@@ -396,6 +420,41 @@ export default function PagamentosPage() {
               <p className="text-sm font-medium">{error}</p>
             </div>
           )}
+
+          {/* Painel Executivo Financeiro 2.0 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <ExecutiveMetricCard
+              title="Receita Prevista"
+              value={financialStats.receitaPrevista}
+              subtitle="Faturamento projetado"
+              icon={TrendingUp}
+              color="blue"
+            />
+
+            <ExecutiveMetricCard
+              title="Receita Recebida"
+              value={financialStats.receitaRecebida}
+              subtitle="Pagamentos confirmados"
+              icon={ShieldCheck}
+              color="emerald"
+            />
+
+            <ExecutiveMetricCard
+              title="Cobranças em Aberto"
+              value={financialStats.cobrancasEmAberto}
+              subtitle="Aguardando pagamento"
+              icon={CreditCard}
+              color="amber"
+            />
+
+            <ExecutiveMetricCard
+              title="Faturas Vencidas"
+              value={financialStats.faturasVencidas}
+              subtitle="Prazo expirado no Asaas"
+              icon={AlertCircle}
+              color="rose"
+            />
+          </div>
 
           {/* Filtros */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
