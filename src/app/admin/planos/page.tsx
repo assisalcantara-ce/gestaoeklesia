@@ -10,6 +10,7 @@ import type { SubscriptionPlan } from '@/types/admin'
 import { useAppDialog } from '@/providers/AppDialogProvider'
 import AdminSidebar from '@/components/AdminSidebar'
 import { temAcessoAdmin } from '@/lib/access-control'
+import { Info } from 'lucide-react'
 
 export default function PlanosPage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
@@ -324,7 +325,7 @@ export default function PlanosPage() {
                     />
                   </div>
 
-                  <div className="md:col-span-3 flex items-center pt-6">
+                  <div className="md:col-span-3 flex flex-col gap-2 pt-6">
                     <label className="flex items-center space-x-2 text-sm font-medium text-gray-300 cursor-pointer">
                       <input
                         type="checkbox"
@@ -334,6 +335,15 @@ export default function PlanosPage() {
                       />
                       <span>Exibir "Consulte-nos" na Landing Page</span>
                     </label>
+
+                    {formData.is_price_on_request && (
+                      <div className="mt-1 flex items-start gap-2.5 p-3 rounded-lg bg-blue-950/40 border border-blue-900/50 text-blue-300 text-xs leading-relaxed transition-all">
+                        <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                        <p>
+                          Esta opção altera apenas a exibição pública do preço na Landing Page. O valor informado em <strong>"Preço Mensal"</strong> continuará sendo utilizado para ativação de clientes, faturamento, geração de cobranças e relatórios financeiros.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="md:col-span-3">
