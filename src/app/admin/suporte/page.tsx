@@ -2,13 +2,15 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import AdminSidebar from '@/components/AdminSidebar'
 import type { SupportTicket, SupportTicketMessage, SupportTicketLanding, LandingTicketNote } from '@/types/admin'
 import { temAcessoAdmin } from '@/lib/access-control'
+import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
+import { LifeBuoy, Clock, MessageSquare, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
 export default function SuportePage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
@@ -47,6 +49,33 @@ export default function SuportePage() {
     category: 'technical',
     priority: 'medium',
   })
+
+  // FASE 1: Cálculo dos KPIs Executivos do Suporte (sem novas consultas ao banco)
+  const kpis = useMemo(() => {
+    const currentList = ticketView === 'tenant' ? tickets : landingTickets
+    const todayStr = new Date().toISOString().split('T')[0]
+
+    const abertos = currentList.filter((t) => t.status === 'open').length
+    const emAtendimento = currentList.filter(
+      (t) => t.status === 'in_progress' || (t.status as string) === 'em_atendimento',
+    ).length
+    const aguardandoCliente = currentList.filter((t) => t.status === 'waiting_customer').length
+    const altaPrioridade = currentList.filter((t) => t.priority === 'high' || t.priority === 'urgent').length
+    const resolvidosHoje = currentList.filter((t) => {
+      const isResolved =
+        t.status === 'resolved' || t.status === 'closed' || (t.status as string) === 'contrato_finalizado'
+      const updatedDate = t.updated_at ? t.updated_at.split('T')[0] : ''
+      return isResolved && updatedDate === todayStr
+    }).length
+
+    return {
+      abertos,
+      emAtendimento,
+      aguardandoCliente,
+      altaPrioridade,
+      resolvidosHoje,
+    }
+  }, [tickets, landingTickets, ticketView])
 
   useEffect(() => {
     if (!isLoading) {
@@ -477,6 +506,49 @@ export default function SuportePage() {
         </div>
 
         <div className="p-6 space-y-6">
+          {/* FASE 1: Painel Executivo do Suporte */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <ExecutiveMetricCard
+              title="Tickets Abertos"
+              value={kpis.abertos}
+              subtitle="Primeiro atendimento"
+              icon={LifeBuoy}
+              color="blue"
+            />
+
+            <ExecutiveMetricCard
+              title="Em Atendimento"
+              value={kpis.emAtendimento}
+              subtitle="Sendo analisados"
+              icon={Clock}
+              color="amber"
+            />
+
+            <ExecutiveMetricCard
+              title="Aguardando Cliente"
+              value={kpis.aguardandoCliente}
+              subtitle="Retorno ou confirmação"
+              icon={MessageSquare}
+              color="indigo"
+            />
+
+            <ExecutiveMetricCard
+              title="Alta Prioridade"
+              value={kpis.altaPrioridade}
+              subtitle="Urgentes e alta"
+              icon={AlertTriangle}
+              color="rose"
+            />
+
+            <ExecutiveMetricCard
+              title="Resolvidos Hoje"
+              value={kpis.resolvidosHoje}
+              subtitle="Concluídos no dia"
+              icon={CheckCircle2}
+              color="emerald"
+            />
+          </div>
+
           {/* Mensagens */}
           {error && (
             <div className="p-4 bg-red-900/40 border border-red-700 text-red-300 rounded-lg">
