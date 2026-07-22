@@ -50,6 +50,12 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    // Consultar Leads pendentes na tabela pre_registrations
+    const { count: leadsCount } = await supabaseAdmin
+      .from('pre_registrations')
+      .select('id', { count: 'exact', head: true })
+      .neq('status', 'efetivado')
+
     return NextResponse.json({
       data: {
         total: list.length,
@@ -57,6 +63,8 @@ export async function GET(request: NextRequest) {
         trials,
         suspensos,
         pendentes,
+        leads: leadsCount || 0,
+        mrr: 'Em implantação',
       },
     })
   } catch (err: any) {

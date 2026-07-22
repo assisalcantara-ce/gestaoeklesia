@@ -25,7 +25,7 @@ import { useBillingActions } from '@/hooks/admin/ministerios/useBillingActions'
 import { friendlyError, formatPhoneDisplay } from '@/lib/admin/ministerios/helpers'
 import { getDetailedStatus } from '@/lib/admin/ministerios/status'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
-import { Users, ShieldCheck, Clock, Lock, CreditCard } from 'lucide-react'
+import { ShieldCheck, Clock, CreditCard, Inbox, TrendingUp } from 'lucide-react'
 
 export default function MinisteriosPage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
@@ -38,7 +38,7 @@ export default function MinisteriosPage() {
   const [activeTab, setActiveTab] = useState<'ativos' | 'leads'>('ativos')
   const [confirmDeleteMinisterio, setConfirmDeleteMinisterio] = useState<SupabaseMinistry | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
-  const [globalStats, setGlobalStats] = useState<{ total: number; ativos: number; trials: number; suspensos: number; pendentes: number } | null>(null)
+  const [globalStats, setGlobalStats] = useState<{ total: number; ativos: number; trials: number; suspensos: number; pendentes: number; leads?: number; mrr?: string } | null>(null)
   const errorRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -304,16 +304,22 @@ export default function MinisteriosPage() {
 
   const stats = useMemo(() => {
     if (globalStats) {
-      return globalStats
+      return {
+        ativos: globalStats.ativos ?? 0,
+        leads: globalStats.leads ?? 0,
+        trials: globalStats.trials ?? 0,
+        pendentes: globalStats.pendentes ?? 0,
+        mrr: globalStats.mrr || 'Em implantação',
+      }
     }
     return {
-      total: totalItems,
       ativos: 0,
+      leads: 0,
       trials: 0,
-      suspensos: 0,
       pendentes: 0,
+      mrr: 'Em implantação',
     }
-  }, [globalStats, totalItems])
+  }, [globalStats])
 
   return (
     <div className="flex h-screen bg-gray-900">
@@ -340,46 +346,46 @@ export default function MinisteriosPage() {
               </div>
             )}
 
-            {/* Painel Executivo (Executive Summary) */}
+            {/* Painel Executivo 2.0 (Executive Summary) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
               <ExecutiveMetricCard
-                title="Total de Ministérios"
-                value={stats.total}
-                subtitle="Clientes cadastrados"
-                icon={Users}
-                color="indigo"
-              />
-
-              <ExecutiveMetricCard
-                title="Licenças Ativas"
+                title="Clientes Ativos"
                 value={stats.ativos}
-                subtitle="Acesso liberado"
+                subtitle="Assinantes com acesso liberado"
                 icon={ShieldCheck}
                 color="emerald"
               />
 
               <ExecutiveMetricCard
-                title="Trials Ativos"
-                value={stats.trials}
-                subtitle="Período de avaliação"
-                icon={Clock}
+                title="Leads Pendentes"
+                value={stats.leads}
+                subtitle="Cadastros aguardando conversão"
+                icon={Inbox}
                 color="blue"
               />
 
               <ExecutiveMetricCard
-                title="Licenças Suspensas"
-                value={stats.suspensos}
-                subtitle="Inadimplentes/Inativos"
-                icon={Lock}
-                color="rose"
+                title="Trials Ativos"
+                value={stats.trials}
+                subtitle="Clientes em período de teste"
+                icon={Clock}
+                color="indigo"
               />
 
               <ExecutiveMetricCard
                 title="Cobranças Pendentes"
                 value={stats.pendentes}
-                subtitle="Faturas em aberto"
+                subtitle="Faturas em aberto no Asaas"
                 icon={CreditCard}
                 color="amber"
+              />
+
+              <ExecutiveMetricCard
+                title="Receita Mensal (MRR)"
+                value={stats.mrr}
+                subtitle="Faturamento recorrente mensal"
+                icon={TrendingUp}
+                color="slate"
               />
             </div>
 
