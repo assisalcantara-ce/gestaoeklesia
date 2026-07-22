@@ -6,7 +6,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
-import TrialSignupsWidget from '@/components/TrialSignupsWidget'
+import LeadsWidget from '@/components/LeadsWidget'
 import AdminSidebar from '@/components/AdminSidebar'
 import { temAcessoAdmin } from '@/lib/access-control'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
@@ -491,9 +491,9 @@ export default function MinisteriosPage() {
           </>
         )}
 
-        {/* TAB: Pré-Cadastros */}
+        {/* TAB: Leads */}
         {activeTab === 'precadastros' && (
-          <TrialSignupsWidget />
+          <LeadsWidget />
         )}
       </div>
     </div>

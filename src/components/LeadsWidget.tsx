@@ -25,7 +25,7 @@ interface Plano {
   price_monthly: number
 }
 
-export default function TrialSignupsWidget() {
+export default function LeadsWidget() {
   const [signups, setSignups] = useState<PreRegistration[]>([])
   const [planos, setPlanos] = useState<Plano[]>([])
   const [loading, setLoading] = useState(true)
