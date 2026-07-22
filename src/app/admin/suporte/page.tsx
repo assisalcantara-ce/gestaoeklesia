@@ -10,7 +10,7 @@ import AdminSidebar from '@/components/AdminSidebar'
 import type { SupportTicket, SupportTicketMessage, SupportTicketLanding, LandingTicketNote } from '@/types/admin'
 import { temAcessoAdmin } from '@/lib/access-control'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
-import { LifeBuoy, Clock, MessageSquare, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { LifeBuoy, Clock, MessageSquare, AlertTriangle, CheckCircle2, Search, Plus } from 'lucide-react'
 
 export default function SuportePage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
@@ -40,6 +40,7 @@ export default function SuportePage() {
   const [replyStatus, setReplyStatus] = useState<SupportTicket['status']>('waiting_customer')
   const [closingTicketId, setClosingTicketId] = useState<string | null>(null)
   const [closingTicket, setClosingTicket] = useState<SupportTicket | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
   const router = useRouter()
 
   const [formData, setFormData] = useState({
@@ -76,6 +77,33 @@ export default function SuportePage() {
       resolvidosHoje,
     }
   }, [tickets, landingTickets, ticketView])
+
+  const filteredTickets = useMemo(() => {
+    if (!searchQuery.trim()) return tickets
+    const q = searchQuery.toLowerCase().trim()
+    return tickets.filter((t) => {
+      const ticketNum = t.ticket_number?.toLowerCase() || ''
+      const subject = t.subject?.toLowerCase() || ''
+      const desc = t.description?.toLowerCase() || ''
+      const ministry = t.ministry_name?.toLowerCase() || ''
+      return ticketNum.includes(q) || subject.includes(q) || desc.includes(q) || ministry.includes(q)
+    })
+  }, [tickets, searchQuery])
+
+  const filteredLandingTickets = useMemo(() => {
+    if (!searchQuery.trim()) return landingTickets
+    const q = searchQuery.toLowerCase().trim()
+    return landingTickets.filter((t) => {
+      const ticketNum = t.ticket_number?.toLowerCase() || ''
+      const inst = t.institution_name?.toLowerCase() || ''
+      const contact = t.contact_name?.toLowerCase() || ''
+      const email = t.email?.toLowerCase() || ''
+      const desc = t.description?.toLowerCase() || ''
+      return (
+        ticketNum.includes(q) || inst.includes(q) || contact.includes(q) || email.includes(q) || desc.includes(q)
+      )
+    })
+  }, [landingTickets, searchQuery])
 
   useEffect(() => {
     if (!isLoading) {
@@ -561,71 +589,115 @@ export default function SuportePage() {
             </div>
           )}
 
-          {/* Toolbar */}
-          <div className="flex gap-3 items-center flex-wrap">
-            {/* Tabs */}
-            <div className="inline-flex rounded-lg border border-gray-700 bg-gray-800 p-1">
-              <button
-                type="button"
-                onClick={() => setTicketView('tenant')}
-                className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
-                  ticketView === 'tenant' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Tickets de Ministérios
-              </button>
-              <button
-                type="button"
-                onClick={() => setTicketView('landing')}
-                className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
-                  ticketView === 'landing' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Tickets do site
-              </button>
+          {/* Toolbar Horizontal Unificada Suporte 2.0 */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* Lado Esquerdo: Alternância de Abas + Campo de Busca + Filtros */}
+            <div className="flex flex-wrap items-center gap-3 flex-1">
+              {/* Alternância de Abas */}
+              <div className="inline-flex rounded-lg border border-gray-800 bg-gray-950 p-1">
+                <button
+                  type="button"
+                  onClick={() => setTicketView('tenant')}
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition ${
+                    ticketView === 'tenant'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Tickets de Ministérios
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTicketView('landing')}
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition ${
+                    ticketView === 'landing'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Tickets do Site
+                </button>
+              </div>
+
+              {/* Campo de Pesquisa Rápida */}
+              <div className="relative flex-1 min-w-[200px] max-w-md">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nº ticket, assunto, cliente ou solicitante..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-gray-200 placeholder-gray-500 focus:border-blue-500 focus:outline-none transition"
+                />
+              </div>
+
+              {/* Filtros para Tickets de Ministérios */}
+              {ticketView === 'tenant' && (
+                <>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => {
+                      setStatusFilter(e.target.value)
+                      setPage(1)
+                    }}
+                    className="bg-gray-950 border border-gray-800 text-gray-300 rounded-lg px-3 py-1.5 text-xs font-medium focus:border-blue-500 focus:outline-none cursor-pointer transition"
+                  >
+                    <option value="active">Status: Ativos</option>
+                    <option value="open">Status: Aberto</option>
+                    <option value="in_progress">Status: Em Atendimento</option>
+                    <option value="waiting_customer">Status: Aguardando Cliente</option>
+                    <option value="resolved">Status: Resolvido</option>
+                    <option value="closed">Status: Fechado</option>
+                  </select>
+
+                  <select
+                    value={priorityFilter}
+                    onChange={(e) => {
+                      setPriorityFilter(e.target.value)
+                      setPage(1)
+                    }}
+                    className="bg-gray-950 border border-gray-800 text-gray-300 rounded-lg px-3 py-1.5 text-xs font-medium focus:border-blue-500 focus:outline-none cursor-pointer transition"
+                  >
+                    <option value="all">Prioridade: Todas</option>
+                    <option value="urgent">Urgente</option>
+                    <option value="high">Alta</option>
+                    <option value="medium">Média</option>
+                    <option value="low">Baixa</option>
+                  </select>
+                </>
+              )}
+
+              {/* Filtros para Tickets do Site */}
+              {ticketView === 'landing' && (
+                <select
+                  value={landingStatusFilter}
+                  onChange={(e) => {
+                    setLandingStatusFilter(e.target.value)
+                    setLandingPage(1)
+                  }}
+                  className="bg-gray-950 border border-gray-800 text-gray-300 rounded-lg px-3 py-1.5 text-xs font-medium focus:border-blue-500 focus:outline-none cursor-pointer transition"
+                >
+                  <option value="active">Status: Ativos</option>
+                  <option value="open">Status: Aberto</option>
+                  <option value="em_atendimento">Status: Em Atendimento</option>
+                  <option value="aguardando_contrato">Status: Aguardando Contrato</option>
+                  <option value="contrato_finalizado">Status: Contrato Finalizado</option>
+                  <option value="closed">Status: Fechado</option>
+                  <option value="cancelado">Status: Cancelado</option>
+                </select>
+              )}
             </div>
 
+            {/* Lado Direito: Botão "Novo Ticket" */}
             {ticketView === 'tenant' && (
-              <>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
-                  className="px-3 py-2 bg-gray-800 border border-gray-700 text-gray-300 rounded-lg text-sm"
-                >
-                  <option value="open">ABERTO</option>
-                  <option value="in_progress">EM ATENDIMENTO</option>
-                  <option value="closed">FECHADO</option>
-                </select>
-                <select
-                  value={priorityFilter}
-                  onChange={(e) => { setPriorityFilter(e.target.value); setPage(1) }}
-                  className="px-3 py-2 bg-gray-800 border border-gray-700 text-gray-300 rounded-lg text-sm"
-                >
-                  <option value="all">Todas as Prioridades</option>
-                  <option value="urgent">Urgente</option>
-                  <option value="high">Alta</option>
-                  <option value="medium">Média</option>
-                  <option value="low">Baixa</option>
-                </select>
-                <button
-                  onClick={() => setShowForm(!showForm)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold transition"
-                >
-                  + Novo Ticket
-                </button>
-              </>
-            )}
-
-            {ticketView === 'landing' && (
-              <select
-                value={landingStatusFilter}
-                onChange={(e) => { setLandingStatusFilter(e.target.value); setLandingPage(1) }}
-                className="px-3 py-2 bg-gray-800 border border-gray-700 text-gray-300 rounded-lg text-sm"
+              <button
+                type="button"
+                onClick={() => setShowForm(!showForm)}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition shrink-0"
               >
-                <option value="open">ABERTO</option>
-                <option value="em_atendimento">EM ATENDIMENTO</option>
-                <option value="closed">FECHADO</option>
-              </select>
+                <Plus className="h-4 w-4" />
+                Novo Ticket
+              </button>
             )}
           </div>
 
@@ -707,13 +779,12 @@ export default function SuportePage() {
               </form>
             </div>
           )}
-
           {/* Tabela */}
           <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
             {ticketView === 'tenant' && (
               loading ? (
                 <div className="p-6 text-center text-gray-400">Carregando...</div>
-              ) : tickets.length === 0 ? (
+              ) : filteredTickets.length === 0 ? (
                 <div className="p-6 text-center text-gray-400">Nenhum ticket encontrado</div>
               ) : (
                 <table className="w-full">
@@ -729,7 +800,7 @@ export default function SuportePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700">
-                    {tickets.map((t) => {
+                    {filteredTickets.map((t) => {
                       const replyState = getReplyState(t)
 
                       return (
@@ -750,51 +821,47 @@ export default function SuportePage() {
                         }`}
                       >
                         <td className="px-6 py-4 font-mono text-xs text-gray-400">{t.ticket_number}</td>
-                        <td className="px-6 py-4 font-medium text-gray-200">{t.subject}</td>
-                        <td className="px-6 py-4 text-sm text-gray-200 font-medium">{t.ministry_name || t.ministry_id}</td>
+                        <td className="px-6 py-4 max-w-xs truncate">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-gray-200 truncate">{t.subject}</span>
+                            <span className="text-xs text-gray-400 truncate">{t.description}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-300 font-medium">
+                          {t.ministry_name || <span className="text-gray-500 italic">ID: {t.ministry_id}</span>}
+                        </td>
                         <td className="px-6 py-4">
                           <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getPriorityColor(t.priority)}`}>
                             {getPriorityLabel(t.priority)}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex flex-col gap-1">
-                            {replyState === 'support' ? (
-                              <span className="px-2 py-1 rounded-full text-xs font-semibold w-fit bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                                RESPOSTA DO SUPORTE
-                              </span>
-                            ) : replyState === 'customer' ? (
-                              <span className="px-2 py-1 rounded-full text-xs font-semibold w-fit bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                                RESPOSTA DO CLIENTE
-                              </span>
-                            ) : (
-                              <span className={`px-2 py-1 rounded-full text-xs font-semibold w-fit ${getStatusColor(t.status)}`}>
-                                {getStatusLabel(t.status)}
-                              </span>
-                            )}
-                            {t.response_at && (
-                              <span className="text-[10px] text-gray-500">
-                                em {new Date(t.response_at).toLocaleDateString('pt-BR')}
-                              </span>
-                            )}
-                          </div>
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(t.status)}`}>
+                            {getStatusLabel(t.status)}
+                          </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-400">
-                          {new Date(t.created_at).toLocaleDateString('pt-BR')}
+                        <td className="px-6 py-4 text-xs text-gray-400 whitespace-nowrap">
+                          {new Date(t.created_at).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex gap-2">
                             <button
                               onClick={() => setSelectedTicket(t)}
-                              className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition"
+                              className="px-3 py-1 bg-blue-600/30 text-blue-400 border border-blue-600/50 rounded hover:bg-blue-600/50 text-xs font-semibold transition"
                             >
-                              {t.status === 'closed' ? 'Visualizar' : 'Responder'}
+                              Ver / Responder
                             </button>
                             {t.status !== 'closed' && (
                               <button
-                                onClick={() => setClosingTicket(t)}
+                                onClick={() => closeTicket(t)}
                                 disabled={closingTicketId === t.id}
-                                className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-700 text-white hover:bg-gray-600 transition disabled:opacity-50"
+                                className="px-3 py-1 bg-red-600/30 text-red-400 border border-red-600/50 rounded hover:bg-red-600/50 text-xs font-semibold transition disabled:opacity-50"
                               >
                                 {closingTicketId === t.id ? 'Fechando...' : 'Fechar'}
                               </button>
@@ -811,7 +878,7 @@ export default function SuportePage() {
             {ticketView === 'landing' && (
               landingLoading ? (
                 <div className="p-6 text-center text-gray-400">Carregando...</div>
-              ) : landingTickets.length === 0 ? (
+              ) : filteredLandingTickets.length === 0 ? (
                 <div className="p-6 text-center text-gray-400">Nenhum ticket de landing encontrado</div>
               ) : (
                 <table className="w-full">
@@ -827,7 +894,7 @@ export default function SuportePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700">
-                    {landingTickets.map((t) => (
+                    {filteredLandingTickets.map((t) => (
                       <tr key={t.id} className={`border-l-4 ${getStatusRowBorder(t.status)} hover:bg-gray-750 transition`}>
                         <td className="px-6 py-4 font-mono text-xs text-gray-400">{t.ticket_number}</td>
                         <td className="px-6 py-4 font-medium text-gray-200">{t.institution_name}</td>
