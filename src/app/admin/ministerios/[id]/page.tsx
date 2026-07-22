@@ -15,7 +15,7 @@ import ActivationModal from '@/components/admin/ministerios/modals/ActivationMod
 import { useBillingActions } from '@/hooks/admin/ministerios/useBillingActions'
 import { friendlyError, getDetailedStatus, formatPhoneDisplay } from '@/lib/admin/ministerios/helpers'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
-import { ShieldCheck, Award, Clock, CreditCard, Users, Church, LogIn } from 'lucide-react'
+import { ShieldCheck, Award, Clock, CreditCard, Users, Church, LogIn, Key, Eye, Wrench, FileText } from 'lucide-react'
 
 interface CockpitPageProps {
   params: Promise<{ id: string }>
@@ -301,6 +301,76 @@ export default function CockpitPage({ params }: CockpitPageProps) {
                 icon={LogIn}
                 color="slate"
               />
+            </div>
+
+            {/* Central de Ações Rápidas */}
+            <div className="bg-gray-800/80 border border-gray-700/50 rounded-xl p-5 space-y-4">
+              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">⚡ Central de Ações Rápidas</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <Link
+                  href={`/admin/ministerios/${ministry.id}/editar`}
+                  className="flex items-center gap-3 p-3 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/30 hover:border-blue-500/50 text-blue-300 rounded-lg text-sm font-medium transition cursor-pointer"
+                >
+                  <Wrench className="w-4 h-4" />
+                  <span>Editar Cadastro</span>
+                </Link>
+
+                <button
+                  onClick={() => handleOpenBilling(ministry)}
+                  className="flex items-center gap-3 p-3 bg-emerald-600/10 hover:bg-emerald-600/20 border border-emerald-500/30 hover:border-emerald-500/50 text-emerald-300 rounded-lg text-sm font-medium transition text-left cursor-pointer"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>Gerar Cobrança</span>
+                </button>
+
+                <button
+                  onClick={() => handleOpenActivate(ministry)}
+                  className="flex items-center gap-3 p-3 bg-amber-600/10 hover:bg-amber-600/20 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 rounded-lg text-sm font-medium transition text-left cursor-pointer"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Ativar / Renovar</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('financeiro')}
+                  className="flex items-center gap-3 p-3 bg-gray-700/40 hover:bg-gray-750 border border-gray-600/50 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition text-left cursor-pointer"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>Visualizar Faturas</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('usuarios')}
+                  className="flex items-center gap-3 p-3 bg-gray-700/40 hover:bg-gray-750 border border-gray-600/50 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition text-left cursor-pointer"
+                >
+                  <Key className="w-4 h-4" />
+                  <span>Resetar Credenciais</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('usuarios')}
+                  className="flex items-center gap-3 p-3 bg-gray-700/40 hover:bg-gray-750 border border-gray-600/50 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition text-left cursor-pointer"
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Visualizar Usuários</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('congregacoes')}
+                  className="flex items-center gap-3 p-3 bg-gray-700/40 hover:bg-gray-750 border border-gray-600/50 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition text-left cursor-pointer"
+                >
+                  <Church className="w-4 h-4" />
+                  <span>Acessar Congregações</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('auditoria')}
+                  className="flex items-center gap-3 p-3 bg-gray-700/40 hover:bg-gray-750 border border-gray-600/50 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition text-left cursor-pointer"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Ver Auditoria</span>
+                </button>
+              </div>
             </div>
 
             {/* Abas de Informação */}
