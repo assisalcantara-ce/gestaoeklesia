@@ -15,7 +15,7 @@ import ActivationModal from '@/components/admin/ministerios/modals/ActivationMod
 import { useBillingActions } from '@/hooks/admin/ministerios/useBillingActions'
 import { friendlyError, getDetailedStatus, formatPhoneDisplay } from '@/lib/admin/ministerios/helpers'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
-import { ShieldCheck, Award, Clock, CreditCard, Users, Church, LogIn, Key, Eye, Wrench, FileText } from 'lucide-react'
+import { ShieldCheck, Award, Clock, CreditCard, Users, Church, LogIn, Key, Eye, Wrench, FileText, AlertTriangle, AlertCircle, XCircle } from 'lucide-react'
 
 interface CockpitPageProps {
   params: Promise<{ id: string }>
@@ -372,6 +372,95 @@ export default function CockpitPage({ params }: CockpitPageProps) {
                 </button>
               </div>
             </div>
+
+            {/* Seção Alertas e Atenção */}
+            {(() => {
+              const alerts = [];
+
+              // Alerta 1: Trial Expirado
+              if (statusDetail.type === 'TRIAL_EXPIRADO') {
+                alerts.push({
+                  icon: XCircle,
+                  title: 'Licença de Teste Expirada',
+                  description: 'O período de avaliação gratuita deste ministério terminou. Efetue a ativação comercial para restabelecer o acesso.',
+                  severity: 'danger',
+                });
+              }
+
+              // Alerta 2: Trial perto do fim (menos de 7 dias)
+              if (statusDetail.type === 'TRIAL_ATIVO') {
+                const daysRemaining = parseInt(statusDetail.label.replace('Teste — restam ', '').replace(' dias', ''));
+                if (daysRemaining < 7) {
+                  alerts.push({
+                    icon: AlertTriangle,
+                    title: `Período de Avaliação Terminando (${daysRemaining} dias)`,
+                    description: 'O período de Trial deste ministério está próximo do fim. Recomendamos gerar faturamento para evitar suspensões.',
+                    severity: 'warning',
+                  });
+                }
+              }
+
+              // Alerta 3: Assinatura suspensa
+              if (statusDetail.type === 'SUSPENSO') {
+                alerts.push({
+                  icon: XCircle,
+                  title: 'Assinatura Suspensa',
+                  description: 'A licença deste ministério encontra-se temporariamente suspensa por falta de pagamento ou cancelamento manual.',
+                  severity: 'danger',
+                });
+              }
+
+              // Alerta 4: Cobrança vencida ou pendente
+              const cobrancasAbertas = faturas.filter((fat: any) => fat.status !== 'RECEIVED' && fat.status !== 'CONFIRMED');
+              if (cobrancasAbertas.length > 0) {
+                alerts.push({
+                  icon: AlertCircle,
+                  title: 'Faturas Pendentes no Asaas',
+                  description: `Existem ${cobrancasAbertas.length} cobrança(s) pendente(s) ou vencida(s) no sistema. Verifique a aba Financeiro Asaas.`,
+                  severity: 'warning',
+                });
+              }
+
+              // Alerta 5: Sem administrador cadastrado
+              if (!ministry.email_admin) {
+                alerts.push({
+                  icon: AlertTriangle,
+                  title: 'Sem Administrador Definido',
+                  description: 'Não há e-mail administrativo associado a esta conta de ministério. O acesso do cliente está indisponível.',
+                  severity: 'danger',
+                });
+              }
+
+              if (alerts.length === 0) return null;
+
+              return (
+                <div className="bg-gray-800/60 border border-gray-700/50 rounded-xl p-5 space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                    <span>⚠️ Alertas e Atenção</span>
+                    <span className="bg-red-900/50 text-red-300 px-2 py-0.5 rounded-full text-[10px] font-bold border border-red-700/30 animate-pulse">
+                      {alerts.length} pendência(s)
+                    </span>
+                  </h3>
+                  <div className="space-y-2">
+                    {alerts.map((alerta, idx) => {
+                      const Icone = alerta.icon;
+                      const severityColors = alerta.severity === 'danger'
+                        ? 'bg-red-950/40 border-red-900 text-red-200'
+                        : 'bg-amber-950/40 border-amber-900 text-amber-200';
+                      return (
+                        <div key={idx} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${severityColors}`}>
+                          <Icone className="w-5 h-5 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <h4 className="font-bold">{alerta.title}</h4>
+                            <p className="text-xs text-gray-300">{alerta.description}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Abas de Informação */}
             <div className="border-b border-gray-800">
