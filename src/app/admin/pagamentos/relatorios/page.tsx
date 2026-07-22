@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
@@ -19,11 +19,33 @@ import {
   ArrowLeft,
   DollarSign,
   PieChart,
+  Filter,
+  RefreshCw,
+  RotateCcw,
 } from 'lucide-react'
 
 export default function RelatoriosFinanceirosPage() {
   const { isLoading, isAuthenticated, isAdmin, adminUser } = useAdminAuth()
   const router = useRouter()
+
+  // Estados dos Filtros Globais
+  const [periodo, setPeriodo] = useState('este_mes')
+  const [clienteId, setClienteId] = useState('todos')
+  const [statusCobranca, setStatusCobranca] = useState('todos')
+  const [planoSlug, setPlanoSlug] = useState('todos')
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleLimparFiltros = () => {
+    setPeriodo('este_mes')
+    setClienteId('todos')
+    setStatusCobranca('todos')
+    setPlanoSlug('todos')
+  }
+
+  const handleAtualizar = () => {
+    setIsRefreshing(true)
+    setTimeout(() => setIsRefreshing(false), 600)
+  }
 
   useEffect(() => {
     if (!isLoading) {
@@ -89,6 +111,108 @@ export default function RelatoriosFinanceirosPage() {
         </header>
 
         <div className="p-8 max-w-7xl w-full mx-auto space-y-8">
+          {/* Barra de Filtros Globais */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-blue-400" />
+                <h2 className="text-xs font-extrabold uppercase tracking-wider text-gray-300">
+                  Filtros Globais de Análise
+                </h2>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleLimparFiltros}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded-lg text-xs font-semibold border border-gray-700 transition"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Limpar Filtros
+                </button>
+
+                <button
+                  onClick={handleAtualizar}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-xs transition"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Atualizar
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* 1. Período */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                  Período
+                </label>
+                <select
+                  value={periodo}
+                  onChange={(e) => setPeriodo(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:border-blue-500 focus:outline-none cursor-pointer transition"
+                >
+                  <option value="este_mes">Este Mês</option>
+                  <option value="mes_passado">Mês Passado</option>
+                  <option value="90_dias">Últimos 90 dias</option>
+                  <option value="este_ano">Este Ano (2026)</option>
+                  <option value="todos">Todo o Período</option>
+                </select>
+              </div>
+
+              {/* 2. Cliente (Ministério) */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                  Cliente / Ministério
+                </label>
+                <select
+                  value={clienteId}
+                  onChange={(e) => setClienteId(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:border-blue-500 focus:outline-none cursor-pointer transition"
+                >
+                  <option value="todos">Todos os Clientes</option>
+                  <option value="exemplo_1">Igreja Central</option>
+                  <option value="exemplo_2">Comunidade Cristã</option>
+                </select>
+              </div>
+
+              {/* 3. Status da Cobrança */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                  Status da Cobrança
+                </label>
+                <select
+                  value={statusCobranca}
+                  onChange={(e) => setStatusCobranca(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:border-blue-500 focus:outline-none cursor-pointer transition"
+                >
+                  <option value="todos">Todos os Status</option>
+                  <option value="pending">Pendente (Aguardando)</option>
+                  <option value="paid">Pago (Confirmado)</option>
+                  <option value="overdue">Vencido (Inadimplente)</option>
+                  <option value="cancelled">Cancelado</option>
+                </select>
+              </div>
+
+              {/* 4. Plano */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                  Plano de Assinatura
+                </label>
+                <select
+                  value={planoSlug}
+                  onChange={(e) => setPlanoSlug(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:border-blue-500 focus:outline-none cursor-pointer transition"
+                >
+                  <option value="todos">Todos os Planos</option>
+                  <option value="starter">Starter</option>
+                  <option value="expert">Expert</option>
+                  <option value="pro">Pro</option>
+                  <option value="enterprise">Enterprise</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           {/* Área 1: KPIs Executivos */}
           <section className="space-y-4">
             <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
