@@ -35,7 +35,7 @@ export default function MinisteriosPage() {
   const [success, setSuccess] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(15)
-  const [activeTab, setActiveTab] = useState<'ativos' | 'precadastros'>('ativos')
+  const [activeTab, setActiveTab] = useState<'ativos' | 'leads'>('ativos')
   const [confirmDeleteMinisterio, setConfirmDeleteMinisterio] = useState<SupabaseMinistry | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [globalStats, setGlobalStats] = useState<{ total: number; ativos: number; trials: number; suspensos: number; pendentes: number } | null>(null)
@@ -397,9 +397,9 @@ export default function MinisteriosPage() {
                   📋 Ministérios Ativos
                 </button>
                 <button
-                  onClick={() => setActiveTab('precadastros')}
+                  onClick={() => setActiveTab('leads')}
                   className={`px-4 py-3 font-medium text-sm transition ${
-                    activeTab === 'precadastros'
+                    activeTab === 'leads'
                       ? 'text-blue-400 border-b-2 border-blue-400'
                       : 'text-gray-400 hover:text-gray-200'
                   }`}
@@ -492,7 +492,7 @@ export default function MinisteriosPage() {
         )}
 
         {/* TAB: Leads */}
-        {activeTab === 'precadastros' && (
+        {activeTab === 'leads' && (
           <LeadsWidget />
         )}
       </div>
