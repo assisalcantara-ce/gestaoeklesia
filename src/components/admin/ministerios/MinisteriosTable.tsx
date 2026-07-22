@@ -1,6 +1,7 @@
 'use client'
 
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
+import Link from 'next/link'
 import MinistryRowActions from './MinistryRowActions'
 
 interface MinisteriosTableProps {
@@ -69,7 +70,11 @@ export default function MinisteriosTable({
             const statusDetail = getDetailedStatus(ministerio)
             return (
               <tr key={ministerio.id} className="hover:bg-gray-700/40">
-                <td className="px-6 py-4 text-sm text-gray-100">{ministerio.name}</td>
+                <td className="px-6 py-4 text-sm text-gray-100">
+                  <Link href={`/admin/ministerios/${ministerio.id}`} className="hover:text-blue-400 font-medium transition">
+                    {ministerio.name}
+                  </Link>
+                </td>
                 <td className="px-6 py-4 text-sm text-gray-300">{ministerio.email_admin}</td>
                 <td className="px-6 py-4 text-sm text-gray-300">{formatPhoneDisplay(ministerio.phone)}</td>
                 <td className="px-6 py-4 text-sm">
