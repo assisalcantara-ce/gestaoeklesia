@@ -1,10 +1,12 @@
 /**
  * API ROUTE: Ministry Stats (Admin)
- * Endpoint de estatísticas agregadas globais do módulo Tenant Management
+ * Endpoint de estatísticas agregadas globais do módulo Tenant Management.
+ * Reutiliza estritamente a função autoritativa getDetailedStatus() para classificação de status.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-guard'
+import { getDetailedStatus } from '@/lib/admin/ministerios/helpers'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,16 +14,15 @@ export async function GET(request: NextRequest) {
     if (!result.ok) return result.response
     const { supabaseAdmin } = result.ctx
 
-    // Buscar a coleção global de ministérios com suas cobranças
+    // Select otimizado contendo os campos obrigatorios requeridos por getDetailedStatus()
     const { data: ministries, error } = await supabaseAdmin
       .from('ministries')
-      .select('id, subscription_status, trial_ends_at, subscription_end_date, platform_billing_invoices(id, status)')
+      .select('id, is_active, subscription_status, subscription_end_date, trial_ends_at, platform_billing_invoices(id, status)')
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    const now = new Date()
     let ativos = 0
     let trials = 0
     let suspensos = 0
@@ -30,26 +31,18 @@ export async function GET(request: NextRequest) {
     const list = ministries || []
 
     list.forEach((m: any) => {
-      // Regra de calculo de status alinhada com helpers.ts
-      const statusRaw = m.subscription_status
-      const trialEnds = m.trial_ends_at ? new Date(m.trial_ends_at) : null
-      const subEnds = m.subscription_end_date ? new Date(m.subscription_end_date) : null
+      // 1. Classificação via regra autoritativa getDetailedStatus
+      const status = getDetailedStatus(m)
 
-      const isTrial = statusRaw === 'trial' || statusRaw === 'trialing' || statusRaw === 'precadastro' || (trialEnds && trialEnds > now)
-      const isExpiredTrial = (statusRaw === 'trial' || statusRaw === 'trialing' || statusRaw === 'precadastro') && trialEnds && trialEnds <= now
-
-      if (statusRaw === 'active' || statusRaw === 'ativo' || (subEnds && subEnds > now && !isTrial)) {
+      if (status.type === 'ATIVO') {
         ativos++
-      } else if (isTrial && !isExpiredTrial) {
+      } else if (status.type === 'TRIAL_ATIVO') {
         trials++
-      } else if (statusRaw === 'suspended' || statusRaw === 'suspenso' || isExpiredTrial) {
+      } else if (status.type === 'SUSPENSO' || status.type === 'TRIAL_EXPIRADO' || status.type === 'CANCELADO') {
         suspensos++
-      } else {
-        // Fallback default
-        ativos++
       }
 
-      // Regra de cobrancas pendentes no Asaas
+      // 2. Regra de cobranças pendentes no Asaas
       const faturas = m.platform_billing_invoices || []
       const temPendencia = faturas.some((f: any) => f.status !== 'RECEIVED' && f.status !== 'CONFIRMED')
       if (temPendencia) {
