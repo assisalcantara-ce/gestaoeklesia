@@ -97,7 +97,7 @@ export default function ExecutiveMetricCard({
       {/* Topo do Card */}
       <div className="flex justify-between items-start gap-2">
         <div className="space-y-1">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+          <span className="text-[10.5px] font-black text-slate-900 uppercase tracking-wide block">
             {title}
           </span>
           <p className={`text-2xl md:text-3xl font-black ${scheme.text} tracking-tight leading-none`}>
@@ -113,7 +113,7 @@ export default function ExecutiveMetricCard({
       </div>
 
       {/* Subtítulo / Badge de Tendência */}
-      <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2.5 border-t border-slate-100/50">
+      <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2.5 border-t border-slate-200/60">
         
         {trend && (
           <span className={`text-[10px] font-extrabold flex items-center gap-0.5 rounded px-1 py-0.2 shrink-0 ${
@@ -128,13 +128,13 @@ export default function ExecutiveMetricCard({
         )}
 
         {badgeText && (
-          <span className="text-[9px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.2 rounded shadow-3xs shrink-0">
+          <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.2 rounded shadow-3xs shrink-0">
             {badgeText}
           </span>
         )}
 
         {subtitle && (
-          <span className="text-[10px] text-slate-450 font-medium truncate flex-1 min-w-[80px]">
+          <span className="text-[10px] text-slate-600 font-semibold truncate flex-1 min-w-[80px]">
             {subtitle}
           </span>
         )}
@@ -142,7 +142,7 @@ export default function ExecutiveMetricCard({
 
       {/* Footer Text opcional */}
       {footerText && (
-        <span className="text-[9px] text-slate-400 font-bold mt-1.5 block">
+        <span className="text-[9px] text-slate-600 font-bold mt-1.5 block">
           {footerText}
         </span>
       )}
