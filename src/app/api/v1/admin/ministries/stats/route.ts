@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     // Select otimizado contendo os campos obrigatorios requeridos por getDetailedStatus()
     const { data: ministries, error } = await supabaseAdmin
       .from('ministries')
-      .select('id, is_active, subscription_status, subscription_end_date, trial_ends_at, platform_billing_invoices(id, status)')
+      .select('id, is_active, subscription_status, subscription_end_date, platform_billing_invoices(id, status)')
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
