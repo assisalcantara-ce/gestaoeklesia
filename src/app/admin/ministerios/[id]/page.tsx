@@ -14,6 +14,8 @@ import BillingModal from '@/components/admin/ministerios/modals/BillingModal'
 import ActivationModal from '@/components/admin/ministerios/modals/ActivationModal'
 import { useBillingActions } from '@/hooks/admin/ministerios/useBillingActions'
 import { friendlyError, getDetailedStatus, formatPhoneDisplay } from '@/lib/admin/ministerios/helpers'
+import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
+import { ShieldCheck, Award, Clock, CreditCard, Users, Church, LogIn } from 'lucide-react'
 
 interface CockpitPageProps {
   params: Promise<{ id: string }>
@@ -236,6 +238,69 @@ export default function CockpitPage({ params }: CockpitPageProps) {
                   💰 Gerar Cobrança
                 </button>
               </div>
+            </div>
+
+            {/* Painel Executivo (Executive Summary) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+              <ExecutiveMetricCard
+                title="Assinatura"
+                value={statusDetail.label}
+                subtitle="Status Geral"
+                icon={ShieldCheck}
+                color={statusDetail.type === 'ATIVO' ? 'emerald' : statusDetail.type === 'TRIAL_ATIVO' ? 'blue' : 'rose'}
+              />
+
+              <ExecutiveMetricCard
+                title="Plano Atual"
+                value={ministry.plan ? String(ministry.plan).toUpperCase() : 'STARTER'}
+                subtitle="Licenciamento"
+                icon={Award}
+                color="indigo"
+              />
+
+              <ExecutiveMetricCard
+                title="Trial / Dias"
+                value={
+                  statusDetail.type === 'TRIAL_ATIVO'
+                    ? statusDetail.label.replace('Teste — restam ', '').replace(' dias', '')
+                    : 'Licenciado'
+                }
+                subtitle="Período de Testes"
+                icon={Clock}
+                color="blue"
+              />
+
+              <ExecutiveMetricCard
+                title="Última Cobrança"
+                value={faturas.length > 0 ? `R$ ${faturas[0].value}` : 'R$ 0'}
+                subtitle={faturas.length > 0 ? String(faturas[0].status).toUpperCase() : 'Nenhuma'}
+                icon={CreditCard}
+                color="slate"
+              />
+
+              <ExecutiveMetricCard
+                title="Usuários"
+                value="1"
+                subtitle="Ativos na conta"
+                icon={Users}
+                color="slate"
+              />
+
+              <ExecutiveMetricCard
+                title="Congregações"
+                value={ministry.quantity_temples || 'Ilimitado'}
+                subtitle="Templos permitidos"
+                icon={Church}
+                color="slate"
+              />
+
+              <ExecutiveMetricCard
+                title="Último Acesso"
+                value="Não informado"
+                subtitle="Logs de login"
+                icon={LogIn}
+                color="slate"
+              />
             </div>
 
             {/* Abas de Informação */}
