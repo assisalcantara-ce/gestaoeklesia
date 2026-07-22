@@ -545,7 +545,50 @@ export default function PagamentosPage() {
                     </div>
 
                     {isExpanded && (
-                      <div className="overflow-x-auto bg-gray-950/30 border-t border-gray-800/40">
+                      <>
+                        {/* Resumo Financeiro Executivo do Cliente */}
+                        {(() => {
+                          const clienteAberto = group.invoices
+                            .filter((i) => i.status === 'PENDING' || i.status === 'pending' || i.status === 'OVERDUE' || i.status === 'overdue')
+                            .reduce((sum, i) => sum + (i.amount || 0), 0);
+
+                          const clienteRecebido = group.invoices
+                            .filter((i) => i.status === 'RECEIVED' || i.status === 'paid' || i.status === 'CONFIRMED' || i.status === 'pago')
+                            .reduce((sum, i) => sum + (i.amount || 0), 0);
+
+                          const pendentesComData = group.invoices
+                            .filter((i) => (i.status === 'PENDING' || i.status === 'pending' || i.status === 'OVERDUE' || i.status === 'overdue') && i.due_date)
+                            .map((i) => new Date(i.due_date!).getTime());
+
+                          const menorVencimento = pendentesComData.length > 0 ? new Date(Math.min(...pendentesComData)) : null;
+                          const proximoVencimentoFormatted = menorVencimento ? menorVencimento.toLocaleDateString('pt-BR') : '—';
+
+                          return (
+                            <div className="bg-gray-900/90 border-t border-b border-gray-800/80 px-6 py-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                              <div className="bg-gray-950/70 p-2.5 rounded-lg border border-gray-800/80">
+                                <span className="text-gray-400 font-medium text-[11px] block">Total em Aberto</span>
+                                <span className="text-amber-400 font-bold text-sm mt-0.5 block">{formatCurrency(clienteAberto)}</span>
+                              </div>
+
+                              <div className="bg-gray-950/70 p-2.5 rounded-lg border border-gray-800/80">
+                                <span className="text-gray-400 font-medium text-[11px] block">Valor Recebido</span>
+                                <span className="text-emerald-400 font-bold text-sm mt-0.5 block">{formatCurrency(clienteRecebido)}</span>
+                              </div>
+
+                              <div className="bg-gray-950/70 p-2.5 rounded-lg border border-gray-800/80">
+                                <span className="text-gray-400 font-medium text-[11px] block">Faturas Emitidas</span>
+                                <span className="text-white font-bold text-sm mt-0.5 block">{group.invoices.length} fatura{group.invoices.length !== 1 ? 's' : ''}</span>
+                              </div>
+
+                              <div className="bg-gray-950/70 p-2.5 rounded-lg border border-gray-800/80">
+                                <span className="text-gray-400 font-medium text-[11px] block">Próximo Vencimento</span>
+                                <span className="text-blue-400 font-bold text-sm mt-0.5 block">{proximoVencimentoFormatted}</span>
+                              </div>
+                            </div>
+                          )
+                        })()}
+
+                        <div className="overflow-x-auto bg-gray-950/30">
                         <table className="w-full text-left border-collapse">
                           <thead>
                             <tr className="border-b border-gray-800 bg-gray-950/40 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
@@ -629,6 +672,7 @@ export default function PagamentosPage() {
                           </tbody>
                         </table>
                       </div>
+                      </>
                     )}
                   </div>
                 );
