@@ -11,7 +11,7 @@ import AdminSidebar from '@/components/AdminSidebar'
 import { temAcessoAdmin } from '@/lib/access-control'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 import type { SubscriptionPlan } from '@/types/admin'
-import { onlyDigits, formatPhone } from '@/lib/mascaras'
+
 
 import MinisteriosHeader from '@/components/admin/ministerios/MinisteriosHeader'
 import MinisteriosToolbar from '@/components/admin/ministerios/MinisteriosToolbar'
@@ -25,6 +25,7 @@ import { useMinisterios } from '@/hooks/admin/ministerios/useMinisterios'
 import { useMinistryForm } from '@/hooks/admin/ministerios/useMinistryForm'
 import { useCsvImport } from '@/hooks/admin/ministerios/useCsvImport'
 import { useBillingActions } from '@/hooks/admin/ministerios/useBillingActions'
+import { friendlyError, getDetailedStatus, formatPhoneDisplay } from '@/lib/admin/ministerios/helpers'
 
 export default function MinisteriosPage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
@@ -40,17 +41,6 @@ export default function MinisteriosPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const errorRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
-
-  const friendlyError = (msg: string): string => {
-    if (!msg) return msg
-    if (msg.includes('ministries_email_admin_key') || (msg.includes('duplicate key') && msg.includes('email')))
-      return 'Este e-mail já está cadastrado em outro ministério. Utilize um e-mail diferente.'
-    if (msg.includes('duplicate key') || msg.includes('unique constraint'))
-      return 'Já existe um registro com esses dados. Verifique os campos e tente novamente.'
-    if (msg.includes('auth/email-already-in-use') || msg.includes('User already registered'))
-      return 'Este e-mail já possui uma conta no sistema. Utilize outro e-mail de acesso.'
-    return msg
-  }
 
   const showError = (msg: string) => {
     setError(friendlyError(msg))
@@ -172,55 +162,7 @@ export default function MinisteriosPage() {
     setMinisterios,
   })
 
-  const getDetailedStatus = (m: any) => {
-    if (!m.is_active || m.subscription_status === 'suspended') {
-      return {
-        label: 'Suspenso',
-        class: 'bg-red-900/60 text-red-200 border border-red-700/50',
-        type: 'SUSPENSO'
-      }
-    }
-    if (m.subscription_status === 'cancelled') {
-      return {
-        label: 'Cancelado',
-        class: 'bg-gray-700 text-gray-300 border border-gray-600',
-        type: 'CANCELADO'
-      }
-    }
-    if (m.subscription_status === 'trial') {
-      const expiresAt = m.subscription_end_date ? new Date(m.subscription_end_date) : null
-      const now = new Date()
-      if (expiresAt && expiresAt.getTime() <= now.getTime()) {
-        return {
-          label: 'Teste Expirado',
-          class: 'bg-red-950 text-red-400 border border-red-800',
-          type: 'TRIAL_EXPIRADO',
-          expiresAt
-        }
-      } else {
-        const diffTime = expiresAt ? expiresAt.getTime() - now.getTime() : 0
-        const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
-        return {
-          label: `Teste — restam ${diffDays} dias`,
-          class: 'bg-blue-900/80 text-blue-200 border border-blue-700',
-          type: 'TRIAL_ATIVO',
-          expiresAt
-        }
-      }
-    }
-    if (m.subscription_status === 'active') {
-      return {
-        label: 'Ativo',
-        class: 'bg-green-900/80 text-green-200 border border-green-700',
-        type: 'ATIVO'
-      }
-    }
-    return {
-      label: m.is_active ? 'Ativo' : 'Inativo',
-      class: m.is_active ? 'bg-green-900 text-green-200' : 'bg-gray-700 text-gray-300',
-      type: m.is_active ? 'ATIVO' : 'SUSPENSO'
-    }
-  }
+
 
   const handleDelete = (ministerio: SupabaseMinistry) => {
     setConfirmDeleteMinisterio(ministerio)
@@ -286,11 +228,7 @@ export default function MinisteriosPage() {
     }
   }
 
-  const formatPhoneDisplay = (value: string | null | undefined) => {
-    const digits = onlyDigits(value || '')
-    if (!digits) return '-'
-    return formatPhone(digits)
-  }
+
 
   const handlePrintLabel = async (m: SupabaseMinistry) => {
     let password = tempPasswords[m.id] || '';

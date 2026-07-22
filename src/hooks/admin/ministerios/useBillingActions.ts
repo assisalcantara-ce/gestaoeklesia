@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { authenticatedFetch } from '@/lib/api-client'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 import type { SubscriptionPlan } from '@/types/admin'
+import { getPlanPrice } from '@/lib/admin/ministerios/helpers'
 
 interface UseBillingActionsOptions {
   planos: SubscriptionPlan[]
@@ -127,9 +128,8 @@ export function useBillingActions({
     setSuccess('')
   }
 
-  const getPlanPrice = (slug: string) => {
-    const p = planos.find((x) => x.slug === slug)
-    return p ? Number(p.price_monthly) : 99
+  const getPlanPriceWrapper = (slug: string) => {
+    return getPlanPrice(slug, planos)
   }
 
   const handleCreateBillingSubmit = async (e: React.FormEvent) => {
@@ -208,7 +208,7 @@ export function useBillingActions({
     handleOpenActivate,
     handleActivateSubmit,
     handleOpenBilling,
-    getPlanPrice,
+    getPlanPrice: getPlanPriceWrapper,
     handleCreateBillingSubmit,
   }
 }
