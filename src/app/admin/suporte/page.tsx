@@ -7,10 +7,10 @@ import { useRouter } from 'next/navigation'
 import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import AdminSidebar from '@/components/AdminSidebar'
-import type { SupportTicket, SupportTicketMessage, SupportTicketLanding, LandingTicketNote } from '@/types/admin'
+import type { SupportTicket, SupportTicketMessage, SupportTicketLanding } from '@/types/admin'
 import { temAcessoAdmin } from '@/lib/access-control'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
-import { LifeBuoy, Clock, MessageSquare, AlertTriangle, CheckCircle2, Search, Plus, MoreVertical } from 'lucide-react'
+import { LifeBuoy, Clock, MessageSquare, AlertTriangle, CheckCircle2, Search, Plus, MoreVertical, X, Send } from 'lucide-react'
 
 export default function SuportePage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
@@ -520,8 +520,6 @@ export default function SuportePage() {
     }
     return 'none'
   }
-
-  const selectedTicketReplyState = getReplyState(selectedTicket)
 
   return (
     <div className="flex h-screen bg-gray-900">
@@ -1085,161 +1083,174 @@ export default function SuportePage() {
         </div>
       </main>
 
-      {/* Modal: Ticket de Ministério */}
+      {/* Drawer Lateral Slide-Over: Ticket de Ministério (Suporte 2.0) */}
       {ticketView === 'tenant' && selectedTicket && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden border border-gray-700">
-            {/* Header */}
-            <div className="relative bg-gradient-to-r from-[#0f2f4d] via-[#123b63] to-[#1b6aa5] text-white px-8 py-7">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-white/70">Ticket</p>
-                  <h3 className="text-2xl font-bold">{selectedTicket.subject}</h3>
-                  <p className="text-sm text-white/80 mt-1">#{selectedTicket.ticket_number}</p>
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          {/* Backdrop semitransparente com transição */}
+          <div
+            onClick={() => {
+              setSelectedTicket(null)
+              setMessages([])
+              setReplyText('')
+              setError('')
+            }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+          />
+
+          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+            <div className="w-screen max-w-2xl bg-gray-900 border-l border-gray-800 shadow-2xl flex flex-col">
+              {/* Cabeçalho Fixo do Drawer */}
+              <div className="p-6 bg-gray-950 border-b border-gray-800 flex items-start justify-between gap-4 sticky top-0 z-10">
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800/60 font-semibold">
+                      #{selectedTicket.ticket_number}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${getStatusColor(selectedTicket.status)}`}>
+                      {getStatusLabel(selectedTicket.status)}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${getPriorityColor(selectedTicket.priority)}`}>
+                      {getPriorityLabel(selectedTicket.priority)}
+                    </span>
+                  </div>
+
+                  <h3 className="text-lg font-bold text-white truncate">{selectedTicket.subject}</h3>
+                  <p className="text-xs text-gray-400">
+                    Solicitante: <span className="text-gray-200 font-semibold">{selectedTicket.ministry_name || selectedTicket.ministry_id}</span>
+                  </p>
                 </div>
+
                 <button
-                  onClick={() => { setSelectedTicket(null); setMessages([]); setReplyText(''); setError('') }}
-                  className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-2 transition"
+                  onClick={() => {
+                    setSelectedTicket(null)
+                    setMessages([])
+                    setReplyText('')
+                    setError('')
+                  }}
+                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
                 >
-                  ✕
+                  <X className="h-5 w-5" />
                 </button>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {selectedTicketReplyState === 'support' ? (
-                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                    RESPOSTA DO SUPORTE
+
+              {/* Corpo do Drawer com Histórico em Formato Chat */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-900/50">
+                {/* Descrição Inicial do Ticket */}
+                <div className="bg-gray-950 border border-gray-800 rounded-xl p-4 shadow-xs">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Descrição Inicial</h4>
+                  <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">
+                    {selectedTicket.description}
+                  </p>
+                  <span className="text-[10px] text-gray-500 mt-3 block">
+                    Criado em: {new Date(selectedTicket.created_at).toLocaleString('pt-BR')}
                   </span>
-                ) : selectedTicketReplyState === 'customer' ? (
-                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    RESPOSTA DO CLIENTE
+                </div>
+
+                {/* Divisor do Histórico */}
+                <div className="relative flex items-center justify-center my-4">
+                  <div className="border-t border-gray-800 w-full" />
+                  <span className="bg-gray-900 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider absolute">
+                    Histórico de Atendimento
                   </span>
+                </div>
+
+                {/* Histórico em Formato Chat */}
+                {messages.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500 text-xs font-medium">
+                    Nenhuma mensagem registrada. Envie uma resposta abaixo para iniciar o atendimento.
+                  </div>
                 ) : (
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedTicket.status)}`}>
-                    {getStatusLabel(selectedTicket.status)}
-                  </span>
-                )}
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPriorityColor(selectedTicket.priority)}`}>
-                  PRIORIDADE {getPriorityLabel(selectedTicket.priority)}
-                </span>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white">
-                  {selectedTicket.ministry_name || selectedTicket.ministry_id}
-                </span>
-              </div>
-            </div>
+                  <div className="space-y-4">
+                    {messages.map((msg, index) => {
+                      const isLatestMessage = index === 0
+                      const forceSupportOnRespondedTicket =
+                        isLatestMessage && (selectedTicket.status === 'waiting_customer' || Boolean(selectedTicket.response_at))
+                      const isSupportMessage = msg.sender_role
+                        ? msg.sender_role === 'support'
+                        : msg.user_id !== selectedTicket.user_id || forceSupportOnRespondedTicket
+                      const isInternalNote = msg.is_internal
 
-            <div className="px-6 lg:px-8 pb-8 max-h-[70vh] overflow-y-auto">
-              <div className="mx-auto grid grid-cols-1 lg:grid-cols-2 gap-0">
-                {/* Esquerda: detalhe + conversa */}
-                <div className="p-6 border-b lg:border-b-0 lg:border-r border-gray-700 space-y-6">
-                  <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Detalhes</h4>
-                    <p className="text-gray-300 bg-gray-800 border border-gray-700 rounded-xl p-4 leading-relaxed text-sm">
-                      {selectedTicket.description}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Conversas</h4>
-                    </div>
-                    {messages.length === 0 ? (
-                      <p className="text-gray-500 text-sm">Nenhuma mensagem ainda.</p>
-                    ) : (
-                      <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                        {messages.map((msg, index) => {
-                          const isLatestMessage = index === 0
-                          const forceSupportOnRespondedTicket =
-                            isLatestMessage && (selectedTicket.status === 'waiting_customer' || Boolean(selectedTicket.response_at))
-                          const isSupportMessage = msg.sender_role
-                            ? msg.sender_role === 'support'
-                            : msg.user_id !== selectedTicket.user_id || forceSupportOnRespondedTicket
-
-                          return (
-                            <div
-                              key={msg.id}
-                              className={`rounded-xl p-3 border ${
-                                isSupportMessage
-                                  ? 'bg-orange-900/20 border-orange-700/40'
-                                  : 'bg-emerald-900/20 border-emerald-700/40'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
-                                <span className="inline-flex items-center gap-2 font-semibold">
-                                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${
-                                    isSupportMessage
-                                      ? 'bg-orange-700/50 text-orange-300'
-                                      : 'bg-emerald-700/50 text-emerald-300'
-                                  }`}>
-                                    {isSupportMessage ? 'ST' : 'CL'}
-                                  </span>
-                                  {isSupportMessage ? 'Suporte Técnico' : 'Cliente'}
-                                </span>
-                                <span>{new Date(msg.created_at).toLocaleString('pt-BR')}</span>
-                              </div>
-                              <p className="text-gray-300 whitespace-pre-wrap text-sm leading-relaxed">{msg.message}</p>
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`flex flex-col ${
+                            isInternalNote
+                              ? 'items-center'
+                              : isSupportMessage
+                              ? 'items-end'
+                              : 'items-start'
+                          }`}
+                        >
+                          <div
+                            className={`max-w-[85%] rounded-2xl p-4 shadow-xs text-xs ${
+                              isInternalNote
+                                ? 'bg-amber-950/40 border border-amber-800/50 text-amber-200 rounded-xl w-full'
+                                : isSupportMessage
+                                ? 'bg-blue-950/70 border border-blue-800/60 text-gray-100 rounded-tr-xs'
+                                : 'bg-gray-800/80 border border-gray-700 text-gray-100 rounded-tl-xs'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-4 mb-1.5 pb-1 border-b border-white/10">
+                              <span className="font-bold flex items-center gap-1.5">
+                                {isInternalNote ? (
+                                  '📌 Nota Interna da Equipe'
+                                ) : isSupportMessage ? (
+                                  '💬 Suporte Técnico'
+                                ) : (
+                                  '👤 Cliente / Ministério'
+                                )}
+                              </span>
+                              <span className="text-[10px] opacity-70">
+                                {new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
                             </div>
-                          )
-                        })}
-                      </div>
-                    )}
+                            <p className="whitespace-pre-wrap leading-relaxed text-xs">{msg.message}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                </div>
-
-                {/* Direita: datas + resposta */}
-                <div className="p-6 space-y-6">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="rounded-xl border border-gray-700 bg-gray-800 p-3">
-                      <p className="text-xs text-gray-500 uppercase tracking-widest">Criado em</p>
-                      <p className="font-semibold text-gray-200 mt-1">
-                        {new Date(selectedTicket.created_at).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-gray-700 bg-gray-800 p-3">
-                      <p className="text-xs text-gray-500 uppercase tracking-widest">Atualizado</p>
-                      <p className="font-semibold text-gray-200 mt-1">
-                        {new Date(selectedTicket.updated_at).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {selectedTicket.status === 'closed' ? (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Ticket fechado</h4>
-                      <p className="text-sm text-gray-500">
-                        Este ticket foi fechado. O cliente pode reabrir caso necessite.
-                      </p>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleReply} className="space-y-4">
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Responder</h4>
-                      <textarea
-                        value={replyText}
-                        onChange={(e) => setReplyText(e.target.value)}
-                        rows={6}
-                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-gray-200 rounded-xl focus:outline-none focus:border-blue-500 resize-none placeholder-gray-600 text-sm"
-                        placeholder="Escreva a resposta para o cliente"
-                      />
-                      <div className="flex flex-wrap gap-3 items-center">
-                        <select
-                          value={replyStatus}
-                          onChange={(e) => setReplyStatus(e.target.value as SupportTicket['status'])}
-                          className="bg-gray-800 border border-gray-700 text-gray-300 rounded-lg px-3 py-2 text-sm"
-                        >
-                          <option value="waiting_customer">Resposta do Suporte</option>
-                          <option value="in_progress">Em Progresso</option>
-                          <option value="closed">Fechado</option>
-                        </select>
-                        <button
-                          type="submit"
-                          disabled={replying}
-                          className="ml-auto px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
-                        >
-                          {replying ? 'Enviando...' : 'Enviar resposta'}
-                        </button>
-                      </div>
-                    </form>
-                  )}
-                </div>
+                )}
               </div>
+
+              {/* Rodapé Fixo de Resposta */}
+              {selectedTicket.status === 'closed' ? (
+                <div className="p-4 bg-gray-950 border-t border-gray-800 text-center text-xs text-gray-400 font-medium">
+                  🔒 Ticket Encerrado. O atendimento foi finalizado.
+                </div>
+              ) : (
+                <form onSubmit={handleReply} className="p-4 bg-gray-950 border-t border-gray-800 space-y-3 sticky bottom-0 z-10">
+                  <textarea
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    rows={3}
+                    className="w-full bg-gray-900 border border-gray-800 rounded-xl p-3 text-xs text-gray-200 placeholder-gray-500 focus:border-blue-500 focus:outline-none resize-none transition"
+                    placeholder="Digite a resposta para o cliente..."
+                    required
+                  />
+
+                  <div className="flex items-center justify-between gap-3">
+                    <select
+                      value={replyStatus}
+                      onChange={(e) => setReplyStatus(e.target.value as SupportTicket['status'])}
+                      className="bg-gray-900 border border-gray-800 text-gray-300 rounded-lg px-3 py-1.5 text-xs font-medium focus:border-blue-500 focus:outline-none"
+                    >
+                      <option value="waiting_customer">Status: Aguardando Cliente</option>
+                      <option value="in_progress">Status: Em Atendimento</option>
+                      <option value="closed">Status: Fechado</option>
+                    </select>
+
+                    <button
+                      type="submit"
+                      disabled={replying || !replyText.trim()}
+                      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg text-xs font-bold shadow-sm transition disabled:opacity-50"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      {replying ? 'Enviando...' : 'Enviar Resposta'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         </div>
@@ -1276,132 +1287,139 @@ export default function SuportePage() {
         </div>
       )}
 
-      {/* Modal: Ticket da Landing */}
+      {/* Drawer Lateral Slide-Over: Ticket do Site / Landing (Suporte 2.0) */}
       {ticketView === 'landing' && selectedLandingTicket && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden border border-gray-700">
-            {/* Header */}
-            <div className="relative bg-gradient-to-r from-[#123b63] via-[#1b6aa5] to-[#2b7cbf] text-white px-8 py-7">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-white/70">Ticket Landing</p>
-                  <h3 className="text-2xl font-bold">{selectedLandingTicket.institution_name}</h3>
-                  <p className="text-sm text-white/80 mt-1">#{selectedLandingTicket.ticket_number}</p>
-                </div>
-                <button
-                  onClick={() => setSelectedLandingTicket(null)}
-                  className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-2 transition"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedLandingTicket.status)}`}>
-                  {getStatusLabel(selectedLandingTicket.status)}
-                </span>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPriorityColor(selectedLandingTicket.priority)}`}>
-                  PRIORIDADE {getPriorityLabel(selectedLandingTicket.priority)}
-                </span>
-              </div>
-            </div>
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          <div
+            onClick={() => setSelectedLandingTicket(null)}
+            className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+          />
 
-            <div className="px-6 lg:px-8 pb-8 pt-6 space-y-6 max-h-[70vh] overflow-y-auto">
-              {/* Info contato */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="rounded-xl border border-gray-700 bg-gray-800 p-4">
-                  <p className="text-xs text-gray-500 uppercase tracking-widest">Contato</p>
-                  <p className="font-semibold text-gray-200 mt-2">{selectedLandingTicket.contact_name}</p>
-                  <p className="text-gray-400 mt-1">{selectedLandingTicket.email}</p>
-                  <p className="text-gray-400 mt-1">{selectedLandingTicket.whatsapp}</p>
-                </div>
-                <div className="rounded-xl border border-gray-700 bg-gray-800 p-4">
-                  <p className="text-xs text-gray-500 uppercase tracking-widest">Criado em</p>
-                  <p className="font-semibold text-gray-200 mt-2">
-                    {new Date(selectedLandingTicket.created_at).toLocaleString('pt-BR')}
+          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+            <div className="w-screen max-w-xl bg-gray-900 border-l border-gray-800 shadow-2xl flex flex-col">
+              {/* Cabeçalho Fixo do Drawer */}
+              <div className="p-6 bg-gray-950 border-b border-gray-800 flex items-start justify-between gap-4 sticky top-0 z-10">
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800/60 font-semibold">
+                      #{selectedLandingTicket.ticket_number}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${getStatusColor(selectedLandingTicket.status)}`}>
+                      {getStatusLabel(selectedLandingTicket.status)}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${getPriorityColor(selectedLandingTicket.priority)}`}>
+                      {getPriorityLabel(selectedLandingTicket.priority)}
+                    </span>
+                  </div>
+
+                  <h3 className="text-lg font-bold text-white truncate">{selectedLandingTicket.institution_name}</h3>
+                  <p className="text-xs text-gray-400">
+                    Lead: <span className="text-gray-200 font-semibold">{selectedLandingTicket.contact_name}</span> ({selectedLandingTicket.email})
                   </p>
                 </div>
+
+                <button
+                  onClick={() => setSelectedLandingTicket(null)}
+                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
 
-              {/* Botões de status */}
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-widest mb-3">Mudar Status</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => updateLandingStatus(selectedLandingTicket.id, 'em_atendimento')}
-                    disabled={landingUpdating}
-                    className="px-3 py-2 rounded-lg text-xs font-semibold bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 disabled:opacity-50 transition"
-                  >
-                    Em Atendimento
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateLandingStatus(selectedLandingTicket.id, 'aguardando_contrato')}
-                    disabled={landingUpdating}
-                    className="px-3 py-2 rounded-lg text-xs font-semibold bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 disabled:opacity-50 transition"
-                  >
-                    Aguardando Contrato
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateLandingStatus(selectedLandingTicket.id, 'contrato_finalizado')}
-                    disabled={landingUpdating}
-                    className="px-3 py-2 rounded-lg text-xs font-semibold bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 disabled:opacity-50 transition"
-                  >
-                    Contrato Finalizado
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateLandingStatus(selectedLandingTicket.id, 'cancelado')}
-                    disabled={landingUpdating}
-                    className="px-3 py-2 rounded-lg text-xs font-semibold bg-gray-500/10 border border-gray-500/30 text-gray-400 hover:bg-gray-500/20 disabled:opacity-50 transition"
-                  >
-                    Cancelado
-                  </button>
-                </div>
-              </div>
-
-              {/* Descrição */}
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Descrição</p>
-                <div className="rounded-xl border border-gray-700 bg-gray-800 p-4 text-sm text-gray-300 whitespace-pre-wrap">
-                  {selectedLandingTicket.description}
-                </div>
-              </div>
-
-              {/* Histórico de comentários */}
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-widest mb-3">Histórico de Comentários</p>
-                {(!selectedLandingTicket.notes || selectedLandingTicket.notes.length === 0) ? (
-                  <p className="text-xs text-gray-600 italic mb-3">Nenhum comentário ainda.</p>
-                ) : (
-                  <div className="space-y-3 mb-4 max-h-56 overflow-y-auto pr-1">
-                    {[...selectedLandingTicket.notes].reverse().map((note: LandingTicketNote, idx: number) => (
-                      <div key={idx} className="rounded-xl border border-blue-800/40 bg-blue-900/20 p-4">
-                        <p className="text-sm text-gray-300 whitespace-pre-wrap">{note.text}</p>
-                        <p className="text-xs text-gray-500 mt-2">
-                          {new Date(note.created_at).toLocaleString('pt-BR')}
-                        </p>
-                      </div>
-                    ))}
+              {/* Corpo do Drawer com Informações e Notas */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-900/50">
+                {/* Dados de Contato do Lead */}
+                <div className="bg-gray-950 border border-gray-800 rounded-xl p-4 shadow-xs space-y-3">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Dados de Contato</h4>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-gray-500 block">Contato:</span>
+                      <span className="font-semibold text-gray-200">{selectedLandingTicket.contact_name}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">WhatsApp:</span>
+                      <span className="font-semibold text-gray-200">{selectedLandingTicket.whatsapp || 'Não informado'}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-500 block">E-mail:</span>
+                      <span className="font-semibold text-gray-200">{selectedLandingTicket.email}</span>
+                    </div>
                   </div>
-                )}
-                <div className="flex flex-col gap-2">
-                  <textarea
-                    rows={3}
-                    placeholder="Escreva um comentário interno..."
-                    value={landingNoteText}
-                    onChange={(e) => setLandingNoteText(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 text-gray-200 rounded-xl text-sm resize-none placeholder-gray-600 focus:outline-none focus:border-blue-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={addLandingNote}
-                    disabled={landingAddingNote || !landingNoteText.trim()}
-                    className="self-end px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
-                  >
-                    {landingAddingNote ? 'Salvando...' : 'Salvar Comentário'}
-                  </button>
+                </div>
+
+                {/* Descrição do Interesse */}
+                <div className="bg-gray-950 border border-gray-800 rounded-xl p-4 shadow-xs">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Mensagem do Site</h4>
+                  <p className="text-xs text-gray-200 whitespace-pre-wrap leading-relaxed">
+                    {selectedLandingTicket.description}
+                  </p>
+                </div>
+
+                {/* Alteração Rápida de Status */}
+                <div className="bg-gray-950 border border-gray-800 rounded-xl p-4 shadow-xs space-y-3">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Alterar Status do Lead</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateLandingStatus(selectedLandingTicket.id, 'em_atendimento')}
+                      disabled={landingUpdating}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 disabled:opacity-50 transition"
+                    >
+                      Em Atendimento
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateLandingStatus(selectedLandingTicket.id, 'aguardando_contrato')}
+                      disabled={landingUpdating}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 disabled:opacity-50 transition"
+                    >
+                      Aguardando Contrato
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateLandingStatus(selectedLandingTicket.id, 'contrato_finalizado')}
+                      disabled={landingUpdating}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50 transition"
+                    >
+                      Contrato Finalizado
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bloco de Notas Internas */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Notas Internas do Atendimento</h4>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={landingNoteText}
+                      onChange={(e) => setLandingNoteText(e.target.value)}
+                      placeholder="Adicionar nota sobre esta negociação..."
+                      className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={addLandingNote}
+                      disabled={landingAddingNote || !landingNoteText.trim()}
+                      className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg text-xs font-bold transition disabled:opacity-50"
+                    >
+                      Adicionar
+                    </button>
+                  </div>
+
+                  {selectedLandingTicket.notes && selectedLandingTicket.notes.length > 0 && (
+                    <div className="space-y-2">
+                      {selectedLandingTicket.notes.map((note, idx) => (
+                        <div key={idx} className="bg-gray-950 border border-gray-800 p-3 rounded-lg text-xs text-gray-300">
+                          <p>{note.text}</p>
+                          <span className="text-[10px] text-gray-500 mt-1 block">
+                            {new Date(note.created_at).toLocaleString('pt-BR')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
