@@ -34,12 +34,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'Campos obrigatórios: name, slug' }, { status: 400 });
     }
 
-    const isPriceOnRequest = !!body?.is_price_on_request;
-
-    if (!isPriceOnRequest) {
-      if (!Number.isFinite(priceMonthly) || priceMonthly <= 0) {
-        return NextResponse.json({ error: 'price_monthly inválido' }, { status: 400 });
-      }
+    if (!Number.isFinite(priceMonthly) || priceMonthly < 0) {
+      return NextResponse.json({ error: 'price_monthly inválido' }, { status: 400 });
     }
 
     if (!Number.isFinite(maxUsers) || maxUsers <= 0) {
@@ -66,8 +62,8 @@ export async function PATCH(
       name,
       slug,
       description: body.description,
-      price_monthly: isPriceOnRequest ? 0 : priceMonthly,
-      price_annually: isPriceOnRequest ? 0 : (Number.isFinite(priceAnnually) ? priceAnnually : 0),
+      price_monthly: priceMonthly,
+      price_annually: Number.isFinite(priceAnnually) ? priceAnnually : 0,
       setup_fee: Number.isFinite(setupFee) ? setupFee : 0,
       max_users: maxUsers,
       max_storage_bytes: body.max_storage_bytes ?? 0,

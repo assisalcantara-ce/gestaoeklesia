@@ -116,8 +116,8 @@ export default function PlanosPage() {
         body: JSON.stringify({
           ...formData,
           slug: slugValue,
-          price_monthly: formData.is_price_on_request ? 0 : parseFloat(formData.price_monthly || '0'),
-          price_annually: formData.is_price_on_request ? 0 : parseFloat(formData.price_annually || '0'),
+          price_monthly: parseFloat(formData.price_monthly || '0'),
+          price_annually: parseFloat(formData.price_annually || '0'),
           max_users: parseInt(formData.max_users),
           max_members: formData.members_unlimited ? 0 : parseInt(formData.max_members || '0'),
           max_ministerios: parseInt(formData.max_ministerios),
@@ -332,7 +332,7 @@ export default function PlanosPage() {
                         onChange={(e) => setFormData({ ...formData, is_price_on_request: e.target.checked })}
                         className="rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500"
                       />
-                      <span>Preço sob consulta (Consulte-nos)</span>
+                      <span>Exibir "Consulte-nos" na Landing Page</span>
                     </label>
                   </div>
 
@@ -341,12 +341,11 @@ export default function PlanosPage() {
                     <input
                       type="number"
                       step="0.01"
-                      value={formData.is_price_on_request ? '' : formData.price_monthly}
+                      value={formData.price_monthly}
                       onChange={(e) => setFormData({ ...formData, price_monthly: e.target.value })}
-                      required={!formData.is_price_on_request}
-                      disabled={formData.is_price_on_request}
-                      placeholder={formData.is_price_on_request ? 'Consulte-nos' : '0.00'}
-                      className="w-full px-4 py-2 border rounded-lg bg-gray-800 disabled:opacity-50 text-white"
+                      required
+                      placeholder="0.00"
+                      className="w-full px-4 py-2 border rounded-lg bg-gray-800 text-white"
                     />
                   </div>
 
@@ -396,15 +395,14 @@ export default function PlanosPage() {
 
                     <div className="p-6 border-b border-gray-800">
                       <div className="text-3xl font-bold text-white">
-                        {plan.is_price_on_request ? (
-                          <span>Consulte-nos</span>
-                        ) : (
-                          <>
-                            R$ {plan.price_monthly.toFixed(2)}
-                            <span className="text-base text-gray-300">/mês</span>
-                          </>
-                        )}
+                        R$ {plan.price_monthly.toFixed(2)}
+                        <span className="text-base text-gray-300">/mês</span>
                       </div>
+                      {plan.is_price_on_request && (
+                        <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded bg-blue-950/80 text-blue-400 border border-blue-800/60 text-[11px] font-semibold">
+                          🏷️ LP: "Consulte-nos"
+                        </div>
+                      )}
                     </div>
 
                     <div className="p-6 border-b border-gray-800">
