@@ -404,7 +404,7 @@ export default function MinisteriosPage() {
                       : 'text-gray-400 hover:text-gray-200'
                   }`}
                 >
-                  ⏳ Pré-Cadastros (Trial)
+                  📥 Leads
                 </button>
               </div>
             </div>

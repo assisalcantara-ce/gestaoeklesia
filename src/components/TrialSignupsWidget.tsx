@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import { Eye, X, CheckCircle, Trash2, XCircle } from 'lucide-react'
@@ -147,10 +147,17 @@ export default function TrialSignupsWidget() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
-          <h3 className="text-lg font-semibold text-white">📝 Pré-Cadastros</h3>
-          <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-blue-600 rounded-full">
-            {signups.filter(s => s.status !== 'efetivado').length}
-          </span>
+          <div>
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              📥 Leads da Landing Page
+              <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-bold text-white bg-blue-600 rounded-full">
+                {signups.filter(s => s.status !== 'efetivado').length}
+              </span>
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Registros oriundos da Landing Page aguardando conversão ou início de licença.
+            </p>
+          </div>
         </div>
         <button
           type="button"
@@ -171,7 +178,7 @@ export default function TrialSignupsWidget() {
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
-          Em Teste ({emTeste.length})
+          Leads Pendentes ({emTeste.length})
         </button>
         <button
           onClick={() => setActiveTab('encerrado')}
@@ -181,13 +188,13 @@ export default function TrialSignupsWidget() {
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
-          Expirado ({expirados.length})
+          Leads Expirados ({expirados.length})
         </button>
       </div>
 
       {filteredSignups.length === 0 ? (
         <p className="text-gray-400 text-sm py-4">
-          {activeTab === 'trial' ? 'Nenhum pré-cadastro em teste' : 'Nenhum pré-cadastro expirado'}
+          {activeTab === 'trial' ? 'Nenhum lead pendente de conversão registrado' : 'Nenhum lead expirado'}
         </p>
       ) : (
         <div className="overflow-x-auto">
