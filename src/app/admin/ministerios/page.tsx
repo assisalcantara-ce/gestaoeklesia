@@ -39,6 +39,13 @@ export default function MinisteriosPage() {
   const [confirmDeleteMinisterio, setConfirmDeleteMinisterio] = useState<SupabaseMinistry | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [globalStats, setGlobalStats] = useState<{ total: number; ativos: number; trials: number; suspensos: number; pendentes: number; leads?: number; mrr?: string } | null>(null)
+  
+  // Clientes 2.1: Estados dos Filtros da Toolbar Executiva
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [planFilter, setPlanFilter] = useState('all')
+  const [trialFilter, setTrialFilter] = useState('all')
+
   const errorRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -66,7 +73,6 @@ export default function MinisteriosPage() {
     ministerios,
     setMinisterios,
     loading,
-    totalItems,
     fetchMinisterios,
   } = useMinisterios({
     currentPage,
@@ -321,6 +327,66 @@ export default function MinisteriosPage() {
     }
   }, [globalStats])
 
+  // Normalização para pesquisa sem acentos e case insensitive
+  const normalizeText = (text: string | null | undefined): string => {
+    if (!text) return ''
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+  }
+
+  // Clientes 2.1: Filtragem Cumulativa em Memória
+  const filteredMinisterios = useMemo(() => {
+    const list = ministerios || []
+    return list.filter((m) => {
+      // 1. Pesquisa em tempo real: Nome, Nome Fantasia, Responsável, E-mail, Cidade, Telefone
+      if (searchTerm.trim()) {
+        const term = normalizeText(searchTerm)
+        const matchName = normalizeText(m.name).includes(term)
+        const matchFantasy = normalizeText((m as any).nome_fantasia || (m as any).fantasy_name).includes(term)
+        const matchResp = normalizeText((m as any).responsavel_nome || (m as any).contact_name).includes(term)
+        const matchEmail = normalizeText(m.email_admin).includes(term)
+        const matchCity = normalizeText((m as any).cidade || (m as any).city).includes(term)
+        const matchPhone = normalizeText(m.phone).includes(term)
+
+        if (!matchName && !matchFantasy && !matchResp && !matchEmail && !matchCity && !matchPhone) {
+          return false
+        }
+      }
+
+      // 2. Filtro de Status (Utiliza a helper oficial getDetailedStatus)
+      if (statusFilter !== 'all') {
+        const statusDetail = getDetailedStatus(m)
+        const sType = statusDetail.type // Ex: ATIVO, TRIAL_ATIVO, TRIAL_EXPIRADO, SUSPENSO
+
+        if (statusFilter === 'ativo' && sType !== 'ATIVO' && sType !== 'TRIAL_ATIVO') return false
+        if (statusFilter === 'trial' && sType !== 'TRIAL_ATIVO') return false
+        if (statusFilter === 'expirado' && sType !== 'TRIAL_EXPIRADO') return false
+        if (statusFilter === 'suspenso' && sType !== 'SUSPENSO') return false
+      }
+
+      // 3. Filtro de Plano (Popular dinamicamente pelos planos carregados)
+      if (planFilter !== 'all') {
+        const mPlan = normalizeText(m.plan)
+        const targetPlan = normalizeText(planFilter)
+        if (!mPlan.includes(targetPlan)) return false
+      }
+
+      // 4. Filtro de Trial (Opções: Todos, Em Trial, Trial Expirado, Sem Trial)
+      if (trialFilter !== 'all') {
+        const statusDetail = getDetailedStatus(m)
+        const sType = statusDetail.type
+
+        if (trialFilter === 'em_trial' && sType !== 'TRIAL_ATIVO') return false
+        if (trialFilter === 'trial_expirado' && sType !== 'TRIAL_EXPIRADO') return false
+        if (trialFilter === 'sem_trial' && (sType === 'TRIAL_ATIVO' || sType === 'TRIAL_EXPIRADO')) return false
+      }
+
+      return true
+    })
+  }, [ministerios, searchTerm, statusFilter, planFilter, trialFilter])
+
   return (
     <div className="flex h-screen bg-gray-900">
       <AdminSidebar />
@@ -426,28 +492,47 @@ export default function MinisteriosPage() {
                   <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">🔍</span>
                   <input
                     type="text"
-                    placeholder="Pesquisar ministério..."
-                    className="w-full pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 hover:border-gray-650 focus:border-blue-500 rounded-lg text-sm text-gray-100 placeholder-gray-400 focus:outline-none transition"
-                    disabled
+                    placeholder="Pesquisar por nome, responsável, e-mail, cidade, telefone..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 hover:border-gray-600 focus:border-blue-500 rounded-lg text-sm text-gray-100 placeholder-gray-400 focus:outline-none transition"
                   />
                 </div>
 
-                <select className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer" disabled>
-                  <option value="">Filtro: Todos os Status</option>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="all">Status: Todos</option>
                   <option value="ativo">Ativo</option>
+                  <option value="trial">Trial</option>
+                  <option value="expirado">Trial Expirado</option>
                   <option value="suspenso">Suspenso</option>
                 </select>
 
-                <select className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer" disabled>
-                  <option value="">Filtro: Todos os Planos</option>
-                  <option value="starter">Starter</option>
-                  <option value="expert">Expert</option>
+                <select
+                  value={planFilter}
+                  onChange={(e) => setPlanFilter(e.target.value)}
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="all">Plano: Todos os Planos</option>
+                  {planos.map((p) => (
+                    <option key={p.id} value={p.slug || p.name}>
+                      {p.name}
+                    </option>
+                  ))}
                 </select>
 
-                <select className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer" disabled>
-                  <option value="">Filtro: Todos os Trials</option>
-                  <option value="sim">Sim</option>
-                  <option value="nao">Não</option>
+                <select
+                  value={trialFilter}
+                  onChange={(e) => setTrialFilter(e.target.value)}
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="all">Trial: Todos</option>
+                  <option value="em_trial">Em Trial</option>
+                  <option value="trial_expirado">Trial Expirado</option>
+                  <option value="sem_trial">Sem Trial</option>
                 </select>
               </div>
 
@@ -481,8 +566,8 @@ export default function MinisteriosPage() {
             {/* Lista de ministérios */}
             <MinisteriosTable
               loading={loading}
-              ministerios={ministerios}
-              totalItems={totalItems}
+              ministerios={filteredMinisterios}
+              totalItems={filteredMinisterios.length}
               currentPage={currentPage}
               itemsPerPage={itemsPerPage}
               onPageChange={(page) => setCurrentPage(page)}
