@@ -22,6 +22,7 @@ import {
 import { createClient } from '@/lib/supabase-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import { temAcessoAdmin } from '@/lib/access-control'
+import { authenticatedFetch } from '@/lib/api-client'
 import { useEffect } from 'react'
 
 export default function AdminSidebar() {
@@ -35,7 +36,7 @@ export default function AdminSidebar() {
   useEffect(() => {
     const fetchNewCount = async () => {
       try {
-        const response = await fetch('/api/v1/admin/oportunidades')
+        const response = await authenticatedFetch('/api/v1/admin/oportunidades')
         if (response.ok) {
           const data = await response.json()
           setNewCount(data.new_count || 0)

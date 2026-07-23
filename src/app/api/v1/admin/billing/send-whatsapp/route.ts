@@ -58,9 +58,7 @@ export async function POST(request: NextRequest) {
         ministries (
           id,
           name,
-          phone,
-          responsavel_phone,
-          contact_phone
+          phone
         )
       `)
       .eq('id', invoice_id)
