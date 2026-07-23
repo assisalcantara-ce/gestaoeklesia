@@ -29,6 +29,8 @@ import {
   RotateCcw,
   CreditCard,
   Filter,
+  Zap,
+  Settings,
 } from 'lucide-react'
 
 interface BillingInvoice {
@@ -65,6 +67,24 @@ export default function PagamentosPage() {
   const [cancelingLoading, setCancelingLoading] = useState(false)
   const [deletingInvoice, setDeletingInvoice] = useState<BillingInvoice | null>(null)
   const [deletingLoading, setDeletingLoading] = useState(false)
+
+  // Financeiro 2.2: Ações em Lote do Cliente e Wizard de Regeneração
+  const [openMenuMinistryId, setOpenMenuMinistryId] = useState<string | null>(null)
+  const [batchCancelMinistry, setBatchCancelMinistry] = useState<{ id: string; name: string } | null>(null)
+  const [batchCancelReason, setBatchCancelReason] = useState('')
+  const [batchCancelLoading, setBatchCancelLoading] = useState(false)
+
+  const [batchDeleteMinistry, setBatchDeleteMinistry] = useState<{ id: string; name: string } | null>(null)
+  const [batchDeleteLoading, setBatchDeleteLoading] = useState(false)
+
+  // Wizard de Regeneração em 3 Passos
+  const [wizardMinistry, setWizardMinistry] = useState<{ id: string; name: string } | null>(null)
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1)
+  const [wizardDueDay, setWizardDueDay] = useState<number>(10)
+  const [wizardPendingAction, setWizardPendingAction] = useState<'cancel' | 'delete'>('cancel')
+  const [wizardInstallments, setWizardInstallments] = useState<number>(12)
+  const [wizardAmount, setWizardAmount] = useState<string>('')
+  const [wizardLoading, setWizardLoading] = useState(false)
   const [error, setError] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   
@@ -260,6 +280,107 @@ export default function PagamentosPage() {
       setError(err.message || 'Erro ao excluir cobrança.')
     } finally {
       setDeletingLoading(false)
+    }
+  }
+
+  // Financeiro 2.2 — Cancelamento em Lote das Cobranças Pendentes de um Cliente
+  const handleBatchCancelSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!batchCancelMinistry || !batchCancelReason.trim()) return
+
+    try {
+      setBatchCancelLoading(true)
+      setError('')
+
+      const response = await authenticatedFetch('/api/v1/admin/billing/batch-actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'cancel_all_pending',
+          ministry_id: batchCancelMinistry.id,
+          cancel_reason: batchCancelReason,
+        }),
+      })
+
+      if (!response.ok) {
+        const resErr = await response.json()
+        throw new Error(resErr.error || 'Erro ao cancelar cobranças em lote')
+      }
+
+      setBatchCancelMinistry(null)
+      setBatchCancelReason('')
+      await fetchInvoices()
+    } catch (err: any) {
+      setError(err.message || 'Erro no cancelamento em lote.')
+    } finally {
+      setBatchCancelLoading(false)
+    }
+  }
+
+  // Financeiro 2.2 — Exclusão em Lote das Cobranças Pendentes (Super Admin)
+  const handleBatchDeleteSubmit = async () => {
+    if (!batchDeleteMinistry) return
+
+    try {
+      setBatchDeleteLoading(true)
+      setError('')
+
+      const response = await authenticatedFetch('/api/v1/admin/billing/batch-actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_all_pending',
+          ministry_id: batchDeleteMinistry.id,
+        }),
+      })
+
+      if (!response.ok) {
+        const resErr = await response.json()
+        throw new Error(resErr.error || 'Erro ao excluir cobranças em lote')
+      }
+
+      setBatchDeleteMinistry(null)
+      await fetchInvoices()
+    } catch (err: any) {
+      setError(err.message || 'Erro na exclusão em lote.')
+    } finally {
+      setBatchDeleteLoading(false)
+    }
+  }
+
+  // Financeiro 2.2 — Wizard de Regeneração de Cobranças (Preserva Pagas)
+  const handleWizardRegenerateSubmit = async () => {
+    if (!wizardMinistry || !wizardAmount || Number(wizardAmount) <= 0) return
+
+    try {
+      setWizardLoading(true)
+      setError('')
+
+      const response = await authenticatedFetch('/api/v1/admin/billing/batch-actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'regenerate',
+          ministry_id: wizardMinistry.id,
+          new_due_day: wizardDueDay,
+          pending_action: wizardPendingAction,
+          new_installments_count: wizardInstallments,
+          amount_per_installment: Number(wizardAmount),
+        }),
+      })
+
+      if (!response.ok) {
+        const resErr = await response.json()
+        throw new Error(resErr.error || 'Erro ao regenerar cobranças')
+      }
+
+      setWizardMinistry(null)
+      setWizardStep(1)
+      await fetchInvoices()
+    } catch (err: any) {
+      setError(err.message || 'Erro ao regenerar cobranças.')
+    } finally {
+      setWizardLoading(false)
     }
   }
 
@@ -665,7 +786,7 @@ export default function PagamentosPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         {pendingCount > 0 && (
                           <span className="px-2.5 py-0.5 text-xs font-semibold rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
                             {pendingCount} Pendente{pendingCount !== 1 ? 's' : ''}
@@ -681,6 +802,63 @@ export default function PagamentosPage() {
                             Em dia
                           </span>
                         )}
+
+                        {/* Menu de Ações em Lote do Cliente (Financeiro 2.2) */}
+                        <div className="relative" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => setOpenMenuMinistryId(openMenuMinistryId === group.ministryId ? null : group.ministryId)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+                          >
+                            <Settings className="h-3.5 w-3.5 text-blue-400" />
+                            Ações do Cliente
+                            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                          </button>
+
+                          {openMenuMinistryId === group.ministryId && (
+                            <div className="absolute right-0 mt-2 w-56 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-30 text-left">
+                              <button
+                                onClick={() => {
+                                  setWizardMinistry({ id: group.ministryId, name: group.ministryName })
+                                  setWizardStep(1)
+                                  const paidCount = group.invoices.filter((i) => i.status === 'paid' || i.status === 'pago').length
+                                  const remaining = Math.max(1, 12 - paidCount)
+                                  setWizardInstallments(remaining)
+                                  setWizardAmount(group.invoices[0] ? String(group.invoices[0].amount) : '15000')
+                                  setOpenMenuMinistryId(null)
+                                }}
+                                className="w-full px-4 py-2 text-xs font-semibold text-blue-400 hover:bg-blue-950/40 flex items-center gap-2 transition"
+                              >
+                                <Zap className="h-3.5 w-3.5" />
+                                ⚡ Regenerar Cobranças
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setBatchCancelMinistry({ id: group.ministryId, name: group.ministryName })
+                                  setBatchCancelReason('')
+                                  setOpenMenuMinistryId(null)
+                                }}
+                                className="w-full px-4 py-2 text-xs font-semibold text-amber-400 hover:bg-amber-950/40 flex items-center gap-2 transition"
+                              >
+                                <Ban className="h-3.5 w-3.5" />
+                                Cancelar Pendentes
+                              </button>
+
+                              {adminUser?.role === 'admin' && (
+                                <button
+                                  onClick={() => {
+                                    setBatchDeleteMinistry({ id: group.ministryId, name: group.ministryName })
+                                    setOpenMenuMinistryId(null)
+                                  }}
+                                  className="w-full px-4 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-950/40 flex items-center gap-2 transition border-t border-gray-800/80 mt-1"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  Excluir Pendentes
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -1219,6 +1397,299 @@ export default function PagamentosPage() {
                 {deletingLoading ? 'Excluindo...' : 'Excluir Permanentemente'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Cancelar Cobranças Pendentes em Lote (Financeiro 2.2) */}
+      {batchCancelMinistry && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 text-gray-100 space-y-4">
+            <div className="flex items-center gap-3 text-amber-400">
+              <Ban className="h-6 w-6" />
+              <h3 className="text-lg font-bold text-white">Cancelar Pendentes em Lote</h3>
+            </div>
+
+            <p className="text-xs text-gray-300">
+              Todas as cobranças <span className="font-semibold text-amber-400">pendentes e vencidas</span> de{' '}
+              <span className="font-bold text-white">{batchCancelMinistry.name}</span> serão canceladas e removidas dos totais em aberto.
+            </p>
+
+            <form onSubmit={handleBatchCancelSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
+                  Motivo do Cancelamento em Lote *
+                </label>
+                <textarea
+                  value={batchCancelReason}
+                  onChange={(e) => setBatchCancelReason(e.target.value)}
+                  placeholder="Informe a razão do cancelamento das cobranças pendentes..."
+                  required
+                  rows={3}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl p-3 text-xs text-gray-200 placeholder-gray-500 focus:border-blue-500 focus:outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBatchCancelMinistry(null)
+                    setBatchCancelReason('')
+                  }}
+                  disabled={batchCancelLoading}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="submit"
+                  disabled={batchCancelLoading || !batchCancelReason.trim()}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold shadow-sm transition disabled:opacity-50"
+                >
+                  {batchCancelLoading ? 'Cancelando...' : 'Confirmar Cancelamento em Lote'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Excluir Cobranças Pendentes em Lote - Super Admin (Financeiro 2.2) */}
+      {batchDeleteMinistry && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
+          <div className="bg-gray-900 border border-red-800/60 rounded-2xl shadow-2xl max-w-md w-full p-6 text-gray-100 space-y-4">
+            <div className="flex items-center gap-3 text-rose-500">
+              <AlertCircle className="h-6 w-6" />
+              <h3 className="text-lg font-bold text-white">Excluir Pendentes em Lote</h3>
+            </div>
+
+            <div className="bg-rose-950/40 border border-rose-800/50 rounded-xl p-3 text-xs text-rose-200 space-y-1">
+              <p className="font-bold">⚠️ ATENÇÃO: EXCLUSÃO PERMANENTE</p>
+              <p>Todas as cobranças pendentes de <span className="font-bold">{batchDeleteMinistry.name}</span> serão excluídas fisicamente.</p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setBatchDeleteMinistry(null)}
+                disabled={batchDeleteLoading}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleBatchDeleteSubmit}
+                disabled={batchDeleteLoading}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold shadow-sm transition disabled:opacity-50"
+              >
+                {batchDeleteLoading ? 'Excluindo...' : 'Excluir Pendentes em Lote'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wizard de Regeneração de Cobranças em 3 Passos (Financeiro 2.2) */}
+      {wizardMinistry && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 text-gray-100 space-y-6">
+            {/* Header do Wizard */}
+            <div className="flex items-center justify-between border-b border-gray-800 pb-4">
+              <div className="flex items-center gap-3 text-blue-400">
+                <Zap className="h-6 w-6" />
+                <div>
+                  <h3 className="text-lg font-bold text-white">Regenerar Cobranças</h3>
+                  <p className="text-xs text-gray-400">{wizardMinistry.name}</p>
+                </div>
+              </div>
+              <span className="px-3 py-1 bg-blue-950 border border-blue-800 text-blue-300 rounded-full text-xs font-bold font-mono">
+                Passo {wizardStep} de 3
+              </span>
+            </div>
+
+            {/* Passo 1: Selecionar Novo Dia de Vencimento */}
+            {wizardStep === 1 && (
+              <div className="space-y-4">
+                <h4 className="text-sm font-bold text-white">Passo 1: Novo Dia de Vencimento</h4>
+                <p className="text-xs text-gray-300">
+                  Informe em qual dia do mês as parcelas futuras deverão vencer.
+                </p>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">
+                    Dia do Vencimento (1 a 31)
+                  </label>
+                  <select
+                    value={wizardDueDay}
+                    onChange={(e) => setWizardDueDay(Number(e.target.value))}
+                    className="w-full bg-gray-950 border border-gray-800 rounded-xl p-3 text-sm text-gray-100 focus:border-blue-500 focus:outline-none"
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                      <option key={day} value={day}>
+                        Dia {day} de cada mês
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex justify-between pt-4 border-t border-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => setWizardMinistry(null)}
+                    className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg text-xs font-semibold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep(2)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold"
+                  >
+                    Próximo: Tratamento das Pendentes →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Passo 2: Escolher Tratamento das Pendentes Existentes */}
+            {wizardStep === 2 && (
+              <div className="space-y-4">
+                <h4 className="text-sm font-bold text-white">Passo 2: O que fazer com as cobranças pendentes atuais?</h4>
+                <p className="text-xs text-gray-300">
+                  Escolha como deseja tratar as cobranças em aberto atuais antes de gerar as novas parcelas.
+                </p>
+
+                <div className="space-y-3">
+                  <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition ${
+                    wizardPendingAction === 'cancel'
+                      ? 'bg-blue-950/40 border-blue-500/60 text-white'
+                      : 'bg-gray-950 border-gray-800 text-gray-400'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="wizardPendingAction"
+                      checked={wizardPendingAction === 'cancel'}
+                      onChange={() => setWizardPendingAction('cancel')}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <span className="font-bold text-xs block text-white">Cancelar pendentes (Recomendado)</span>
+                      <span className="text-[11px] text-gray-400 block mt-0.5">
+                        Altera o status das cobranças em aberto para "Canceladas", mantendo-as visíveis no histórico para auditoria.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition ${
+                    wizardPendingAction === 'delete'
+                      ? 'bg-rose-950/40 border-rose-500/60 text-white'
+                      : 'bg-gray-950 border-gray-800 text-gray-400'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="wizardPendingAction"
+                      checked={wizardPendingAction === 'delete'}
+                      onChange={() => setWizardPendingAction('delete')}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <span className="font-bold text-xs block text-white">Excluir pendentes</span>
+                      <span className="text-[11px] text-gray-400 block mt-0.5">
+                        Remove fisicamente do banco de dados as cobranças não pagas atuais.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="flex justify-between pt-4 border-t border-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep(1)}
+                    className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg text-xs font-semibold"
+                  >
+                    ← Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep(3)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold"
+                  >
+                    Próximo: Resumo das Parcelas →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Passo 3: Resumo e Confirmação das Novas Parcelas */}
+            {wizardStep === 3 && (
+              <div className="space-y-4">
+                <h4 className="text-sm font-bold text-white">Passo 3: Resumo e Confirmação</h4>
+
+                <div className="bg-emerald-950/40 border border-emerald-800/60 rounded-xl p-3 text-xs text-emerald-300 flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 shrink-0" />
+                  <span>Cobranças já <strong>pagas</strong> serão preservadas 100% intactas sem qualquer alteração.</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="font-bold text-gray-400 block mb-1">Novas Parcelas</label>
+                    <select
+                      value={wizardInstallments}
+                      onChange={(e) => setWizardInstallments(Number(e.target.value))}
+                      className="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 text-white"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                        <option key={n} value={n}>{n} parcelas</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-gray-400 block mb-1">Valor por Parcela (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={wizardAmount}
+                      onChange={(e) => setWizardAmount(e.target.value)}
+                      placeholder="150.00"
+                      className="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 text-xs space-y-1 text-gray-300">
+                  <div className="flex justify-between">
+                    <span>Novo Dia do Vencimento:</span>
+                    <span className="font-bold text-white">Dia {wizardDueDay} de cada mês</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Ação nas Pendentes Atuais:</span>
+                    <span className="font-bold text-amber-400">{wizardPendingAction === 'cancel' ? 'Cancelar' : 'Excluir'}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between pt-4 border-t border-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep(2)}
+                    disabled={wizardLoading}
+                    className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg text-xs font-semibold disabled:opacity-50"
+                  >
+                    ← Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleWizardRegenerateSubmit}
+                    disabled={wizardLoading || !wizardAmount || Number(wizardAmount) <= 0}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-lg shadow-emerald-600/25 transition disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {wizardLoading ? 'Regenerando...' : '⚡ Confirmar e Regenerar Cobranças'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
