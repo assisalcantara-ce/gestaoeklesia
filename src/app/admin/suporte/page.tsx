@@ -779,11 +779,11 @@ export default function SuportePage() {
               </form>
             </div>
           )}
-          {/* Tabela Modernizada Suporte 2.0 */}
-          <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden shadow-xl">
+          {/* Tabela Modernizada Suporte 2.0 (Arquitetura sem corte de dropdowns) */}
+          <div className="bg-gray-900 rounded-xl border border-gray-800 shadow-xl relative z-10 hover:z-20">
             {ticketView === 'tenant' && (
               loading ? (
-                <div className="p-6 space-y-3">
+                <div className="p-6 space-y-3 overflow-hidden rounded-xl">
                   {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="animate-pulse bg-gray-950/80 border border-gray-800 rounded-xl p-4 flex items-center justify-between gap-4">
                       <div className="space-y-2 flex-1">
@@ -796,7 +796,7 @@ export default function SuportePage() {
                   ))}
                 </div>
               ) : filteredTickets.length === 0 ? (
-                <div className="p-8">
+                <div className="p-8 overflow-hidden rounded-xl">
                   <DashboardEmptyState
                     icon={LifeBuoy}
                     title="Nenhum ticket encontrado"
@@ -804,155 +804,152 @@ export default function SuportePage() {
                   />
                 </div>
               ) : (
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-gray-950/80 border-b border-gray-800 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                    <tr>
-                      <th className="px-6 py-3.5">Ticket & Assunto</th>
-                      <th className="px-6 py-3.5">Status & Prioridade</th>
-                      <th className="px-6 py-3.5">Última Atualização</th>
-                      <th className="px-6 py-3.5 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-800/60">
-                    {filteredTickets.map((t) => {
-                      const replyState = getReplyState(t)
-                      const isMenuOpen = openMenuTicketId === t.id
+                <div className="overflow-hidden rounded-xl">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-gray-950/80 border-b border-gray-800 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                      <tr>
+                        <th className="px-6 py-3.5">Ticket & Assunto</th>
+                        <th className="px-6 py-3.5">Status & Prioridade</th>
+                        <th className="px-6 py-3.5">Última Atualização</th>
+                        <th className="px-6 py-3.5 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800/60">
+                      {filteredTickets.map((t) => {
+                        const replyState = getReplyState(t)
+                        const isMenuOpen = openMenuTicketId === t.id
 
-                      return (
-                        <tr
-                          key={t.id}
-                          className={`border-l-4 ${
-                            replyState === 'support'
-                              ? 'border-l-amber-500'
-                              : replyState === 'customer'
-                              ? 'border-l-emerald-500'
-                              : getStatusRowBorder(t.status)
-                          } hover:bg-gray-800/40 transition group`}
-                        >
-                          {/* Coluna 1: Ticket & Assunto (Linha Principal, Secundária e Terciária) */}
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col gap-1">
-                              {/* Linha Principal: Assunto */}
-                              <div
-                                onClick={() => setSelectedTicket(t)}
-                                className="font-bold text-gray-100 text-sm hover:text-blue-400 transition cursor-pointer flex items-center gap-2"
-                              >
-                                <span>{t.subject}</span>
-                              </div>
-
-                              {/* Linha Secundária: Ministério + Código do Ticket */}
-                              <div className="flex items-center gap-2 text-xs">
-                                <span className="font-semibold text-blue-400">
-                                  {t.ministry_name || `Ministério #${t.ministry_id}`}
-                                </span>
-                                <span className="text-gray-600">•</span>
-                                <span className="px-1.5 py-0.5 rounded bg-gray-950 border border-gray-800 text-gray-400 font-mono text-[10.5px]">
-                                  {t.ticket_number}
-                                </span>
-                              </div>
-
-                              {/* Linha Terciária: Descrição/Resumo */}
-                              <p className="text-xs text-gray-400 line-clamp-1 max-w-xl mt-0.5">
-                                {t.description}
-                              </p>
-                            </div>
-                          </td>
-
-                          {/* Coluna 2: Status & Prioridade Agrupados */}
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${getStatusColor(t.status)}`}>
-                                {getStatusLabel(t.status)}
-                              </span>
-                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${getPriorityColor(t.priority)}`}>
-                                {getPriorityLabel(t.priority)}
-                              </span>
-                            </div>
-                          </td>
-
-                          {/* Coluna 3: Última Atualização (updated_at) */}
-                          <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400 font-medium">
-                            {new Date(t.updated_at || t.created_at).toLocaleDateString('pt-BR', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </td>
-
-                          {/* Coluna 4: Hierarquia de Ações (Responder Principal + Menu ⋮) */}
-                          <td className="px-6 py-4 whitespace-nowrap text-right relative">
-                            <div className="flex items-center justify-end gap-2">
-                              {/* Ação Principal: Responder */}
-                              <button
-                                onClick={() => setSelectedTicket(t)}
-                                className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:ring-offset-gray-900"
-                              >
-                                <MessageSquare className="h-3.5 w-3.5" />
-                                Responder
-                              </button>
-
-                              {/* Menu de Ações Secundárias (⋮) */}
-                              <div className="relative">
-                                <button
-                                  onClick={() => setOpenMenuTicketId(isMenuOpen ? null : t.id)}
-                                  className="p-1.5 text-gray-400 hover:text-white bg-gray-950 hover:bg-gray-800 border border-gray-800 rounded-lg transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  title="Mais ações"
+                        return (
+                          <tr
+                            key={t.id}
+                            className={`border-l-4 ${
+                              replyState === 'support'
+                                ? 'border-l-amber-500'
+                                : replyState === 'customer'
+                                ? 'border-l-emerald-500'
+                                : getStatusRowBorder(t.status)
+                            } hover:bg-gray-800/40 transition group`}
+                          >
+                            {/* Coluna 1: Ticket & Assunto */}
+                            <td className="px-6 py-4">
+                              <div className="flex flex-col gap-1">
+                                <div
+                                  onClick={() => setSelectedTicket(t)}
+                                  className="font-bold text-gray-100 text-sm hover:text-blue-400 transition cursor-pointer flex items-center gap-2"
                                 >
-                                  <MoreVertical className="h-4 w-4" />
+                                  <span>{t.subject}</span>
+                                </div>
+
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span className="font-semibold text-blue-400">
+                                    {t.ministry_name || `Ministério #${t.ministry_id}`}
+                                  </span>
+                                  <span className="text-gray-600">•</span>
+                                  <span className="px-1.5 py-0.5 rounded bg-gray-950 border border-gray-800 text-gray-400 font-mono text-[10.5px]">
+                                    {t.ticket_number}
+                                  </span>
+                                </div>
+
+                                <p className="text-xs text-gray-400 line-clamp-1 max-w-xl mt-0.5">
+                                  {t.description}
+                                </p>
+                              </div>
+                            </td>
+
+                            {/* Coluna 2: Status & Prioridade Agrupados */}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${getStatusColor(t.status)}`}>
+                                  {getStatusLabel(t.status)}
+                                </span>
+                                <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${getPriorityColor(t.priority)}`}>
+                                  {getPriorityLabel(t.priority)}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Coluna 3: Última Atualização */}
+                            <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400 font-medium">
+                              {new Date(t.updated_at || t.created_at).toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </td>
+
+                            {/* Coluna 4: Hierarquia de Ações (Responder Principal + Menu ⋮) */}
+                            <td className="px-6 py-4 whitespace-nowrap text-right relative">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => setSelectedTicket(t)}
+                                  className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5" />
+                                  Responder
                                 </button>
 
-                                {isMenuOpen && (
-                                  <div className="absolute right-0 mt-1 w-44 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-20 text-left">
-                                    <button
-                                      onClick={() => {
-                                        setSelectedTicket(t)
-                                        setOpenMenuTicketId(null)
-                                      }}
-                                      className="w-full px-4 py-2 text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-2 transition"
-                                    >
-                                      👁️ Ver Histórico
-                                    </button>
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setOpenMenuTicketId(isMenuOpen ? null : t.id)}
+                                    className="p-1.5 text-gray-400 hover:text-white bg-gray-950 hover:bg-gray-800 border border-gray-800 rounded-lg transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    title="Mais ações"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </button>
 
-                                    {t.status !== 'closed' ? (
-                                      <button
-                                        onClick={() => {
-                                          closeTicket(t)
-                                          setOpenMenuTicketId(null)
-                                        }}
-                                        disabled={closingTicketId === t.id}
-                                        className="w-full px-4 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-950/40 flex items-center gap-2 transition"
-                                      >
-                                        🔒 Fechar Ticket
-                                      </button>
-                                    ) : (
+                                  {isMenuOpen && (
+                                    <div className="absolute right-0 mt-1 w-44 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-50 text-left">
                                       <button
                                         onClick={() => {
                                           setSelectedTicket(t)
                                           setOpenMenuTicketId(null)
                                         }}
-                                        className="w-full px-4 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-950/40 flex items-center gap-2 transition"
+                                        className="w-full px-4 py-2 text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-2 transition"
                                       >
-                                        🔓 Reabrir Ticket
+                                        👁️ Ver Histórico
                                       </button>
-                                    )}
-                                  </div>
-                                )}
+
+                                      {t.status !== 'closed' ? (
+                                        <button
+                                          onClick={() => {
+                                            closeTicket(t)
+                                            setOpenMenuTicketId(null)
+                                          }}
+                                          disabled={closingTicketId === t.id}
+                                          className="w-full px-4 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-950/40 flex items-center gap-2 transition"
+                                        >
+                                          🔒 Fechar Ticket
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => {
+                                            setSelectedTicket(t)
+                                            setOpenMenuTicketId(null)
+                                          }}
+                                          className="w-full px-4 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-950/40 flex items-center gap-2 transition"
+                                        >
+                                          🔓 Reabrir Ticket
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )
             )}
 
             {ticketView === 'landing' && (
               landingLoading ? (
-                <div className="p-6 space-y-3">
+                <div className="p-6 space-y-3 overflow-hidden rounded-xl">
                   {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="animate-pulse bg-gray-950/80 border border-gray-800 rounded-xl p-4 flex items-center justify-between gap-4">
                       <div className="space-y-2 flex-1">
@@ -965,7 +962,7 @@ export default function SuportePage() {
                   ))}
                 </div>
               ) : filteredLandingTickets.length === 0 ? (
-                <div className="p-8">
+                <div className="p-8 overflow-hidden rounded-xl">
                   <DashboardEmptyState
                     icon={LifeBuoy}
                     title="Nenhum ticket do site encontrado"
@@ -973,110 +970,112 @@ export default function SuportePage() {
                   />
                 </div>
               ) : (
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-gray-950/80 border-b border-gray-800 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                    <tr>
-                      <th className="px-6 py-3.5">Lead & Solicitação</th>
-                      <th className="px-6 py-3.5">Contato</th>
-                      <th className="px-6 py-3.5">Status & Prioridade</th>
-                      <th className="px-6 py-3.5">Última Atualização</th>
-                      <th className="px-6 py-3.5 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-800/60">
-                    {filteredLandingTickets.map((t) => {
-                      const isMenuOpen = openMenuTicketId === t.id
+                <div className="overflow-hidden rounded-xl">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-gray-950/80 border-b border-gray-800 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                      <tr>
+                        <th className="px-6 py-3.5">Lead & Solicitação</th>
+                        <th className="px-6 py-3.5">Contato</th>
+                        <th className="px-6 py-3.5">Status & Prioridade</th>
+                        <th className="px-6 py-3.5">Última Atualização</th>
+                        <th className="px-6 py-3.5 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800/60">
+                      {filteredLandingTickets.map((t) => {
+                        const isMenuOpen = openMenuTicketId === t.id
 
-                      return (
-                        <tr key={t.id} className={`border-l-4 ${getStatusRowBorder(t.status)} hover:bg-gray-800/40 transition group`}>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col gap-1">
-                              <div
-                                onClick={() => setSelectedLandingTicket(t)}
-                                className="font-bold text-gray-100 text-sm hover:text-blue-400 transition cursor-pointer flex items-center gap-2"
-                              >
-                                <span>{t.institution_name}</span>
+                        return (
+                          <tr key={t.id} className={`border-l-4 ${getStatusRowBorder(t.status)} hover:bg-gray-800/40 transition group`}>
+                            <td className="px-6 py-4">
+                              <div className="flex flex-col gap-1">
+                                <div
+                                  onClick={() => setSelectedLandingTicket(t)}
+                                  className="font-bold text-gray-100 text-sm hover:text-blue-400 transition cursor-pointer flex items-center gap-2"
+                                >
+                                  <span>{t.institution_name}</span>
+                                </div>
+
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span className="font-mono text-[10.5px] text-gray-400 bg-gray-950 px-1.5 py-0.5 rounded border border-gray-800">
+                                    {t.ticket_number}
+                                  </span>
+                                </div>
+
+                                <p className="text-xs text-gray-400 line-clamp-1 max-w-xl mt-0.5">
+                                  {t.description}
+                                </p>
                               </div>
+                            </td>
 
-                              <div className="flex items-center gap-2 text-xs">
-                                <span className="font-mono text-[10.5px] text-gray-400 bg-gray-950 px-1.5 py-0.5 rounded border border-gray-800">
-                                  {t.ticket_number}
+                            <td className="px-6 py-4 text-xs text-gray-300">
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-200">{t.contact_name}</span>
+                                <span className="text-gray-400">{t.email}</span>
+                              </div>
+                            </td>
+
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${getStatusColor(t.status)}`}>
+                                  {getStatusLabel(t.status)}
+                                </span>
+                                <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${getPriorityColor(t.priority)}`}>
+                                  {getPriorityLabel(t.priority)}
                                 </span>
                               </div>
+                            </td>
 
-                              <p className="text-xs text-gray-400 line-clamp-1 max-w-xl mt-0.5">
-                                {t.description}
-                              </p>
-                            </div>
-                          </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400 font-medium">
+                              {new Date(t.updated_at || t.created_at).toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </td>
 
-                          <td className="px-6 py-4 text-xs text-gray-300">
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-gray-200">{t.contact_name}</span>
-                              <span className="text-gray-400">{t.email}</span>
-                            </div>
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${getStatusColor(t.status)}`}>
-                                {getStatusLabel(t.status)}
-                              </span>
-                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${getPriorityColor(t.priority)}`}>
-                                {getPriorityLabel(t.priority)}
-                              </span>
-                            </div>
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400 font-medium">
-                            {new Date(t.updated_at || t.created_at).toLocaleDateString('pt-BR', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-right relative">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => setSelectedLandingTicket(t)}
-                                className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
-                              >
-                                Visualizar
-                              </button>
-
-                              <div className="relative">
+                            <td className="px-6 py-4 whitespace-nowrap text-right relative">
+                              <div className="flex items-center justify-end gap-2">
                                 <button
-                                  onClick={() => setOpenMenuTicketId(isMenuOpen ? null : t.id)}
-                                  className="p-1.5 text-gray-400 hover:text-white bg-gray-950 hover:bg-gray-800 border border-gray-800 rounded-lg transition cursor-pointer"
-                                  title="Mais ações"
+                                  onClick={() => setSelectedLandingTicket(t)}
+                                  className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
                                 >
-                                  <MoreVertical className="h-4 w-4" />
+                                  Visualizar
                                 </button>
 
-                                {isMenuOpen && (
-                                  <div className="absolute right-0 mt-1 w-44 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-20 text-left">
-                                    <button
-                                      onClick={() => {
-                                        setSelectedLandingTicket(t)
-                                        setOpenMenuTicketId(null)
-                                      }}
-                                      className="w-full px-4 py-2 text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-2 transition"
-                                    >
-                                      👁️ Ver Detalhes
-                                    </button>
-                                  </div>
-                                )}
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setOpenMenuTicketId(isMenuOpen ? null : t.id)}
+                                    className="p-1.5 text-gray-400 hover:text-white bg-gray-950 hover:bg-gray-800 border border-gray-800 rounded-lg transition cursor-pointer"
+                                    title="Mais ações"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </button>
+
+                                  {isMenuOpen && (
+                                    <div className="absolute right-0 mt-1 w-44 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-50 text-left">
+                                      <button
+                                        onClick={() => {
+                                          setSelectedLandingTicket(t)
+                                          setOpenMenuTicketId(null)
+                                        }}
+                                        className="w-full px-4 py-2 text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-2 transition"
+                                      >
+                                        👁️ Ver Detalhes
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )
             )}
           </div>
