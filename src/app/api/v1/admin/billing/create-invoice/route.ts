@@ -31,8 +31,8 @@ const platformAsaasFetch = async (path: string, init: RequestInit) => {
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Validar admin
-    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    // 1. Validar admin/financeiro
+    const result = await requireAdmin(request, { requiredModule: 'pagamentos' })
     if (!result.ok) return result.response
     const { supabaseAdmin: supabase } = result.ctx
 

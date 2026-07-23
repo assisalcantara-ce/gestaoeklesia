@@ -23,6 +23,8 @@ export const ADMIN_MODULOS_ACESSO: Record<AdminRole, string[]> = {
   ],
   financeiro: [
     'dashboard',
+    'ministerios',
+    'comercial',
     'pagamentos',
     'planos',
     'suporte',

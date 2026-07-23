@@ -2,6 +2,7 @@
 
 import { Pencil, Play, Coins, Tag, Trash2 } from 'lucide-react'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
+import { useAdminAuth } from '@/providers/AdminAuthProvider'
 
 interface MinistryRowActionsProps {
   ministerio: SupabaseMinistry
@@ -26,7 +27,9 @@ export default function MinistryRowActions({
   onPrintLabel,
   onDelete,
 }: MinistryRowActionsProps) {
+  const { adminUser } = useAdminAuth()
   const hasInvoices = (ministerio as any).platform_billing_invoices && (ministerio as any).platform_billing_invoices.length > 0;
+  const isSuperAdmin = adminUser?.role === 'admin' || adminUser?.role === 'super_admin'
 
   return (
     <td className="px-6 py-4 text-sm flex items-center gap-2">
@@ -62,13 +65,15 @@ export default function MinistryRowActions({
       >
         <Tag className="h-4 w-4" />
       </button>
-      <button
-        onClick={() => onDelete(ministerio)}
-        className="p-1.5 bg-red-900/40 text-red-400 hover:text-red-300 hover:bg-red-900/60 rounded transition flex items-center justify-center"
-        title="Remover"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
+      {isSuperAdmin && (
+        <button
+          onClick={() => onDelete(ministerio)}
+          className="p-1.5 bg-red-900/40 text-red-400 hover:text-red-300 hover:bg-red-900/60 rounded transition flex items-center justify-center"
+          title="Remover"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
     </td>
   )
 }
