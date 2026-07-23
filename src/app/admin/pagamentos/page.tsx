@@ -765,7 +765,7 @@ export default function PagamentosPage() {
                 return (
                   <div
                     key={group.ministryId}
-                    className="border border-gray-800 rounded-xl overflow-hidden bg-gray-900/50 backdrop-blur shadow-xl transition-all"
+                    className="border border-gray-800 rounded-xl bg-gray-900/50 backdrop-blur shadow-xl transition-all relative z-10 hover:z-20"
                   >
                     <div
                       onClick={() => toggleGroup(group.ministryId)}
@@ -815,7 +815,7 @@ export default function PagamentosPage() {
                           </button>
 
                           {openMenuMinistryId === group.ministryId && (
-                            <div className="absolute right-0 mt-2 w-56 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-30 text-left">
+                            <div className="absolute right-0 mt-2 w-56 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-50 text-left">
                               <button
                                 onClick={() => {
                                   setWizardMinistry({ id: group.ministryId, name: group.ministryName })
@@ -863,7 +863,7 @@ export default function PagamentosPage() {
                     </div>
 
                     {isExpanded && (
-                      <>
+                      <div className="overflow-hidden rounded-b-xl border-t border-gray-800">
                         {/* Resumo Financeiro Executivo do Cliente */}
                         {(() => {
                           const clienteAberto = group.invoices
@@ -882,7 +882,7 @@ export default function PagamentosPage() {
                           const proximoVencimentoFormatted = menorVencimento ? menorVencimento.toLocaleDateString('pt-BR') : '—';
 
                           return (
-                            <div className="bg-gray-900/90 border-t border-b border-gray-800/80 px-6 py-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                            <div className="bg-gray-900/90 border-b border-gray-800/80 px-6 py-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                               <div className="bg-gray-950/70 p-2.5 rounded-lg border border-gray-800/80">
                                 <span className="text-gray-400 font-medium text-[11px] block">Total em Aberto</span>
                                 <span className="text-amber-400 font-bold text-sm mt-0.5 block">{formatCurrency(clienteAberto)}</span>
@@ -1041,7 +1041,7 @@ export default function PagamentosPage() {
                           </tbody>
                         </table>
                       </div>
-                      </>
+                      </div>
                     )}
                   </div>
                 );
