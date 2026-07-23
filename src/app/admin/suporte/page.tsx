@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
@@ -43,25 +44,49 @@ export default function SuportePage() {
   const [closingTicket, setClosingTicket] = useState<SupportTicket | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [openMenuTicketId, setOpenMenuTicketId] = useState<string | null>(null)
-  const [menuPlacement, setMenuPlacement] = useState<'bottom' | 'top'>('bottom')
+  const [menuCoords, setMenuCoords] = useState<{ top: number; left: number } | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  // Fechar dropdown ao rolar ou redimensionar a janela
+  useEffect(() => {
+    if (!openMenuTicketId) return
+    const handleClose = () => {
+      setOpenMenuTicketId(null)
+      setMenuCoords(null)
+    }
+    window.addEventListener('scroll', handleClose, true)
+    window.addEventListener('resize', handleClose)
+    return () => {
+      window.removeEventListener('scroll', handleClose, true)
+      window.removeEventListener('resize', handleClose)
+    }
+  }, [openMenuTicketId])
 
   const toggleMenu = (id: string, e: React.MouseEvent<HTMLButtonElement>) => {
     if (openMenuTicketId === id) {
       setOpenMenuTicketId(null)
+      setMenuCoords(null)
       return
     }
 
     const btnRect = e.currentTarget.getBoundingClientRect()
+    const menuWidth = 176 // 11rem (w-44)
+    const menuHeight = 110
     const spaceBelow = window.innerHeight - btnRect.bottom
     const spaceAbove = btnRect.top
-    const estimatedMenuHeight = 140
 
-    if (spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow) {
-      setMenuPlacement('top')
-    } else {
-      setMenuPlacement('bottom')
-    }
+    const openUpwards = spaceBelow < menuHeight && spaceAbove > spaceBelow
 
+    const top = openUpwards
+      ? Math.max(8, btnRect.top - menuHeight - 6)
+      : Math.min(window.innerHeight - menuHeight - 8, btnRect.bottom + 6)
+    const left = Math.max(8, btnRect.right - menuWidth)
+
+    setMenuCoords({ top, left })
     setOpenMenuTicketId(id)
   }
   const router = useRouter()
@@ -920,11 +945,15 @@ export default function SuportePage() {
                                     <MoreVertical className="h-4 w-4" />
                                   </button>
 
-                                  {isMenuOpen && (
+                                  {isMenuOpen && isMounted && menuCoords && createPortal(
                                     <div
-                                      className={`absolute right-0 ${
-                                        menuPlacement === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
-                                      } w-44 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-50 text-left`}
+                                      style={{
+                                        position: 'fixed',
+                                        top: `${menuCoords.top}px`,
+                                        left: `${menuCoords.left}px`,
+                                        zIndex: 99999,
+                                      }}
+                                      className="w-44 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 text-left"
                                     >
                                       <button
                                         onClick={() => {
@@ -958,7 +987,8 @@ export default function SuportePage() {
                                           🔓 Reabrir Ticket
                                         </button>
                                       )}
-                                    </div>
+                                    </div>,
+                                    document.body
                                   )}
                                 </div>
                               </div>
@@ -1079,11 +1109,15 @@ export default function SuportePage() {
                                     <MoreVertical className="h-4 w-4" />
                                   </button>
 
-                                  {isMenuOpen && (
+                                  {isMenuOpen && isMounted && menuCoords && createPortal(
                                     <div
-                                      className={`absolute right-0 ${
-                                        menuPlacement === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
-                                      } w-44 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-50 text-left`}
+                                      style={{
+                                        position: 'fixed',
+                                        top: `${menuCoords.top}px`,
+                                        left: `${menuCoords.left}px`,
+                                        zIndex: 99999,
+                                      }}
+                                      className="w-44 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 text-left"
                                     >
                                       <button
                                         onClick={() => {
@@ -1094,7 +1128,8 @@ export default function SuportePage() {
                                       >
                                         👁️ Ver Detalhes
                                       </button>
-                                    </div>
+                                    </div>,
+                                    document.body
                                   )}
                                 </div>
                               </div>

@@ -51,4 +51,5 @@ export interface LifecycleResult {
   calculatedAt: string;
   daysRemaining?: number;
   reason: string;
+  isTrial?: boolean;
 }

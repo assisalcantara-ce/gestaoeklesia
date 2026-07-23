@@ -44,9 +44,10 @@ export class CrmService {
     list.forEach(item => {
       const status = item.lifecycle.status;
 
-      // Comercial 2.0.1: Registros RENEWAL originados de trial (pre_registrations ou menção a trial)
+      // Comercial 2.0.1: Registros RENEWAL originados de trial (pre_registrations, subscription_status === 'trial' ou menção a trial)
       // também devem ser contabilizados no KPI de totalTrials sem alterar as renovações.
       const isTrialInRenewal = status === 'RENEWAL' && (
+        item.lifecycle?.isTrial ||
         item.origem === 'pre_registrations' ||
         (item.reason && item.reason.toLowerCase().includes('trial'))
       );

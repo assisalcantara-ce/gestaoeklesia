@@ -46,7 +46,11 @@ export default function CrmMyDayCard({ onStartDay }: CrmMyDayCardProps) {
 
   // Calcular métricas derivadas das tarefas retornadas
   const totalAcoes = actions.length;
-  const trialsExpirando = actions.filter(a => a.lifecycle?.status === 'TRIAL_EXPIRING' || a.lifecycle?.status === 'TRIAL').length;
+  const trialsExpirando = actions.filter(a =>
+    a.lifecycle?.status === 'TRIAL_EXPIRING' ||
+    a.lifecycle?.status === 'TRIAL' ||
+    (a.lifecycle?.status === 'RENEWAL' && (a.lifecycle as any)?.isTrial)
+  ).length;
   const cobrancasPendentes = actions.filter(a => a.lifecycle?.status === 'PAYMENT_PENDING').length;
   const renovacoesProximas = actions.filter(a => a.lifecycle?.status === 'RENEWAL').length;
 

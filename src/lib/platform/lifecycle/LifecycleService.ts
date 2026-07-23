@@ -10,13 +10,15 @@ export class LifecycleService {
     const calculatedAt = now.toISOString();
 
     const { preRegistration, ministry, billingInvoices, opportunity } = input;
+    const isTrial = ministry?.subscription_status === 'trial' || preRegistration?.status === 'trial';
 
     // 1. Sem Ministério e Sem Pré-Cadastro
     if (!ministry && !preRegistration) {
       return {
         status: 'LEAD',
         reason: 'Nenhum registro operacional (Ministério ou Pré-cadastro) foi localizado.',
-        calculatedAt
+        calculatedAt,
+        isTrial
       };
     }
 
@@ -27,7 +29,8 @@ export class LifecycleService {
         return {
           status: 'CANCELED',
           reason: 'O ministério está desativado ou a assinatura foi cancelada.',
-          calculatedAt
+          calculatedAt,
+          isTrial
         };
       }
 
@@ -47,7 +50,8 @@ export class LifecycleService {
               status: 'RENEWAL',
               reason: `Vigência do contrato expira em menos de ${LifecycleRules.RenewalWindow} dias.`,
               daysRemaining: diffDays,
-              calculatedAt
+              calculatedAt,
+              isTrial
             };
           } else {
             return {
