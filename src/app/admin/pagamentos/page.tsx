@@ -466,22 +466,74 @@ export default function PagamentosPage() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex h-screen bg-gray-900">
-        <AdminSidebar />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-white text-lg flex items-center gap-2">
-            <RefreshCw className="animate-spin text-blue-500" />
-            Verificando autenticação...
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Agrupar faturas por ministério/tenant (Hook resiliente com fallback)
+  const groupedInvoices = useMemo(() => {
+    const list = invoices || []
+    const groups: Record<string, { ministryName: string; invoices: BillingInvoice[] }> = {}
+    for (const inv of list) {
+      const mId = inv.ministry_id
+      const mName = inv.ministries?.name || 'Ministério Removido'
+      if (!groups[mId]) {
+        groups[mId] = {
+          ministryName: mName,
+          invoices: [],
+        }
+      }
+      groups[mId].invoices.push(inv)
+    }
 
-  if (!isAuthenticated || !isAdmin) {
-    return null
+    return Object.entries(groups).map(([ministryId, data]) => {
+      const sortedInvoices = [...data.invoices].sort((a, b) => {
+        const isAOpen = a.status === 'pending' || a.status === 'pendente' || a.status === 'overdue' || a.status === 'vencido'
+        const isBOpen = b.status === 'pending' || b.status === 'pendente' || b.status === 'overdue' || b.status === 'vencido'
+
+        if (isAOpen && !isBOpen) return -1
+        if (!isAOpen && isBOpen) return 1
+
+        const dateA = a.due_date ? new Date(a.due_date).getTime() : Infinity
+        const dateB = b.due_date ? new Date(b.due_date).getTime() : Infinity
+        return dateA - dateB
+      })
+
+      return {
+        ministryId,
+        ministryName: data.ministryName,
+        invoices: sortedInvoices,
+      }
+    })
+  }, [invoices])
+
+  // Estatísticas financeiras (Hook resiliente com fallback zerado)
+  const financialStats = useMemo(() => {
+    const list = invoices || []
+    const activeInvoices = list.filter((inv) => inv.status !== 'canceled' && inv.status !== 'cancelada')
+
+    const previstaTotal = activeInvoices.reduce((acc, inv) => acc + (inv.amount || 0), 0)
+
+    const recebidaTotal = activeInvoices
+      .filter((inv) => inv.status === 'RECEIVED' || inv.status === 'CONFIRMED' || inv.status === 'paid' || inv.status === 'pago')
+      .reduce((acc, inv) => acc + (inv.amount || 0), 0)
+
+    const emAberto = activeInvoices.filter((inv) => inv.status === 'PENDING' || inv.status === 'pending').length
+    const vencidas = activeInvoices.filter((inv) => inv.status === 'OVERDUE' || inv.status === 'overdue').length
+
+    return {
+      receitaPrevista:
+        previstaTotal > 0
+          ? `R$ ${((previstaTotal + recebidaTotal) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+          : 'R$ 0,00',
+      receitaRecebida:
+        recebidaTotal > 0 ? `R$ ${(recebidaTotal / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00',
+      cobrancasEmAberto: emAberto,
+      faturasVencidas: vencidas,
+    }
+  }, [invoices])
+
+  const toggleGroup = (id: string) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }))
   }
 
   const getStatusBadge = (status: string) => {
@@ -534,7 +586,6 @@ export default function PagamentosPage() {
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-'
     const date = new Date(dateStr)
-    // Evitar problemas de timezone em datas sem hora (due_date)
     if (dateStr.length <= 10) {
       const parts = dateStr.split('-')
       if (parts.length === 3) {
@@ -555,79 +606,24 @@ export default function PagamentosPage() {
     })
   }
 
-  // Agrupar faturas por ministério/tenant
-  const groupedInvoices = useMemo(() => {
-    const groups: Record<string, { ministryName: string; invoices: BillingInvoice[] }> = {}
-    for (const inv of invoices) {
-      const mId = inv.ministry_id
-      const mName = inv.ministries?.name || 'Ministério Removido'
-      if (!groups[mId]) {
-        groups[mId] = {
-          ministryName: mName,
-          invoices: [],
-        }
-      }
-      groups[mId].invoices.push(inv)
-    }
-    
-    return Object.entries(groups).map(([ministryId, data]) => {
-      // Ordena as faturas: abertas (pending/overdue) primeiro, ordenadas por vencimento (mais próximo/antigo primeiro)
-      const sortedInvoices = [...data.invoices].sort((a, b) => {
-        const isAOpen = a.status === 'pending' || a.status === 'pendente' || a.status === 'overdue' || a.status === 'vencido'
-        const isBOpen = b.status === 'pending' || b.status === 'pendente' || b.status === 'overdue' || b.status === 'vencido'
-
-        if (isAOpen && !isBOpen) return -1
-        if (!isAOpen && isBOpen) return 1
-
-        const dateA = a.due_date ? new Date(a.due_date).getTime() : Infinity
-        const dateB = b.due_date ? new Date(b.due_date).getTime() : Infinity
-        return dateA - dateB
-      })
-
-      return {
-        ministryId,
-        ministryName: data.ministryName,
-        invoices: sortedInvoices,
-      }
-    })
-  }, [invoices])
-
-  const toggleGroup = (id: string) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [id]: !prev[id],
-    }))
+  // Cláusulas de Retorno Antecipado (apenas APÓS a execução incondicional de TODOS os Hooks)
+  if (isLoading) {
+    return (
+      <div className="flex h-screen bg-gray-900">
+        <AdminSidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-white text-lg flex items-center gap-2">
+            <RefreshCw className="animate-spin text-blue-500" />
+            Verificando autenticação...
+          </div>
+        </div>
+      </div>
+    )
   }
 
-  const financialStats = useMemo(() => {
-    // Faturas ativas (excluindo canceladas)
-    const activeInvoices = invoices.filter((inv) => inv.status !== 'canceled' && inv.status !== 'cancelada')
-
-    // 1. Receita Prevista: Faturas projetadas / a receber (exclui canceladas)
-    const previstaTotal = activeInvoices.reduce((acc, inv) => acc + (inv.amount || 0), 0)
-
-    // 2. Receita Recebida: Faturas pagas (RECEIVED / CONFIRMED / paid)
-    const recebidaTotal = activeInvoices
-      .filter((inv) => inv.status === 'RECEIVED' || inv.status === 'CONFIRMED' || inv.status === 'paid' || inv.status === 'pago')
-      .reduce((acc, inv) => acc + (inv.amount || 0), 0)
-
-    // 3. Cobranças em Aberto: Faturas PENDING / pending (exclui canceladas)
-    const emAberto = activeInvoices.filter((inv) => inv.status === 'PENDING' || inv.status === 'pending').length
-
-    // 4. Faturas Vencidas: Faturas OVERDUE / overdue (exclui canceladas)
-    const vencidas = activeInvoices.filter((inv) => inv.status === 'OVERDUE' || inv.status === 'overdue').length
-
-    return {
-      receitaPrevista:
-        previstaTotal > 0
-          ? `R$ ${((previstaTotal + recebidaTotal) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-          : 'R$ 0,00',
-      receitaRecebida:
-        recebidaTotal > 0 ? `R$ ${(recebidaTotal / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00',
-      cobrancasEmAberto: emAberto,
-      faturasVencidas: vencidas,
-    }
-  }, [invoices])
+  if (!isAuthenticated || !isAdmin) {
+    return null
+  }
 
   return (
     <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden">
