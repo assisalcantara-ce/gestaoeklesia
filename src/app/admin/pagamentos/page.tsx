@@ -31,6 +31,7 @@ import {
   Filter,
   Zap,
   Settings,
+  MessageCircle,
 } from 'lucide-react'
 
 interface BillingInvoice {
@@ -85,6 +86,7 @@ export default function PagamentosPage() {
   const [wizardInstallments, setWizardInstallments] = useState<number>(12)
   const [wizardAmount, setWizardAmount] = useState<string>('')
   const [wizardLoading, setWizardLoading] = useState(false)
+  const [waLoadingId, setWaLoadingId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   
@@ -381,6 +383,39 @@ export default function PagamentosPage() {
       setError(err.message || 'Erro ao regenerar cobranças.')
     } finally {
       setWizardLoading(false)
+    }
+  }
+
+  // Financeiro 2.3 — Envio de Faturas via WhatsApp
+  const handleSendWhatsApp = async (invoice: BillingInvoice) => {
+    const statusLower = String(invoice.status || '').toLowerCase()
+    if (statusLower === 'paid' || statusLower === 'pago' || statusLower === 'canceled' || statusLower === 'cancelada') {
+      setError('Somente cobranças pendentes podem ser enviadas.')
+      return
+    }
+
+    try {
+      setWaLoadingId(invoice.id)
+      setError('')
+
+      const response = await authenticatedFetch('/api/v1/admin/billing/send-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoice_id: invoice.id }),
+      })
+
+      const resData = await response.json()
+      if (!response.ok) {
+        throw new Error(resData.error || 'Erro ao preparar mensagem de WhatsApp.')
+      }
+
+      if (resData.whatsapp_url) {
+        window.open(resData.whatsapp_url, '_blank')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Erro ao enviar fatura via WhatsApp.')
+    } finally {
+      setWaLoadingId(null)
     }
   }
 
@@ -939,6 +974,21 @@ export default function PagamentosPage() {
                                 <td className="px-6 py-3.5 text-gray-400">{formatDateTime(inv.created_at)}</td>
                                 <td className="px-6 py-3.5 text-right relative">
                                   <div className="flex justify-end items-center gap-1.5">
+                                    {/* Botão Enviar WhatsApp na linha (Financeiro 2.3) */}
+                                    <button
+                                      onClick={() => handleSendWhatsApp(inv)}
+                                      disabled={inv.status === 'paid' || inv.status === 'pago' || inv.status === 'canceled' || inv.status === 'cancelada' || waLoadingId === inv.id}
+                                      title={
+                                        inv.status === 'paid' || inv.status === 'pago' || inv.status === 'canceled' || inv.status === 'cancelada'
+                                          ? 'Somente cobranças pendentes podem ser enviadas.'
+                                          : 'Enviar cobrança via WhatsApp'
+                                      }
+                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-800 disabled:text-gray-500 text-white rounded text-[11px] font-semibold transition cursor-pointer disabled:cursor-not-allowed border border-emerald-500/30"
+                                    >
+                                      <MessageCircle className="h-3 w-3" />
+                                      📲 Enviar WhatsApp
+                                    </button>
+
                                     {inv.asaas_invoice_url && (
                                       <a
                                         href={inv.asaas_invoice_url}
@@ -962,7 +1012,25 @@ export default function PagamentosPage() {
                                       </button>
 
                                       {openMenuInvoiceId === inv.id && (
-                                        <div className="absolute right-0 mt-1 w-48 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-30 text-left">
+                                        <div className="absolute right-0 mt-1 w-52 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-30 text-left">
+                                          {/* Opção WhatsApp no Menu (Financeiro 2.3) */}
+                                          <button
+                                            onClick={() => {
+                                              handleSendWhatsApp(inv)
+                                              setOpenMenuInvoiceId(null)
+                                            }}
+                                            disabled={inv.status === 'paid' || inv.status === 'pago' || inv.status === 'canceled' || inv.status === 'cancelada'}
+                                            title={
+                                              inv.status === 'paid' || inv.status === 'pago' || inv.status === 'canceled' || inv.status === 'cancelada'
+                                                ? 'Somente cobranças pendentes podem ser enviadas.'
+                                                : 'Enviar cobrança via WhatsApp'
+                                            }
+                                            className="w-full px-4 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-950/40 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition"
+                                          >
+                                            <MessageCircle className="h-3.5 w-3.5" />
+                                            📲 Enviar via WhatsApp
+                                          </button>
+
                                           {inv.asaas_invoice_url && (
                                             <button
                                               onClick={() => {

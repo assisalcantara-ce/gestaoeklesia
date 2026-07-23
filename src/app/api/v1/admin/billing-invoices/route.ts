@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
         created_at,
         updated_at,
         ministries (
-          name
+          name,
+          phone,
+          responsavel_phone,
+          contact_phone
         )
       `)
       .order('created_at', { ascending: false })
