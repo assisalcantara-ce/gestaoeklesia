@@ -16,6 +16,7 @@ Este diretório contém os guias arquiteturais, padrões de código e regras té
 | 📡 [05-APIs.md](./05-APIs.md) | **REGRA 04**: Requisições administrativas obrigatórias com `authenticatedFetch()` |
 | 🧩 [06-UI-Patterns.md](./06-UI-Patterns.md) | Padrões de Toolbars, filtros cumulativos em memória e responsividade |
 | 🛠️ [07-Coding-Standards.md](./07-Coding-Standards.md) | Boas práticas de código, TypeScript, auditoria e resiliência |
+| 👤 [11-IMPERSONATION.md](./11-IMPERSONATION.md) | Especificação técnica e arquitetura de Admin Impersonation (Assumir Sessão) |
 
 ---
 
