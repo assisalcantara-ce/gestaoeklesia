@@ -43,6 +43,27 @@ export default function SuportePage() {
   const [closingTicket, setClosingTicket] = useState<SupportTicket | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [openMenuTicketId, setOpenMenuTicketId] = useState<string | null>(null)
+  const [menuPlacement, setMenuPlacement] = useState<'bottom' | 'top'>('bottom')
+
+  const toggleMenu = (id: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    if (openMenuTicketId === id) {
+      setOpenMenuTicketId(null)
+      return
+    }
+
+    const btnRect = e.currentTarget.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - btnRect.bottom
+    const spaceAbove = btnRect.top
+    const estimatedMenuHeight = 140
+
+    if (spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow) {
+      setMenuPlacement('top')
+    } else {
+      setMenuPlacement('bottom')
+    }
+
+    setOpenMenuTicketId(id)
+  }
   const router = useRouter()
 
   const [formData, setFormData] = useState({
@@ -892,7 +913,7 @@ export default function SuportePage() {
 
                                 <div className="relative">
                                   <button
-                                    onClick={() => setOpenMenuTicketId(isMenuOpen ? null : t.id)}
+                                    onClick={(e) => toggleMenu(t.id, e)}
                                     className="p-1.5 text-gray-400 hover:text-white bg-gray-950 hover:bg-gray-800 border border-gray-800 rounded-lg transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     title="Mais ações"
                                   >
@@ -900,7 +921,11 @@ export default function SuportePage() {
                                   </button>
 
                                   {isMenuOpen && (
-                                    <div className="absolute right-0 mt-1 w-44 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-50 text-left">
+                                    <div
+                                      className={`absolute right-0 ${
+                                        menuPlacement === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+                                      } w-44 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-50 text-left`}
+                                    >
                                       <button
                                         onClick={() => {
                                           setSelectedTicket(t)
@@ -1047,7 +1072,7 @@ export default function SuportePage() {
 
                                 <div className="relative">
                                   <button
-                                    onClick={() => setOpenMenuTicketId(isMenuOpen ? null : t.id)}
+                                    onClick={(e) => toggleMenu(t.id, e)}
                                     className="p-1.5 text-gray-400 hover:text-white bg-gray-950 hover:bg-gray-800 border border-gray-800 rounded-lg transition cursor-pointer"
                                     title="Mais ações"
                                   >
@@ -1055,7 +1080,11 @@ export default function SuportePage() {
                                   </button>
 
                                   {isMenuOpen && (
-                                    <div className="absolute right-0 mt-1 w-44 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-50 text-left">
+                                    <div
+                                      className={`absolute right-0 ${
+                                        menuPlacement === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+                                      } w-44 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-50 text-left`}
+                                    >
                                       <button
                                         onClick={() => {
                                           setSelectedLandingTicket(t)
