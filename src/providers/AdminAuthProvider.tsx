@@ -18,6 +18,12 @@ interface AdminAuthContextType {
   isLoading: boolean
   isAuthenticated: boolean
   isAdmin: boolean
+  // Novos estados de Impersonação (Admin Impersonation 2.0B - Sem interface visual)
+  isImpersonating: boolean
+  originalAdmin: { id: string; email: string; role: string; nome?: string } | null
+  targetTenant: { id: string; name: string } | null
+  readOnly: boolean
+  impersonationSessionId: string | null
   logout: () => Promise<void>
 }
 
@@ -27,6 +33,11 @@ const AdminAuthContext = createContext<AdminAuthContextType>({
   isLoading: true,
   isAuthenticated: false,
   isAdmin: false,
+  isImpersonating: false,
+  originalAdmin: null,
+  targetTenant: null,
+  readOnly: false,
+  impersonationSessionId: null,
   logout: async () => {},
 })
 
@@ -36,6 +47,14 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+
+  // Estados de Impersonação (Sem elementos visuais)
+  const [isImpersonating, setIsImpersonating] = useState(false)
+  const [originalAdmin, setOriginalAdmin] = useState<{ id: string; email: string; role: string; nome?: string } | null>(null)
+  const [targetTenant, setTargetTenant] = useState<{ id: string; name: string } | null>(null)
+  const [readOnly, setReadOnly] = useState(false)
+  const [impersonationSessionId, setImpersonationSessionId] = useState<string | null>(null)
+
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
 
   useEffect(() => {
@@ -48,6 +67,41 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     
     const checkAdminSession = async () => {
       try {
+        // Impersonation 2.0B: Verificar se há token de impersonação ativo no navegador
+        if (typeof window !== 'undefined') {
+          const impToken = sessionStorage.getItem('eklesia_impersonation_token') || localStorage.getItem('eklesia_impersonation_token')
+          if (impToken) {
+            try {
+              const statusRes = await fetch(`/api/v1/admin/impersonate/status?token=${encodeURIComponent(impToken)}`)
+              if (statusRes.ok) {
+                const statusData = await statusRes.json()
+                if (statusData.valid && statusData.status === 'active') {
+                  setIsImpersonating(true)
+                  setOriginalAdmin(statusData.session?.adminId ? {
+                    id: statusData.session.adminId,
+                    email: statusData.session.adminEmail || '',
+                    role: 'super_admin'
+                  } : null)
+                  setTargetTenant(statusData.tenant)
+                  setReadOnly(!!statusData.readOnly)
+                  setImpersonationSessionId(statusData.session?.id || null)
+                } else {
+                  // Token expirado ou revogado
+                  sessionStorage.removeItem('eklesia_impersonation_token')
+                  localStorage.removeItem('eklesia_impersonation_token')
+                  setIsImpersonating(false)
+                  setOriginalAdmin(null)
+                  setTargetTenant(null)
+                  setReadOnly(false)
+                  setImpersonationSessionId(null)
+                }
+              }
+            } catch (e) {
+              console.warn('[AdminAuthProvider] Falha ao verificar status da impersonação:', e)
+            }
+          }
+        }
+
         // Primeiro, verificar se há sessão Supabase
         const {
           data: { user: sessionUser },
@@ -127,6 +181,11 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         setIsAuthenticated(false)
         setIsAdmin(false)
         setIsLoading(false)
+        setIsImpersonating(false)
+        setOriginalAdmin(null)
+        setTargetTenant(null)
+        setReadOnly(false)
+        setImpersonationSessionId(null)
       } else if (event === 'SIGNED_IN') {
         // Só re-verifica admin no login, não em cada TOKEN_REFRESHED
         setUser(session.user)
@@ -149,6 +208,15 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       setAdminUser(null)
       setIsAuthenticated(false)
       setIsAdmin(false)
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('eklesia_impersonation_token')
+        localStorage.removeItem('eklesia_impersonation_token')
+      }
+      setIsImpersonating(false)
+      setOriginalAdmin(null)
+      setTargetTenant(null)
+      setReadOnly(false)
+      setImpersonationSessionId(null)
 
       // Depois fazer logout no Supabase
       if (supabaseRef.current) {
@@ -167,6 +235,11 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isAuthenticated,
         isAdmin,
+        isImpersonating,
+        originalAdmin,
+        targetTenant,
+        readOnly,
+        impersonationSessionId,
         logout,
       }}
     >

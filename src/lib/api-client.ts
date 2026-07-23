@@ -30,8 +30,17 @@ export async function authenticatedFetch(
   
   const headers = new Headers(options.headers || {})
   
-  // Adicionar token de autorização
-  if (session?.access_token) {
+  // Impersonation 2.0B: Se existir um token de impersonação ativo no navegador, injetá-lo com prioridade.
+  let impersonationToken: string | null = null;
+  if (typeof window !== 'undefined') {
+    impersonationToken =
+      sessionStorage.getItem('eklesia_impersonation_token') ||
+      localStorage.getItem('eklesia_impersonation_token');
+  }
+
+  if (impersonationToken) {
+    headers.set('Authorization', `Bearer ${impersonationToken}`)
+  } else if (session?.access_token) {
     headers.set('Authorization', `Bearer ${session.access_token}`)
   }
 

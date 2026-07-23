@@ -5,6 +5,26 @@ import {
   ImpersonationTokenPayload,
 } from './impersonation-jwt';
 
+/**
+ * Operações críticas bloqueadas para sessões de impersonação (Fase 2B — Estrutura preparada).
+ * Nota: Nesta etapa de integração técnica, os bloqueios estão catalogados sem impedir a chamada.
+ */
+export const FORBIDDEN_WHILE_IMPERSONATING = [
+  'DELETE_MINISTRY',
+  'DELETE_ADMIN',
+  'CHANGE_OWNER',
+  'CHANGE_PRIMARY_EMAIL',
+  'CHANGE_CNPJ',
+  'DELETE_SUBSCRIPTION',
+  'DELETE_TENANT',
+] as const;
+
+export type ForbiddenImpersonationOperation = typeof FORBIDDEN_WHILE_IMPERSONATING[number];
+
+export function isOperationForbiddenWhileImpersonating(operation: string): boolean {
+  return FORBIDDEN_WHILE_IMPERSONATING.includes(operation as ForbiddenImpersonationOperation);
+}
+
 export type ImpersonationEndedReason = 'user_action' | 'timeout' | 'security_revocation';
 
 export interface ImpersonationSessionRecord {
