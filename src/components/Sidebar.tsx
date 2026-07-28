@@ -198,13 +198,15 @@ export default function Sidebar() {
       icon: '👑',
       path: '/presidencia',
       modulo: 'presidencia',
+      featureFlag: 'presidency_module',
+      planFeature: 'has_modulo_presidencial',
       submenu: [
-        { id: 'presidencia-geral',        label: 'Visão Geral',             icon: '📋', path: '/presidencia',                     modulo: 'presidencia'           },
-        { id: 'consolidado-financeiro',   label: 'Consolidado Financeiro',  icon: '🏛️', path: '/presidencia/consolidado',        modulo: 'consolidado_financeiro' },
-        { id: 'prestacao-contas',          label: 'Prestação de Contas',        icon: '📄', path: '/presidencia/prestacao-contas',          modulo: 'consolidado_financeiro' },
-        { id: 'prestacao-contas-oficial', label: 'Prestação de Contas Oficial', icon: '📋', path: '/presidencia/prestacao-contas-oficial', modulo: 'consolidado_financeiro' },
-        { id: 'auditoria-financeira',     label: 'Auditoria Financeira',       icon: '🔍', path: '/presidencia/auditoria',                modulo: 'consolidado_financeiro' },
-        { id: 'conselho-fiscal',          label: 'Conselho Fiscal',         icon: '⚖️', path: '/presidencia/conselho-fiscal',   modulo: 'conselho_fiscal'        },
+        { id: 'presidencia-geral',        label: 'Visão Geral',             icon: '📋', path: '/presidencia',                     modulo: 'presidencia',           featureFlag: 'presidency_module', planFeature: 'has_modulo_presidencial' },
+        { id: 'consolidado-financeiro',   label: 'Consolidado Financeiro',  icon: '🏛️', path: '/presidencia/consolidado',        modulo: 'consolidado_financeiro', featureFlag: 'presidency_module', planFeature: 'has_modulo_presidencial' },
+        { id: 'prestacao-contas',          label: 'Prestação de Contas',        icon: '📄', path: '/presidencia/prestacao-contas',          modulo: 'consolidado_financeiro', featureFlag: 'presidency_module', planFeature: 'has_modulo_presidencial' },
+        { id: 'prestacao-contas-oficial', label: 'Prestação de Contas Oficial', icon: '📋', path: '/presidencia/prestacao-contas-oficial', modulo: 'consolidado_financeiro', featureFlag: 'presidency_module', planFeature: 'has_modulo_presidencial' },
+        { id: 'auditoria-financeira',     label: 'Auditoria Financeira',       icon: '🔍', path: '/presidencia/auditoria',                modulo: 'consolidado_financeiro', featureFlag: 'presidency_module', planFeature: 'has_modulo_presidencial' },
+        { id: 'conselho-fiscal',          label: 'Conselho Fiscal',         icon: '⚖️', path: '/presidencia/conselho-fiscal',   modulo: 'conselho_fiscal',        featureFlag: 'presidency_module', planFeature: 'has_modulo_presidencial' },
       ]
     },
     { id: 'patrimonio',       label: 'Patrimônio',         icon: '🏢', path: '/patrimonio',                 modulo: 'patrimonio' },
@@ -233,7 +235,7 @@ export default function Sidebar() {
   const menuItems = allMenuItems.filter(i => {
     // Enquanto algum dos dois carrega, oculta itens sensíveis para não piscar
     if (planFeatures.loading || userCtx.loading) {
-      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda', 'ebd', 'missoes', 'funcionarios', 'comissao', 'comissoes', 'consagracao', 'apresentacao-criancas'].includes(i.id);
+      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda', 'ebd', 'missoes', 'funcionarios', 'comissao', 'comissoes', 'consagracao', 'apresentacao-criancas', 'presidencia', 'presidencia-geral', 'consolidado-financeiro', 'prestacao-contas', 'prestacao-contas-oficial', 'auditoria-financeira', 'conselho-fiscal'].includes(i.id);
     }
     // Filtro por plano
     if ((i as any).featureFlag && !planFeatures.hasFeature((i as any).featureFlag)) return false;

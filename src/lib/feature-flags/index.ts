@@ -17,6 +17,7 @@ export type FeatureFlag =
   | 'employees_module'          // Gestão de Funcionários & RH
   | 'ordination_module'         // Comissão & Consagração de Obreiros
   | 'kids_module'               // Área Kids & Apresentação de Crianças
+  | 'presidency_module'         // Módulo Presidência & Visão Corporativa
   | 'student_portal'            // Portal do Aluno (EBD)
   | 'teacher_portal'            // Portal do Professor (EBD)
   | 'mobile_app'                // Aplicativo Mobile
@@ -104,6 +105,12 @@ export const FEATURE_CATALOG: Record<FeatureFlag, FeatureMetadata> = {
     label: 'Área Kids & Apresentação de Crianças',
     description: 'Gestão infantil, registros e certificados de apresentação de crianças.',
     minTier: 'intermediate',
+  },
+  presidency_module: {
+    key: 'presidency_module',
+    label: 'Módulo Presidência & Visão Corporativa',
+    description: 'Gestão da presidência, consolidados regionais, conselho fiscal e atas da diretoria.',
+    minTier: 'professional',
   },
   student_portal: {
     key: 'student_portal',
@@ -212,6 +219,10 @@ const ALIAS_MAP: Record<string, FeatureFlag> = {
   'modulo de reunioes': 'meetings_module',
   'atas de reuniões': 'meetings_module',
   'atas de reunioes': 'meetings_module',
+  'presidência': 'presidency_module',
+  'presidencia': 'presidency_module',
+  'módulo presidência': 'presidency_module',
+  'modulo presidencia': 'presidency_module',
   'portal do aluno': 'student_portal',
   'portal do professor': 'teacher_portal',
   'aplicativo mobile': 'mobile_app',
@@ -244,7 +255,15 @@ export function getPlanTierRank(plan?: any): number {
   }
 
   // Tier 3: Profissional / Expansão
-  if (price >= 400 || maxUsers >= 20 || slug.includes('profissional') || slug.includes('professional') || plan.has_modulo_eventos) {
+  if (
+    price >= 400 ||
+    maxUsers >= 20 ||
+    slug.includes('profissional') ||
+    slug.includes('professional') ||
+    plan.has_modulo_eventos ||
+    modulosList.includes('presidência') ||
+    modulosList.includes('presidencia')
+  ) {
     return 3;
   }
 
@@ -291,7 +310,7 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
   // Inicializa mapa base com base no Tier do Plano
   const resolved: Record<FeatureFlag, boolean> = {
     financial_module:     tierRank >= 0,
-    meetings_module:      tierRank >= 2, // Intermediário e superiores (Básico e Starter = false)
+    meetings_module:      tierRank >= 2, // Intermediário e superiores
     agenda_module:        tierRank >= 1, // Starter e superiores
     ebd_module:           tierRank >= 1, // Starter e superiores
     missions_module:      tierRank >= 1, // Starter e superiores
@@ -300,7 +319,8 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
     digital_collection:   tierRank >= 2, // Intermediário e superiores
     employees_module:     tierRank >= 2, // Intermediário e superiores
     ordination_module:    tierRank >= 2, // Intermediário e superiores
-    kids_module:          tierRank >= 2, // Intermediário e superiores (Básico e Starter = false)
+    kids_module:          tierRank >= 2, // Intermediário e superiores
+    presidency_module:    tierRank >= 3, // Profissional e superiores (Básico, Starter e Intermediário = false)
     advanced_finance:     tierRank >= 3,
     events_module:        tierRank >= 3,
     mobile_app:           tierRank >= 3,
