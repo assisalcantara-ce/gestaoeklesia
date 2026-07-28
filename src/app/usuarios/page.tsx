@@ -131,8 +131,16 @@ export default function UsuariosPage() {
       cor: 'bg-gray-100 border-gray-300',
     },
     {
+      id: 'tesoureiro_geral',
+      nome: 'Tesoureiro Geral',
+      categoria: 'Tesouraria',
+      descricao: 'Acesso completo às informações financeiras de todas as congregações do ministério',
+      icon: '💵',
+      cor: 'bg-amber-100 border-amber-300',
+    },
+    {
       id: 'tesouraria_local',
-      nome: 'Tesouraria Local',
+      nome: 'Tesoureiro Local',
       categoria: 'Tesouraria',
       descricao: 'Acesso restrito à tesouraria da sua congregação',
       icon: '💰',
@@ -159,7 +167,7 @@ export default function UsuariosPage() {
   const getNivelInfo = (nivel: string) => {
     return nivelAcessoInfo.find(n => n.id === nivel) || {
       id: nivel,
-      nome: nivel === 'secretario_geral' ? 'Secretário Geral' : nivel === 'operador' ? 'Operador Local (Legado)' : nivel === 'admin_local' ? 'Admin Local (Legado)' : nivel === 'financeiro_local' ? 'Financeiro Local (Legado)' : nivel === 'superintendente' ? 'Superintendente EBD (Legado)' : nivel === 'coordenador' ? 'Coordenador EBD (Legado)' : nivel,
+      nome: nivel === 'secretario_geral' ? 'Secretário Geral' : nivel === 'tesoureiro_geral' ? 'Tesoureiro Geral' : nivel === 'operador' ? 'Operador Local (Legado)' : nivel === 'admin_local' ? 'Admin Local (Legado)' : nivel === 'financeiro_local' ? 'Financeiro Local (Legado)' : nivel === 'superintendente' ? 'Superintendente EBD (Legado)' : nivel === 'coordenador' ? 'Coordenador EBD (Legado)' : nivel,
       descricao: '',
       icon: '👤',
       cor: 'bg-gray-50 border-gray-200',
@@ -647,7 +655,7 @@ export default function UsuariosPage() {
           </div>
 
           {/* Níveis de Acesso */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
             {nivelAcessoInfo.map(nivel => (
               <div
                 key={nivel.id}

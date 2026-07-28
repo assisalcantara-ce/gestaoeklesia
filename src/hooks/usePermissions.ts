@@ -31,6 +31,10 @@ export function isSecretarioGeral(nivel: NivelAcesso): boolean {
   return nivel === 'secretario_geral';
 }
 
+export function isTesoureiroGeral(nivel: NivelAcesso): boolean {
+  return nivel === 'tesoureiro_geral';
+}
+
 export function isSupervisor(nivel: NivelAcesso): boolean {
   return nivel === 'supervisor';
 }
@@ -40,7 +44,7 @@ export function isOperador(nivel: NivelAcesso): boolean {
 }
 
 export function isFinanceiro(nivel: NivelAcesso): boolean {
-  return nivel === 'financeiro' || nivel === 'tesouraria_local' || nivel === 'financeiro_local';
+  return nivel === 'financeiro' || nivel === 'tesoureiro_geral' || nivel === 'tesouraria_local' || nivel === 'financeiro_local';
 }
 
 export function isSuperintendente(nivel: NivelAcesso): boolean {
@@ -69,7 +73,7 @@ export function filtrarCongregacoes(
   congregacaoUsuario?: string,
   supervisaoUsuario?: string
 ): typeof congregacoes {
-  if (nivel === 'administrador' || nivel === 'financeiro' || nivel === 'secretario_geral') {
+  if (nivel === 'administrador' || nivel === 'financeiro' || nivel === 'secretario_geral' || nivel === 'tesoureiro_geral') {
     return congregacoes;
   }
 

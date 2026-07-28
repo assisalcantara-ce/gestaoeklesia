@@ -45,6 +45,7 @@ export type NivelAcesso =
   | 'administrador'
   | 'financeiro'
   | 'secretario_geral'
+  | 'tesoureiro_geral'
   | 'supervisor'
   | 'secretaria_local'
   | 'tesouraria_local'
@@ -100,6 +101,11 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'patrimonio',
     'geolocalizacao',
     'gestao',
+    'agenda',
+  ],
+  tesoureiro_geral: [
+    'dashboard',
+    'tesouraria',
     'agenda',
   ],
   supervisor: [
@@ -210,6 +216,9 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'gestao',
     'agenda',
   ],
+  tesoureiro_geral: [
+    'tesouraria',
+  ],
   supervisor: [
     'secretaria',
   ],
@@ -280,6 +289,7 @@ export function resolveNivel(role: string | null | undefined, permissions: unkno
 
   if (perms.includes('ADMINISTRADOR')) resolved = 'administrador';
   else if (perms.includes('SECRETARIO_GERAL')) resolved = 'secretario_geral';
+  else if (perms.includes('TESOUREIRO_GERAL')) resolved = 'tesoureiro_geral';
   else if (perms.includes('ADMIN_LOCAL')) resolved = 'secretaria_local';
   else if (perms.includes('SECRETARIA_LOCAL')) resolved = 'secretaria_local';
   else if (perms.includes('FINANCEIRO_LOCAL')) resolved = 'tesouraria_local';
@@ -303,6 +313,8 @@ export function resolveNivel(role: string | null | undefined, permissions: unkno
       financial: 'financeiro',
       secretario_geral: 'secretario_geral',
       secretariogeral: 'secretario_geral',
+      tesoureiro_geral: 'tesoureiro_geral',
+      tesoureirogeral: 'tesoureiro_geral',
       financeiro_local: 'tesouraria_local',
       tesouraria_local: 'tesouraria_local',
       supervisor: 'supervisor',
@@ -342,6 +354,8 @@ export function mapRoleAndPermissions(nivel: NivelAcesso): RoleConfig {
       return { role: 'manager', permissions: ['FINANCEIRO'] };
     case 'secretario_geral':
       return { role: 'operator', permissions: ['SECRETARIO_GERAL'] };
+    case 'tesoureiro_geral':
+      return { role: 'operator', permissions: ['TESOUREIRO_GERAL'] };
     case 'supervisor':
       return { role: 'manager', permissions: ['SUPERVISOR'] };
     case 'secretaria_local':
