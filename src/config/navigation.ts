@@ -133,7 +133,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
   {
     groupName: "EVENTOS",
     items: [
-      { id: 'eventos', label: 'Eventos', icon: '📅', path: '/eventos', modulo: 'eventos' },
+      { id: 'eventos', label: 'Eventos', icon: '📅', path: '/eventos', modulo: 'eventos', featureFlag: 'events_module', planFeature: 'has_modulo_eventos' },
     ]
   },
   {

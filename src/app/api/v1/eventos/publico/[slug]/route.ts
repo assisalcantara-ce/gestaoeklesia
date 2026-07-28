@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
+import { isFeatureAllowedForTenant } from '@/lib/plan-permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,7 @@ export async function GET(
   // Buscar evento público pelo slug
   const { data: evento, error } = await admin
     .from('eventos')
-    .select('id, titulo, descricao, tipo, data_inicio, data_fim, local_nome, local_endereco, capacidade, status, is_publico, aceita_inscricao, valor_inscricao, slug')
+    .select('id, titulo, descricao, tipo, data_inicio, data_fim, local_nome, local_endereco, capacidade, status, is_publico, aceita_inscricao, valor_inscricao, slug, ministry_id')
     .eq('slug', slug)
     .eq('is_publico', true)
     .maybeSingle();
@@ -29,6 +30,12 @@ export async function GET(
 
   if (!evento) {
     return NextResponse.json({ error: 'Evento não encontrado.' }, { status: 404 });
+  }
+
+  // Validação da Feature Flag do Módulo de Eventos para o Tenant
+  const isAllowed = await isFeatureAllowedForTenant(admin, evento.ministry_id, 'events_module');
+  if (!isAllowed) {
+    return NextResponse.json({ error: 'Módulo de Eventos indisponível neste ministério.' }, { status: 403 });
   }
 
   // Contar inscrições confirmadas

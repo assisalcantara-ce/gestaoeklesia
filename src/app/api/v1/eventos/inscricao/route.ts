@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
+import { isFeatureAllowedForTenant } from '@/lib/plan-permissions';
 import { decryptCredentials } from '@/lib/ministry-credentials';
 import {
   getOrCreateAsaasCustomer,
@@ -50,6 +51,12 @@ export async function POST(request: NextRequest) {
 
   if (evErr || !evento) {
     return NextResponse.json({ error: 'Evento não encontrado.' }, { status: 404 });
+  }
+
+  // Validação da Feature Flag do Módulo de Eventos para o Tenant
+  const isAllowed = await isFeatureAllowedForTenant(admin, evento.ministry_id, 'events_module');
+  if (!isAllowed) {
+    return NextResponse.json({ error: 'Inscrições desabilitadas para este ministério.' }, { status: 403 });
   }
 
   // Validações de negócio

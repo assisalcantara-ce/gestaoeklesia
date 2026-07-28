@@ -191,7 +191,7 @@ export default function Sidebar() {
     },
     { id: 'reunioes',         label: 'Reuniões',           icon: '🤝', path: '/reunioes',                   modulo: 'reunioes', featureFlag: 'meetings_module', planFeature: 'has_modulo_reunioes' },
     { id: 'missoes',          label: 'Missões',            icon: '✈️', path: '/missoes',                    modulo: 'missoes', featureFlag: 'missions_module', planFeature: 'has_modulo_missoes' },
-    { id: 'eventos',          label: 'Eventos',            icon: '📅', path: '/eventos',                    modulo: 'eventos'    },
+    { id: 'eventos',          label: 'Eventos',            icon: '📅', path: '/eventos',                    modulo: 'eventos', featureFlag: 'events_module', planFeature: 'has_modulo_eventos' },
     {
       id: 'presidencia',
       label: 'Presidência',
