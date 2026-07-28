@@ -206,27 +206,27 @@ export default function SuportePage() {
     if (!user || !ministryId) return
     try {
       const { data, error: fetchErr } = await supabase
-        .from('tickets_suporte')
+        .from('support_tickets')
         .select('*')
         .eq('ministry_id', ministryId)
-        .order('data_atualizacao', { ascending: false })
+        .order('updated_at', { ascending: false })
 
       if (fetchErr) throw fetchErr
 
       const mapped: Ticket[] = (data || []).map((t: any) => ({
         id: t.id,
-        titulo: t.titulo,
-        descricao: t.descricao,
+        titulo: t.subject,
+        descricao: t.description,
         status: mapStatusFromDb(t.status),
-        prioridade: mapPriorityFromDb(t.prioridade),
-        categoria: t.categoria || 'Geral',
-        data_criacao: t.data_criacao,
-        data_atualizacao: t.data_atualizacao,
-        respondido_em: t.respondido_em,
-        usuario_id: t.usuario_id,
-        ultimo_autor_id: t.ultimo_autor_id,
-        ultimo_autor_role: t.ultimo_autor_role,
-        suporte_respondeu: t.suporte_respondeu,
+        prioridade: mapPriorityFromDb(t.priority),
+        categoria: t.category || 'Geral',
+        data_criacao: t.created_at,
+        data_atualizacao: t.updated_at,
+        respondido_em: t.response_at,
+        usuario_id: t.user_id,
+        ultimo_autor_id: null,
+        ultimo_autor_role: null,
+        suporte_respondeu: t.status === 'waiting_customer',
         ministry_id: t.ministry_id,
         ticket_number: t.ticket_number,
       }))
@@ -245,7 +245,7 @@ export default function SuportePage() {
     setCarregandoMensagens(true)
     try {
       const { data, error: fetchErr } = await supabase
-        .from('tickets_suporte_mensagens')
+        .from('support_ticket_messages')
         .select('*')
         .eq('ticket_id', ticketId)
         .order('created_at', { ascending: true })
@@ -266,17 +266,15 @@ export default function SuportePage() {
     setEnviando(true)
     try {
       const { data, error: insertErr } = await supabase
-        .from('tickets_suporte')
+        .from('support_tickets')
         .insert({
-          titulo: novoTicket.titulo.trim(),
-          descricao: novoTicket.descricao.trim(),
-          categoria: novoTicket.categoria,
-          prioridade: mapPriorityToDb(novoTicket.prioridade),
+          subject: novoTicket.titulo.trim(),
+          description: novoTicket.descricao.trim(),
+          category: novoTicket.categoria,
+          priority: mapPriorityToDb(novoTicket.prioridade),
           status: 'open',
-          usuario_id: user.id,
+          user_id: user.id,
           ministry_id: ministryId,
-          ultimo_autor_id: user.id,
-          ultimo_autor_role: 'user',
         })
         .select()
         .single()
@@ -300,16 +298,14 @@ export default function SuportePage() {
       if (data) {
         const mappedTicket: Ticket = {
           id: data.id,
-          titulo: data.titulo,
-          descricao: data.descricao,
+          titulo: data.subject,
+          descricao: data.description,
           status: mapStatusFromDb(data.status),
-          prioridade: mapPriorityFromDb(data.prioridade),
-          categoria: data.categoria || 'Geral',
-          data_criacao: data.data_criacao,
-          data_atualizacao: data.data_atualizacao,
-          usuario_id: data.usuario_id,
-          ultimo_autor_id: data.ultimo_autor_id,
-          ultimo_autor_role: data.ultimo_autor_role,
+          prioridade: mapPriorityFromDb(data.priority),
+          categoria: data.category || 'Geral',
+          data_criacao: data.created_at,
+          data_atualizacao: data.updated_at,
+          usuario_id: data.user_id,
           ministry_id: data.ministry_id,
           ticket_number: data.ticket_number,
         }
@@ -325,11 +321,11 @@ export default function SuportePage() {
 
   const handleResponder = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!resposta.trim() || !selecionado || !user) return
+    if (!resposta.trim() || !selecionado || !user || !ministryId) return
 
     setEnviandoResposta(true)
     try {
-      const { error: msgErr } = await supabase.from('tickets_suporte_mensagens').insert({
+      const { error: msgErr } = await supabase.from('support_ticket_messages').insert({
         ticket_id: selecionado.id,
         user_id: user.id,
         message: resposta.trim(),
@@ -339,14 +335,13 @@ export default function SuportePage() {
       if (msgErr) throw msgErr
 
       const { error: ticketErr } = await supabase
-        .from('tickets_suporte')
+        .from('support_tickets')
         .update({
           status: 'open',
-          ultimo_autor_id: user.id,
-          ultimo_autor_role: 'user',
-          data_atualizacao: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .eq('id', selecionado.id)
+        .eq('ministry_id', ministryId)
 
       if (ticketErr) throw ticketErr
 
@@ -361,13 +356,14 @@ export default function SuportePage() {
   }
 
   const handleSalvarDescricao = async () => {
-    if (!selecionado || !descricaoEditada.trim()) return
+    if (!selecionado || !descricaoEditada.trim() || !ministryId) return
     setSalvandoDescricao(true)
     try {
       const { error: updateErr } = await supabase
-        .from('tickets_suporte')
-        .update({ descricao: descricaoEditada.trim(), data_atualizacao: new Date().toISOString() })
+        .from('support_tickets')
+        .update({ description: descricaoEditada.trim(), updated_at: new Date().toISOString() })
         .eq('id', selecionado.id)
+        .eq('ministry_id', ministryId)
 
       if (updateErr) throw updateErr
 
@@ -382,6 +378,7 @@ export default function SuportePage() {
   }
 
   const handleApagarTicket = async (ticketId: string) => {
+    if (!ministryId) return
     const confirmar = await dialog.confirm({
       message: 'Tem certeza que deseja excluir permanentemente este chamado e todo o seu histórico de mensagens?'
     })
@@ -389,13 +386,18 @@ export default function SuportePage() {
 
     try {
       const { error: delMsgsErr } = await supabase
-        .from('tickets_suporte_mensagens')
+        .from('support_ticket_messages')
         .delete()
         .eq('ticket_id', ticketId)
 
       if (delMsgsErr) throw delMsgsErr
 
-      const { error: delErr } = await supabase.from('tickets_suporte').delete().eq('id', ticketId)
+      const { error: delErr } = await supabase
+        .from('support_tickets')
+        .delete()
+        .eq('id', ticketId)
+        .eq('ministry_id', ministryId)
+
       if (delErr) throw delErr
 
       if (selecionado?.id === ticketId) {
