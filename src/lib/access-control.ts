@@ -46,6 +46,7 @@ export type NivelAcesso =
   | 'financeiro'
   | 'secretario_geral'
   | 'tesoureiro_geral'
+  | 'auxiliar_secretaria'
   | 'supervisor'
   | 'secretaria_local'
   | 'tesouraria_local'
@@ -109,6 +110,12 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
   tesoureiro_geral: [
     'dashboard',
     'tesouraria',
+    'agenda',
+  ],
+  auxiliar_secretaria: [
+    'dashboard',
+    'secretaria',
+    'secretaria_local',
     'agenda',
   ],
   supervisor: [
@@ -222,6 +229,10 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
   tesoureiro_geral: [
     'tesouraria',
   ],
+  auxiliar_secretaria: [
+    'secretaria',
+    'secretaria_local',
+  ],
   supervisor: [
     'secretaria',
   ],
@@ -293,6 +304,7 @@ export function resolveNivel(role: string | null | undefined, permissions: unkno
   if (perms.includes('ADMINISTRADOR')) resolved = 'administrador';
   else if (perms.includes('SECRETARIO_GERAL')) resolved = 'secretario_geral';
   else if (perms.includes('TESOUREIRO_GERAL')) resolved = 'tesoureiro_geral';
+  else if (perms.includes('AUXILIAR_SECRETARIA')) resolved = 'auxiliar_secretaria';
   else if (perms.includes('ADMIN_LOCAL')) resolved = 'secretaria_local';
   else if (perms.includes('SECRETARIA_LOCAL')) resolved = 'secretaria_local';
   else if (perms.includes('FINANCEIRO_LOCAL')) resolved = 'tesouraria_local';
@@ -318,6 +330,8 @@ export function resolveNivel(role: string | null | undefined, permissions: unkno
       secretariogeral: 'secretario_geral',
       tesoureiro_geral: 'tesoureiro_geral',
       tesoureirogeral: 'tesoureiro_geral',
+      auxiliar_secretaria: 'auxiliar_secretaria',
+      auxiliarsecretaria: 'auxiliar_secretaria',
       financeiro_local: 'tesouraria_local',
       tesouraria_local: 'tesouraria_local',
       supervisor: 'supervisor',
@@ -359,6 +373,8 @@ export function mapRoleAndPermissions(nivel: NivelAcesso): RoleConfig {
       return { role: 'operator', permissions: ['SECRETARIO_GERAL'] };
     case 'tesoureiro_geral':
       return { role: 'operator', permissions: ['TESOUREIRO_GERAL'] };
+    case 'auxiliar_secretaria':
+      return { role: 'operator', permissions: ['AUXILIAR_SECRETARIA'] };
     case 'supervisor':
       return { role: 'manager', permissions: ['SUPERVISOR'] };
     case 'secretaria_local':
@@ -398,6 +414,7 @@ export function hasRole(roles: string[], required: string[] | string): boolean {
 export function isLocalNivel(nivel: NivelAcesso): boolean {
   return [
     'secretaria_local',
+    'auxiliar_secretaria',
     'tesouraria_local',
     'coordenador_ebd',
     'admin_local',

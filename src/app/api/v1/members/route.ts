@@ -182,6 +182,18 @@ export async function POST(request: NextRequest) {
       ],
     })
 
+    if (context.nivel === 'auxiliar_secretaria') {
+      delete normalizedBody.cargo_ministerial
+      delete normalizedBody.dados_cargos
+      delete normalizedBody.observacoes_ministeriais
+      delete normalizedBody.data_consagracao
+      delete normalizedBody.data_emissao
+      delete normalizedBody.data_validade_credencial
+      if (context.congregacaoId) {
+        normalizedBody.congregacao_id = context.congregacaoId
+      }
+    }
+
     const resolvedMinistryId = ministryId
     if (!resolvedMinistryId) {
       return NextResponse.json(

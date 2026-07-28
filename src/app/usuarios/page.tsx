@@ -134,6 +134,14 @@ export default function UsuariosPage() {
       cor: 'bg-gray-100 border-gray-300',
     },
     {
+      id: 'auxiliar_secretaria',
+      nome: 'Auxiliar de Secretaria',
+      categoria: 'Secretaria',
+      descricao: 'Cadastramento e atualização operacional da Secretaria da sua congregação',
+      icon: '✍️',
+      cor: 'bg-sky-100 border-sky-300',
+    },
+    {
       id: 'tesoureiro_geral',
       nome: 'Tesoureiro Geral',
       categoria: 'Tesouraria',
@@ -170,7 +178,7 @@ export default function UsuariosPage() {
   const getNivelInfo = (nivel: string) => {
     return nivelAcessoInfo.find(n => n.id === nivel) || {
       id: nivel,
-      nome: nivel === 'secretario_geral' ? 'Secretário Geral' : nivel === 'tesoureiro_geral' ? 'Tesoureiro Geral' : nivel === 'operador' ? 'Operador Local (Legado)' : nivel === 'admin_local' ? 'Admin Local (Legado)' : nivel === 'financeiro_local' ? 'Financeiro Local (Legado)' : nivel === 'superintendente' ? 'Superintendente EBD (Legado)' : nivel === 'coordenador' ? 'Coordenador EBD (Legado)' : nivel,
+      nome: nivel === 'secretario_geral' ? 'Secretário Geral' : nivel === 'auxiliar_secretaria' ? 'Auxiliar de Secretaria' : nivel === 'tesoureiro_geral' ? 'Tesoureiro Geral' : nivel === 'operador' ? 'Operador Local (Legado)' : nivel === 'admin_local' ? 'Admin Local (Legado)' : nivel === 'financeiro_local' ? 'Financeiro Local (Legado)' : nivel === 'superintendente' ? 'Superintendente EBD (Legado)' : nivel === 'coordenador' ? 'Coordenador EBD (Legado)' : nivel,
       descricao: '',
       icon: '👤',
       cor: 'bg-gray-50 border-gray-200',
@@ -350,7 +358,7 @@ export default function UsuariosPage() {
       return;
     }
 
-    if (['secretaria_local', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'coordenador', 'operador'].includes(editData.nivel) && !editData.congregacao_id) {
+    if (['secretaria_local', 'auxiliar_secretaria', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'coordenador', 'operador'].includes(editData.nivel) && !editData.congregacao_id) {
       setEditError('Congregação obrigatória para este nível.');
       return;
     }
@@ -514,7 +522,7 @@ export default function UsuariosPage() {
       return;
     }
 
-    if (['secretaria_local', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'coordenador', 'operador'].includes(formData.nivel) && !formData.congregacao_id) {
+    if (['secretaria_local', 'auxiliar_secretaria', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'coordenador', 'operador'].includes(formData.nivel) && !formData.congregacao_id) {
       setFormError('Congregação obrigatória para este nível.');
       return;
     }
@@ -658,7 +666,7 @@ export default function UsuariosPage() {
           </div>
 
           {/* Níveis de Acesso */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
             {nivelAcessoInfo.filter(n => !n.legacy).map(nivel => (
               <div
                 key={nivel.id}
@@ -777,7 +785,7 @@ export default function UsuariosPage() {
                 </div>
               )}
 
-              {['secretaria_local', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'coordenador', 'operador'].includes(selectedLevel) && (
+              {['secretaria_local', 'auxiliar_secretaria', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'coordenador', 'operador'].includes(selectedLevel) && (
                 <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                   <label className="block text-sm font-semibold text-green-800 mb-1">
                     Congregação / Igreja * <span className="font-normal text-green-600">(1ª divisão — escopo de acesso)</span>
@@ -1083,7 +1091,7 @@ export default function UsuariosPage() {
                   </div>
                 </div>
 
-                {['secretaria_local', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'coordenador', 'operador'].includes(editData.nivel) && (
+                {['secretaria_local', 'auxiliar_secretaria', 'tesouraria_local', 'coordenador_ebd', 'admin_local', 'financeiro_local', 'coordenador', 'operador'].includes(editData.nivel) && (
                   <div>
                     <label className="block text-sm font-semibold text-[#123b63] mb-2">Congregação / Igreja *</label>
                     <select

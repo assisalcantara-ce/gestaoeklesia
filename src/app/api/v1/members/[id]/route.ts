@@ -146,6 +146,15 @@ export async function PUT(
     const body = await request.json()
     const normalizedBody = normalizeMemberBody(body)
 
+    if (context.nivel === 'auxiliar_secretaria') {
+      delete normalizedBody.cargo_ministerial
+      delete normalizedBody.dados_cargos
+      delete normalizedBody.observacoes_ministeriais
+      delete normalizedBody.data_consagracao
+      delete normalizedBody.data_emissao
+      delete normalizedBody.data_validade_credencial
+    }
+
     let existingQuery = supabase
       .from('members')
       .select('id')
@@ -192,6 +201,9 @@ export async function DELETE(
   const { id } = await params
   try {
     const context = await resolveTenantAuth(request)
+    if (context.nivel === 'auxiliar_secretaria') {
+      return NextResponse.json({ error: 'Auxiliar de Secretaria não possui permissão para excluir membros.' }, { status: 403 })
+    }
     const { supabase, ministryId } = context
     const congregacaoIds = await getAccessibleCongregacaoIds(context)
 
