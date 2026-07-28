@@ -1370,12 +1370,12 @@ export default function TesourariaPage() {
       member_id:        dizSelId || null,
       tipo_movimento:   form.tipo_movimento,
       tipo_recebimento: isSaida ? (form.categoria_saida || 'outros_despesa') : form.tipo_recebimento,
-      descricao:        form.descricao.trim()  || null,
+      descricao:        form.observacoes.trim() || form.descricao.trim() || null,
       referencia:       form.referencia.trim() || null,
       valor:            valorNum,
       forma_pagamento:  form.forma_pagamento,
       data_lancamento:  form.data_lancamento,
-      observacoes:      form.observacoes.trim() || null,
+      observacoes:      form.observacoes.trim() || form.descricao.trim() || null,
       conta_id:         form.conta_id    || null,
       categoria_id:     form.categoria_id || null,
       updated_at:       now,
@@ -1438,6 +1438,7 @@ export default function TesourariaPage() {
 
   const handleEdit = (l: Lancamento) => {
     const isSaida = l.tipo_movimento === 'saida';
+    const obsRestaurada = l.observacoes ?? l.descricao ?? '';
     // Limpar estado de busca antes de restaurar
     resetDizForm();
     setForm({
@@ -1446,12 +1447,12 @@ export default function TesourariaPage() {
       tipo_movimento:   l.tipo_movimento,
       tipo_recebimento: isSaida ? '' : l.tipo_recebimento,
       categoria_saida:  isSaida ? l.tipo_recebimento : '',
-      descricao:        l.descricao  ?? '',
+      descricao:        obsRestaurada,
       referencia:       l.referencia ?? '',
       valor:            fmtBRL(Number(l.valor)),
       forma_pagamento:  l.forma_pagamento,
       data_lancamento:  l.data_lancamento,
-      observacoes:      l.observacoes ?? '',
+      observacoes:      obsRestaurada,
       conta_id:         (l as any).conta_id    ?? '',
       categoria_id:     (l as any).categoria_id ?? '',
     });
@@ -2343,26 +2344,18 @@ export default function TesourariaPage() {
                   />
                 </div>
 
-                {/* Descrição */}
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Descrição</label>
-                  <input
-                    type="text"
-                    placeholder="Descrição livre..."
-                    value={form.descricao}
-                    onChange={e => setForm(p => ({ ...p, descricao: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
-
-                {/* Obs */}
-                <div className="sm:col-span-3">
+                {/* Observações (Campo único) */}
+                <div className="sm:col-span-2 lg:col-span-3">
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Observações</label>
                   <textarea
                     rows={2}
+                    placeholder="Observações do lançamento..."
                     value={form.observacoes}
-                    onChange={e => setForm(p => ({ ...p, observacoes: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none"
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(p => ({ ...p, observacoes: val, descricao: val }));
+                    }}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#123b63]"
                   />
                 </div>
               </div>
@@ -2426,7 +2419,7 @@ export default function TesourariaPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">
-                          {l.referencia || l.descricao || '—'}
+                          {l.referencia || l.observacoes || l.descricao || '—'}
                         </td>
                         <td className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${l.tipo_movimento === 'saida' ? 'text-red-600' : 'text-[#123b63]'}`}>
                           {l.tipo_movimento === 'saida' ? '- ' : ''}{fmtBRL(Number(l.valor))}
@@ -3102,7 +3095,7 @@ export default function TesourariaPage() {
                               {tipoLabel(l.tipo_recebimento)}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-gray-500 print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">{l.referencia || l.descricao || '—'}</td>
+                          <td className="px-3 py-2 text-gray-500 print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">{l.referencia || l.observacoes || l.descricao || '—'}</td>
                           <td className="px-3 py-2 text-gray-500 capitalize print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200">{l.forma_pagamento}</td>
                           <td className={`px-3 py-2 text-right font-semibold print:text-[9px] print:py-1.5 print:px-2 print:border-b print:border-gray-200 ${l.tipo_movimento === 'saida' ? 'text-red-600' : 'text-[#123b63]'}`}>
                             {l.tipo_movimento === 'saida' ? '−' : ''}{fmtBRL(Number(l.valor))}
