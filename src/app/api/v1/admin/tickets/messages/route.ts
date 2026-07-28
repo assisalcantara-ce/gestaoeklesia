@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const { supabaseAdmin, user } = result.ctx
 
     const body = await request.json()
-    const { ticket_id, message, is_internal, next_status } = body || {}
+    const { ticket_id, message, is_internal, next_status, attachments } = body || {}
 
     if (!ticket_id || !message) {
       return NextResponse.json({ error: 'ticket_id e message são obrigatórios' }, { status: 400 })
@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
         message,
         is_internal: is_internal === true,
         sender_role: 'support',
+        attachments: attachments ? (typeof attachments === 'string' ? attachments : JSON.stringify(attachments)) : null,
       })
       .select()
       .single()

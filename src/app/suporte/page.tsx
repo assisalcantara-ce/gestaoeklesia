@@ -10,6 +10,8 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth'
 import { useRequireModulo } from '@/hooks/useRequireModulo'
 import PageLayout from '@/components/PageLayout'
 import { useAppDialog } from '@/providers/AppDialogProvider'
+import AttachmentUploader, { AttachmentItem } from '@/components/common/AttachmentUploader'
+import AttachmentList from '@/components/common/AttachmentList'
 
 type TicketStatus = 'aberto' | 'em_progresso' | 'resolvido' | 'fechado' | 'aguardando_cliente'
 type TicketPriority = 'baixa' | 'media' | 'alta' | 'critica'
@@ -56,7 +58,7 @@ export default function SuportePage() {
   const [ministryId, setMinistryId] = useState<string | null>(null)
   const [ministryResolved, setMinistryResolved] = useState(false)
   const [mensagens, setMensagens] = useState<
-    Array<{ id: string; user_id: string; message: string; created_at: string; sender_role?: 'support' | 'user' | null }>
+    Array<{ id: string; user_id: string; message: string; created_at: string; sender_role?: 'support' | 'user' | null; attachments?: any }>
   >([])
   const [carregandoMensagens, setCarregandoMensagens] = useState(false)
   const [resposta, setResposta] = useState('')
@@ -64,6 +66,8 @@ export default function SuportePage() {
   const [podeEditarDescricao, setPodeEditarDescricao] = useState(false)
   const [descricaoEditada, setDescricaoEditada] = useState('')
   const [salvandoDescricao, setSalvandoDescricao] = useState(false)
+  const [novoTicketAnexos, setNovoTicketAnexos] = useState<AttachmentItem[]>([])
+  const [respostaAnexos, setRespostaAnexos] = useState<AttachmentItem[]>([])
   const [novoTicket, setNovoTicket] = useState<NovoTicket>({
     titulo: '',
     descricao: '',
@@ -281,9 +285,19 @@ export default function SuportePage() {
 
       if (insertErr) throw insertErr
 
+      if (data && novoTicketAnexos.length > 0) {
+        await supabase.from('support_ticket_messages').insert({
+          ticket_id: data.id,
+          user_id: user.id,
+          message: 'Anexos iniciais do chamado',
+          sender_role: 'user',
+          attachments: JSON.stringify(novoTicketAnexos),
+        })
+      }
+
       await registrarAcao({
         acao: 'criar',
-        descricao: `Abriu chamado sobre '${novoTicket.titulo.trim()}'`,
+        descricao: `Abriu chamado sobre '${novoTicket.titulo.trim()}' com ${novoTicketAnexos.length} anexo(s)`,
         modulo: 'suporte',
       })
 
@@ -293,6 +307,7 @@ export default function SuportePage() {
         categoria: 'Geral',
         prioridade: 'media',
       })
+      setNovoTicketAnexos([])
       setMostrarFormulario(false)
       carregarTickets()
       if (data) {
@@ -321,15 +336,16 @@ export default function SuportePage() {
 
   const handleResponder = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!resposta.trim() || !selecionado || !user || !ministryId) return
+    if ((!resposta.trim() && respostaAnexos.length === 0) || !selecionado || !user || !ministryId) return
 
     setEnviandoResposta(true)
     try {
       const { error: msgErr } = await supabase.from('support_ticket_messages').insert({
         ticket_id: selecionado.id,
         user_id: user.id,
-        message: resposta.trim(),
+        message: resposta.trim() || '(Anexos enviados)',
         sender_role: 'user',
+        attachments: respostaAnexos.length > 0 ? JSON.stringify(respostaAnexos) : null,
       })
 
       if (msgErr) throw msgErr
@@ -346,6 +362,7 @@ export default function SuportePage() {
       if (ticketErr) throw ticketErr
 
       setResposta('')
+      setRespostaAnexos([])
       carregarMensagens(selecionado.id)
       carregarTickets()
     } catch (err) {
@@ -591,6 +608,18 @@ export default function SuportePage() {
                     <option value="critica">Crítica</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Upload de Anexos do Chamado Inicial */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Anexar Arquivos (Opcional)
+                </label>
+                <AttachmentUploader
+                  attachments={novoTicketAnexos}
+                  onChange={setNovoTicketAnexos}
+                  disabled={enviando}
+                />
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -875,6 +904,7 @@ export default function SuportePage() {
                             </span>
                           </div>
                           <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                          <AttachmentList attachments={msg.attachments} />
                         </div>
                       )
                     })}
@@ -884,7 +914,12 @@ export default function SuportePage() {
             </div>
 
             {/* Nova Resposta */}
-            <div className="p-6 border-t border-gray-150 bg-gray-50 rounded-b-2xl">
+            <div className="p-6 border-t border-gray-150 bg-gray-50 rounded-b-2xl space-y-3">
+              <AttachmentUploader
+                attachments={respostaAnexos}
+                onChange={setRespostaAnexos}
+                disabled={enviandoResposta}
+              />
               <form onSubmit={handleResponder} className="flex gap-3">
                 <input
                   type="text"
@@ -895,7 +930,7 @@ export default function SuportePage() {
                 />
                 <button
                   type="submit"
-                  disabled={enviandoResposta || !resposta.trim()}
+                  disabled={enviandoResposta || (!resposta.trim() && respostaAnexos.length === 0)}
                   className="px-6 py-2.5 bg-[#0284c7] text-white rounded-xl font-bold hover:bg-[#0270b0] transition disabled:opacity-50"
                 >
                   Enviar
