@@ -294,6 +294,7 @@ interface FinConta {
   tipo: string;
   is_padrao: boolean;
   congregacao_id: string | null;
+  departamento_id: string | null;
 }
 
 interface FinCategoria {
@@ -309,6 +310,7 @@ interface FinContaFull {
   id: string;
   ministry_id: string;
   congregacao_id: string | null;
+  departamento_id: string | null;
   nome: string;
   tipo: 'caixa' | 'conta_corrente' | 'poupanca' | 'pix' | 'fundo' | 'outro';
   banco: string | null;
@@ -344,13 +346,14 @@ type FormConta = {
   chave_pix: string;
   saldo_inicial: string;
   congregacao_id: string;
+  departamento_id: string;
   is_padrao: boolean;
   is_ativa: boolean;
 };
 
 const emptyFormConta = (): FormConta => ({
   nome: '', tipo: 'caixa', banco: '', agencia: '', conta: '',
-  chave_pix: '', saldo_inicial: '0', congregacao_id: '', is_padrao: false, is_ativa: true,
+  chave_pix: '', saldo_inicial: '0', congregacao_id: '', departamento_id: '', is_padrao: false, is_ativa: true,
 });
 
 type FormCat = {
@@ -651,14 +654,14 @@ export default function TesourariaPage() {
       .select('id, nome, sigla')
       .eq('ministry_id', mid)
       .eq('ativo', true)
-      .order('ordem');
+      .order('nome');
     setDepartamentos((deps as Departamento[]) || []);
 
     // Contas financeiras (Fase 1 — opcional, pode não existir em instalações antigas)
     try {
       const { data: contas } = await supabase
         .from('fin_contas')
-        .select('id,nome,tipo,is_padrao,congregacao_id')
+        .select('id,nome,tipo,is_padrao,congregacao_id,departamento_id')
         .eq('ministry_id', mid)
         .eq('is_ativa', true)
         .order('is_padrao', { ascending: false })
@@ -1204,18 +1207,19 @@ export default function TesourariaPage() {
     const saldoNum = parseFloat(formConta.saldo_inicial.replace(',', '.')) || 0;
     const now = new Date().toISOString();
     const payload = {
-      ministry_id:    ministryId,
-      congregacao_id: formConta.congregacao_id || null,
-      nome:           formConta.nome.trim(),
-      tipo:           formConta.tipo,
-      banco:          formConta.banco.trim()     || null,
-      agencia:        formConta.agencia.trim()   || null,
-      conta:          formConta.conta.trim()     || null,
-      chave_pix:      formConta.chave_pix.trim() || null,
-      saldo_inicial:  saldoNum,
-      is_ativa:       formConta.is_ativa,
-      is_padrao:      formConta.is_padrao,
-      updated_at:     now,
+      ministry_id:     ministryId,
+      congregacao_id:  formConta.congregacao_id  || null,
+      departamento_id: formConta.departamento_id || null,
+      nome:            formConta.nome.trim(),
+      tipo:            formConta.tipo,
+      banco:           formConta.banco.trim()     || null,
+      agencia:         formConta.agencia.trim()   || null,
+      conta:           formConta.conta.trim()     || null,
+      chave_pix:       formConta.chave_pix.trim() || null,
+      saldo_inicial:   saldoNum,
+      is_ativa:        formConta.is_ativa,
+      is_padrao:       formConta.is_padrao,
+      updated_at:      now,
     };
     const res = contaEditId
       ? await supabase.from('fin_contas').update(payload).eq('id', contaEditId)
@@ -3453,6 +3457,9 @@ export default function TesourariaPage() {
                     {c.congregacao_id && (
                       <p>📍 {congregacoes.find(x => x.id === c.congregacao_id)?.nome ?? '—'}</p>
                     )}
+                    {c.departamento_id && (
+                      <p>🏢 Dep.: {departamentos.find(x => x.id === c.departamento_id)?.nome ?? '—'}</p>
+                    )}
                     {c.banco && <p>🏦 {c.banco}{c.agencia ? ` / Ag. ${c.agencia}` : ''}{c.conta ? ` / C. ${c.conta}` : ''}</p>}
                     {c.chave_pix && <p>⚡ PIX: {c.chave_pix}</p>}
                     <p>Saldo inicial: <span className="font-semibold text-gray-700">{fmtBRL(Number(c.saldo_inicial))}</span></p>
@@ -3467,6 +3474,7 @@ export default function TesourariaPage() {
                             conta: c.conta ?? '', chave_pix: c.chave_pix ?? '',
                             saldo_inicial: String(c.saldo_inicial),
                             congregacao_id: c.congregacao_id ?? '',
+                            departamento_id: c.departamento_id ?? '',
                             is_padrao: c.is_padrao, is_ativa: c.is_ativa,
                           });
                           setContaEditId(c.id);
@@ -3548,6 +3556,21 @@ export default function TesourariaPage() {
                     >
                       <option value="">Sede / Ministério geral</option>
                       {congregacoes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Departamento (opcional)</label>
+                    <select
+                      value={formConta.departamento_id}
+                      onChange={e => setFormConta(p => ({ ...p, departamento_id: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="">Nenhum departamento (Geral)</option>
+                      {departamentos.map(d => (
+                        <option key={d.id} value={d.id}>
+                          {d.sigla ? `${d.sigla} – ` : ''}{d.nome}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>
