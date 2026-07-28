@@ -139,7 +139,7 @@ export default function Sidebar() {
         { id: 'estrutura-hierarquica', label: 'Estrutura Hierárquica',  icon: '🏛️', path: '/secretaria/estrutura-hierarquica', modulo: 'gestao'          },
         { id: 'membros',               label: 'Membros',                icon: '👥', path: '/secretaria/membros'                                            },
         { id: 'departamentos',         label: 'Departamentos',          icon: '🏷️', path: '/secretaria/departamentos',          modulo: 'secretaria_local' },
-        { id: 'apresentacao-criancas', label: 'Apresentação de Crianças', icon: '🧒', path: '/secretaria/apresentacao-criancas', modulo: 'secretaria_local' },
+        { id: 'apresentacao-criancas', label: 'Apresentação de Crianças', icon: '🧒', path: '/secretaria/apresentacao-criancas', modulo: 'secretaria_local', featureFlag: 'kids_module', planFeature: 'has_modulo_kids' },
         { id: 'batismo-aguas',         label: 'Batismo nas Águas',      icon: '✝️', path: '/secretaria/batismo-aguas',          modulo: 'secretaria_local' },
         { id: 'casamento',             label: 'Casamento',              icon: '💍', path: '/secretaria/casamento',              modulo: 'gestao'           },
         { id: 'cartas',                label: 'Cartas ministeriais',    icon: '📜', path: '/secretaria/cartas',                 modulo: 'gestao'          },
@@ -233,7 +233,7 @@ export default function Sidebar() {
   const menuItems = allMenuItems.filter(i => {
     // Enquanto algum dos dois carrega, oculta itens sensíveis para não piscar
     if (planFeatures.loading || userCtx.loading) {
-      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda', 'ebd', 'missoes', 'funcionarios', 'comissao', 'comissoes', 'consagracao'].includes(i.id);
+      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda', 'ebd', 'missoes', 'funcionarios', 'comissao', 'comissoes', 'consagracao', 'apresentacao-criancas'].includes(i.id);
     }
     // Filtro por plano
     if ((i as any).featureFlag && !planFeatures.hasFeature((i as any).featureFlag)) return false;

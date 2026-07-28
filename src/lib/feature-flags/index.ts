@@ -16,6 +16,7 @@ export type FeatureFlag =
   | 'missions_module'           // Módulo de Missões
   | 'employees_module'          // Gestão de Funcionários & RH
   | 'ordination_module'         // Comissão & Consagração de Obreiros
+  | 'kids_module'               // Área Kids & Apresentação de Crianças
   | 'student_portal'            // Portal do Aluno (EBD)
   | 'teacher_portal'            // Portal do Professor (EBD)
   | 'mobile_app'                // Aplicativo Mobile
@@ -96,6 +97,12 @@ export const FEATURE_CATALOG: Record<FeatureFlag, FeatureMetadata> = {
     key: 'ordination_module',
     label: 'Comissão & Consagração de Obreiros',
     description: 'Gestão de comissões, processos de consagração, ordenação e filiação ministerial.',
+    minTier: 'intermediate',
+  },
+  kids_module: {
+    key: 'kids_module',
+    label: 'Área Kids & Apresentação de Crianças',
+    description: 'Gestão infantil, registros e certificados de apresentação de crianças.',
     minTier: 'intermediate',
   },
   student_portal: {
@@ -193,6 +200,13 @@ const ALIAS_MAP: Record<string, FeatureFlag> = {
   'comissão de consagração': 'ordination_module',
   'ordenação': 'ordination_module',
   'ordenacao': 'ordination_module',
+  'área kids': 'kids_module',
+  'area kids': 'kids_module',
+  'kids': 'kids_module',
+  'apresentação de crianças': 'kids_module',
+  'apresentacao de criancas': 'kids_module',
+  'crianças': 'kids_module',
+  'criancas': 'kids_module',
   'portal do aluno': 'student_portal',
   'portal do professor': 'teacher_portal',
   'aplicativo mobile': 'mobile_app',
@@ -230,7 +244,24 @@ export function getPlanTierRank(plan?: any): number {
   }
 
   // Tier 2: Intermediário
-  if (price >= 200 || maxUsers >= 8 || slug.includes('intermediar') || modulosList.includes('arrecadação digital') || modulosList.includes('arrecadacao digital') || modulosList.includes('funcionários') || modulosList.includes('funcionarios') || modulosList.includes('comissão') || modulosList.includes('comissao') || modulosList.includes('consagração') || modulosList.includes('consagracao')) {
+  if (
+    price >= 200 ||
+    maxUsers >= 8 ||
+    slug.includes('intermediar') ||
+    modulosList.includes('arrecadação digital') ||
+    modulosList.includes('arrecadacao digital') ||
+    modulosList.includes('funcionários') ||
+    modulosList.includes('funcionarios') ||
+    modulosList.includes('comissão') ||
+    modulosList.includes('comissao') ||
+    modulosList.includes('consagração') ||
+    modulosList.includes('consagracao') ||
+    modulosList.includes('área kids') ||
+    modulosList.includes('area kids') ||
+    modulosList.includes('kids') ||
+    modulosList.includes('apresentação de crianças') ||
+    modulosList.includes('apresentacao de criancas')
+  ) {
     return 2;
   }
 
@@ -261,7 +292,8 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
     teacher_portal:       tierRank >= 1,
     digital_collection:   tierRank >= 2, // Intermediário e superiores
     employees_module:     tierRank >= 2, // Intermediário e superiores
-    ordination_module:    tierRank >= 2, // Intermediário e superiores (Básico e Starter = false)
+    ordination_module:    tierRank >= 2, // Intermediário e superiores
+    kids_module:          tierRank >= 2, // Intermediário e superiores (Básico e Starter = false)
     advanced_finance:     tierRank >= 3,
     events_module:        tierRank >= 3,
     mobile_app:           tierRank >= 3,

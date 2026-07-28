@@ -6,6 +6,7 @@ import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
@@ -77,6 +78,7 @@ const formatIsoDate = (value?: string | null) => {
 
 export default function ApresentacaoCriancasPage() {
   const { ctx, bloqueado } = useRequireModulo('secretaria_local');
+  const planFeatures = usePlanFeatures();
   const supabase = useMemo(() => createClient(), []);
 
   const [activeTab, setActiveTab] = useState('cadastro');
@@ -461,9 +463,41 @@ export default function ApresentacaoCriancasPage() {
     setPrintTarget(null);
   };
 
-  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (ctx.loading || loadingData || planFeatures.loading) return <div className="p-8 text-gray-500">Carregando...</div>;
+
+  if (!planFeatures.has_modulo_kids || !planFeatures.hasFeature('kids_module')) {
+    return (
+      <PageLayout title="Apresentação de Crianças" description="Cadastro e controle de apresentações de crianças" activeMenu="apresentacao-criancas">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center max-w-2xl mx-auto space-y-5 my-10">
+          <div className="w-16 h-16 bg-pink-50 rounded-2xl flex items-center justify-center mx-auto text-pink-600 shadow-sm border border-pink-200/60">
+            <span className="text-3xl">🧒</span>
+          </div>
+          <div>
+            <span className="inline-block px-3 py-1 bg-pink-100 text-pink-800 text-xs font-bold rounded-full mb-3">
+              Recurso do Plano Intermediário
+            </span>
+            <h2 className="text-xl font-bold text-slate-800">Módulo Área Kids Indisponível no seu Plano</h2>
+          </div>
+          <p className="text-slate-600 text-base font-semibold leading-relaxed max-w-lg mx-auto">
+            A Gestão da Área Kids e Apresentação de Crianças está disponível a partir do Plano Intermediário.
+          </p>
+          <p className="text-slate-500 text-xs leading-relaxed max-w-md mx-auto">
+            Faça o upgrade para gerenciar registros infantis, eventos de apresentação e emissão de certificados de crianças.
+          </p>
+          <div className="pt-3">
+            <a
+              href="/configuracoes"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#123b63] text-white text-sm font-semibold rounded-xl hover:bg-[#1a4f85] transition shadow-md hover:shadow-lg"
+            >
+              Fazer Upgrade / Conhecer Planos
+            </a>
+          </div>
+        </div>
+      </PageLayout>
+    );
+  }
+
   if (bloqueado) return null;
-  if (loadingData) return <div className="p-8">Carregando...</div>;
 
   return (
     <PageLayout
