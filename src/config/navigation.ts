@@ -141,7 +141,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
     items: [
       { id: 'usuarios', label: 'Usuários', icon: '👤', path: '/usuarios', modulo: 'usuarios' },
       { id: 'suporte', label: 'Suporte', icon: '🎫', path: '/suporte', modulo: 'suporte' },
-      { id: 'reunioes', label: 'Reuniões', icon: '🤝', path: '/reunioes', modulo: 'reunioes' },
+      { id: 'reunioes', label: 'Reuniões', icon: '🤝', path: '/reunioes', modulo: 'reunioes', featureFlag: 'meetings_module', planFeature: 'has_modulo_reunioes' },
       { id: 'missoes', label: 'Missões', icon: '✈️', path: '/missoes', modulo: 'missoes', featureFlag: 'missions_module', planFeature: 'has_modulo_missoes' },
       { id: 'patrimonio', label: 'Patrimônio', icon: '🏢', path: '/patrimonio', modulo: 'patrimonio' },
       { id: 'geolocalizacao', label: 'Geolocalização', icon: '📍', path: '/geolocalizacao', modulo: 'geolocalizacao' },

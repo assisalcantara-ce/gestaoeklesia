@@ -189,7 +189,7 @@ export default function Sidebar() {
         { id: 'consagracao', label: 'Consagração (obreiros)', icon: '🙏', path: '/secretaria/consagracao', featureFlag: 'ordination_module', planFeature: 'has_modulo_comissao' },
       ]
     },
-    { id: 'reunioes',         label: 'Reuniões',           icon: '🤝', path: '/reunioes',                   modulo: 'reunioes'   },
+    { id: 'reunioes',         label: 'Reuniões',           icon: '🤝', path: '/reunioes',                   modulo: 'reunioes', featureFlag: 'meetings_module', planFeature: 'has_modulo_reunioes' },
     { id: 'missoes',          label: 'Missões',            icon: '✈️', path: '/missoes',                    modulo: 'missoes', featureFlag: 'missions_module', planFeature: 'has_modulo_missoes' },
     { id: 'eventos',          label: 'Eventos',            icon: '📅', path: '/eventos',                    modulo: 'eventos'    },
     {

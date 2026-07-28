@@ -67,7 +67,7 @@ export const FEATURE_CATALOG: Record<FeatureFlag, FeatureMetadata> = {
     key: 'meetings_module',
     label: 'Módulo de Reuniões',
     description: 'Atas de reuniões, agendamentos e quórum.',
-    minTier: 'basic',
+    minTier: 'intermediate',
   },
   agenda_module: {
     key: 'agenda_module',
@@ -176,7 +176,6 @@ const ALIAS_MAP: Record<string, FeatureFlag> = {
   'financeiro avançado': 'advanced_finance',
   'módulo de eventos': 'events_module',
   'eventos': 'events_module',
-  'reuniões': 'meetings_module',
   'agenda do ministério': 'agenda_module',
   'agenda': 'agenda_module',
   'planejamento ministerial': 'agenda_module',
@@ -207,6 +206,12 @@ const ALIAS_MAP: Record<string, FeatureFlag> = {
   'apresentacao de criancas': 'kids_module',
   'crianças': 'kids_module',
   'criancas': 'kids_module',
+  'reuniões': 'meetings_module',
+  'reunioes': 'meetings_module',
+  'módulo de reuniões': 'meetings_module',
+  'modulo de reunioes': 'meetings_module',
+  'atas de reuniões': 'meetings_module',
+  'atas de reunioes': 'meetings_module',
   'portal do aluno': 'student_portal',
   'portal do professor': 'teacher_portal',
   'aplicativo mobile': 'mobile_app',
@@ -260,7 +265,9 @@ export function getPlanTierRank(plan?: any): number {
     modulosList.includes('area kids') ||
     modulosList.includes('kids') ||
     modulosList.includes('apresentação de crianças') ||
-    modulosList.includes('apresentacao de criancas')
+    modulosList.includes('apresentacao de criancas') ||
+    modulosList.includes('reuniões') ||
+    modulosList.includes('reunioes')
   ) {
     return 2;
   }
@@ -284,7 +291,7 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
   // Inicializa mapa base com base no Tier do Plano
   const resolved: Record<FeatureFlag, boolean> = {
     financial_module:     tierRank >= 0,
-    meetings_module:      tierRank >= 0,
+    meetings_module:      tierRank >= 2, // Intermediário e superiores (Básico e Starter = false)
     agenda_module:        tierRank >= 1, // Starter e superiores
     ebd_module:           tierRank >= 1, // Starter e superiores
     missions_module:      tierRank >= 1, // Starter e superiores
