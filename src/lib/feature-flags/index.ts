@@ -19,6 +19,7 @@ export type FeatureFlag =
   | 'kids_module'               // Área Kids & Apresentação de Crianças
   | 'presidency_module'         // Módulo Presidência & Visão Corporativa
   | 'fiscal_council_module'     // Módulo Conselho Fiscal & Auditoria de Fechamentos
+  | 'accounting_module'         // Módulo Contabilidade & Prestação de Contas Oficial
   | 'student_portal'            // Portal do Aluno (EBD)
   | 'teacher_portal'            // Portal do Professor (EBD)
   | 'mobile_app'                // Aplicativo Mobile
@@ -117,6 +118,12 @@ export const FEATURE_CATALOG: Record<FeatureFlag, FeatureMetadata> = {
     key: 'fiscal_council_module',
     label: 'Conselho Fiscal & Auditoria de Fechamentos',
     description: 'Análise de fechamentos mensais, emissão de pareceres oficiais e auditoria do conselho fiscal.',
+    minTier: 'professional',
+  },
+  accounting_module: {
+    key: 'accounting_module',
+    label: 'Contabilidade & Prestação de Contas Oficial',
+    description: 'Relatórios contábeis oficiais, prestação de contas mensal, balancetes e exportação para escritórios contábeis.',
     minTier: 'professional',
   },
   student_portal: {
@@ -234,6 +241,13 @@ const ALIAS_MAP: Record<string, FeatureFlag> = {
   'conselho_fiscal': 'fiscal_council_module',
   'parecer fiscal': 'fiscal_council_module',
   'auditoria fiscal': 'fiscal_council_module',
+  'contabilidade': 'accounting_module',
+  'módulo contabilidade': 'accounting_module',
+  'modulo contabilidade': 'accounting_module',
+  'prestação de contas': 'accounting_module',
+  'prestacao de contas': 'accounting_module',
+  'prestação de contas oficial': 'accounting_module',
+  'prestacao de contas oficial': 'accounting_module',
   'portal do aluno': 'student_portal',
   'portal do professor': 'teacher_portal',
   'aplicativo mobile': 'mobile_app',
@@ -275,7 +289,10 @@ export function getPlanTierRank(plan?: any): number {
     modulosList.includes('presidência') ||
     modulosList.includes('presidencia') ||
     modulosList.includes('conselho fiscal') ||
-    modulosList.includes('conselho_fiscal')
+    modulosList.includes('conselho_fiscal') ||
+    modulosList.includes('contabilidade') ||
+    modulosList.includes('prestação de contas') ||
+    modulosList.includes('prestacao de contas')
   ) {
     return 3;
   }
@@ -334,7 +351,8 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
     ordination_module:    tierRank >= 2, // Intermediário e superiores
     kids_module:          tierRank >= 2, // Intermediário e superiores
     presidency_module:    tierRank >= 3, // Profissional e superiores
-    fiscal_council_module:tierRank >= 3, // Profissional e superiores (Básico, Starter e Intermediário = false)
+    fiscal_council_module:tierRank >= 3, // Profissional e superiores
+    accounting_module:    tierRank >= 3, // Profissional e superiores (Básico, Starter e Intermediário = false)
     advanced_finance:     tierRank >= 3,
     events_module:        tierRank >= 3,
     mobile_app:           tierRank >= 3,

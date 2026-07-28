@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { FileText, Printer, TrendingUp, TrendingDown, Minus } from 'lucide-react';
@@ -578,7 +579,42 @@ export default function PrestacaoContasPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  const planFeatures = usePlanFeatures();
+
+  if (ctx.loading || planFeatures.loading) return <div className="p-8 text-gray-500">Carregando...</div>;
+
+  if (!planFeatures.has_modulo_contabilidade || !planFeatures.hasFeature('accounting_module')) {
+    return (
+      <PageLayout title="Prestação de Contas" description="Relatório financeiro mensal automatizado por congregação" activeMenu="prestacao-contas">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center max-w-2xl mx-auto space-y-5 my-10">
+          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto text-blue-600 shadow-sm border border-blue-200/60">
+            <span className="text-3xl">📄</span>
+          </div>
+          <div>
+            <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full mb-3">
+              Recurso do Plano Profissional
+            </span>
+            <h2 className="text-xl font-bold text-slate-800">Módulo Contabilidade Indisponível no seu Plano</h2>
+          </div>
+          <p className="text-slate-600 text-base font-semibold leading-relaxed max-w-lg mx-auto">
+            O Módulo de Contabilidade e Prestação de Contas Oficial está disponível exclusivamente no Plano Profissional e superiores.
+          </p>
+          <p className="text-slate-500 text-xs leading-relaxed max-w-md mx-auto">
+            Faça o upgrade para gerar prestações de contas mensais automatizadas, exportar relatórios contábeis e emitir demonstrativos oficiais por congregação.
+          </p>
+          <div className="pt-3">
+            <a
+              href="/configuracoes"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#123b63] text-white text-sm font-semibold rounded-xl hover:bg-[#1a4f85] transition shadow-md hover:shadow-lg"
+            >
+              Fazer Upgrade / Conhecer Planos
+            </a>
+          </div>
+        </div>
+      </PageLayout>
+    );
+  }
+
   if (bloqueado) return null;
 
   return (
