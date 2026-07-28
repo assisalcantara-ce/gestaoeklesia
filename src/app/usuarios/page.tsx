@@ -667,25 +667,35 @@ export default function UsuariosPage() {
 
           {/* Níveis de Acesso */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
-            {nivelAcessoInfo.filter(n => !n.legacy).map(nivel => (
-              <div
-                key={nivel.id}
-                onClick={() => { setFiltroNivel(prev => prev === nivel.id ? '' : nivel.id); setCurrentPage(1); }}
-                className={`${nivel.cor} border-2 rounded-lg p-4 cursor-pointer transition hover:shadow-md flex items-center justify-between select-none ${
-                  filtroNivel === nivel.id ? 'ring-2 ring-[#123b63] ring-offset-1 shadow-md' : ''
-                }`}
-              >
-                <div className="flex-1">
-                  <div className="text-2xl mb-1">{nivel.icon}</div>
-                  <h3 className="font-bold text-[#123b63] text-sm">{nivel.nome}</h3>
-                  <p className="text-xs text-gray-700">{nivel.descricao}</p>
+            {nivelAcessoInfo.filter(n => !n.legacy).map(nivel => {
+              const count = getCountByLevel(nivel.id);
+              const isSelected = filtroNivel === nivel.id;
+              return (
+                <div
+                  key={nivel.id}
+                  onClick={() => { setFiltroNivel(prev => prev === nivel.id ? '' : nivel.id); setCurrentPage(1); }}
+                  className={`${nivel.cor} border-2 rounded-xl p-4 cursor-pointer transition hover:shadow-md flex flex-col justify-between h-full min-h-[185px] select-none ${
+                    isSelected ? 'ring-2 ring-[#123b63] ring-offset-1 shadow-md' : ''
+                  }`}
+                >
+                  {/* Cabeçalho & Corpo */}
+                  <div className="flex flex-col flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xl">{nivel.icon}</span>
+                      <h3 className="font-bold text-[#123b63] text-sm leading-tight">{nivel.nome}</h3>
+                    </div>
+                    <p className="text-xs text-gray-700 leading-relaxed mb-3 flex-1">{nivel.descricao}</p>
+                  </div>
+
+                  {/* Rodapé com Badge Centralizado */}
+                  <div className="pt-2.5 border-t border-black/10 flex items-center justify-center w-full mt-auto">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full bg-white/90 text-[#123b63] border border-black/10 shadow-sm">
+                      👥 {count} {count === 1 ? 'usuário' : 'usuários'}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right ml-3">
-                  <p className="text-2xl font-bold text-[#123b63]">{getCountByLevel(nivel.id)}</p>
-                  <p className="text-xs text-gray-600">usuário{getCountByLevel(nivel.id) !== 1 ? 's' : ''}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {showForm && (
