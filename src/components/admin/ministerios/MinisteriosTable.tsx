@@ -5,6 +5,7 @@ import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 import Link from 'next/link'
 import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState'
 import { Inbox } from 'lucide-react'
+import { useAdminAuth } from '@/providers/AdminAuthProvider'
 
 interface MinisteriosTableProps {
   loading: boolean
@@ -24,6 +25,7 @@ interface MinisteriosTableProps {
   onBilling: (m: SupabaseMinistry) => void
   onPrintLabel: (m: SupabaseMinistry) => void
   onDelete: (m: SupabaseMinistry) => void
+  onImpersonate?: (m: SupabaseMinistry) => void
 }
 
 export default function MinisteriosTable({
@@ -40,7 +42,9 @@ export default function MinisteriosTable({
   onBilling,
   onPrintLabel,
   onDelete,
+  onImpersonate,
 }: MinisteriosTableProps) {
+  const { adminUser } = useAdminAuth()
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
 
   if (loading) {
@@ -179,7 +183,7 @@ export default function MinisteriosTable({
                             >
                               ⚡ Ativar / Renovar
                             </button>
-                            <button
+                             <button
                               onClick={() => {
                                 onPrintLabel(ministerio)
                                 setOpenDropdownId(null)
@@ -188,6 +192,17 @@ export default function MinisteriosTable({
                             >
                               🏷️ Imprimir Etiqueta
                             </button>
+                            {adminUser?.role === 'super_admin' && (
+                              <button
+                                onClick={() => {
+                                  onImpersonate?.(ministerio)
+                                  setOpenDropdownId(null)
+                                }}
+                                className="w-full px-4 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-950/30 transition text-left flex items-center gap-2"
+                              >
+                                👤 Assumir Sessão...
+                              </button>
+                            )}
                             <hr className="border-gray-800 my-1" />
                             <button
                               onClick={() => {

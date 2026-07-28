@@ -12,6 +12,7 @@ import AdminSidebar from '@/components/AdminSidebar'
 import MinisteriosHeader from '@/components/admin/ministerios/MinisteriosHeader'
 import BillingModal from '@/components/admin/ministerios/modals/BillingModal'
 import ActivationModal from '@/components/admin/ministerios/modals/ActivationModal'
+import ImpersonationHistoryTab from '@/components/admin/impersonation/ImpersonationHistoryTab'
 import { useBillingActions } from '@/hooks/admin/ministerios/useBillingActions'
 import { friendlyError, formatPhoneDisplay } from '@/lib/admin/ministerios/helpers'
 import { getDetailedStatus } from '@/lib/admin/ministerios/status'
@@ -31,7 +32,7 @@ export default function CockpitPage({ params }: CockpitPageProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [activeTab, setActiveTab] = useState<'resumo' | 'financeiro' | 'usuarios' | 'congregacoes' | 'uso' | 'auditoria'>('resumo')
+  const [activeTab, setActiveTab] = useState<'resumo' | 'financeiro' | 'usuarios' | 'congregacoes' | 'uso' | 'auditoria' | 'suporte'>('resumo')
   const router = useRouter()
   const errorRef = useRef<HTMLDivElement>(null)
 
@@ -468,6 +469,7 @@ export default function CockpitPage({ params }: CockpitPageProps) {
               <div className="flex flex-wrap gap-2">
                 {[
                   { id: 'resumo', label: '📋 Resumo Cadastral' },
+                  { id: 'suporte', label: '🎧 Histórico de Suporte' },
                   { id: 'financeiro', label: '💳 Financeiro Asaas' },
                   { id: 'usuarios', label: '🔑 Acesso e Usuários' },
                   { id: 'congregacoes', label: '⛪ Congregações' },
@@ -516,6 +518,10 @@ export default function CockpitPage({ params }: CockpitPageProps) {
                     </div>
                   </div>
                 </div>
+              )}
+
+              {activeTab === 'suporte' && (
+                <ImpersonationHistoryTab tenantId={ministry.id} />
               )}
 
               {activeTab === 'financeiro' && (

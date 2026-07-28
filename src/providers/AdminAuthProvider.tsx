@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
+import ImpersonationBanner from '@/components/admin/impersonation/ImpersonationBanner'
 
 interface AdminUser {
   id: string
@@ -243,6 +244,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         logout,
       }}
     >
+      <ImpersonationBanner />
       {children}
     </AdminAuthContext.Provider>
   )
