@@ -12,6 +12,7 @@ export interface PlanFeatures {
   has_modulo_agenda: boolean;
   has_modulo_ebd: boolean;
   has_modulo_missoes: boolean;
+  has_modulo_funcionarios: boolean;
   has_arrecadacao_digital: boolean;
   /** Mapa completo de Feature Flags resolvidos para o plano */
   flags: Record<FeatureFlag, boolean>;
@@ -35,6 +36,7 @@ const DEFAULT_FEATURES: PlanFeatures = {
   has_modulo_agenda: false,
   has_modulo_ebd: false,          // default fail-closed para o Plano Básico enquanto carrega
   has_modulo_missoes: false,     // default fail-closed para o Plano Básico enquanto carrega
+  has_modulo_funcionarios: false, // default fail-closed para o Plano Básico e Starter enquanto carrega
   has_arrecadacao_digital: false, // default fail-closed para o Plano Básico enquanto carrega
   flags: DEFAULT_FLAGS,
   hasFeature: (feature: FeatureFlag) => DEFAULT_FLAGS[feature] ?? false,
@@ -101,6 +103,7 @@ export function usePlanFeatures(): PlanFeatures {
             has_modulo_agenda: resolvedFlags.agenda_module,
             has_modulo_ebd: resolvedFlags.ebd_module,
             has_modulo_missoes: resolvedFlags.missions_module,
+            has_modulo_funcionarios: resolvedFlags.employees_module,
             has_arrecadacao_digital: resolvedFlags.digital_collection,
             flags: resolvedFlags,
             hasFeature: (feature: FeatureFlag) => resolvedFlags[feature] ?? false,

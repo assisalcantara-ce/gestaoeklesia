@@ -14,6 +14,7 @@ export type FeatureFlag =
   | 'agenda_module'             // Agenda do Ministério
   | 'ebd_module'                // Escola Bíblica Dominical (EBD) completa
   | 'missions_module'           // Módulo de Missões
+  | 'employees_module'          // Gestão de Funcionários & RH
   | 'student_portal'            // Portal do Aluno (EBD)
   | 'teacher_portal'            // Portal do Professor (EBD)
   | 'mobile_app'                // Aplicativo Mobile
@@ -83,6 +84,12 @@ export const FEATURE_CATALOG: Record<FeatureFlag, FeatureMetadata> = {
     label: 'Módulo de Missões',
     description: 'Gestão de projetos missionários, missionários sustentados, eventos e arrecadações.',
     minTier: 'starter',
+  },
+  employees_module: {
+    key: 'employees_module',
+    label: 'Gestão de Funcionários & RH',
+    description: 'Cadastro de funcionários, funções, controle de acesso e folha de pagamentos.',
+    minTier: 'intermediate',
   },
   student_portal: {
     key: 'student_portal',
@@ -168,6 +175,11 @@ const ALIAS_MAP: Record<string, FeatureFlag> = {
   'missoes': 'missions_module',
   'módulo de missões': 'missions_module',
   'modulo de missoes': 'missions_module',
+  'funcionários': 'employees_module',
+  'funcionarios': 'employees_module',
+  'gestão de funcionários': 'employees_module',
+  'gestao de funcionarios': 'employees_module',
+  'rh': 'employees_module',
   'portal do aluno': 'student_portal',
   'portal do professor': 'teacher_portal',
   'aplicativo mobile': 'mobile_app',
@@ -205,7 +217,7 @@ export function getPlanTierRank(plan?: any): number {
   }
 
   // Tier 2: Intermediário
-  if (price >= 200 || maxUsers >= 8 || slug.includes('intermediar') || modulosList.includes('arrecadação digital') || modulosList.includes('arrecadacao digital')) {
+  if (price >= 200 || maxUsers >= 8 || slug.includes('intermediar') || modulosList.includes('arrecadação digital') || modulosList.includes('arrecadacao digital') || modulosList.includes('funcionários') || modulosList.includes('funcionarios')) {
     return 2;
   }
 
@@ -229,12 +241,13 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
   const resolved: Record<FeatureFlag, boolean> = {
     financial_module:     tierRank >= 0,
     meetings_module:      tierRank >= 0,
-    agenda_module:        tierRank >= 1, // Starter e superiores (Básico = false)
-    ebd_module:           tierRank >= 1, // Starter e superiores (Básico = false)
-    missions_module:      tierRank >= 1, // Starter e superiores (Básico = false)
+    agenda_module:        tierRank >= 1, // Starter e superiores
+    ebd_module:           tierRank >= 1, // Starter e superiores
+    missions_module:      tierRank >= 1, // Starter e superiores
     student_portal:       tierRank >= 1,
     teacher_portal:       tierRank >= 1,
     digital_collection:   tierRank >= 2, // Intermediário e superiores
+    employees_module:     tierRank >= 2, // Intermediário e superiores (Básico e Starter = false)
     advanced_finance:     tierRank >= 3,
     events_module:        tierRank >= 3,
     mobile_app:           tierRank >= 3,

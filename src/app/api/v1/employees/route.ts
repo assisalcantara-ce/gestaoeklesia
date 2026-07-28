@@ -1,6 +1,7 @@
 import { getAccessibleMemberIds, resolveTenantAuth } from '@/lib/tenant-auth'
 import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer'
 import { authTenantErrorResponse, forbiddenResponse } from '@/lib/api-errors'
+import { isFeatureAllowedForTenant } from '@/lib/plan-permissions'
 import { NextRequest, NextResponse } from 'next/server'
 
 function getSupabaseErrorText(error: any): string {
@@ -93,7 +94,17 @@ async function listEmployeesFallback(
 export async function GET(request: NextRequest) {
   try {
     const context = await resolveTenantAuth(request)
-    const { supabase, ministryId } = context
+    const { supabase, ministryId, admin } = context
+    
+    const isAllowed = await isFeatureAllowedForTenant(admin, ministryId, 'employees_module')
+    if (!isAllowed) {
+      return NextResponse.json({
+        error: 'A Gestão de Funcionários está disponível a partir do Plano Intermediário.',
+        code: 'PLAN_RESTRICTED',
+        required_plan: 'intermediate'
+      }, { status: 403 })
+    }
+
     const accessibleMemberIds = await getAccessibleMemberIds(context)
 
     const searchParams = request.nextUrl.searchParams
@@ -163,7 +174,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const context = await resolveTenantAuth(request)
-    const { supabase, ministryId } = context
+    const { supabase, ministryId, admin } = context
+
+    const isAllowed = await isFeatureAllowedForTenant(admin, ministryId, 'employees_module')
+    if (!isAllowed) {
+      return NextResponse.json({
+        error: 'A Gestão de Funcionários está disponível a partir do Plano Intermediário.',
+        code: 'PLAN_RESTRICTED',
+        required_plan: 'intermediate'
+      }, { status: 403 })
+    }
 
     const body = await request.json()
     const normalizedBody = normalizePayloadToUppercase(body, {

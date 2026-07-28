@@ -209,7 +209,7 @@ export default function Sidebar() {
     },
     { id: 'patrimonio',       label: 'Patrimônio',         icon: '🏢', path: '/patrimonio',                 modulo: 'patrimonio' },
     { id: 'achados-perdidos', label: 'Achados e Perdidos', icon: '🔍', path: '/secretaria/achados-perdidos', modulo: 'gestao' },
-    { id: 'funcionarios',     label: 'Funcionários',       icon: '👔', path: '/secretaria/funcionarios',     modulo: 'gestao'     },
+    { id: 'funcionarios',     label: 'Funcionários',       icon: '👔', path: '/secretaria/funcionarios',     modulo: 'gestao', featureFlag: 'employees_module', planFeature: 'has_modulo_funcionarios' },
     { id: 'financeiro',       label: 'Financeiro',         icon: '💳', path: '/financeiro',                 modulo: 'financeiro' },
     { id: 'auditoria',        label: 'Auditoria',          icon: '✅', path: '/auditoria',                  modulo: 'auditoria'       },
     { id: 'geolocalizacao',   label: 'Geolocalização',     icon: '📍', path: '/geolocalizacao',              modulo: 'geolocalizacao'  },
@@ -233,7 +233,7 @@ export default function Sidebar() {
   const menuItems = allMenuItems.filter(i => {
     // Enquanto algum dos dois carrega, oculta itens sensíveis para não piscar
     if (planFeatures.loading || userCtx.loading) {
-      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda', 'ebd', 'missoes'].includes(i.id);
+      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda', 'ebd', 'missoes', 'funcionarios'].includes(i.id);
     }
     // Filtro por plano
     if ((i as any).featureFlag && !planFeatures.hasFeature((i as any).featureFlag)) return false;
@@ -243,6 +243,7 @@ export default function Sidebar() {
     if (i.id === 'reunioes'   && !planFeatures.has_modulo_reunioes)            return false;
     if (i.id === 'agenda'     && !planFeatures.has_modulo_agenda)              return false;
     if (i.id === 'funcionarios') {
+      if (!planFeatures.has_modulo_funcionarios || !planFeatures.hasFeature('employees_module')) return false;
       const isLocal = userCtx.nivel && ['admin_local', 'financeiro_local', 'supervisor', 'viewer'].includes(userCtx.nivel);
       if (isLocal) return false;
     }

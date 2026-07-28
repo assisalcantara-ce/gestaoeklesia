@@ -3,9 +3,11 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
+import PageLayout from '@/components/PageLayout';
 import NotificationModal from '@/components/NotificationModal';
 import { createClient } from '@/lib/supabase-client';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { formatPhone } from '@/lib/mascaras';
 
 interface Membro {
@@ -97,6 +99,7 @@ const normalizeOptionValue = (value: string) =>
 export default function GerenciarFuncionarios() {
   const supabase = createClient();
   const { ctx, bloqueado } = useRequireModulo('gestao');
+  const planFeatures = usePlanFeatures();
 
   const [membros, setMembros] = useState<Membro[]>([]);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
@@ -510,7 +513,40 @@ export default function GerenciarFuncionarios() {
 
   const isLocal = ctx.nivel && ['admin_local', 'financeiro_local', 'supervisor', 'viewer'].includes(ctx.nivel);
 
-  if (ctx.loading) return <div className="p-8">Carregando...</div>;
+  if (ctx.loading || planFeatures.loading) return <div className="p-8 text-gray-500">Carregando...</div>;
+
+  if (!planFeatures.has_modulo_funcionarios || !planFeatures.hasFeature('employees_module')) {
+    return (
+      <PageLayout title="Funcionários" description="Gestão de Funcionários & RH" activeMenu="funcionarios">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center max-w-2xl mx-auto space-y-5 my-10">
+          <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto text-amber-600 shadow-sm border border-amber-200/60">
+            <span className="text-3xl">👔</span>
+          </div>
+          <div>
+            <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-full mb-3">
+              Recurso do Plano Intermediário
+            </span>
+            <h2 className="text-xl font-bold text-slate-800">Módulo Funcionários Indisponível no seu Plano</h2>
+          </div>
+          <p className="text-slate-600 text-base font-semibold leading-relaxed max-w-lg mx-auto">
+            A Gestão de Funcionários & RH está disponível a partir do Plano Intermediário.
+          </p>
+          <p className="text-slate-500 text-xs leading-relaxed max-w-md mx-auto">
+            Faça o upgrade para gerenciar cadastro de colaboradores, funções, folhas e permissões administrativas da instituição.
+          </p>
+          <div className="pt-3">
+            <a
+              href="/configuracoes"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#123b63] text-white text-sm font-semibold rounded-xl hover:bg-[#1a4f85] transition shadow-md hover:shadow-lg"
+            >
+              Fazer Upgrade / Conhecer Planos
+            </a>
+          </div>
+        </div>
+      </PageLayout>
+    );
+  }
+
   if (bloqueado || isLocal) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50 text-gray-500 font-semibold p-8 text-center">
