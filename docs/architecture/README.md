@@ -18,6 +18,7 @@ Este diretório contém os guias arquiteturais, padrões de código e regras té
 | 🛠️ [07-Coding-Standards.md](./07-Coding-Standards.md) | Boas práticas de código, TypeScript, auditoria e resiliência |
 | 👤 [11-IMPERSONATION.md](./11-IMPERSONATION.md) | Especificação técnica, matriz estrita (SUPER_ADMIN) e tabela `admin_impersonation_sessions` |
 | 👑 [12-ADMIN-IMPERSONATION.md](./12-ADMIN-IMPERSONATION.md) | **Arquitetura Oficial e Fonte da Verdade** do recurso Admin Impersonation (Assumir Sessão) |
+| 🛡️ [13-CONSUMING-PROTECTED-APIS.md](./13-CONSUMING-PROTECTED-APIS.md) | **Padrão Oficial de Consumo de APIs Protegidas** (Injeção de `Authorization: Bearer <access_token>`) |
 
 ---
 
@@ -26,4 +27,4 @@ Este diretório contém os guias arquiteturais, padrões de código e regras té
 1. **Hooks no Topo (REGRA 01):** Todos os React Hooks devem ser declarados incondicionalmente antes de qualquer `return` antecipado.
 2. **Cards sem Clipping (REGRA 02):** NUNCA colocar `overflow-hidden` no card pai se houver dropdowns ou menus flutuantes.
 3. **Validação de Schema (REGRA 03):** NUNCA consultar colunas no Supabase sem verificar a existência prévia no schema oficial.
-4. **Fetch Autenticado (REGRA 04):** TODA requisição administrativa no frontend DEVE utilizar `authenticatedFetch()`.
+4. **Fetch Autenticado & APIs Protegidas (REGRA 04):** Toda requisição a rotas com `resolveTenantAuth()` DEVE obter a sessão via `supabase.auth.getSession()` e incluir o cabeçalho `Authorization: Bearer <access_token>`.
