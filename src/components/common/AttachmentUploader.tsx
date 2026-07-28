@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { createClient } from '@/lib/supabase-client';
 
 export interface AttachmentItem {
   name: string;
@@ -44,11 +45,25 @@ export default function AttachmentUploader({
     setErrorMessage(null);
 
     try {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        setErrorMessage('Sessão expirada ou não autenticada. Faça login novamente para anexar arquivos.');
+        setUploading(false);
+        return;
+      }
+
       const formData = new FormData();
       formData.append('file', file);
 
       const res = await fetch('/api/v1/suporte/uploads', {
         method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: formData,
       });
 
