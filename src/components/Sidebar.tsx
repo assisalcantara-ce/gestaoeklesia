@@ -184,9 +184,9 @@ export default function Sidebar() {
       featureFlag: 'ebd_module',
       planFeature: 'has_modulo_ebd',
     },
-    { id: 'comissao', label: 'Comissão', icon: '👥', path: '/comissao', modulo: 'comissao', submenu: [
-        { id: 'comissoes',   label: 'Comissões',              icon: '👥', path: '/comissao',               modulo: 'gestao' },
-        { id: 'consagracao', label: 'Consagração (obreiros)', icon: '🙏', path: '/secretaria/consagracao'  },
+    { id: 'comissao', label: 'Comissão', icon: '👥', path: '/comissao', modulo: 'comissao', featureFlag: 'ordination_module', planFeature: 'has_modulo_comissao', submenu: [
+        { id: 'comissoes',   label: 'Comissões',              icon: '👥', path: '/comissao',               modulo: 'gestao', featureFlag: 'ordination_module', planFeature: 'has_modulo_comissao' },
+        { id: 'consagracao', label: 'Consagração (obreiros)', icon: '🙏', path: '/secretaria/consagracao', featureFlag: 'ordination_module', planFeature: 'has_modulo_comissao' },
       ]
     },
     { id: 'reunioes',         label: 'Reuniões',           icon: '🤝', path: '/reunioes',                   modulo: 'reunioes'   },
@@ -233,7 +233,7 @@ export default function Sidebar() {
   const menuItems = allMenuItems.filter(i => {
     // Enquanto algum dos dois carrega, oculta itens sensíveis para não piscar
     if (planFeatures.loading || userCtx.loading) {
-      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda', 'ebd', 'missoes', 'funcionarios'].includes(i.id);
+      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda', 'ebd', 'missoes', 'funcionarios', 'comissao', 'comissoes', 'consagracao'].includes(i.id);
     }
     // Filtro por plano
     if ((i as any).featureFlag && !planFeatures.hasFeature((i as any).featureFlag)) return false;

@@ -64,9 +64,11 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
         icon: '👥',
         path: '/comissao',
         modulo: 'comissao',
+        featureFlag: 'ordination_module',
+        planFeature: 'has_modulo_comissao',
         submenu: [
-          { id: 'comissoes', label: 'Comissões', icon: '👥', path: '/comissao', modulo: 'gestao' },
-          { id: 'consagracao', label: 'Consagração (obreiros)', icon: '🙏', path: '/secretaria/consagracao' },
+          { id: 'comissoes', label: 'Comissões', icon: '👥', path: '/comissao', modulo: 'gestao', featureFlag: 'ordination_module', planFeature: 'has_modulo_comissao' },
+          { id: 'consagracao', label: 'Consagração (obreiros)', icon: '🙏', path: '/secretaria/consagracao', featureFlag: 'ordination_module', planFeature: 'has_modulo_comissao' },
         ]
       },
     ]

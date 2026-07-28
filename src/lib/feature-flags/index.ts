@@ -15,6 +15,7 @@ export type FeatureFlag =
   | 'ebd_module'                // Escola Bíblica Dominical (EBD) completa
   | 'missions_module'           // Módulo de Missões
   | 'employees_module'          // Gestão de Funcionários & RH
+  | 'ordination_module'         // Comissão & Consagração de Obreiros
   | 'student_portal'            // Portal do Aluno (EBD)
   | 'teacher_portal'            // Portal do Professor (EBD)
   | 'mobile_app'                // Aplicativo Mobile
@@ -89,6 +90,12 @@ export const FEATURE_CATALOG: Record<FeatureFlag, FeatureMetadata> = {
     key: 'employees_module',
     label: 'Gestão de Funcionários & RH',
     description: 'Cadastro de funcionários, funções, controle de acesso e folha de pagamentos.',
+    minTier: 'intermediate',
+  },
+  ordination_module: {
+    key: 'ordination_module',
+    label: 'Comissão & Consagração de Obreiros',
+    description: 'Gestão de comissões, processos de consagração, ordenação e filiação ministerial.',
     minTier: 'intermediate',
   },
   student_portal: {
@@ -178,8 +185,14 @@ const ALIAS_MAP: Record<string, FeatureFlag> = {
   'funcionários': 'employees_module',
   'funcionarios': 'employees_module',
   'gestão de funcionários': 'employees_module',
-  'gestao de funcionarios': 'employees_module',
   'rh': 'employees_module',
+  'comissão': 'ordination_module',
+  'comissao': 'ordination_module',
+  'consagração': 'ordination_module',
+  'consagracao': 'ordination_module',
+  'comissão de consagração': 'ordination_module',
+  'ordenação': 'ordination_module',
+  'ordenacao': 'ordination_module',
   'portal do aluno': 'student_portal',
   'portal do professor': 'teacher_portal',
   'aplicativo mobile': 'mobile_app',
@@ -217,7 +230,7 @@ export function getPlanTierRank(plan?: any): number {
   }
 
   // Tier 2: Intermediário
-  if (price >= 200 || maxUsers >= 8 || slug.includes('intermediar') || modulosList.includes('arrecadação digital') || modulosList.includes('arrecadacao digital') || modulosList.includes('funcionários') || modulosList.includes('funcionarios')) {
+  if (price >= 200 || maxUsers >= 8 || slug.includes('intermediar') || modulosList.includes('arrecadação digital') || modulosList.includes('arrecadacao digital') || modulosList.includes('funcionários') || modulosList.includes('funcionarios') || modulosList.includes('comissão') || modulosList.includes('comissao') || modulosList.includes('consagração') || modulosList.includes('consagracao')) {
     return 2;
   }
 
@@ -247,7 +260,8 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
     student_portal:       tierRank >= 1,
     teacher_portal:       tierRank >= 1,
     digital_collection:   tierRank >= 2, // Intermediário e superiores
-    employees_module:     tierRank >= 2, // Intermediário e superiores (Básico e Starter = false)
+    employees_module:     tierRank >= 2, // Intermediário e superiores
+    ordination_module:    tierRank >= 2, // Intermediário e superiores (Básico e Starter = false)
     advanced_finance:     tierRank >= 3,
     events_module:        tierRank >= 3,
     mobile_app:           tierRank >= 3,

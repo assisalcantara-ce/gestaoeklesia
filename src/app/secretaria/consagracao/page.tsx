@@ -1,10 +1,11 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { useMembers } from '@/hooks/useMembers';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
@@ -68,7 +69,8 @@ const isConsagracaoTableMissing = (error: any) => {
 };
 
 export default function ConsagracaoPage() {
-  const { ctx, bloqueado } = useRequireModulo('gestao');
+  const { ctx, bloqueado } = useRequireModulo('comissao');
+  const planFeatures = usePlanFeatures();
   const isSupervisor = ctx.nivel === 'supervisor';
   const supabase = useMemo(() => createClient(), []);
   const { fetchMembers } = useMembers();
@@ -757,6 +759,40 @@ export default function ConsagracaoPage() {
   const isProgressao = formRegistro.tipo_registro === 'progressao';
   const isFiliacao = formRegistro.tipo_registro === 'filiacao';
   const statusIsError = /(erro|preencha|obrigat|nao foi possivel|não foi possível)/i.test(statusMensagem);
+
+  if (ctx.loading || planFeatures.loading) return <div className="p-8 text-gray-500">Carregando...</div>;
+
+  if (!planFeatures.has_modulo_comissao || !planFeatures.hasFeature('ordination_module')) {
+    return (
+      <PageLayout title="Consagração" description="Separação de ministros: chegadas, progressão e filiação" activeMenu="consagracao">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center max-w-2xl mx-auto space-y-5 my-10">
+          <div className="w-16 h-16 bg-teal-50 rounded-2xl flex items-center justify-center mx-auto text-teal-600 shadow-sm border border-teal-200/60">
+            <span className="text-3xl">🙏</span>
+          </div>
+          <div>
+            <span className="inline-block px-3 py-1 bg-teal-100 text-teal-800 text-xs font-bold rounded-full mb-3">
+              Recurso do Plano Intermediário
+            </span>
+            <h2 className="text-xl font-bold text-slate-800">Módulo Consagração Indisponível no seu Plano</h2>
+          </div>
+          <p className="text-slate-600 text-base font-semibold leading-relaxed max-w-lg mx-auto">
+            A Gestão de Consagração e Ordenação de Obreiros está disponível a partir do Plano Intermediário.
+          </p>
+          <p className="text-slate-500 text-xs leading-relaxed max-w-md mx-auto">
+            Faça o upgrade para gerenciar processos de consagração, ordenação, chegadas, filiações e homologação de ministros da igreja.
+          </p>
+          <div className="pt-3">
+            <a
+              href="/configuracoes"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#123b63] text-white text-sm font-semibold rounded-xl hover:bg-[#1a4f85] transition shadow-md hover:shadow-lg"
+            >
+              Fazer Upgrade / Conhecer Planos
+            </a>
+          </div>
+        </div>
+      </PageLayout>
+    );
+  }
 
   return (
     <PageLayout
