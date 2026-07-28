@@ -43,11 +43,13 @@ interface Lancamento {
   forma_pagamento: FormaPagamento;
   data_lancamento: string;
   observacoes: string | null;
+  conta_id?: string | null;
   criado_por: string | null;
   created_at: string;
   // joined
   congregacao_nome?: string;
   departamento_nome?: string;
+  conta_nome?: string;
 }
 
 type TipoRecebimento = 'oferta' | 'dizimo' | 'evento' | 'campanha' | 'contribuicao' | 'outros' | 'missoes';
@@ -131,7 +133,7 @@ interface MesDados {
 }
 
 function exportarCSV(linhas: Lancamento[], nomeArquivo: string) {
-  const header = ['Data', 'Movimento', 'Tipo/Categoria', 'Caixa', 'Departamento', 'Descrição', 'Referência', 'Forma Pagamento', 'Valor (R$)'];
+  const header = ['Data', 'Movimento', 'Tipo/Categoria', 'Caixa/Congregação', 'Departamento', 'Conta/Caixa', 'Observações', 'Referência', 'Forma Pagamento', 'Valor (R$)'];
   const rows = linhas.map(l => [
     fmtDate(l.data_lancamento),
     l.tipo_movimento === 'saida' ? 'Saída' : 'Entrada',
@@ -139,8 +141,9 @@ function exportarCSV(linhas: Lancamento[], nomeArquivo: string) {
       ? (TIPOS_SAIDA.find(t => t.value === l.tipo_recebimento)?.label ?? l.tipo_recebimento)
       : tipoLabel(l.tipo_recebimento),
     l.congregacao_nome ?? 'Caixa Geral (Sede)',
-    l.departamento_nome ?? 'Caixa da Igreja',
-    l.descricao ?? '',
+    l.departamento_nome ?? '—',
+    l.conta_nome ?? '—',
+    l.observacoes ?? l.descricao ?? '',
     l.referencia ?? '',
     l.forma_pagamento,
     Number(l.valor).toFixed(2).replace('.', ','),
@@ -505,10 +508,12 @@ export default function TesourariaPage() {
 
   // Filtros
   const [filtroCong,  setFiltroCong]  = useState('');
+  const [filtroDept,  setFiltroDept]  = useState('');
   const [filtroTipo,  setFiltroTipo]  = useState('');
   const [filtroMes,   setFiltroMes]   = useState(mesAtual());
   const [relMes,           setRelMes]           = useState(mesAtual());
   const [relCong,          setRelCong]          = useState('');
+  const [relDept,          setRelDept]          = useState('');
   const [relMostrarDet,    setRelMostrarDet]    = useState(false);
   const [relTipoRel,       setRelTipoRel]       = useState<'entradas' | 'saidas' | 'ambos'>('entradas');
   const [relFiltroPeriodo, setRelFiltroPeriodo] = useState<'mes' | 'custom'>('mes');
@@ -720,8 +725,12 @@ export default function TesourariaPage() {
     if (filtroMovimento && l.tipo_movimento !== filtroMovimento) return false;
     if (filtroTipo && l.tipo_recebimento !== filtroTipo) return false;
     if (filtroCong && l.congregacao_id !== filtroCong) return false;
+    if (filtroDept) {
+      const contaDeptId = finContas.find(c => c.id === l.conta_id)?.departamento_id;
+      if (l.departamento_id !== filtroDept && contaDeptId !== filtroDept) return false;
+    }
     return true;
-  }), [lancamentosMes, filtroMovimento, filtroTipo, filtroCong]);
+  }), [lancamentosMes, filtroMovimento, filtroTipo, filtroCong, filtroDept, finContas]);
 
   const entradasFiltradas = useMemo(() =>
     lancsFiltrados.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0),
@@ -859,7 +868,9 @@ export default function TesourariaPage() {
     if (!ministryId) return;
     setLoadingMes(true);
     const congMap = new Map(congregacoes.map(c => [c.id, c.nome]));
-    const depMap  = new Map(departamentos.map(d => [d.id, `${d.sigla} - ${d.nome}`]));
+    const depMap  = new Map(departamentos.map(d => [d.id, `${d.sigla ? d.sigla + ' - ' : ''}${d.nome}`]));
+    const contaMap = new Map(finContas.map(c => [c.id, c.nome]));
+    const contaDeptMap = new Map(finContas.map(c => [c.id, c.departamento_id]));
     
     const activeCongId = scope.isFinanceiroLocal && scope.congregacaoId 
       ? scope.congregacaoId 
@@ -898,14 +909,20 @@ export default function TesourariaPage() {
       q = q.eq('congregacao_id', scope.congregacaoId);
     }
     const { data } = await q;
-    setLancamentosMes(((data ?? []) as Lancamento[]).map(l => ({
-      ...l,
-      tipo_movimento:    (l as unknown as { tipo_movimento?: string }).tipo_movimento as TipoMovimento ?? 'entrada',
-      congregacao_nome:  l.congregacao_id  ? (congMap.get(l.congregacao_id)  ?? 'Sede') : 'Caixa Geral (Sede)',
-      departamento_nome: l.departamento_id ? (depMap.get(l.departamento_id)  ?? '—')    : 'Caixa da Igreja',
-    })));
+    setLancamentosMes(((data ?? []) as Lancamento[]).map(l => {
+      const directDep = l.departamento_id ? depMap.get(l.departamento_id) : null;
+      const accountDepId = l.conta_id ? contaDeptMap.get(l.conta_id) : null;
+      const accountDep = accountDepId ? depMap.get(accountDepId) : null;
+      return {
+        ...l,
+        tipo_movimento:    (l as unknown as { tipo_movimento?: string }).tipo_movimento as TipoMovimento ?? 'entrada',
+        congregacao_nome:  l.congregacao_id  ? (congMap.get(l.congregacao_id)  ?? 'Sede') : 'Caixa Geral (Sede)',
+        departamento_nome: directDep || accountDep || '—',
+        conta_nome:        l.conta_id ? (contaMap.get(l.conta_id) ?? '—') : '—',
+      };
+    }));
     setLoadingMes(false);
-  }, [ministryId, supabase, scope, congregacoes, departamentos, filtroCong, fechamentos]);
+  }, [ministryId, supabase, scope, congregacoes, departamentos, finContas, filtroCong, fechamentos]);
 
   // Gráfico 12 meses: carrega após o load inicial completar
   useEffect(() => {
@@ -921,11 +938,14 @@ export default function TesourariaPage() {
 
   // ── Fase 2: Relatório — query direta ao banco por período ─────────────────────
 
-  const carregarRelatorio = useCallback(async (mes: string, cong: string) => {
+  const carregarRelatorio = useCallback(async (mes: string, cong: string, dept: string) => {
     if (!ministryId) return;
     setRelLoadingDB(true);
     const congMap = new Map(congregacoes.map(c => [c.id, c.nome]));
-    const depMap  = new Map(departamentos.map(d => [d.id, `${d.sigla} - ${d.nome}`]));
+    const depMap  = new Map(departamentos.map(d => [d.id, `${d.sigla ? d.sigla + ' - ' : ''}${d.nome}`]));
+    const contaMap = new Map(finContas.map(c => [c.id, c.nome]));
+    const contaDeptMap = new Map(finContas.map(c => [c.id, c.departamento_id]));
+
     let q = supabase
       .from('tesouraria_lancamentos')
       .select('*')
@@ -952,20 +972,36 @@ export default function TesourariaPage() {
     } else if (cong) {
       q = q.eq('congregacao_id', cong);
     }
+
+    if (dept) {
+      const contasDoDept = finContas.filter(c => c.departamento_id === dept).map(c => c.id);
+      if (contasDoDept.length > 0) {
+        q = q.or(`departamento_id.eq.${dept},conta_id.in.(${contasDoDept.join(',')})`);
+      } else {
+        q = q.eq('departamento_id', dept);
+      }
+    }
+
     const { data } = await q;
-    setRelDadosDB(((data ?? []) as Lancamento[]).map(l => ({
-      ...l,
-      tipo_movimento:    (l as unknown as { tipo_movimento?: string }).tipo_movimento as TipoMovimento ?? 'entrada',
-      congregacao_nome:  l.congregacao_id  ? (congMap.get(l.congregacao_id)  ?? 'Sede') : 'Caixa Geral (Sede)',
-      departamento_nome: l.departamento_id ? (depMap.get(l.departamento_id)  ?? '—')    : 'Caixa da Igreja',
-    })));
+    setRelDadosDB(((data ?? []) as Lancamento[]).map(l => {
+      const directDep = l.departamento_id ? depMap.get(l.departamento_id) : null;
+      const accountDepId = l.conta_id ? contaDeptMap.get(l.conta_id) : null;
+      const accountDep = accountDepId ? depMap.get(accountDepId) : null;
+      return {
+        ...l,
+        tipo_movimento:    (l as unknown as { tipo_movimento?: string }).tipo_movimento as TipoMovimento ?? 'entrada',
+        congregacao_nome:  l.congregacao_id  ? (congMap.get(l.congregacao_id)  ?? 'Sede') : 'Caixa Geral (Sede)',
+        departamento_nome: directDep || accountDep || '—',
+        conta_nome:        l.conta_id ? (contaMap.get(l.conta_id) ?? '—') : '—',
+      };
+    }));
     setRelLoadingDB(false);
-  }, [ministryId, supabase, scope, congregacoes, departamentos, relFiltroPeriodo, relDataInicio, relDataFim]);
+  }, [ministryId, supabase, scope, congregacoes, departamentos, finContas, relFiltroPeriodo, relDataInicio, relDataFim]);
 
   useEffect(() => {
     if (!ministryId || loadingData || aba !== 'relatorio') return;
-    carregarRelatorio(relMes, relCong);
-  }, [relMes, relCong, relFiltroPeriodo, relDataInicio, relDataFim, aba, ministryId, loadingData, carregarRelatorio]);
+    carregarRelatorio(relMes, relCong, relDept);
+  }, [relMes, relCong, relDept, relFiltroPeriodo, relDataInicio, relDataFim, aba, ministryId, loadingData, carregarRelatorio]);
 
   // ── Contas: carregar lista completa ──────────────────────────────────────────
 
@@ -2026,6 +2062,21 @@ export default function TesourariaPage() {
                   </select>
                 </div>
               )}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Departamento</label>
+                <select
+                  value={filtroDept}
+                  onChange={e => setFiltroDept(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">Todos os departamentos</option>
+                  {departamentos.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.sigla ? `${d.sigla} – ` : ''}{d.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Linha de ações */}
@@ -2868,6 +2919,21 @@ export default function TesourariaPage() {
                 </select>
               </div>
             )}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Departamento</label>
+              <select
+                value={relDept}
+                onChange={e => setRelDept(e.target.value)}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">Todos os departamentos</option>
+                {departamentos.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.sigla ? `${d.sigla} – ` : ''}{d.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
             <label className="no-print flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -2938,7 +3004,8 @@ export default function TesourariaPage() {
                       ? (relMes ? `Período: ${relMes.split('-')[1]}/${relMes.split('-')[0]}` : 'Todos os períodos')
                       : `Período: ${relDataInicio ? fmtDate(relDataInicio) : 'Início'} até ${relDataFim ? fmtDate(relDataFim) : 'Fim'}`
                     }
-                    {relCong ? ` • ${congNome(relCong)}` : ' • Todas as congregações'}
+                    {relCong ? ` • Congregação: ${congNome(relCong)}` : ' • Todas as congregações'}
+                    {relDept ? ` • Departamento: ${departamentos.find(x => x.id === relDept)?.nome ?? '—'}` : ' • Todos os departamentos'}
                   </p>
                 </div>
 
