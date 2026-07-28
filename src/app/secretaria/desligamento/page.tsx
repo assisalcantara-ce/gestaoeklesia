@@ -1,17 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { isAuxiliarSecretaria } from '@/hooks/usePermissions';
 
 export default function DesligamentoPage() {
   const { ctx, bloqueado } = useRequireModulo('secretaria');
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('pendentes');
 
+  const isAuxiliar = ctx.nivel ? isAuxiliarSecretaria(ctx.nivel) : false;
+
+  useEffect(() => {
+    if (!ctx.loading && (bloqueado || isAuxiliar)) {
+      router.replace('/acesso-negado');
+    }
+  }, [ctx.loading, bloqueado, isAuxiliar, router]);
+
   if (ctx.loading) return <div className="p-8">Carregando...</div>;
-  if (bloqueado) return null;
+  if (bloqueado || isAuxiliar) return null;
 
   const tabs = [
     { id: 'pendentes', label: 'Pendentes', icon: '⏳' },

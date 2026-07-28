@@ -374,13 +374,23 @@ export default function CartasPage() {
     { id: 'historico', label: 'Historico', icon: '🗂️' },
   ];
 
-  // Operador não acessa o editor de modelos
-  const visibleTabs = isOperador ? tabs.filter(t => t.id !== 'modelos') : tabs;
+  const isAuxiliar = userCtx.nivel === 'auxiliar_secretaria';
 
-  // Se operador cair na aba modelos (ex: URL direta), redireciona para emitir
+  // Operador não acessa o editor de modelos; Auxiliar acessa apenas Histórico
+  const visibleTabs = isAuxiliar
+    ? tabs.filter(t => t.id === 'historico')
+    : isOperador
+    ? tabs.filter(t => t.id !== 'modelos')
+    : tabs;
+
+  // Se operador/auxiliar cair em abas restritas, redireciona para aba permitida
   useEffect(() => {
-    if (isOperador && activeTab === 'modelos') setActiveTab('emitir');
-  }, [isOperador, activeTab]);
+    if (isAuxiliar && activeTab !== 'historico') {
+      setActiveTab('historico');
+    } else if (isOperador && activeTab === 'modelos') {
+      setActiveTab('emitir');
+    }
+  }, [isAuxiliar, isOperador, activeTab]);
 
   // Templates disponíveis para operador: apenas transito e recomendacao
   const TIPOS_LIVRES: TemplateTipo[] = ['transito', 'recomendacao'];

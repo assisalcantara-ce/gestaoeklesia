@@ -148,6 +148,13 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
       const isLocal = userCtx.nivel && ['admin_local', 'financeiro_local', 'supervisor', 'viewer'].includes(userCtx.nivel);
       if (isLocal) return false;
     }
+
+    if (userCtx.nivel === 'auxiliar_secretaria') {
+      if (['cartas', 'certificados', 'funcionarios', 'comissao', 'ativar-fluxo', 'casamento', 'estrutura-hierarquica'].includes(i.id)) {
+        return false;
+      }
+    }
+
     const modulo = i.modulo;
     if (modulo && !userCtx.podeAcessar(modulo)) return false;
     return true;

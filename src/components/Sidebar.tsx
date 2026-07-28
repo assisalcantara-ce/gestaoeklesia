@@ -233,6 +233,11 @@ export default function Sidebar() {
       const isLocal = userCtx.nivel && ['admin_local', 'financeiro_local', 'supervisor', 'viewer'].includes(userCtx.nivel);
       if (isLocal) return false;
     }
+    if (userCtx.nivel === 'auxiliar_secretaria') {
+      if (['cartas', 'certificados', 'funcionarios', 'comissao', 'ativar-fluxo', 'casamento', 'estrutura-hierarquica'].includes(i.id)) {
+        return false;
+      }
+    }
     // Filtro por permissão de nível
     const modulo = (i as any).modulo as string | undefined;
     if (modulo && !userCtx.podeAcessar(modulo)) return false;

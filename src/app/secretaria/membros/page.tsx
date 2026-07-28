@@ -468,6 +468,7 @@ export default function MembrosPage() {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const userCtx = useUserContext();
   const isSupervisor = userCtx.nivel === 'supervisor';
+  const isAuxiliar = userCtx.nivel === 'auxiliar_secretaria';
   const [isEditando, setIsEditando] = useState(false);
 
   // Cargos ministeriais (sincronizados com configurações via localStorage)
@@ -2603,6 +2604,7 @@ export default function MembrosPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                             </svg>
                           </button>
+                          {!isAuxiliar && (
                           <button
                             onClick={async () => {
                               const templatesBase = await ensureTemplatesSnapshot();
@@ -2624,6 +2626,7 @@ export default function MembrosPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                             </svg>
                           </button>
+                          )}
                           {!isSupervisor && (
                           <button
                             onClick={() => abrirEdicao(membro)}
@@ -2635,7 +2638,7 @@ export default function MembrosPage() {
                             </svg>
                           </button>
                           )}
-                          {!isSupervisor && (
+                          {!isSupervisor && !isAuxiliar && (
                           <button
                             onClick={() => abrirConfirmacaoDeletar(membro)}
                             className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition"

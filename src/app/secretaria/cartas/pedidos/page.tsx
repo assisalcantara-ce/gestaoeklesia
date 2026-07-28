@@ -88,13 +88,18 @@ export default function CartaPedidosPage() {
   const router = useRouter();
   const userCtx = useUserContext();
   const isGestor = userCtx.nivel === 'administrador' || userCtx.nivel === 'supervisor';
+  const isAuxiliar = userCtx.nivel === 'auxiliar_secretaria';
 
-  // Administrador tem o editor completo em /secretaria/cartas
+  // Administrador tem o editor completo em /secretaria/cartas; Auxiliar não acessa emissão de cartas
   useEffect(() => {
-    if (!userCtx.loading && userCtx.nivel === 'administrador') {
-      router.replace('/secretaria/cartas');
+    if (!userCtx.loading) {
+      if (userCtx.nivel === 'administrador') {
+        router.replace('/secretaria/cartas');
+      } else if (isAuxiliar) {
+        router.replace('/acesso-negado');
+      }
     }
-  }, [userCtx.loading, userCtx.nivel, router]);
+  }, [userCtx.loading, userCtx.nivel, isAuxiliar, router]);
 
   const [pedidos, setPedidos] = useState<CartaPedido[]>([]);
   const [loadingData, setLoadingData] = useState(true);
