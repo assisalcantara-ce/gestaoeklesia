@@ -300,6 +300,7 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
                             {item.submenu
                               .filter((sub) => !sub.modulo || userCtx.podeAcessar(sub.modulo))
                               .filter((sub) => !(sub.id === 'cartas-pedidos' && userCtx.nivel === 'administrador'))
+                              .filter((sub) => !(sub as any).planFeature || (planFeatures as any)[(sub as any).planFeature])
                               .map((submenu: any) => {
                                 const isSubActive = activeMenu === submenu.id;
                                 return (

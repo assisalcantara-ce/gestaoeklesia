@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase-client';
+import { hasArrecadacaoDigitalPlanAccess } from '@/lib/plan-permissions';
 
 export interface PlanFeatures {
   has_modulo_financeiro: boolean;
@@ -9,6 +10,7 @@ export interface PlanFeatures {
   has_modulo_eventos: boolean;
   has_modulo_reunioes: boolean;
   has_modulo_agenda: boolean;
+  has_arrecadacao_digital: boolean;
   /** Status da assinatura do ministério ('trial', 'active', 'cancelled', etc.) */
   subscription_status: string | null;
   /** Data de término da assinatura ou do trial */
@@ -23,6 +25,7 @@ const DEFAULT_FEATURES: PlanFeatures = {
   has_modulo_eventos: false, // somente Profissional
   has_modulo_reunioes: true,
   has_modulo_agenda: false, // default fail-closed
+  has_arrecadacao_digital: false, // default fail-closed para o Plano Básico enquanto carrega
   subscription_status: null,
   subscription_end_date: null,
   loading: true,
@@ -57,13 +60,13 @@ export function usePlanFeatures(): PlanFeatures {
         const query = ministryId
           ? supabase
               .from('ministries')
-              .select('subscription_plan_id, subscription_status, subscription_end_date, subscription_plans(has_modulo_financeiro, has_modulo_financeiro_avancado, has_modulo_eventos, has_modulo_reunioes, modulos)')
+              .select('plan, subscription_plan_id, subscription_status, subscription_end_date, subscription_plans(id, slug, name, has_modulo_financeiro, has_modulo_financeiro_avancado, has_modulo_eventos, has_modulo_reunioes, modulos)')
               .eq('id', ministryId)
               .limit(1)
               .maybeSingle()
           : supabase
               .from('ministries')
-              .select('subscription_plan_id, subscription_status, subscription_end_date, subscription_plans(has_modulo_financeiro, has_modulo_financeiro_avancado, has_modulo_eventos, has_modulo_reunioes, modulos)')
+              .select('plan, subscription_plan_id, subscription_status, subscription_end_date, subscription_plans(id, slug, name, has_modulo_financeiro, has_modulo_financeiro_avancado, has_modulo_eventos, has_modulo_reunioes, modulos)')
               .eq('user_id', user.id)
               .limit(1)
               .maybeSingle();
@@ -71,8 +74,10 @@ export function usePlanFeatures(): PlanFeatures {
         const { data: ministry } = await query;
 
         const plan = (ministry as any)?.subscription_plans;
+        const planSlug = (plan?.slug || (ministry as any)?.plan || 'starter').toLowerCase().trim();
         const modulosList = Array.isArray(plan?.modulos) ? plan.modulos : [];
         const hasAgenda = modulosList.includes('Agenda do Ministério') || modulosList.includes('Agenda') || modulosList.includes('Planejamento Ministerial');
+        const hasArrecadacao = hasArrecadacaoDigitalPlanAccess(planSlug, plan);
 
         if (!cancelled) {
           setFeatures({
@@ -81,13 +86,13 @@ export function usePlanFeatures(): PlanFeatures {
             has_modulo_eventos: plan?.has_modulo_eventos ?? false, // fail-closed
             has_modulo_reunioes: plan?.has_modulo_reunioes ?? true,
             has_modulo_agenda: hasAgenda,
+            has_arrecadacao_digital: hasArrecadacao,
             subscription_status: (ministry as any)?.subscription_status ?? null,
             subscription_end_date: (ministry as any)?.subscription_end_date ?? null,
             loading: false,
           });
         }
       } catch {
-        // Em caso de erro, libera acesso (fail-open) para não bloquear usuários
         if (!cancelled) setFeatures({ ...DEFAULT_FEATURES, loading: false });
       }
     };

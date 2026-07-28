@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { decryptCredentials } from '@/lib/ministry-credentials';
+import { isArrecadacaoDigitalAllowedForTenant } from '@/lib/plan-permissions';
 import {
   getOrCreateAsaasCustomer,
   createAsaasPixCharge,
@@ -37,12 +38,17 @@ export async function GET(_request: NextRequest, context: Ctx) {
 
   const { data: dest } = await admin
     .from('fin_payment_destinations')
-    .select('label, descricao, tipo_recebimento, valor_fixo, is_ativo, expires_at, congregacoes(nome)')
+    .select('ministry_id, label, descricao, tipo_recebimento, valor_fixo, is_ativo, expires_at, congregacoes(nome)')
     .eq('public_token', token)
     .maybeSingle();
 
   if (!dest || !dest.is_ativo) {
     return NextResponse.json({ error: 'Link de pagamento inválido ou inativo.' }, { status: 404 });
+  }
+
+  const allowedPlan = await isArrecadacaoDigitalAllowedForTenant(admin, dest.ministry_id);
+  if (!allowedPlan) {
+    return NextResponse.json({ error: 'A funcionalidade Arrecadação Digital está indisponível para esta instituição.' }, { status: 403 });
   }
 
   if (dest.expires_at && new Date(dest.expires_at) < new Date()) {
@@ -107,6 +113,11 @@ export async function POST(request: NextRequest, context: Ctx) {
 
   if (!dest || !dest.is_ativo) {
     return NextResponse.json({ error: 'Link inválido ou inativo.' }, { status: 404 });
+  }
+
+  const allowedPlan = await isArrecadacaoDigitalAllowedForTenant(admin, dest.ministry_id);
+  if (!allowedPlan) {
+    return NextResponse.json({ error: 'A funcionalidade Arrecadação Digital está indisponível para esta instituição.' }, { status: 403 });
   }
 
   if (dest.expires_at && new Date(dest.expires_at) < new Date()) {

@@ -4,6 +4,7 @@ export interface NavigationItem {
   icon: string;
   path: string;
   modulo?: string;
+  planFeature?: string;
   ebdMenu?: boolean;
   submenu?: {
     id: string;
@@ -11,6 +12,7 @@ export interface NavigationItem {
     icon: string;
     path: string;
     modulo?: string;
+    planFeature?: string;
   }[];
 }
 
@@ -70,7 +72,17 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
   {
     groupName: "FINANCEIRO",
     items: [
-      { id: 'tesouraria', label: 'Tesouraria', icon: '💰', path: '/tesouraria', modulo: 'tesouraria' },
+      {
+        id: 'tesouraria',
+        label: 'Tesouraria',
+        icon: '💰',
+        path: '/tesouraria',
+        modulo: 'tesouraria',
+        submenu: [
+          { id: 'tesouraria-geral', label: 'Visão Geral & Lançamentos', icon: '💰', path: '/tesouraria', modulo: 'tesouraria' },
+          { id: 'arrecadacao-digital', label: 'Arrecadação Digital', icon: '📱', path: '/tesouraria/arrecadacao-digital', modulo: 'tesouraria', planFeature: 'has_arrecadacao_digital' },
+        ]
+      },
       {
         id: 'presidencia',
         label: 'Presidência',

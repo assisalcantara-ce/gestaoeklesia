@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveTenantAuth } from '@/lib/tenant-auth'
+import { isArrecadacaoDigitalAllowedForTenant } from '@/lib/plan-permissions'
 import {
   encryptCredentials,
   decryptCredentials,
@@ -36,6 +37,14 @@ export async function GET(request: NextRequest) {
     const ctx = await resolveTenantAuth(request)
     if (!ctx.ministryId) {
       return NextResponse.json({ error: 'Usuário sem ministério associado.', code: 'NO_MINISTRY' }, { status: 403 })
+    }
+
+    const allowedPlan = await isArrecadacaoDigitalAllowedForTenant(ctx.admin, ctx.ministryId);
+    if (!allowedPlan) {
+      return NextResponse.json(
+        { error: 'A funcionalidade Arrecadação Digital está disponível a partir do Plano Intermediário.', code: 'PLAN_RESTRICTED', required_plan: 'intermediario' },
+        { status: 403 }
+      );
     }
 
     const hasAccess =
@@ -124,6 +133,14 @@ export async function POST(request: NextRequest) {
     const ctx = await resolveTenantAuth(request)
     if (!ctx.ministryId) {
       return NextResponse.json({ error: 'Usuário sem ministério associado.', code: 'NO_MINISTRY' }, { status: 403 })
+    }
+
+    const allowedPlan = await isArrecadacaoDigitalAllowedForTenant(ctx.admin, ctx.ministryId);
+    if (!allowedPlan) {
+      return NextResponse.json(
+        { error: 'A funcionalidade Arrecadação Digital está disponível a partir do Plano Intermediário.', code: 'PLAN_RESTRICTED', required_plan: 'intermediario' },
+        { status: 403 }
+      );
     }
 
     const isAdmin =
@@ -363,6 +380,14 @@ export async function DELETE(request: NextRequest) {
     const ctx = await resolveTenantAuth(request)
     if (!ctx.ministryId) {
       return NextResponse.json({ error: 'Usuário sem ministério associado.', code: 'NO_MINISTRY' }, { status: 403 })
+    }
+
+    const allowedPlan = await isArrecadacaoDigitalAllowedForTenant(ctx.admin, ctx.ministryId);
+    if (!allowedPlan) {
+      return NextResponse.json(
+        { error: 'A funcionalidade Arrecadação Digital está disponível a partir do Plano Intermediário.', code: 'PLAN_RESTRICTED', required_plan: 'intermediario' },
+        { status: 403 }
+      );
     }
 
     const isAdmin =

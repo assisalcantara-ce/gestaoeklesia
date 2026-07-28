@@ -7,6 +7,7 @@ import PageLayout from '@/components/PageLayout';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { Pencil, Plus, Trash2, X, TrendingUp, Building2, Tag, Printer, Users, CalendarDays, Lock, Unlock, CheckCircle, Search, Download, CreditCard, List, Star, AlertCircle, QrCode, Copy, ExternalLink, Settings, RefreshCw } from 'lucide-react';
@@ -470,6 +471,7 @@ interface UserScope {
 export default function TesourariaPage() {
   const { loading: authLoading } = useRequireSupabaseAuth();
   const { bloqueado } = useRequireModulo('tesouraria');
+  const planFeatures = usePlanFeatures();
   const supabase = useMemo(() => createClient(), []);
 
   const [ministryId,  setMinistryId]  = useState<string | null>(null);
@@ -1793,16 +1795,16 @@ export default function TesourariaPage() {
 
       {/* ── Abas ── */}
       <div className="mb-6 border-b-2 border-slate-200 flex gap-1 flex-wrap">
-        {([
-          { id: 'dashboard',   icon: <TrendingUp className="h-4 w-4" />,    label: 'Dashboard'     },
-          { id: 'lancamentos', icon: <Tag className="h-4 w-4" />,           label: 'Lançamentos'   },
-          { id: 'caixa',       icon: <CalendarDays className="h-4 w-4" />,  label: 'Caixa Mensal'  },
-          { id: 'relatorio',   icon: <Printer className="h-4 w-4" />,       label: 'Relatório'     },
-          { id: 'dizimistas',  icon: <Users className="h-4 w-4" />,         label: 'Dizimistas'    },
-          { id: 'contas',      icon: <CreditCard className="h-4 w-4" />,    label: 'Contas'        },
-          { id: 'categorias',  icon: <List className="h-4 w-4" />,          label: 'Categorias'    },
-          { id: 'arrecadacao', icon: <QrCode className="h-4 w-4" />,        label: 'Arrecadação Digital' },
-        ] as const).map(t => (
+        {[
+          { id: 'dashboard' as const,   icon: <TrendingUp className="h-4 w-4" />,    label: 'Dashboard'     },
+          { id: 'lancamentos' as const, icon: <Tag className="h-4 w-4" />,           label: 'Lançamentos'   },
+          { id: 'caixa' as const,       icon: <CalendarDays className="h-4 w-4" />,  label: 'Caixa Mensal'  },
+          { id: 'relatorio' as const,   icon: <Printer className="h-4 w-4" />,       label: 'Relatório'     },
+          { id: 'dizimistas' as const,  icon: <Users className="h-4 w-4" />,         label: 'Dizimistas'    },
+          { id: 'contas' as const,      icon: <CreditCard className="h-4 w-4" />,    label: 'Contas'        },
+          { id: 'categorias' as const,  icon: <List className="h-4 w-4" />,          label: 'Categorias'    },
+          ...(planFeatures.has_arrecadacao_digital ? [{ id: 'arrecadacao' as const, icon: <QrCode className="h-4 w-4" />, label: 'Arrecadação Digital' }] : []),
+        ].map(t => (
           <button
             key={t.id}
             onClick={() => setAba(t.id)}
@@ -4093,6 +4095,28 @@ export default function TesourariaPage() {
           ABA: ARRECADAÇÃO DIGITAL
       ══════════════════════════════════════════════════════════════════════ */}
       {aba === 'arrecadacao' && (
+        !planFeatures.has_arrecadacao_digital ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center max-w-2xl mx-auto space-y-4 my-8">
+            <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto text-amber-600">
+              <QrCode className="h-8 w-8" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-800">Recurso Indisponível no seu Plano</h2>
+            <p className="text-slate-600 text-sm leading-relaxed font-semibold">
+              A funcionalidade Arrecadação Digital está disponível a partir do Plano Intermediário.
+            </p>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Com o Plano Intermediário você tem acesso a links PIX automatizados, geração de QR Codes e conciliação bancária em tempo real.
+            </p>
+            <div className="pt-2">
+              <a
+                href="/configuracoes"
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#123b63] text-white text-sm font-semibold rounded-xl hover:bg-[#1a4f85] transition shadow-sm"
+              >
+                Conhecer Planos / Fazer Upgrade
+              </a>
+            </div>
+          </div>
+        ) : (
         <div className="space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between flex-wrap gap-3">
@@ -4695,7 +4719,7 @@ export default function TesourariaPage() {
             </div>
           )}
         </div>
-      )}
+      ))}
 
       {/* ── Confirm Delete Destino ────────────────────────────────────────── */}
       {confirmDelDestino && (

@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
+import { isArrecadacaoDigitalAllowedForTenant } from '@/lib/plan-permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,14 @@ export async function GET(request: NextRequest, context: Ctx) {
 
   if (!ctx.ministryId) {
     return NextResponse.json({ error: 'Sem ministério.' }, { status: 403 });
+  }
+
+  const allowedPlan = await isArrecadacaoDigitalAllowedForTenant(ctx.admin, ctx.ministryId);
+  if (!allowedPlan) {
+    return NextResponse.json(
+      { error: 'A funcionalidade Arrecadação Digital está disponível a partir do Plano Intermediário.', code: 'PLAN_RESTRICTED', required_plan: 'intermediario' },
+      { status: 403 }
+    );
   }
 
   const { data, error } = await ctx.admin
@@ -46,6 +55,14 @@ export async function PUT(request: NextRequest, context: Ctx) {
 
   if (!ctx.ministryId) {
     return NextResponse.json({ error: 'Sem ministério.' }, { status: 403 });
+  }
+
+  const allowedPlan = await isArrecadacaoDigitalAllowedForTenant(ctx.admin, ctx.ministryId);
+  if (!allowedPlan) {
+    return NextResponse.json(
+      { error: 'A funcionalidade Arrecadação Digital está disponível a partir do Plano Intermediário.', code: 'PLAN_RESTRICTED', required_plan: 'intermediario' },
+      { status: 403 }
+    );
   }
 
   const canEdit =
@@ -113,6 +130,14 @@ export async function DELETE(request: NextRequest, context: Ctx) {
 
   if (!ctx.ministryId) {
     return NextResponse.json({ error: 'Sem ministério.' }, { status: 403 });
+  }
+
+  const allowedPlan = await isArrecadacaoDigitalAllowedForTenant(ctx.admin, ctx.ministryId);
+  if (!allowedPlan) {
+    return NextResponse.json(
+      { error: 'A funcionalidade Arrecadação Digital está disponível a partir do Plano Intermediário.', code: 'PLAN_RESTRICTED', required_plan: 'intermediario' },
+      { status: 403 }
+    );
   }
 
   const canDelete = ctx.isOwner || ctx.nivel === 'administrador';

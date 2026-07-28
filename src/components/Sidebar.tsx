@@ -149,7 +149,17 @@ export default function Sidebar() {
         { id: 'sorteios',              label: 'Sorteios',                icon: '🎰', path: '/secretaria/sorteios',               modulo: 'secretaria_local' },
       ]
     },
-    { id: 'tesouraria', label: 'Tesouraria', icon: '💰', path: '/tesouraria', modulo: 'tesouraria' },
+    {
+      id: 'tesouraria',
+      label: 'Tesouraria',
+      icon: '💰',
+      path: '/tesouraria',
+      modulo: 'tesouraria',
+      submenu: [
+        { id: 'tesouraria-geral', label: 'Visão Geral & Lançamentos', icon: '💰', path: '/tesouraria', modulo: 'tesouraria' },
+        { id: 'arrecadacao-digital', label: 'Arrecadação Digital', icon: '📱', path: '/tesouraria/arrecadacao-digital', modulo: 'tesouraria', planFeature: 'has_arrecadacao_digital' },
+      ]
+    },
     {
       id: 'acolhimento',
       label: 'Acolhimento',
@@ -315,6 +325,7 @@ export default function Sidebar() {
                   {((item as any).submenu as any[])
                     .filter((sub) => !sub.modulo || userCtx.podeAcessar(sub.modulo))
                     .filter((sub) => !(sub.id === 'cartas-pedidos' && userCtx.nivel === 'administrador'))
+                    .filter((sub) => !sub.planFeature || (planFeatures as any)[sub.planFeature])
                     .map((submenu: any, index: number, arr: any[]) => (
                     <button
                       key={submenu.id}

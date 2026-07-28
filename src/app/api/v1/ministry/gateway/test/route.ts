@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { resolveTenantAuth } from '@/lib/tenant-auth'
 import { decryptCredentials } from '@/lib/ministry-credentials'
 import { testEfiConnection } from '@/lib/efi-pay'
+import { isArrecadacaoDigitalAllowedForTenant } from '@/lib/plan-permissions'
 
 type Gateway = 'asaas' | 'efi'
 const VALID_GATEWAYS: Gateway[] = ['asaas', 'efi']
@@ -42,6 +43,14 @@ export async function POST(request: NextRequest) {
         { error: 'Usuário sem ministério associado.', code: 'NO_MINISTRY' },
         { status: 403 }
       )
+    }
+
+    const allowedPlan = await isArrecadacaoDigitalAllowedForTenant(ctx.admin, ctx.ministryId);
+    if (!allowedPlan) {
+      return NextResponse.json(
+        { error: 'A funcionalidade Arrecadação Digital está disponível a partir do Plano Intermediário.', code: 'PLAN_RESTRICTED', required_plan: 'intermediario' },
+        { status: 403 }
+      );
     }
 
     const isAdmin =
