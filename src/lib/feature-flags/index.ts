@@ -12,6 +12,7 @@ export type FeatureFlag =
   | 'events_module'             // Módulo de Eventos
   | 'meetings_module'           // Módulo de Reuniões
   | 'agenda_module'             // Agenda do Ministério
+  | 'ebd_module'                // Escola Bíblica Dominical (EBD) completa
   | 'student_portal'            // Portal do Aluno (EBD)
   | 'teacher_portal'            // Portal do Professor (EBD)
   | 'mobile_app'                // Aplicativo Mobile
@@ -68,6 +69,12 @@ export const FEATURE_CATALOG: Record<FeatureFlag, FeatureMetadata> = {
     key: 'agenda_module',
     label: 'Agenda do Ministério',
     description: 'Planejamento ministerial anual e calendário de atividades.',
+    minTier: 'starter',
+  },
+  ebd_module: {
+    key: 'ebd_module',
+    label: 'Escola Bíblica Dominical (EBD)',
+    description: 'Gestão completa da EBD: turmas, chamada, alunos, professores, relatórios e certificados.',
     minTier: 'starter',
   },
   student_portal: {
@@ -145,6 +152,11 @@ const ALIAS_MAP: Record<string, FeatureFlag> = {
   'agenda do ministério': 'agenda_module',
   'agenda': 'agenda_module',
   'planejamento ministerial': 'agenda_module',
+  'ebd': 'ebd_module',
+  'escola bíblica': 'ebd_module',
+  'escola biblica': 'ebd_module',
+  'escola bíblica dominical': 'ebd_module',
+  'escola biblica dominical': 'ebd_module',
   'portal do aluno': 'student_portal',
   'portal do professor': 'teacher_portal',
   'aplicativo mobile': 'mobile_app',
@@ -187,7 +199,7 @@ export function getPlanTierRank(plan?: any): number {
   }
 
   // Tier 1: Starter
-  if (price >= 100 || maxUsers >= 3 || slug.includes('starter') || modulosList.includes('agenda') || modulosList.includes('agenda do ministério')) {
+  if (price >= 100 || maxUsers >= 3 || slug.includes('starter') || modulosList.includes('agenda') || modulosList.includes('ebd') || modulosList.includes('escola bíblica')) {
     return 1;
   }
 
@@ -206,10 +218,11 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
   const resolved: Record<FeatureFlag, boolean> = {
     financial_module:     tierRank >= 0,
     meetings_module:      tierRank >= 0,
-    agenda_module:        tierRank >= 1, // Starter, Intermediário, Profissional, Expert (Básico = false)
+    agenda_module:        tierRank >= 1, // Starter e superiores (Básico = false)
+    ebd_module:           tierRank >= 1, // Starter e superiores (Básico = false)
     student_portal:       tierRank >= 1,
     teacher_portal:       tierRank >= 1,
-    digital_collection:   tierRank >= 2, // Intermediário e superiores (Básico e Starter = false)
+    digital_collection:   tierRank >= 2, // Intermediário e superiores
     advanced_finance:     tierRank >= 3,
     events_module:        tierRank >= 3,
     mobile_app:           tierRank >= 3,

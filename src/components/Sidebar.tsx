@@ -181,6 +181,8 @@ export default function Sidebar() {
       path: '/ebd/dashboard/geral',
       modulo: 'ebd',
       ebdMenu: true,
+      featureFlag: 'ebd_module',
+      planFeature: 'has_modulo_ebd',
     },
     { id: 'comissao', label: 'Comissão', icon: '👥', path: '/comissao', modulo: 'comissao', submenu: [
         { id: 'comissoes',   label: 'Comissões',              icon: '👥', path: '/comissao',               modulo: 'gestao' },
@@ -231,7 +233,7 @@ export default function Sidebar() {
   const menuItems = allMenuItems.filter(i => {
     // Enquanto algum dos dois carrega, oculta itens sensíveis para não piscar
     if (planFeatures.loading || userCtx.loading) {
-      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda'].includes(i.id);
+      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda', 'ebd'].includes(i.id);
     }
     // Filtro por plano
     if ((i as any).featureFlag && !planFeatures.hasFeature((i as any).featureFlag)) return false;

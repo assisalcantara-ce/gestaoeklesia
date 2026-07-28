@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import {
@@ -381,6 +382,7 @@ function DashboardLocal({ congregacaoNome: _congregacaoNome, ...props }: Dashboa
 export default function EbdDashboardPage() {
   const { user } = useRequireSupabaseAuth();
   const { bloqueado: ebdBloqueado } = useRequireModulo('ebd');
+  const planFeatures = usePlanFeatures();
   const supabase = useMemo(() => createClient(), []);
 
   // ── Permissão ──
@@ -606,6 +608,43 @@ export default function EbdDashboardPage() {
       </span>
     </div>
   );
+
+  // Verificação de Feature Flag do plano antes de renderizar
+  if (planFeatures.loading) {
+    return <div className="p-8 text-gray-500">Carregando...</div>;
+  }
+
+  if (!planFeatures.has_modulo_ebd || !planFeatures.hasFeature('ebd_module')) {
+    return (
+      <PageLayout title="EBD" description="Escola Bíblica Dominical" activeMenu="ebd-dashboard">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center max-w-2xl mx-auto space-y-5 my-10">
+          <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto text-indigo-600 shadow-sm border border-indigo-200/60">
+            <BookOpen className="h-8 w-8" />
+          </div>
+          <div>
+            <span className="inline-block px-3 py-1 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-full mb-3">
+              Recurso do Plano Starter
+            </span>
+            <h2 className="text-xl font-bold text-slate-800">Módulo EBD Indisponível no seu Plano</h2>
+          </div>
+          <p className="text-slate-600 text-base font-semibold leading-relaxed max-w-lg mx-auto">
+            A Escola Bíblica Dominical está disponível a partir do Plano Starter.
+          </p>
+          <p className="text-slate-500 text-xs leading-relaxed max-w-md mx-auto">
+            Faça o upgrade para liberar o gerenciamento completo de turmas, chamadas, alunos, professores, relatórios e certificados da EBD.
+          </p>
+          <div className="pt-3">
+            <a
+              href="/configuracoes"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#123b63] text-white text-sm font-semibold rounded-xl hover:bg-[#1a4f85] transition shadow-md hover:shadow-lg"
+            >
+              Fazer Upgrade / Conhecer Planos
+            </a>
+          </div>
+        </div>
+      </PageLayout>
+    );
+  }
 
   if (ebdBloqueado) return null;
 

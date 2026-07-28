@@ -123,6 +123,8 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
         path: '/ebd/dashboard/geral',
         modulo: 'ebd',
         ebdMenu: true,
+        featureFlag: 'ebd_module',
+        planFeature: 'has_modulo_ebd',
       },
     ]
   },
