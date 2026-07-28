@@ -5,6 +5,7 @@ export interface NavigationItem {
   path: string;
   modulo?: string;
   planFeature?: string;
+  featureFlag?: string;
   ebdMenu?: boolean;
   submenu?: {
     id: string;
@@ -13,6 +14,7 @@ export interface NavigationItem {
     path: string;
     modulo?: string;
     planFeature?: string;
+    featureFlag?: string;
   }[];
 }
 
@@ -80,7 +82,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
         modulo: 'tesouraria',
         submenu: [
           { id: 'tesouraria-geral', label: 'Visão Geral & Lançamentos', icon: '💰', path: '/tesouraria', modulo: 'tesouraria' },
-          { id: 'arrecadacao-digital', label: 'Arrecadação Digital', icon: '📱', path: '/tesouraria/arrecadacao-digital', modulo: 'tesouraria', planFeature: 'has_arrecadacao_digital' },
+          { id: 'arrecadacao-digital', label: 'Arrecadação Digital', icon: '📱', path: '/tesouraria/arrecadacao-digital', modulo: 'tesouraria', planFeature: 'has_arrecadacao_digital', featureFlag: 'digital_collection' },
         ]
       },
       {

@@ -138,6 +138,7 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
     if (planFeatures.loading || userCtx.loading) {
       return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda'].includes(i.id);
     }
+    if (i.featureFlag && !planFeatures.hasFeature(i.featureFlag as any))       return false;
     if (i.id === 'tesouraria' && !planFeatures.has_modulo_financeiro)          return false;
     if (i.id === 'financeiro' && !planFeatures.has_modulo_financeiro_avancado) return false;
     if (i.id === 'eventos'    && !planFeatures.has_modulo_eventos)             return false;
@@ -300,6 +301,7 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
                             {item.submenu
                               .filter((sub) => !sub.modulo || userCtx.podeAcessar(sub.modulo))
                               .filter((sub) => !(sub.id === 'cartas-pedidos' && userCtx.nivel === 'administrador'))
+                              .filter((sub) => !(sub as any).featureFlag || planFeatures.hasFeature((sub as any).featureFlag))
                               .filter((sub) => !(sub as any).planFeature || (planFeatures as any)[(sub as any).planFeature])
                               .map((submenu: any) => {
                                 const isSubActive = activeMenu === submenu.id;
