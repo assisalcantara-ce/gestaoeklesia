@@ -13,6 +13,7 @@ export type FeatureFlag =
   | 'meetings_module'           // Módulo de Reuniões
   | 'agenda_module'             // Agenda do Ministério
   | 'ebd_module'                // Escola Bíblica Dominical (EBD) completa
+  | 'missions_module'           // Módulo de Missões
   | 'student_portal'            // Portal do Aluno (EBD)
   | 'teacher_portal'            // Portal do Professor (EBD)
   | 'mobile_app'                // Aplicativo Mobile
@@ -75,6 +76,12 @@ export const FEATURE_CATALOG: Record<FeatureFlag, FeatureMetadata> = {
     key: 'ebd_module',
     label: 'Escola Bíblica Dominical (EBD)',
     description: 'Gestão completa da EBD: turmas, chamada, alunos, professores, relatórios e certificados.',
+    minTier: 'starter',
+  },
+  missions_module: {
+    key: 'missions_module',
+    label: 'Módulo de Missões',
+    description: 'Gestão de projetos missionários, missionários sustentados, eventos e arrecadações.',
     minTier: 'starter',
   },
   student_portal: {
@@ -157,6 +164,10 @@ const ALIAS_MAP: Record<string, FeatureFlag> = {
   'escola biblica': 'ebd_module',
   'escola bíblica dominical': 'ebd_module',
   'escola biblica dominical': 'ebd_module',
+  'missões': 'missions_module',
+  'missoes': 'missions_module',
+  'módulo de missões': 'missions_module',
+  'modulo de missoes': 'missions_module',
   'portal do aluno': 'student_portal',
   'portal do professor': 'teacher_portal',
   'aplicativo mobile': 'mobile_app',
@@ -199,7 +210,7 @@ export function getPlanTierRank(plan?: any): number {
   }
 
   // Tier 1: Starter
-  if (price >= 100 || maxUsers >= 3 || slug.includes('starter') || modulosList.includes('agenda') || modulosList.includes('ebd') || modulosList.includes('escola bíblica')) {
+  if (price >= 100 || maxUsers >= 3 || slug.includes('starter') || modulosList.includes('agenda') || modulosList.includes('ebd') || modulosList.includes('escola bíblica') || modulosList.includes('missões') || modulosList.includes('missoes')) {
     return 1;
   }
 
@@ -220,6 +231,7 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
     meetings_module:      tierRank >= 0,
     agenda_module:        tierRank >= 1, // Starter e superiores (Básico = false)
     ebd_module:           tierRank >= 1, // Starter e superiores (Básico = false)
+    missions_module:      tierRank >= 1, // Starter e superiores (Básico = false)
     student_portal:       tierRank >= 1,
     teacher_portal:       tierRank >= 1,
     digital_collection:   tierRank >= 2, // Intermediário e superiores
