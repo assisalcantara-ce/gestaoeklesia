@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import {
@@ -174,6 +175,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function ConselhoFiscalPage() {
   const { ctx, bloqueado } = useRequireModulo('conselho_fiscal');
+  const planFeatures = usePlanFeatures();
   const supabase = useMemo(() => createClient(), []);
 
   const [ministryId, setMinistryId] = useState<string | null>(null);
@@ -792,7 +794,41 @@ ${f.review.recomendacoes ? `<div class="section"><p class="section-title">Recome
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (ctx.loading || bloqueado) return null;
+  if (ctx.loading || planFeatures.loading) return <div className="p-8 text-gray-500">Carregando...</div>;
+
+  if (!planFeatures.has_modulo_conselho_fiscal || !planFeatures.hasFeature('fiscal_council_module')) {
+    return (
+      <PageLayout title="Conselho Fiscal" description="Análise e parecer sobre fechamentos financeiros por congregação" activeMenu="conselho-fiscal">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center max-w-2xl mx-auto space-y-5 my-10">
+          <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto text-slate-700 shadow-sm border border-slate-200/60">
+            <span className="text-3xl">⚖️</span>
+          </div>
+          <div>
+            <span className="inline-block px-3 py-1 bg-slate-100 text-slate-800 text-xs font-bold rounded-full mb-3">
+              Recurso do Plano Profissional
+            </span>
+            <h2 className="text-xl font-bold text-slate-800">Módulo Conselho Fiscal Indisponível no seu Plano</h2>
+          </div>
+          <p className="text-slate-600 text-base font-semibold leading-relaxed max-w-lg mx-auto">
+            O Módulo de Conselho Fiscal e Auditoria Digital de Fechamentos está disponível exclusivamente no Plano Profissional e superiores.
+          </p>
+          <p className="text-slate-500 text-xs leading-relaxed max-w-md mx-auto">
+            Faça o upgrade para emitir pareceres oficiais, assinar relatórios digitais com hash de auditoria e revisar os fechamentos mensais de todas as congregações.
+          </p>
+          <div className="pt-3">
+            <a
+              href="/configuracoes"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#123b63] text-white text-sm font-semibold rounded-xl hover:bg-[#1a4f85] transition shadow-md hover:shadow-lg"
+            >
+              Fazer Upgrade / Conhecer Planos
+            </a>
+          </div>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  if (bloqueado) return null;
 
   return (
     <PageLayout

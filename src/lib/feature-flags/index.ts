@@ -18,6 +18,7 @@ export type FeatureFlag =
   | 'ordination_module'         // Comissão & Consagração de Obreiros
   | 'kids_module'               // Área Kids & Apresentação de Crianças
   | 'presidency_module'         // Módulo Presidência & Visão Corporativa
+  | 'fiscal_council_module'     // Módulo Conselho Fiscal & Auditoria de Fechamentos
   | 'student_portal'            // Portal do Aluno (EBD)
   | 'teacher_portal'            // Portal do Professor (EBD)
   | 'mobile_app'                // Aplicativo Mobile
@@ -110,6 +111,12 @@ export const FEATURE_CATALOG: Record<FeatureFlag, FeatureMetadata> = {
     key: 'presidency_module',
     label: 'Módulo Presidência & Visão Corporativa',
     description: 'Gestão da presidência, consolidados regionais, conselho fiscal e atas da diretoria.',
+    minTier: 'professional',
+  },
+  fiscal_council_module: {
+    key: 'fiscal_council_module',
+    label: 'Conselho Fiscal & Auditoria de Fechamentos',
+    description: 'Análise de fechamentos mensais, emissão de pareceres oficiais e auditoria do conselho fiscal.',
     minTier: 'professional',
   },
   student_portal: {
@@ -223,6 +230,10 @@ const ALIAS_MAP: Record<string, FeatureFlag> = {
   'presidencia': 'presidency_module',
   'módulo presidência': 'presidency_module',
   'modulo presidencia': 'presidency_module',
+  'conselho fiscal': 'fiscal_council_module',
+  'conselho_fiscal': 'fiscal_council_module',
+  'parecer fiscal': 'fiscal_council_module',
+  'auditoria fiscal': 'fiscal_council_module',
   'portal do aluno': 'student_portal',
   'portal do professor': 'teacher_portal',
   'aplicativo mobile': 'mobile_app',
@@ -262,7 +273,9 @@ export function getPlanTierRank(plan?: any): number {
     slug.includes('professional') ||
     plan.has_modulo_eventos ||
     modulosList.includes('presidência') ||
-    modulosList.includes('presidencia')
+    modulosList.includes('presidencia') ||
+    modulosList.includes('conselho fiscal') ||
+    modulosList.includes('conselho_fiscal')
   ) {
     return 3;
   }
@@ -320,7 +333,8 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
     employees_module:     tierRank >= 2, // Intermediário e superiores
     ordination_module:    tierRank >= 2, // Intermediário e superiores
     kids_module:          tierRank >= 2, // Intermediário e superiores
-    presidency_module:    tierRank >= 3, // Profissional e superiores (Básico, Starter e Intermediário = false)
+    presidency_module:    tierRank >= 3, // Profissional e superiores
+    fiscal_council_module:tierRank >= 3, // Profissional e superiores (Básico, Starter e Intermediário = false)
     advanced_finance:     tierRank >= 3,
     events_module:        tierRank >= 3,
     mobile_app:           tierRank >= 3,

@@ -16,6 +16,7 @@ export interface PlanFeatures {
   has_modulo_comissao: boolean;
   has_modulo_kids: boolean;
   has_modulo_presidencial: boolean;
+  has_modulo_conselho_fiscal: boolean;
   has_arrecadacao_digital: boolean;
   /** Mapa completo de Feature Flags resolvidos para o plano */
   flags: Record<FeatureFlag, boolean>;
@@ -43,6 +44,7 @@ const DEFAULT_FEATURES: PlanFeatures = {
   has_modulo_comissao: false,     // default fail-closed para o Plano Básico e Starter enquanto carrega
   has_modulo_kids: false,         // default fail-closed para o Plano Básico e Starter enquanto carrega
   has_modulo_presidencial: false, // default fail-closed para os Planos Básico, Starter e Intermediário
+  has_modulo_conselho_fiscal: false, // default fail-closed para os Planos Básico, Starter e Intermediário
   has_arrecadacao_digital: false, // default fail-closed para o Plano Básico enquanto carrega
   flags: DEFAULT_FLAGS,
   hasFeature: (feature: FeatureFlag) => DEFAULT_FLAGS[feature] ?? false,
@@ -113,6 +115,7 @@ export function usePlanFeatures(): PlanFeatures {
             has_modulo_comissao: resolvedFlags.ordination_module,
             has_modulo_kids: resolvedFlags.kids_module,
             has_modulo_presidencial: resolvedFlags.presidency_module,
+            has_modulo_conselho_fiscal: resolvedFlags.fiscal_council_module,
             has_arrecadacao_digital: resolvedFlags.digital_collection,
             flags: resolvedFlags,
             hasFeature: (feature: FeatureFlag) => resolvedFlags[feature] ?? false,
