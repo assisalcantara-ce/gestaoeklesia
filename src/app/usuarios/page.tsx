@@ -97,7 +97,9 @@ export default function UsuariosPage() {
   const totalUsuarios = usuarios.length;
   const limiteAtingido = totalUsuarios >= limiteUsuarios;
 
-  const nivelAcessoInfo: (NivelAcesso & { categoria: string })[] = [
+  // LEGADO (Perfis 2.3): O perfil "financeiro" está descontinuado para novos cadastros.
+  // Ocultado do formulário de criação de usuários e do dashboard de métricas, mas mantido para compatibilidade.
+  const nivelAcessoInfo: (NivelAcesso & { categoria: string; legacy?: boolean })[] = [
     {
       id: 'administrador',
       nome: 'Administrador',
@@ -110,9 +112,10 @@ export default function UsuariosPage() {
       id: 'financeiro',
       nome: 'Financeiro',
       categoria: 'Administração',
-      descricao: 'Acesso completo ao financeiro e tesouraria geral',
+      descricao: 'Acesso completo ao financeiro (Perfil Legado)',
       icon: '💳',
       cor: 'bg-blue-100 border-blue-300',
+      legacy: true,
     },
     {
       id: 'secretario_geral',
@@ -655,8 +658,8 @@ export default function UsuariosPage() {
           </div>
 
           {/* Níveis de Acesso */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
-            {nivelAcessoInfo.map(nivel => (
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+            {nivelAcessoInfo.filter(n => !n.legacy).map(nivel => (
               <div
                 key={nivel.id}
                 onClick={() => { setFiltroNivel(prev => prev === nivel.id ? '' : nivel.id); setCurrentPage(1); }}
@@ -717,7 +720,7 @@ export default function UsuariosPage() {
               <div className="mb-4 space-y-4">
                 <label className="block text-sm font-semibold text-[#123b63]">Nível de Acesso *</label>
                 {['Administração', 'Secretaria', 'Tesouraria', 'EBD'].map((cat) => {
-                  const items = nivelAcessoInfo.filter(n => n.categoria === cat);
+                  const items = nivelAcessoInfo.filter(n => n.categoria === cat && !n.legacy);
                   return (
                     <div key={cat} className="space-y-1.5">
                       <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">{cat}</h4>
@@ -1058,9 +1061,9 @@ export default function UsuariosPage() {
                       <option value="">Selecione</option>
                       {['Administração', 'Secretaria', 'Tesouraria', 'EBD'].map((cat) => (
                         <optgroup key={cat} label={cat}>
-                          {nivelAcessoInfo.filter(n => n.categoria === cat).map(nivel => (
+                          {nivelAcessoInfo.filter(n => n.categoria === cat && (!n.legacy || editData.nivel === n.id)).map(nivel => (
                             <option key={nivel.id} value={nivel.id}>
-                              {nivel.icon} {nivel.nome}
+                              {nivel.icon} {nivel.nome} {nivel.legacy ? '(Legado)' : ''}
                             </option>
                           ))}
                         </optgroup>

@@ -89,6 +89,9 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'gestao',
     'agenda',
   ],
+  // LEGADO (Perfis 2.3): O perfil "financeiro" está em modo legado.
+  // Preservado exclusivamente para compatibilidade de permissões de usuários já cadastrados.
+  // Descontinuado para novos cadastros de usuários.
   financeiro: [
     'dashboard',
     'tesouraria',
