@@ -27,6 +27,10 @@ export function isAdmin(nivel: NivelAcesso): boolean {
   return nivel === 'administrador';
 }
 
+export function isSecretarioGeral(nivel: NivelAcesso): boolean {
+  return nivel === 'secretario_geral';
+}
+
 export function isSupervisor(nivel: NivelAcesso): boolean {
   return nivel === 'supervisor';
 }
@@ -65,7 +69,7 @@ export function filtrarCongregacoes(
   congregacaoUsuario?: string,
   supervisaoUsuario?: string
 ): typeof congregacoes {
-  if (nivel === 'administrador' || nivel === 'financeiro') {
+  if (nivel === 'administrador' || nivel === 'financeiro' || nivel === 'secretario_geral') {
     return congregacoes;
   }
 

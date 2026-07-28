@@ -97,10 +97,11 @@ export default function UsuariosPage() {
   const totalUsuarios = usuarios.length;
   const limiteAtingido = totalUsuarios >= limiteUsuarios;
 
-  const nivelAcessoInfo: NivelAcesso[] = [
+  const nivelAcessoInfo: (NivelAcesso & { categoria: string })[] = [
     {
       id: 'administrador',
       nome: 'Administrador',
+      categoria: 'Administração',
       descricao: 'Acesso total a todos os recursos do sistema',
       icon: '👑',
       cor: 'bg-purple-100 border-purple-300',
@@ -108,13 +109,23 @@ export default function UsuariosPage() {
     {
       id: 'financeiro',
       nome: 'Financeiro',
+      categoria: 'Administração',
       descricao: 'Acesso completo ao financeiro e tesouraria geral',
       icon: '💳',
       cor: 'bg-blue-100 border-blue-300',
     },
     {
+      id: 'secretario_geral',
+      nome: 'Secretário Geral',
+      categoria: 'Secretaria',
+      descricao: 'Acesso completo à Secretaria de todas as congregações do ministério',
+      icon: '📋',
+      cor: 'bg-emerald-100 border-emerald-300',
+    },
+    {
       id: 'secretaria_local',
-      nome: 'Secretaria Local',
+      nome: 'Secretário Local',
+      categoria: 'Secretaria',
       descricao: 'Acesso restrito aos dados da sua congregação',
       icon: '👤',
       cor: 'bg-gray-100 border-gray-300',
@@ -122,6 +133,7 @@ export default function UsuariosPage() {
     {
       id: 'tesouraria_local',
       nome: 'Tesouraria Local',
+      categoria: 'Tesouraria',
       descricao: 'Acesso restrito à tesouraria da sua congregação',
       icon: '💰',
       cor: 'bg-yellow-50 border-yellow-300',
@@ -129,6 +141,7 @@ export default function UsuariosPage() {
     {
       id: 'superintendente_ebd',
       nome: 'Superintendente EBD',
+      categoria: 'EBD',
       descricao: 'Acesso completo ao módulo EBD do ministério',
       icon: '📖',
       cor: 'bg-teal-100 border-teal-300',
@@ -136,6 +149,7 @@ export default function UsuariosPage() {
     {
       id: 'coordenador_ebd',
       nome: 'Coordenador EBD',
+      categoria: 'EBD',
       descricao: 'Acesso restrito à EBD da sua congregação',
       icon: '🎓',
       cor: 'bg-indigo-100 border-indigo-300',
@@ -145,7 +159,7 @@ export default function UsuariosPage() {
   const getNivelInfo = (nivel: string) => {
     return nivelAcessoInfo.find(n => n.id === nivel) || {
       id: nivel,
-      nome: nivel === 'operador' ? 'Operador Local (Legado)' : nivel === 'admin_local' ? 'Admin Local (Legado)' : nivel === 'financeiro_local' ? 'Financeiro Local (Legado)' : nivel === 'superintendente' ? 'Superintendente EBD (Legado)' : nivel === 'coordenador' ? 'Coordenador EBD (Legado)' : nivel,
+      nome: nivel === 'secretario_geral' ? 'Secretário Geral' : nivel === 'operador' ? 'Operador Local (Legado)' : nivel === 'admin_local' ? 'Admin Local (Legado)' : nivel === 'financeiro_local' ? 'Financeiro Local (Legado)' : nivel === 'superintendente' ? 'Superintendente EBD (Legado)' : nivel === 'coordenador' ? 'Coordenador EBD (Legado)' : nivel,
       descricao: '',
       icon: '👤',
       cor: 'bg-gray-50 border-gray-200',
@@ -692,33 +706,41 @@ export default function UsuariosPage() {
               </div>
 
               {/* Nível de acesso */}
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-[#123b63] mb-2">Nível de Acesso *</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {nivelAcessoInfo.map(nivel => (
-                    <button
-                      key={nivel.id}
-                      type="button"
-                      onClick={() => {
-                        handleFormChange('nivel', nivel.id);
-                        setSelectedLevel(nivel.id);
-                        handleFormChange('congregacao_id', '');
-                        handleFormChange('supervisao_id', '');
-                      }}
-                      className={`text-left p-3 rounded-lg border-2 transition ${
-                        formData.nivel === nivel.id
-                          ? 'border-[#123b63] bg-[#123b63]/5 ring-2 ring-[#123b63]/30'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-lg">{nivel.icon}</span>
-                        <span className="font-semibold text-sm text-[#123b63]">{nivel.nome}</span>
+              <div className="mb-4 space-y-4">
+                <label className="block text-sm font-semibold text-[#123b63]">Nível de Acesso *</label>
+                {['Administração', 'Secretaria', 'Tesouraria', 'EBD'].map((cat) => {
+                  const items = nivelAcessoInfo.filter(n => n.categoria === cat);
+                  return (
+                    <div key={cat} className="space-y-1.5">
+                      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">{cat}</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {items.map(nivel => (
+                          <button
+                            key={nivel.id}
+                            type="button"
+                            onClick={() => {
+                              handleFormChange('nivel', nivel.id);
+                              setSelectedLevel(nivel.id);
+                              handleFormChange('congregacao_id', '');
+                              handleFormChange('supervisao_id', '');
+                            }}
+                            className={`text-left p-3 rounded-lg border-2 transition ${
+                              formData.nivel === nivel.id
+                                ? 'border-[#123b63] bg-[#123b63]/5 ring-2 ring-[#123b63]/30'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-lg">{nivel.icon}</span>
+                              <span className="font-semibold text-sm text-[#123b63]">{nivel.nome}</span>
+                            </div>
+                            <p className="text-xs text-gray-500 leading-tight">{nivel.descricao}</p>
+                          </button>
+                        ))}
                       </div>
-                      <p className="text-xs text-gray-500 leading-tight">{nivel.descricao}</p>
-                    </button>
-                  ))}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Seleção de escopo: Supervisor → 2ª divisão; Admin/Fin Local → 1ª divisão */}
@@ -1026,10 +1048,14 @@ export default function UsuariosPage() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
                     >
                       <option value="">Selecione</option>
-                      {nivelAcessoInfo.map(nivel => (
-                        <option key={nivel.id} value={nivel.id}>
-                          {nivel.icon} {nivel.nome}
-                        </option>
+                      {['Administração', 'Secretaria', 'Tesouraria', 'EBD'].map((cat) => (
+                        <optgroup key={cat} label={cat}>
+                          {nivelAcessoInfo.filter(n => n.categoria === cat).map(nivel => (
+                            <option key={nivel.id} value={nivel.id}>
+                              {nivel.icon} {nivel.nome}
+                            </option>
+                          ))}
+                        </optgroup>
                       ))}
                     </select>
                   </div>
