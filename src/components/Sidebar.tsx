@@ -173,7 +173,7 @@ export default function Sidebar() {
         { id: 'relatorios-acolhimento', label: 'Relatórios',              icon: '📋', path: '/acolhimento/relatorios',            modulo: 'gestao'          },
       ]
     },
-    { id: 'agenda',           label: 'Agenda',             icon: '📅', path: '/agenda',      modulo: 'agenda'     },
+    { id: 'agenda',           label: 'Agenda',             icon: '📅', path: '/agenda',      modulo: 'agenda', planFeature: 'has_modulo_agenda', featureFlag: 'agenda_module' },
     {
       id: 'ebd',
       label: 'EBD',
@@ -234,6 +234,7 @@ export default function Sidebar() {
       return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda'].includes(i.id);
     }
     // Filtro por plano
+    if ((i as any).featureFlag && !planFeatures.hasFeature((i as any).featureFlag)) return false;
     if (i.id === 'tesouraria' && !planFeatures.has_modulo_financeiro)          return false;
     if (i.id === 'financeiro' && !planFeatures.has_modulo_financeiro_avancado) return false;
     if (i.id === 'eventos'    && !planFeatures.has_modulo_eventos)             return false;

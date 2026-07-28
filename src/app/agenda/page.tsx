@@ -1126,8 +1126,39 @@ export default function AgendaPage() {
     return <div className="p-8 text-gray-500">Carregando...</div>;
   }
 
-  if (bloqueado || !planFeatures.has_modulo_agenda) {
-    return null;
+  if (bloqueado || !planFeatures.has_modulo_agenda || !planFeatures.hasFeature('agenda_module')) {
+    return (
+      <DashboardContainer>
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center max-w-2xl mx-auto space-y-5 my-10">
+          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto text-blue-600 shadow-sm border border-blue-200/60">
+            <CalendarIcon className="h-8 w-8" />
+          </div>
+          <div>
+            <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full mb-3">
+              Recurso do Plano Starter
+            </span>
+            <h2 className="text-xl font-bold text-slate-800">Módulo Agenda Indisponível no seu Plano</h2>
+          </div>
+
+          <p className="text-slate-600 text-base font-semibold leading-relaxed max-w-lg mx-auto">
+            A funcionalidade Agenda do Ministério está disponível a partir do Plano Starter.
+          </p>
+
+          <p className="text-slate-500 text-xs leading-relaxed max-w-md mx-auto">
+            Faça o upgrade para liberar o calendário ministerial completo, sincronização com cultos e reuniões, além do planejamento anual de atividades da sua igreja.
+          </p>
+
+          <div className="pt-3">
+            <a
+              href="/configuracoes"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#123b63] text-white text-sm font-semibold rounded-xl hover:bg-[#1a4f85] transition shadow-md hover:shadow-lg"
+            >
+              Fazer Upgrade / Conhecer Planos
+            </a>
+          </div>
+        </div>
+      </DashboardContainer>
+    );
   }
 
   return (

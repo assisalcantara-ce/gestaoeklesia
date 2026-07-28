@@ -28,7 +28,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
     groupName: "GERAL",
     items: [
       { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard', modulo: 'dashboard' },
-      { id: 'agenda', label: 'Agenda', icon: '📅', path: '/agenda', modulo: 'agenda' },
+      { id: 'agenda', label: 'Agenda', icon: '📅', path: '/agenda', modulo: 'agenda', featureFlag: 'agenda_module' },
       {
         id: 'configuracoes',
         label: 'Configurações',

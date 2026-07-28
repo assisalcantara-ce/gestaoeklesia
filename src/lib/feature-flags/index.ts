@@ -27,7 +27,7 @@ export interface FeatureMetadata {
   key: FeatureFlag;
   label: string;
   description: string;
-  minTier: 'basic' | 'intermediate' | 'professional' | 'expert';
+  minTier: 'basic' | 'starter' | 'intermediate' | 'professional' | 'expert';
 }
 
 /**
@@ -68,19 +68,19 @@ export const FEATURE_CATALOG: Record<FeatureFlag, FeatureMetadata> = {
     key: 'agenda_module',
     label: 'Agenda do Ministério',
     description: 'Planejamento ministerial anual e calendário de atividades.',
-    minTier: 'intermediate',
+    minTier: 'starter',
   },
   student_portal: {
     key: 'student_portal',
     label: 'Portal do Aluno',
     description: 'Acesso dos alunos aos conteúdos e presença da Escola Bíblica.',
-    minTier: 'intermediate',
+    minTier: 'starter',
   },
   teacher_portal: {
     key: 'teacher_portal',
     label: 'Portal do Professor',
     description: 'Lançamento de chamadas e gestão de turmas da EBD.',
-    minTier: 'intermediate',
+    minTier: 'starter',
   },
   mobile_app: {
     key: 'mobile_app',
@@ -158,12 +158,11 @@ const ALIAS_MAP: Record<string, FeatureFlag> = {
 };
 
 /**
- * Determina o nível de capacidade do plano (Tier 0 a 3) sem acoplamento a nomes fixos de slugs.
+ * Determina o nível de capacidade do plano (Tier 0 a 4) sem acoplamento a nomes fixos de slugs.
  */
 export function getPlanTierRank(plan?: any): number {
   if (!plan) return 0; // Básico por padrão se nulo
 
-  // Se o objeto possui flags booleanas diretas ou modulos explícitos
   const modulosList: string[] = Array.isArray(plan.modulos)
     ? plan.modulos.map((m: string) => String(m).toLowerCase().trim())
     : [];
@@ -172,22 +171,27 @@ export function getPlanTierRank(plan?: any): number {
   const maxUsers = Number(plan.max_users ?? 0);
   const slug = String(plan.slug ?? plan.plan ?? '').toLowerCase().trim();
 
-  // Tier 3: Expert / Enterprise / Suporte a grandes igrejas
+  // Tier 4: Expert / Enterprise / Suporte a grandes igrejas
   if (price >= 900 || maxUsers >= 500 || slug.includes('expert') || slug.includes('enterprise')) {
+    return 4;
+  }
+
+  // Tier 3: Profissional / Expansão
+  if (price >= 400 || maxUsers >= 20 || slug.includes('profissional') || slug.includes('professional') || plan.has_modulo_eventos) {
     return 3;
   }
 
-  // Tier 2: Profissional / Expansão
-  if (price >= 400 || maxUsers >= 20 || slug.includes('profissional') || slug.includes('professional') || plan.has_modulo_eventos) {
+  // Tier 2: Intermediário
+  if (price >= 200 || maxUsers >= 8 || slug.includes('intermediar') || modulosList.includes('arrecadação digital') || modulosList.includes('arrecadacao digital')) {
     return 2;
   }
 
-  // Tier 1: Intermediário
-  if (price >= 200 || maxUsers >= 8 || slug.includes('intermediar') || modulosList.includes('arrecadação digital') || modulosList.includes('arrecadacao digital')) {
+  // Tier 1: Starter
+  if (price >= 100 || maxUsers >= 3 || slug.includes('starter') || modulosList.includes('agenda') || modulosList.includes('agenda do ministério')) {
     return 1;
   }
 
-  // Tier 0: Básico / Starter
+  // Tier 0: Básico
   return 0;
 }
 
@@ -202,20 +206,20 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
   const resolved: Record<FeatureFlag, boolean> = {
     financial_module:     tierRank >= 0,
     meetings_module:      tierRank >= 0,
-    digital_collection:   tierRank >= 1,
-    agenda_module:        tierRank >= 1,
+    agenda_module:        tierRank >= 1, // Starter, Intermediário, Profissional, Expert (Básico = false)
     student_portal:       tierRank >= 1,
     teacher_portal:       tierRank >= 1,
-    advanced_finance:     tierRank >= 2,
-    events_module:        tierRank >= 2,
-    mobile_app:           tierRank >= 2,
-    whatsapp_integration: tierRank >= 2,
-    integrations:         tierRank >= 2,
-    advanced_bi:          tierRank >= 3,
-    ai_assistant:         tierRank >= 3,
-    digital_signature:    tierRank >= 3,
-    ead_courses:          tierRank >= 3,
-    premium_events:       tierRank >= 3,
+    digital_collection:   tierRank >= 2, // Intermediário e superiores (Básico e Starter = false)
+    advanced_finance:     tierRank >= 3,
+    events_module:        tierRank >= 3,
+    mobile_app:           tierRank >= 3,
+    whatsapp_integration: tierRank >= 3,
+    integrations:         tierRank >= 3,
+    advanced_bi:          tierRank >= 4,
+    ai_assistant:         tierRank >= 4,
+    digital_signature:    tierRank >= 4,
+    ead_courses:          tierRank >= 4,
+    premium_events:       tierRank >= 4,
   };
 
   if (!plan) return resolved;
