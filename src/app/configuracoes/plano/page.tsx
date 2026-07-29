@@ -8,8 +8,10 @@ import { PLANOS_DISPONIBLES, formatarPreco } from '@/config/plans';
 import type { PlanType } from '@/types/ministry';
 import { useAppDialog } from '@/providers/AppDialogProvider';
 import { useAuditLog } from '@/hooks/useAuditLog';
+import { useUserContext } from '@/hooks/useUserContext';
 
 export default function PlanoPage() {
+  const userCtx = useUserContext();
 
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [planoSelecionado, setPlanoSelecionado] = useState<PlanType | null>(null);
@@ -40,30 +42,11 @@ export default function PlanoPage() {
   };
 
   useEffect(() => {
+    if (userCtx.loading) return;
     const supabase = createClient();
 
     const resolveMinistryId = async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) return null;
-
-        const mu = await supabase
-          .from('ministry_users')
-          .select('ministry_id')
-          .eq('user_id', user.id)
-          .limit(1);
-
-        const ministryIdFromMu = (mu.data as any)?.[0]?.ministry_id as string | undefined;
-        if (ministryIdFromMu) return ministryIdFromMu;
-
-        const m = await supabase.from('ministries').select('id').eq('user_id', user.id).limit(1);
-        const ministryIdFromOwner = (m.data as any)?.[0]?.id as string | undefined;
-        return ministryIdFromOwner || null;
-      } catch {
-        return null;
-      }
+      return userCtx.ministryId;
     };
 
     const normalizePlanId = (value: string | null | undefined): PlanType => {

@@ -11,6 +11,7 @@ import { formatarPreco } from '@/config/plans';
 import type { SubscriptionPlan } from '@/types/admin';
 import { NOMENCLATURAS_SCHEMA_VERSION, NOMENCLATURAS_SCHEMA_VERSION_KEY } from '@/lib/org-nomenclaturas';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { useUserContext } from '@/hooks/useUserContext';
 
 export const dynamic = 'force-dynamic';
 
@@ -503,6 +504,7 @@ function BrandingContent({ onNotification }: { onNotification: (title: string, m
 
 // Componente Faturas
 function FaturasContent() {
+  const userCtx = useUserContext();
   const [filterStatus, setFilterStatus] = useState('TODAS');
   const [faturas, setFaturas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -512,26 +514,7 @@ function FaturasContent() {
     const carregarFaturas = async () => {
       try {
         const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) {
-          setFaturas([]);
-          return;
-        }
-
-        const mu = await supabase
-          .from('ministry_users')
-          .select('ministry_id')
-          .eq('user_id', user.id)
-          .limit(1);
-        let ministryId = (mu.data as any)?.[0]?.ministry_id;
-
-        if (!ministryId) {
-          const m = await supabase.from('ministries').select('id').eq('user_id', user.id).limit(1);
-          ministryId = (m.data as any)?.[0]?.id;
-        }
+        const ministryId = userCtx.ministryId;
 
         if (!ministryId) {
           setFaturas([]);
@@ -753,6 +736,7 @@ function FaturasContent() {
 
 // Componente Plano
 function PlanoContent({ onNotification }: { onNotification: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {
+  const userCtx = useUserContext();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [planoSelecionado, setPlanoSelecionado] = useState<SubscriptionPlan | null>(null);
   const [criandoTicket, setCriandoTicket] = useState(false);
@@ -842,12 +826,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const muResult = await supabase.from('ministry_users').select('ministry_id').eq('user_id', user.id).maybeSingle();
-        let mId = (muResult.data as any)?.ministry_id as string | undefined;
-        if (!mId) {
-          const mResult = await supabase.from('ministries').select('id').eq('user_id', user.id).maybeSingle();
-          mId = (mResult.data as any)?.id as string | undefined;
-        }
+        const mId = userCtx.ministryId;
         if (!mId) return;
         setMinistryId(mId);
 
@@ -901,15 +880,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
         return;
       }
 
-      let mId = ministryId;
-      if (!mId) {
-        const muResult = await supabase.from('ministry_users').select('ministry_id').eq('user_id', user.id).maybeSingle();
-        mId = (muResult.data as any)?.ministry_id as string;
-        if (!mId) {
-          const mResult = await supabase.from('ministries').select('id').eq('user_id', user.id).maybeSingle();
-          mId = (mResult.data as any)?.id as string;
-        }
-      }
+      const mId = ministryId || userCtx.ministryId;
 
       if (!mId) {
         await dialog.alert({ title: 'Erro', type: 'error', message: 'Ministério não encontrado' });

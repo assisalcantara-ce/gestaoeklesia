@@ -5,8 +5,10 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase-client';
 
-export default function NomenclaturaPage() {
+import { useUserContext } from '@/hooks/useUserContext';
 
+export default function NomenclaturaPage() {
+  const userCtx = useUserContext();
   const [isEditing, setIsEditing] = useState(false);
 
   const supabase = createClient();
@@ -26,6 +28,10 @@ export default function NomenclaturaPage() {
     divisaoSecundaria: ['CAMPO', 'SETOR', 'GRUPO', 'ÁREA', 'NENHUMA'],
     // Divisão 3: deixar apenas "NENHUMA" (usuário pode adicionar manualmente)
     divisaoTerciaria: ['NENHUMA']
+  };
+
+  const resolveMinistryId = async (): Promise<string | null> => {
+    return userCtx.ministryId;
   };
 
   const getDefaultNomenclaturas = (): NomenclaturasState => ({
@@ -97,30 +103,7 @@ export default function NomenclaturaPage() {
     divisaoTerciaria: ''
   });
 
-  const resolveMinistryId = async (): Promise<string | null> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
 
-      const mu = await supabase
-        .from('ministry_users')
-        .select('ministry_id')
-        .eq('user_id', user.id)
-        .limit(1);
-      const ministryIdFromMu = (mu.data as any)?.[0]?.ministry_id as string | undefined;
-      if (ministryIdFromMu) return ministryIdFromMu;
-
-      const m = await supabase
-        .from('ministries')
-        .select('id')
-        .eq('user_id', user.id)
-        .limit(1);
-      const ministryIdFromOwner = (m.data as any)?.[0]?.id as string | undefined;
-      return ministryIdFromOwner || null;
-    } catch {
-      return null;
-    }
-  };
 
   const buildOrgNomenclaturasPayload = (state: NomenclaturasState) => {
     return {

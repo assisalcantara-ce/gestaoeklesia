@@ -6,6 +6,8 @@ import PageLayout from '@/components/PageLayout';
 import { createClient } from '@/lib/supabase-client';
 import { ArrowLeft, Download, UploadCloud, AlertTriangle, CheckCircle2, FileText, AlertCircle, Info, Settings, Image, FileImage, ShieldAlert, Play, RefreshCw } from 'lucide-react';
 
+import { useUserContext } from '@/hooks/useUserContext';
+
 interface RowError {
   line: number;
   message: string;
@@ -23,6 +25,7 @@ interface ParsedRow {
 }
 
 export default function ImportarMembrosPage() {
+  const userCtx = useUserContext();
   const supabase = createClient();
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -70,7 +73,7 @@ export default function ImportarMembrosPage() {
 
   const fetchPendingPhotosCount = async () => {
     try {
-      const ministryId = await resolveMinistryId();
+      const ministryId = await fetchMinistryId();
       if (!ministryId) return;
       const { count } = await supabase
         .from('members')
@@ -153,28 +156,8 @@ export default function ImportarMembrosPage() {
     'CONVERSAO': 'data_conversao',
   };
 
-  const resolveMinistryId = async (): Promise<string | null> => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return null;
-
-      const mu = await supabase
-        .from('ministry_users')
-        .select('ministry_id')
-        .eq('user_id', user.id)
-        .limit(1);
-
-      const ministryIdFromMu = (mu.data as any)?.[0]?.ministry_id as string | undefined;
-      if (ministryIdFromMu) return ministryIdFromMu;
-
-      const m = await supabase.from('ministries').select('id').eq('user_id', user.id).limit(1);
-      const ministryIdFromOwner = (m.data as any)?.[0]?.id as string | undefined;
-      return ministryIdFromOwner || null;
-    } catch {
-      return null;
-    }
+  const fetchMinistryId = async (): Promise<string | null> => {
+    return userCtx.ministryId;
   };
 
   const normalizeHeaderName = (h: string): string => {
@@ -563,7 +546,7 @@ export default function ImportarMembrosPage() {
     setImportSummary(null);
 
     try {
-      const ministryId = await resolveMinistryId();
+      const ministryId = await fetchMinistryId();
       if (!ministryId) {
         setErrorMessage('Não foi possível identificar o ministério do usuário logado.');
         setImporting(false);

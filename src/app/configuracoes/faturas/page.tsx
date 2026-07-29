@@ -6,6 +6,8 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase-client';
 import { ExternalLink, Copy, Check, Filter, RefreshCw, AlertCircle, FileText, Calendar } from 'lucide-react';
 
+import { useUserContext } from '@/hooks/useUserContext';
+
 interface BillingInvoice {
   id: string;
   ministry_id: string;
@@ -21,6 +23,7 @@ interface BillingInvoice {
 }
 
 export default function FaturasPage() {
+  const userCtx = useUserContext();
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -29,27 +32,7 @@ export default function FaturasPage() {
   const supabase = createClient();
 
   const resolveMinistryId = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return null;
-
-      const mu = await supabase
-        .from('ministry_users')
-        .select('ministry_id')
-        .eq('user_id', user.id)
-        .limit(1);
-
-      const ministryIdFromMu = (mu.data as any)?.[0]?.ministry_id as string | undefined;
-      if (ministryIdFromMu) return ministryIdFromMu;
-
-      const m = await supabase.from('ministries').select('id').eq('user_id', user.id).limit(1);
-      const ministryIdFromOwner = (m.data as any)?.[0]?.id as string | undefined;
-      return ministryIdFromOwner || null;
-    } catch {
-      return null;
-    }
+    return userCtx.ministryId;
   };
 
   const loadInvoices = async () => {

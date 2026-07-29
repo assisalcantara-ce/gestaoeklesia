@@ -529,24 +529,8 @@ export default function CartasPage() {
     return new Date(issuedAt).toLocaleDateString('pt-BR');
   }, [records]);
 
-  const resolveMinistryId = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return null;
-
-    const mu = await supabase
-      .from('ministry_users')
-      .select('ministry_id')
-      .eq('user_id', user.id)
-      .limit(1);
-
-    const ministryIdFromMu = (mu.data as any)?.[0]?.ministry_id as string | undefined;
-    if (ministryIdFromMu) return ministryIdFromMu;
-
-    const m = await supabase.from('ministries').select('id').eq('user_id', user.id).limit(1);
-    const ministryIdFromOwner = (m.data as any)?.[0]?.id as string | undefined;
-    return ministryIdFromOwner || null;
+  const fetchMinData = async () => {
+    return userCtx.ministryId;
   };
 
   const loadTemplates = async () => {
@@ -638,7 +622,7 @@ export default function CartasPage() {
   useEffect(() => {
     if (loading || bloqueado) return;
     const run = async () => {
-      const mid = await resolveMinistryId();
+      const mid = await fetchMinData();
       setMinistryId(mid);
       const config = await fetchConfiguracaoIgrejaFromSupabase(supabase);
       setConfigIgreja(config);
