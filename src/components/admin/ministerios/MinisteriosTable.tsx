@@ -226,11 +226,11 @@ export default function MinisteriosTable({
       </table>
 
       {/* Paginação */}
-      {totalItems > itemsPerPage && (
-        <div className="px-6 py-4 bg-gray-900/50 border-t border-gray-750 flex items-center justify-between gap-4 flex-wrap">
-          <span className="text-xs text-gray-400">
-            Mostrando {Math.min(totalItems, (currentPage - 1) * itemsPerPage + 1)} a {Math.min(totalItems, currentPage * itemsPerPage)} de {totalItems} ministérios
-          </span>
+      <div className="px-6 py-4 bg-gray-900/50 border-t border-gray-750 flex items-center justify-between gap-4 flex-wrap">
+        <span className="text-xs text-gray-400">
+          Mostrando {totalItems > 0 ? Math.min(totalItems, (currentPage - 1) * itemsPerPage + 1) : 0} a {Math.min(totalItems, currentPage * itemsPerPage)} de {totalItems} ministérios
+        </span>
+        {totalPages > 1 && (
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => onPageChange(Math.max(1, currentPage - 1))}
@@ -264,8 +264,8 @@ export default function MinisteriosTable({
               Próximo
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

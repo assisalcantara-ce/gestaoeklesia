@@ -357,12 +357,17 @@ export default function MinisteriosPage() {
         }
       }
 
-      // 2. Filtro de Status (Utiliza a helper oficial getDetailedStatus)
+      // 2. Filtro de Status (Acesso Liberado para o filtro 'ativo')
       if (statusFilter !== 'all') {
         const statusDetail = getDetailedStatus(m)
-        const sType = statusDetail.type // Ex: ATIVO, TRIAL_ATIVO, TRIAL_EXPIRADO, SUSPENSO
+        const sType = statusDetail.type // Ex: ATIVO, TRIAL_ATIVO, TRIAL_EXPIRADO, SUSPENSO, CANCELADO
 
-        if (statusFilter === 'ativo' && sType !== 'ATIVO' && sType !== 'TRIAL_ATIVO') return false
+        if (statusFilter === 'ativo') {
+          // Cliente tem acesso liberado se is_active for true e a assinatura nao estiver cancelada ou desativada
+          const subStatus = String(m.subscription_status || '').toLowerCase()
+          const isAccessAllowed = m.is_active !== false && subStatus !== 'cancelled'
+          if (!isAccessAllowed) return false
+        }
         if (statusFilter === 'trial' && sType !== 'TRIAL_ATIVO') return false
         if (statusFilter === 'expirado' && sType !== 'TRIAL_EXPIRADO') return false
         if (statusFilter === 'suspenso' && sType !== 'SUSPENSO') return false
