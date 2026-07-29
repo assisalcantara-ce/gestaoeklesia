@@ -5,7 +5,7 @@ import { AuthProvider } from '@/providers/AuthProvider';
 import { UsuarioProvider } from '@/providers/UsuarioContext';
 import { TrialGuard } from '@/components/TrialGuard';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import AppShell from '@/components/AppShell';
+import AppShell from '@/components/layout/AppShell';
 
 export const dynamic = 'force-dynamic';
 
