@@ -1,4 +1,5 @@
 import { createServerClient } from '@/lib/supabase-server';
+import { temPermissaoAdmin } from '@/lib/access-control';
 import {
   signImpersonationToken,
   verifyImpersonationToken,
@@ -65,17 +66,15 @@ export interface StartImpersonationResult {
 
 export class ImpersonationService {
   /**
-   * Valida se a role do operador possui permissão exclusiva para iniciar impersonação.
-   * EXCLUSIVIDADE: Apenas SUPER_ADMIN é autorizado.
+   * Valida se o perfil do operador possui a permissão administrativa IMPERSONATE_TENANT (RBAC).
    */
   static isRoleAuthorizedForImpersonation(role: string): boolean {
-    const normRole = String(role || '').toLowerCase().trim();
-    return normRole === 'super_admin';
+    return temPermissaoAdmin(role, 'IMPERSONATE_TENANT');
   }
 
   /**
-   * Inicia a sessão de impersonação para um Super Admin assumir um Tenant/Ministério.
-   * 1. Valida role === 'super_admin'
+   * Inicia a sessão de impersonação para um usuário com permissão IMPERSONATE_TENANT assumir um Tenant/Ministério.
+   * 1. Valida permissão RBAC (IMPERSONATE_TENANT)
    * 2. Valida motivo (mínimo 5 caracteres)
    * 3. Valida se o tenant/ministério existe no banco
    * 4. Registra sessão em admin_impersonation_sessions
@@ -86,7 +85,7 @@ export class ImpersonationService {
   ): Promise<StartImpersonationResult> {
     if (!this.isRoleAuthorizedForImpersonation(input.originalAdminRole)) {
       throw new Error(
-        'Acesso negado: Apenas o perfil SUPER_ADMIN possui permissão para assumir sessão de um tenant.'
+        'Acesso negado: Perfil sem permissão para assumir sessão de tenant (IMPERSONATE_TENANT).'
       );
     }
 

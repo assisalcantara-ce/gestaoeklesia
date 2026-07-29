@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase-client'
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import ImpersonationBanner from '@/components/admin/impersonation/ImpersonationBanner'
 
+import { temPermissaoAdmin, type AdminPermission } from '@/lib/access-control'
+
 interface AdminUser {
   id: string
   email: string
@@ -19,6 +21,7 @@ interface AdminAuthContextType {
   isLoading: boolean
   isAuthenticated: boolean
   isAdmin: boolean
+  hasPermission: (permission: AdminPermission) => boolean
   // Novos estados de Impersonação (Admin Impersonation 2.0B - Sem interface visual)
   isImpersonating: boolean
   originalAdmin: { id: string; email: string; role: string; nome?: string } | null
@@ -34,6 +37,7 @@ const AdminAuthContext = createContext<AdminAuthContextType>({
   isLoading: true,
   isAuthenticated: false,
   isAdmin: false,
+  hasPermission: () => false,
   isImpersonating: false,
   originalAdmin: null,
   targetTenant: null,
@@ -236,6 +240,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isAuthenticated,
         isAdmin,
+        hasPermission: (permission: AdminPermission) => temPermissaoAdmin(adminUser?.role, permission),
         isImpersonating,
         originalAdmin,
         targetTenant,

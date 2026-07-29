@@ -44,7 +44,7 @@ export default function MinisteriosTable({
   onDelete,
   onImpersonate,
 }: MinisteriosTableProps) {
-  const { adminUser } = useAdminAuth()
+  const { adminUser, hasPermission } = useAdminAuth()
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
 
   if (loading) {
@@ -192,7 +192,7 @@ export default function MinisteriosTable({
                             >
                               🏷️ Imprimir Etiqueta
                             </button>
-                            {adminUser?.role === 'super_admin' && (
+                            {hasPermission('IMPERSONATE_TENANT') && (
                               <button
                                 onClick={() => {
                                   onImpersonate?.(ministerio)

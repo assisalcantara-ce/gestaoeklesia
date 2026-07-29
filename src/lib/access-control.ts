@@ -1,5 +1,43 @@
 export type AdminRole = 'admin' | 'super_admin' | 'financeiro' | 'suporte';
 
+export type AdminPermission =
+  | 'IMPERSONATE_TENANT'
+  | 'VIEW_AUDIT_LOG'
+  | 'MANAGE_FEATURE_FLAGS'
+  | 'MANAGE_PLATFORM_SETTINGS'
+  | 'MANAGE_LICENSES';
+
+export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
+  super_admin: [
+    'IMPERSONATE_TENANT',
+    'VIEW_AUDIT_LOG',
+    'MANAGE_FEATURE_FLAGS',
+    'MANAGE_PLATFORM_SETTINGS',
+    'MANAGE_LICENSES',
+  ],
+  admin: [
+    'IMPERSONATE_TENANT',
+    'VIEW_AUDIT_LOG',
+    'MANAGE_FEATURE_FLAGS',
+    'MANAGE_PLATFORM_SETTINGS',
+    'MANAGE_LICENSES',
+  ],
+  suporte: [
+    'IMPERSONATE_TENANT',
+    'VIEW_AUDIT_LOG',
+  ],
+  financeiro: [
+    'VIEW_AUDIT_LOG',
+    'MANAGE_LICENSES',
+  ],
+};
+
+export function temPermissaoAdmin(role: string | null | undefined, permission: AdminPermission): boolean {
+  const normRole = String(role || '').toLowerCase().trim();
+  const permissions = ADMIN_ROLE_PERMISSIONS[normRole] ?? [];
+  return permissions.includes(permission);
+}
+
 export const ADMIN_MODULOS_ACESSO: Record<AdminRole, string[]> = {
   admin: [
     'dashboard',
