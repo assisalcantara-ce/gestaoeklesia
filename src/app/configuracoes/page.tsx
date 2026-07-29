@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import NotificationModal from '@/components/NotificationModal';
 import { getCargosMinisteriais, saveCargosMinisteriais, type CargoMinisterial } from '@/lib/cargos-utils';
 import { useAppDialog } from '@/providers/AppDialogProvider'
@@ -1790,6 +1790,22 @@ function GatewaysContent({ onNotification }: { onNotification: (title: string, m
   const [formFields, setFormFields] = useState<Record<string, string>>({})
   const [envField, setEnvField] = useState<'sandbox' | 'production'>('sandbox')
 
+  // Regra 2 & 3: Gerenciamento de Gateway Padrão
+  const activeGateways = useMemo(() => gateways.filter((g: GatewayRow) => g.is_active && (g.status === 'connected' || g.status === 'configured')), [gateways])
+  const [defaultGw, setDefaultGw] = useState<string>('')
+
+  useEffect(() => {
+    if (activeGateways.length === 1) {
+      setDefaultGw(activeGateways[0].gateway)
+    } else if (activeGateways.length > 1) {
+      if (!defaultGw || !activeGateways.some((g: GatewayRow) => g.gateway === defaultGw)) {
+        setDefaultGw(activeGateways[0].gateway)
+      }
+    } else {
+      setDefaultGw('')
+    }
+  }, [activeGateways, defaultGw])
+
   async function fetchGateways() {
     setLoading(true)
     try {
@@ -1957,6 +1973,37 @@ function GatewaysContent({ onNotification }: { onNotification: (title: string, m
         armazenadas criptografadas e nunca são exibidas em texto claro.
       </p>
 
+      {/* Regra 3: Configuração de Gateway Padrão quando 2 ou mais gateways ativos */}
+      {activeGateways.length >= 2 && (
+        <div className="mb-6 p-4 bg-blue-50/80 border border-blue-200 rounded-xl flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h3 className="text-sm font-bold text-blue-900 flex items-center gap-2">
+              ⭐ Gateway Padrão
+            </h3>
+            <p className="text-xs text-blue-700 mt-0.5">
+              Escolha qual gateway de pagamento será utilizado automaticamente para a emissão de novos QR Codes e Links PIX.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-blue-900">Selecionar Padrão:</label>
+            <select
+              value={defaultGw}
+              onChange={(e) => {
+                setDefaultGw(e.target.value)
+                onNotification('Sucesso', `Gateway padrão alterado para ${GW_LABELS[e.target.value]?.name ?? e.target.value.toUpperCase()}.`, 'info')
+              }}
+              className="bg-white border border-blue-300 text-blue-900 text-xs font-semibold rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+            >
+              {activeGateways.map(g => (
+                <option key={g.gateway} value={g.gateway}>
+                  {GW_LABELS[g.gateway]?.name ?? g.gateway.toUpperCase()}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {(['asaas', 'efi'] as const).map(gw => {
           const meta       = GW_LABELS[gw]
@@ -1968,12 +2015,20 @@ function GatewaysContent({ onNotification }: { onNotification: (title: string, m
           const isTesting  = testingGw === gw
           const isAnyBusy  = isBusy || isTesting
           const testResult = testResults[gw] ?? null
+          const isDefault  = defaultGw === gw
 
           return (
-            <div key={gw} className={`border rounded-xl p-5 ${meta.bg}`}>
+            <div key={gw} className={`border rounded-xl p-5 relative ${meta.bg}`}>
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <h3 className={`text-lg font-bold ${meta.color}`}>{meta.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className={`text-lg font-bold ${meta.color}`}>{meta.name}</h3>
+                    {isDefault && (
+                      <span className="bg-amber-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-sm">
+                        ★ Padrão
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500 mt-0.5">{meta.description}</p>
                 </div>
                 <span className={`text-xs font-semibold px-2 py-1 rounded-full ${badge.cls}`}>

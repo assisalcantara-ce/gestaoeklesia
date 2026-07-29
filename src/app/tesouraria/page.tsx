@@ -1144,10 +1144,9 @@ export default function TesourariaPage() {
         .from('ministry_payment_gateways')
         .select('id')
         .eq('ministry_id', ministryId)
-        .eq('gateway', 'asaas')
         .eq('is_active', true)
-        .maybeSingle();
-      setGatewayAtivo(!!data);
+        .limit(1);
+      setGatewayAtivo(!!(data && data.length > 0));
     } catch {
       setGatewayAtivo(false);
     }
@@ -4157,14 +4156,14 @@ export default function TesourariaPage() {
             <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
               <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-amber-800">Gateway ASAAS não configurado</p>
-                <p className="text-xs text-amber-600">Configure um gateway ativo para que os links PIX possam aceitar pagamentos.</p>
+                <p className="text-sm font-semibold text-amber-800">Nenhum gateway de pagamento configurado.</p>
+                <p className="text-xs text-amber-600">Configure um gateway em Configurações → Gateways de Pagamento para começar a emitir QR Codes e Links PIX.</p>
               </div>
               <a
                 href="/configuracoes"
                 className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition"
               >
-                <Settings className="h-3.5 w-3.5" /> Configurar Gateway
+                <Settings className="h-3.5 w-3.5" /> Configurações → Gateways
               </a>
             </div>
           )}
