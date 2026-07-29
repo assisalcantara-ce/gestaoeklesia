@@ -16,6 +16,11 @@ import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import type { ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import TesourariaTable from '@/components/tesouraria/TesourariaTable';
+import TesourariaToolbar from '@/components/tesouraria/TesourariaToolbar';
+import FechamentoCaixaModal from '@/components/tesouraria/modals/FechamentoCaixaModal';
+import ContaBancariaModal from '@/components/tesouraria/modals/ContaBancariaModal';
+import CategoriaFinanceiraModal from '@/components/tesouraria/modals/CategoriaFinanceiraModal';
+import ConfirmDeleteModal from '@/components/tesouraria/modals/ConfirmDeleteModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -2003,121 +2008,33 @@ export default function TesourariaPage() {
       ══════════════════════════════════════════════════════════════════════ */}
       {aba === 'lancamentos' && (
         <div className="space-y-4">
-          {/* Barra de filtros */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-md">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Mês</label>
-                <MonthPicker
-                  value={filtroMes}
-                  onChange={setFiltroMes}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Movimento</label>
-                <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm h-[38px]">
-                  {([
-                    { v: '' as const,        label: 'Todos'   },
-                    { v: 'entrada' as const, label: '↑ Entr.' },
-                    { v: 'saida' as const,   label: '↓ Saída' },
-                  ]).map(opt => (
-                    <button key={opt.v} type="button"
-                      onClick={() => { setFiltroMovimento(opt.v); setFiltroTipo(''); }}
-                      className={`flex-1 text-xs font-medium transition px-1 ${
-                        filtroMovimento === opt.v
-                          ? opt.v === 'entrada' ? 'bg-green-600 text-white'
-                            : opt.v === 'saida' ? 'bg-red-500 text-white'
-                            : 'bg-[#123b63] text-white'
-                          : 'bg-white text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo</label>
-                <select
-                  value={filtroTipo}
-                  onChange={e => setFiltroTipo(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="">Todos os tipos</option>
-                  {filtroMovimento === 'saida'
-                    ? TIPOS_SAIDA.map(t => <option key={t.value} value={t.value}>{t.label}</option>)
-                    : TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)
-                  }
-                </select>
-              </div>
-              {!scope.isFinanceiroLocal && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Caixa</label>
-                  <select
-                    value={filtroCong}
-                    onChange={e => setFiltroCong(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  >
-                    <option value="">Todas as congregações</option>
-                    {congregacoes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Departamento</label>
-                <select
-                  value={filtroDept}
-                  onChange={e => setFiltroDept(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="">Todos os departamentos</option>
-                  {departamentos.map(d => (
-                    <option key={d.id} value={d.id}>
-                      {d.sigla ? `${d.sigla} – ` : ''}{d.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Linha de ações */}
-            <div className="mt-3 flex flex-wrap gap-2 items-center justify-between">
-              <div className="flex gap-2">
-                {scope.canWrite && (
-                  <button
-                    onClick={() => { setForm(emptyForm()); setEditId(null); setShowForm(true); }}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition"
-                  >
-                    <Plus className="h-4 w-4" /> Novo
-                  </button>
-                )}
-                {lancamentosMes.length > 0 && (
-                  <button
-                    onClick={() => exportarCSV(lancsFiltrados, `lancamentos-${filtroMes}`)}
-                    className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
-                    title="Exportar lançamentos filtrados para CSV"
-                  >
-                    <Download className="h-4 w-4" /> CSV
-                  </button>
-                )}
-              </div>
-              {/* Totalizador */}
-              <div className="flex gap-3 flex-wrap text-sm">
-                <span className="text-gray-400">{lancsFiltrados.length} reg.</span>
-                <span className="text-green-600 font-semibold">↑ {fmtBRL(entradasFiltradas)}</span>
-                <span className="text-red-500 font-semibold">↓ {fmtBRL(saidasFiltradas)}</span>
-                <span className={`font-bold ${entradasFiltradas - saidasFiltradas >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>
-                  = {fmtBRL(entradasFiltradas - saidasFiltradas)}
-                </span>
-              </div>
-            </div>
-
-            {/* Loading do mês */}
-            {loadingMes && (
-              <p className="text-xs text-gray-400 mt-2 text-center">Buscando lançamentos do mês...</p>
-            )}
-          </div>
+          {/* Toolbar de Lançamentos */}
+          <TesourariaToolbar
+            filtroMes={filtroMes}
+            setFiltroMes={setFiltroMes}
+            filtroMovimento={filtroMovimento}
+            setFiltroMovimento={setFiltroMovimento}
+            filtroTipo={filtroTipo}
+            setFiltroTipo={setFiltroTipo}
+            filtroCong={filtroCong}
+            setFiltroCong={setFiltroCong}
+            filtroDept={filtroDept}
+            setFiltroDept={setFiltroDept}
+            scope={scope}
+            congregacoes={congregacoes}
+            departamentos={departamentos}
+            TIPOS={TIPOS}
+            TIPOS_SAIDA={TIPOS_SAIDA}
+            MonthPicker={MonthPicker}
+            onNovoClick={() => { setForm(emptyForm()); setEditId(null); setShowForm(true); }}
+            lancamentosMesCount={lancamentosMes.length}
+            onExportarCSV={() => exportarCSV(lancsFiltrados, `lancamentos-${filtroMes}`)}
+            lancsFiltradosCount={lancsFiltrados.length}
+            entradasFiltradas={entradasFiltradas}
+            saidasFiltradas={saidasFiltradas}
+            fmtBRL={fmtBRL}
+            loadingMes={loadingMes}
+          />
 
           {/* Formulário inline */}
           {showForm && (
@@ -2612,110 +2529,38 @@ export default function TesourariaPage() {
             </div>
 
             {/* Modal de fechamento por congregação */}
-            {showFechaModal && (() => {
+            {(() => {
+              if (!showFechaModal) return null;
               const cxModal = statusMes.find(cx => cx.id === fechaCongId) ?? statusMes[0];
               const saldoIniNum = parseFloat(fechaSaldoInicial.replace(',', '.')) || 0;
-              
-              // Calcular entradas e saídas dinâmicas do período [fechaDataInicio, fechaDataFim]
               const doPeriodo = lancamentos.filter(l =>
                 l.data_lancamento >= fechaDataInicio &&
                 l.data_lancamento <= fechaDataFim &&
-                (cxModal.id === null ? l.congregacao_id === null : l.congregacao_id === cxModal.id)
+                (cxModal?.id === null ? l.congregacao_id === null : l.congregacao_id === cxModal?.id)
               );
               const entLivePeriodo = doPeriodo.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
               const saiLivePeriodo = doPeriodo.filter(l => l.tipo_movimento === 'saida').reduce((s, l) => s + Number(l.valor), 0);
               const saldoFinalModal = saldoIniNum + entLivePeriodo - saiLivePeriodo;
 
               return (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                  <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 w-full max-w-md space-y-4">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h3 className="text-base font-bold text-[#123b63]">Fechar Caixa</h3>
-                        <p className="text-sm text-gray-500">{cxModal?.nome}</p>
-                      </div>
-                      <button onClick={() => { setShowFechaModal(false); setFechaCongId(null); }}><X className="h-5 w-5 text-gray-400" /></button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Data Inicial</label>
-                        <input
-                          type="date"
-                          value={fechaDataInicio}
-                          disabled
-                          className="w-full border border-gray-100 bg-gray-50 text-gray-500 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Data Final (Fechamento)</label>
-                        <input
-                          type="date"
-                          value={fechaDataFim}
-                          onChange={e => setFechaDataFim(e.target.value)}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#123b63]"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Saldo inicial do período (R$)</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0,00"
-                        value={fechaSaldoInicial}
-                        onChange={e => setFechaSaldoInicial(e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      />
-                      {cxModal?.fechAnt && (
-                        <p className="text-xs text-gray-400 mt-1">
-                          Sugerido: {fmtBRL(cxModal.fechAnt.saldo_final)} (saldo de {cxModal.fechAnt.mes_referencia.split('-').reverse().join('/')})
-                        </p>
-                      )}
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Entradas do período:</span>
-                        <span className="font-semibold text-green-600">{fmtBRL(entLivePeriodo)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Saídas do período:</span>
-                        <span className="font-semibold text-red-500">{fmtBRL(saiLivePeriodo)}</span>
-                      </div>
-                      <div className="flex justify-between border-t pt-1 mt-1">
-                        <span className="text-gray-700 font-semibold">Saldo final:</span>
-                        <span className={`font-bold ${saldoFinalModal >= 0 ? 'text-[#123b63]' : 'text-red-600'}`}>
-                          {fmtBRL(saldoFinalModal)}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Observações</label>
-                      <textarea
-                        rows={2}
-                        value={fechaObs}
-                        onChange={e => setFechaObs(e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none"
-                      />
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={handleFecharMes}
-                        disabled={salvandoFecha}
-                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition disabled:opacity-50"
-                      >
-                        <Lock className="h-4 w-4" /> {salvandoFecha ? 'Fechando...' : 'Confirmar Fechamento'}
-                      </button>
-                      <button
-                        onClick={() => { setShowFechaModal(false); setFechaCongId(null); }}
-                        className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <FechamentoCaixaModal
+                  isOpen={showFechaModal}
+                  onClose={() => { setShowFechaModal(false); setFechaCongId(null); }}
+                  cxModal={cxModal}
+                  fechaDataInicio={fechaDataInicio}
+                  fechaDataFim={fechaDataFim}
+                  setFechaDataFim={setFechaDataFim}
+                  fechaSaldoInicial={fechaSaldoInicial}
+                  setFechaSaldoInicial={setFechaSaldoInicial}
+                  fechaObs={fechaObs}
+                  setFechaObs={setFechaObs}
+                  salvandoFecha={salvandoFecha}
+                  handleFecharMes={handleFecharMes}
+                  entLivePeriodo={entLivePeriodo}
+                  saiLivePeriodo={saiLivePeriodo}
+                  saldoFinalModal={saldoFinalModal}
+                  fmtBRL={fmtBRL}
+                />
               );
             })()}
 
@@ -3673,30 +3518,28 @@ export default function TesourariaPage() {
             </div>
           )}
 
-          {/* Confirm delete conta */}
-          {confirmDelConta && (
-            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
-                <h3 className="text-base font-bold text-gray-800 mb-2">Excluir Conta</h3>
-                <p className="text-sm text-gray-600 mb-1">Esta ação não pode ser desfeita.</p>
-                <p className="text-xs text-amber-600 mb-5">Lançamentos vinculados perderão a referência de conta (conta_id → NULL).</p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => handleDeleteConta(confirmDelConta)}
-                    className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition"
-                  >
-                    Excluir
-                  </button>
-                  <button
-                    onClick={() => setConfirmDelConta(null)}
-                    className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Modal de Conta Bancária */}
+          <ContaBancariaModal
+            isOpen={showContaModal}
+            onClose={() => { setShowContaModal(false); setContaEditId(null); setFormConta(emptyFormConta()); }}
+            formConta={formConta}
+            setFormConta={setFormConta}
+            contaEditId={contaEditId}
+            savingConta={savingConta}
+            handleSaveConta={handleSaveConta}
+            TIPOS_CONTA={TIPOS_CONTA}
+          />
+
+          {/* Modal de Confirmação de Exclusão de Conta */}
+          <ConfirmDeleteModal
+            isOpen={!!confirmDelConta}
+            onClose={() => setConfirmDelConta(null)}
+            onConfirm={() => handleDeleteConta(confirmDelConta!)}
+            title="Excluir Conta"
+            description="Esta ação não pode ser desfeita."
+            warningText="Lançamentos vinculados perderão a referência de conta (conta_id → NULL)."
+            confirmText="Excluir"
+          />
         </div>
       )}
 
@@ -3882,151 +3725,28 @@ export default function TesourariaPage() {
             </>
           )}
 
-          {/* Modal: form de categoria */}
-          {showCatModal && (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 w-full max-w-md space-y-4 overflow-y-auto max-h-[90vh]">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-base font-bold text-[#123b63]">{catEditId ? 'Editar Categoria' : 'Nova Categoria'}</h3>
-                  <button onClick={() => { setShowCatModal(false); setCatEditId(null); setFormCat(emptyFormCat()); }}>
-                    <X className="h-5 w-5 text-gray-400 hover:text-gray-700" />
-                  </button>
-                </div>
+          {/* Modal de Categoria Financeira */}
+          <CategoriaFinanceiraModal
+            isOpen={showCatModal}
+            onClose={() => { setShowCatModal(false); setCatEditId(null); setFormCat(emptyFormCat()); }}
+            formCat={formCat}
+            setFormCat={setFormCat}
+            catEditId={catEditId}
+            savingCat={savingCat}
+            handleSaveCat={handleSaveCat}
+            categoriasFull={categoriasFull}
+          />
 
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Nome <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Fundo Social, Construção..."
-                      value={formCat.nome}
-                      onChange={e => setFormCat(p => ({ ...p, nome: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Tipo de movimento</label>
-                    <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-                      {([
-                        { v: 'entrada' as const, label: '↑ Entrada' },
-                        { v: 'saida' as const,   label: '↓ Saída'  },
-                        { v: 'ambos' as const,   label: '⇅ Ambos'  },
-                      ]).map(opt => (
-                        <button
-                          key={opt.v}
-                          type="button"
-                          onClick={() => setFormCat(p => ({ ...p, tipo_movimento: opt.v }))}
-                          className={`flex-1 py-2 text-sm font-medium transition ${
-                            formCat.tipo_movimento === opt.v ? 'bg-[#123b63] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Código (opcional)</label>
-                      <input
-                        type="text"
-                        placeholder="Ex: 3.1"
-                        value={formCat.codigo}
-                        onChange={e => setFormCat(p => ({ ...p, codigo: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Ícone (emoji)</label>
-                      <input
-                        type="text"
-                        placeholder="Ex: 🏠"
-                        value={formCat.icone}
-                        onChange={e => setFormCat(p => ({ ...p, icone: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Cor</label>
-                      <input
-                        type="color"
-                        value={formCat.cor}
-                        onChange={e => setFormCat(p => ({ ...p, cor: e.target.value }))}
-                        className="w-full h-9 border border-gray-200 rounded-lg px-1 py-1 cursor-pointer"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria pai (opcional)</label>
-                      <select
-                        value={formCat.categoria_pai_id}
-                        onChange={e => setFormCat(p => ({ ...p, categoria_pai_id: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      >
-                        <option value="">Nenhuma</option>
-                        {categoriasFull
-                          .filter(c => c.id !== catEditId)
-                          .map(c => (
-                            <option key={c.id} value={c.id}>
-                              {c.icone ? `${c.icone} ` : ''}{c.nome}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={formCat.is_ativa}
-                      onChange={e => setFormCat(p => ({ ...p, is_ativa: e.target.checked }))}
-                      className="w-4 h-4 accent-[#123b63]"
-                    />
-                    <span className="text-sm text-gray-700">Categoria ativa</span>
-                  </label>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={handleSaveCat}
-                    disabled={savingCat}
-                    className="flex-1 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition disabled:opacity-50"
-                  >
-                    {savingCat ? 'Salvando...' : catEditId ? 'Atualizar' : 'Criar Categoria'}
-                  </button>
-                  <button
-                    onClick={() => { setShowCatModal(false); setCatEditId(null); setFormCat(emptyFormCat()); }}
-                    className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Confirm delete categoria */}
-          {confirmDelCat && (
-            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
-                <h3 className="text-base font-bold text-gray-800 mb-2">Excluir Categoria</h3>
-                <p className="text-sm text-gray-600 mb-1">Esta ação não pode ser desfeita.</p>
-                <p className="text-xs text-amber-600 mb-5">Lançamentos vinculados perderão a referência de categoria.</p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => handleDeleteCat(confirmDelCat)}
-                    className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition"
-                  >
-                    Excluir
-                  </button>
-                  <button
-                    onClick={() => setConfirmDelCat(null)}
-                    className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Modal de Confirmação de Exclusão de Categoria */}
+          <ConfirmDeleteModal
+            isOpen={!!confirmDelCat}
+            onClose={() => setConfirmDelCat(null)}
+            onConfirm={() => handleDeleteCat(confirmDelCat!)}
+            title="Excluir Categoria"
+            description="Esta ação não pode ser desfeita."
+            warningText="Lançamentos vinculados perderão a referência de categoria."
+            confirmText="Excluir"
+          />
         </div>
       )}
 
