@@ -8,6 +8,7 @@ export default function ImpersonationBanner() {
   const { isImpersonating, originalAdmin, targetTenant, readOnly, impersonationSessionId } = useAdminAuth()
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null)
   const [isEnding, setIsEnding] = useState(false)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
 
   useEffect(() => {
     if (!isImpersonating) {
@@ -20,19 +21,19 @@ export default function ImpersonationBanner() {
       try {
         const token = sessionStorage.getItem('eklesia_impersonation_token') || localStorage.getItem('eklesia_impersonation_token')
         if (!token) {
-          handleEndSession(false)
+          executeEndSession()
           return
         }
 
         const res = await fetch(`/api/v1/admin/impersonate/status?token=${encodeURIComponent(token)}`)
         if (!res.ok) {
-          handleEndSession(false, 'A sessão de impersonação foi encerrada ou expirou.')
+          executeEndSession('A sessão de impersonação foi encerrada ou expirou.')
           return
         }
 
         const data = await res.json()
         if (!data.valid || data.status !== 'active') {
-          handleEndSession(false, 'A sessão de impersonação foi encerrada por expiração do tempo.')
+          executeEndSession('A sessão de impersonação foi encerrada por expiração do tempo.')
           return
         }
 
@@ -55,7 +56,7 @@ export default function ImpersonationBanner() {
         if (prev === null) return null
         if (prev <= 1) {
           clearInterval(interval)
-          handleEndSession(false, 'A sessão de impersonação foi encerrada por expiração do tempo.')
+          executeEndSession('A sessão de impersonação foi encerrada por expiração do tempo.')
           return 0
         }
         return prev - 1
@@ -65,12 +66,8 @@ export default function ImpersonationBanner() {
     return () => clearInterval(interval)
   }, [isImpersonating])
 
-  const handleEndSession = async (userConfirmed = true, customMessage?: string) => {
-    if (userConfirmed) {
-      const confirm = window.confirm('Deseja realmente encerrar a sessão de impersonação e retornar ao painel da Plataforma?')
-      if (!confirm) return
-    }
-
+  const executeEndSession = async (customMessage?: string) => {
+    setShowConfirmModal(false)
     setIsEnding(true)
     try {
       if (impersonationSessionId) {
@@ -100,7 +97,6 @@ export default function ImpersonationBanner() {
           // Ignora falha de permissão do navegador
         }
 
-        // Se o navegador não fechou a aba (ex: window.closed é false), executar fallback seguro imediato
         setTimeout(() => {
           if (!window.closed) {
             window.location.href = '/admin/ministerios'
@@ -187,7 +183,7 @@ export default function ImpersonationBanner() {
           </div>
 
           <button
-            onClick={() => handleEndSession(true)}
+            onClick={() => setShowConfirmModal(true)}
             disabled={isEnding}
             className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition cursor-pointer shadow-sm disabled:opacity-50"
             title="Encerrar a sessão de impersonação e retornar ao painel da Plataforma"
@@ -197,6 +193,60 @@ export default function ImpersonationBanner() {
           </button>
         </div>
       </div>
+
+      {/* MODAL DESIGN SYSTEM 2.0 — Confirmação de Encerramento de Impersonação */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-750 text-slate-100 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden p-6 transform transition-all scale-100 border-red-500/20">
+            {/* Cabeçalho do Modal */}
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="w-11 h-11 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-6 h-6 text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white tracking-tight">
+                  Encerrar Sessão de Impersonação?
+                </h3>
+                <p className="text-xs text-slate-400 font-medium">
+                  Atendimento de Suporte / Auditoria
+                </p>
+              </div>
+            </div>
+
+            {/* Mensagem e Detalhes do Cliente */}
+            <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3.5 mb-5 space-y-2 text-xs">
+              <p className="text-slate-300 leading-relaxed">
+                Você deixará a sessão de suporte do cliente <strong className="text-white font-bold uppercase">{targetTenant?.name || 'Ministério Alvo'}</strong> e retornará ao Painel Administrativo da Plataforma.
+              </p>
+              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Operador: <strong className="text-slate-200">{originalAdmin?.email || 'Super Admin'}</strong></span>
+                <span className="text-amber-400 font-medium">Tempo Restante: {formatTime(remainingSeconds)}</span>
+              </div>
+            </div>
+
+            {/* Botões de Ação */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={isEnding}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => executeEndSession()}
+                disabled={isEnding}
+                className="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-red-950/50 cursor-pointer disabled:opacity-50 flex items-center gap-2"
+              >
+                <Power className="w-3.5 h-3.5" />
+                <span>{isEnding ? 'Encerrando...' : 'Confirmar e Encerrar'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
