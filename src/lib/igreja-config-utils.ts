@@ -58,6 +58,7 @@ export async function fetchConfiguracaoIgrejaFromSupabase(
     _supabase?: any,
     _ministryId?: string | null
 ): Promise<ConfiguracaoIgreja> {
+    console.log('[DIAGNOSTICO UTILS] Início da chamada fetchConfiguracaoIgrejaFromSupabase(). Headers:', getApiHeaders());
     try {
         const res = await fetch('/api/v1/configuracoes/perfil', {
             method: 'GET',
@@ -65,19 +66,27 @@ export async function fetchConfiguracaoIgrejaFromSupabase(
             cache: 'no-store',
         });
 
+        console.log('[DIAGNOSTICO UTILS] Status HTTP retornado:', res.status, res.statusText);
+
         if (!res.ok) {
-            console.error('[igreja-config-utils] Erro na requisição GET /api/v1/configuracoes/perfil:', res.status, res.statusText);
+            console.error('[DIAGNOSTICO UTILS] Erro na requisição GET /api/v1/configuracoes/perfil:', res.status, res.statusText);
+            console.log('[DIAGNOSTICO UTILS] Retornando CONFIGURACAO_PADRAO devido a res.ok === false:', CONFIGURACAO_PADRAO);
             return CONFIGURACAO_PADRAO;
         }
 
         const json = await res.json();
+        console.log('[DIAGNOSTICO UTILS] JSON recebido da API:', JSON.stringify(json));
+
         if (json?.data) {
+            console.log('[DIAGNOSTICO UTILS] Objeto final retornado pela função (json.data):', json.data);
             return json.data as ConfiguracaoIgreja;
         }
 
+        console.log('[DIAGNOSTICO UTILS] json.data ausente. Retornando CONFIGURACAO_PADRAO:', CONFIGURACAO_PADRAO);
         return CONFIGURACAO_PADRAO;
     } catch (err) {
-        console.error('[igreja-config-utils] Exceção ao buscar configuração da igreja via API:', err);
+        console.error('[DIAGNOSTICO UTILS] Exceção ao buscar configuração da igreja via API:', err);
+        console.log('[DIAGNOSTICO UTILS] Retornando CONFIGURACAO_PADRAO devido a exceção:', CONFIGURACAO_PADRAO);
         return CONFIGURACAO_PADRAO;
     }
 }
@@ -94,14 +103,18 @@ export async function updateConfiguracaoIgrejaInSupabase(
     config: Partial<ConfiguracaoIgreja>,
     _ministryId?: string | null
 ): Promise<void> {
+    console.log('[DIAGNOSTICO UTILS] Início de updateConfiguracaoIgrejaInSupabase(). Payload:', config);
     const res = await fetch('/api/v1/configuracoes/perfil', {
         method: 'PUT',
         headers: getApiHeaders(),
         body: JSON.stringify(config),
     });
 
+    console.log('[DIAGNOSTICO UTILS] Status HTTP do PUT:', res.status);
+
     if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
+        console.error('[DIAGNOSTICO UTILS] Erro no PUT:', errJson);
         throw new Error(errJson.error || errJson.detail || 'Erro ao salvar configurações do ministério via API.');
     }
 }

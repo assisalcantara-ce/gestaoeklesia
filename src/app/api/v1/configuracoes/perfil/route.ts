@@ -22,7 +22,10 @@ export async function GET(request: NextRequest) {
   try {
     const ctx = await resolveTenantAuth(request);
 
+    console.log('[DIAGNOSTICO API GET] ministryId resolvido:', ctx.ministryId);
+
     if (!ctx.ministryId) {
+      console.log('[DIAGNOSTICO API GET] Nenhum ministryId resolvido. Retornando 403 NO_MINISTRY.');
       return NextResponse.json({ error: 'Ministério não encontrado.', code: 'NO_MINISTRY' }, { status: 403 });
     }
 
@@ -33,12 +36,16 @@ export async function GET(request: NextRequest) {
       .eq('id', ctx.ministryId)
       .maybeSingle();
 
+    console.log('[DIAGNOSTICO API GET] Objeto retornado por ministries:', { data: ministryData, error: ministryErr });
+
     // Busca dados em configurations usando service_role (ctx.admin) — sem RLS
-    const { data: configRow } = await ctx.admin
+    const { data: configRow, error: configErr } = await ctx.admin
       .from('configurations')
       .select('church_profile')
       .eq('ministry_id', ctx.ministryId)
       .maybeSingle();
+
+    console.log('[DIAGNOSTICO API GET] Objeto retornado por configurations:', { data: configRow, error: configErr });
 
     if (ministryErr) {
       console.error('[API /api/v1/configuracoes/perfil] Erro ao buscar ministério:', ministryErr);
@@ -60,7 +67,10 @@ export async function GET(request: NextRequest) {
       logo: ministryData?.logo_url || '',
     };
 
-    return NextResponse.json({ data: responseData });
+    const finalResponse = { data: responseData };
+    console.log('[DIAGNOSTICO API GET] JSON enviado na resposta:', JSON.stringify(finalResponse));
+
+    return NextResponse.json(finalResponse);
   } catch (err: any) {
     console.error('[API /api/v1/configuracoes/perfil] Exceção:', err);
     if (err?.message === 'UNAUTHORIZED') {

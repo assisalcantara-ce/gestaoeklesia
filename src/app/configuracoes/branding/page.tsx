@@ -16,12 +16,19 @@ export default function BrandingPage() {
   const { ministryId } = useUserContext();
 
   useEffect(() => {
+    console.log('[DIAGNOSTICO ROTA DEDICADA BRANDING] useEffect disparado. ministryId:', ministryId);
     if (!ministryId) return;
     fetchConfiguracaoIgrejaFromSupabase(supabase, ministryId)
-      .then((config) => setLogoPreview(config.logo || null))
-      .catch(() => null);
+      .then((config) => {
+        console.log('[DIAGNOSTICO ROTA DEDICADA BRANDING] Config recebido:', config);
+        console.log('[DIAGNOSTICO ROTA DEDICADA BRANDING] setLogoPreview com:', config.logo || null);
+        setLogoPreview(config.logo || null);
+      })
+      .catch((err) => console.error('[DIAGNOSTICO ROTA DEDICADA BRANDING] Erro:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministryId]);
+
+  console.log('[DIAGNOSTICO ROTA DEDICADA BRANDING] Render de BrandingPage. logoPreview atual:', logoPreview ? `${logoPreview.substring(0, 30)}...` : null);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

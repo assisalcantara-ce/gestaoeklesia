@@ -164,10 +164,12 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
   });
 
   useEffect(() => {
+    console.log('[DIAGNOSTICO FRONT PERFIL] useEffect disparado. ministryId:', ministryId);
     if (!ministryId) return;
     fetchConfiguracaoIgrejaFromSupabase(supabase, ministryId)
       .then((config: any) => {
-        setFormData({
+        console.log('[DIAGNOSTICO FRONT PERFIL] Objeto config recebido em .then():', config);
+        const novoState = {
           nomeMinisterio: config.nome || 'Ministério',
           cnpj: config.cnpj || '',
           email: config.email || '',
@@ -177,11 +179,15 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
           descricao: config.descricao || '',
           responsavel: config.responsavel || '',
           dataCadastro: config.dataCadastro || ''
-        });
+        };
+        console.log('[DIAGNOSTICO FRONT PERFIL] Chamando setFormData() com:', novoState);
+        setFormData(novoState);
       })
-      .catch(() => null);
+      .catch((err) => console.error('[DIAGNOSTICO FRONT PERFIL] Erro em fetchConfiguracaoIgrejaFromSupabase:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministryId]);
+
+  console.log('[DIAGNOSTICO FRONT PERFIL] Render de PerfilContent. formData atual:', formData);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -391,12 +397,19 @@ function BrandingContent({ onNotification }: { onNotification: (title: string, m
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('[DIAGNOSTICO FRONT BRANDING] useEffect disparado. ministryId:', ministryId);
     if (!ministryId) return;
     fetchConfiguracaoIgrejaFromSupabase(supabase, ministryId)
-      .then((config: any) => setLogoPreview(config.logo || null))
-      .catch(() => null);
+      .then((config: any) => {
+        console.log('[DIAGNOSTICO FRONT BRANDING] Objeto config recebido em .then():', config);
+        console.log('[DIAGNOSTICO FRONT BRANDING] Chamando setLogoPreview() com:', config.logo || null);
+        setLogoPreview(config.logo || null);
+      })
+      .catch((err) => console.error('[DIAGNOSTICO FRONT BRANDING] Erro em fetchConfiguracaoIgrejaFromSupabase:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministryId]);
+
+  console.log('[DIAGNOSTICO FRONT BRANDING] Render de BrandingContent. logoPreview atual:', logoPreview ? `${logoPreview.substring(0, 30)}...` : null);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

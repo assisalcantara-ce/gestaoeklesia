@@ -27,10 +27,12 @@ export default function PerfilMinisterioPage() {
   const { ministryId } = useUserContext();
 
   useEffect(() => {
+    console.log('[DIAGNOSTICO ROTA DEDICADA PERFIL] useEffect disparado. ministryId:', ministryId);
     if (!ministryId) return;
     fetchConfiguracaoIgrejaFromSupabase(supabase, ministryId)
       .then((config) => {
-        setFormData({
+        console.log('[DIAGNOSTICO ROTA DEDICADA PERFIL] Config recebido:', config);
+        const novoState = {
           nomeMinisterio: config.nome || 'Ministério',
           cnpj: config.cnpj || '',
           email: config.email || '',
@@ -39,11 +41,15 @@ export default function PerfilMinisterioPage() {
           endereco: config.endereco || '',
           responsavel: config.responsavel || '',
           dataCadastro: ''
-        });
+        };
+        console.log('[DIAGNOSTICO ROTA DEDICADA PERFIL] setFormData com:', novoState);
+        setFormData(novoState);
       })
-      .catch(() => null);
+      .catch((err) => console.error('[DIAGNOSTICO ROTA DEDICADA PERFIL] Erro:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministryId]);
+
+  console.log('[DIAGNOSTICO ROTA DEDICADA PERFIL] Render de PerfilMinisterioPage. formData atual:', formData);
 
   const [isEditing, setIsEditing] = useState(false);
 
