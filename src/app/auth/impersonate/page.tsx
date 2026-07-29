@@ -2,6 +2,39 @@
 
 export const dynamic = 'force-dynamic';
 
+// ─── Eliminação da Race Condition de Bootstrap ──────────────────────────────
+//
+// PROBLEMA RAIZ:
+// O token era armazenado apenas dentro de um useEffect, que executa DEPOIS
+// que os Providers da árvore React (AuthProvider → useUserContext) já rodaram.
+// O AuthProvider resolve a sessão Supabase da cache (milissegundos), tornando
+// authLoading=false antes do useEffect desta página executar.
+// O useUserContext, ao rodar, não encontrava o token no sessionStorage e
+// caía no fallback nativo do Supabase, resolvendo o ministério do Super Admin
+// (IEADMI) em vez do ministério impersonado.
+//
+// SOLUÇÃO ARQUITETURAL:
+// Código executado no NÍVEL DO MÓDULO é síncrono e ocorre durante a
+// inicialização do bundle JavaScript no browser — ANTES de qualquer montagem
+// de componente React e ANTES de qualquer useEffect.
+// Ao gravar o token aqui, garantimos que sessionStorage já esteja preenchido
+// quando o useUserContext executar sua verificação prioritária de impersonação.
+//
+if (typeof window !== 'undefined') {
+  try {
+    const _params = new URLSearchParams(window.location.search);
+    const _token = _params.get('token');
+    if (_token) {
+      sessionStorage.setItem('eklesia_impersonation_token', _token);
+      sessionStorage.setItem('eklesia_impersonation_window', 'true');
+      localStorage.setItem('eklesia_impersonation_token', _token);
+    }
+  } catch {
+    // Tolerância a ambientes com restrição de acesso ao storage (iframe, modo privado extremo)
+  }
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
@@ -25,12 +58,14 @@ export default function ImpersonateBootstrapPage() {
 
     const bootstrapSession = async () => {
       try {
-        // 1. Armazenar token temporário de impersonação e flag mestre da janela no armazenamento da nova aba
+        // O token já foi gravado no storage a nível de módulo (acima).
+        // As linhas abaixo são idempotentes e garantem consistência caso o
+        // módulo tenha sido importado em contexto sem window (ex.: SSR parcial).
         sessionStorage.setItem('eklesia_impersonation_token', token);
         sessionStorage.setItem('eklesia_impersonation_window', 'true');
         localStorage.setItem('eklesia_impersonation_token', token);
 
-        // 2. Validar token no servidor via API de status
+        // Validar token no servidor via API de status
         const response = await fetch(`/api/v1/admin/impersonate/status?token=${encodeURIComponent(token)}`);
         const data = await response.json();
 
@@ -41,13 +76,14 @@ export default function ImpersonateBootstrapPage() {
         setTenantName(data.tenant?.name || 'Ministério');
         setStatus('success');
 
-        // 3. Redirecionar para o Dashboard do tenant na nova aba
+        // Redirecionar para o Dashboard do tenant na nova aba
         setTimeout(() => {
           router.replace('/dashboard');
         }, 1000);
       } catch (err: any) {
         // Limpar tokens com falha
         sessionStorage.removeItem('eklesia_impersonation_token');
+        sessionStorage.removeItem('eklesia_impersonation_window');
         localStorage.removeItem('eklesia_impersonation_token');
         setStatus('error');
         setErrorMessage(err.message || 'Falha ao validar sessão de impersonação.');
