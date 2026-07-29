@@ -17,6 +17,7 @@ Este diretório contém os guias arquiteturais, padrões de código e regras té
 | 🧩 [06-UI-Patterns.md](./06-UI-Patterns.md) | Padrões de Toolbars, filtros cumulativos em memória e responsividade |
 | 🛠️ [07-Coding-Standards.md](./07-Coding-Standards.md) | Boas práticas de código, TypeScript, auditoria e resiliência |
 | 🛡️ [13-CONSUMING-PROTECTED-APIS.md](./13-CONSUMING-PROTECTED-APIS.md) | **Padrão Oficial de Consumo de APIs Protegidas** (Injeção de `Authorization: Bearer <access_token>`) |
+| 🏛️ [14-COMPONENTIZATION-ARCHITECTURE.md](./14-COMPONENTIZATION-ARCHITECTURE.md) | **Guia Oficial da Arquitetura 2.0**: Fundação da Componentização e convenções do Frontend |
 
 ---
 
