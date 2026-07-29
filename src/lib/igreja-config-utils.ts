@@ -28,7 +28,17 @@ const CONFIGURACAO_PADRAO: ConfiguracaoIgreja = {
     logo: ''
 };
 
-async function resolveMinistryId(supabase: SupabaseClient): Promise<string | null> {
+/**
+ * Resolve o ministryId a partir do próprio Supabase Auth.
+ *
+ * ATENÇÃO — uso restrito ao fallback.
+ * Esta função é mantida EXCLUSIVAMENTE para consumidores que ainda não
+ * recebem o ministryId via contexto oficial (useUserContext / useCurrentMinistry).
+ * Em sessões de impersonação ela retorna o tenant do Super Admin (IEADMI),
+ * o que é incorreto. Todos os consumidores em /configuracoes já passam
+ * ministryId explicitamente e NUNCA chegam a chamar esta função.
+ */
+async function resolveMinistryIdFallback(supabase: SupabaseClient): Promise<string | null> {
     try {
         const {
             data: { user },
@@ -52,22 +62,35 @@ async function resolveMinistryId(supabase: SupabaseClient): Promise<string | nul
     }
 }
 
+/**
+ * Busca as configurações da igreja/ministério.
+ *
+ * @param supabase  Cliente Supabase autenticado.
+ * @param ministryId  ID do ministério resolvido pelo contexto oficial (useUserContext).
+ *                    Quando fornecido, é utilizado diretamente — sem qualquer
+ *                    consulta paralela ao Supabase Auth. Isso garante que sessões
+ *                    de impersonação leiam o tenant correto.
+ *                    Quando omitido, aplica o fallback via Auth (legado, somente
+ *                    para chamadas fora do contexto de impersonação).
+ */
 export async function fetchConfiguracaoIgrejaFromSupabase(
-    supabase: SupabaseClient
+    supabase: SupabaseClient,
+    ministryId?: string | null
 ): Promise<ConfiguracaoIgreja> {
-    const ministryId = await resolveMinistryId(supabase);
-    if (!ministryId) return CONFIGURACAO_PADRAO;
+    // Usa o ministryId fornecido (fonte oficial) ou resolve via fallback (legado)
+    const resolvedId = ministryId ?? await resolveMinistryIdFallback(supabase);
+    if (!resolvedId) return CONFIGURACAO_PADRAO;
 
     const { data, error } = await supabase
         .from('ministries')
         .select('name, email_admin, cnpj_cpf, phone, website, description, logo_url, created_at')
-        .eq('id', ministryId)
+        .eq('id', resolvedId)
         .maybeSingle();
 
     const { data: configRow } = await supabase
         .from('configurations')
         .select('church_profile')
-        .eq('ministry_id', ministryId)
+        .eq('ministry_id', resolvedId)
         .maybeSingle();
 
     const churchProfile = (configRow as any)?.church_profile || {};
@@ -88,12 +111,22 @@ export async function fetchConfiguracaoIgrejaFromSupabase(
     };
 }
 
+/**
+ * Atualiza as configurações da igreja/ministério.
+ *
+ * @param supabase  Cliente Supabase autenticado.
+ * @param config  Campos a atualizar.
+ * @param ministryId  ID do ministério resolvido pelo contexto oficial (useUserContext).
+ *                    Mesma semântica de fetchConfiguracaoIgrejaFromSupabase.
+ */
 export async function updateConfiguracaoIgrejaInSupabase(
     supabase: SupabaseClient,
-    config: Partial<ConfiguracaoIgreja>
+    config: Partial<ConfiguracaoIgreja>,
+    ministryId?: string | null
 ): Promise<void> {
-    const ministryId = await resolveMinistryId(supabase);
-    if (!ministryId) return;
+    // Usa o ministryId fornecido (fonte oficial) ou resolve via fallback (legado)
+    const resolvedId = ministryId ?? await resolveMinistryIdFallback(supabase);
+    if (!resolvedId) return;
 
     const updateMinistry: Record<string, any> = {};
     if (typeof config.nome === 'string') updateMinistry.name = config.nome;
@@ -108,13 +141,13 @@ export async function updateConfiguracaoIgrejaInSupabase(
         await supabase
             .from('ministries')
             .update(updateMinistry)
-            .eq('id', ministryId);
+            .eq('id', resolvedId);
     }
 
     const { data: configRow } = await supabase
         .from('configurations')
         .select('church_profile')
-        .eq('ministry_id', ministryId)
+        .eq('ministry_id', resolvedId)
         .maybeSingle();
 
     const existingProfile = (configRow as any)?.church_profile || {};
@@ -128,7 +161,7 @@ export async function updateConfiguracaoIgrejaInSupabase(
         .from('configurations')
         .upsert(
             {
-                ministry_id: ministryId,
+                ministry_id: resolvedId,
                 church_profile: nextProfile,
                 updated_at: new Date().toISOString(),
             } as any,

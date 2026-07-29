@@ -5,18 +5,23 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase-client';
 import { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase } from '@/lib/igreja-config-utils';
+import { useUserContext } from '@/hooks/useUserContext';
 
 export default function BrandingPage() {
 
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const supabase = createClient();
+  // Fonte oficial do tenant — garantida pelo contexto da aplicação.
+  // Em sessões de impersonação reflete o ministério impersonado, não o Super Admin.
+  const { ministryId } = useUserContext();
 
   useEffect(() => {
-    fetchConfiguracaoIgrejaFromSupabase(supabase)
+    if (!ministryId) return;
+    fetchConfiguracaoIgrejaFromSupabase(supabase, ministryId)
       .then((config) => setLogoPreview(config.logo || null))
       .catch(() => null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ministryId]);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -40,7 +45,7 @@ export default function BrandingPage() {
 
   const handleSaveLogo = async () => {
     if (logoPreview) {
-      await updateConfiguracaoIgrejaInSupabase(supabase, { logo: logoPreview });
+      await updateConfiguracaoIgrejaInSupabase(supabase, { logo: logoPreview }, ministryId);
       alert('Logo salva com sucesso! Será utilizada em todos os documentos gerados.');
     }
   };

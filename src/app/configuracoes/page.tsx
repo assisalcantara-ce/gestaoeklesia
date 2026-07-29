@@ -12,6 +12,7 @@ import type { SubscriptionPlan } from '@/types/admin';
 import { NOMENCLATURAS_SCHEMA_VERSION, NOMENCLATURAS_SCHEMA_VERSION_KEY } from '@/lib/org-nomenclaturas';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useUserContext } from '@/hooks/useUserContext';
+import { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase } from '@/lib/igreja-config-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -144,8 +145,10 @@ export default function ConfiguracoesPage() {
 // Componente Perfil
 function PerfilContent({ onNotification }: { onNotification: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {
   const supabase = createClient();
-  const { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase } = require('@/lib/igreja-config-utils');
   const { registrarAcao } = useAuditLog();
+  // Fonte oficial do tenant — mesma utilizada por todo o restante da aplicação.
+  // Em sessões de impersonação reflete o ministério impersonado, não o Super Admin.
+  const { ministryId } = useUserContext();
 
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -161,7 +164,8 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
   });
 
   useEffect(() => {
-    fetchConfiguracaoIgrejaFromSupabase(supabase)
+    if (!ministryId) return;
+    fetchConfiguracaoIgrejaFromSupabase(supabase, ministryId)
       .then((config: any) => {
         setFormData({
           nomeMinisterio: config.nome || 'Ministério',
@@ -177,7 +181,7 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
       })
       .catch(() => null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ministryId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -203,7 +207,7 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
         descricao: formData.descricao,
         website: formData.website,
         responsavel: formData.responsavel
-      });
+      }, ministryId);
       await registrarAcao({
         acao: 'editar',
         modulo: 'configuracoes',
@@ -380,17 +384,19 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
 // Componente Branding
 function BrandingContent({ onNotification }: { onNotification: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {
   const supabase = createClient();
-  const { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase } = require('@/lib/igreja-config-utils');
   const { registrarAcao } = useAuditLog();
+  // Fonte oficial do tenant — garante logo do ministério impersonado em sessões de impersonação.
+  const { ministryId } = useUserContext();
 
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchConfiguracaoIgrejaFromSupabase(supabase)
+    if (!ministryId) return;
+    fetchConfiguracaoIgrejaFromSupabase(supabase, ministryId)
       .then((config: any) => setLogoPreview(config.logo || null))
       .catch(() => null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ministryId]);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -415,7 +421,7 @@ function BrandingContent({ onNotification }: { onNotification: (title: string, m
   const handleSaveLogo = async () => {
     if (logoPreview) {
       try {
-        await updateConfiguracaoIgrejaInSupabase(supabase, { logo: logoPreview });
+        await updateConfiguracaoIgrejaInSupabase(supabase, { logo: logoPreview }, ministryId);
         await registrarAcao({
           acao: 'editar',
           modulo: 'configuracoes',
