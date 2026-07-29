@@ -117,7 +117,6 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
           setAdminUser(null)
           setIsAuthenticated(false)
           setIsAdmin(false)
-          setIsLoading(false)
           return
         }
 
