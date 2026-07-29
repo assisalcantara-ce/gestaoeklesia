@@ -44,7 +44,6 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
 
   useEffect(() => {
-    // Inicializar Supabase apenas aqui, dentro do useEffect
     if (!supabaseRef.current) {
       supabaseRef.current = createClient()
     }
@@ -53,7 +52,6 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     
     const checkAdminSession = async () => {
       try {
-        // Primeiro, verificar se há sessão Supabase
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
         if (sessionError || !session) {
@@ -64,11 +62,14 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
         setUser(session.user)
 
-        // Buscar dados do admin_users no backend
-        const response = await fetch('/api/v1/admin/me', {
+        // Validar permissão administrativa chamando o endpoint oficial POST /api/v1/admin/verify
+        const response = await fetch('/api/v1/admin/verify', {
+          method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          }
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ email: session.user.email }),
         })
 
         if (response.ok) {
@@ -76,13 +77,16 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
           setAdminUser(adminData)
           setIsAuthenticated(true)
           setIsAdmin(adminData.role === 'admin' || adminData.role === 'super_admin')
-        } else {
-          // Usuário autenticado no Supabase mas não é admin_user válido
+        } else if (response.status === 401 || response.status === 403) {
+          // 401/403: Autenticação inválida ou acesso revogado
+          console.warn('[AdminAuthProvider] Acesso negado para o usuário admin (Status:', response.status, ')')
           clearAdminState()
+        } else {
+          // 404 / 500: Erro de infraestrutura/servidor - não desloga o estado imediatamente
+          console.error('[AdminAuthProvider] Erro no servidor de autenticação admin (Status:', response.status, ')')
         }
       } catch (error) {
-        console.error('Erro ao verificar sessão administrativa:', error)
-        clearAdminState()
+        console.error('[AdminAuthProvider] Exceção ao verificar sessão administrativa:', error)
       } finally {
         setIsLoading(false)
       }
