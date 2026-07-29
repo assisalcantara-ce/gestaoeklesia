@@ -8,8 +8,6 @@ import {
   resolveRoles,
   type NivelAcesso,
 } from '@/lib/access-control';
-import { ImpersonationService } from '@/lib/security/ImpersonationService';
-import { verifyImpersonationToken } from '@/lib/security/impersonation-jwt';
 
 type SupabaseLike = ReturnType<typeof createServerClientFromRequest>;
 
@@ -87,35 +85,7 @@ export async function resolveTenantAuth(request: NextRequest): Promise<TenantAut
   const supabase = createServerClientFromRequest(request);
   const admin = createServerClient();
 
-  // 1. Checar se existe contexto de Impersonação (x-impersonation-token ou Authorization Bearer impersonation)
-  const customImpToken = request.headers.get('x-impersonation-token')?.trim() || '';
-  const authHeader = request.headers.get('Authorization') || '';
-  const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim();
-  const tokenCandidate = customImpToken || bearerToken;
-
-  if (tokenCandidate) {
-    const verifyCheck = verifyImpersonationToken(tokenCandidate);
-    if (verifyCheck.payload?.type === 'impersonation') {
-      const valResult = await ImpersonationService.validateImpersonation(tokenCandidate);
-      if (valResult.valid && valResult.session && valResult.status === 'active') {
-        const session = valResult.session;
-        return {
-          supabase,
-          admin,
-          userId: session.adminId,
-          ministryId: session.tenantId,
-          nivel: 'administrador',
-          roles: ['ADMINISTRADOR'],
-          permissions: ['ADMINISTRADOR'],
-          congregacaoId: null,
-          supervisaoId: null,
-          isOwner: true,
-        };
-      }
-    }
-  }
-
-  // 2. Fluxo nativo Supabase Auth (quando não houver token de impersonação ativo)
+  // Fluxo nativo Supabase Auth puro
   const {
     data: { user },
     error,

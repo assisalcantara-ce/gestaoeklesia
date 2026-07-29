@@ -1,6 +1,6 @@
 /**
  * API Client com autenticação Supabase
- * Injeta automaticamente o token Bearer nas requisições
+ * Injeta automaticamente o token Bearer da sessão nativa nas requisições.
  */
 
 import { createClient } from '@/lib/supabase-client'
@@ -22,31 +22,16 @@ export async function authenticatedFetch(
     const result = await Promise.race([getSessionPromise, timeoutPromise]) as { data: { session: any } }
     session = result?.data?.session ?? null
   } catch (error: any) {
-    // Mantem a chamada de API mesmo sem token para permitir respostas 401/403 controladas pelo backend.
+    // Mantém a chamada de API mesmo sem token para permitir respostas 401/403 controladas pelo backend.
     if (error?.message !== 'SESSION_TIMEOUT') {
       console.warn('[authenticatedFetch] Falha ao obter sessão:', error)
     }
   }
   
   const headers = new Headers(options.headers || {})
-  
-  // Impersonation 2.0B: Se existir um token de impersonação ativo no navegador, injetá-lo com prioridade.
-  let impersonationToken: string | null = null;
-  if (typeof window !== 'undefined') {
-    impersonationToken =
-      sessionStorage.getItem('eklesia_impersonation_token') ||
-      localStorage.getItem('eklesia_impersonation_token');
-  }
 
   if (session?.access_token) {
     headers.set('Authorization', `Bearer ${session.access_token}`)
-  }
-
-  if (impersonationToken) {
-    headers.set('x-impersonation-token', impersonationToken)
-    if (!headers.has('Authorization')) {
-      headers.set('Authorization', `Bearer ${impersonationToken}`)
-    }
   }
 
   const requestInit: RequestInit = {

@@ -5,7 +5,6 @@ import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 import Link from 'next/link'
 import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState'
 import { Inbox } from 'lucide-react'
-import { useAdminAuth } from '@/providers/AdminAuthProvider'
 
 interface MinisteriosTableProps {
   loading: boolean
@@ -25,7 +24,6 @@ interface MinisteriosTableProps {
   onBilling: (m: SupabaseMinistry) => void
   onPrintLabel: (m: SupabaseMinistry) => void
   onDelete: (m: SupabaseMinistry) => void
-  onImpersonate?: (m: SupabaseMinistry) => void
   onTechnicalAccess?: (m: SupabaseMinistry) => void
 }
 
@@ -43,10 +41,8 @@ export default function MinisteriosTable({
   onBilling,
   onPrintLabel,
   onDelete,
-  onImpersonate,
   onTechnicalAccess,
 }: MinisteriosTableProps) {
-  const { hasPermission } = useAdminAuth()
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
 
   if (loading) {
@@ -188,17 +184,6 @@ export default function MinisteriosTable({
                                 <span>Acesso Técnico Nativo</span>
                               </button>
                              )}
-                             {onImpersonate && (
-                              <button
-                                onClick={() => {
-                                  onImpersonate(ministerio)
-                                  setOpenDropdownId(null)
-                                }}
-                                className="w-full px-4 py-2 text-xs font-medium text-amber-400 hover:bg-gray-800 hover:text-amber-300 transition text-left"
-                              >
-                                🎭 Impersonate (Legado)
-                              </button>
-                             )}
                             <button
                               onClick={() => {
                                 onActivate(ministerio)
@@ -217,17 +202,6 @@ export default function MinisteriosTable({
                             >
                               🏷️ Imprimir Etiqueta
                             </button>
-                            {hasPermission('IMPERSONATE_TENANT') && (
-                              <button
-                                onClick={() => {
-                                  onImpersonate?.(ministerio)
-                                  setOpenDropdownId(null)
-                                }}
-                                className="w-full px-4 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-950/30 transition text-left flex items-center gap-2"
-                              >
-                                👤 Assumir Sessão...
-                              </button>
-                            )}
                             <hr className="border-gray-800 my-1" />
                             <button
                               onClick={() => {

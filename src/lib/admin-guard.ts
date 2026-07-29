@@ -1,8 +1,6 @@
 import { createServerClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
 import { ADMIN_MODULOS_ACESSO, type AdminRole } from '@/lib/access-control'
-import { ImpersonationService } from '@/lib/security/ImpersonationService'
-import { verifyImpersonationToken } from '@/lib/security/impersonation-jwt'
 
 export type RequireAdminOptions = {
   requiredRole?: AdminRole
@@ -14,18 +12,6 @@ export type AdminContext = {
   supabaseAdmin: ReturnType<typeof createServerClient>
   user: NonNullable<Awaited<ReturnType<ReturnType<typeof createServerClient>['auth']['getUser']>>['data']['user']>
   adminUser: any
-  // Contexto de Impersonação (Admin Impersonation 2.0B)
-  isImpersonating?: boolean
-  originalAdmin?: {
-    id: string
-    email: string
-    role: string
-    nome?: string
-  } | null
-  impersonationSessionId?: string | null
-  readOnly?: boolean
-  targetTenantId?: string | null
-  targetTenantName?: string | null
 }
 
 function isActiveAdmin(adminUser: any): boolean {
@@ -51,12 +37,11 @@ function hasRequiredRole(adminUser: any, requiredRole?: AdminRole): boolean {
 
 function hasCapability(adminUser: any, requiredCapability?: string): boolean {
   if (!requiredCapability) return true
+  if (adminUser?.role === 'super_admin') return true
 
-  // Compatibilidade: alguns ambientes usam um schema antigo de admin_users
-  // sem colunas can_manage_*; nesse caso, admin tem acesso total.
-  const role = adminUser?.role
-  if ((role === 'admin' || role === 'super_admin') && adminUser?.[requiredCapability] == null) {
-    return true
+  // Verifica na lista de capabilities caso existam no profile do admin
+  if (Array.isArray(adminUser?.capabilities)) {
+    return adminUser.capabilities.includes(requiredCapability)
   }
 
   return adminUser?.[requiredCapability] === true
@@ -68,26 +53,8 @@ export async function requireAdmin(
 ): Promise<{ ok: true; ctx: AdminContext } | { ok: false; response: NextResponse }> {
   const supabaseAdmin = createServerClient()
 
-  const customImpToken = request.headers.get('x-impersonation-token')?.trim() || ''
   const authHeader = request.headers.get('Authorization') || ''
-  const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim()
-
-  // Blindagem de Plataforma: Rotas pertencentes ao painel corporativo do Admin
-  // operam exclusivamente em contexto global da plataforma e DEVEM ignorar o x-impersonation-token.
-  const pathname = request.nextUrl.pathname
-  const isCorporateAdminRoute =
-    pathname.startsWith('/api/v1/admin/crm') ||
-    pathname.startsWith('/api/v1/admin/oportunidades') ||
-    pathname.startsWith('/api/v1/admin/metrics') ||
-    pathname.startsWith('/api/v1/admin/ministries') ||
-    pathname.startsWith('/api/v1/admin/billing') ||
-    pathname.startsWith('/api/v1/admin/tickets') ||
-    pathname.startsWith('/api/v1/admin/contracts') ||
-    // Início de nova sessão de impersonação deve autenticar pelo Bearer do Super Admin,
-    // nunca por um x-impersonation-token anterior armazenado no navegador.
-    pathname === '/api/v1/admin/impersonate/start'
-
-  const token = (isCorporateAdminRoute ? bearerToken : (customImpToken || bearerToken))
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim()
 
   if (!token) {
     return {
@@ -96,106 +63,31 @@ export async function requireAdmin(
     }
   }
 
-  // 1. Checar se o token enviado é um JWT exclusivo de Impersonação
-  const verifyCheck = verifyImpersonationToken(token)
-  if (verifyCheck.payload?.type === 'impersonation') {
-    const valResult = await ImpersonationService.validateImpersonation(token)
-    if (!valResult.valid || !valResult.session || valResult.status !== 'active') {
-      return {
-        ok: false,
-        response: NextResponse.json(
-          { error: 'Unauthorized', details: valResult.error || 'Sessão de impersonação inválida ou expirada.' },
-          { status: 401 }
-        ),
-      }
-    }
+  // 1. Obter usuário autenticado via Supabase Auth
+  const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
 
-    const session = valResult.session
-
-    // Buscar o Super Admin original no banco de dados
-    const { data: adminUser, error: adminError } = await supabaseAdmin
-      .from('admin_users')
-      .select('*')
-      .eq('id', session.adminId)
-      .single()
-
-    if (adminError || !adminUser || !isActiveAdmin(adminUser)) {
-      return {
-        ok: false,
-        response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
-      }
-    }
-
-    if (!hasRequiredRole(adminUser, options.requiredRole) || !hasCapability(adminUser, options.requiredCapability)) {
-      return {
-        ok: false,
-        response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
-      }
-    }
-
-    if (options.requiredModule) {
-      const roleNorm = String(adminUser?.role || '').toLowerCase().trim() as AdminRole;
-      const allowed = ADMIN_MODULOS_ACESSO[roleNorm]?.includes(options.requiredModule);
-      if (!allowed && roleNorm !== 'admin' && roleNorm !== 'super_admin') {
-        return {
-          ok: false,
-          response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
-        }
-      }
-    }
-
-    return {
-      ok: true,
-      ctx: {
-        supabaseAdmin,
-        user: { id: adminUser.id, email: adminUser.email } as any,
-        adminUser,
-        isImpersonating: true,
-        originalAdmin: {
-          id: adminUser.id,
-          email: adminUser.email,
-          role: adminUser.role,
-          nome: adminUser.nome,
-        },
-        impersonationSessionId: session.id,
-        readOnly: session.readOnly,
-        targetTenantId: session.tenantId,
-        targetTenantName: session.tenantName,
-      },
-    }
-  }
-
-  // 2. Fluxo nativo Supabase Auth (quando não for token de impersonação)
-  const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token)
-  if (authError || !authData.user || !authData.user.email) {
+  if (userError || !user) {
     return {
       ok: false,
       response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
     }
   }
 
-  const user = authData.user
-
+  // 2. Verificar se o usuário existe em admin_users e está ATIVO
   const { data: adminUser, error: adminError } = await supabaseAdmin
     .from('admin_users')
     .select('*')
-    .eq('email', user.email)
+    .eq('user_id', user.id)
     .single()
 
-  if (adminError || !adminUser) {
+  if (adminError || !adminUser || !isActiveAdmin(adminUser)) {
     return {
       ok: false,
       response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
     }
   }
 
-  if (!isActiveAdmin(adminUser)) {
-    return {
-      ok: false,
-      response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
-    }
-  }
-
+  // 3. Validar Role
   if (!hasRequiredRole(adminUser, options.requiredRole)) {
     return {
       ok: false,
@@ -203,6 +95,7 @@ export async function requireAdmin(
     }
   }
 
+  // 4. Validar Capability
   if (!hasCapability(adminUser, options.requiredCapability)) {
     return {
       ok: false,
@@ -210,6 +103,7 @@ export async function requireAdmin(
     }
   }
 
+  // 5. Validar Módulo Solicitado
   if (options.requiredModule) {
     const roleNorm = String(adminUser?.role || '').toLowerCase().trim() as AdminRole;
     const allowed = ADMIN_MODULOS_ACESSO[roleNorm]?.includes(options.requiredModule);
@@ -227,12 +121,6 @@ export async function requireAdmin(
       supabaseAdmin,
       user,
       adminUser,
-      isImpersonating: false,
-      originalAdmin: null,
-      impersonationSessionId: null,
-      readOnly: false,
-      targetTenantId: null,
-      targetTenantName: null,
     },
   }
 }

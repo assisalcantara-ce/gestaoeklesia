@@ -12,7 +12,6 @@ import AdminSidebar from '@/components/AdminSidebar'
 import MinisteriosHeader from '@/components/admin/ministerios/MinisteriosHeader'
 import BillingModal from '@/components/admin/ministerios/modals/BillingModal'
 import ActivationModal from '@/components/admin/ministerios/modals/ActivationModal'
-import ImpersonationHistoryTab from '@/components/admin/impersonation/ImpersonationHistoryTab'
 import { useBillingActions } from '@/hooks/admin/ministerios/useBillingActions'
 import { friendlyError, formatPhoneDisplay } from '@/lib/admin/ministerios/helpers'
 import { getDetailedStatus } from '@/lib/admin/ministerios/status'
@@ -520,8 +519,10 @@ export default function CockpitPage({ params }: CockpitPageProps) {
                 </div>
               )}
 
-              {activeTab === 'suporte' && (
-                <ImpersonationHistoryTab tenantId={ministry.id} />
+              {activeTab === 'auditoria' && (
+                <div className="p-6 bg-gray-800/40 rounded-xl border border-gray-700/50 text-gray-400 text-sm text-center">
+                  O histórico de acessos técnicos pode ser consultado na tabela audit_logs.
+                </div>
               )}
 
               {activeTab === 'financeiro' && (
