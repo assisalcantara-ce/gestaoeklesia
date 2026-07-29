@@ -132,14 +132,6 @@ export default function TrialExpiradoPage() {
 
         setSessionUserId(user.id)
 
-        // Busca o ministry_id do usuário em ministry_users ou ministries
-        let mId = ''
-        const { data: ministryUser } = await supabase
-          .from('ministry_users')
-          .select('ministry_id')
-          .eq('user_id', user.id)
-          .maybeSingle()
-
         const mId = userCtx.ministryId;
         if (!mId) return;
 

@@ -1126,6 +1126,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
 // Componente Nomenclaturas
 function NomenclaturaContent({ onNotification }: { onNotification: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {
   const dialog = useAppDialog();
+  const userCtx = useUserContext();
   const { registrarAcao } = useAuditLog();
   const [isEditing, setIsEditing] = useState(false);
 
