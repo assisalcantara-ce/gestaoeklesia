@@ -82,7 +82,10 @@ export async function requireAdmin(
     pathname.startsWith('/api/v1/admin/ministries') ||
     pathname.startsWith('/api/v1/admin/billing') ||
     pathname.startsWith('/api/v1/admin/tickets') ||
-    pathname.startsWith('/api/v1/admin/contracts')
+    pathname.startsWith('/api/v1/admin/contracts') ||
+    // Início de nova sessão de impersonação deve autenticar pelo Bearer do Super Admin,
+    // nunca por um x-impersonation-token anterior armazenado no navegador.
+    pathname === '/api/v1/admin/impersonate/start'
 
   const token = (isCorporateAdminRoute ? bearerToken : (customImpToken || bearerToken))
 
