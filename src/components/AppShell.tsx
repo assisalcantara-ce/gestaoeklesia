@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import TechnicalAccessBanner from '@/components/admin/technical/TechnicalAccessBanner';
 import { ReactNode } from 'react';
 
 // Prefixos de rota que exibem o Sidebar
@@ -33,15 +34,23 @@ export default function AppShell({ children }: { children: ReactNode }) {
   );
 
   if (!showSidebar) {
-    return <>{children}</>;
+    return (
+      <>
+        <TechnicalAccessBanner />
+        {children}
+      </>
+    );
   }
 
   return (
-    <div className="flex h-screen bg-[#f4f6f9] overflow-x-hidden">
-      <Sidebar />
-      <main className="flex-1 min-h-0 min-w-0 flex flex-col">
-        {children}
-      </main>
+    <div className="flex flex-col h-screen bg-[#f4f6f9] overflow-x-hidden">
+      <TechnicalAccessBanner />
+      <div className="flex flex-1 min-h-0 min-w-0">
+        <Sidebar />
+        <main className="flex-1 min-h-0 min-w-0 flex flex-col">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
