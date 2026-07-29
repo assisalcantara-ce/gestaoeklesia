@@ -392,17 +392,123 @@ export async function enviarEmailBoasVindas(
 }
 
 /**
- * Recuperar informações do token
+ * Gera o template HTML institucional para notificação de alteração de senha
  */
-export function obterInfoToken(token: string): EmailValidacao | null {
-  const tokens = readTokens();
-  const entry = tokens[token];
-  if (!entry) return null;
-  return {
-    token,
-    ministryId: entry.ministryId,
-    email: entry.email,
-    expiresAt: entry.expiresAt,
-    criadoEm: entry.criadoEm,
-  };
+export function gerarEmailSegurancaHTML(params: {
+  nomeUsuario: string;
+  nomeMinisterio?: string;
+  dataHora: string;
+  ip?: string;
+  userAgent?: string;
+}): string {
+  const { nomeUsuario, nomeMinisterio, dataHora, ip, userAgent } = params;
+
+  return `
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Notificação de Segurança - Gestão Eklésia</title>
+      <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f7fb; margin: 0; padding: 20px; color: #334155; }
+        .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05); }
+        .header { background: linear-gradient(135deg, #062E6F 0%, #154A92 100%); padding: 32px 24px; text-align: center; color: white; }
+        .header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+        .header p { margin: 6px 0 0 0; font-size: 12px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; }
+        .content { padding: 32px 28px; }
+        .greeting { font-size: 16px; font-weight: 600; color: #0f172a; margin-bottom: 12px; }
+        .message-box { background-color: #f8fafc; border-left: 4px solid #2563eb; border-radius: 6px; padding: 16px 20px; margin: 20px 0; }
+        .message-box p { margin: 0; font-size: 14px; line-height: 1.6; color: #334155; }
+        .details-grid { background-color: #f1f5f9; border-radius: 12px; padding: 18px; margin: 20px 0; font-size: 13px; }
+        .details-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e2e8f0; }
+        .details-row:last-child { border-bottom: none; }
+        .details-label { color: #64748b; font-weight: 500; }
+        .details-val { color: #0f172a; font-weight: 600; text-align: right; }
+        .warning-box { background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 10px; padding: 16px; margin-top: 24px; text-align: center; }
+        .warning-box p { margin: 0; font-size: 13px; color: #be123c; font-weight: 600; line-height: 1.5; }
+        .footer { background-color: #f8fafc; padding: 20px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #f1f5f9; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>GESTÃO EKLÉSIA</h1>
+          <p>Notificação de Segurança</p>
+        </div>
+        <div class="content">
+          <div class="greeting">Olá, ${nomeUsuario}</div>
+          <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+            Informamos que a senha da sua conta no <strong>Gestão Eklésia</strong> ${nomeMinisterio ? `(${nomeMinisterio})` : ''} foi alterada com sucesso.
+          </p>
+
+          <div class="message-box">
+            <p><strong>🔒 Sua senha foi alterada com sucesso.</strong></p>
+          </div>
+
+          <div class="details-grid">
+            <div class="details-row">
+              <span class="details-label">Data e Hora:</span>
+              <span class="details-val">${dataHora}</span>
+            </div>
+            ${ip ? `
+            <div class="details-row">
+              <span class="details-label">Endereço IP:</span>
+              <span class="details-val">${ip}</span>
+            </div>` : ''}
+            ${userAgent ? `
+            <div class="details-row">
+              <span class="details-label">Dispositivo / Navegador:</span>
+              <span class="details-val">${userAgent}</span>
+            </div>` : ''}
+          </div>
+
+          <div class="warning-box">
+            <p>
+              Caso esta alteração não tenha sido realizada por você, entre imediatamente em contato com o suporte da Gestão Eklésia.
+            </p>
+          </div>
+        </div>
+        <div class="footer">
+          <p><strong>GESTÃO EKLÉSIA™</strong> — Tecnologia Alcântara Sistemas</p>
+          <p>© ${new Date().getFullYear()} Todos os direitos reservados. E-mail automático de segurança.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 }
+
+/**
+ * Envia notificação de segurança após redefinição de senha (com tratamento de resiliência)
+ */
+export async function enviarNotificacaoSegurancaSenha(params: {
+  email: string;
+  nomeUsuario?: string;
+  nomeMinisterio?: string;
+  ip?: string;
+  userAgent?: string;
+}): Promise<{ enviado: boolean; erro?: string }> {
+  try {
+    const dataHoraStr = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const html = gerarEmailSegurancaHTML({
+      nomeUsuario: params.nomeUsuario || params.email.split('@')[0],
+      nomeMinisterio: params.nomeMinisterio,
+      dataHora: dataHoraStr,
+      ip: params.ip,
+      userAgent: params.userAgent,
+    });
+
+    console.log('🔒 📧 Notificação de segurança disparada para:', {
+      para: params.email,
+      assunto: 'Notificação de Segurança - Senha Alterada com Sucesso',
+      html,
+    });
+
+    return { enviado: true };
+  } catch (err: any) {
+    console.error('❌ Falha ao processar envio de e-mail de segurança:', err);
+    return { enviado: false, erro: err?.message || 'Erro desconhecido' };
+  }
+}
+
