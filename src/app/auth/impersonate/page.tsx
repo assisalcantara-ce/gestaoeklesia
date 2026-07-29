@@ -25,8 +25,9 @@ export default function ImpersonateBootstrapPage() {
 
     const bootstrapSession = async () => {
       try {
-        // 1. Armazenar token temporário de impersonação no armazenamento da nova aba
+        // 1. Armazenar token temporário de impersonação e flag mestre da janela no armazenamento da nova aba
         sessionStorage.setItem('eklesia_impersonation_token', token);
+        sessionStorage.setItem('eklesia_impersonation_window', 'true');
         localStorage.setItem('eklesia_impersonation_token', token);
 
         // 2. Validar token no servidor via API de status

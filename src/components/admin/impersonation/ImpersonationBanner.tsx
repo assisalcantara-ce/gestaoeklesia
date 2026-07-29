@@ -83,15 +83,29 @@ export default function ImpersonationBanner() {
     } catch (e) {
       console.warn('Erro ao chamar endpoint de end impersonation:', e)
     } finally {
+      const isImpersonationWindow = sessionStorage.getItem('eklesia_impersonation_window') === 'true'
+
       sessionStorage.removeItem('eklesia_impersonation_token')
+      sessionStorage.removeItem('eklesia_impersonation_window')
       localStorage.removeItem('eklesia_impersonation_token')
       
       if (customMessage) {
         alert(customMessage)
       }
 
-      if (window.opener || window.history.length === 1) {
-        window.close()
+      if (isImpersonationWindow) {
+        try {
+          window.close()
+        } catch {
+          // Ignora falha de permissão do navegador
+        }
+
+        // Se o navegador não fechou a aba (ex: window.closed é false), executar fallback seguro imediato
+        setTimeout(() => {
+          if (!window.closed) {
+            window.location.href = '/admin/ministerios'
+          }
+        }, 300)
       } else {
         window.location.href = '/admin/ministerios'
       }
