@@ -27,6 +27,70 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [loginErrorModal, setLoginErrorModal] = useState({ isOpen: false })
+  const [showForgotModal, setShowForgotModal] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotSent, setForgotSent] = useState(false)
+  const [forgotError, setForgotError] = useState('')
+
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (forgotLoading) return
+    
+    const emailTrimmed = forgotEmail.trim()
+    if (!emailTrimmed) {
+      setForgotError('Por favor, informe o e-mail cadastrado.')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(emailTrimmed)) {
+      setForgotError('Informe um e-mail válido.')
+      return
+    }
+
+    setForgotLoading(true)
+    setForgotError('')
+
+    try {
+
+      if (!supabaseRef.current) {
+        supabaseRef.current = createClient()
+      }
+      const supabase = supabaseRef.current
+
+      const redirectTo = `${window.location.origin}/redefinir-senha`
+
+      // Dispara o envio oficial do Supabase Auth
+      await supabase.auth.resetPasswordForEmail(emailTrimmed, {
+        redirectTo,
+      })
+
+      // Registrar auditoria via API
+      try {
+        await fetch('/api/v1/audit-logs/public', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            acao: 'outro',
+            modulo: 'autenticacao',
+            descricao: 'Solicitação de redefinição de senha',
+            usuario_email: emailTrimmed,
+            status: 'sucesso',
+          }),
+        })
+      } catch {
+        // Ignora falha de log na solicitação
+      }
+
+      setForgotSent(true)
+    } catch {
+      // Mensagem neutra por segurança
+      setForgotSent(true)
+    } finally {
+      setForgotLoading(false)
+    }
+  }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.gestaoeklesia.com.br'
 
@@ -200,12 +264,18 @@ export default function LoginPage() {
                 />
                 <span>Lembrar acesso</span>
               </label>
-              <a
-                href={`${siteUrl}/login#recuperar`}
-                className="font-semibold text-[#0B3B82] hover:underline transition"
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotEmail(email);
+                  setForgotError('');
+                  setForgotSent(false);
+                  setShowForgotModal(true);
+                }}
+                className="font-semibold text-[#0B3B82] hover:underline transition bg-transparent border-none p-0 cursor-pointer"
               >
                 Esqueci minha senha
-              </a>
+              </button>
             </div>
 
             {/* Botão de envio */}
@@ -249,6 +319,91 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      {/* Modal Esqueci minha senha */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-lg font-bold text-[#0B3B82] flex items-center gap-2">
+                <Mail className="w-5 h-5 text-[#0B3B82]" /> Recuperar Senha
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition text-sm font-bold p-1"
+                disabled={forgotLoading}
+              >
+                ✕
+              </button>
+            </div>
+
+            {forgotSent ? (
+              <div className="space-y-4 text-center py-3">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl">
+                  ✓
+                </div>
+                <p className="text-sm font-semibold text-slate-700 leading-relaxed">
+                  Se existir uma conta vinculada a este e-mail, enviaremos as instruções para redefinição da senha.
+                </p>
+                <p className="text-xs text-slate-500">
+                  Por favor, verifique também a sua caixa de spam ou lixo eletrônico.
+                </p>
+                <div className="pt-2">
+                  <PremiumButton
+                    type="button"
+                    onClick={() => setShowForgotModal(false)}
+                    className="w-full"
+                  >
+                    Entendido
+                  </PremiumButton>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Informe o seu e-mail cadastrado. Enviaremos um link seguro para você redefinir sua senha.
+                </p>
+
+                {forgotError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold">
+                    {forgotError}
+                  </div>
+                )}
+
+                <PremiumInput
+                  type="email"
+                  label="E-mail cadastrado"
+                  placeholder="seu.email@igreja.com"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  icon={<Mail className="w-4 h-4" />}
+                  required
+                  disabled={forgotLoading}
+                />
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotModal(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition"
+                    disabled={forgotLoading}
+                  >
+                    Cancelar
+                  </button>
+                  <PremiumButton
+                    type="submit"
+                    loading={forgotLoading}
+                    disabled={forgotLoading}
+                  >
+                    Enviar instruções
+                  </PremiumButton>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
