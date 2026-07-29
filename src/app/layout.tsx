@@ -3,6 +3,7 @@ import './globals.css';
 import { AppDialogProvider } from '@/providers/AppDialogProvider';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { UsuarioProvider } from '@/providers/UsuarioContext';
+import { CurrentMinistryProvider } from '@/providers/CurrentMinistryProvider';
 import { TrialGuard } from '@/components/TrialGuard';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AppShell from '@/components/AppShell';
@@ -26,15 +27,17 @@ export default function RootLayout({
       <body className="antialiased bg-white">
         <AuthProvider>
           <UsuarioProvider>
-            <AppDialogProvider>
-              <TrialGuard>
-                <ProtectedRoute>
-                  <AppShell>
-                    {children}
-                  </AppShell>
-                </ProtectedRoute>
-              </TrialGuard>
-            </AppDialogProvider>
+            <CurrentMinistryProvider>
+              <AppDialogProvider>
+                <TrialGuard>
+                  <ProtectedRoute>
+                    <AppShell>
+                      {children}
+                    </AppShell>
+                  </ProtectedRoute>
+                </TrialGuard>
+              </AppDialogProvider>
+            </CurrentMinistryProvider>
           </UsuarioProvider>
         </AuthProvider>
       </body>

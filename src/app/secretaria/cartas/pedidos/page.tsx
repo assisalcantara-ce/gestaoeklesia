@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useUserContext } from '@/hooks/useUserContext';
+import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
 import { createClient } from '@/lib/supabase-client';
 import { CheckCircle, Clock, FileText, Printer, Send, XCircle } from 'lucide-react';
 
@@ -87,6 +88,7 @@ export default function CartaPedidosPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const userCtx = useUserContext();
+  const { ministry: currentMinistry } = useCurrentMinistry();
   const isGestor = userCtx.nivel === 'administrador' || userCtx.nivel === 'supervisor';
   const isAuxiliar = userCtx.nivel === 'auxiliar_secretaria';
 
@@ -150,9 +152,7 @@ export default function CartaPedidosPage() {
   }
 
   async function loadMinisterio() {
-    if (!userCtx.ministryId) return;
-    const { data } = await supabase.from('ministries').select('name').eq('id', userCtx.ministryId).maybeSingle();
-    setMinisterioNome(data?.name ?? '');
+    setMinisterioNome(currentMinistry?.nome || currentMinistry?.name || '');
   }
 
   useEffect(() => {

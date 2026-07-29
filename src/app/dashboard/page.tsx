@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
 import { useUserContext } from '@/hooks/useUserContext';
+import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
 import { ProductExperienceService } from '@/lib/services/product-experience';
 import { ExperienceCenter } from '@/services/experience/ExperienceCenter';
 import {
@@ -118,6 +119,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const userCtx = useUserContext();
+  const { ministry: currentMinistry } = useCurrentMinistry();
   const [dataAtual, setDataAtual] = useState('');
   const [usuarioLogado, setUsuarioLogado] = useState<{ nome: string; email: string; nivel: string } | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -369,7 +371,7 @@ export default function DashboardPage() {
 
       const [
         congListRes, allMembersRes, eventosProxRes,
-        memberGrowthRes, cartasPendCountRes, pareceresRes, ministerioRes,
+        memberGrowthRes, cartasPendCountRes, pareceresRes,
       ] = await Promise.all([
         safeQuery(supabase.from('congregacoes').select('id, nome').eq('ministry_id', ministryId).eq('is_active', true).order('nome').limit(50)),
         safeQuery(supabase.from('members').select('congregacao_id, status').eq('ministry_id', ministryId).limit(10000)),
@@ -377,7 +379,6 @@ export default function DashboardPage() {
         safeQuery(supabase.from('members').select('created_at').eq('ministry_id', ministryId).gte('created_at', twelveMonthsAgo).limit(5000)),
         safeQuery(supabase.from('carta_pedidos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'pendente')),
         safeQuery(supabase.from('flow_instances').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).in('status', ['pendente', 'em_analise'])),
-        safeQuery(supabase.from('ministries').select('name').eq('id', ministryId).maybeSingle(), { data: { name: '' } }),
       ]);
 
       // PIX vencidos (best-effort — campo status pode não existir)
@@ -528,7 +529,7 @@ export default function DashboardPage() {
         pendencias,
         mensagemPresidencia,
         crescimentoMembros,
-        nomeMinisterio: (ministerioRes.data as any)?.name ?? '',
+        nomeMinisterio: currentMinistry?.nome || currentMinistry?.name || '',
       });
 
       // Busca o status do onboarding

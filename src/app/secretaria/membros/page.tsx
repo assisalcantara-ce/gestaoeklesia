@@ -535,30 +535,7 @@ export default function MembrosPage() {
   }, []);
 
   const resolveMinistryId = async (): Promise<string | null> => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return null;
-
-      const mu = await supabase
-        .from('ministry_users')
-        .select('ministry_id')
-        .eq('user_id', user.id)
-        .limit(1);
-      const ministryIdFromMu = (mu.data as any)?.[0]?.ministry_id as string | undefined;
-      if (ministryIdFromMu) return ministryIdFromMu;
-
-      const m = await supabase
-        .from('ministries')
-        .select('id')
-        .eq('user_id', user.id)
-        .limit(1);
-      const ministryIdFromOwner = (m.data as any)?.[0]?.id as string | undefined;
-      return ministryIdFromOwner || null;
-    } catch {
-      return null;
-    }
+    return userCtx.ministryId;
   };
 
   useEffect(() => {

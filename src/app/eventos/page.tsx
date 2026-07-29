@@ -245,6 +245,7 @@ const exportarCSVInscricoes = (inscricoes: Inscricao[], tituloEvento: string) =>
 export default function EventosPage() {
   const { user }           = useRequireSupabaseAuth();
   const { ctx, bloqueado } = useRequireModulo('eventos');
+  const userCtx            = useUserContext();
   const planFeatures       = usePlanFeatures();
   const router             = useRouter();
   const supabase           = createClient();
@@ -311,18 +312,16 @@ export default function EventosPage() {
       if (!mid) { setLoadingData(false); return; }
       setMinistryId(mid);
 
-      const [{ data: congs }, { data: mu }, { data: owner }] = await Promise.all([
+      const [{ data: congs }, { data: mu }] = await Promise.all([
         supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome'),
         supabase.from('ministry_users').select('permissions, role').eq('user_id', user.id).eq('ministry_id', mid).single(),
-        supabase.from('ministries').select('id').eq('id', mid).eq('user_id', user.id).maybeSingle(),
       ]);
 
       setCongregacoes((congs ?? []) as Congregacao[]);
 
-      const isOwner = !!owner;
       const perms   = ((mu as { permissions?: string[] } | null)?.permissions ?? []);
       const role    = ((mu as { role?: string } | null)?.role ?? '');
-      const isAdmin  = perms.includes('ADMINISTRADOR') || role === 'admin' || isOwner;
+      const isAdmin = userCtx.isAdmin || perms.includes('ADMINISTRADOR') || role === 'admin';
       const isSecret = perms.includes('SECRETARIO');
       const isFinanc = perms.includes('FINANCEIRO');
       setScope({ canWrite: isAdmin || isSecret, canDelete: isAdmin, canFinanceiro: isAdmin || isFinanc });

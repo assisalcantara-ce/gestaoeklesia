@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
+import { useUserContext } from '@/hooks/useUserContext'
+import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider'
 import { formatarPreco } from '@/config/plans'
 import PremiumCard from '@/components/ui/PremiumCard'
 import PremiumButton from '@/components/ui/PremiumButton'
@@ -53,6 +55,8 @@ function buildHighlights(plan: PlanoDB): string[] {
 export default function TrialExpiradoPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
+  const userCtx = useUserContext()
+  const { ministry: currentMinistry } = useCurrentMinistry()
   const [planos, setPlanos] = useState<PlanoDB[]>([])
 
   const handleLogout = async () => {
@@ -136,25 +140,10 @@ export default function TrialExpiradoPage() {
           .eq('user_id', user.id)
           .maybeSingle()
 
-        if (ministryUser?.ministry_id) {
-          mId = ministryUser.ministry_id
-        } else {
-          const { data: ownedM } = await supabase
-            .from('ministries')
-            .select('id')
-            .eq('user_id', user.id)
-            .maybeSingle()
-          if (ownedM?.id) mId = ownedM.id
-        }
+        const mId = userCtx.ministryId;
+        if (!mId) return;
 
-        if (!mId) return
-
-        // Busca informações do ministério
-        const { data: mData } = await supabase
-          .from('ministries')
-          .select('name, email_admin, phone')
-          .eq('id', mId)
-          .maybeSingle()
+        const mData = currentMinistry;
 
         // Busca informações de configurações adicionais (como responsável)
         const { data: configData } = await supabase

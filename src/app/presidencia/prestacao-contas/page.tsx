@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { FileText, Printer, TrendingUp, TrendingDown, Minus } from 'lucide-react';
@@ -383,6 +384,7 @@ function DeltaBadge({ pct }: { pct: number | null }) {
 
 export default function PrestacaoContasPage() {
   const { ctx, bloqueado } = useRequireModulo('consolidado_financeiro');
+  const { ministry: currentMinistry } = useCurrentMinistry();
   const supabase = useMemo(() => createClient(), []);
 
   const [filtroMes, setFiltroMes]   = useState(mesAtual);
@@ -412,15 +414,12 @@ export default function PrestacaoContasPage() {
   useEffect(() => {
     if (!ministryId) return;
     const load = async () => {
-      const [resCongs, resMin] = await Promise.all([
-        supabase.from('congregacoes').select('id, nome').eq('ministry_id', ministryId).eq('is_active', true).order('nome'),
-        supabase.from('ministries').select('nome').eq('id', ministryId).maybeSingle(),
-      ]);
+      const resCongs = await supabase.from('congregacoes').select('id, nome').eq('ministry_id', ministryId).eq('is_active', true).order('nome');
       setCongregacoes((resCongs.data ?? []) as Congregacao[]);
-      setMinistryNome((resMin.data as { nome?: string } | null)?.nome ?? '');
+      setMinistryNome(currentMinistry?.nome || currentMinistry?.name || '');
     };
     void load();
-  }, [ministryId, supabase]);
+  }, [ministryId, supabase, currentMinistry]);
 
   // ── Gerar relatório ───────────────────────────────────────────────────────
 

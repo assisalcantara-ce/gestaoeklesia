@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import {
@@ -176,6 +177,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function ConselhoFiscalPage() {
   const { ctx, bloqueado } = useRequireModulo('conselho_fiscal');
   const planFeatures = usePlanFeatures();
+  const { ministry: currentMinistry } = useCurrentMinistry();
   const supabase = useMemo(() => createClient(), []);
 
   const [ministryId, setMinistryId] = useState<string | null>(null);
@@ -251,9 +253,7 @@ export default function ConselhoFiscalPage() {
       }
     }
 
-    // Nome do ministério e usuário autenticado (para documentos oficiais e assinatura)
-    const { data: mData } = await supabase.from('ministries').select('nome').eq('id', ministryId).maybeSingle();
-    setMinistryNome((mData as { nome: string } | null)?.nome ?? '');
+    setMinistryNome(currentMinistry?.nome || currentMinistry?.name || '');
     const userMeta = sessionData.session?.user;
     setSigNome(prev => prev || userMeta?.user_metadata?.name || userMeta?.user_metadata?.full_name || userMeta?.email || '');
 

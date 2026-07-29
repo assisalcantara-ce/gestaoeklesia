@@ -7,6 +7,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { useAuditLog } from '@/hooks/useAuditLog';
+import { useUserContext } from '@/hooks/useUserContext';
 import { type NivelAcesso as NivelAcessoRole } from '@/lib/access-control';
 
 interface Usuario {
@@ -43,6 +44,7 @@ interface SupervisaoOption {
 export default function UsuariosPage() {
   const { loading: authLoading } = useRequireSupabaseAuth();
   const { bloqueado } = useRequireModulo('usuarios');
+  const userCtx = useUserContext();
   const supabase = useMemo(() => createClient(), []);
   const { registrarAcao } = useAuditLog();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -283,38 +285,21 @@ export default function UsuariosPage() {
   }, [authLoading, supabase]);
 
   useEffect(() => {
-    const loadPlano = async () => {
-      if (authLoading) return;
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) return;
+    const resolveMaxUsuarios = async () => {
+      const ministryId = userCtx.ministryId;
+      if (!ministryId) return;
 
-      // Tenta via ministry_users (usuário secundário)
-      const { data: mu } = await supabase
-        .from('ministry_users')
-        .select('ministry_id')
-        .eq('user_id', data.session.user.id)
-        .limit(1)
+      const { data: row } = await supabase
+        .from('ministries')
+        .select('subscription_plan_id, subscription_plans(max_users)')
+        .eq('id', ministryId)
         .maybeSingle();
-      const ministryId = mu?.ministry_id;
 
-      const query = ministryId
-        ? supabase
-            .from('ministries')
-            .select('subscription_plan_id, subscription_plans(max_users)')
-            .eq('id', ministryId)
-            .maybeSingle()
-        : supabase
-            .from('ministries')
-            .select('subscription_plan_id, subscription_plans(max_users)')
-            .eq('user_id', data.session.user.id)
-            .maybeSingle();
-
-      const { data: row } = await query;
       const maxUsers = (row as any)?.subscription_plans?.max_users;
       if (typeof maxUsers === 'number') setMaxUsuarios(maxUsers);
     };
-    loadPlano();
-  }, [authLoading, supabase]);
+    resolveMaxUsuarios();
+  }, [authLoading, supabase, userCtx.ministryId]);
 
   const openEditModal = (usuario: Usuario & { congregacao_id?: string | null; supervisao_id?: string | null }) => {
     setEditError('');

@@ -12,6 +12,7 @@ import PageLayout from '@/components/PageLayout'
 import { useAppDialog } from '@/providers/AppDialogProvider'
 import AttachmentUploader, { AttachmentItem } from '@/components/common/AttachmentUploader'
 import AttachmentList from '@/components/common/AttachmentList'
+import { useUserContext } from '@/hooks/useUserContext'
 
 type TicketStatus = 'aberto' | 'em_progresso' | 'resolvido' | 'fechado' | 'aguardando_cliente'
 type TicketPriority = 'baixa' | 'media' | 'alta' | 'critica'
@@ -44,6 +45,7 @@ interface NovoTicket {
 export default function SuportePage() {
   const router = useRouter()
   const supabase = createClient()
+  const userCtx = useUserContext()
   const { registrarAcao } = useAuditLog()
   const { user, loading: authLoading } = useRequireSupabaseAuth()
   const { ctx, bloqueado } = useRequireModulo('suporte')
@@ -89,33 +91,8 @@ export default function SuportePage() {
   ]
 
   const resolveMinistryId = async () => {
-    try {
-      const {
-        data: { user: currentUser },
-      } = await supabase.auth.getUser()
-
-      if (!currentUser) return null
-
-      const { data: mu, error: muErr } = await supabase
-        .from('ministry_users')
-        .select('ministry_id')
-        .eq('user_id', currentUser.id)
-        .maybeSingle()
-
-      if (!muErr && mu?.ministry_id) return mu.ministry_id as string
-
-      const { data: m, error: mErr } = await supabase
-        .from('ministries')
-        .select('id')
-        .eq('user_id', currentUser.id)
-        .maybeSingle()
-
-      if (!mErr && m?.id) return m.id as string
-    } catch {
-      return null
-    }
-    return null
-  }
+    return userCtx.ministryId;
+  };
 
   // Carregar tickets
   useEffect(() => {

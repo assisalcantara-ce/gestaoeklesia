@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import {
@@ -569,6 +570,7 @@ function MonthPicker({ value, onChange }: { value: string; onChange: (v: string)
 export default function PrestacaoContasOficialPage() {
   const { ctx, bloqueado } = useRequireModulo('consolidado_financeiro');
   const planFeatures = usePlanFeatures();
+  const { ministry: currentMinistry } = useCurrentMinistry();
   const supabase = useMemo(() => createClient(), []);
 
   const [filtroMes, setFiltroMes]   = useState(mesAtual);
@@ -653,13 +655,12 @@ export default function PrestacaoContasOficialPage() {
       const mid = await resolveMinistryId(supabase);
       setMinistryId(mid);
 
-      const [resMins, resCongs, resUser] = await Promise.all([
-        supabase.from('ministries').select('nome').eq('id', mid).single(),
+      const [resCongs, resUser] = await Promise.all([
         supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome'),
         supabase.auth.getUser(),
       ]);
 
-      setMinistryNome((resMins.data as { nome: string } | null)?.nome ?? '');
+      setMinistryNome(currentMinistry?.nome || currentMinistry?.name || '');
       setCongregacoes((resCongs.data ?? []) as Congregacao[]);
 
       const u = resUser.data.user;
