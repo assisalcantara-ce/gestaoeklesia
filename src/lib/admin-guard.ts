@@ -68,8 +68,11 @@ export async function requireAdmin(
 ): Promise<{ ok: true; ctx: AdminContext } | { ok: false; response: NextResponse }> {
   const supabaseAdmin = createServerClient()
 
+  const customImpToken = request.headers.get('x-impersonation-token')?.trim() || ''
   const authHeader = request.headers.get('Authorization') || ''
-  const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+  const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim()
+  const token = customImpToken || bearerToken
+
   if (!token) {
     return {
       ok: false,

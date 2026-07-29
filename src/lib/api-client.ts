@@ -38,10 +38,15 @@ export async function authenticatedFetch(
       localStorage.getItem('eklesia_impersonation_token');
   }
 
-  if (impersonationToken) {
-    headers.set('Authorization', `Bearer ${impersonationToken}`)
-  } else if (session?.access_token) {
+  if (session?.access_token) {
     headers.set('Authorization', `Bearer ${session.access_token}`)
+  }
+
+  if (impersonationToken) {
+    headers.set('x-impersonation-token', impersonationToken)
+    if (!headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${impersonationToken}`)
+    }
   }
 
   const requestInit: RequestInit = {
