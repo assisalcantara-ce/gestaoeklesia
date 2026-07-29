@@ -26,6 +26,7 @@ interface MinisteriosTableProps {
   onPrintLabel: (m: SupabaseMinistry) => void
   onDelete: (m: SupabaseMinistry) => void
   onImpersonate?: (m: SupabaseMinistry) => void
+  onTechnicalAccess?: (m: SupabaseMinistry) => void
 }
 
 export default function MinisteriosTable({
@@ -43,6 +44,7 @@ export default function MinisteriosTable({
   onPrintLabel,
   onDelete,
   onImpersonate,
+  onTechnicalAccess,
 }: MinisteriosTableProps) {
   const { hasPermission } = useAdminAuth()
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
@@ -174,6 +176,29 @@ export default function MinisteriosTable({
                             >
                               💰 Gerar Cobrança
                             </button>
+                             {onTechnicalAccess && (
+                              <button
+                                onClick={() => {
+                                  onTechnicalAccess(ministerio)
+                                  setOpenDropdownId(null)
+                                }}
+                                className="w-full px-4 py-2 text-xs font-semibold text-blue-400 hover:bg-blue-600/20 hover:text-blue-200 transition text-left flex items-center gap-2 border-t border-gray-800 mt-1 pt-2"
+                              >
+                                <span>🛠️</span>
+                                <span>Acesso Técnico Nativo</span>
+                              </button>
+                             )}
+                             {onImpersonate && (
+                              <button
+                                onClick={() => {
+                                  onImpersonate(ministerio)
+                                  setOpenDropdownId(null)
+                                }}
+                                className="w-full px-4 py-2 text-xs font-medium text-amber-400 hover:bg-gray-800 hover:text-amber-300 transition text-left"
+                              >
+                                🎭 Impersonate (Legado)
+                              </button>
+                             )}
                             <button
                               onClick={() => {
                                 onActivate(ministerio)

@@ -153,6 +153,96 @@ export class TechnicalAccessService {
   }
 
   /**
+   * Inicia a sessão de Acesso Técnico Ativo para o tenant.
+   * 1. Obter/reutilizar o Usuário Técnico Permanente do tenant.
+   * 2. Reativar temporariamente o usuário no Supabase Auth (desbanir).
+   * 3. Registrar a concessão em technical_access_grants.
+   * 4. Gerar o Magic Link do Supabase Auth para autenticação nativa sem senha.
+   */
+  public static async startTechnicalSession(
+    adminClient: SupabaseClient,
+    params: {
+      tenantId: string;
+      adminId: string;
+      reason: string;
+      ticketReference?: string;
+      durationHours?: number;
+      baseUrl?: string;
+    }
+  ): Promise<{ actionLink: string; grantId: string; technicalUserId: string }> {
+    const { tenantId, adminId, reason, ticketReference, durationHours = 2, baseUrl = '' } = params;
+
+    // 1. Reutilizar/Garantir Usuário Técnico Permanente de forma determinística
+    const techUser = await this.getOrCreateTechnicalUser(adminClient, tenantId);
+
+    // 2. Reativar temporariamente a conta no Supabase Auth (remover ban)
+    const { error: unbanErr } = await adminClient.auth.admin.updateUserById(techUser.user_id, {
+      ban_duration: 'none',
+    });
+
+    if (unbanErr) {
+      console.error('[TechnicalAccessService] Erro ao reativar usuário técnico no Supabase Auth:', unbanErr);
+      throw new Error(`Erro ao ativar conta técnica no Auth: ${unbanErr.message}`);
+    }
+
+    // 3. Registrar a concessão na tabela technical_access_grants
+    const startsAt = new Date();
+    const expiresAt = new Date(startsAt.getTime() + durationHours * 3600 * 1000);
+
+    const { data: grant, error: grantErr } = await adminClient
+      .from('technical_access_grants')
+      .insert({
+        ministry_id: tenantId,
+        technical_user_id: techUser.user_id,
+        admin_id: adminId,
+        reason,
+        ticket_reference: ticketReference || null,
+        role: 'ADMINISTRADOR',
+        status: 'active',
+        starts_at: startsAt.toISOString(),
+        expires_at: expiresAt.toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (grantErr || !grant) {
+      console.error('[TechnicalAccessService] Erro ao registrar concessão:', grantErr);
+      throw new Error(`Erro ao salvar concessão de acesso técnico: ${grantErr?.message}`);
+    }
+
+    // Marca como is_active = true na tabela de controle
+    await adminClient
+      .from('permanent_technical_users')
+      .update({
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('ministry_id', tenantId);
+
+    // 4. Gerar Magic Link nativo do Supabase Auth direcionando para /dashboard
+    const redirectUrl = baseUrl ? `${baseUrl}/dashboard` : '/dashboard';
+
+    const { data: linkData, error: linkErr } = await adminClient.auth.admin.generateLink({
+      type: 'magiclink',
+      email: techUser.email,
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
+
+    if (linkErr || !linkData?.properties?.action_link) {
+      console.error('[TechnicalAccessService] Erro ao gerar Magic Link nativo do Supabase Auth:', linkErr);
+      throw new Error(`Erro ao gerar link de autenticação nativa: ${linkErr?.message}`);
+    }
+
+    return {
+      actionLink: linkData.properties.action_link,
+      grantId: grant.id,
+      technicalUserId: techUser.user_id,
+    };
+  }
+
+  /**
    * Garante que o Usuário Técnico do tenant permaneça desabilitado / inativo.
    *
    * @param adminClient Cliente Supabase com permissão de service_role.

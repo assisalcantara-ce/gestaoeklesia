@@ -20,6 +20,7 @@ import ActivationModal from '@/components/admin/ministerios/modals/ActivationMod
 import CsvImportModal from '@/components/admin/ministerios/modals/CsvImportModal'
 import DeleteConfirmationDialog from '@/components/admin/ministerios/modals/DeleteConfirmationDialog'
 import ImpersonationModal from '@/components/admin/impersonation/ImpersonationModal'
+import TechnicalAccessModal from '@/components/admin/technical/TechnicalAccessModal'
 import { useMinisterios } from '@/hooks/admin/ministerios/useMinisterios'
 import { useCsvImport } from '@/hooks/admin/ministerios/useCsvImport'
 import { useBillingActions } from '@/hooks/admin/ministerios/useBillingActions'
@@ -39,6 +40,7 @@ export default function MinisteriosPage() {
   const [activeTab, setActiveTab] = useState<'ativos' | 'leads'>('ativos')
   const [confirmDeleteMinisterio, setConfirmDeleteMinisterio] = useState<SupabaseMinistry | null>(null)
   const [selectedImpersonateMinistry, setSelectedImpersonateMinistry] = useState<SupabaseMinistry | null>(null)
+  const [selectedTechnicalAccessMinistry, setSelectedTechnicalAccessMinistry] = useState<SupabaseMinistry | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [globalStats, setGlobalStats] = useState<{ total: number; ativos: number; trials: number; suspensos: number; pendentes: number; leads?: number; mrr?: string } | null>(null)
   
@@ -586,6 +588,7 @@ export default function MinisteriosPage() {
               onPrintLabel={handlePrintLabel}
               onDelete={handleDelete}
               onImpersonate={(m) => setSelectedImpersonateMinistry(m)}
+              onTechnicalAccess={(m) => setSelectedTechnicalAccessMinistry(m)}
             />
           </>
         )}
@@ -679,6 +682,13 @@ export default function MinisteriosPage() {
     isOpen={!!selectedImpersonateMinistry}
     onClose={() => setSelectedImpersonateMinistry(null)}
     ministry={selectedImpersonateMinistry}
+  />
+
+  <TechnicalAccessModal
+    isOpen={!!selectedTechnicalAccessMinistry}
+    onClose={() => setSelectedTechnicalAccessMinistry(null)}
+    tenantId={selectedTechnicalAccessMinistry?.id || ''}
+    tenantName={selectedTechnicalAccessMinistry?.name || ''}
   />
 </div>
 )
