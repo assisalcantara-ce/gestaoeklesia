@@ -62,15 +62,16 @@ type SortDirection = 'asc' | 'desc' | null
 
 // ─── Opções dos selects ────────────────────────────────────────────────────────
 const LIFECYCLE_OPTIONS = [
-  { value: '',                     label: 'Todos os estágios' },
-  { value: 'novo',                 label: 'Novo' },
-  { value: 'primeiro_contato',     label: 'Primeiro Contato' },
-  { value: 'em_negociacao',        label: 'Em Negociação' },
-  { value: 'proposta_enviada',     label: 'Proposta Enviada' },
-  { value: 'aguardando_cliente',   label: 'Aguardando Cliente' },
-  { value: 'aguardando_pagamento', label: 'Aguardando Pagamento' },
-  { value: 'convertido',           label: 'Convertido' },
-  { value: 'perdido',              label: 'Perdido' },
+  { value: '',                label: 'Todos os estágios' },
+  { value: 'LEAD',            label: 'Lead' },
+  { value: 'TRIAL',           label: 'Trial Ativo' },
+  { value: 'TRIAL_EXPIRING',  label: 'Trial Expirando' },
+  { value: 'TRIAL_EXPIRED',   label: 'Trial Expirado' },
+  { value: 'NEGOTIATION',     label: 'Em Negociação' },
+  { value: 'PAYMENT_PENDING', label: 'Aguardando Pagamento' },
+  { value: 'ACTIVE',          label: 'Cliente Ativo' },
+  { value: 'RENEWAL',         label: 'Renovação' },
+  { value: 'CANCELED',        label: 'Cancelado' },
 ]
 
 const PRIORIDADE_OPTIONS = [

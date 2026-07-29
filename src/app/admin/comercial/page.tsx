@@ -13,6 +13,7 @@ import CrmSummaryCards from '@/components/crm/CrmSummaryCards'
 import CrmNextActions from '@/components/crm/CrmNextActions'
 import CrmTimeline from '@/components/crm/CrmTimeline'
 import CrmActivities from '@/components/crm/CrmActivities'
+import { ComercialViewModel } from '@/lib/platform/commercial/types'
 import {
   Briefcase,
   TrendingUp,
@@ -26,29 +27,11 @@ import {
 } from 'lucide-react'
 
 
-type Oportunidade = {
-  id: string
-  ministry_id: string
-  ministry_name: string
-  responsavel: string
-  email: string
-  telefone: string
-  plano_solicitado: string
-  observacao: string | null
-  observacao_interna: string | null
-  created_at: string
-  status: string
-  historico?: Array<{
-    created_at: string
-    status_novo: string
-  }>
-}
-
 export default function ComercialDashboardPage() {
   const { isLoading, isAuthenticated } = useAdminAuth()
   const router = useRouter()
 
-  const [oportunidades, setOportunidades] = useState<Oportunidade[]>([])
+  const [oportunidades, setOportunidades] = useState<ComercialViewModel[]>([])
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -78,26 +61,27 @@ export default function ComercialDashboardPage() {
   // --- CÁLCULOS DOS KPIS ---
   const kpis = useMemo(() => {
     const counts = {
-      novo: 0,
-      primeiro_contato: 0,
-      em_negociacao: 0,
-      proposta_enviada: 0,
-      aguardando_cliente: 0,
-      aguardando_pagamento: 0,
-      convertido: 0,
-      perdido: 0
+      lead: 0,
+      trial: 0,
+      trial_expiring: 0,
+      negotiation: 0,
+      payment_pending: 0,
+      active: 0,
+      renewal: 0,
+      canceled: 0
     }
 
     oportunidades.forEach((opt) => {
-      const status = opt.status.toLowerCase().trim()
-      if (status === 'novo') counts.novo++
-      else if (status === 'primeiro contato' || status === 'primeiro_contato') counts.primeiro_contato++
-      else if (status === 'em negociação' || status === 'em_negociacao') counts.em_negociacao++
-      else if (status === 'proposta enviada' || status === 'proposta_enviada') counts.proposta_enviada++
-      else if (status === 'aguardando cliente' || status === 'aguardando_cliente') counts.aguardando_cliente++
-      else if (status === 'aguardando pagamento' || status === 'aguardando_pagamento') counts.aguardando_pagamento++
-      else if (status === 'convertido') counts.convertido++
-      else if (status === 'perdido') counts.perdido++
+      const status = (opt.lifecycle?.status || opt.status || '').toUpperCase().trim()
+      if (status === 'LEAD') counts.lead++
+      else if (status === 'TRIAL') counts.trial++
+      else if (status === 'TRIAL_EXPIRING') counts.trial_expiring++
+      else if (status === 'NEGOTIATION') counts.negotiation++
+      else if (status === 'PAYMENT_PENDING') counts.payment_pending++
+      else if (status === 'ACTIVE' || status === 'CONVERTIDO') counts.active++
+      else if (status === 'RENEWAL') counts.renewal++
+      else if (status === 'CANCELED' || status === 'TRIAL_EXPIRED' || status === 'CANCELLED') counts.canceled++
+      else counts.lead++
     })
 
     return counts
@@ -114,20 +98,21 @@ export default function ComercialDashboardPage() {
   // --- PIPELINE STAGES com valores financeiros estimados ---
   const pipelineStages = useMemo(() => {
     const stages = [
-      { key: 'novo',                label: 'Novos',          desc: 'Identificados',       statusMatch: ['novo'],                                                  accent: '#6366f1', bg: 'rgba(99,102,241,0.08)',  border: 'rgba(99,102,241,0.3)'  },
-      { key: 'primeiro_contato',   label: '1º Contato',     desc: 'Interação inicial',   statusMatch: ['primeiro contato', 'primeiro_contato'],                   accent: '#3b82f6', bg: 'rgba(59,130,246,0.08)',  border: 'rgba(59,130,246,0.3)'  },
-      { key: 'em_negociacao',      label: 'Negociação',     desc: 'Alinhando plano',     statusMatch: ['em negociação', 'em_negociacao'],                         accent: '#06b6d4', bg: 'rgba(6,182,212,0.08)',   border: 'rgba(6,182,212,0.3)'   },
-      { key: 'proposta_enviada',   label: 'Proposta',       desc: 'Boleto/Customizado',  statusMatch: ['proposta enviada', 'proposta_enviada'],                   accent: '#f59e0b', bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.3)'  },
-      { key: 'aguardando_pagamento', label: 'Pagamento',    desc: 'Aguardando ASAAS',    statusMatch: ['aguardando pagamento', 'aguardando_pagamento'],            accent: '#ec4899', bg: 'rgba(236,72,153,0.08)',  border: 'rgba(236,72,153,0.3)'  },
-      { key: 'convertido',         label: 'Convertidos',    desc: 'Clientes ativos',     statusMatch: ['convertido'],                                            accent: '#10b981', bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.3)'  },
+      { key: 'LEAD',            label: 'Leads',          desc: 'Pré-cadastros sem ação', statusMatch: ['LEAD'],                             accent: '#6366f1', bg: 'rgba(99,102,241,0.08)',  border: 'rgba(99,102,241,0.3)'  },
+      { key: 'TRIAL',           label: 'Trial',          desc: 'Em teste gratuito',     statusMatch: ['TRIAL', 'TRIAL_EXPIRING'],          accent: '#3b82f6', bg: 'rgba(59,130,246,0.08)',  border: 'rgba(59,130,246,0.3)'  },
+      { key: 'NEGOTIATION',     label: 'Negociação',     desc: 'Alinhando contrato',    statusMatch: ['NEGOTIATION'],                      accent: '#06b6d4', bg: 'rgba(6,182,212,0.08)',   border: 'rgba(6,182,212,0.3)'   },
+      { key: 'PAYMENT_PENDING', label: 'Pagamento',      desc: 'Aguardando ASAAS',      statusMatch: ['PAYMENT_PENDING'],                  accent: '#ec4899', bg: 'rgba(236,72,153,0.08)',  border: 'rgba(236,72,153,0.3)'  },
+      { key: 'ACTIVE',          label: 'Ativos',         desc: 'Clientes operacionais', statusMatch: ['ACTIVE', 'CONVERTIDO'],             accent: '#10b981', bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.3)'  },
+      { key: 'RENEWAL',         label: 'Renovação',      desc: 'Próximos a vencer',     statusMatch: ['RENEWAL'],                          accent: '#0284c7', bg: 'rgba(2,132,199,0.08)',   border: 'rgba(2,132,199,0.3)'   },
     ]
 
     const withData = stages.map((stage) => {
-      const matching = oportunidades.filter(o =>
-        stage.statusMatch.includes(o.status.toLowerCase().trim())
-      )
+      const matching = oportunidades.filter(o => {
+        const s = (o.lifecycle?.status || o.status || '').toUpperCase().trim()
+        return stage.statusMatch.includes(s)
+      })
       const count = matching.length
-      const valor = matching.reduce((acc, o) => acc + getPlanoPrice(o.plano_solicitado), 0)
+      const valor = matching.reduce((acc, o) => acc + getPlanoPrice(o.plano_solicitado || o.plano), 0)
       return { ...stage, count, valor }
     })
 
@@ -141,8 +126,8 @@ export default function ComercialDashboardPage() {
 
   // --- CÁLCULOS DOS INDICADORES COMERCIAIS ---
   const indicadores = useMemo(() => {
-    const convertidas = kpis.convertido
-    const perdidas = kpis.perdido
+    const convertidas = kpis.active
+    const perdidas = kpis.canceled
 
     // Taxa de conversão: convertidos / (convertidos + perdidos) ou do total
     const decididas = convertidas + perdidas
@@ -162,15 +147,18 @@ export default function ComercialDashboardPage() {
     let contConversõesComTempo = 0
 
     oportunidades.forEach((opt) => {
-      const price = getPlanoValue(opt.plano_solicitado)
-      const status = opt.status.toLowerCase().trim()
+      const price = getPlanoValue(opt.plano_solicitado || opt.plano)
+      const status = (opt.lifecycle?.status || opt.status || '').toUpperCase().trim()
 
-      if (status === 'convertido') {
+      if (status === 'ACTIVE' || status === 'CONVERTIDO') {
         receitaConvertida += price
         
         // Calcula tempo de conversão (se houver histórico de mudança)
         if (opt.historico && opt.historico.length > 0) {
-          const convEvent = opt.historico.find(h => h.status_novo.toLowerCase() === 'convertido')
+          const convEvent = opt.historico.find(h => {
+            const sn = h.status_novo.toUpperCase().trim()
+            return sn === 'ACTIVE' || sn === 'CONVERTIDO'
+          })
           if (convEvent) {
             const start = new Date(opt.created_at).getTime()
             const end = new Date(convEvent.created_at).getTime()
@@ -179,7 +167,7 @@ export default function ComercialDashboardPage() {
             contConversõesComTempo++
           }
         }
-      } else if (status !== 'perdido') {
+      } else if (status !== 'CANCELED' && status !== 'TRIAL_EXPIRED' && status !== 'CANCELLED') {
         // Receita prevista de oportunidades ativas ponderada de forma simples
         receitaPrevista += price
       }
@@ -195,59 +183,19 @@ export default function ComercialDashboardPage() {
     }
   }, [oportunidades, kpis])
 
-  // --- OPORTUNIDADES PRIORITÁRIAS ---
-  // As 10 primeiras ordenadas por:
-  // 1. Trial mais antigo (maior tempo de expiração/criação)
-  // 2. Status: Aguardando Cliente, Proposta Enviada, Em Negociação
-  const oportunidadesPrioritarias = useMemo(() => {
-    const ativas = oportunidades.filter((opt) => {
-      const status = opt.status.toLowerCase().trim()
-      return status !== 'convertido' && status !== 'perdido'
-    })
-
-    // Calcula os dias expirados (baseado na data de criação)
-    const comDias = ativas.map((opt) => {
-      const diffTime = Math.abs(Date.now() - new Date(opt.created_at).getTime())
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      return { ...opt, dias_expirado: diffDays }
-    })
-
-    // Função de peso para o status na ordenação
-    const getStatusWeight = (status: string) => {
-      const s = status.toLowerCase().trim()
-      if (s === 'aguardando cliente' || s === 'aguardando_cliente') return 1
-      if (s === 'proposta enviada' || s === 'proposta_enviada') return 2
-      if (s === 'em negociação' || s === 'em_negociacao') return 3
-      return 4
-    }
-
-    return comDias.sort((a, b) => {
-      // 1. Trial mais antigo (maior dias expirado)
-      if (b.dias_expirado !== a.dias_expirado) {
-        return b.dias_expirado - a.dias_expirado
-      }
-      // 2. Peso do status
-      return getStatusWeight(a.status) - getStatusWeight(b.status)
-    }).slice(0, 10)
-  }, [oportunidades])
-
-  // --- AÇÕES PENDENTES (MOCKADOS/CALCULADOS COM SEGURANÇA) ---
+  // --- AÇÕES PENDENTES ---
   const acoesPendentes = useMemo(() => {
-    const expirados = oportunidadesPrioritarias.filter(o => o.dias_expirado > 0).length
-    const expirando = oportunidades.filter(o => {
-      const diff = Date.now() - new Date(o.created_at).getTime()
-      const diffDays = diff / (1000 * 60 * 60 * 24)
-      return diffDays < 0 && diffDays > -3 // Expirando nos próximos 3 dias
-    }).length
+    const expirados = oportunidades.filter(o => (o.lifecycle?.status || o.status || '').toUpperCase() === 'TRIAL_EXPIRED').length
+    const expirando = oportunidades.filter(o => (o.lifecycle?.status || o.status || '').toUpperCase() === 'TRIAL_EXPIRING').length
 
     return {
-      trialsExpirando: expirando || 1,
-      trialsExpirados: expirados || kpis.novo,
-      cobrancasPendentes: kpis.aguardando_pagamento || 2,
-      renovacoesProximas: kpis.convertido > 0 ? Math.ceil(kpis.convertido * 0.1) : 1,
+      trialsExpirando: expirando,
+      trialsExpirados: expirados,
+      cobrancasPendentes: kpis.payment_pending,
+      renovacoesProximas: kpis.renewal,
       webhooksErro: 0
     }
-  }, [oportunidades, oportunidadesPrioritarias, kpis])
+  }, [oportunidades, kpis])
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -390,14 +338,14 @@ export default function ComercialDashboardPage() {
             <div className="p-6">
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
                 {[
-                  { label: 'Novo', count: kpis.novo, color: 'border-indigo-500/20 text-indigo-400 bg-indigo-950/20' },
-                  { label: '1º Contato', count: kpis.primeiro_contato, color: 'border-blue-500/20 text-blue-400 bg-blue-950/20' },
-                  { label: 'Negociação', count: kpis.em_negociacao, color: 'border-cyan-500/20 text-cyan-400 bg-cyan-950/20' },
-                  { label: 'Proposta', count: kpis.proposta_enviada, color: 'border-amber-500/20 text-amber-400 bg-amber-950/20' },
-                  { label: 'Ag. Cliente', count: kpis.aguardando_cliente, color: 'border-purple-500/20 text-purple-400 bg-purple-950/20' },
-                  { label: 'Ag. Pgto', count: kpis.aguardando_pagamento, color: 'border-pink-500/20 text-pink-400 bg-pink-950/20' },
-                  { label: 'Convertidas', count: kpis.convertido, color: 'border-emerald-500/20 text-emerald-400 bg-emerald-950/20' },
-                  { label: 'Perdidas', count: kpis.perdido, color: 'border-slate-500/20 text-slate-400 bg-slate-950/20' }
+                  { label: 'Leads',           count: kpis.lead,            color: 'border-indigo-500/20 text-indigo-400 bg-indigo-950/20' },
+                  { label: 'Trial Ativo',     count: kpis.trial,           color: 'border-blue-500/20 text-blue-400 bg-blue-950/20' },
+                  { label: 'Trial Expirando', count: kpis.trial_expiring,  color: 'border-amber-500/20 text-amber-400 bg-amber-950/20' },
+                  { label: 'Negociação',      count: kpis.negotiation,     color: 'border-cyan-500/20 text-cyan-400 bg-cyan-950/20' },
+                  { label: 'Ag. Pgto',        count: kpis.payment_pending, color: 'border-pink-500/20 text-pink-400 bg-pink-950/20' },
+                  { label: 'Ativos',          count: kpis.active,          color: 'border-emerald-500/20 text-emerald-400 bg-emerald-950/20' },
+                  { label: 'Renovação',       count: kpis.renewal,         color: 'border-sky-500/20 text-sky-400 bg-sky-950/20' },
+                  { label: 'Cancelados',      count: kpis.canceled,        color: 'border-slate-500/20 text-slate-400 bg-slate-950/20' }
                 ].map((k) => (
                   <div key={k.label} className={`border p-4 rounded-xl text-center space-y-1.5 ${k.color}`}>
                     <p className="text-[10px] font-bold uppercase tracking-wider opacity-70 leading-tight">{k.label}</p>

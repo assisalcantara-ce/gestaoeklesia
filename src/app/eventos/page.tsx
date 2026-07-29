@@ -7,6 +7,7 @@ import NotificationModal from '@/components/NotificationModal';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import { useUserContext } from '@/hooks/useUserContext';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import {

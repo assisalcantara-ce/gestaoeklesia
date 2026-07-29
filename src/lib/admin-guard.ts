@@ -71,7 +71,20 @@ export async function requireAdmin(
   const customImpToken = request.headers.get('x-impersonation-token')?.trim() || ''
   const authHeader = request.headers.get('Authorization') || ''
   const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim()
-  const token = customImpToken || bearerToken
+
+  // Blindagem de Plataforma: Rotas pertencentes ao painel corporativo do Admin
+  // operam exclusivamente em contexto global da plataforma e DEVEM ignorar o x-impersonation-token.
+  const pathname = request.nextUrl.pathname
+  const isCorporateAdminRoute =
+    pathname.startsWith('/api/v1/admin/crm') ||
+    pathname.startsWith('/api/v1/admin/oportunidades') ||
+    pathname.startsWith('/api/v1/admin/metrics') ||
+    pathname.startsWith('/api/v1/admin/ministries') ||
+    pathname.startsWith('/api/v1/admin/billing') ||
+    pathname.startsWith('/api/v1/admin/tickets') ||
+    pathname.startsWith('/api/v1/admin/contracts')
+
+  const token = (isCorporateAdminRoute ? bearerToken : (customImpToken || bearerToken))
 
   if (!token) {
     return {
