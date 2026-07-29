@@ -44,7 +44,7 @@ export default function MinisteriosTable({
   onDelete,
   onImpersonate,
 }: MinisteriosTableProps) {
-  const { adminUser, hasPermission } = useAdminAuth()
+  const { hasPermission } = useAdminAuth()
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
 
   if (loading) {
