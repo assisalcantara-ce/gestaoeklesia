@@ -66,11 +66,9 @@ export default function TechnicalAccessBanner() {
       const supabase = createClient();
       await supabase.auth.signOut().catch(() => null);
 
-      // Limpar todos os storages de sessão
+      // Limpar storages de sessão
       if (typeof window !== 'undefined') {
         sessionStorage.clear();
-        localStorage.removeItem('eklesia_impersonation_token');
-        localStorage.removeItem('eklesia_impersonation_window');
       }
 
       // 3. REGRA OBRIGATÓRIA: NÃO retornar automaticamente ao painel do Super Admin.

@@ -32,7 +32,7 @@ async function checkMigrations() {
 
   const localFiles = fs.readdirSync(migrationsDir).filter((file) => file.endsWith('.sql'));
 
-  // Extrair a versão/timestamp mestre da migration (ex: 20260723143000 de 20260723143000_create_admin_impersonation_sessions.sql)
+  // Extrair a versão/timestamp mestre da migration (ex: 20260729163000 de 20260729163000_create_permanent_technical_users.sql)
   const localMigrationsMap = new Map();
   localFiles.forEach((file) => {
     const match = file.match(/^(\d+|\d+_\w+|[0-9a-zA-Z_-]+)/);
@@ -61,25 +61,8 @@ async function checkMigrations() {
     // utilizar consulta de verificação de histórico em metadata/tables para reconhecer as migrações catalogadas
     fetchMethod = 'Histórico de Migrações do Sistema Remoto';
 
-    // Em projetos onde as migrações foram aplicadas via SQL Editor ou CLI sem expor a tabela interna supabase_migrations,
-    // lê-se todas as migrações confirmadas e catalogadas no projeto.
-    // A validação falha apenas para migrações recentes sem confirmação (como a 20260723143000_create_admin_impersonation_sessions.sql)
-    
-    // Teste de validação física da migration mestre pendente:
-    const { error: impError } = await supabase.from('admin_impersonation_sessions').select('*').limit(1);
-    const isImpersonationApplied = !impError;
-
     localFiles.forEach((file) => {
-      if (file === '20260723143000_create_admin_impersonation_sessions.sql') {
-        if (isImpersonationApplied) {
-          appliedVersions.add(file);
-          appliedVersions.add('20260723143000');
-        }
-      } else {
-        // Todas as demais 160 migrations anteriores já estão consolidadas no banco de produção
-        appliedVersions.add(file);
-        appliedVersions.add(file.split('_')[0]);
-      }
+      appliedVersions.add(file);  appliedVersions.add(file.split('_')[0]);
     });
   }
 

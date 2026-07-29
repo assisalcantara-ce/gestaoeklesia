@@ -1,6 +1,6 @@
 // Utilitário para gerenciar configurações da igreja/ministério via API Backend Next.js (/api/v1/configuracoes/perfil)
 // Utiliza exclusivamente o cliente HTTP centralizado da plataforma (authenticatedFetch),
-// garantindo envio automático de Authorization (Bearer token) e x-impersonation-token.
+// garantindo envio automático de Authorization (Bearer token) da sessão nativa Supabase.
 
 import { authenticatedFetch } from '@/lib/api-client';
 

@@ -62,11 +62,9 @@ export default function TechnicalAccessModal({
       const supabase = createClient();
       await supabase.auth.signOut();
 
-      // Limpar todos os storages de sessão local
+      // Limpar storages de sessão local
       if (typeof window !== 'undefined') {
         sessionStorage.clear();
-        localStorage.removeItem('eklesia_impersonation_token');
-        localStorage.removeItem('eklesia_impersonation_window');
       }
 
       setStatusMessage('Redirecionando para o Magic Link nativo do Supabase...');
