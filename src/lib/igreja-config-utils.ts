@@ -1,6 +1,5 @@
-// Utilitário para gerenciar configurações da igreja/ministério
-
-import type { SupabaseClient } from '@supabase/supabase-js';
+// Utilitário para gerenciar configurações da igreja/ministério via API Backend Next.js (/api/v1/configuracoes/perfil)
+// ELIMINADA toda consulta client-side direta via Supabase Browser Client para as tabelas ministries e configurations.
 
 export interface ConfiguracaoIgreja {
     nome: string;
@@ -29,144 +28,80 @@ const CONFIGURACAO_PADRAO: ConfiguracaoIgreja = {
 };
 
 /**
- * Resolve o ministryId a partir do próprio Supabase Auth.
- *
- * ATENÇÃO — uso restrito ao fallback.
- * Esta função é mantida EXCLUSIVAMENTE para consumidores que ainda não
- * recebem o ministryId via contexto oficial (useUserContext / useCurrentMinistry).
- * Em sessões de impersonação ela retorna o tenant do Super Admin (IEADMI),
- * o que é incorreto. Todos os consumidores em /configuracoes já passam
- * ministryId explicitamente e NUNCA chegam a chamar esta função.
+ * Obtém os cabeçalhos HTTP necessários para chamadas à API Next.js,
+ * incluindo o token de impersonação quando ativo.
  */
-async function resolveMinistryIdFallback(supabase: SupabaseClient): Promise<string | null> {
-    try {
-        const {
-            data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) return null;
+function getApiHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
 
-        const mu = await supabase
-            .from('ministry_users')
-            .select('ministry_id')
-            .eq('user_id', user.id)
-            .limit(1);
-
-        const ministryIdFromMu = (mu.data as any)?.[0]?.ministry_id as string | undefined;
-        if (ministryIdFromMu) return ministryIdFromMu;
-
-        const m = await supabase.from('ministries').select('id').eq('user_id', user.id).limit(1);
-        const ministryIdFromOwner = (m.data as any)?.[0]?.id as string | undefined;
-        return ministryIdFromOwner || null;
-    } catch {
-        return null;
+    if (typeof window !== 'undefined') {
+        const impToken = sessionStorage.getItem('eklesia_impersonation_token') || localStorage.getItem('eklesia_impersonation_token');
+        if (impToken) {
+            headers['x-impersonation-token'] = impToken;
+        }
     }
+
+    return headers;
 }
 
 /**
- * Busca as configurações da igreja/ministério.
+ * Busca as configurações da igreja/ministério exclusivamente via API Backend (/api/v1/configuracoes/perfil).
+ * O backend utiliza `resolveTenantAuth()` e `createAdminClient()` (service_role) para resolver o tenant
+ * correto tanto em sessões nativas quanto em sessões de impersonação, sem restrições de RLS.
  *
- * @param supabase  Cliente Supabase autenticado.
- * @param ministryId  ID do ministério resolvido pelo contexto oficial (useUserContext).
- *                    Quando fornecido, é utilizado diretamente — sem qualquer
- *                    consulta paralela ao Supabase Auth. Isso garante que sessões
- *                    de impersonação leiam o tenant correto.
- *                    Quando omitido, aplica o fallback via Auth (legado, somente
- *                    para chamadas fora do contexto de impersonação).
+ * @param _supabase  Parâmetro mantido por retrocompatibilidade de assinatura com os consumidores existentes, porém NÃO utilizado para queries no banco.
+ * @param _ministryId  Parâmetro mantido por retrocompatibilidade de assinatura.
  */
 export async function fetchConfiguracaoIgrejaFromSupabase(
-    supabase: SupabaseClient,
-    ministryId?: string | null
+    _supabase?: any,
+    _ministryId?: string | null
 ): Promise<ConfiguracaoIgreja> {
-    // Usa o ministryId fornecido (fonte oficial) ou resolve via fallback (legado)
-    const resolvedId = ministryId ?? await resolveMinistryIdFallback(supabase);
-    if (!resolvedId) return CONFIGURACAO_PADRAO;
+    try {
+        const res = await fetch('/api/v1/configuracoes/perfil', {
+            method: 'GET',
+            headers: getApiHeaders(),
+            cache: 'no-store',
+        });
 
-    const { data, error } = await supabase
-        .from('ministries')
-        .select('name, email_admin, cnpj_cpf, phone, website, description, logo_url, created_at')
-        .eq('id', resolvedId)
-        .maybeSingle();
+        if (!res.ok) {
+            console.error('[igreja-config-utils] Erro na requisição GET /api/v1/configuracoes/perfil:', res.status, res.statusText);
+            return CONFIGURACAO_PADRAO;
+        }
 
-    const { data: configRow } = await supabase
-        .from('configurations')
-        .select('church_profile')
-        .eq('ministry_id', resolvedId)
-        .maybeSingle();
+        const json = await res.json();
+        if (json?.data) {
+            return json.data as ConfiguracaoIgreja;
+        }
 
-    const churchProfile = (configRow as any)?.church_profile || {};
-
-    if (error || !data) return CONFIGURACAO_PADRAO;
-
-    return {
-        nome: data.name || CONFIGURACAO_PADRAO.nome,
-        endereco: churchProfile.endereco || CONFIGURACAO_PADRAO.endereco,
-        cnpj: data.cnpj_cpf || '',
-        telefone: data.phone || '',
-        email: data.email_admin || '',
-        website: data.website || '',
-        descricao: data.description || '',
-        responsavel: churchProfile.responsavel || CONFIGURACAO_PADRAO.responsavel || '',
-        dataCadastro: data.created_at ? new Date(data.created_at).toISOString().split('T')[0] : '',
-        logo: data.logo_url || ''
-    };
+        return CONFIGURACAO_PADRAO;
+    } catch (err) {
+        console.error('[igreja-config-utils] Exceção ao buscar configuração da igreja via API:', err);
+        return CONFIGURACAO_PADRAO;
+    }
 }
 
 /**
- * Atualiza as configurações da igreja/ministério.
+ * Atualiza as configurações da igreja/ministério exclusivamente via API Backend (/api/v1/configuracoes/perfil).
  *
- * @param supabase  Cliente Supabase autenticado.
+ * @param _supabase  Parâmetro mantido por retrocompatibilidade de assinatura.
  * @param config  Campos a atualizar.
- * @param ministryId  ID do ministério resolvido pelo contexto oficial (useUserContext).
- *                    Mesma semântica de fetchConfiguracaoIgrejaFromSupabase.
+ * @param _ministryId  Parâmetro mantido por retrocompatibilidade de assinatura.
  */
 export async function updateConfiguracaoIgrejaInSupabase(
-    supabase: SupabaseClient,
+    _supabase: any,
     config: Partial<ConfiguracaoIgreja>,
-    ministryId?: string | null
+    _ministryId?: string | null
 ): Promise<void> {
-    // Usa o ministryId fornecido (fonte oficial) ou resolve via fallback (legado)
-    const resolvedId = ministryId ?? await resolveMinistryIdFallback(supabase);
-    if (!resolvedId) return;
+    const res = await fetch('/api/v1/configuracoes/perfil', {
+        method: 'PUT',
+        headers: getApiHeaders(),
+        body: JSON.stringify(config),
+    });
 
-    const updateMinistry: Record<string, any> = {};
-    if (typeof config.nome === 'string') updateMinistry.name = config.nome;
-    if (typeof config.email === 'string') updateMinistry.email_admin = config.email;
-    if (typeof config.cnpj === 'string') updateMinistry.cnpj_cpf = config.cnpj;
-    if (typeof config.telefone === 'string') updateMinistry.phone = config.telefone;
-    if (typeof config.website === 'string') updateMinistry.website = config.website;
-    if (typeof config.descricao === 'string') updateMinistry.description = config.descricao;
-    if (typeof config.logo === 'string') updateMinistry.logo_url = config.logo;
-
-    if (Object.keys(updateMinistry).length > 0) {
-        await supabase
-            .from('ministries')
-            .update(updateMinistry)
-            .eq('id', resolvedId);
+    if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || errJson.detail || 'Erro ao salvar configurações do ministério via API.');
     }
-
-    const { data: configRow } = await supabase
-        .from('configurations')
-        .select('church_profile')
-        .eq('ministry_id', resolvedId)
-        .maybeSingle();
-
-    const existingProfile = (configRow as any)?.church_profile || {};
-    const nextProfile = {
-        ...existingProfile,
-        ...(typeof config.endereco === 'string' ? { endereco: config.endereco } : {}),
-        ...(typeof config.responsavel === 'string' ? { responsavel: config.responsavel } : {})
-    };
-
-    const { error: upsertErr } = await supabase
-        .from('configurations')
-        .upsert(
-            {
-                ministry_id: resolvedId,
-                church_profile: nextProfile,
-                updated_at: new Date().toISOString(),
-            } as any,
-            { onConflict: 'ministry_id' }
-        );
-
-    if (upsertErr) throw upsertErr;
 }
