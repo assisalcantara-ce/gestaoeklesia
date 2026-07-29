@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 import { ShieldAlert, X, Eye, Wrench, CheckCircle2 } from 'lucide-react'
+import { authenticatedFetch } from '@/lib/api-client'
 
 interface ImpersonationModalProps {
   isOpen: boolean
@@ -68,11 +69,10 @@ export default function ImpersonationModal({ isOpen, onClose, ministry }: Impers
     setLoading(true)
 
     try {
-      const response = await fetch('/api/v1/admin/impersonate/start', {
+      const response = await authenticatedFetch('/api/v1/admin/impersonate/start', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${sessionStorage.getItem('supabase.auth.token') || ''}`, // authenticatedFetch injects token
         },
         body: JSON.stringify({
           tenantId: ministry.id,
@@ -88,16 +88,13 @@ export default function ImpersonationModal({ isOpen, onClose, ministry }: Impers
         throw new Error(data.error || 'Falha ao iniciar a sessão de impersonação.')
       }
 
-      // Persistir o JWT de Impersonação retornado
-      if (data.token) {
-        sessionStorage.setItem('eklesia_impersonation_token', data.token)
-        localStorage.setItem('eklesia_impersonation_token', data.token)
-      }
-
       onClose()
 
-      // Redirecionar imediatamente para o Dashboard do cliente impersonado sem exigir novo login
-      window.location.href = '/admin/dashboard'
+      // Redirecionar para a página de bootstrap de impersonação em uma NOVA ABA (window.open)
+      if (data.token) {
+        const bootstrapUrl = `/auth/impersonate?token=${encodeURIComponent(data.token)}`
+        window.open(bootstrapUrl, '_blank')
+      }
     } catch (err: any) {
       console.error('Erro ao iniciar impersonação:', err)
       setError(err.message || 'Erro inesperado ao conectar à API.')

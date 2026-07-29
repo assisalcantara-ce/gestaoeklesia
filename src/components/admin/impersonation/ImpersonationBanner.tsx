@@ -90,7 +90,11 @@ export default function ImpersonationBanner() {
         alert(customMessage)
       }
 
-      window.location.href = '/admin/ministerios'
+      if (window.opener || window.history.length === 1) {
+        window.close()
+      } else {
+        window.location.href = '/admin/ministerios'
+      }
     }
   }
 
