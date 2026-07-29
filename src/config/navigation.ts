@@ -82,10 +82,6 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
         icon: '💰',
         path: '/tesouraria',
         modulo: 'tesouraria',
-        submenu: [
-          { id: 'tesouraria-geral', label: 'Visão Geral & Lançamentos', icon: '💰', path: '/tesouraria', modulo: 'tesouraria' },
-          { id: 'arrecadacao-digital', label: 'Arrecadação Digital', icon: '📱', path: '/tesouraria/arrecadacao-digital', modulo: 'tesouraria', planFeature: 'has_arrecadacao_digital', featureFlag: 'digital_collection' },
-        ]
       },
       {
         id: 'presidencia',
