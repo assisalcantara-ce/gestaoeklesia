@@ -48,32 +48,57 @@ export function useUserContext(): UserContext {
     // Aguarda o AuthProvider terminar de validar o token
     if (authLoading) return;
 
-    // Sem sessão válida → limpa estado
-    if (!user) {
-      setNivel(null);
-      setCongregacaoId(null);
-      setSupervisaoId(null);
-      setMinistryId(null);
-      setUserId(null);
-      setLoading(false);
-      lastFetchedUserId.current = null;
-      return;
-    }
-
-    // Evita refetch se já carregou para este usuário
-    if (lastFetchedUserId.current === user.id) {
-      setLoading(false);
-      return;
-    }
-
     let cancelled = false;
 
-    const fetchProfile = async () => {
+    const checkAndFetchContext = async () => {
+      // 1. VERIFICAÇÃO PRIORITÁRIA DE IMPERSONAÇÃO (Única Fonte de Verdade no Frontend)
+      if (typeof window !== 'undefined') {
+        const impToken = sessionStorage.getItem('eklesia_impersonation_token') || localStorage.getItem('eklesia_impersonation_token');
+        if (impToken) {
+          try {
+            const statusRes = await fetch(`/api/v1/admin/impersonate/status?token=${encodeURIComponent(impToken)}`);
+            if (statusRes.ok) {
+              const statusData = await statusRes.json();
+              if (statusData.valid && statusData.status === 'active' && statusData.tenant?.id) {
+                if (!cancelled) {
+                  setUserId(statusData.session?.adminId || user?.id || 'impersonated-admin');
+                  setMinistryId(String(statusData.tenant.id));
+                  setNivel('administrador');
+                  setCongregacaoId(null);
+                  setSupervisaoId(null);
+                  setLoading(false);
+                }
+                return;
+              }
+            }
+          } catch (err) {
+            console.warn('Erro ao verificar status de impersonação em useUserContext:', err);
+          }
+        }
+      }
+
+      // 2. FLUXO NATIVO (Sem impersonação ativa)
+      if (!user) {
+        setNivel(null);
+        setCongregacaoId(null);
+        setSupervisaoId(null);
+        setMinistryId(null);
+        setUserId(null);
+        setLoading(false);
+        lastFetchedUserId.current = null;
+        return;
+      }
+
+      if (lastFetchedUserId.current === user.id) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
         setUserId(user.id);
 
-        // Busca perfil em ministry_users (token garantidamente válido via AuthProvider)
+        // Busca perfil em ministry_users
         const { data: mu } = await supabase
           .from('ministry_users')
           .select('role, permissions, congregacao_id, supervisao_id, ministry_id')
@@ -89,7 +114,7 @@ export function useUserContext(): UserContext {
           setSupervisaoId(mu.supervisao_id ?? null);
           setMinistryId(mu.ministry_id ?? null);
         } else {
-          // Fallback: dono do ministry (registrado em ministries.user_id)
+          // Fallback: dono do ministry
           const { data: ministry } = await supabase
             .from('ministries')
             .select('id')
@@ -104,7 +129,6 @@ export function useUserContext(): UserContext {
             setSupervisaoId(null);
             setMinistryId(ministry.id);
           } else {
-            // Usuário autenticado mas sem perfil no sistema
             setNivel(null);
           }
         }
@@ -115,7 +139,7 @@ export function useUserContext(): UserContext {
       }
     };
 
-    fetchProfile();
+    checkAndFetchContext();
     return () => { cancelled = true; };
   }, [user, authLoading, supabase]);
 
@@ -129,4 +153,3 @@ export function useUserContext(): UserContext {
 
   return { loading, nivel, congregacaoId, supervisaoId, ministryId, userId, isAdmin, podeAcessar, podeEscrever };
 }
-
