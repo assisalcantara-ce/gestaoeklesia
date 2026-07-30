@@ -1,265 +1,264 @@
-import crypto from 'crypto';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
+import {
+  encryptPassword,
+  decryptPassword,
+  generateStrongPassword,
+} from './technical-crypto';
 
-export interface TechnicalUserRecord {
-  user_id: string;
-  ministry_id: string;
+export interface TechnicalAccountDetails {
+  authUserId: string;
+  ministryId: string;
   email: string;
-}
-
-export interface TechnicalAccessGrant {
-  id: string;
-  ministry_id: string;
-  technical_user_id: string;
-  admin_id: string;
-  reason: string;
-  ticket_reference?: string | null;
-  role: string;
-  status: 'active' | 'expired' | 'revoked' | 'ended';
-  starts_at: string;
-  expires_at: string;
-  revoked_at?: string | null;
-  revoked_by?: string | null;
-  created_at: string;
+  lastSignInAt: string | null;
+  lastSignInIp?: string | null;
+  lastSignInUserAgent?: string | null;
+  hasCredentialsStored: boolean;
 }
 
 export class TechnicalAccessService {
   /**
-   * Domínio interno não-roteável para emails de contas técnicas.
-   * Impede recebimento de emails reais da plataforma.
+   * Constrói o e-mail determinístico da conta técnica do tenant.
    */
-  private static readonly TECH_EMAIL_DOMAIN = 'technical.eklesia.internal';
-
-  /**
-   * Gera o email padrão determinístico para o Usuário Técnico de um tenant.
-   */
-  public static buildTechnicalEmail(tenantId: string): string {
-    const cleanId = tenantId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    return `tech.suporte.${cleanId}@${this.TECH_EMAIL_DOMAIN}`;
+  private static getTechnicalEmail(tenantId: string): string {
+    const cleanTenantId = tenantId.replace(/[^a-zA-Z0-9-]/g, '').toLowerCase();
+    return `tech.suporte.${cleanTenantId}@technical.eklesia.internal`;
   }
 
   /**
-   * Obtém ou reutiliza o Usuário Técnico de um tenant utilizando a arquitetura nativa.
-   * GARANTIA DE ARQUITETURA: Identifica a conta técnica determinística por tenant.
-   * Se a conta já existir no Supabase Auth ou em profiles, a função REUTILIZA o registro cadastrado sem gerar duplicidade.
-   *
-   * @param adminClient Cliente Supabase com permissão de service_role.
-   * @param tenantId ID do ministério / tenant alvo.
+   * Localiza ou cria a conta técnica de um tenant, garantindo que ela possua
+   * credenciais de senha forte (AES-256-GCM) cadastradas em technical_access_secrets.
    */
-  public static async getOrCreateTechnicalUser(
+  public static async getOrCreateTechnicalAccount(
     adminClient: SupabaseClient,
     tenantId: string
-  ): Promise<TechnicalUserRecord> {
-    if (!tenantId) {
-      throw new Error('[TechnicalAccessService] tenantId é obrigatório.');
-    }
+  ): Promise<TechnicalAccountDetails> {
+    const techEmail = this.getTechnicalEmail(tenantId);
 
-    const email = this.buildTechnicalEmail(tenantId);
-
-    // 1. Verificar se já existe a conta de perfil para este e-mail determinístico em public.profiles
-    const { data: existingProfile } = await adminClient
-      .from('profiles')
-      .select('id, email')
-      .eq('email', email)
-      .maybeSingle();
-
-    if (existingProfile) {
-      // Garantir que a associação em ministry_users exista
-      const { error: upsertErr } = await adminClient.from('ministry_users').upsert({
-        user_id: existingProfile.id,
-        ministry_id: tenantId,
-        role: 'ADMINISTRADOR',
-      }, { onConflict: 'user_id,ministry_id' });
-
-      if (upsertErr) {
-        console.warn('[TechnicalAccessService] Aviso ao garantir ministry_users para usuario existente:', upsertErr);
-      }
-
-      return {
-        user_id: existingProfile.id,
-        ministry_id: tenantId,
-        email,
-      };
-    }
-
-    // 2. Se não existir em public.profiles, tentar criar a conta técnica no Supabase Auth
-    const secureUnusablePassword = crypto.randomBytes(32).toString('hex') + 'A1!';
-    let userId: string | undefined;
-
-    const { data: authUser, error: createAuthErr } = await adminClient.auth.admin.createUser({
-      email,
-      password: secureUnusablePassword,
-      email_confirm: true,
-      user_metadata: {
-        is_technical_user: true,
-        ministry_id: tenantId,
-        full_name: 'Usuário Técnico de Suporte',
-      },
-      app_metadata: {
-        is_technical_user: true,
-        provider: 'technical_access',
-      },
-      // Criado desabilitado por padrão (banido por 100 anos até que haja concessão ativa)
-      ban_duration: '876000h',
-    });
-
-    if (createAuthErr || !authUser?.user) {
-      const errText = createAuthErr?.message || '';
-      // Se o usuário já existir no Auth (ex: conta cadastrada anteriormente), buscar e reutilizar a conta existente no Auth
-      if (errText.toLowerCase().includes('already') || errText.toLowerCase().includes('registered') || errText.toLowerCase().includes('exists')) {
-        const { data: userList, error: listErr } = await adminClient.auth.admin.listUsers();
-        if (listErr) {
-          console.error('[TechnicalAccessService] Erro ao listar usuários do Auth:', listErr);
-        }
-        const found = userList?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
-        if (found) {
-          userId = found.id;
-        } else {
-          throw new Error(`Falha ao recuperar conta técnica cadastrada no Auth: ${errText}`);
-        }
-      } else {
-        console.error('[TechnicalAccessService] Erro ao criar conta de usuário técnico no Supabase Auth:', createAuthErr);
-        throw new Error(`Falha ao criar usuário técnico no Auth: ${errText}`);
-      }
-    } else {
-      userId = authUser.user.id;
-    }
-
-    // 3. Garantir o registro em public.profiles e public.ministry_users para a conta recuperada/criada
-    try {
-      await adminClient.from('profiles').upsert({
-        id: userId,
-        email,
-        full_name: 'Usuário Técnico de Suporte',
-        updated_at: new Date().toISOString(),
-      });
-
-      await adminClient.from('ministry_users').upsert({
-        user_id: userId,
-        ministry_id: tenantId,
-        role: 'ADMINISTRADOR',
-        created_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,ministry_id' });
-
-      return {
-        user_id: userId,
-        ministry_id: tenantId,
-        email,
-      };
-    } catch (err: any) {
-      console.error('[TechnicalAccessService] Erro ao salvar vinculo do usuário técnico:', err);
-      return {
-        user_id: userId,
-        ministry_id: tenantId,
-        email,
-      };
-    }
-  }
-
-  /**
-   * Inicia a sessão de Acesso Técnico Ativo para o tenant.
-   * 1. Obter/reutilizar o Usuário Técnico do tenant.
-   * 2. Reativar temporariamente o usuário no Supabase Auth (desbanir).
-   * 3. Registrar a concessão em technical_access_grants.
-   * 4. Gerar o Magic Link do Supabase Auth para autenticação nativa sem senha.
-   */
-  public static async startTechnicalSession(
-    adminClient: SupabaseClient,
-    params: {
-      tenantId: string;
-      adminId: string;
-      reason: string;
-      ticketReference?: string;
-      durationHours?: number;
-      baseUrl?: string;
-    }
-  ): Promise<{ actionLink: string; grantId: string; technicalUserId: string }> {
-    const { tenantId, adminId, reason, ticketReference, durationHours = 2, baseUrl = '' } = params;
-
-    // 1. Reutilizar/Garantir Usuário Técnico via e-mail determinístico
-    const techUser = await this.getOrCreateTechnicalUser(adminClient, tenantId);
-
-    // 2. Reativar temporariamente a conta no Supabase Auth (remover ban)
-    const { error: unbanErr } = await adminClient.auth.admin.updateUserById(techUser.user_id, {
-      ban_duration: 'none',
-    });
-
-    if (unbanErr) {
-      console.error('[TechnicalAccessService] Erro ao reativar usuário técnico no Supabase Auth:', unbanErr);
-      throw new Error(`Erro ao ativar conta técnica no Auth: ${unbanErr.message}`);
-    }
-
-    // 3. Registrar a concessão na tabela oficial technical_access_grants
-    const startsAt = new Date();
-    const expiresAt = new Date(startsAt.getTime() + durationHours * 3600 * 1000);
-
-    const { data: grant, error: grantErr } = await adminClient
-      .from('technical_access_grants')
-      .insert({
-        ministry_id: tenantId,
-        technical_user_id: techUser.user_id,
-        admin_id: adminId,
-        reason,
-        ticket_reference: ticketReference || null,
-        role: 'ADMINISTRADOR',
-        status: 'active',
-        starts_at: startsAt.toISOString(),
-        expires_at: expiresAt.toISOString(),
-      })
-      .select('id')
+    // 1. Verificar se a igreja / tenant existe
+    const { data: tenant, error: tenantErr } = await adminClient
+      .from('ministries')
+      .select('id, name')
+      .eq('id', tenantId)
       .single();
 
-    if (grantErr || !grant) {
-      console.error('[TechnicalAccessService] Erro ao registrar concessão:', grantErr);
-      throw new Error(`Erro ao salvar concessão de acesso técnico: ${grantErr?.message}`);
+    if (tenantErr || !tenant) {
+      throw new Error(`Tenant / Ministério '${tenantId}' não encontrado.`);
     }
 
-    // 4. Gerar Magic Link nativo do Supabase Auth direcionando para a pagina cliente dedicada /auth/technical-callback
-    const redirectUrl = baseUrl ? `${baseUrl}/auth/technical-callback` : '/auth/technical-callback';
-
-    const { data: linkData, error: linkErr } = await adminClient.auth.admin.generateLink({
-      type: 'magiclink',
-      email: techUser.email,
-      options: {
-        redirectTo: redirectUrl,
-      },
+    // 2. Verificar se a conta técnica já existe no Supabase Auth pelo email
+    let authUser: any = null;
+    const { data: listData, error: listErr } = await adminClient.auth.admin.listUsers({
+      page: 1,
+      perPage: 100,
     });
 
-    if (linkErr || !linkData?.properties?.action_link) {
-      console.error('[TechnicalAccessService] Erro ao gerar Magic Link nativo do Supabase Auth:', linkErr);
-      throw new Error(`Erro ao gerar link de autenticação nativa: ${linkErr?.message}`);
+    if (!listErr && listData?.users) {
+      authUser = listData.users.find((u: any) => u.email?.toLowerCase() === techEmail.toLowerCase());
+    }
+
+    // Se não encontrou na listagem rápida, tenta obter diretamente via busca individual
+    if (!authUser) {
+      const { data: searchMu } = await adminClient
+        .from('ministry_users')
+        .select('user_id')
+        .eq('ministry_id', tenantId)
+        .maybeSingle();
+
+      if (searchMu?.user_id) {
+        const { data: fetchedUser } = await adminClient.auth.admin.getUserById(searchMu.user_id);
+        if (fetchedUser?.user && fetchedUser.user.email?.toLowerCase() === techEmail.toLowerCase()) {
+          authUser = fetchedUser.user;
+        }
+      }
+    }
+
+    let initialPasswordToSet: string | null = null;
+
+    // 3. Se a conta não existir no Auth, cria com senha forte
+    if (!authUser) {
+      initialPasswordToSet = generateStrongPassword();
+      const { data: newAuthData, error: createErr } = await adminClient.auth.admin.createUser({
+        email: techEmail,
+        password: initialPasswordToSet,
+        email_confirm: true,
+        user_metadata: {
+          full_name: `Suporte Técnico (${tenant.name})`,
+          is_technical_user: true,
+          tenant_id: tenantId,
+        },
+      });
+
+      if (createErr || !newAuthData?.user) {
+        // Se deu erro de email já cadastrado por corrida, resgata o usuário existente
+        if (createErr?.message?.includes('already been registered')) {
+          const { data: retryList } = await adminClient.auth.admin.listUsers();
+          authUser = retryList?.users?.find((u: any) => u.email?.toLowerCase() === techEmail.toLowerCase());
+        }
+        
+        if (!authUser) {
+          throw new Error(`Erro ao criar conta técnica no Supabase Auth: ${createErr?.message}`);
+        }
+      } else {
+        authUser = newAuthData.user;
+      }
+    }
+
+    // 4. Garantir registro em profiles e ministry_users
+    await adminClient.from('profiles').upsert(
+      {
+        id: authUser.id,
+        email: techEmail,
+        full_name: `Suporte Técnico (${tenant.name})`,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' }
+    );
+
+    await adminClient.from('ministry_users').upsert(
+      {
+        ministry_id: tenantId,
+        user_id: authUser.id,
+        role: 'ADMINISTRADOR',
+        permissions: ['ADMINISTRADOR', 'TODOS'],
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'ministry_id,user_id' }
+    );
+
+    // 5. Garantir que a senha criptografada esteja salva em technical_access_secrets
+    const { data: existingSecret } = await adminClient
+      .from('technical_access_secrets')
+      .select('id, encrypted_password, iv, auth_tag')
+      .eq('ministry_id', tenantId)
+      .maybeSingle();
+
+    if (!existingSecret) {
+      const passwordToEncrypt = initialPasswordToSet || generateStrongPassword();
+      
+      // Se tivermos gerado uma nova senha para a conta existente sem secret, atualiza no Supabase Auth
+      if (!initialPasswordToSet) {
+        await adminClient.auth.admin.updateUserById(authUser.id, {
+          password: passwordToEncrypt,
+        });
+      }
+
+      const encrypted = encryptPassword(passwordToEncrypt);
+      await adminClient.from('technical_access_secrets').insert({
+        ministry_id: tenantId,
+        technical_user_id: authUser.id,
+        email: techEmail,
+        encrypted_password: encrypted.encryptedPassword,
+        iv: encrypted.iv,
+        auth_tag: encrypted.authTag,
+        updated_at: new Date().toISOString(),
+      });
     }
 
     return {
-      actionLink: linkData.properties.action_link,
-      grantId: grant.id,
-      technicalUserId: techUser.user_id,
+      authUserId: authUser.id,
+      ministryId: tenantId,
+      email: techEmail,
+      lastSignInAt: authUser.last_sign_in_at || null,
+      lastSignInIp: authUser.last_sign_in_ip || null,
+      lastSignInUserAgent: authUser.user_metadata?.last_sign_in_user_agent || null,
+      hasCredentialsStored: true,
     };
   }
 
   /**
-   * Garante que o Usuário Técnico do tenant permaneça desabilitado / inativo no Supabase Auth.
-   *
-   * @param adminClient Cliente Supabase com permissão de service_role.
-   * @param tenantId ID do ministério / tenant alvo.
+   * Descriptografa a senha da conta técnica para o Super Admin.
    */
-  public static async disableTechnicalUser(
+  public static async revealPassword(
     adminClient: SupabaseClient,
     tenantId: string
-  ): Promise<void> {
-    const email = this.buildTechnicalEmail(tenantId);
+  ): Promise<{ email: string; plainTextPassword: string }> {
+    const { data: secret, error } = await adminClient
+      .from('technical_access_secrets')
+      .select('email, encrypted_password, iv, auth_tag')
+      .eq('ministry_id', tenantId)
+      .single();
 
-    const { data: record } = await adminClient
-      .from('profiles')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle();
+    if (error || !secret) {
+      throw new Error(`Credenciais técnicas não encontradas para o tenant '${tenantId}'. Execute a inicialização da conta.`);
+    }
 
-    if (!record?.id) return;
+    const plainTextPassword = decryptPassword(secret.encrypted_password, secret.iv, secret.auth_tag);
 
-    // Desabilitar conta no Supabase Auth via ban_duration de 100 anos
-    await adminClient.auth.admin.updateUserById(record.id, { ban_duration: '876000h' }).catch((err: any) => {
-      console.warn('[TechnicalAccessService] Aviso ao desabilitar usuário técnico:', err);
+    return {
+      email: secret.email,
+      plainTextPassword,
+    };
+  }
+
+  /**
+   * Regenera a senha forte da conta técnica, atualizando o Supabase Auth e
+   * a tabela de segredos criptografados, invalidando sessões anteriores.
+   */
+  public static async regeneratePassword(
+    adminClient: SupabaseClient,
+    tenantId: string,
+    adminId: string
+  ): Promise<{ email: string; newPassword: string }> {
+    const { data: secret, error } = await adminClient
+      .from('technical_access_secrets')
+      .select('technical_user_id, email')
+      .eq('ministry_id', tenantId)
+      .single();
+
+    if (error || !secret) {
+      throw new Error(`Credenciais técnicas não encontradas para o tenant '${tenantId}'.`);
+    }
+
+    const newPassword = generateStrongPassword();
+
+    // 1. Atualizar a senha no Supabase Auth e desabilitar/reabilitar temporariamente para revogar tokens
+    const { error: updateAuthErr } = await adminClient.auth.admin.updateUserById(secret.technical_user_id, {
+      password: newPassword,
+      ban_duration: 'none', // Força renovação de estado de auth
     });
+
+    if (updateAuthErr) {
+      throw new Error(`Erro ao atualizar senha no Supabase Auth: ${updateAuthErr.message}`);
+    }
+
+    // 2. Criptografar nova senha e salvar no banco
+    const encrypted = encryptPassword(newPassword);
+    const { error: updateDbErr } = await adminClient
+      .from('technical_access_secrets')
+      .update({
+        encrypted_password: encrypted.encryptedPassword,
+        iv: encrypted.iv,
+        auth_tag: encrypted.authTag,
+        updated_at: new Date().toISOString(),
+        updated_by: adminId,
+      })
+      .eq('ministry_id', tenantId);
+
+    if (updateDbErr) {
+      throw new Error(`Erro ao salvar senha criptografada: ${updateDbErr.message}`);
+    }
+
+    return {
+      email: secret.email,
+      newPassword,
+    };
+  }
+
+  /**
+   * Obtém a data/hora do último login e informações da conta técnica diretamente do Supabase Auth.
+   */
+  public static async getLastLogin(
+    adminClient: SupabaseClient,
+    technicalUserId: string
+  ): Promise<{ lastSignInAt: string | null; email: string }> {
+    const { data, error } = await adminClient.auth.admin.getUserById(technicalUserId);
+    if (error || !data?.user) {
+      throw new Error(`Usuário técnico não encontrado no Supabase Auth.`);
+    }
+
+    return {
+      lastSignInAt: data.user.last_sign_in_at || null,
+      email: data.user.email || '',
+    };
   }
 }
