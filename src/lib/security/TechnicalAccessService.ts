@@ -39,9 +39,9 @@ export class TechnicalAccessService {
   }
 
   /**
-   * Obtém ou cria o Usuário Técnico de um tenant utilizando a arquitetura nativa.
+   * Obtém ou reutiliza o Usuário Técnico de um tenant utilizando a arquitetura nativa.
    * GARANTIA DE ARQUITETURA: Identifica a conta técnica determinística por tenant.
-   * Se já existir, a função REUTILIZA o registro cadastrado sem criar novas contas.
+   * Se a conta já existir no Supabase Auth ou em profiles, a função REUTILIZA o registro cadastrado sem gerar duplicidade.
    *
    * @param adminClient Cliente Supabase com permissão de service_role.
    * @param tenantId ID do ministério / tenant alvo.
@@ -56,7 +56,7 @@ export class TechnicalAccessService {
 
     const email = this.buildTechnicalEmail(tenantId);
 
-    // 1. Verificar se já existe a conta de perfil para este e-mail determinístico
+    // 1. Verificar se já existe a conta de perfil para este e-mail determinístico em public.profiles
     const { data: existingProfile } = await adminClient
       .from('profiles')
       .select('id, email')
@@ -64,14 +64,15 @@ export class TechnicalAccessService {
       .maybeSingle();
 
     if (existingProfile) {
-      // Garantir que a associação em ministry_users existe com as colunas padrão
+      // Garantir que a associação em ministry_users exista
       const { error: upsertErr } = await adminClient.from('ministry_users').upsert({
         user_id: existingProfile.id,
         ministry_id: tenantId,
         role: 'ADMINISTRADOR',
       }, { onConflict: 'user_id,ministry_id' });
+
       if (upsertErr) {
-        console.warn('[TechnicalAccessService] Aviso ao garantir ministry_users:', upsertErr);
+        console.warn('[TechnicalAccessService] Aviso ao garantir ministry_users para usuario existente:', upsertErr);
       }
 
       return {
@@ -81,9 +82,9 @@ export class TechnicalAccessService {
       };
     }
 
-    // 2. Se não existir no profiles, criar a conta técnica no Supabase Auth
-    // Senha aleatória de 64 caracteres hexadecimais (impossível de adivinhar ou fazer login manual por form)
+    // 2. Se não existir em public.profiles, tentar criar a conta técnica no Supabase Auth
     const secureUnusablePassword = crypto.randomBytes(32).toString('hex') + 'A1!';
+    let userId: string | undefined;
 
     const { data: authUser, error: createAuthErr } = await adminClient.auth.admin.createUser({
       email,
@@ -102,15 +103,30 @@ export class TechnicalAccessService {
       ban_duration: '876000h',
     });
 
-    if (createAuthErr || !authUser.user) {
-      console.error('[TechnicalAccessService] Erro ao criar conta de usuário técnico no Supabase Auth:', createAuthErr);
-      throw new Error(`Falha ao criar usuário técnico no Auth: ${createAuthErr?.message}`);
+    if (createAuthErr || !authUser?.user) {
+      const errText = createAuthErr?.message || '';
+      // Se o usuário já existir no Auth (ex: conta cadastrada anteriormente), buscar e reutilizar a conta existente no Auth
+      if (errText.toLowerCase().includes('already') || errText.toLowerCase().includes('registered') || errText.toLowerCase().includes('exists')) {
+        const { data: userList, error: listErr } = await adminClient.auth.admin.listUsers();
+        if (listErr) {
+          console.error('[TechnicalAccessService] Erro ao listar usuários do Auth:', listErr);
+        }
+        const found = userList?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+        if (found) {
+          userId = found.id;
+        } else {
+          throw new Error(`Falha ao recuperar conta técnica cadastrada no Auth: ${errText}`);
+        }
+      } else {
+        console.error('[TechnicalAccessService] Erro ao criar conta de usuário técnico no Supabase Auth:', createAuthErr);
+        throw new Error(`Falha ao criar usuário técnico no Auth: ${errText}`);
+      }
+    } else {
+      userId = authUser.user.id;
     }
 
-    const userId = authUser.user.id;
-
+    // 3. Garantir o registro em public.profiles e public.ministry_users para a conta recuperada/criada
     try {
-      // 3. Registrar em public.profiles
       await adminClient.from('profiles').upsert({
         id: userId,
         email,
@@ -118,17 +134,12 @@ export class TechnicalAccessService {
         updated_at: new Date().toISOString(),
       });
 
-      // 4. Registrar em public.ministry_users (usando apenas colunas padrão existentes no schema)
-      const { error: minUserErr } = await adminClient.from('ministry_users').upsert({
+      await adminClient.from('ministry_users').upsert({
         user_id: userId,
         ministry_id: tenantId,
         role: 'ADMINISTRADOR',
         created_at: new Date().toISOString(),
       }, { onConflict: 'user_id,ministry_id' });
-
-      if (minUserErr) {
-        console.warn('[TechnicalAccessService] Aviso ao salvar em ministry_users:', minUserErr);
-      }
 
       return {
         user_id: userId,
@@ -136,9 +147,12 @@ export class TechnicalAccessService {
         email,
       };
     } catch (err: any) {
-      // Cleanup de segurança caso haja falha intermediária
-      await adminClient.auth.admin.deleteUser(userId).catch(() => null);
-      throw err;
+      console.error('[TechnicalAccessService] Erro ao salvar vinculo do usuário técnico:', err);
+      return {
+        user_id: userId,
+        ministry_id: tenantId,
+        email,
+      };
     }
   }
 
