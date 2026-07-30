@@ -3,18 +3,17 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 /**
- * Callback para confirmação de email
- * Supabase redireciona automaticamente para:
- * /auth/callback?code=XXXXX&type=signup ou email_change
- * 
- * Persiste a sessão em cookies via @supabase/ssr
+ * Callback de autenticação e confirmação de sessão (PKCE / SSR)
+ * Recebe o código do Supabase via /auth/callback?code=XXXXX&next=/dashboard ou signup
+ * Persiste a sessão em cookies HTTP nativos via @supabase/ssr
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
   const type = searchParams.get('type')
+  const next = searchParams.get('next')
 
-  console.log('[EMAIL_CALLBACK] Recebido callback:', { code: code?.substring(0, 10) + '...', type })
+  console.log('[AUTH_CALLBACK] Recebido callback:', { code: code?.substring(0, 10) + '...', type, next })
 
   if (!code) {
     return NextResponse.redirect(
@@ -43,37 +42,43 @@ export async function GET(request: NextRequest) {
       }
     )
 
-    // Trocar o código por uma sessão (confirma o email)
+    // Trocar o código por uma sessão (grava cookies HTTP via @supabase/ssr)
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
-    console.log('[EMAIL_CALLBACK] Resultado da troca de código:', { 
+    console.log('[AUTH_CALLBACK] Resultado da troca de código:', { 
       user: data?.user?.email, 
       error: error?.message 
     })
 
     if (error) {
-      console.error('[EMAIL_CALLBACK] Erro ao confirmar email:', error)
+      console.error('[AUTH_CALLBACK] Erro ao trocar código por sessão:', error)
       return NextResponse.redirect(
         new URL(`/email-confirmation?error=${encodeURIComponent(error.message)}`, request.url)
       )
     }
 
     if (!data?.user) {
-      console.error('[EMAIL_CALLBACK] Usuário não encontrado após confirmação')
+      console.error('[AUTH_CALLBACK] Usuário não encontrado após troca de código')
       return NextResponse.redirect(
         new URL('/email-confirmation?error=user_not_found', request.url)
       )
     }
 
-    console.log('[EMAIL_CALLBACK] ✅ Email confirmado com sucesso:', data.user?.email)
+    console.log('[AUTH_CALLBACK] ✅ Sessão iniciada com sucesso via @supabase/ssr:', data.user?.email)
 
-    // Redirecionar para página de sucesso ou dashboard
+    // Se houver parâmetro next (ex: /dashboard do Acesso Técnico), redirecionar diretamente
+    if (next) {
+      const redirectTarget = next.startsWith('/') ? next : `/${next}`
+      return NextResponse.redirect(new URL(redirectTarget, request.url))
+    }
+
+    // Fallback padrão para confirmação de email de signup
     return NextResponse.redirect(
       new URL(`/email-confirmation?success=true&email=${encodeURIComponent(data.user?.email || 'desconhecido')}`, request.url)
     )
 
   } catch (error) {
-    console.error('[EMAIL_CALLBACK] Erro geral:', error)
+    console.error('[AUTH_CALLBACK] Erro geral no callback:', error)
     return NextResponse.redirect(
       new URL('/email-confirmation?error=confirmation_failed', request.url)
     )

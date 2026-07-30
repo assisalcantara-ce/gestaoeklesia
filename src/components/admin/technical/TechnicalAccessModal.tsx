@@ -70,7 +70,6 @@ export default function TechnicalAccessModal({
       setStatusMessage('Redirecionando para o Magic Link nativo do Supabase...');
 
       // 3. Redirecionar a janela para o Magic Link nativo do Supabase Auth
-      // O Supabase irá autenticar a conta técnica com sessão nativa e direcionar para /dashboard
       window.location.href = data.redirectUrl;
     } catch (err: any) {
       console.error('Erro no Acesso Técnico:', err);
@@ -88,7 +87,7 @@ export default function TechnicalAccessModal({
           <div className="flex items-center space-x-3">
             <span className="text-3xl">🛠️</span>
             <div>
-              <h3 className="text-xl font-bold">Acesso Técnico Nativo</h3>
+              <h3 className="text-xl font-bold">🔒 Acesso Seguro</h3>
               <p className="text-blue-100 text-sm mt-0.5">
                 Atendimento ao tenant: <span className="font-semibold text-white">{tenantName}</span>
               </p>
@@ -146,12 +145,12 @@ export default function TechnicalAccessModal({
           </div>
 
           {/* Banner explicativo de segurança nativa */}
-          <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 space-y-1">
-            <p className="font-semibold text-blue-950 flex items-center gap-1.5">
-              <span>🔒</span> Autenticação Nativa Supabase Auth:
+          <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 space-y-2">
+            <p className="leading-relaxed">
+              Ao iniciar o atendimento, sua sessão administrativa será encerrada automaticamente e você será conectado ao ambiente do ministério utilizando uma conta técnica exclusiva.
             </p>
-            <p>
-              Ao confirmar, sua sessão de Administrador será <strong>encerrada com logout automático</strong> e o navegador autenticará diretamente a conta técnica permanente do tenant via Magic Link nativo.
+            <p className="font-semibold text-blue-950">
+              Todo o acesso é registrado para fins de auditoria.
             </p>
           </div>
 

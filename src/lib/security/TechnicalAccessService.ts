@@ -214,8 +214,8 @@ export class TechnicalAccessService {
       throw new Error(`Erro ao salvar concessão de acesso técnico: ${grantErr?.message}`);
     }
 
-    // 4. Gerar Magic Link nativo do Supabase Auth direcionando para /dashboard
-    const redirectUrl = baseUrl ? `${baseUrl}/dashboard` : '/dashboard';
+    // 4. Gerar Magic Link nativo do Supabase Auth direcionando para o callback PKCE /auth/callback?next=/dashboard
+    const redirectUrl = baseUrl ? `${baseUrl}/auth/callback?next=/dashboard` : '/auth/callback?next=/dashboard';
 
     const { data: linkData, error: linkErr } = await adminClient.auth.admin.generateLink({
       type: 'magiclink',
