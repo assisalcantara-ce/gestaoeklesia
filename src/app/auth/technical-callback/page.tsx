@@ -16,50 +16,48 @@ export default function TechnicalCallbackPage() {
       supabaseRef.current = createClient();
     }
     const supabase = supabaseRef.current;
+    let isSubscribed = true;
 
-    const handleTechnicalCallback = async () => {
-      try {
-        // 1. O createBrowserClient() do @supabase/ssr processa automaticamente o #access_token da URL
-        // e persiste os cookies HTTP de sessão nativos no navegador.
-        const { data: { session } } = await supabase.auth.getSession();
+    const verifyAndRedirect = async () => {
+      if (!isSubscribed) return;
 
-        if (session) {
-          setStatusMessage('Sessão técnica confirmada. Redirecionando...');
-          router.replace('/dashboard');
-          return;
-        }
+      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: userData } = await supabase.auth.getUser();
 
-        // 2. Se a sessão ainda não estiver montada imediatamente no estado, escuta a mudança de estado
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          async (event: any, currentSession: any) => {
-            if (currentSession || event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-              setStatusMessage('Sessão técnica confirmada. Redirecionando...');
-              subscription.unsubscribe();
-              router.replace('/dashboard');
-            }
-          }
-        );
+      console.log('[TECHNICAL_CALLBACK] getSession():', sessionData?.session?.user?.id || null);
+      console.log('[TECHNICAL_CALLBACK] getUser():', userData?.user?.id || null);
 
-        // Fallback limite de aguardo do processamento nativo do Supabase Auth Client
-        setTimeout(async () => {
-          const { data: { session: retrySession } } = await supabase.auth.getSession();
-          if (retrySession) {
-            router.replace('/dashboard');
-          } else {
-            setStatusMessage('Falha ao autenticar sessão técnica. Redirecionando para a entrada...');
-            setTimeout(() => router.replace('/login'), 1500);
-          }
-          subscription.unsubscribe();
-        }, 2500);
-
-      } catch (err) {
-        console.error('[TechnicalCallback] Erro ao processar sessão técnica:', err);
-        setStatusMessage('Erro de autenticação. Redirecionando para a entrada...');
-        setTimeout(() => router.replace('/login'), 1500);
+      if (sessionData?.session && userData?.user) {
+        setStatusMessage('Sessão técnica confirmada. Redirecionando...');
+        router.replace('/dashboard');
       }
     };
 
-    handleTechnicalCallback();
+    // 1. Ouvir alterações de estado de autenticação (Processamento nativo do #access_token)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event: any, session: any) => {
+        console.log('[TECHNICAL_CALLBACK] AuthStateChange event:', event, 'user:', session?.user?.id || null);
+
+        if (session && session.user) {
+          await verifyAndRedirect();
+        }
+      }
+    );
+
+    // 2. Verificar imediatamente se a sessão já está totalmente disponível
+    const checkInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && session.user) {
+        await verifyAndRedirect();
+      }
+    };
+
+    void checkInitialSession();
+
+    return () => {
+      isSubscribed = false;
+      subscription?.unsubscribe();
+    };
   }, [router]);
 
   return (

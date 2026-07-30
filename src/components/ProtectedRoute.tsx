@@ -40,12 +40,16 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   const isPublic = isPublicPath(pathname)
 
   useEffect(() => {
+    console.log('[PROTECTED_ROUTE] authLoading:', authLoading, 'user.id:', user?.id || null);
+
     if (isPublic) return
 
     // 1. Redirecionamento por falta de autenticação
     if (!authLoading && !user) {
       const isMobile = pathname.startsWith('/app/') || pathname === '/app'
-      router.replace(isMobile ? '/app/login' : '/login')
+      const redirectTarget = isMobile ? '/app/login' : '/login'
+      console.log('[PROTECTED_ROUTE] motivo do redirect: Usuário não autenticado após término do carregamento de auth. Destino:', redirectTarget);
+      router.replace(redirectTarget)
       return
     }
 
@@ -53,6 +57,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     if (!authLoading && !contextLoading && user && pathname.startsWith('/app/presidencia')) {
       const temNivelPresidencia = nivel === 'presidencia' || nivel === 'administrador'
       if (!temNivelPresidencia) {
+        console.log('[PROTECTED_ROUTE] motivo do redirect: Nível de permissão insuficiente para /app/presidencia');
         router.replace('/acesso-negado')
       }
     }
@@ -62,7 +67,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     return <>{children}</>
   }
 
-  // Se a autenticação ou o perfil estiver carregando, renderiza carregamento neutro
+  // Se a autenticação ou o perfil estiver carregando, renderiza carregamento neutro sem redirecionar
   if (authLoading || contextLoading || !user) {
     return (
       <div className="min-h-screen w-screen flex items-center justify-center" style={{ background: GRADIENTS.APP_BACKGROUND }}>
@@ -73,29 +78,15 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
             width={290}
             height={83}
             priority
-            sizes="290px"
-            className="h-[83px] w-auto object-contain animate-pulse select-none"
+            className="w-[220px] sm:w-[290px] h-auto"
           />
-          <div className="w-24 h-1 bg-white/20 rounded-full overflow-hidden relative">
-            <div className="w-1/2 h-full bg-[#5A9DDC] rounded-full absolute left-0 top-0 animate-[loading_1s_infinite_ease-in-out]"></div>
+          <div className="flex items-center gap-2">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+            <span className="text-white/80 text-sm font-medium">Carregando permissões...</span>
           </div>
-          <style jsx>{`
-            @keyframes loading {
-              0% { left: -50%; }
-              100% { left: 100%; }
-            }
-          `}</style>
         </div>
       </div>
     )
-  }
-
-  // Tratativa final para /app/presidencia se não tiver permissão (evita piscar conteúdo antes do useEffect)
-  if (pathname.startsWith('/app/presidencia')) {
-    const temNivelPresidencia = nivel === 'presidencia' || nivel === 'administrador'
-    if (!temNivelPresidencia) {
-      return null
-    }
   }
 
   return <>{children}</>

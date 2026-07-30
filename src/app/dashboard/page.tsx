@@ -152,6 +152,8 @@ export default function DashboardPage() {
     if (userCtx.loading) return; // Aguarda o carregamento completo do contexto de usuário/permissões
     const run = async () => {
       const { data: authData } = await supabase.auth.getUser();
+      console.log('[DASHBOARD_AUTH] user.id:', authData?.user?.id || null);
+
       if (!authData.user) { router.push('/login'); return; }
 
       const { data: mu } = await supabase
@@ -159,6 +161,8 @@ export default function DashboardPage() {
         .select('role, permissions')
         .eq('user_id', authData.user.id)
         .maybeSingle();
+
+      console.log('[DASHBOARD_AUTH] resultado da consulta em ministry_users:', mu);
 
       const nivel = mu?.role ? String(mu.role) : 'viewer';
 
