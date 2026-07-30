@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { mapRoleAndPermissions } from '@/lib/access-control';
 import {
   encryptPassword,
   decryptPassword,
@@ -25,9 +26,10 @@ export class TechnicalAccessService {
   }
 
   /**
-   * Garantia Idempotente de Migração/Criacao:
+   * Garantia Idempotente de Migração/Criação:
    * Localiza ou cria a conta técnica de um tenant, garantindo que ela possua
-   * o usuário no Auth, vinculo em ministry_users e credencial criptografada AES-256-GCM
+   * o usuário no Auth, vínculo em ministry_users utilizando obrigatoriamente
+   * mapRoleAndPermissions('administrador'), e credencial criptografada AES-256-GCM
    * em technical_access_secrets.
    */
   public static async getOrCreateTechnicalAccount(
@@ -105,7 +107,10 @@ export class TechnicalAccessService {
       }
     }
 
-    // 4. Idempotência em Profiles e Ministry_Users (UPSERT sem duplicatas)
+    // 4. Idempotência e Migração de RBAC em Profiles e Ministry_Users
+    // Utiliza obrigatoriamente a função oficial mapRoleAndPermissions('administrador')
+    const roleConfig = mapRoleAndPermissions('administrador');
+
     await adminClient.from('profiles').upsert(
       {
         id: authUser.id,
@@ -116,12 +121,13 @@ export class TechnicalAccessService {
       { onConflict: 'id' }
     );
 
+    // Corrige ou cria o vínculo em ministry_users garantindo role: 'admin' e permissions: ['ADMINISTRADOR']
     await adminClient.from('ministry_users').upsert(
       {
         ministry_id: tenantId,
         user_id: authUser.id,
-        role: 'ADMINISTRADOR',
-        permissions: ['ADMINISTRADOR', 'TODOS'],
+        role: roleConfig.role,
+        permissions: roleConfig.permissions,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'ministry_id,user_id' }
