@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-guard';
 import { createServerClient } from '@/lib/supabase-server';
 import { TechnicalAccessService } from '@/lib/security/TechnicalAccessService';
+import { getAppBaseUrl } from '@/lib/app-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,14 @@ export async function POST(request: NextRequest) {
     }
 
     const adminClient = createServerClient();
-    const origin = request.headers.get('origin') || request.nextUrl.origin || '';
+    
+    // Resolvendo a URL base publica oficial da aplicacao sem usar request.nextUrl.origin
+    const baseUrl = getAppBaseUrl(request);
+    const expectedRedirectTo = `${baseUrl}/auth/callback?next=/dashboard`;
+
+    // Debug logs para auditoria de conexao e geracao de link
+    console.log('[TECHNICAL_ACCESS_START] baseUrl resolvida:', baseUrl);
+    console.log('[TECHNICAL_ACCESS_START] redirectTo final:', expectedRedirectTo);
 
     // 2. Iniciar sessão técnica e gerar Magic Link nativo do Supabase Auth
     const sessionResult = await TechnicalAccessService.startTechnicalSession(adminClient, {
@@ -42,8 +50,10 @@ export async function POST(request: NextRequest) {
       reason: reason.trim(),
       ticketReference: typeof ticketReference === 'string' ? ticketReference.trim() : undefined,
       durationHours: typeof durationHours === 'number' && durationHours > 0 ? durationHours : 2,
-      baseUrl: origin,
+      baseUrl,
     });
+
+    console.log('[TECHNICAL_ACCESS_START] action_link retornado pelo Supabase:', sessionResult.actionLink);
 
     // 3. Registrar auditoria do acesso técnico
     try {
