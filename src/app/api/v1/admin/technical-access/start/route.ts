@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     
     // Resolvendo a URL base publica oficial da aplicacao sem usar request.nextUrl.origin
     const baseUrl = getAppBaseUrl(request);
-    const expectedRedirectTo = `${baseUrl}/auth/callback?next=/dashboard`;
+    const expectedRedirectTo = `${baseUrl}/auth/technical-callback`;
 
     // Debug logs para auditoria de conexao e geracao de link
     console.log('[TECHNICAL_ACCESS_START] baseUrl resolvida:', baseUrl);
