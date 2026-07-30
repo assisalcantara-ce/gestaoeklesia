@@ -1,22 +1,22 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
 import NotificationModal from '@/components/NotificationModal';
-import FichaMembro from '@/components/FichaMembro';
-import CartãoMembro from '@/components/CartãoMembro';
-import CartaoBatchPrinter from '@/components/CartaoBatchPrinter';
 import MembrosOverview from '@/components/MembrosOverview';
+import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { useUserContext } from '@/hooks/useUserContext';
+import { useMembers } from '@/hooks/useMembers';
 import { getCargosMinisteriais, type CargoMinisterial } from '@/lib/cargos-utils';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import { getMensagemSemTemplate } from '@/lib/cartoes-utils';
 import { createClient } from '@/lib/supabase-client';
 import { loadOrgNomenclaturasFromSupabaseOrMigrate } from '@/lib/org-nomenclaturas';
 import { loadTemplatesForCurrentUser } from '@/lib/cartoes-templates-sync';
-import { useRequireModulo } from '@/hooks/useRequireModulo';
-import { useUserContext } from '@/hooks/useUserContext';
-import { useMembers } from '@/hooks/useMembers';
-import type { Member, CreateMemberRequest, UpdateMemberRequest } from '@/types/supabase';
+import ConfirmDeleteModal from '@/components/secretaria/membros/ConfirmDeleteModal';
+import MembroCarteirinhaModal from '@/components/secretaria/membros/MembroCarteirinhaModal';
+import MembrosToolbar from '@/components/secretaria/membros/MembrosToolbar';
+import MembrosTable from '@/components/secretaria/membros/MembrosTable';
+import MembroFormModal from '@/components/secretaria/membros/MembroFormModal';
 
 interface Membro {
   id: string;
@@ -143,7 +143,7 @@ export default function MembrosPage() {
   const [activeTab, setActiveTab] = useState<MembrosFormTab>('dados');
   const [isDizimista, setIsDizimista] = useState(false);
   const [dizimosHistorico, setDizimosHistorico] = useState<Array<{mes_referencia: string; status: string; valor: number | null; data_pagamento: string | null}>>([]);
-  const [loadingDizimosHistorico, setLoadingDizimosHistorico] = useState(false);
+  const [loadingDizimosHistorico, _setLoadingDizimosHistorico] = useState(false);
   const [templatesSnapshot, setTemplatesSnapshot] = useState<any[]>([]);
   const [configIgreja, setConfigIgreja] = useState({
     nome: 'Igreja/Ministério',
@@ -182,14 +182,7 @@ export default function MembrosPage() {
     return formatCpf(digits).replace(/^(\d{3})\.\d{3}\.\d{3}-(\d{2})$/, '$1.***.***-$2');
   };
 
-  const formatPhone = (value: string) => {
-    const digits = onlyDigits(value).slice(0, 11);
-    if (!digits) return '';
-    if (digits.length <= 2) return `(${digits}`;
-    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-  };
+
 
   const normalizeTipoCadastro = (value: any): Membro['tipoCadastro'] => {
     const v = String(value || '').toLowerCase();
@@ -197,13 +190,13 @@ export default function MembrosPage() {
     return 'ministro';
   };
 
-  const dbStatusToUi = (status: Member['status'] | null | undefined): Membro['status'] =>
+  const dbStatusToUi = (status: any): Membro['status'] =>
     status === 'active' ? 'ativo' : 'inativo';
 
-  const uiStatusToDb = (status: Membro['status']): Member['status'] =>
+  const uiStatusToDb = (status: Membro['status']): string =>
     status === 'ativo' ? 'active' : 'inactive';
 
-  const memberToMembro = (member: Member): Membro => {
+  const memberToMembro = (member: any): Membro => {
     const cf = (member.custom_fields && typeof member.custom_fields === 'object') ? member.custom_fields : {};
     const cargoMinisterial = String(
       (cf as any).cargoMinisterial ||
@@ -349,7 +342,7 @@ export default function MembrosPage() {
   const [ultimoCadastro, setUltimoCadastro] = useState<Membro | null>(null);
   const [membrosSelecionados, setMembrosSelecionados] = useState<Set<string>>(new Set());
   const [cpfDuplicado, setCpfDuplicado] = useState(false);
-  const [verificandoCpf, setVerificandoCpf] = useState(false);
+  const [_verificandoCpf, _setVerificandoCpf] = useState(false);
   const cpfInputRef = useRef<HTMLInputElement>(null);
   const [imprimindoLote, setImprimindoLote] = useState(false);
   const [notification, setNotification] = useState<{
@@ -465,11 +458,11 @@ export default function MembrosPage() {
   }>({});
 
   // Estado para controlar modo edição (admin only)
-  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [_isAdminMode, setIsAdminMode] = useState(false);
   const userCtx = useUserContext();
   const isSupervisor = userCtx.nivel === 'supervisor';
   const isAuxiliar = userCtx.nivel === 'auxiliar_secretaria';
-  const [isEditando, setIsEditando] = useState(false);
+  const [_isEditando, setIsEditando] = useState(false);
 
   // Cargos ministeriais (sincronizados com configurações via localStorage)
   const [cargosMinisteriais] = useState<CargoMinisterial[]>(() => getCargosMinisteriais());
@@ -493,8 +486,8 @@ export default function MembrosPage() {
   });
   const [orgNomenclaturasRaw, setOrgNomenclaturasRaw] = useState<any>(null);
 
-  const [supervisoes, setSupervisoes] = useState<DivisaoOption[]>([]);
-  const [campos, setCampos] = useState<DivisaoOption[]>([]);
+  const [_supervisoes, setSupervisoes] = useState<DivisaoOption[]>([]);
+  const [_campos, setCampos] = useState<DivisaoOption[]>([]);
   const [congregacoes, setCongregacoes] = useState<DivisaoOption[]>([]);
 
   const refreshNomenclaturas = async () => {
@@ -567,24 +560,9 @@ export default function MembrosPage() {
     };
 
     loadEstruturaOptions().catch(() => null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const sanitizeNome = (value: unknown) => String(value || '').trim();
-
-  const dedupByNome = (items: DivisaoOption[]): DivisaoOption[] => {
-    const seen = new Set<string>();
-    const out: DivisaoOption[] = [];
-    items.forEach((item) => {
-      const nome = sanitizeNome(item.nome);
-      if (!nome) return;
-      const key = nome.toUpperCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      out.push({ ...item, nome });
-    });
-    return out;
-  };
 
   const supervisoesFromNomenclaturas = ((orgNomenclaturasRaw?.divisaoPrincipal?.custom || []) as string[])
     .map((nome, idx) => ({ id: `cfg-s-${idx}-${nome}`, nome: sanitizeNome(nome) }))
@@ -596,21 +574,9 @@ export default function MembrosPage() {
     .map((nome, idx) => ({ id: `cfg-g-${idx}-${nome}`, nome: sanitizeNome(nome) }))
     .filter((opt) => !!opt.nome);
 
-  const supervisoesFromMembers = dedupByNome(
-    (membersApi || [])
-      .map((m: any, idx: number) => ({ id: `legacy-s-${idx}`, nome: sanitizeNome((m?.custom_fields as any)?.supervisao) }))
-      .filter((opt: any) => !!opt.nome)
-  );
-  const camposFromMembers = dedupByNome(
-    (membersApi || [])
-      .map((m: any, idx: number) => ({ id: `legacy-c-${idx}`, nome: sanitizeNome((m?.custom_fields as any)?.campo) }))
-      .filter((opt: any) => !!opt.nome)
-  );
-  const congregacoesFromMembers = dedupByNome(
-    (membersApi || [])
-      .map((m: any, idx: number) => ({ id: `legacy-g-${idx}`, nome: sanitizeNome((m?.custom_fields as any)?.congregacao) }))
-      .filter((opt: any) => !!opt.nome)
-  );
+
+
+
 
   // Funções de Imagem
   const handleFotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1186,52 +1152,7 @@ export default function MembrosPage() {
   };
 
   // Função para salvar/atualizar membro
-  const verificarCpfDuplicado = async (cpf: string) => {
-    const digits = onlyDigits(cpf);
-    if (digits.length !== 11) return;
-    if (!validarCPF(cpf)) {
-      setCpfDuplicado(false);
-      setDadosPessoais((prev) => ({ ...prev, cpf: '' }));
-      setTimeout(() => cpfInputRef.current?.focus(), 50);
-      setNotification({
-        isOpen: true,
-        title: 'CPF inválido',
-        message: 'O número de CPF informado não é válido. Verifique os dígitos e tente novamente.',
-        type: 'error',
-        autoClose: 6000,
-      });
-      return;
-    }
-    if (membroEditando) return; // edição: CPF não muda
 
-    setVerificandoCpf(true);
-    try {
-      const ministryId = await resolveMinistryId();
-      if (!ministryId) return;
-      const { data } = await supabase
-        .from('members')
-        .select('id')
-        .eq('ministry_id', ministryId)
-        .eq('cpf', digits)
-        .limit(1);
-      if (data && data.length > 0) {
-        setCpfDuplicado(true);
-        setDadosPessoais((prev) => ({ ...prev, cpf: '' }));
-        setTimeout(() => cpfInputRef.current?.focus(), 50);
-        setNotification({
-          isOpen: true,
-          title: 'CPF já cadastrado',
-          message: 'Este CPF já está registrado em outro membro do seu ministério. Verifique o número e tente novamente.',
-          type: 'error',
-          autoClose: 6000,
-        });
-      } else {
-        setCpfDuplicado(false);
-      }
-    } finally {
-      setVerificandoCpf(false);
-    }
-  };
 
   const salvarMembro = async () => {
     console.log('💾 Iniciando salvamento do membro...');
@@ -1325,7 +1246,7 @@ export default function MembrosPage() {
       // Converte para maiúsculo, retorna null se vazio
       const u = (v: string | null | undefined): string | null => v ? v.toUpperCase().trim() : null;
 
-      const payloadBase: CreateMemberRequest = {
+      const payloadBase: any = {
         name: (dadosPessoais.nome || '').toUpperCase().trim(),
         cpf: onlyDigits(dadosPessoais.cpf) || null,
         email: dadosPessoais.email?.trim().toLowerCase() || null,
@@ -1398,7 +1319,7 @@ export default function MembrosPage() {
       };
 
       if (membroEditando) {
-        const payload: UpdateMemberRequest = payloadBase;
+        const payload: any = payloadBase;
         await updateMember(membroEditando.id, payload);
         await fetchMembers(1, 500);
         setNotification({
@@ -1410,7 +1331,7 @@ export default function MembrosPage() {
       } else {
         const created = await createMember(payloadBase);
         await fetchMembers(1, 500);
-        const createdUi = memberToMembro(created as unknown as Member);
+        const createdUi = memberToMembro(created as unknown as any);
         setUltimoCadastro(createdUi);
         setNotification({
           isOpen: true,
@@ -1510,18 +1431,7 @@ export default function MembrosPage() {
     resetarFormulario();
   };
 
-  // Carregar histórico de dízimos do membro (aba Dízimos)
-  const carregarDizimosHistorico = async (memberId: string) => {
-    setLoadingDizimosHistorico(true);
-    const { data } = await supabase
-      .from('dizimistas_pagamentos')
-      .select('mes_referencia, status, valor, data_pagamento')
-      .eq('member_id', memberId)
-      .order('mes_referencia', { ascending: false })
-      .limit(24);
-    setDizimosHistorico((data as any[]) || []);
-    setLoadingDizimosHistorico(false);
-  };
+
 
   // Função para abrir modal de confirmação de deleção
   const abrirConfirmacaoDeletar = (membro: Membro) => {
@@ -1715,52 +1625,11 @@ export default function MembrosPage() {
   const endIndex = startIndex + itemsPerPage;
   const membrosPaginados = membrosFiltrados.slice(startIndex, endIndex);
 
-  const supervisoesOptions = supervisoes.length
-    ? dedupByNome([...supervisoes])
-    : dedupByNome([
-        ...supervisoes,
-        ...supervisoesFromMembers,
-        ...supervisoesFromNomenclaturas,
-      ]);
-  const camposOptions = campos.length
-    ? dedupByNome([...campos])
-    : dedupByNome([
-        ...campos,
-        ...camposFromMembers,
-        ...camposFromNomenclaturas,
-      ]);
-  const congregacoesOptions = congregacoes.length
-    ? dedupByNome([...congregacoes])
-    : dedupByNome([
-        ...congregacoes,
-        ...congregacoesFromMembers,
-        ...congregacoesFromNomenclaturas,
-      ]);
 
-  const isDbOption = (id?: string | null) => !!id && !id.startsWith('legacy-') && !id.startsWith('cfg-');
 
-  // Mapeamento da tela atual:
-  // 1ª Divisão = Congregação, 2ª Divisão = Setor, 3ª Divisão = Regional.
-  const divisao1Options = congregacoesOptions;
-  const divisao2Options = camposOptions;
-  const divisao3Options = supervisoesOptions;
 
-  const divisao1Selecionada = divisao1Options.find((o) => o.nome === dadosPessoais.supervisao) || null;
-  const divisao2Selecionada = divisao2Options.find((o) => o.nome === dadosPessoais.campo) || null;
 
-  const divisao2Filtradas = (divisao1Selecionada?.campo_id && isDbOption(divisao1Selecionada.id))
-    ? divisao2Options.filter((o) => o.id === divisao1Selecionada.campo_id)
-    : divisao2Options;
 
-  const divisao3Filtradas = divisao3Options.filter((o) => {
-    if (divisao2Selecionada?.supervisao_id && isDbOption(divisao2Selecionada.id)) {
-      return o.id === divisao2Selecionada.supervisao_id;
-    }
-    if (divisao1Selecionada?.supervisao_id && isDbOption(divisao1Selecionada.id)) {
-      return o.id === divisao1Selecionada.supervisao_id;
-    }
-    return true;
-  });
 
   if (bloqueado) return null;
 
@@ -1777,56 +1646,12 @@ export default function MembrosPage() {
       />
 
       {/* Modal de Confirmação de Deleção */}
-      {membroDeletando && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
-            {/* Header */}
-            <div className="flex items-center gap-3 px-6 py-4 border-b-2 border-red-500 bg-gradient-to-r from-red-600 to-red-700">
-              <span className="text-3xl">⚠️</span>
-              <h2 className="text-lg font-bold text-white">Confirmar Deleção</h2>
-            </div>
-
-            {/* Conteúdo */}
-            <div className="px-6 py-6 space-y-4">
-              <p className="text-gray-700 font-semibold">
-                Tem certeza que deseja deletar este membro?
-              </p>
-              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
-                <p className="text-sm text-gray-700">
-                  <span className="font-semibold">Matrícula:</span> {membroDeletando.matricula}
-                </p>
-                <p className="text-sm text-gray-700">
-                  <span className="font-semibold">Nome:</span> {membroDeletando.nome}
-                </p>
-                <p className="text-sm text-gray-700">
-                  <span className="font-semibold">CPF:</span> {membroDeletando.cpf}
-                </p>
-              </div>
-              <div className="bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded">
-                <p className="text-xs text-yellow-800">
-                  <span className="font-semibold">⚠️ Atenção:</span> Esta ação é irreversível e não pode ser desfeita.
-                </p>
-              </div>
-            </div>
-
-            {/* Botões */}
-            <div className="flex gap-4 px-6 py-4 border-t border-gray-300 bg-gray-50">
-              <button
-                onClick={deletarMembro}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition font-semibold text-sm"
-              >
-                ✓ Deletar
-              </button>
-              <button
-                onClick={cancelarDeletar}
-                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition font-semibold text-sm"
-              >
-                ✕ Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDeleteModal
+        isOpen={!!membroDeletando}
+        membro={membroDeletando}
+        onConfirm={deletarMembro}
+        onCancel={cancelarDeletar}
+      />
 
       {/* Modal de Crop de Foto - Enquadrar Foto 3x4 */}
       {mostrarCropModal && fotoOriginal && (
@@ -1982,166 +1807,20 @@ export default function MembrosPage() {
         </div>
       )}
 
-      {/* Modal de Impressão - Ficha do Ministro */}
-      {membroImprimindo && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full my-8 flex flex-col max-h-[90vh]">
-            {/* Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b-2 border-teal-500 bg-gradient-to-r from-teal-600 to-teal-700 flex-shrink-0">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <span>🖨️</span> Ficha do Membro
-              </h2>
-              <button
-                onClick={() => setMembroImprimindo(null)}
-                className="text-white hover:text-gray-100 text-2xl"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Conteúdo da Ficha com scroll */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <FichaMembro
-                membro={{
-                  matricula: membroImprimindo.matricula,
-                  id: membroImprimindo.id,
-                  uniqueId: membroImprimindo.uniqueId,
-                  nome: membroImprimindo.nome,
-                  cpf: membroImprimindo.cpf,
-                  tipoCadastro: membroImprimindo.tipoCadastro,
-                  dataNascimento: membroImprimindo.dataNascimento || '',
-                  sexo: membroImprimindo.sexo || '',
-                  tipoSanguineo: membroImprimindo.tipoSanguineo || '',
-                  escolaridade: membroImprimindo.escolaridade || '',
-                  estadoCivil: membroImprimindo.estadoCivil || '',
-                  rg: membroImprimindo.rg || '',
-                  nacionalidade: membroImprimindo.nacionalidade || '',
-                  naturalidade: membroImprimindo.naturalidade || '',
-                  uf: membroImprimindo.uf || '',
-                  cep: membroImprimindo.cep || '',
-                  logradouro: membroImprimindo.logradouro || '',
-                  numero: membroImprimindo.numero || '',
-                  bairro: membroImprimindo.bairro || '',
-                  complemento: membroImprimindo.complemento || '',
-                  cidade: membroImprimindo.cidade || '',
-                  nomeConjuge: membroImprimindo.nomeConjuge || '',
-                  cpfConjuge: membroImprimindo.cpfConjuge || '',
-                  dataNascimentoConjuge: membroImprimindo.dataNascimentoConjuge || '',
-                  nomePai: membroImprimindo.nomePai || '',
-                  nomeMae: membroImprimindo.nomeMae || '',
-                  email: membroImprimindo.email || '',
-                  celular: membroImprimindo.celular || '',
-                  whatsapp: membroImprimindo.whatsapp || '',
-                  qualFuncao: membroImprimindo.qualFuncao || '',
-                  setorDepartamento: membroImprimindo.setorDepartamento || ''
-                }}
-                dadosIgreja={(() => {
-                  return {
-                    nomeIgreja: configIgreja.nome || 'Igreja',
-                    endereco: configIgreja.endereco || '',
-                    telefone: configIgreja.telefone || '',
-                    email: configIgreja.email || '',
-                    logoUrl: configIgreja.logo || undefined
-                  };
-                })()}
-                fotoUrl={membroImprimindo.fotoUrl || undefined}
-              />
-            </div>
-
-            {/* Botão de Fechar */}
-            <div className="flex gap-4 px-6 py-4 border-t border-gray-300 bg-gray-50 flex-shrink-0">
-              <button
-                onClick={() => setMembroImprimindo(null)}
-                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition font-semibold text-sm"
-              >
-                ✕ Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Impressão - Cartão do Membro */}
-      {membroImprimindoCartao && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <CartãoMembro
-            membro={membroImprimindoCartao}
-            onClose={() => setMembroImprimindoCartao(null)}
-          />
-        </div>
-      )}
-
-      {/* Modal de Impressão em Lote - Cartões */}
-      {imprimindoLote && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
-            {/* Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b-2 border-purple-500 bg-gradient-to-r from-purple-600 to-purple-700">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <span>🎫</span> Impressão em Lote
-              </h2>
-              <button
-                onClick={() => setImprimindoLote(false)}
-                className="text-white hover:text-gray-100 text-2xl"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Conteúdo */}
-            <div className="p-6">
-              <div className="mb-4">
-                <p className="text-gray-700 font-semibold mb-4">
-                  Pronto para imprimir cartões de {membrosSelecionados.size} membro{membrosSelecionados.size !== 1 ? 's' : ''}?
-                </p>
-
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-gray-600">
-                    Os cartões serão gerados em PDF e otimizados para impressão em lote.
-                  </p>
-                </div>
-
-                {/* Listagem dos membros selecionados */}
-                <div className="bg-gray-50 rounded-lg p-3 max-h-48 overflow-y-auto mb-4">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">Membros selecionados:</p>
-                  <ul className="text-xs text-gray-600 space-y-1">
-                    {membros
-                      .filter(m => membrosSelecionados.has(m.id))
-                      .map(m => (
-                        <li key={m.id}>• {m.nome} ({m.matricula})</li>
-                      ))}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Botões */}
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setImprimindoLote(false)}
-                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition font-semibold"
-                >
-                  ✕ Cancelar
-                </button>
-                <CartaoBatchPrinter
-                  membros={membros.filter(m => membrosSelecionados.has(m.id))}
-                  onComplete={() => {
-                    setImprimindoLote(false);
-                    setMembrosSelecionados(new Set());
-                    setNotification({
-                      isOpen: true,
-                      title: 'Sucesso',
-                      message: 'PDF de cartões gerado com sucesso!',
-                      type: 'success',
-                      autoClose: 2000, // Fechar em 2 segundos
-                      showButton: false // Esconder botão
-                    });
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modais de Impressão e Carteirinha */}
+      <MembroCarteirinhaModal
+        membroImprimindo={membroImprimindo}
+        setMembroImprimindo={setMembroImprimindo}
+        membroImprimindoCartao={membroImprimindoCartao}
+        setMembroImprimindoCartao={setMembroImprimindoCartao}
+        imprimindoLote={imprimindoLote}
+        setImprimindoLote={setImprimindoLote}
+        membrosSelecionados={membrosSelecionados}
+        setMembrosSelecionados={setMembrosSelecionados}
+        membros={membros}
+        configIgreja={configIgreja}
+        setNotification={setNotification}
+      />
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="p-6 max-w-[96rem] mx-auto w-full">
@@ -2196,1575 +1875,100 @@ export default function MembrosPage() {
           {/* Vista - Dados de Ministros (Listagem completa) */}
           {dashboardView === 'list' && (
             <div>
-          {/* Filtro de Busca */}
-          <div className="bg-white rounded-lg p-4 shadow-md mb-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end">
-              <div className="w-full md:flex-1">
-                <label className="block text-sm font-semibold text-teal-700 mb-2">Filtro de Busca</label>
-                <input
-                  type="text"
-                  placeholder="DIGITE SUA BUSCA"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="w-full px-4 py-2 border-2 border-teal-300 rounded-lg focus:outline-none focus:border-teal-500"
-                />
-              </div>
-              <div className="w-full md:w-48">
-                <label className="block text-sm font-semibold text-teal-700 mb-2">CARGO</label>
-                <select
-                  value={cargoFilter}
-                  onChange={(e) => {
-                    setCargoFilter(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="w-full px-4 py-2 border-2 border-teal-300 rounded-lg bg-teal-50 focus:outline-none focus:border-teal-500"
-                >
-                  <option value="TODOS">TODOS</option>
-                  {getCargosMinisteriais().filter(c => c.ativo).map(c => (
-                    <option key={c.id} value={c.nome}>{c.nome.toUpperCase()}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="w-full md:w-48">
-                <label className="block text-sm font-semibold text-teal-700 mb-2">STATUS</label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => {
-                    setStatusFilter(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="w-full px-4 py-2 border-2 border-teal-300 rounded-lg bg-teal-50 focus:outline-none focus:border-teal-500"
-                >
-                  <option>ATIVO</option>
-                  <option>INATIVO</option>
-                  <option>TODOS</option>
-                </select>
-              </div>
-              <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setStatusFilter('ATIVO');
-                    setCargoFilter('TODOS');
-                    setCurrentPage(1);
-                  }}
-                  className="w-full md:w-auto mt-0 md:mt-[26px] px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition font-semibold text-sm h-[42px]"
-                >
-                  LIMPAR
-                </button>
-            </div>
-          </div>
-
-          {/* Header da Tabela */}
-          <div className="bg-white rounded-t-lg shadow-md">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between p-4 border-b-2 border-teal-500">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">☰</span>
-                <h2 className="text-lg font-bold text-teal-700">Listagem de Membros</h2>
-              </div>
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
-                <span className="text-sm text-gray-600">
-                  Quantidade de Membros:
-                  <span className="ml-2 px-2 py-0.5 bg-teal-100 text-teal-700 font-bold rounded-full text-sm">
-                    {membrosFiltrados.length}
-                  </span>
-                  {membrosFiltrados.length !== membros.length && (
-                    <span className="ml-1 text-xs text-gray-400">de {membros.length}</span>
-                  )}
-                </span>
-                <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                  {!isSupervisor && (
-                    <>
-                      <Link
-                        href="/secretaria/membros/importar"
-                        className="px-4 py-2 bg-teal-600 text-white hover:bg-teal-700 rounded-lg transition font-semibold text-sm flex items-center gap-2 w-full sm:w-auto cursor-pointer"
-                      >
-                        <span>📥</span>
-                        <span>Importar CSV</span>
-                      </Link>
-                      <button
-                        onClick={() => {
-                          if (limiteMembrosAtingido) {
-                            setNotification({ isOpen: true, title: 'Limite atingido', message: `Seu plano permite no máximo ${maxMembros} cadastros. Faça upgrade para adicionar mais.`, type: 'warning', showButton: true });
-                            return;
-                          }
-                          abrirNovoCadastro();
-                        }}
-                        className={`px-4 py-2 rounded-lg transition font-semibold text-sm flex items-center gap-2 w-full sm:w-auto ${
-                          limiteMembrosAtingido
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'bg-green-600 text-white hover:bg-green-700'
-                        }`}
-                        title={limiteMembrosAtingido ? `Limite de ${maxMembros} cadastros atingido` : 'Novo Cadastro'}
-                      >
-                        <span>➕</span>
-                        <span className="md:hidden">+ Membro</span>
-                        <span className="hidden md:inline">Novo Cadastro</span>
-                      </button>
-                    </>
-                  )}
-                  <button
-                    onClick={async () => {
-                      if (ultimoCadastro) {
-                        const novaMatricula = gerarProximaMatricula();
-                        setDadosPessoais({
-                          matricula: novaMatricula,
-                          cpf: '',
-                          tipoCadastro: 'ministro',
-                          nome: '',
-                          dataNascimento: ultimoCadastro.dataNascimento || '',
-                          sexo: ultimoCadastro.sexo || 'MASCULINO',
-                          tipoSanguineo: ultimoCadastro.tipoSanguineo || '',
-                          escolaridade: ultimoCadastro.escolaridade || '',
-                          estadoCivil: ultimoCadastro.estadoCivil || '',
-                          nomeConjuge: '',
-                          cpfConjuge: '',
-                          dataNascimentoConjuge: '',
-                          nomePai: ultimoCadastro.nomePai || '',
-                          nomeMae: ultimoCadastro.nomeMae || '',
-                          rg: '',
-                          orgaoEmissor: ultimoCadastro.orgaoEmissor || '',
-                          nacionalidade: ultimoCadastro.nacionalidade || 'BRASILEIRA',
-                          naturalidade: ultimoCadastro.naturalidade || '',
-                          uf: ultimoCadastro.uf || '',
-                          supervisao: ultimoCadastro.supervisao || '',
-                          campo: ultimoCadastro.campo || '',
-                          congregacao: ultimoCadastro.congregacao || '',
-                          email: '',
-                          celular: '',
-                          whatsapp: '',
-                          profissao: ultimoCadastro.profissao || '',
-                          tituloEleitoral: ultimoCadastro.tituloEleitoral || '',
-                          zonaEleitoral: ultimoCadastro.zonaEleitoral || '',
-                          secaoEleitoral: ultimoCadastro.secaoEleitoral || '',
-                          observacoes: ultimoCadastro.observacoes || ''
-                        });
-                        setEnderecoData({
-                          cep: ultimoCadastro.cep || '',
-                          logradouro: ultimoCadastro.logradouro || '',
-                          numero: ultimoCadastro.numero || '',
-                          bairro: ultimoCadastro.bairro || '',
-                          complemento: ultimoCadastro.complemento || '',
-                          cidade: ultimoCadastro.cidade || '',
-                          latitude: ultimoCadastro.latitude || '',
-                          longitude: ultimoCadastro.longitude || ''
-                        });
-                        setDadosMinisteriais({
-                          temFuncaoIgreja: ultimoCadastro.temFuncaoIgreja || false,
-                          qualFuncao: ultimoCadastro.qualFuncao || '',
-                          setorDepartamento: ultimoCadastro.setorDepartamento || '',
-                          dataBatismoAguas: ultimoCadastro.dataBatismoAguas || '',
-                          dataBatismoEspiritoSanto: ultimoCadastro.dataBatismoEspiritoSanto || '',
-                          cursoTeologico: ultimoCadastro.cursoTeologico || '',
-                          instituicaoTeologica: ultimoCadastro.instituicaoTeologica || '',
-                          pastorAuxiliar: ultimoCadastro.pastorAuxiliar || false,
-                          procedencia: ultimoCadastro.procedencia || '',
-                          procedenciaLocal: ultimoCadastro.procedenciaLocal || '',
-                          dataConsagracao: ultimoCadastro.dataConsagracao || '',
-                          dataEmissao: ultimoCadastro.dataEmissao || '',
-                          dataValidadeCredencial: ultimoCadastro.dataValidadeCredencial || '',
-                          observacoesMinisteriais: ultimoCadastro.observacoesMinisteriais || ''
-                        });
-                        setCargoSelecionado(resolveCargoValue(ultimoCadastro.cargoMinisterial));
-                        setDadosCargos(ultimoCadastro.dadosCargos || {});
-                        setIsEditando(false);
-                        setShowForm(true);
-                        setActiveTab('dados');
-                      }
-                    }}
-                    disabled={!ultimoCadastro}
-                    className={`px-4 py-2 rounded-lg transition font-semibold text-sm w-full sm:w-auto ${ultimoCadastro
-                      ? 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
-                  >
-                    📋 Cadastrar Semelhante
-                  </button>
-                  <button
-                    onClick={gerarPDFListagem}
-                    className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition font-semibold text-sm w-full sm:w-auto"
-                  >
-                    🖨️ IMPRIMIR
-                  </button>
-                  <button
-                    onClick={async () => {
-                      if (membrosSelecionados.size === 0) {
-                        setNotification({
-                          isOpen: true,
-                          title: 'Aviso',
-                          message: 'Selecione pelo menos um membro para imprimir cartões',
-                          type: 'warning'
-                        });
-                        return;
-                      }
-
-                      // Verificar template ativo (assumindo 'membro' como padrão para lote ou verificar o primeiro)
-                      // Se quiser ser mais estrito, poderia verificar todos os selecionados
-                      const selecionados = membros.filter(m => membrosSelecionados.has(m.id));
-                      if (selecionados.length === 0) return;
-
-                      const tiposUnicos = Array.from(new Set(selecionados.map(m => m.tipoCadastro || 'membro')));
-                      const templatesBase = await ensureTemplatesSnapshot();
-                      const tipoSemTemplate = tiposUnicos.find(t => !hasActiveTemplate(t, templatesBase));
-
-                      if (tipoSemTemplate) {
-                        setNotification({
-                          isOpen: true,
-                          title: 'Template Ausente',
-                          message: getMensagemSemTemplate(tipoSemTemplate),
-                          type: 'warning'
-                        });
-                        return;
-                      }
-
-                      setImprimindoLote(true);
-                    }}
-                    disabled={membrosSelecionados.size === 0}
-                    className={`px-4 py-2 rounded-lg transition font-semibold text-sm w-full sm:w-auto ${membrosSelecionados.size > 0
-                      ? 'bg-purple-600 text-white hover:bg-purple-700 cursor-pointer'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
-                  >
-                    🎫 IMPRIMIR CARTÕES ({membrosSelecionados.size})
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* CARDS MOBILE — visíveis apenas em telas < md */}
-            <div className="md:hidden space-y-3 px-4 pt-3 pb-2 max-w-full">
-              {membrosPaginados.length === 0 && (
-                <div className="text-center py-8 text-gray-400 text-sm">Nenhum membro encontrado.</div>
-              )}
-              {membrosPaginados.map((membro) => (
-                <div key={membro.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="w-12 h-14 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center border border-gray-200 flex-shrink-0">
-                      {membro.fotoUrl ? (
-                        <img src={membro.fotoUrl} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-2xl text-gray-400">👤</span>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-gray-800 text-sm break-words">{membro.nome}</p>
-                      <div className="text-xs text-gray-500 mt-1 space-y-0.5">
-                        <p>Matrícula: <span className="font-semibold">{membro.matricula}</span></p>
-                        <p>CPF: {maskCpf(membro.cpf)}</p>
-                      </div>
-                    </div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-bold self-start flex-shrink-0 ${
-                      membro.status === 'ativo' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {membro.status.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="mt-3 space-y-1 text-xs text-gray-600 break-words">
-                    <p><span className="font-semibold">Congregação:</span> {membro.congregacao || '-'}</p>
-                    <p><span className="font-semibold">Cargo/Função:</span> {membro.cargoMinisterial || '-'}</p>
-                  </div>
-                  <div className="mt-3 flex gap-2 flex-wrap">
-                    <button
-                      onClick={() => setMembroImprimindo(membro)}
-                      className="flex-1 min-w-[70px] px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200 transition"
-                    >
-                      Ver
-                    </button>
-                    {!isSupervisor && (
-                      <button
-                        onClick={() => abrirEdicao(membro)}
-                        className="flex-1 min-w-[70px] px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition"
-                      >
-                        Editar
-                      </button>
-                    )}
-                    <button
-                      onClick={() => { void abrirDocumentosMembro(membro); }}
-                      className="flex-1 min-w-[90px] px-3 py-2 bg-purple-50 text-purple-700 rounded-lg text-xs font-semibold hover:bg-purple-100 transition"
-                    >
-                      Documentos
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* TABELA DESKTOP — visível apenas em md+ */}
-            <div className="hidden md:block px-4 pt-3 pb-2">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[960px] border-collapse">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border-2 border-gray-300 px-4 py-3 text-center font-semibold text-gray-700 w-12">
-                      <input
-                        type="checkbox"
-                        checked={membrosSelecionados.size === membrosPaginados.length && membrosPaginados.length > 0}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            const novoSet = new Set(membrosSelecionados);
-                            membrosPaginados.forEach(m => novoSet.add(m.id));
-                            setMembrosSelecionados(novoSet);
-                          } else {
-                            const novoSet = new Set(membrosSelecionados);
-                            membrosPaginados.forEach(m => novoSet.delete(m.id));
-                            setMembrosSelecionados(novoSet);
-                          }
-                        }}
-                        className="w-4 h-4 cursor-pointer"
-                      />
-                    </th>
-                    <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700 w-20">Matrícula</th>
-                    <th className="border-2 border-gray-300 px-4 py-3 text-center font-semibold text-gray-700 w-12">Foto</th>
-                    <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Nome</th>
-                    <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">CPF</th>
-                    <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Cargo</th>
-                    <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Data Consagração</th>
-                    <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Status</th>
-                    <th className="border-2 border-gray-300 px-4 py-3 text-center font-semibold text-gray-700">Controles</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {membrosPaginados.map((membro) => (
-                    <tr key={membro.id} className="hover:bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={membrosSelecionados.has(membro.id)}
-                          onChange={(e) => {
-                            const novoSet = new Set(membrosSelecionados);
-                            if (e.target.checked) {
-                              novoSet.add(membro.id);
-                            } else {
-                              novoSet.delete(membro.id);
-                            }
-                            setMembrosSelecionados(novoSet);
-                          }}
-                          className="w-4 h-4 cursor-pointer"
-                        />
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 font-semibold text-gray-700">{membro.matricula}</td>
-                      <td className="border border-gray-300 px-4 py-3 text-center">
-                        <div className="w-10 h-12 bg-gray-100 rounded overflow-hidden flex items-center justify-center mx-auto border border-gray-200">
-                          {membro.fotoUrl ? (
-                            <img src={membro.fotoUrl} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-xl text-gray-400">👤</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-gray-700">{membro.nome}</td>
-                      <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.cpf}</td>
-                      <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.cargoMinisterial || ''}</td>
-                      <td className="border border-gray-300 px-4 py-3 text-gray-600">
-                        {membro.dataConsagracao
-                          ? new Date(membro.dataConsagracao + 'T00:00:00').toLocaleDateString('pt-BR')
-                          : '-'}
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3">
-                        <span className={`px-3 py-1 rounded text-sm font-semibold ${membro.status === 'ativo'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                          }`}>
-                          {membro.status.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3">
-                        <div className="flex justify-center gap-2">
-                          <button
-                            onClick={() => setMembroImprimindo(membro)}
-                            className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition"
-                            title="Imprimir Ficha"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                            </svg>
-                          </button>
-                          {!isAuxiliar && (
-                          <button
-                            onClick={async () => {
-                              const templatesBase = await ensureTemplatesSnapshot();
-                              if (!hasActiveTemplate(membro.tipoCadastro, templatesBase)) {
-                                setNotification({
-                                  isOpen: true,
-                                  title: 'Template Ausente',
-                                  message: getMensagemSemTemplate(membro.tipoCadastro),
-                                  type: 'warning'
-                                });
-                                return;
-                              }
-                              setMembroImprimindoCartao(membro);
-                            }}
-                            className="p-2 text-purple-600 hover:bg-purple-100 rounded-lg transition"
-                            title="Imprimir Cartão"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-                            </svg>
-                          </button>
-                          )}
-                          {!isSupervisor && (
-                          <button
-                            onClick={() => abrirEdicao(membro)}
-                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition"
-                            title="Editar"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          )}
-                          {!isSupervisor && !isAuxiliar && (
-                          <button
-                            onClick={() => abrirConfirmacaoDeletar(membro)}
-                            className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition"
-                            title="Deletar"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Rodapé da Tabela */}
-          <div className="bg-white rounded-b-lg shadow-md p-4 border-t border-gray-300">
-            <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-center">
-              <div className="text-sm text-gray-600 text-center md:text-left">
-                Mostrando {startIndex + 1} até {Math.min(endIndex, membrosFiltrados.length)} de {membrosFiltrados.length} registros
-              </div>
-              <div className="flex items-center justify-center gap-1 flex-wrap">
-                {/* Anterior */}
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  ‹
-                </button>
-
-                {/* Páginas com ellipsis */}
-                {(() => {
-                  const pages: (number | string)[] = [];
-                  if (totalPages <= 7) {
-                    for (let i = 1; i <= totalPages; i++) pages.push(i);
-                  } else {
-                    pages.push(1);
-                    if (currentPage > 4) pages.push('...');
-                    const start = Math.max(2, currentPage - 2);
-                    const end = Math.min(totalPages - 1, currentPage + 2);
-                    for (let i = start; i <= end; i++) pages.push(i);
-                    if (currentPage < totalPages - 3) pages.push('...');
-                    pages.push(totalPages);
-                  }
-                  return pages.map((p, idx) =>
-                    p === '...' ? (
-                      <span key={`ellipsis-${idx}`} className="px-2 py-1 text-gray-400 select-none">…</span>
-                    ) : (
-                      <button
-                        key={p}
-                        onClick={() => setCurrentPage(p as number)}
-                        className={`px-3 py-1 rounded ${
-                          currentPage === p
-                            ? 'bg-teal-600 text-white font-bold'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    )
-                  );
-                })()}
-
-                {/* Próximo */}
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  ›
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Formulário Modal com Abas */}
-          {showForm && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col" style={{ height: '90vh' }}>
-                {/* Header */}
-                <div className="flex justify-between items-center px-4 py-4 border-b-2 border-teal-500 bg-gradient-to-r from-teal-600 to-teal-700 flex-shrink-0">
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <span>{membroEditando ? '✏️' : '➕'}</span>
-                    {membroEditando ? `Editar Membro - ${membroEditando.nome}` : 'Inserir Novo Membro'}
-                  </h2>
-                  <button
-                    onClick={() => setShowForm(false)}
-                    className="text-white hover:text-gray-100 text-2xl"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* Abas - Com altura fixa para evitar redimensionamento */}
-                <div className="flex border-b border-gray-300 bg-white overflow-x-auto h-16 items-center flex-shrink-0">
-                  <button
-                    onClick={() => setActiveTab('dados')}
-                    className={`px-4 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'dados'
-                      ? 'text-teal-700 border-teal-600'
-                      : 'text-gray-600 border-transparent hover:text-teal-600'
-                      }`}
-                  >
-                    📋 Dados
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('endereco')}
-                    className={`px-4 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'endereco'
-                      ? 'text-teal-700 border-teal-600'
-                      : 'text-gray-600 border-transparent hover:text-teal-600'
-                      }`}
-                  >
-                    🌍 Endereço + Contato
-                  </button>
-                  {dadosPessoais.tipoCadastro === 'ministro' && (
-                    <button
-                      onClick={() => setActiveTab('ministerial')}
-                      className={`px-4 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'ministerial'
-                        ? 'text-teal-700 border-teal-600'
-                        : 'text-gray-600 border-transparent hover:text-teal-600'
-                        }`}
-                    >
-                      ⛪ Ministerial
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setActiveTab('foto')}
-                    className={`px-4 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'foto'
-                      ? 'text-teal-700 border-teal-600'
-                      : 'text-gray-600 border-transparent hover:text-teal-600'
-                      }`}
-                  >
-                    📸 Foto
-                  </button>
-                  {isDizimista && (
-                    <button
-                      onClick={async () => {
-                        setActiveTab('dizimos');
-                        if (membroEditando && dizimosHistorico.length === 0) {
-                          await carregarDizimosHistorico(membroEditando.id);
-                        }
-                      }}
-                      className={`px-4 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 h-full flex items-center ${activeTab === 'dizimos'
-                        ? 'text-teal-700 border-teal-600'
-                        : 'text-gray-600 border-transparent hover:text-teal-600'
-                        }`}
-                    >
-                      💰 Dízimos
-                    </button>
-                  )}
-                </div>
-
-                {/* Conteúdo das Abas - Scrollável com margens laterais e altura fixa */}
-                <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0">
-                  {/* ABA: DADOS CADASTRAIS */}
-                  {activeTab === 'dados' && (
-                    <div className="space-y-3">
-                      {/* Linha 0: Matrícula */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Matrícula</label>
-                          <input
-                            type="text"
-                            placeholder="Automática"
-                            value={dadosPessoais.matricula}
-                            onChange={(e) => isAdminMode ? setDadosPessoais({ ...dadosPessoais, matricula: e.target.value }) : null}
-                            disabled={!isAdminMode}
-                            className={`w-full px-3 py-2 border border-gray-300 rounded-md text-sm ${isAdminMode
-                              ? 'focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
-                              : 'bg-gray-100 text-gray-600 cursor-not-allowed'
-                              }`}
-                          />
-                        </div>
-                        {isAdminMode && (
-                          <div className="flex items-end">
-                            <label className="flex items-center gap-2 text-xs text-gray-600">
-                              <input
-                                type="checkbox"
-                                checked={isEditando}
-                                onChange={(e) => setIsEditando(e.target.checked)}
-                                className="w-4 h-4 rounded border-gray-300"
-                              />
-                              Editar Matrícula
-                            </label>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Linha 1: CPF e Tipo de Cadastro */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">
-                            CPF *
-                            {membroEditando && <span className="ml-2 text-xs text-gray-500">(Bloqueado)</span>}
-                            {dadosPessoais.cpf && !membroEditando && (
-                              <span className={`ml-2 ${validarCPF(dadosPessoais.cpf) ? 'text-green-600' : 'text-red-600'}`}>
-                                {validarCPF(dadosPessoais.cpf) ? '✓ Válido' : '✗ Inválido'}
-                              </span>
-                            )}
-                          </label>
-                          <input
-                            ref={cpfInputRef}
-                            type="text"
-                            placeholder="Somente Números"
-                            value={dadosPessoais.cpf}
-                            onChange={(e) => {
-                              setCpfDuplicado(false);
-                              setDadosPessoais({ ...dadosPessoais, cpf: formatCpf(e.target.value) });
-                            }}
-                            onBlur={(e) => verificarCpfDuplicado(e.target.value)}
-                            disabled={false}
-                            className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:border-transparent ${
-                              cpfDuplicado
-                                ? 'border-red-500 focus:ring-red-500 bg-red-50'
-                                : dadosPessoais.cpf && !validarCPF(dadosPessoais.cpf)
-                                ? 'border-red-500 focus:ring-red-500'
-                                : 'border-gray-300 focus:ring-teal-500'
-                            }`}
-                          />
-                          {verificandoCpf && (
-                            <p className="mt-1 text-xs text-gray-400">Verificando CPF...</p>
-                          )}
-                          {cpfDuplicado && (
-                            <p className="mt-1 text-xs text-red-600 font-medium">⚠ CPF já cadastrado neste ministério.</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Tipo de Cadastro *</label>
-                          <select
-                            value={dadosPessoais.tipoCadastro}
-                            onChange={(e) => {
-                              const v = e.target.value as Membro['tipoCadastro'];
-                              setDadosPessoais({ ...dadosPessoais, tipoCadastro: v });
-                              if (v === 'ministro') setIsDizimista(true);
-                              if (v !== 'ministro') {
-                                setActiveTab((prev) => (prev === 'ministerial' ? 'dados' : prev));
-                              }
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          >
-                            <option value="ministro">Ministro</option>
-                            <option value="membro">Membro</option>
-                            <option value="congregado">Congregado</option>
-                          </select>
-                        </div>
-                      </div>
-
-
-
-                      {/* Nome + É dizimista? */}
-                      <div className="flex gap-3 items-end">
-                        <div className="flex-1">
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">NOME *</label>
-                          <input
-                            type="text"
-                            placeholder="Nome da Pessoa"
-                            value={dadosPessoais.nome}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, nome: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2 pb-2">
-                          <input
-                            type="checkbox"
-                            id="chk-dizimista"
-                            checked={isDizimista || dadosPessoais.tipoCadastro === 'ministro'}
-                            disabled={dadosPessoais.tipoCadastro === 'ministro'}
-                            onChange={(e) => {
-                              setIsDizimista(e.target.checked);
-                              if (!e.target.checked && (activeTab as string) === 'dizimos') setActiveTab('dados');
-                            }}
-                            className="w-4 h-4 accent-teal-600 cursor-pointer disabled:cursor-not-allowed"
-                          />
-                          <label
-                            htmlFor="chk-dizimista"
-                            className={`text-xs font-semibold whitespace-nowrap select-none ${dadosPessoais.tipoCadastro === 'ministro' ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 cursor-pointer'}`}
-                          >
-                            É dizimista?
-                          </label>
-                        </div>
-                      </div>
-
-                      {/* Data Nascimento, Sexo e Tipo Sanguíneo */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Data Nascimento *</label>
-                          <input
-                            type="date"
-                            value={dadosPessoais.dataNascimento}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, dataNascimento: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Sexo</label>
-                          <select
-                            value={dadosPessoais.sexo}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, sexo: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          >
-                            <option>MASCULINO</option>
-                            <option>FEMININO</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Tipo Sanguíneo</label>
-                          <select
-                            value={dadosPessoais.tipoSanguineo}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, tipoSanguineo: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          >
-                            <option value="">- Escolha -</option>
-                            <option value="O+">O+</option>
-                            <option value="O-">O-</option>
-                            <option value="A+">A+</option>
-                            <option value="A-">A-</option>
-                            <option value="B+">B+</option>
-                            <option value="B-">B-</option>
-                            <option value="AB+">AB+</option>
-                            <option value="AB-">AB-</option>
-                          </select>
-                        </div>
-                      </div>
-
-
-
-                      {/* Escolaridade e Estado Civil */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Escolaridade</label>
-                          <select
-                            value={dadosPessoais.escolaridade}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, escolaridade: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          >
-                            <option value="">- Escolha -</option>
-                            <option value="sem_instrucao">Sem Instrução</option>
-                            <option value="fundamental">Ensino Fundamental</option>
-                            <option value="medio">Ensino Médio</option>
-                            <option value="superior">Ensino Superior</option>
-                            <option value="posgraduacao">Pós-Graduação</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Estado Civil</label>
-                          <select
-                            value={dadosPessoais.estadoCivil}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, estadoCivil: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          >
-                            <option value="">- Escolha -</option>
-                            <option value="solteiro">{dadosPessoais.sexo === 'FEMININO' ? 'Solteira' : 'Solteiro'}</option>
-                            <option value="casado">{dadosPessoais.sexo === 'FEMININO' ? 'Casada' : 'Casado'}</option>
-                          </select>
-                        </div>
-                      </div>
-
-
-
-                      {/* Dados do Cônjuge - Aparecem apenas se casado */}
-                      {dadosPessoais.estadoCivil === 'casado' && (
-                        <div className="bg-blue-50 border border-blue-200 p-3 rounded-md">
-                          <h4 className="text-xs font-semibold text-blue-800 mb-3">👥 Dados do Cônjuge</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-700 mb-1">Nome do Cônjuge</label>
-                              <input
-                                type="text"
-                                placeholder="Nome"
-                                value={dadosPessoais.nomeConjuge}
-                                onChange={(e) => setDadosPessoais({ ...dadosPessoais, nomeConjuge: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-700 mb-1">CPF do Cônjuge</label>
-                              <input
-                                type="text"
-                                placeholder="Somente Números"
-                                value={dadosPessoais.cpfConjuge}
-                                onChange={(e) => setDadosPessoais({ ...dadosPessoais, cpfConjuge: formatCpf(e.target.value) })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-700 mb-1">Data Nascimento do Cônjuge</label>
-                              <input
-                                type="date"
-                                value={dadosPessoais.dataNascimentoConjuge}
-                                onChange={(e) => setDadosPessoais({ ...dadosPessoais, dataNascimentoConjuge: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Pais e Filiação */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Nome do Pai</label>
-                          <input
-                            type="text"
-                            value={dadosPessoais.nomePai}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, nomePai: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Nome da Mãe</label>
-                          <input
-                            type="text"
-                            value={dadosPessoais.nomeMae}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, nomeMae: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-
-
-
-                      {/* Documentação */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">RG</label>
-                          <input
-                            type="text"
-                            value={dadosPessoais.rg}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, rg: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Órgão Emissor</label>
-                          <input
-                            type="text"
-                            value={dadosPessoais.orgaoEmissor}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, orgaoEmissor: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Nacionalidade</label>
-                          <select
-                            value={dadosPessoais.nacionalidade}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, nacionalidade: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          >
-                            <option>BRASILEIRA</option>
-                            <option>ESTRANGEIRA</option>
-                          </select>
-                        </div>
-                      </div>
-
-
-
-                      {/* Naturalidade e UF */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Naturalidade</label>
-                          <input
-                            type="text"
-                            value={dadosPessoais.naturalidade}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, naturalidade: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">UF</label>
-                          <select
-                            value={dadosPessoais.uf}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, uf: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          >
-                            <option value="">Selecionar</option>
-                            <option value="AC">Acre</option>
-                            <option value="AL">Alagoas</option>
-                            <option value="AP">Amapá</option>
-                            <option value="AM">Amazonas</option>
-                            <option value="BA">Bahia</option>
-                            <option value="CE">Ceará</option>
-                            <option value="DF">Distrito Federal</option>
-                            <option value="ES">Espírito Santo</option>
-                            <option value="GO">Goiás</option>
-                            <option value="MA">Maranhão</option>
-                            <option value="MT">Mato Grosso</option>
-                            <option value="MS">Mato Grosso do Sul</option>
-                            <option value="MG">Minas Gerais</option>
-                            <option value="PA">Pará</option>
-                            <option value="PB">Paraíba</option>
-                            <option value="PR">Paraná</option>
-                            <option value="PE">Pernambuco</option>
-                            <option value="PI">Piauí</option>
-                            <option value="RJ">Rio de Janeiro</option>
-                            <option value="RN">Rio Grande do Norte</option>
-                            <option value="RS">Rio Grande do Sul</option>
-                            <option value="RO">Rondônia</option>
-                            <option value="RR">Roraima</option>
-                            <option value="SC">Santa Catarina</option>
-                            <option value="SP">São Paulo</option>
-                            <option value="SE">Sergipe</option>
-                            <option value="TO">Tocantins</option>
-                          </select>
-                        </div>
-                      </div>
-
-
-
-                      {/* Batismo */}
-                      <div className={`bg-teal-50 border border-teal-200 p-3 rounded-md ${dadosPessoais.tipoCadastro === 'congregado' ? 'opacity-50' : ''}`}>
-                        <h4 className="text-xs font-semibold text-teal-800 mb-3">⛪ Dados Eclesiásticos</h4>
-                        {dadosPessoais.tipoCadastro === 'congregado' && (
-                          <p className="text-xs text-teal-700 mb-2 italic">Não disponível para Congregado.</p>
-                        )}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">Data de Batismo nas Águas</label>
-                            <input
-                              type="date"
-                              value={dadosMinisteriais.dataBatismoAguas}
-                              onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, dataBatismoAguas: e.target.value })}
-                              disabled={dadosPessoais.tipoCadastro === 'congregado'}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:cursor-not-allowed disabled:bg-gray-100"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">Data de Batismo no Espírito Santo</label>
-                            <input
-                              type="date"
-                              value={dadosMinisteriais.dataBatismoEspiritoSanto}
-                              onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, dataBatismoEspiritoSanto: e.target.value })}
-                              disabled={dadosPessoais.tipoCadastro === 'congregado'}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:cursor-not-allowed disabled:bg-gray-100"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-
-
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Profissão</label>
-                          <input
-                            type="text"
-                            value={dadosPessoais.profissao}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, profissao: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Título Eleitoral</label>
-                          <input
-                            type="text"
-                            value={dadosPessoais.tituloEleitoral}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, tituloEleitoral: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Zona</label>
-                          <input
-                            type="text"
-                            value={dadosPessoais.zonaEleitoral}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, zonaEleitoral: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Seção</label>
-                          <input
-                            type="text"
-                            value={dadosPessoais.secaoEleitoral}
-                            onChange={(e) => setDadosPessoais({ ...dadosPessoais, secaoEleitoral: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-
-
-
-                      {/* Organização Eclesiástica */}
-                      <div className="bg-sky-50 border border-sky-200 p-3 rounded-md mt-3">
-                        <h4 className="text-xs font-semibold text-sky-800 mb-3">🏢 Organização Eclesiástica</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">{nomenclaturas.divisao1} (1ª Divisão)</label>
-                            <select
-                              value={dadosPessoais.supervisao}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                const congregacaoSelecionada = divisao1Options.find((opt) => opt.nome === value) || null;
-                                const setorRelacionado = congregacaoSelecionada?.campo_id
-                                  ? divisao2Options.find((opt) => opt.id === congregacaoSelecionada.campo_id) || null
-                                  : null;
-                                const regionalRelacionado = setorRelacionado?.supervisao_id
-                                  ? divisao3Options.find((opt) => opt.id === setorRelacionado.supervisao_id) || null
-                                  : (congregacaoSelecionada?.supervisao_id
-                                      ? divisao3Options.find((opt) => opt.id === congregacaoSelecionada.supervisao_id) || null
-                                      : null);
-
-                                setDadosPessoais({
-                                  ...dadosPessoais,
-                                  supervisao: value,
-                                  campo: setorRelacionado?.nome || '',
-                                  congregacao: regionalRelacionado?.nome || '',
-                                });
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            >
-                              <option value="">Selecione</option>
-                              {divisao1Options.map((opt) => (
-                                <option key={opt.id} value={opt.nome}>{opt.nome}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">{nomenclaturas.divisao2} (2ª Divisão)</label>
-                            <select
-                              value={dadosPessoais.campo}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                const setorSelecionado = divisao2Options.find((opt) => opt.nome === value) || null;
-                                const regionalRelacionado = setorSelecionado?.supervisao_id
-                                  ? divisao3Options.find((opt) => opt.id === setorSelecionado.supervisao_id) || null
-                                  : null;
-
-                                setDadosPessoais({
-                                  ...dadosPessoais,
-                                  campo: value,
-                                  congregacao: regionalRelacionado?.nome || '',
-                                });
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            >
-                              <option value="">Selecione</option>
-                              {divisao2Filtradas.map((opt) => (
-                                <option key={opt.id} value={opt.nome}>{opt.nome}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">{nomenclaturas.divisao3} (3ª Divisão)</label>
-                            <select
-                              value={dadosPessoais.congregacao}
-                              onChange={(e) => setDadosPessoais({ ...dadosPessoais, congregacao: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            >
-                              <option value="">Selecione</option>
-                              {divisao3Filtradas.map((opt) => (
-                                <option key={opt.id} value={opt.nome}>{opt.nome}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Observações</label>
-                        <input
-                          type="text"
-                          value={dadosPessoais.observacoes}
-                          onChange={(e) => setDadosPessoais({ ...dadosPessoais, observacoes: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                        />
-                      </div>
-
-                    </div>
-                  )}
-
-                  {/* ABA: ENDEREÇO + CONTATO COM GEOLOCALIZAÇÃO */}
-                  {activeTab === 'endereco' && (
-                    <div className="space-y-3">
-                      {/* Seção: ENDEREÇO */}
-                      <div className="border-b pb-3">
-                        <h3 className="text-sm font-bold text-teal-700 mb-3">📍 Endereço</h3>
-                        <div className="space-y-3">
-                          {/* Linha 1: CEP + Botão Buscar */}
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">CEP</label>
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                value={enderecoData.cep}
-                                onChange={(e) => setEnderecoData({ ...enderecoData, cep: e.target.value })}
-                                placeholder="00000-000"
-                                className="w-32 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                              />
-                              <button
-                                type="button"
-                                onClick={buscarCEP}
-                                className="px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-semibold text-sm transition whitespace-nowrap"
-                              >
-                                🔍 Buscar
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Linha 2: Logradouro + Número */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div className="md:col-span-2">
-                              <label className="block text-xs font-semibold text-gray-700 mb-1">Logradouro</label>
-                              <input type="text" value={enderecoData.logradouro} onChange={(e) => setEnderecoData({ ...enderecoData, logradouro: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-700 mb-1">Número</label>
-                              <input type="text" value={enderecoData.numero} onChange={(e) => setEnderecoData({ ...enderecoData, numero: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">Bairro</label>
-                            <input type="text" value={enderecoData.bairro} onChange={(e) => setEnderecoData({ ...enderecoData, bairro: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">Complemento</label>
-                            <input type="text" value={enderecoData.complemento} onChange={(e) => setEnderecoData({ ...enderecoData, complemento: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">Cidade</label>
-                            <input type="text" value={enderecoData.cidade} onChange={(e) => setEnderecoData({ ...enderecoData, cidade: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
-                          </div>
-                        </div>
-
-                        {/* Geolocalização (Automática) */}
-                        <div className="mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
-                          <label className="block text-xs font-semibold text-gray-700 mb-2">🌐 Geolocalização (Automática)</label>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-700 mb-1">Latitude</label>
-                              <input type="text" value={enderecoData.latitude} disabled className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-600 cursor-not-allowed" />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-700 mb-1">Longitude</label>
-                              <input type="text" value={enderecoData.longitude} disabled className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-600 cursor-not-allowed" />
-                            </div>
-                          </div>
-                          <p className="text-xs text-gray-600 mt-2">Os dados de latitude e longitude serão preenchidos automaticamente ao buscar o CEP.</p>
-                        </div>
-                      </div>
-
-                      {/* Seção: CONTATO */}
-                      <div>
-                        <h3 className="text-sm font-bold text-teal-700 mb-3">📞 Contato</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">EMAIL</label>
-                            <input
-                              type="email"
-                              value={dadosPessoais.email}
-                              onChange={(e) => setDadosPessoais({ ...dadosPessoais, email: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">CELULAR</label>
-                            <input
-                              type="text"
-                              placeholder="(00) 00000-0000"
-                              value={dadosPessoais.celular}
-                              onChange={(e) => setDadosPessoais({ ...dadosPessoais, celular: formatPhone(e.target.value) })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">WHATSAPP</label>
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                placeholder="(00) 00000-0000"
-                                value={dadosPessoais.whatsapp}
-                                onChange={(e) => setDadosPessoais({ ...dadosPessoais, whatsapp: formatPhone(e.target.value) })}
-                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (dadosPessoais.whatsapp) {
-                                    const num = dadosPessoais.whatsapp.replace(/\D/g, '');
-                                    window.open(`https://wa.me/55${num}`, '_blank');
-                                  }
-                                }}
-                                className="bg-green-600 text-white px-3 rounded-md hover:bg-green-700 font-semibold text-sm"
-                              >
-                                💬
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                    </div>
-                  )}
-
-                  {/* ABA: MINISTERIAL */}
-                  {activeTab === 'ministerial' && (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Curso Teológico</label>
-                          <select
-                            value={dadosMinisteriais.cursoTeologico}
-                            onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, cursoTeologico: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          >
-                            <option value="">NÃO TEM</option>
-                            <option value="basico">Básico</option>
-                            <option value="medio">Médio</option>
-                            <option value="bacharel">Bacharel</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Instituição</label>
-                          <input
-                            type="text"
-                            value={dadosMinisteriais.instituicaoTeologica}
-                            onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, instituicaoTeologica: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Pastor Auxiliar?</label>
-                          <input
-                            type="checkbox"
-                            checked={!!dadosMinisteriais.pastorAuxiliar}
-                            onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, pastorAuxiliar: e.target.checked })}
-                            className="w-5 h-5 mt-2"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Procedência</label>
-                          <select
-                            value={dadosMinisteriais.procedencia}
-                            onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, procedencia: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          >
-                            <option value="">- Definir -</option>
-                            <option value="aclamacao">Aclamação</option>
-                            <option value="batismo">Batismo</option>
-                            <option value="carta">Carta</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Procedência Local</label>
-                          <input
-                            type="text"
-                            value={dadosMinisteriais.procedenciaLocal}
-                            onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, procedenciaLocal: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-
-
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Cargo Ministerial</label>
-                          <select
-                            value={cargoSelecionado}
-                            onChange={(e) => setCargoSelecionado(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          >
-                            <option value="">- Selecionar -</option>
-                            {cargosMinisteriais
-                              .filter(cargo => cargo.ativo)
-                              .map(cargo => (
-                                <option key={cargo.id} value={cargo.nome}>
-                                  {cargo.nome}
-                                </option>
-                              ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Data Batismo Esp. Santo</label>
-                          <input
-                            type="date"
-                            value={dadosMinisteriais.dataBatismoEspiritoSanto}
-                            onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, dataBatismoEspiritoSanto: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Data Batismo Águas</label>
-                          <input
-                            type="date"
-                            value={dadosMinisteriais.dataBatismoAguas}
-                            onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, dataBatismoAguas: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Bloco de Consagração/Recebimento - Aparece quando cargo é selecionado */}
-                      {cargoSelecionado && (
-                        <div className="p-4 border border-teal-200 rounded-lg bg-teal-50">
-                          <h3 className="text-sm font-bold text-teal-900 mb-3">Consagração / Recebimento - {cargoSelecionado}</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-700 mb-1">Data da Consagração ou Recebimento</label>
-                              <input
-                                type="date"
-                                value={dadosCargos[cargoSelecionado]?.dataConsagracaoRecebimento || ''}
-                                onChange={(e) => setDadosCargos({
-                                  ...dadosCargos,
-                                  [cargoSelecionado]: {
-                                    ...dadosCargos[cargoSelecionado],
-                                    dataConsagracaoRecebimento: e.target.value
-                                  }
-                                })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-700 mb-1">Local de Consagração</label>
-                              <input
-                                type="text"
-                                placeholder="Ex: Templo Central"
-                                value={dadosCargos[cargoSelecionado]?.localConsagracao || ''}
-                                onChange={(e) => setDadosCargos({
-                                  ...dadosCargos,
-                                  [cargoSelecionado]: {
-                                    ...dadosCargos[cargoSelecionado],
-                                    localConsagracao: e.target.value
-                                  }
-                                })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-700 mb-1">Local de Origem</label>
-                              <input
-                                type="text"
-                                placeholder="Ex: Igreja Original, Pastor Referência"
-                                value={dadosCargos[cargoSelecionado]?.localOrigem || ''}
-                                onChange={(e) => setDadosCargos({
-                                  ...dadosCargos,
-                                  [cargoSelecionado]: {
-                                    ...dadosCargos[cargoSelecionado],
-                                    localOrigem: e.target.value
-                                  }
-                                })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3 p-3 border border-gray-300 rounded-lg bg-gray-50">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={dadosMinisteriais.temFuncaoIgreja}
-                              onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, temFuncaoIgreja: e.target.checked })}
-                              className="w-5 h-5 cursor-pointer"
-                            />
-                            <label className="text-sm font-semibold text-gray-700">Função na Igreja?</label>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 rounded-lg" style={{ backgroundColor: dadosMinisteriais.temFuncaoIgreja ? '#f0f9ff' : '#f9fafb', borderColor: dadosMinisteriais.temFuncaoIgreja ? '#bfdbfe' : '#e5e7eb', borderWidth: '1px' }}>
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">Qual Função?</label>
-                            <input
-                              type="text"
-                              placeholder="Ex: Líder de Louvor, Coordenador"
-                              value={dadosMinisteriais.qualFuncao}
-                              onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, qualFuncao: e.target.value })}
-                              disabled={!dadosMinisteriais.temFuncaoIgreja}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">Setor ou Departamento</label>
-                            <input
-                              type="text"
-                              placeholder="Ex: Ministério de Louvor"
-                              value={dadosMinisteriais.setorDepartamento}
-                              onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, setorDepartamento: e.target.value })}
-                              disabled={!dadosMinisteriais.temFuncaoIgreja}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-
-
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Observações</label>
-                        <textarea
-                          rows={2}
-                          value={dadosMinisteriais.observacoesMinisteriais}
-                          onChange={(e) => setDadosMinisteriais({ ...dadosMinisteriais, observacoesMinisteriais: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ABA: FOTO */}
-                  {activeTab === 'foto' && (
-                    <div className="space-y-4">
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50 relative overflow-hidden flex flex-col items-center justify-center min-h-[300px]">
-                        {fotoMembro ? (
-                          <div className="relative group">
-                            <img
-                              src={fotoMembro}
-                              alt="Foto do Ministro"
-                              className="max-h-64 rounded-md shadow-md border-2 border-teal-500 transition-opacity group-hover:opacity-50"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                onClick={() => fileInputRef.current?.click()}
-                                className="bg-teal-600 text-white p-2 rounded-full shadow-lg"
-                                title="Alterar Foto"
-                              >
-                                ✏️
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="text-4xl mb-3">📸</div>
-                            <h3 className="text-base font-semibold text-gray-800 mb-1">Foto do Ministro</h3>
-                            <p className="text-xs text-gray-600 mb-3">Clique para fazer upload</p>
-                            <button
-                              onClick={() => fileInputRef.current?.click()}
-                              className="px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-semibold text-sm flex items-center gap-2"
-                            >
-                              📁 Escolher Foto
-                            </button>
-                          </>
-                        )}
-                        <input
-                          type="file"
-                          ref={fileInputRef}
-                          onChange={handleFotoUpload}
-                          accept="image/*"
-                          className="hidden"
-                        />
-                      </div>
-
-                      {fotoMembro && (
-                        <div className="flex gap-3 justify-center">
-                          <button
-                            onClick={handleGirarFoto}
-                            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 font-semibold text-sm flex items-center gap-2"
-                          >
-                            🔄 Girar
-                          </button>
-                          {fotoMembro && (
-                            <button
-                              onClick={() => setFotoMembro(null)}
-                              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-semibold text-sm flex items-center gap-2"
-                            >
-                              🗑️ Remover
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* ABA: DÍZIMOS */}
-                  {activeTab === 'dizimos' && (
-                    <div className="space-y-4">
-                      {!membroEditando ? (
-                        <div className="text-center py-8 text-gray-500">
-                          <p className="text-sm">Salve o membro primeiro para visualizar o histórico de dízimos.</p>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-sm text-teal-800">
-                            <p>Para registrar pagamentos, use a aba <strong>Tesouraria → Dizimistas</strong>.</p>
-                            <p className="mt-1 text-teal-600">Aqui você vê o histórico deste membro.</p>
-                          </div>
-                          {loadingDizimosHistorico ? (
-                            <div className="text-center py-6 text-gray-400 text-sm">Carregando...</div>
-                          ) : dizimosHistorico.length === 0 ? (
-                            <div className="text-center py-6 text-gray-400 text-sm">Nenhum registro de dízimo encontrado.</div>
-                          ) : (
-                            <table className="w-full text-sm border-collapse">
-                              <thead>
-                                <tr className="bg-gray-100">
-                                  <th className="text-left p-2 text-xs font-semibold text-gray-700 border-b">Mês/Ano</th>
-                                  <th className="text-left p-2 text-xs font-semibold text-gray-700 border-b">Status</th>
-                                  <th className="text-left p-2 text-xs font-semibold text-gray-700 border-b">Valor</th>
-                                  <th className="text-left p-2 text-xs font-semibold text-gray-700 border-b">Pagamento</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {dizimosHistorico.map((h) => (
-                                  <tr key={h.mes_referencia} className="border-b last:border-0 hover:bg-gray-50">
-                                    <td className="p-2 text-gray-800">{h.mes_referencia.split('-').reverse().join('/')}</td>
-                                    <td className="p-2">
-                                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${h.status === 'pago' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                        {h.status === 'pago' ? 'Pago' : 'Pendente'}
-                                      </span>
-                                    </td>
-                                    <td className="p-2 text-gray-700">
-                                      {h.valor != null ? `R$ ${Number(h.valor).toFixed(2).replace('.', ',')}` : '—'}
-                                    </td>
-                                    <td className="p-2 text-gray-700">
-                                      {h.data_pagamento ? h.data_pagamento.split('-').reverse().join('/') : '—'}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Rodapé com Botões de Ação */}
-                <div className="flex gap-4 px-4 py-3 border-t border-gray-300 bg-gradient-to-r from-teal-50 to-cyan-50 flex-shrink-0">
-                  <button
-                    onClick={salvarMembro}
-                    className="flex-1 px-4 py-2 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg hover:from-teal-700 hover:to-teal-800 transition font-bold text-sm"
-                  >
-                    ✓ {membroEditando ? 'Atualizar' : 'Cadastrar'}
-                  </button>
-                  <button
-                    onClick={fecharFormulario}
-                    className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition font-bold text-sm"
-                  >
-                    ✕ Cancelar
-                  </button>
-                </div>
-              </div>
+              {/* Toolbar de Filtros e Pesquisa */}
+              <MembrosToolbar
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                cargoFilter={cargoFilter}
+                setCargoFilter={setCargoFilter}
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                setCurrentPage={setCurrentPage}
+                cargosMinisteriais={cargosMinisteriais as any}
+                membrosFiltradosCount={membrosFiltrados.length}
+                totalMembrosCount={membros.length}
+                isSupervisor={isSupervisor}
+                limiteMembrosAtingido={limiteMembrosAtingido}
+                maxMembros={maxMembros}
+                abrirNovoCadastro={abrirNovoCadastro}
+                ultimoCadastro={ultimoCadastro}
+                gerarProximaMatricula={gerarProximaMatricula}
+                setDadosPessoais={setDadosPessoais}
+                setEnderecoData={setEnderecoData}
+                setDadosMinisteriais={setDadosMinisteriais}
+                setCargoSelecionado={setCargoSelecionado}
+                setDadosCargos={setDadosCargos}
+                setIsEditando={setIsEditando}
+                setShowForm={setShowForm}
+                setActiveTab={setActiveTab as any}
+                resolveCargoValue={resolveCargoValue}
+                gerarPDFListagem={gerarPDFListagem}
+                membrosSelecionadosCount={membrosSelecionados.size}
+                setImprimindoLote={setImprimindoLote}
+                setNotification={setNotification}
+              />
+
+              {/* Tabela de Membros */}
+              <MembrosTable
+                membrosPaginados={membrosPaginados}
+                membrosFiltradosCount={membrosFiltrados.length}
+                membrosSelecionados={membrosSelecionados}
+                setMembrosSelecionados={setMembrosSelecionados}
+                maskCpf={maskCpf}
+                isSupervisor={isSupervisor}
+                isAuxiliar={isAuxiliar}
+                setMembroImprimindo={setMembroImprimindo}
+                abrirEdicao={abrirEdicao}
+                abrirDocumentosMembro={abrirDocumentosMembro}
+                abrirConfirmacaoDeletar={abrirConfirmacaoDeletar}
+                ensureTemplatesSnapshot={ensureTemplatesSnapshot}
+                hasActiveTemplate={hasActiveTemplate}
+                getMensagemSemTemplate={getMensagemSemTemplate}
+                setNotification={setNotification}
+                setMembroImprimindoCartao={setMembroImprimindoCartao}
+                startIndex={startIndex}
+                endIndex={endIndex}
+                currentPage={currentPage}
+                setCurrentPage={setCurrentPage}
+                totalPages={totalPages}
+              />
+              {/* Modal de Formulário */}
+              <MembroFormModal
+                showForm={showForm}
+                setShowForm={setShowForm}
+                membroEditando={membroEditando}
+                activeTab={activeTab}
+                setActiveTab={(tab: any) => setActiveTab(tab)}
+                dadosPessoais={dadosPessoais}
+                setDadosPessoais={setDadosPessoais}
+                enderecoData={enderecoData}
+                setEnderecoData={setEnderecoData}
+                dadosMinisteriais={dadosMinisteriais}
+                setDadosMinisteriais={setDadosMinisteriais}
+                cargoSelecionado={cargoSelecionado}
+                setCargoSelecionado={setCargoSelecionado}
+                dadosCargos={dadosCargos}
+                setDadosCargos={setDadosCargos}
+                nomenclaturas={nomenclaturas}
+                supervisoesOptions={supervisoesFromNomenclaturas}
+                camposOptions={camposFromNomenclaturas}
+                congregacoesOptions={congregacoesFromNomenclaturas}
+                cargosMinisteriais={cargosMinisteriais as any}
+                buscarCep={buscarCEP}
+                loadingCep={false}
+                fotoMembro={fotoMembro}
+                setFotoMembro={setFotoMembro}
+                fileInputRef={fileInputRef}
+                handleFotoUpload={handleFotoUpload}
+                handleGirarFoto={handleGirarFoto}
+                salvarMembro={salvarMembro}
+                fecharFormulario={fecharFormulario}
+                dizimosHistorico={dizimosHistorico}
+                loadingDizimosHistorico={loadingDizimosHistorico}
+              />
             </div>
           )}
-            </div>
-          )}        </div>
+        </div>
       </div>
     </>
   );
