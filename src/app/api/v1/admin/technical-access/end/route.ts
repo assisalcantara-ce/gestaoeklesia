@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     const isTechnical = user.app_metadata?.is_technical_user === true || user.user_metadata?.is_technical_user === true;
 
-    // Buscar concessão ativa para este usuário técnico
+    // Buscar concessão ativa para este usuário técnico na tabela oficial technical_access_grants
     const { data: grant } = await admin
       .from('technical_access_grants')
       .select('id, ministry_id, technical_user_id, admin_id')
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (grant) {
-      // 2. Finalizar concessão na tabela technical_access_grants
+      // 2. Finalizar concessão na tabela oficial technical_access_grants
       await admin
         .from('technical_access_grants')
         .update({
@@ -40,25 +40,16 @@ export async function POST(request: NextRequest) {
           revoked_by: user.id,
         })
         .eq('id', grant.id);
-
-      // 3. Atualizar status na tabela permanent_technical_users
-      await admin
-        .from('permanent_technical_users')
-        .update({
-          is_active: false,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', grant.technical_user_id);
     }
 
-    // 4. Desabilitar a conta do usuário técnico no Supabase Auth para bloquear novos acessos não autorizados
+    // 3. Desabilitar a conta do usuário técnico no Supabase Auth para bloquear acessos não autorizados
     if (isTechnical) {
       await admin.auth.admin.updateUserById(user.id, {
         ban_duration: '876000h',
       }).catch((err) => console.warn('[API technical-access/end] Aviso ao desabilitar conta técnica:', err));
     }
 
-    // 5. Registrar log de auditoria do encerramento
+    // 4. Registrar log de auditoria do encerramento
     try {
       await admin.from('audit_logs').insert({
         user_id: user.id,
