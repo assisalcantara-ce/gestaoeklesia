@@ -19,14 +19,16 @@ export class TechnicalAccessService {
   /**
    * Constrói o e-mail determinístico da conta técnica do tenant.
    */
-  private static getTechnicalEmail(tenantId: string): string {
+  public static getTechnicalEmail(tenantId: string): string {
     const cleanTenantId = tenantId.replace(/[^a-zA-Z0-9-]/g, '').toLowerCase();
     return `tech.suporte.${cleanTenantId}@technical.eklesia.internal`;
   }
 
   /**
+   * Garantia Idempotente de Migração/Criacao:
    * Localiza ou cria a conta técnica de um tenant, garantindo que ela possua
-   * credenciais de senha forte (AES-256-GCM) cadastradas em technical_access_secrets.
+   * o usuário no Auth, vinculo em ministry_users e credencial criptografada AES-256-GCM
+   * em technical_access_secrets.
    */
   public static async getOrCreateTechnicalAccount(
     adminClient: SupabaseClient,
@@ -45,18 +47,18 @@ export class TechnicalAccessService {
       throw new Error(`Tenant / Ministério '${tenantId}' não encontrado.`);
     }
 
-    // 2. Verificar se a conta técnica já existe no Supabase Auth pelo email
+    // 2. Localizar usuário existente no Supabase Auth pelo email (Idempotência)
     let authUser: any = null;
-    const { data: listData, error: listErr } = await adminClient.auth.admin.listUsers({
+    const { data: listData } = await adminClient.auth.admin.listUsers({
       page: 1,
-      perPage: 100,
+      perPage: 200,
     });
 
-    if (!listErr && listData?.users) {
+    if (listData?.users) {
       authUser = listData.users.find((u: any) => u.email?.toLowerCase() === techEmail.toLowerCase());
     }
 
-    // Se não encontrou na listagem rápida, tenta obter diretamente via busca individual
+    // Se não encontrou na listagem rápida, tenta obter via busca individual em ministry_users
     if (!authUser) {
       const { data: searchMu } = await adminClient
         .from('ministry_users')
@@ -74,7 +76,7 @@ export class TechnicalAccessService {
 
     let initialPasswordToSet: string | null = null;
 
-    // 3. Se a conta não existir no Auth, cria com senha forte
+    // 3. Se a conta não existir no Supabase Auth, cria silenciosamente com senha forte
     if (!authUser) {
       initialPasswordToSet = generateStrongPassword();
       const { data: newAuthData, error: createErr } = await adminClient.auth.admin.createUser({
@@ -89,12 +91,12 @@ export class TechnicalAccessService {
       });
 
       if (createErr || !newAuthData?.user) {
-        // Se deu erro de email já cadastrado por corrida, resgata o usuário existente
+        // Se ocorreu erro de conta já cadastrada (ex: corrida), tenta relistar para resgatar o usuário
         if (createErr?.message?.includes('already been registered')) {
           const { data: retryList } = await adminClient.auth.admin.listUsers();
           authUser = retryList?.users?.find((u: any) => u.email?.toLowerCase() === techEmail.toLowerCase());
         }
-        
+
         if (!authUser) {
           throw new Error(`Erro ao criar conta técnica no Supabase Auth: ${createErr?.message}`);
         }
@@ -103,7 +105,7 @@ export class TechnicalAccessService {
       }
     }
 
-    // 4. Garantir registro em profiles e ministry_users
+    // 4. Idempotência em Profiles e Ministry_Users (UPSERT sem duplicatas)
     await adminClient.from('profiles').upsert(
       {
         id: authUser.id,
@@ -125,7 +127,7 @@ export class TechnicalAccessService {
       { onConflict: 'ministry_id,user_id' }
     );
 
-    // 5. Garantir que a senha criptografada esteja salva em technical_access_secrets
+    // 5. Idempotência em technical_access_secrets
     const { data: existingSecret } = await adminClient
       .from('technical_access_secrets')
       .select('id, encrypted_password, iv, auth_tag')
@@ -134,8 +136,9 @@ export class TechnicalAccessService {
 
     if (!existingSecret) {
       const passwordToEncrypt = initialPasswordToSet || generateStrongPassword();
-      
-      // Se tivermos gerado uma nova senha para a conta existente sem secret, atualiza no Supabase Auth
+
+      // Se a conta já existia no Auth mas não possuía secret (ex: migração de tenant antigo),
+      // sincronizamos a nova senha forte no Supabase Auth
       if (!initialPasswordToSet) {
         await adminClient.auth.admin.updateUserById(authUser.id, {
           password: passwordToEncrypt,
@@ -143,17 +146,21 @@ export class TechnicalAccessService {
       }
 
       const encrypted = encryptPassword(passwordToEncrypt);
-      await adminClient.from('technical_access_secrets').insert({
-        ministry_id: tenantId,
-        technical_user_id: authUser.id,
-        email: techEmail,
-        encrypted_password: encrypted.encryptedPassword,
-        iv: encrypted.iv,
-        auth_tag: encrypted.authTag,
-        updated_at: new Date().toISOString(),
-      });
+      await adminClient.from('technical_access_secrets').upsert(
+        {
+          ministry_id: tenantId,
+          technical_user_id: authUser.id,
+          email: techEmail,
+          encrypted_password: encrypted.encryptedPassword,
+          iv: encrypted.iv,
+          auth_tag: encrypted.authTag,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'ministry_id' }
+      );
     }
 
+    // 6. Retorno dos dados formatados da conta técnica
     return {
       authUserId: authUser.id,
       ministryId: tenantId,
@@ -211,10 +218,10 @@ export class TechnicalAccessService {
 
     const newPassword = generateStrongPassword();
 
-    // 1. Atualizar a senha no Supabase Auth e desabilitar/reabilitar temporariamente para revogar tokens
+    // 1. Atualizar a senha no Supabase Auth e revogar sessões ativas
     const { error: updateAuthErr } = await adminClient.auth.admin.updateUserById(secret.technical_user_id, {
       password: newPassword,
-      ban_duration: 'none', // Força renovação de estado de auth
+      ban_duration: 'none',
     });
 
     if (updateAuthErr) {
@@ -225,14 +232,19 @@ export class TechnicalAccessService {
     const encrypted = encryptPassword(newPassword);
     const { error: updateDbErr } = await adminClient
       .from('technical_access_secrets')
-      .update({
-        encrypted_password: encrypted.encryptedPassword,
-        iv: encrypted.iv,
-        auth_tag: encrypted.authTag,
-        updated_at: new Date().toISOString(),
-        updated_by: adminId,
-      })
-      .eq('ministry_id', tenantId);
+      .upsert(
+        {
+          ministry_id: tenantId,
+          technical_user_id: secret.technical_user_id,
+          email: secret.email,
+          encrypted_password: encrypted.encryptedPassword,
+          iv: encrypted.iv,
+          auth_tag: encrypted.authTag,
+          updated_at: new Date().toISOString(),
+          updated_by: adminId,
+        },
+        { onConflict: 'ministry_id' }
+      );
 
     if (updateDbErr) {
       throw new Error(`Erro ao salvar senha criptografada: ${updateDbErr.message}`);
