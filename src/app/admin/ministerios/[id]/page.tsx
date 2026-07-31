@@ -175,6 +175,7 @@ export default function CockpitPage({ params }: CockpitPageProps) {
         <MinisteriosHeader
           titulo={`COCKPIT: ${ministry.name}`}
           descricao="Visualização detalhada e gerenciamento comercial do cliente"
+          onBack={() => router.push('/admin/ministerios')}
         />
 
         <div className="p-6 space-y-6">

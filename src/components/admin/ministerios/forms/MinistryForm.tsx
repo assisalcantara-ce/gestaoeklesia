@@ -27,6 +27,7 @@ interface MinistryFormProps {
   cepLookupError: string
   cepResolved: string
   onChangeFormData: (data: Partial<any>) => void
+  onCancel?: () => void
 }
 
 export default function MinistryForm({
@@ -47,6 +48,7 @@ export default function MinistryForm({
   cepLookupError,
   cepResolved,
   onChangeFormData,
+  onCancel,
 }: MinistryFormProps) {
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6 mb-8 text-gray-100">
@@ -107,12 +109,24 @@ export default function MinistryForm({
           onChangeFormData={onChangeFormData}
         />
 
-        <button
-          type="submit"
-          className="mt-6 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium"
-        >
-          {editingId ? 'Atualizar Ministério' : 'Criar Ministério'}
-        </button>
+        <div className="pt-6 border-t border-gray-700/80 flex items-center gap-3">
+          <button
+            type="submit"
+            className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition shadow-lg shadow-green-900/20 flex items-center justify-center cursor-pointer"
+          >
+            {editingId ? 'Atualizar Ministério' : 'Criar Ministério'}
+          </button>
+
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-6 py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium transition flex items-center justify-center cursor-pointer"
+            >
+              Cancelar
+            </button>
+          )}
+        </div>
       </form>
     </div>
   )

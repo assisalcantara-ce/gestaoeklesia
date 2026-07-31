@@ -102,6 +102,7 @@ export default function NovoMinisterioPage() {
         <MinisteriosHeader
           titulo="NOVO MINISTÉRIO"
           descricao="Cadastrar um novo ministério/cliente no sistema"
+          onBack={() => router.push('/admin/ministerios')}
         />
 
         <div className="p-6 space-y-6">
@@ -142,6 +143,7 @@ export default function NovoMinisterioPage() {
                 cepLookupError={cepLookupError}
                 cepResolved={cepResolved}
                 onChangeFormData={(data) => setFormData({ ...formData, ...data })}
+                onCancel={() => router.push('/admin/ministerios')}
               />
             </div>
           </div>

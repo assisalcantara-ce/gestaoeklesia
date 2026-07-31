@@ -130,6 +130,7 @@ export default function EditarMinisterioPage({ params }: EditarMinisterioPagePro
         <MinisteriosHeader
           titulo="EDITAR MINISTÉRIO"
           descricao="Atualizar dados de um ministério existente"
+          onBack={() => router.push('/admin/ministerios')}
         />
 
         <div className="p-6 space-y-6">
@@ -170,6 +171,7 @@ export default function EditarMinisterioPage({ params }: EditarMinisterioPagePro
                 cepLookupError={cepLookupError}
                 cepResolved={cepResolved}
                 onChangeFormData={(data) => setFormData({ ...formData, ...data })}
+                onCancel={() => router.push('/admin/ministerios')}
               />
             </div>
           </div>
