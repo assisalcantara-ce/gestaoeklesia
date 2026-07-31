@@ -128,7 +128,6 @@ export class TechnicalAccessService {
         user_id: authUser.id,
         role: roleConfig.role,
         permissions: roleConfig.permissions,
-        updated_at: new Date().toISOString(),
       },
       { onConflict: 'ministry_id,user_id' }
     );
