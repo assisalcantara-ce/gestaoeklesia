@@ -32,7 +32,7 @@ import {
 import type { DashboardMetrics } from '@/types/admin'
 
 export default function AdminDashboardPage() {
-  const { adminUser, isLoading, isAuthenticated, isAdmin } = useAdminAuth()
+  const { adminUser, isLoading, isAuthenticated } = useAdminAuth()
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [execStats, setExecStats] = useState<{ total: number; ativos: number; trials: number; suspensos: number; pendentes: number; leads?: number } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -78,7 +78,7 @@ export default function AdminDashboardPage() {
     }
 
     fetchData()
-  }, [isAuthenticated, isAdmin, isLoading])
+  }, [isAuthenticated, isLoading])
 
   // Agora SIM podemos fazer early returns (depois de todos os hooks)
 

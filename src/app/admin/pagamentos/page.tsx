@@ -55,7 +55,7 @@ interface BillingInvoice {
 }
 
 export default function PagamentosPage() {
-  const { isLoading, isAuthenticated, isAdmin, adminUser } = useAdminAuth()
+  const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
   const [invoices, setInvoices] = useState<BillingInvoice[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -150,16 +150,16 @@ export default function PagamentosPage() {
   }
 
   useEffect(() => {
-    if (isAuthenticated && isAdmin && temAcessoAdmin(adminUser?.role, 'pagamentos')) {
+    if (isAuthenticated && temAcessoAdmin(adminUser?.role, 'pagamentos')) {
       fetchInvoices()
     }
-  }, [statusFilter, isAuthenticated, isAdmin, adminUser])
+  }, [statusFilter, isAuthenticated, adminUser])
 
   useEffect(() => {
-    if (isAuthenticated && isAdmin && temAcessoAdmin(adminUser?.role, 'pagamentos')) {
+    if (isAuthenticated && temAcessoAdmin(adminUser?.role, 'pagamentos')) {
       fetchMinistries()
     }
-  }, [isAuthenticated, isAdmin, adminUser])
+  }, [isAuthenticated, adminUser])
 
   const handleCopyLink = async (url: string, id: string) => {
     try {
