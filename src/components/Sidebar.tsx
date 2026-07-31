@@ -62,6 +62,10 @@ export default function Sidebar() {
   const planFeatures = usePlanFeatures();
   const userCtx = useUserContext();
 
+  useEffect(() => {
+    console.log('[DEBUG_SIDEBAR] 8. Sidebar - userCtx.loading:', userCtx.loading, '| userCtx.nivel:', userCtx.nivel);
+  }, [userCtx.loading, userCtx.nivel]);
+
   // Deriva o menu ativo a partir da URL atual
   const activeMenu = useMemo(() => {
     for (const { path, id } of PATH_TO_MENU_ID) {

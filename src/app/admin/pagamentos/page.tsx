@@ -108,7 +108,7 @@ export default function PagamentosPage() {
 
   useEffect(() => {
     if (!isLoading) {
-      if (!isAuthenticated || !isAdmin) {
+      if (!isAuthenticated) {
         router.push('/admin/login')
         return
       }
@@ -116,7 +116,7 @@ export default function PagamentosPage() {
         router.push('/admin/dashboard')
       }
     }
-  }, [isLoading, isAuthenticated, isAdmin, adminUser, router])
+  }, [isLoading, isAuthenticated, adminUser, router])
 
   const fetchInvoices = async () => {
     try {
@@ -656,7 +656,7 @@ export default function PagamentosPage() {
     )
   }
 
-  if (!isAuthenticated || !isAdmin) {
+  if (!isAuthenticated) {
     return null
   }
 

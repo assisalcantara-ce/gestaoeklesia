@@ -44,15 +44,15 @@ export default function AdminDashboardPage() {
 
   // Efeito 1: Proteger a página - redirecionar imediatamente se não autenticado
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || !isAdmin)) {
+    if (!isLoading && !isAuthenticated) {
       router.push('/admin/login')
       return
     }
-  }, [isLoading, isAuthenticated, isAdmin, router])
+  }, [isLoading, isAuthenticated, router])
 
-  // Efeito 2: Buscar dados apenas se autenticado como admin
+  // Efeito 2: Buscar dados apenas se autenticado
   useEffect(() => {
-    if (!isAuthenticated || !isAdmin || isLoading) return
+    if (!isAuthenticated || isLoading) return
 
     const fetchData = async () => {
       try {
@@ -94,8 +94,8 @@ export default function AdminDashboardPage() {
     )
   }
 
-  // Bloquear acesso se não autenticado (não deve chegar aqui por causa do middleware)
-  if (!isAuthenticated || !isAdmin) {
+  // Bloquear acesso se não autenticado
+  if (!isAuthenticated) {
     return null
   }
 

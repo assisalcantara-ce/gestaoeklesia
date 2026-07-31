@@ -25,7 +25,7 @@ import {
 } from 'lucide-react'
 
 export default function RelatoriosFinanceirosPage() {
-  const { isLoading, isAuthenticated, isAdmin, adminUser } = useAdminAuth()
+  const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
   const router = useRouter()
 
   // Estados dos Filtros Globais
@@ -49,7 +49,7 @@ export default function RelatoriosFinanceirosPage() {
 
   useEffect(() => {
     if (!isLoading) {
-      if (!isAuthenticated || !isAdmin) {
+      if (!isAuthenticated) {
         router.push('/admin/login')
         return
       }
@@ -57,7 +57,7 @@ export default function RelatoriosFinanceirosPage() {
         router.push('/admin/dashboard')
       }
     }
-  }, [isLoading, isAuthenticated, isAdmin, adminUser, router])
+  }, [isLoading, isAuthenticated, adminUser, router])
 
   if (isLoading) {
     return (

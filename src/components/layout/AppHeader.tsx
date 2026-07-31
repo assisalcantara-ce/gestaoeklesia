@@ -24,6 +24,10 @@ export default function AppHeader() {
   const supabase = useMemo(() => createClient(), []);
   const { user } = useAuth();
   const userCtx = useUserContext();
+
+  useEffect(() => {
+    console.log('[DEBUG_APP_HEADER] 7. AppHeader - userCtx.loading:', userCtx.loading, '| userCtx.nivel:', userCtx.nivel);
+  }, [userCtx.loading, userCtx.nivel]);
   const [dataAtual, setDataAtual] = useState('');
   const [ministryName, setMinistryName] = useState('');
 
