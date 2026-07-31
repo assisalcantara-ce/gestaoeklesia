@@ -58,7 +58,7 @@ export default function PagamentosPage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
   const [invoices, setInvoices] = useState<BillingInvoice[]>([])
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('pending')
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [openMenuInvoiceId, setOpenMenuInvoiceId] = useState<string | null>(null)
 
