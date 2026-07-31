@@ -26,7 +26,7 @@ import { useBillingActions } from '@/hooks/admin/ministerios/useBillingActions'
 import { friendlyError, formatPhoneDisplay } from '@/lib/admin/ministerios/helpers'
 import { getDetailedStatus } from '@/lib/admin/ministerios/status'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
-import { ShieldCheck, Clock, CreditCard, Inbox, TrendingUp } from 'lucide-react'
+import { ShieldCheck, Clock, CreditCard, Inbox, TrendingUp, RotateCcw } from 'lucide-react'
 
 export default function MinisteriosPage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
@@ -357,20 +357,16 @@ export default function MinisteriosPage() {
         }
       }
 
-      // 2. Filtro de Status (Acesso Liberado para o filtro 'ativo')
+      // 2. Filtro de Status — usa getDetailedStatus como fonte única da verdade
       if (statusFilter !== 'all') {
         const statusDetail = getDetailedStatus(m)
-        const sType = statusDetail.type // Ex: ATIVO, TRIAL_ATIVO, TRIAL_EXPIRADO, SUSPENSO, CANCELADO
+        const sType = statusDetail.type // ATIVO | TRIAL_ATIVO | TRIAL_EXPIRADO | SUSPENSO | CANCELADO
 
-        if (statusFilter === 'ativo') {
-          // Cliente tem acesso liberado se is_active for true e a assinatura nao estiver cancelada ou desativada
-          const subStatus = String(m.subscription_status || '').toLowerCase()
-          const isAccessAllowed = m.is_active !== false && subStatus !== 'cancelled'
-          if (!isAccessAllowed) return false
-        }
-        if (statusFilter === 'trial' && sType !== 'TRIAL_ATIVO') return false
+        if (statusFilter === 'ativo'    && sType !== 'ATIVO')         return false
+        if (statusFilter === 'trial'    && sType !== 'TRIAL_ATIVO')   return false
         if (statusFilter === 'expirado' && sType !== 'TRIAL_EXPIRADO') return false
-        if (statusFilter === 'suspenso' && sType !== 'SUSPENSO') return false
+        if (statusFilter === 'suspenso' && sType !== 'SUSPENSO')      return false
+        if (statusFilter === 'cancelado' && sType !== 'CANCELADO')    return false
       }
 
       // 3. Filtro de Plano (Popular dinamicamente pelos planos carregados)
@@ -513,9 +509,10 @@ export default function MinisteriosPage() {
                 >
                   <option value="all">Status: Todos</option>
                   <option value="ativo">Ativo</option>
-                  <option value="trial">Trial</option>
+                  <option value="trial">Trial Ativo</option>
                   <option value="expirado">Trial Expirado</option>
                   <option value="suspenso">Suspenso</option>
+                  <option value="cancelado">Cancelado</option>
                 </select>
 
                 <select
@@ -541,6 +538,24 @@ export default function MinisteriosPage() {
                   <option value="trial_expirado">Trial Expirado</option>
                   <option value="sem_trial">Sem Trial</option>
                 </select>
+
+                {/* Botão Limpar Filtros — aparece apenas quando há filtro ativo */}
+                {(searchTerm !== '' || statusFilter !== 'all' || planFilter !== 'all' || trialFilter !== 'all') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('')
+                      setStatusFilter('all')
+                      setPlanFilter('all')
+                      setTrialFilter('all')
+                    }}
+                    className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+                    title="Limpar todos os filtros"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Limpar filtros
+                  </button>
+                )}
               </div>
 
               {/* Lado Direito: Ações */}
