@@ -11,7 +11,7 @@ import { requireAdmin } from '@/lib/admin-guard'
 
 export async function POST(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    const result = await requireAdmin(request, { requiredModule: 'suporte' })
     if (!result.ok) return result.response
 
     const body = await request.json()

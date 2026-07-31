@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    const result = await requireAdmin(request, { requiredModule: 'planos' })
     if (!result.ok) return result.response
     const { supabaseAdmin: supabase, adminUser } = result.ctx
     const body = await request.json()

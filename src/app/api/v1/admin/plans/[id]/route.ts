@@ -13,7 +13,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const result = await requireAdmin(request, { requiredRole: 'admin' });
+    const result = await requireAdmin(request, { requiredModule: 'planos' });
     if (!result.ok) return result.response;
 
     const { supabaseAdmin: supabase, adminUser } = result.ctx;
@@ -116,7 +116,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const result = await requireAdmin(request, { requiredRole: 'admin' });
+    const result = await requireAdmin(request, { requiredModule: 'planos' });
     if (!result.ok) return result.response;
 
     const { supabaseAdmin: supabase, adminUser } = result.ctx;

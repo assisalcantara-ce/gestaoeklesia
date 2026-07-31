@@ -9,7 +9,7 @@ import { buildMonthlyInstallments, createAsaasPayment, deleteAsaasPayment, ensur
 
 export async function GET(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    const result = await requireAdmin(request, { requiredModule: 'pagamentos' })
     if (!result.ok) return result.response
     const { supabaseAdmin } = result.ctx
     const searchParams = request.nextUrl.searchParams
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    const result = await requireAdmin(request, { requiredModule: 'pagamentos' })
     if (!result.ok) return result.response
     const { supabaseAdmin: supabase, adminUser } = result.ctx
     const body = await request.json()
@@ -255,7 +255,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    const result = await requireAdmin(request, { requiredModule: 'pagamentos' })
     if (!result.ok) return result.response
     const { supabaseAdmin: supabase, adminUser } = result.ctx
 
@@ -304,7 +304,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    const result = await requireAdmin(request, { requiredModule: 'pagamentos' })
     if (!result.ok) return result.response
     const { supabaseAdmin, adminUser } = result.ctx
 

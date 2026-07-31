@@ -29,7 +29,7 @@ function onlyDigits(value: unknown): string | null {
 
 export async function PUT(request: NextRequest) {
   try {
-    const guard = await requireAdmin(request, { requiredRole: 'admin' });
+    const guard = await requireAdmin(request, { requiredModule: 'ministerios' });
     if (!guard.ok) return guard.response;
 
     const body = await request.json();
@@ -127,7 +127,7 @@ export async function PUT(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const guard = await requireAdmin(request, { requiredRole: 'admin' });
+    const guard = await requireAdmin(request, { requiredModule: 'ministerios' });
     if (!guard.ok) return guard.response;
 
     const { supabaseAdmin } = guard.ctx;
@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const guard = await requireAdmin(request, { requiredRole: 'admin' });
+    const guard = await requireAdmin(request, { requiredModule: 'ministerios' });
     if (!guard.ok) return guard.response;
 
     const body = await request.json();

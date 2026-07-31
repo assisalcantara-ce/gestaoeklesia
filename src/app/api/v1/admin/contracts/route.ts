@@ -300,7 +300,7 @@ function generateContractHTML(contractData: any): string {
 // POST /api/v1/admin/contracts - Gerar contrato
 export async function POST(request: NextRequest) {
   try {
-    const guard = await requireAdmin(request, { requiredRole: 'admin' });
+    const guard = await requireAdmin(request, { requiredModule: 'ministerios' });
     if (!guard.ok) return guard.response;
 
     const body = await request.json();
@@ -397,7 +397,7 @@ export async function POST(request: NextRequest) {
 // GET /api/v1/admin/contracts/:id - Obter contrato
 export async function GET(request: NextRequest) {
   try {
-    const guard = await requireAdmin(request, { requiredRole: 'admin' });
+    const guard = await requireAdmin(request, { requiredModule: 'ministerios' });
     if (!guard.ok) return guard.response;
 
     const { searchParams } = new URL(request.url);

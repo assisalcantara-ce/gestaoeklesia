@@ -29,7 +29,7 @@ export const STATUS_LABELS: Record<string, string> = {
 // GET /api/v1/admin/attendance - Listar todos os atendimentos
 export async function GET(request: NextRequest) {
   try {
-    const guard = await requireAdmin(request, { requiredRole: 'admin' })
+    const guard = await requireAdmin(request, { requiredModule: 'suporte' })
     if (!guard.ok) return guard.response
 
     const searchParams = request.nextUrl.searchParams;
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
 // POST /api/v1/admin/attendance - Criar novo atendimento
 export async function POST(request: NextRequest) {
   try {
-    const guard = await requireAdmin(request, { requiredRole: 'admin' })
+    const guard = await requireAdmin(request, { requiredModule: 'suporte' })
     if (!guard.ok) return guard.response
 
     const body = await request.json();
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
 // PUT /api/v1/admin/attendance/:id - Atualizar atendimento
 export async function PUT(request: NextRequest) {
   try {
-    const guard = await requireAdmin(request, { requiredRole: 'admin' })
+    const guard = await requireAdmin(request, { requiredModule: 'suporte' })
     if (!guard.ok) return guard.response
 
     const body = await request.json();

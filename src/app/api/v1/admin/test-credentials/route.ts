@@ -31,7 +31,7 @@ function generatePassword(length = 12) {
 // POST /api/v1/admin/test-credentials - Gerar credenciais (teste ou definitiva)
 export async function POST(request: NextRequest) {
   try {
-    const guard = await requireAdmin(request, { requiredRole: 'admin' });
+    const guard = await requireAdmin(request, { requiredModule: 'suporte' });
     if (!guard.ok) return guard.response;
 
     const ip =
@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
 // GET /api/v1/admin/test-credentials/:pre_registration_id - Obter credenciais
 export async function GET(request: NextRequest) {
   try {
-    const guard = await requireAdmin(request, { requiredRole: 'admin' });
+    const guard = await requireAdmin(request, { requiredModule: 'suporte' });
     if (!guard.ok) return guard.response;
 
     const ip =

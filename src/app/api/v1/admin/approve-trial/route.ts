@@ -15,7 +15,7 @@ function onlyDigits(value: unknown): string | null {
 export async function POST(request: NextRequest) {
   try {
     // 1. Validar admin (responsabilidade da rota)
-    const result = await requireAdmin(request, { requiredRole: 'admin' })
+    const result = await requireAdmin(request, { requiredModule: 'ministerios' })
     if (!result.ok) return result.response
     const { supabaseAdmin } = result.ctx
 
