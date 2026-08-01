@@ -177,28 +177,7 @@ export default function TesourariaPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Data</label>
-                    <input
-                      type="date"
-                      value={t.form.data_lancamento}
-                      onChange={(e) => t.setForm((p) => ({ ...p, data_lancamento: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Valor (R$) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0,00"
-                      value={t.form.valor}
-                      onChange={(e) => t.setForm((p) => ({ ...p, valor: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
+                  {/* Caixa / Congregação */}
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1">Caixa</label>
                     {t.scope.isFinanceiroLocal ? (
@@ -221,6 +200,200 @@ export default function TesourariaPage() {
                         ))}
                       </select>
                     )}
+                  </div>
+
+                  {/* Tipo de Entrada ou Categoria de Saída */}
+                  {t.form.tipo_movimento === 'entrada' ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">
+                        Tipo de recebimento <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={t.form.tipo_recebimento}
+                        onChange={(e) => t.setForm((p) => ({ ...p, tipo_recebimento: e.target.value as any }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="">Selecione</option>
+                        {t.TIPOS.map((tr) => (
+                          <option key={tr.value} value={tr.value}>
+                            {tr.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria da despesa</label>
+                      <select
+                        value={t.form.categoria_saida}
+                        onChange={(e) => t.setForm((p) => ({ ...p, categoria_saida: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="">Selecione</option>
+                        {t.TIPOS_SAIDA.map((ts) => (
+                          <option key={ts.value} value={ts.value}>
+                            {ts.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Departamento */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Departamento</label>
+                    <select
+                      value={t.form.departamento_id}
+                      onChange={(e) => t.setForm((p) => ({ ...p, departamento_id: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="">Caixa da Igreja</option>
+                      {t.departamentos.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.sigla} – {d.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Valor */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Valor (R$) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0,00"
+                      value={t.form.valor}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^\d,]/g, '');
+                        t.setForm((p) => ({ ...p, valor: raw }));
+                      }}
+                      onBlur={(e) => {
+                        const raw = e.target.value.replace(/\./g, '').replace(',', '.');
+                        const num = parseFloat(raw);
+                        if (!isNaN(num) && num > 0) {
+                          t.setForm((p) => ({
+                            ...p,
+                            valor: num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                          }));
+                        }
+                      }}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  {/* Data */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Data <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={t.form.data_lancamento}
+                      onChange={(e) => t.setForm((p) => ({ ...p, data_lancamento: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+
+
+
+                  {/* Conta / Caixa */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Conta / Caixa</label>
+                    {t.finContas.length === 0 ? (
+                      <div className="w-full border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-400 flex items-center justify-between gap-2">
+                        <span>Nenhuma conta cadastrada.</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            t.setShowForm(false);
+                            t.setAba('contas');
+                          }}
+                          className="text-[#123b63] font-semibold hover:underline whitespace-nowrap"
+                        >
+                          + Cadastrar
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        value={t.form.conta_id}
+                        onChange={(e) => t.setForm((p) => ({ ...p, conta_id: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="">Padrão do ministério</option>
+                        {t.finContas.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.nome}
+                            {c.is_padrao ? ' ★' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Categoria financeira */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria financeira</label>
+                    {t.finCategorias.length === 0 ? (
+                      <div className="w-full border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-400 flex items-center justify-between gap-2">
+                        <span>Sem categorias disponíveis.</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            t.setShowForm(false);
+                            t.setAba('categorias');
+                          }}
+                          className="text-[#123b63] font-semibold hover:underline whitespace-nowrap"
+                        >
+                          Configurar
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        value={t.form.categoria_id}
+                        onChange={(e) => t.setForm((p) => ({ ...p, categoria_id: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="">Sem categoria</option>
+                        {t.finCategorias
+                          .filter((c) => c.tipo_movimento === t.form.tipo_movimento || c.tipo_movimento === 'ambos')
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.icone ? `${c.icone} ` : ''}
+                              {c.nome}
+                            </option>
+                          ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Referência */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Referência (evento/campanha)</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Festa das Nações"
+                      value={t.form.referencia}
+                      onChange={(e) => t.setForm((p) => ({ ...p, referencia: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  {/* Observações */}
+                  <div className="sm:col-span-2 lg:col-span-3">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Observações</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Observações do lançamento..."
+                      value={t.form.observacoes}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        t.setForm((p) => ({ ...p, observacoes: val, descricao: val }));
+                      }}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#123b63]"
+                    />
                   </div>
                 </div>
 
