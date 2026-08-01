@@ -393,6 +393,10 @@ export function useMembros() {
   const camposOptions = dedupByNome([...campos]);
   const congregacoesOptions = dedupByNome([...congregacoes]);
 
+  console.log('supervisoesOptions', supervisoesOptions);
+  console.log('camposOptions', camposOptions);
+  console.log('congregacoesOptions', congregacoesOptions);
+
 
 
   // ─── Filtros e paginação ──────────────────────────────────────────────────────
@@ -585,6 +589,10 @@ export function useMembros() {
 
       const maxM = (minRow.data as any)?.subscription_plans?.max_members;
       if (typeof maxM === 'number' && maxM > 0) setMaxMembros(maxM);
+
+      console.log('[DIV1] congregacoes', g.data);
+      console.log('[DIV2] campos', c.data);
+      console.log('[DIV3] supervisoes', s.error ? s.error : s.data);
 
       setSupervisoes(((s.data as any[]) || []).map((row: any) => ({ id: row.id, nome: row.nome })));
       setCampos(((c.data as any[]) || []).map((row: any) => ({ id: row.id, nome: row.nome, supervisao_id: row.supervisao_id })));

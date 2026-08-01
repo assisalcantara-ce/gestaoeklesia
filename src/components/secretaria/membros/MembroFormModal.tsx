@@ -69,6 +69,12 @@ export default function MembroFormModal({
   dizimosHistorico,
   loadingDizimosHistorico,
 }: MembroFormModalProps) {
+  console.log('props recebidas', {
+    supervisoesOptions,
+    camposOptions,
+    congregacoesOptions
+  });
+
   if (!showForm) return null;
 
   return (
@@ -531,6 +537,10 @@ export default function MembroFormModal({
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                         >
                           <option value="">Selecione</option>
+                          {(() => {
+                            console.log('1ª divisão renderizando', supervisoesOptions);
+                            return null;
+                          })()}
                           {supervisoesOptions.map((opt) => (
                             <option key={opt.id} value={opt.nome}>{opt.nome}</option>
                           ))}

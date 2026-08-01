@@ -388,6 +388,14 @@ export default function MembrosPage() {
                 totalPages={totalPages}
               />
 
+              {(() => {
+                console.log('props enviadas', {
+                  supervisoesOptions,
+                  camposOptions,
+                  congregacoesOptions
+                });
+                return null;
+              })()}
               <MembroFormModal
                 showForm={showForm}
                 setShowForm={setShowForm}
