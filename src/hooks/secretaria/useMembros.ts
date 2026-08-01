@@ -363,7 +363,7 @@ export function useMembros() {
     divisao2: 'CAMPO',
     divisao3: 'NENHUMA',
   });
-  const [orgNomenclaturasRaw, setOrgNomenclaturasRaw] = useState<any>(null);
+  const [_orgNomenclaturasRaw, setOrgNomenclaturasRaw] = useState<any>(null);
   const [supervisoes, setSupervisoes] = useState<DivisaoOption[]>([]);
   const [campos, setCampos] = useState<DivisaoOption[]>([]);
   const [congregacoes, setCongregacoes] = useState<DivisaoOption[]>([]);
@@ -389,55 +389,11 @@ export function useMembros() {
     return out;
   };
 
-  const supervisoesFromNomenclaturas = ((orgNomenclaturasRaw?.divisaoPrincipal?.custom || []) as string[])
-    .map((nome, idx) => ({ id: `cfg-s-${idx}-${nome}`, nome: sanitizeNome(nome) }))
-    .filter((opt) => !!opt.nome);
+  const supervisoesOptions = dedupByNome([...supervisoes]);
+  const camposOptions = dedupByNome([...campos]);
+  const congregacoesOptions = dedupByNome([...congregacoes]);
 
-  const camposFromNomenclaturas = ((orgNomenclaturasRaw?.divisaoSecundaria?.custom || []) as string[])
-    .map((nome, idx) => ({ id: `cfg-c-${idx}-${nome}`, nome: sanitizeNome(nome) }))
-    .filter((opt) => !!opt.nome);
 
-  const congregacoesFromNomenclaturas = ((orgNomenclaturasRaw?.divisaoTerciaria?.custom || []) as string[])
-    .map((nome, idx) => ({ id: `cfg-g-${idx}-${nome}`, nome: sanitizeNome(nome) }))
-    .filter((opt) => !!opt.nome);
-
-  const supervisoesFromMembers = dedupByNome(
-    (membersApi || [])
-      .map((m: any, idx: number) => ({ id: `legacy-s-${idx}`, nome: sanitizeNome((m?.custom_fields as any)?.supervisao) }))
-      .filter((opt: any) => !!opt.nome)
-  );
-  const camposFromMembers = dedupByNome(
-    (membersApi || [])
-      .map((m: any, idx: number) => ({ id: `legacy-c-${idx}`, nome: sanitizeNome((m?.custom_fields as any)?.campo) }))
-      .filter((opt: any) => !!opt.nome)
-  );
-  const congregacoesFromMembers = dedupByNome(
-    (membersApi || [])
-      .map((m: any, idx: number) => ({ id: `legacy-g-${idx}`, nome: sanitizeNome((m?.custom_fields as any)?.congregacao) }))
-      .filter((opt: any) => !!opt.nome)
-  );
-
-  const supervisoesOptions = dedupByNome([
-    ...supervisoes,
-    ...supervisoesFromMembers,
-    ...supervisoesFromNomenclaturas,
-  ]);
-
-  const camposOptions = dedupByNome([
-    ...campos,
-    ...camposFromMembers,
-    ...camposFromNomenclaturas,
-  ]);
-
-  const congregacoesOptions = dedupByNome([
-    ...congregacoes,
-    ...congregacoesFromMembers,
-    ...congregacoesFromNomenclaturas,
-  ]);
-
-  const divisao1Options = congregacoesOptions;
-  const divisao2Options = camposOptions;
-  const divisao3Options = supervisoesOptions;
 
   // ─── Filtros e paginação ──────────────────────────────────────────────────────
 
@@ -1419,9 +1375,9 @@ export function useMembros() {
     isAuxiliar,
 
     // Opções de nomenclatura
-    supervisoesOptions: divisao1Options,
-    camposOptions: divisao2Options,
-    congregacoesOptions: divisao3Options,
+    supervisoesOptions: congregacoesOptions,
+    camposOptions: camposOptions,
+    congregacoesOptions: supervisoesOptions,
 
     // Helpers expostos
     maskCpf,
