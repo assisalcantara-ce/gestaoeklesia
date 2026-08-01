@@ -605,8 +605,7 @@ export function useMembros() {
     };
 
     loadEstruturaOptions().catch(() => null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userCtx.ministryId]);
 
   // ─── Templates ───────────────────────────────────────────────────────────────
 
