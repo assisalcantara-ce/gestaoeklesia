@@ -498,50 +498,92 @@ export default function MembroFormModal({
               </div>
 
               {/* Organização Eclesiástica */}
-              <div className="bg-sky-50 border border-sky-200 p-3 rounded-md mt-3">
-                <h4 className="text-xs font-semibold text-sky-800 mb-3">🏢 Organização Eclesiástica</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">{nomenclaturas.divisao1} (1ª Divisão)</label>
-                    <select
-                      value={dadosPessoais.supervisao || ''}
-                      onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, supervisao: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    >
-                      <option value="">Selecione</option>
-                      {supervisoesOptions.map((opt) => (
-                        <option key={opt.id} value={opt.nome}>{opt.nome}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">{nomenclaturas.divisao2} (2ª Divisão)</label>
-                    <select
-                      value={dadosPessoais.campo || ''}
-                      onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, campo: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    >
-                      <option value="">Selecione</option>
-                      {camposOptions.map((opt) => (
-                        <option key={opt.id} value={opt.nome}>{opt.nome}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">{nomenclaturas.divisao3} (3ª Divisão)</label>
-                    <select
-                      value={dadosPessoais.congregacao || ''}
-                      onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, congregacao: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    >
-                      <option value="">Selecione</option>
-                      {congregacoesOptions.map((opt) => (
-                        <option key={opt.id} value={opt.nome}>{opt.nome}</option>
-                      ))}
-                    </select>
+              {((nomenclaturas?.divisao1 && nomenclaturas.divisao1 !== 'NENHUMA') ||
+                (nomenclaturas?.divisao2 && nomenclaturas.divisao2 !== 'NENHUMA') ||
+                (nomenclaturas?.divisao3 && nomenclaturas.divisao3 !== 'NENHUMA')) && (
+                <div className="bg-sky-50 border border-sky-200 p-3 rounded-md mt-3">
+                  <h4 className="text-xs font-semibold text-sky-800 mb-3">🏢 Organização Eclesiástica</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {nomenclaturas?.divisao1 && nomenclaturas.divisao1 !== 'NENHUMA' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">{nomenclaturas.divisao1} (1ª Divisão)</label>
+                        <select
+                          value={dadosPessoais.supervisao || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            const congregacaoSelecionada = supervisoesOptions.find((opt) => opt.nome === value) || null;
+                            const setorRelacionado = (congregacaoSelecionada as any)?.campo_id
+                              ? camposOptions.find((opt) => opt.id === (congregacaoSelecionada as any).campo_id) || null
+                              : null;
+                            const regionalRelacionado = (setorRelacionado as any)?.supervisao_id
+                              ? congregacoesOptions.find((opt) => opt.id === (setorRelacionado as any).supervisao_id) || null
+                              : ((congregacaoSelecionada as any)?.supervisao_id
+                                  ? congregacoesOptions.find((opt) => opt.id === (congregacaoSelecionada as any).supervisao_id) || null
+                                  : null);
+
+                            setDadosPessoais((prev: any) => ({
+                              ...prev,
+                              supervisao: value,
+                              campo: setorRelacionado?.nome || prev.campo || '',
+                              congregacao: regionalRelacionado?.nome || prev.congregacao || '',
+                            }));
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        >
+                          <option value="">Selecione</option>
+                          {supervisoesOptions.map((opt) => (
+                            <option key={opt.id} value={opt.nome}>{opt.nome}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {nomenclaturas?.divisao2 && nomenclaturas.divisao2 !== 'NENHUMA' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">{nomenclaturas.divisao2} (2ª Divisão)</label>
+                        <select
+                          value={dadosPessoais.campo || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            const setorSelecionado = camposOptions.find((opt) => opt.nome === value) || null;
+                            const regionalRelacionado = (setorSelecionado as any)?.supervisao_id
+                              ? congregacoesOptions.find((opt) => opt.id === (setorSelecionado as any).supervisao_id) || null
+                              : null;
+
+                            setDadosPessoais((prev: any) => ({
+                              ...prev,
+                              campo: value,
+                              congregacao: regionalRelacionado?.nome || prev.congregacao || '',
+                            }));
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        >
+                          <option value="">Selecione</option>
+                          {camposOptions.map((opt) => (
+                            <option key={opt.id} value={opt.nome}>{opt.nome}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {nomenclaturas?.divisao3 && nomenclaturas.divisao3 !== 'NENHUMA' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">{nomenclaturas.divisao3} (3ª Divisão)</label>
+                        <select
+                          value={dadosPessoais.congregacao || ''}
+                          onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, congregacao: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        >
+                          <option value="">Selecione</option>
+                          {congregacoesOptions.map((opt) => (
+                            <option key={opt.id} value={opt.nome}>{opt.nome}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Observações</label>
