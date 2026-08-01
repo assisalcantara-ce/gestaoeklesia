@@ -453,16 +453,23 @@ export function useTesouraria() {
           });
         }
 
-        const congRes = await authenticatedFetch('/api/v1/congregacoes');
-        if (congRes.ok) {
-          const cData = await congRes.json();
-          setCongregacoes(Array.isArray(cData) ? cData : cData.data ?? []);
+        // Carrega Congregações diretamente via Supabase
+        const { data: cData } = await supabase
+          .from('congregacoes')
+          .select('id, nome, is_sede')
+          .eq('is_active', true)
+          .order('nome');
+        if (cData) {
+          setCongregacoes(cData);
         }
 
-        const deptRes = await authenticatedFetch('/api/v1/departamentos');
-        if (deptRes.ok) {
-          const dData = await deptRes.json();
-          setDepartamentos(Array.isArray(dData) ? dData : dData.data ?? []);
+        // Carrega Departamentos diretamente via Supabase
+        const { data: dData } = await supabase
+          .from('departamentos')
+          .select('id, nome, sigla')
+          .order('nome');
+        if (dData) {
+          setDepartamentos(dData);
         }
 
         const contasRes = await authenticatedFetch('/api/v1/tesouraria/contas');
