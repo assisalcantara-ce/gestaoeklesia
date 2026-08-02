@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
 import { loadOrgNomenclaturasFromSupabaseOrMigrate } from '@/lib/org-nomenclaturas';
 import { useAppDialog } from '@/providers/AppDialogProvider';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 
 export interface Divisao1 {
   id: string;
@@ -822,16 +823,16 @@ export function useCongregacoes() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formD1.supervisor_cpf_input, showFormD1, ministryId]);
 
-  const loadDivisoes1 = async (ministryId: string) => {
+  const loadDivisoes1 = async (ministryIdParam: string) => {
     try {
-      const { data, error } = await supabase
-        .from('supervisoes')
-        .select('*')
-        .eq('ministry_id', ministryId)
-        .order('nome');
-      
-      if (error) throw error;
-      setDivisoes1(data || []);
+      const orgService = await obterEstruturaOrganizacionalService(ministryIdParam, supabase);
+      const div1 = orgService.getDivisao1();
+      setDivisoes1(div1.map((u) => ({
+        id: u.id,
+        nome: u.nome,
+        is_active: u.isActive !== false,
+        created_at: new Date().toISOString(),
+      })));
     } catch (error) {
       setDivisoes1([]);
       const msg = (error as any)?.message || (error as any)?.error_description || '';
@@ -839,16 +840,16 @@ export function useCongregacoes() {
     }
   };
 
-  const loadDivisoes2 = async (ministryId: string) => {
+  const loadDivisoes2 = async (ministryIdParam: string) => {
     try {
-      const { data, error } = await supabase
-        .from('campos')
-        .select('*')
-        .eq('ministry_id', ministryId)
-        .order('nome');
-
-      if (error) throw error;
-      setDivisoes2((data as any) || []);
+      const orgService = await obterEstruturaOrganizacionalService(ministryIdParam, supabase);
+      const div2 = orgService.getDivisao2();
+      setDivisoes2(div2.map((u) => ({
+        id: u.id,
+        nome: u.nome,
+        supervisao_id: u.parentId || undefined,
+        is_active: u.isActive !== false,
+      })) as any);
     } catch (error) {
       setDivisoes2([] as any);
       const msg = (error as any)?.message || (error as any)?.error_description || '';
@@ -856,16 +857,16 @@ export function useCongregacoes() {
     }
   };
 
-  const loadDivisoes3 = async (ministryId: string) => {
+  const loadDivisoes3 = async (ministryIdParam: string) => {
     try {
-      const { data, error } = await supabase
-        .from('congregacoes')
-        .select('*')
-        .eq('ministry_id', ministryId)
-        .order('nome');
-
-      if (error) throw error;
-      setDivisoes3((data as any) || []);
+      const orgService = await obterEstruturaOrganizacionalService(ministryIdParam, supabase);
+      const div3 = orgService.getDivisao3();
+      setDivisoes3(div3.map((u) => ({
+        id: u.id,
+        nome: u.nome,
+        campo_id: u.parentId || undefined,
+        is_active: u.isActive !== false,
+      })) as any);
     } catch (error) {
       setDivisoes3([] as any);
       const msg = (error as any)?.message || (error as any)?.error_description || '';
