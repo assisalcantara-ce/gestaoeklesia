@@ -7,6 +7,7 @@ import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { FileText, Printer, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -414,8 +415,9 @@ export default function PrestacaoContasPage() {
   useEffect(() => {
     if (!ministryId) return;
     const load = async () => {
-      const resCongs = await supabase.from('congregacoes').select('id, nome').eq('ministry_id', ministryId).eq('is_active', true).order('nome');
-      setCongregacoes((resCongs.data ?? []) as Congregacao[]);
+      const orgService = await obterEstruturaOrganizacionalService(ministryId, supabase);
+      const div1Options = orgService.getOptionsFormatadas(1);
+      setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
       setMinistryNome(currentMinistry?.nome || currentMinistry?.name || '');
     };
     void load();
