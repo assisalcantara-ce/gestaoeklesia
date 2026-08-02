@@ -10,6 +10,7 @@ import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { useUserContext } from '@/hooks/useUserContext';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import {
   Bed, CalendarDays, CheckCircle, Clock, Copy, CreditCard,
   Download, FileBarChart2, Globe, Lock, MapPin, Pencil,
@@ -313,12 +314,13 @@ export default function EventosPage() {
       if (!mid) { setLoadingData(false); return; }
       setMinistryId(mid);
 
-      const [{ data: congs }, { data: mu }] = await Promise.all([
-        supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome'),
+      const [orgService, { data: mu }] = await Promise.all([
+        obterEstruturaOrganizacionalService(mid, supabase),
         supabase.from('ministry_users').select('permissions, role').eq('user_id', user.id).eq('ministry_id', mid).single(),
       ]);
 
-      setCongregacoes((congs ?? []) as Congregacao[]);
+      const div1Options = orgService.getOptionsFormatadas(1);
+      setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
 
       const perms   = ((mu as { permissions?: string[] } | null)?.permissions ?? []);
       const role    = ((mu as { role?: string } | null)?.role ?? '');
