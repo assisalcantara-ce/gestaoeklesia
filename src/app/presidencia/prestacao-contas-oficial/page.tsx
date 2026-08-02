@@ -7,6 +7,7 @@ import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import {
   FileText, Printer, Download, Shield, AlertTriangle, CheckCircle2,
   TrendingUp, TrendingDown, Minus, Award, Users,
@@ -655,13 +656,14 @@ export default function PrestacaoContasOficialPage() {
       const mid = await resolveMinistryId(supabase);
       setMinistryId(mid);
 
-      const [resCongs, resUser] = await Promise.all([
-        supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome'),
+      const [orgService, resUser] = await Promise.all([
+        obterEstruturaOrganizacionalService(mid || '', supabase),
         supabase.auth.getUser(),
       ]);
 
       setMinistryNome(currentMinistry?.nome || currentMinistry?.name || '');
-      setCongregacoes((resCongs.data ?? []) as Congregacao[]);
+      const div1Options = orgService.getOptionsFormatadas(1);
+      setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
 
       const u = resUser.data.user;
       const displayName =
