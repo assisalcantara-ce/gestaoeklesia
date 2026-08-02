@@ -10,6 +10,7 @@ import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { useUserContext } from '@/hooks/useUserContext';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 
 // ─── Labels e helpers ────────────────────────────────────────────────────────
 
@@ -370,27 +371,32 @@ function RelatorioFichaGeral() {
   const [filtroTipo, setFiltroTipo] = useState('');
   const [filtroCong, setFiltroCong] = useState('');
 
+  const userCtx = useUserContext();
+
   useEffect(() => {
     const supabase = createClient();
-    Promise.all([
-      supabase
+    const load = async () => {
+      const membRes = await supabase
         .from('members')
         .select(
           'id, name, tipo_cadastro, status, cargo_ministerial, data_nascimento, phone, celular, cidade, estado, congregacao_id, congregacoes(nome)',
         )
         .order('name', { ascending: true })
-        .limit(1000),
-      supabase
-        .from('congregacoes')
-        .select('id, nome')
-        .eq('is_active', true)
-        .order('nome'),
-    ]).then(([membRes, congRes]) => {
+        .limit(1000);
+
       setMembros((membRes.data as MembroRow[]) ?? []);
-      setCongregacoes((congRes.data as { id: string; nome: string }[]) ?? []);
+
+      if (userCtx.ministryId) {
+        const orgService = await obterEstruturaOrganizacionalService(userCtx.ministryId, supabase);
+        const div1Options = orgService.getOptionsFormatadas(1);
+        setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
+      }
+
       setLoading(false);
-    });
-  }, []);
+    };
+
+    load();
+  }, [userCtx.ministryId]);
 
   const filtrados = useMemo(() => {
     const nome = filtroNome.toLowerCase();
