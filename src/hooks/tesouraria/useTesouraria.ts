@@ -464,14 +464,25 @@ export function useTesouraria() {
           });
         }
 
-        // Carrega Congregações diretamente via Supabase
+        // Carrega 1ª Divisão (Congregações / Supervisões) diretamente via Supabase
         const { data: cData } = await supabase
           .from('congregacoes')
           .select('id, nome, is_sede')
           .eq('is_active', true)
           .order('nome');
-        if (cData) {
+
+        if (cData && cData.length > 0) {
           setCongregacoes(cData);
+        } else {
+          // Fallback para ministérios onde a 1ª Divisão está cadastrada em supervisoes
+          const { data: sData } = await supabase
+            .from('supervisoes')
+            .select('id, nome')
+            .eq('is_active', true)
+            .order('nome');
+          if (sData) {
+            setCongregacoes(sData.map((s: any) => ({ id: s.id, nome: s.nome, is_sede: false })));
+          }
         }
 
         // Carrega Departamentos diretamente via Supabase
