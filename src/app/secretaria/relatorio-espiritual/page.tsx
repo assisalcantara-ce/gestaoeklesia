@@ -10,6 +10,7 @@ import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Pencil,
@@ -336,19 +337,14 @@ export default function RelatorioEspiritualPage() {
     if (ctx?.loading || !ctx?.ministryId) return;
 
     const loadLocais = async () => {
-      let query = supabase
-        .from('congregacoes')
-        .select('id, nome')
-        .eq('ministry_id', ctx.ministryId)
-        .order('nome');
+      const orgService = await obterEstruturaOrganizacionalService(ctx.ministryId || '', supabase);
+      let div1Options = orgService.getOptionsFormatadas(1);
 
       if (isLocalUser && ctx.congregacaoId) {
-        query = query.eq('id', ctx.congregacaoId);
+        div1Options = div1Options.filter((opt) => opt.id === ctx.congregacaoId);
       }
 
-      const { data, error } = await query;
-      if (!error && data) {
-        setLocais(data as LocalOption[]);
+      setLocais(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
 
         // Buscar contatos dos secretários locais
         try {
@@ -399,7 +395,6 @@ export default function RelatorioEspiritualPage() {
           setFormData(prev => ({ ...prev, congregacao_id: ctx.congregacaoId || '' }));
           setFiltroCongregacao(ctx.congregacaoId || '');
         }
-      }
     };
 
     loadLocais();
