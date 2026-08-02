@@ -9,6 +9,7 @@ import { getMensagemSemTemplate } from '@/lib/cartoes-utils';
 import { createClient } from '@/lib/supabase-client';
 import { loadOrgNomenclaturasFromSupabaseOrMigrate } from '@/lib/org-nomenclaturas';
 import { loadTemplatesForCurrentUser } from '@/lib/cartoes-templates-sync';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -570,37 +571,37 @@ export function useMembros() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Carregar estrutura de divisões (supervisões, campos, congregações) + limite de plano
+  // Carregar estrutura de divisões (supervisões, campos, congregações) + limite de plano via EstruturaOrganizacionalService
   useEffect(() => {
     const loadEstruturaOptions = async () => {
       const ministryId = userCtx.ministryId;
       if (!ministryId) return;
 
-      const [s, c, g, minRow] = await Promise.all([
-        supabase.from('supervisoes').select('id,nome,is_active').eq('ministry_id', ministryId).eq('is_active', true).order('nome'),
-        supabase.from('campos').select('id,nome,supervisao_id,is_active').eq('ministry_id', ministryId).eq('is_active', true).order('nome'),
-        supabase.from('congregacoes').select('id,nome,supervisao_id,campo_id,is_active').eq('ministry_id', ministryId).eq('is_active', true).order('nome'),
+      const [orgService, minRow] = await Promise.all([
+        obterEstruturaOrganizacionalService(ministryId, supabase),
         supabase.from('ministries').select('subscription_plan_id, subscription_plans(max_members)').eq('id', ministryId).maybeSingle(),
       ]);
-
-      if (s.error) console.warn('Falha ao carregar 1a divisao:', s.error);
-      if (c.error) console.warn('Falha ao carregar 2a divisao:', c.error);
-      if (g.error) console.warn('Falha ao carregar 3a divisao:', g.error);
 
       const maxM = (minRow.data as any)?.subscription_plans?.max_members;
       if (typeof maxM === 'number' && maxM > 0) setMaxMembros(maxM);
 
-      console.log('[DIV1] congregacoes', g.data);
-      console.log('[DIV2] campos', c.data);
-      console.log('[DIV3] supervisoes', s.error ? s.error : s.data);
+      const div1 = orgService.getDivisao1();
+      const div2 = orgService.getDivisao2();
+      const div3 = orgService.getDivisao3();
+      const labels = orgService.getLabels();
 
-      setSupervisoes(((s.data as any[]) || []).map((row: any) => ({ id: row.id, nome: row.nome })));
-      setCampos(((c.data as any[]) || []).map((row: any) => ({ id: row.id, nome: row.nome, supervisao_id: row.supervisao_id })));
-      setCongregacoes(((g.data as any[]) || []).map((row: any) => ({
-        id: row.id,
-        nome: row.nome,
-        supervisao_id: row.supervisao_id,
-        campo_id: row.campo_id,
+      setNomenclaturasState({
+        divisao1: labels.nomeDivisao1,
+        divisao2: labels.nomeDivisao2,
+        divisao3: labels.nomeDivisao3,
+      });
+
+      setSupervisoes(div1.map((u) => ({ id: u.id, nome: u.nome })));
+      setCampos(div2.map((u) => ({ id: u.id, nome: u.nome, supervisao_id: u.parentId || undefined })));
+      setCongregacoes(div3.map((u) => ({
+        id: u.id,
+        nome: u.nome,
+        supervisao_id: u.parentId || undefined,
       })));
     };
 
