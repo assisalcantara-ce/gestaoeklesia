@@ -9,6 +9,7 @@ import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { Pencil, Trash2, Printer, Search } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -354,17 +355,32 @@ export default function PatrimonioPage() {
     : '';
 
   const loadLocais = async (mid: string) => {
-    let [camposRes, congRes] = await Promise.all([
-      supabase.from('campos').select('id, nome, pastor_nome').eq('ministry_id', mid).eq('is_active', true).order('nome'),
-      supabase.from('congregacoes').select('id, nome, dirigente, dirigente_cargo').eq('ministry_id', mid).eq('is_active', true).order('nome'),
-    ]);
+    const orgService = await obterEstruturaOrganizacionalService(mid, supabase);
+    const div1Regs = orgService.getDivisao1();
+    const div2Regs = orgService.getDivisao2();
+
+    let div1Filtrada = div1Regs;
+    let div2Filtrada = div2Regs;
+
     if (ctx.nivel === 'operador' && ctx.congregacaoId) {
-      congRes.data = (congRes.data || []).filter((c: any) => c.id === ctx.congregacaoId);
-      camposRes.data = [];
+      div1Filtrada = div1Regs.filter((c) => c.id === ctx.congregacaoId);
+      div2Filtrada = [];
     }
+
     const lista: LocalOption[] = [
-      ...((camposRes.data || []).map((c: any) => ({ id: c.id, nome: c.nome, tipo: 'campo' as const, pastor_nome: c.pastor_nome }))),
-      ...((congRes.data || []).map((c: any) => ({ id: c.id, nome: c.nome, tipo: 'congregacao' as const, dirigente: c.dirigente, dirigente_cargo: c.dirigente_cargo }))),
+      ...div2Filtrada.map((c: any) => ({
+        id: c.id,
+        nome: c.nome,
+        tipo: 'campo' as const,
+        pastor_nome: c.pastor_nome || null,
+      })),
+      ...div1Filtrada.map((c: any) => ({
+        id: c.id,
+        nome: c.nome,
+        tipo: 'congregacao' as const,
+        dirigente: c.dirigente || null,
+        dirigente_cargo: c.dirigente_cargo || null,
+      })),
     ];
     setLocais(lista);
   };
