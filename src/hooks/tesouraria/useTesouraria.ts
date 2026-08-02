@@ -8,7 +8,7 @@ import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import type { ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
-import { loadOrgNomenclaturasFromSupabaseOrMigrate } from '@/lib/org-nomenclaturas';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 
 // Types
 export interface Congregacao { id: string; nome: string; is_sede?: boolean }
@@ -457,33 +457,15 @@ export function useTesouraria() {
           });
         }
 
-        const orgNomes = await loadOrgNomenclaturasFromSupabaseOrMigrate(supabase, { syncLocalStorage: false });
-        if (orgNomes?.divisaoPrincipal?.opcao1) {
-          setNomenclaturas({
-            divisao1: orgNomes.divisaoPrincipal.opcao1,
-          });
-        }
+        // Carrega 1ª Divisão (Caixas / Congregações / Unidades) e Nomenclaturas via EstruturaOrganizacionalService
+        const orgService = await obterEstruturaOrganizacionalService(session.user.id, supabase);
+        const labels = orgService.getLabels();
+        setNomenclaturas({
+          divisao1: labels.nomeDivisao1,
+        });
 
-        // Carrega 1ª Divisão (Congregações / Supervisões) diretamente via Supabase
-        const { data: cData } = await supabase
-          .from('congregacoes')
-          .select('id, nome, is_sede')
-          .eq('is_active', true)
-          .order('nome');
-
-        if (cData && cData.length > 0) {
-          setCongregacoes(cData);
-        } else {
-          // Fallback para ministérios onde a 1ª Divisão está cadastrada em supervisoes
-          const { data: sData } = await supabase
-            .from('supervisoes')
-            .select('id, nome')
-            .eq('is_active', true)
-            .order('nome');
-          if (sData) {
-            setCongregacoes(sData.map((s: any) => ({ id: s.id, nome: s.nome, is_sede: false })));
-          }
-        }
+        const div1Options = orgService.getOptionsFormatadas(1);
+        setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome, is_sede: false })));
 
         // Carrega Departamentos diretamente via Supabase
         const { data: dData } = await supabase
