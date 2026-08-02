@@ -7,7 +7,6 @@ import { getCargosMinisteriais, type CargoMinisterial } from '@/lib/cargos-utils
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import { getMensagemSemTemplate } from '@/lib/cartoes-utils';
 import { createClient } from '@/lib/supabase-client';
-import { loadOrgNomenclaturasFromSupabaseOrMigrate } from '@/lib/org-nomenclaturas';
 import { loadTemplatesForCurrentUser } from '@/lib/cartoes-templates-sync';
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 
@@ -186,7 +185,6 @@ const validarCPF = (cpf: string): boolean => {
   return true;
 };
 
-const sanitizeNome = (value: unknown) => String(value || '').trim();
 
 const hasActiveTemplate = (tipoCadastro: string, templatesBase: any[]) => {
   const tipo = (tipoCadastro || '').toLowerCase() === 'crianca' ? 'membro' : tipoCadastro;
@@ -364,7 +362,6 @@ export function useMembros() {
     divisao2: 'CAMPO',
     divisao3: 'NENHUMA',
   });
-  const [_orgNomenclaturasRaw, setOrgNomenclaturasRaw] = useState<any>(null);
   const [supervisoes, setSupervisoes] = useState<DivisaoOption[]>([]);
   const [campos, setCampos] = useState<DivisaoOption[]>([]);
   const [congregacoes, setCongregacoes] = useState<DivisaoOption[]>([]);
@@ -376,23 +373,9 @@ export function useMembros() {
 
   const limiteMembrosAtingido = maxMembros > 0 && membros.length >= maxMembros;
 
-  const dedupByNome = (items: DivisaoOption[]): DivisaoOption[] => {
-    const seen = new Set<string>();
-    const out: DivisaoOption[] = [];
-    items.forEach((item) => {
-      const nome = sanitizeNome(item.nome);
-      if (!nome) return;
-      const key = nome.toUpperCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      out.push({ ...item, nome });
-    });
-    return out;
-  };
-
-  const supervisoesOptions = dedupByNome([...supervisoes]);
-  const camposOptions = dedupByNome([...campos]);
-  const congregacoesOptions = dedupByNome([...congregacoes]);
+  const supervisoesOptions = supervisoes;
+  const camposOptions = campos;
+  const congregacoesOptions = congregacoes;
 
   console.log('supervisoesOptions', supervisoesOptions);
   console.log('camposOptions', camposOptions);
@@ -542,37 +525,10 @@ export function useMembros() {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // Carregar nomenclaturas
-  const refreshNomenclaturas = async () => {
-    const org = await loadOrgNomenclaturasFromSupabaseOrMigrate(supabase);
-    setOrgNomenclaturasRaw(org);
-    setNomenclaturasState({
-      divisao1: org?.divisaoPrincipal?.opcao1 || 'IGREJA',
-      divisao2: org?.divisaoSecundaria?.opcao1 || 'CAMPO',
-      divisao3: org?.divisaoTerciaria?.opcao1 || 'NENHUMA',
-    });
-  };
-
-  useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      try { await refreshNomenclaturas(); } catch { /* ignore */ }
-    };
-    run();
-
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'nomenclaturas' && mounted) run();
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      mounted = false;
-      window.removeEventListener('storage', handleStorageChange);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Carregar estrutura de divisões (supervisões, campos, congregações) + limite de plano via EstruturaOrganizacionalService
   useEffect(() => {
+    let mounted = true;
+
     const loadEstruturaOptions = async () => {
       const ministryId = userCtx.ministryId;
       if (!ministryId) return;
@@ -582,12 +538,14 @@ export function useMembros() {
         supabase.from('ministries').select('subscription_plan_id, subscription_plans(max_members)').eq('id', ministryId).maybeSingle(),
       ]);
 
+      if (!mounted) return;
+
       const maxM = (minRow.data as any)?.subscription_plans?.max_members;
       if (typeof maxM === 'number' && maxM > 0) setMaxMembros(maxM);
 
-      const div1 = orgService.getDivisao1();
-      const div2 = orgService.getDivisao2();
-      const div3 = orgService.getDivisao3();
+      const div1 = orgService.getOptionsFormatadas(1);
+      const div2 = orgService.getOptionsFormatadas(2);
+      const div3 = orgService.getOptionsFormatadas(3);
       const labels = orgService.getLabels();
 
       setNomenclaturasState({
@@ -596,16 +554,24 @@ export function useMembros() {
         divisao3: labels.nomeDivisao3,
       });
 
-      setSupervisoes(div1.map((u) => ({ id: u.id, nome: u.nome })));
-      setCampos(div2.map((u) => ({ id: u.id, nome: u.nome, supervisao_id: u.parentId || undefined })));
-      setCongregacoes(div3.map((u) => ({
-        id: u.id,
-        nome: u.nome,
-        supervisao_id: u.parentId || undefined,
-      })));
+      setSupervisoes(div1);
+      setCampos(div2);
+      setCongregacoes(div3);
     };
 
     loadEstruturaOptions().catch(() => null);
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'nomenclaturas' && mounted) {
+        loadEstruturaOptions().catch(() => null);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, [userCtx.ministryId]);
 
   // ─── Templates ───────────────────────────────────────────────────────────────
