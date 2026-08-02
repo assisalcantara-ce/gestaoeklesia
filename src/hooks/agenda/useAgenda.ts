@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { useAppDialog } from '@/providers/AppDialogProvider';
 import { OrganizationalService, getOrgHelpers, OrgStructure } from '@/lib/organizational-service';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { PlanningConflictService } from '@/lib/planning-conflict-service';
 import { Calendar as CalendarIcon, LayoutDashboard, BookOpen, Gavel } from 'lucide-react';
@@ -316,12 +317,9 @@ export function useAgenda() {
 
   const loadCongregacoes = useCallback(async (mId: string) => {
     try {
-      const { data } = await supabase
-        .from('congregacoes')
-        .select('id, nome')
-        .eq('ministry_id', mId)
-        .order('nome');
-      setCongregacoes(data || []);
+      const orgService = await obterEstruturaOrganizacionalService(mId, supabase);
+      const div1Options = orgService.getOptionsFormatadas(1);
+      setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
     } catch {
       setCongregacoes([]);
     }
