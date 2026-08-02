@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import ReportTemplate, { ReportTemplateRef } from '@/components/ReportTemplate';
 import {
   BarChart,
@@ -79,19 +80,15 @@ export default function RelatoriosAcolhimentoPage() {
     if (ctx?.loading || !ctx?.ministryId) return;
 
     const loadLocais = async () => {
-      const { data, error } = await supabase
-        .from('congregacoes')
-        .select('id, nome')
-        .eq('ministry_id', ctx.ministryId)
-        .order('nome');
+      const orgService = await obterEstruturaOrganizacionalService(ctx.ministryId || '', supabase);
+      const div1Options = orgService.getOptionsFormatadas(1);
+      const locList: LocalOption[] = div1Options.map((opt) => ({ id: opt.id, nome: opt.nome }));
 
-      if (!error && data) {
-        setLocais(data as LocalOption[]);
-        if (isLocalUser && ctx.congregacaoId) {
-          setSelectedCongregacao(ctx.congregacaoId);
-        } else if (data.length > 0) {
-          setSelectedCongregacao(data[0].id);
-        }
+      setLocais(locList);
+      if (isLocalUser && ctx.congregacaoId) {
+        setSelectedCongregacao(ctx.congregacaoId);
+      } else if (locList.length > 0) {
+        setSelectedCongregacao(locList[0].id);
       }
     };
 
