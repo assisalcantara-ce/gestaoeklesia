@@ -6,6 +6,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveEbdScope } from '@/lib/cartoes-templates-sync';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { BarChart3, DollarSign, Link2, Cake, FileText, Printer, UserCheck, X } from 'lucide-react';
 import { useAppDialog } from '@/providers/AppDialogProvider';
 
@@ -112,12 +113,21 @@ export default function EbdRelatoriosPage() {
   const loadBase = useCallback(async (mid: string) => {
     setLoading(true);
     const cid = churchIdRef.current;
-    let congsQ = supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome');
-    if (cid) congsQ = congsQ.eq('id', cid);
+
     let turmasQ = supabase.from('ebd_turmas').select('id, nome, church_id').eq('ministry_id', mid).eq('ativo', true).order('nome');
     if (cid) turmasQ = turmasQ.eq('church_id', cid);
-    const [congsR, turmasR] = await Promise.all([congsQ, turmasQ]);
-    setCongregacoes(congsR.data ?? []);
+
+    const [orgService, turmasR] = await Promise.all([
+      obterEstruturaOrganizacionalService(mid, supabase),
+      turmasQ,
+    ]);
+
+    let div1Options = orgService.getOptionsFormatadas(1);
+    if (cid) {
+      div1Options = div1Options.filter((opt) => opt.id === cid);
+    }
+
+    setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
     setTurmas(turmasR.data ?? []);
     if (cid) {
       setFiltFreqCong(cid);
