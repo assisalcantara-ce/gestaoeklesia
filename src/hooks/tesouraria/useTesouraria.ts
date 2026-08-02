@@ -8,6 +8,7 @@ import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import type { ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
+import { loadOrgNomenclaturasFromSupabaseOrMigrate } from '@/lib/org-nomenclaturas';
 
 // Types
 export interface Congregacao { id: string; nome: string; is_sede?: boolean }
@@ -276,6 +277,9 @@ export function useTesouraria() {
   const [ministryId, setMinistryId] = useState<string | null>(null);
   const [ministerio, setMinisterio] = useState<ConfiguracaoIgreja | null>(null);
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
+  const [nomenclaturas, setNomenclaturas] = useState({
+    divisao1: 'Congregação',
+  });
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [lancamentos] = useState<Lancamento[]>([]);
   const [finContas, setFinContas] = useState<FinConta[]>([]);
@@ -450,6 +454,13 @@ export function useTesouraria() {
             congregacaoId: cId,
             canWrite: ['super_admin', 'admin', 'tesoureiro_sede', 'financeiro_local'].includes(userRole),
             canDelete: ['super_admin', 'admin', 'tesoureiro_sede'].includes(userRole),
+          });
+        }
+
+        const orgNomes = await loadOrgNomenclaturasFromSupabaseOrMigrate(supabase, { syncLocalStorage: false });
+        if (orgNomes?.divisaoPrincipal?.opcao1) {
+          setNomenclaturas({
+            divisao1: orgNomes.divisaoPrincipal.opcao1,
           });
         }
 
@@ -978,6 +989,7 @@ export function useTesouraria() {
     tipoLabel,
     tipoCor,
     congNome,
+    nomenclaturas,
     exportarCSV,
     MESES,
     TIPOS,
