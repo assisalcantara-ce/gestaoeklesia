@@ -8,6 +8,7 @@ import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { Pencil, Trash2, Search, CheckCircle2 } from 'lucide-react';
 
 interface LocalOption {
@@ -132,19 +133,21 @@ export default function AchadosPerdidosPage() {
   };
 
   const loadLocais = async (mid: string) => {
-    let [camposRes, congregacoesRes] = await Promise.all([
-      supabase.from('campos').select('id, nome').eq('ministry_id', mid).eq('is_active', true).order('nome'),
-      supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).eq('is_active', true).order('nome'),
-    ]);
+    const orgService = await obterEstruturaOrganizacionalService(mid, supabase);
+    const div1Options = orgService.getOptionsFormatadas(1);
+    const div2Options = orgService.getOptionsFormatadas(2);
+
+    let div1Filtrada = div1Options;
+    let div2Filtrada = div2Options;
 
     if (ctx.nivel === 'operador' && ctx.congregacaoId) {
-      congregacoesRes.data = (congregacoesRes.data || []).filter((c: any) => c.id === ctx.congregacaoId);
-      camposRes.data = [];
+      div1Filtrada = div1Options.filter((c) => c.id === ctx.congregacaoId);
+      div2Filtrada = [];
     }
 
     const lista: LocalOption[] = [
-      ...((camposRes.data || []).map((c: any) => ({ id: c.id, nome: c.nome, tipo: 'campo' as const }))),
-      ...((congregacoesRes.data || []).map((c: any) => ({ id: c.id, nome: c.nome, tipo: 'congregacao' as const }))),
+      ...div2Filtrada.map((c) => ({ id: c.id, nome: c.nome, tipo: 'campo' as const })),
+      ...div1Filtrada.map((c) => ({ id: c.id, nome: c.nome, tipo: 'congregacao' as const })),
     ];
     setLocais(lista);
   };
