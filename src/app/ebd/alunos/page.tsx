@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
@@ -6,6 +6,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveEbdScope } from '@/lib/cartoes-templates-sync';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { useAppDialog } from '@/providers/AppDialogProvider';
 import { Plus, Printer, X, Users, Search, XCircle, IdCard, ClipboardList } from 'lucide-react';
@@ -95,8 +96,7 @@ export default function EbdAlunosPage() {
   const load = useCallback(async (mid: string) => {
     setLoading(true);
     const cid = churchIdRef.current;
-    let congsQ   = supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome');
-    if (cid) congsQ = congsQ.eq('id', cid);
+
     const classesQ = supabase.from('ebd_classes').select('id, nome').eq('ministry_id', mid).eq('ativo', true).order('ordem').order('nome');
     let turmasQ  = supabase.from('ebd_turmas').select('id, nome, church_id, classe_id, ebd_classes(faixa_etaria_max)').eq('ministry_id', mid).eq('ativo', true).order('nome');
     if (cid) turmasQ = turmasQ.eq('church_id', cid);
@@ -104,8 +104,20 @@ export default function EbdAlunosPage() {
     if (cid) alunosQ = alunosQ.eq('church_id', cid);
     const matsQ = supabase.from('ebd_matriculas').select('*').eq('ministry_id', mid).order('data_inicio', { ascending: false });
 
-    const [congsR, classesR, turmasR, alunosR, matsR] = await Promise.all([congsQ, classesQ, turmasQ, alunosQ, matsQ]);
-    setCongregacoes(congsR.data ?? []);
+    const [orgService, classesR, turmasR, alunosR, matsR] = await Promise.all([
+      obterEstruturaOrganizacionalService(mid, supabase),
+      classesQ,
+      turmasQ,
+      alunosQ,
+      matsQ,
+    ]);
+
+    let div1Options = orgService.getOptionsFormatadas(1);
+    if (cid) {
+      div1Options = div1Options.filter((opt) => opt.id === cid);
+    }
+
+    setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
     setClasses(classesR.data ?? []);
     setTurmas(turmasR.data ?? []);
 
