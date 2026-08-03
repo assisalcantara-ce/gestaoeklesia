@@ -185,7 +185,7 @@ export async function carregarEstruturaOrganizacional(
     .from('congregacoes')
     .select('id, nome, is_sede, is_active, campo_id, supervisao_id')
     .eq('ministry_id', ministryId)
-    .eq('is_active', true)
+    .or('is_active.eq.true,is_active.is.null')
     .order('nome');
 
   if (!cError && cData && cData.length > 0) {
@@ -204,7 +204,7 @@ export async function carregarEstruturaOrganizacional(
       .from('supervisoes')
       .select('id, nome, is_active')
       .eq('ministry_id', ministryId)
-      .eq('is_active', true)
+      .or('is_active.eq.true,is_active.is.null')
       .order('nome');
 
     if (sDataFallback) {
