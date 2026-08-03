@@ -5,6 +5,8 @@ import PageLayout from '@/components/PageLayout';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
+import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { Crown, Mail, Building2, Printer } from 'lucide-react';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 
@@ -40,13 +42,16 @@ export default function EbdSuperintendentesPage() {
       const token = session?.session?.access_token;
       if (!token) { setErro('Sessão expirada.'); setLoading(false); return; }
 
-      const [res, congsRes, config] = await Promise.all([
+      const mid = await resolveMinistryId(supabase);
+
+      const [res, orgService, config] = await Promise.all([
         fetch('/api/usuarios', { headers: { Authorization: `Bearer ${token}` } }),
-        supabase.from('congregacoes').select('id, nome').order('nome'),
+        obterEstruturaOrganizacionalService(mid || '', supabase),
         fetchConfiguracaoIgrejaFromSupabase(supabase),
       ]);
 
-      setCongregacoes(congsRes.data ?? []);
+      const div1Options = orgService.getOptionsFormatadas(1);
+      setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
       setConfigIgreja(config);
 
       if (!res.ok) { setErro('Falha ao carregar usuários.'); setLoading(false); return; }
