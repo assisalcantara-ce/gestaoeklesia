@@ -10,7 +10,8 @@ import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
-import { loadOrgNomenclaturasFromSupabaseOrMigrate, OrgNomenclaturasState, getDefaultOrgNomenclaturas } from '@/lib/org-nomenclaturas';
+import { OrgNomenclaturasState, getDefaultOrgNomenclaturas } from '@/lib/org-nomenclaturas';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import {
   Users,
   Search,
@@ -128,17 +129,16 @@ export default function VisitantesPage() {
     const initData = async () => {
       if (!ctx?.ministryId) return;
       try {
-        const nom = await loadOrgNomenclaturasFromSupabaseOrMigrate(supabase);
-        setNomenclaturas(nom);
+        const orgService = await obterEstruturaOrganizacionalService(ctx.ministryId, supabase);
+        const labels = orgService.getLabels();
+        setNomenclaturas({
+          divisaoPrincipal: { opcao1: labels.nomeDivisao1 },
+          divisaoSecundaria: { opcao1: labels.nomeDivisao2 },
+          divisaoTerciaria: { opcao1: labels.nomeDivisao3 },
+        });
 
-        const { data: cgData } = await supabase
-          .from('congregacoes')
-          .select('id, nome')
-          .eq('ministry_id', ctx.ministryId)
-          .order('nome');
-        if (cgData) {
-          setCongregacoes(cgData as CongregacaoOption[]);
-        }
+        const div1Options = orgService.getOptionsFormatadas(1);
+        setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
       } catch (err) {
         console.error(err);
       }
