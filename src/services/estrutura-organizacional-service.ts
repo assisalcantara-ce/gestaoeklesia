@@ -226,7 +226,7 @@ export async function carregarEstruturaOrganizacional(
     .from('campos')
     .select('id, nome, is_active, supervisao_id')
     .eq('ministry_id', ministryId)
-    .eq('is_active', true)
+    .or('is_active.eq.true,is_active.is.null')
     .order('nome');
 
   if (!camposError && camposData) {
@@ -246,7 +246,7 @@ export async function carregarEstruturaOrganizacional(
     .from('supervisoes')
     .select('id, nome, is_active')
     .eq('ministry_id', ministryId)
-    .eq('is_active', true)
+    .or('is_active.eq.true,is_active.is.null')
     .order('nome');
 
   if (!supError && supData) {
