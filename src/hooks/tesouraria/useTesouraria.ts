@@ -8,6 +8,7 @@ import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import type { ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
+import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 
 // Types
@@ -438,10 +439,14 @@ export function useTesouraria() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
+        const resolvedMid = await resolveMinistryId(supabase);
+        if (resolvedMid) {
+          setMinistryId(resolvedMid);
+        }
+
         const mData = await fetchConfiguracaoIgrejaFromSupabase();
         if (mData) {
           setMinisterio(mData);
-          setMinistryId(session.user.id);
         }
 
         const userRes = await authenticatedFetch('/api/v1/auth/me');
@@ -458,7 +463,7 @@ export function useTesouraria() {
         }
 
         // Carrega 1ª Divisão (Caixas / Congregações / Unidades) e Nomenclaturas via EstruturaOrganizacionalService
-        const orgService = await obterEstruturaOrganizacionalService(session.user.id, supabase);
+        const orgService = await obterEstruturaOrganizacionalService(resolvedMid || session.user.id, supabase);
         const labels = orgService.getLabels();
         setNomenclaturas({
           divisao1: labels.nomeDivisao1,
