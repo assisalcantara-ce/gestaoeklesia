@@ -5,6 +5,7 @@ import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import {
   Shield, AlertTriangle, CheckCircle2, Activity, ClipboardList,
   Download, Printer, ChevronUp, ChevronDown, TrendingDown,
@@ -237,20 +238,15 @@ export default function AuditoriaFinanceiraPage() {
     setGenerated(false);
     try {
       const [
-        resCongs,
+        orgService,
         resLancs,
         resFechs,
         resPix,
         resEvts,
         resDest,
       ] = await Promise.all([
-        // 1. Congregações ativas
-        supabase
-          .from('congregacoes')
-          .select('id, nome')
-          .eq('ministry_id', ministryId)
-          .eq('is_active', true)
-          .order('nome'),
+        // 1. Estrutura Organizacional centralizada
+        obterEstruturaOrganizacionalService(ministryId, supabase),
 
         // 2. Lançamentos — campos mínimos necessários para todos os cálculos
         supabase
@@ -292,7 +288,10 @@ export default function AuditoriaFinanceiraPage() {
           .eq('ministry_id', ministryId),
       ]);
 
-      const congs  = (resCongs.data  ?? []) as Congregacao[];
+      const div1Options = orgService.getOptionsFormatadas(1);
+      const congList: Congregacao[] = div1Options.map((opt) => ({ id: opt.id, nome: opt.nome }));
+
+      const congs  = congList;
       const lancs  = (resLancs.data  ?? []) as RawLanc[];
       const fechs  = (resFechs.data  ?? []) as Fechamento[];
       const pixs   = (resPix.data    ?? []) as PixAlerta[];
