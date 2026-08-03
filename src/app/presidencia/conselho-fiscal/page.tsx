@@ -7,6 +7,7 @@ import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import {
   Scale, ClipboardCheck, CheckCircle2, XCircle, AlertCircle,
   Clock, Search, Printer, Save, FileText,
@@ -258,13 +259,9 @@ export default function ConselhoFiscalPage() {
     setSigNome(prev => prev || userMeta?.user_metadata?.name || userMeta?.user_metadata?.full_name || userMeta?.email || '');
 
     // Congregações
-    const { data: congs } = await supabase
-      .from('congregacoes')
-      .select('id, nome')
-      .eq('ministry_id', ministryId)
-      .eq('is_active', true)
-      .order('nome');
-    const congList = (congs as Congregacao[]) || [];
+    const orgService = await obterEstruturaOrganizacionalService(ministryId, supabase);
+    const div1Options = orgService.getOptionsFormatadas(1);
+    const congList: Congregacao[] = div1Options.map((opt) => ({ id: opt.id, nome: opt.nome }));
     setCongregacoes(congList);
     const congMap = new Map(congList.map(c => [c.id, c.nome]));
 
