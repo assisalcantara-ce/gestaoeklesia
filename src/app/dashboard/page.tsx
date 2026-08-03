@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
 import { useUserContext } from '@/hooks/useUserContext';
 import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { ProductExperienceService } from '@/lib/services/product-experience';
 import { ExperienceCenter } from '@/services/experience/ExperienceCenter';
 import {
@@ -239,11 +240,14 @@ export default function DashboardPage() {
             : supabase.from('cartas_registros').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId)
         ),
         safeQuery(
-          scopeCongId
-            ? supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('id', scopeCongId).eq('is_active', true)
-            : scopeSupId
-              ? supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('supervisao_id', scopeSupId).eq('is_active', true)
-              : supabase.from('congregacoes').select('id, nome', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('is_active', true)
+          (async () => {
+            const orgService = await obterEstruturaOrganizacionalService(ministryId, supabase);
+            let opts = orgService.getOptionsFormatadas(1);
+            if (scopeCongId) {
+              opts = opts.filter((o) => o.id === scopeCongId);
+            }
+            return { count: opts.length, data: opts };
+          })()
         ),
         safeQuery(supabase.from('departamentos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId)),
         safeQuery(
@@ -377,7 +381,13 @@ export default function DashboardPage() {
         congListRes, allMembersRes, eventosProxRes,
         memberGrowthRes, cartasPendCountRes, pareceresRes,
       ] = await Promise.all([
-        safeQuery(supabase.from('congregacoes').select('id, nome').eq('ministry_id', ministryId).eq('is_active', true).order('nome').limit(50)),
+        safeQuery(
+          (async () => {
+            const orgService = await obterEstruturaOrganizacionalService(ministryId, supabase);
+            const opts = orgService.getOptionsFormatadas(1);
+            return { data: opts.map((o) => ({ id: o.id, nome: o.nome })) };
+          })()
+        ),
         safeQuery(supabase.from('members').select('congregacao_id, status').eq('ministry_id', ministryId).limit(10000)),
         safeQuery(supabase.from('eventos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'programado').gte('data_inicio', todayStr).lte('data_inicio', in30daysStr)),
         safeQuery(supabase.from('members').select('created_at').eq('ministry_id', ministryId).gte('created_at', twelveMonthsAgo).limit(5000)),
