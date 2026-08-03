@@ -8,6 +8,7 @@ import Section from '@/components/Section';
 import Tabs from '@/components/Tabs';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 
 const PENDING_STATUSES = new Set(['pendente', 'aguardando', 'em_analise']);
 const TERMINAL_STATUSES = new Set(['concluido', 'rejeitado', 'cancelado']);
@@ -121,14 +122,13 @@ export default function FluxosOperacaoPage() {
         setCongregationId('all');
       }
 
-      const { data: rows, error } = await supabase
-        .from('congregacoes')
-        .select('id, nome')
-        .order('nome', { ascending: true });
+      if (ctx.ministryId) {
+        const orgService = await obterEstruturaOrganizacionalService(ctx.ministryId, supabase);
+        const div1Options = orgService.getOptionsFormatadas(1);
+        const rows = div1Options.map((opt) => ({ id: opt.id, nome: opt.nome }));
 
-      if (!error) {
-        setCongregacoes(rows || []);
-        if (!congregationId && rows && rows.length > 0 && !allowAll) {
+        setCongregacoes(rows);
+        if (!congregationId && rows.length > 0 && !allowAll) {
           setCongregationId(rows[0].id);
         }
       }
