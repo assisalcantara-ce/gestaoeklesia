@@ -7,6 +7,7 @@ import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { Pencil, Trash2, Loader2, Church, Home, Flame, Calendar, Clock, CheckCircle2, Users, X, Link, Copy, Check, RefreshCw, QrCode, ClipboardList, BookCheck } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
@@ -447,20 +448,16 @@ export default function CultosPage() {
     const loadLocais = async () => {
       if (!ctx?.ministryId) return;
       try {
-        const { data, error } = await supabase
-          .from('congregacoes')
-          .select('id, nome')
-          .eq('ministry_id', ctx.ministryId)
-          .order('nome', { ascending: true });
+        const orgService = await obterEstruturaOrganizacionalService(ctx.ministryId, supabase);
+        const div1Options = orgService.getOptionsFormatadas(1);
+        const data = div1Options.map((opt) => ({ id: opt.id, nome: opt.nome }));
 
-        if (!error && data) {
-          setLocais(data as LocalOption[]);
-          // Definir congregação padrão no form
-          if (isLocalUser && ctx?.congregacaoId) {
-            setFormData(prev => ({ ...prev, congregacao_id: ctx.congregacaoId || '' }));
-          } else if (data.length > 0) {
-            setFormData(prev => ({ ...prev, congregacao_id: data[0].id }));
-          }
+        setLocais(data as LocalOption[]);
+        // Definir congregação padrão no form
+        if (isLocalUser && ctx?.congregacaoId) {
+          setFormData(prev => ({ ...prev, congregacao_id: ctx.congregacaoId || '' }));
+        } else if (data.length > 0) {
+          setFormData(prev => ({ ...prev, congregacao_id: data[0].id }));
         }
       } catch (err) {
         console.error(err);
