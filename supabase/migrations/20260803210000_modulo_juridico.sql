@@ -13,10 +13,13 @@ CREATE TABLE IF NOT EXISTS public.documentos_juridicos (
     tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('TERMOS_DE_USO', 'POLITICA_PRIVACIDADE', 'CONTRATO_SERVICO', 'ADITIVO', 'OUTRO')),
     titulo VARCHAR(255) NOT NULL,
     versao VARCHAR(20) NOT NULL,
-    conteudo TEXT NOT NULL,
+    conteudo_md TEXT NOT NULL,
+    conteudo_html TEXT,
+    hash_sha256 VARCHAR(64) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'RASCUNHO' CHECK (status IN ('RASCUNHO', 'PUBLICADO', 'ARQUIVADO')),
     obrigatorio BOOLEAN NOT NULL DEFAULT true,
     ativo BOOLEAN NOT NULL DEFAULT true,
-    publicado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    publicado_em TIMESTAMPTZ,
     criado_por UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -25,6 +28,7 @@ CREATE TABLE IF NOT EXISTS public.documentos_juridicos (
 
 -- Índices documentos_juridicos
 CREATE INDEX IF NOT EXISTS idx_documentos_juridicos_tipo_ativo ON public.documentos_juridicos(tipo, ativo);
+CREATE INDEX IF NOT EXISTS idx_documentos_juridicos_status ON public.documentos_juridicos(status);
 CREATE INDEX IF NOT EXISTS idx_documentos_juridicos_publicado_em ON public.documentos_juridicos(publicado_em DESC);
 
 -- Trigger de updated_at para documentos_juridicos
@@ -44,11 +48,11 @@ CREATE TRIGGER trg_update_documentos_juridicos_updated_at
 -- RLS documentos_juridicos
 ALTER TABLE public.documentos_juridicos ENABLE ROW LEVEL SECURITY;
 
--- Leitura pública / autenticada de documentos ativos
+-- Leitura pública / autenticada de documentos publicados e ativos
 CREATE POLICY "Permitir leitura de documentos jurídicos publicados"
     ON public.documentos_juridicos
     FOR SELECT
-    USING (ativo = true);
+    USING (ativo = true AND status = 'PUBLICADO');
 
 -- Apenas Super Admins / Admins de Plataforma podem gerenciar documentos jurídicos
 CREATE POLICY "Permitir gestão de documentos para super_admin"
@@ -71,6 +75,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_aceites (
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     documento_id UUID NOT NULL REFERENCES public.documentos_juridicos(id) ON DELETE RESTRICT,
     versao_aceita VARCHAR(20) NOT NULL,
+    hash_documento VARCHAR(64) NOT NULL,
     ip_address VARCHAR(45),
     user_agent TEXT,
     payload_aceite JSONB DEFAULT '{}'::jsonb,
@@ -115,6 +120,8 @@ CREATE TABLE IF NOT EXISTS public.tenant_contratos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ministry_id UUID NOT NULL REFERENCES public.ministries(id) ON DELETE CASCADE,
     documento_base_id UUID REFERENCES public.documentos_juridicos(id) ON DELETE SET NULL,
+    versao_documento VARCHAR(20),
+    hash_documento VARCHAR(64),
     numero_contrato VARCHAR(50),
     status VARCHAR(30) NOT NULL DEFAULT 'RASCUNHO' CHECK (status IN ('RASCUNHO', 'AGUARDANDO_ASSINATURA', 'ATIVO', 'CANCELADO', 'EXPIRADO', 'RESCINDIDO')),
     conteudo_customizado TEXT,
