@@ -8,6 +8,7 @@ import Section from '@/components/Section';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 
 export default function AtivarFluxoPage() {
   const { loading } = useRequireSupabaseAuth();
@@ -78,17 +79,14 @@ export default function AtivarFluxoPage() {
         setCongregationId('all');
       }
 
-      if (adminAccess) {
-        const { data: rows, error } = await supabase
-          .from('congregacoes')
-          .select('id, nome')
-          .order('nome', { ascending: true });
+      if (adminAccess && ctx.ministryId) {
+        const orgService = await obterEstruturaOrganizacionalService(ctx.ministryId, supabase);
+        const div1Options = orgService.getOptionsFormatadas(1);
+        const rows = div1Options.map((opt) => ({ id: opt.id, nome: opt.nome }));
 
-        if (!error) {
-          setCongregacoes(rows || []);
-          if (!congregationId && rows && rows.length > 0 && !allowAll) {
-            setCongregationId(rows[0].id);
-          }
+        setCongregacoes(rows);
+        if (!congregationId && rows.length > 0 && !allowAll) {
+          setCongregationId(rows[0].id);
         }
       }
 
