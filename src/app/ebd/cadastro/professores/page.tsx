@@ -6,6 +6,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveEbdScope } from '@/lib/cartoes-templates-sync';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { useAppDialog } from '@/providers/AppDialogProvider';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { Plus, Pencil, Trash2, X, GraduationCap, Printer, Search } from 'lucide-react';
@@ -62,12 +63,13 @@ export default function EbdProfessoresPage() {
   // ── Carregamento ────────────────────────────────────────────────────────────
   const load = useCallback(async (mid: string) => {
     setLoading(true);
-    const [profsR, congsR] = await Promise.all([
+    const [profsR, orgService] = await Promise.all([
       supabase.from('ebd_professores').select('*').eq('ministry_id', mid).order('nome'),
-      supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome'),
+      obterEstruturaOrganizacionalService(mid, supabase),
     ]);
     setProfessores(profsR.data ?? []);
-    setCongregacoes(congsR.data ?? []);
+    const div1Options = orgService.getOptionsFormatadas(1);
+    setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
     setLoading(false);
   }, [supabase]);
 
