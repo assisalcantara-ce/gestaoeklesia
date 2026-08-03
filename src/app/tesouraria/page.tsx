@@ -472,16 +472,136 @@ export default function TesourariaPage() {
           </div>
         )}
 
+        {/* ─── ABA: RELATÓRIOS ─── */}
+        {t.aba === 'relatorios' && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200">
+              <div className="flex flex-wrap items-center gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Mês de Referência</label>
+                  <input
+                    type="month"
+                    value={t.relMes}
+                    onChange={(e) => t.setRelMes(e.target.value)}
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63]"
+                  />
+                </div>
+                {t.congregacoes.length > 0 && !t.scope.isFinanceiroLocal && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">{t.nomenclaturas.divisao1}</label>
+                    <select
+                      value={t.relCong}
+                      onChange={(e) => t.setRelCong(e.target.value)}
+                      className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63]"
+                    >
+                      <option value="">Todas as unidades</option>
+                      {t.congregacoes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo de Movimento</label>
+                  <select
+                    value={t.relTipoRel}
+                    onChange={(e) => t.setRelTipoRel(e.target.value as any)}
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63]"
+                  >
+                    <option value="ambos">Entradas e Saídas</option>
+                    <option value="entradas">Apenas Entradas</option>
+                    <option value="saidas">Apenas Saídas</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => t.exportarCSV(t.lancsFiltrados, `relatorio_tesouraria_${t.relMes}`)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 font-medium transition"
+                >
+                  Exportar CSV
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#123b63] text-white rounded-lg text-sm hover:bg-[#0f2a45] font-medium transition"
+                >
+                  <Printer className="h-4 w-4" /> Imprimir
+                </button>
+              </div>
+            </div>
+
+            {/* Relatório Resumo */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                <h3 className="font-bold text-[#123b63] text-sm">Resumo Financeiro — {t.relMes}</h3>
+                <span className="text-xs text-gray-500">{t.lancsFiltrados.length} lançamentos encontrados</span>
+              </div>
+              <div className="p-4">
+                <TesourariaTable
+                  lancsFiltrados={t.lancsFiltrados}
+                  fmtDate={t.fmtDate}
+                  fmtBRL={t.fmtBRL}
+                  TIPOS_SAIDA={t.TIPOS_SAIDA}
+                  tipoCor={t.tipoCor}
+                  tipoLabel={t.tipoLabel}
+                  totalFiltrado={t.entradasFiltradas - t.saidasFiltradas}
+                  scope={t.scope}
+                  handleEdit={t.handleEdit}
+                  setConfirmDel={t.setConfirmDel}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ─── ABA: FECHAMENTO DE CAIXA ─── */}
         {t.aba === 'fechamento' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200">
               <div>
                 <h2 className="text-base font-bold text-[#123b63]">Fechamento de Caixa</h2>
                 <p className="text-sm text-gray-500">
-                  Encerramento de períodos financeiros por congregação
+                  Encerramento de períodos financeiros por congregação / unidade
                 </p>
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {t.congregacoes.map((c) => {
+                const fecho = t.fechamentos.find((f: any) => f.congregacao_id === c.id || f.cong_id === c.id);
+                return (
+                  <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-bold text-gray-800 text-sm">{c.nome}</h3>
+                        <p className="text-xs text-gray-400">Unidade Local</p>
+                      </div>
+                      <span
+                        className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
+                          fecho?.status === 'fechado' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
+                        }`}
+                      >
+                        {fecho?.status === 'fechado' ? 'Fechado' : 'Aberto'}
+                      </span>
+                    </div>
+
+                    <div className="pt-2 border-t border-gray-100 flex justify-between items-center">
+                      <button
+                        onClick={() => {
+                          t.setFechaCongId(c.id);
+                          t.setShowFechaModal(true);
+                        }}
+                        className="w-full py-2 bg-[#123b63] text-white text-xs font-semibold rounded-lg hover:bg-[#0f2a45] transition flex items-center justify-center gap-1.5"
+                      >
+                        <Lock className="h-3.5 w-3.5" /> Realizar Fechamento
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             <FechamentoCaixaModal
@@ -508,10 +628,60 @@ export default function TesourariaPage() {
           </div>
         )}
 
+        {/* ─── ABA: DIZIMISTAS ─── */}
+        {t.aba === 'dizimistas' && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200">
+              <div className="flex flex-wrap items-center gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Mês de Referência</label>
+                  <input
+                    type="month"
+                    value={t.abaDizimistaMes}
+                    onChange={(e) => t.setAbaDizimistaMes(e.target.value)}
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Buscar por Nome</label>
+                  <input
+                    type="text"
+                    placeholder="Nome do dizimista..."
+                    value={t.filtroNomeDiz}
+                    onChange={(e) => t.setFiltroNomeDiz(e.target.value)}
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63]"
+                  />
+                </div>
+              </div>
+
+              {t.scope.canWrite && (
+                <button
+                  onClick={() => {
+                    t.setAba('lancamentos');
+                    t.setShowForm(true);
+                    t.setForm((p) => ({ ...p, tipo_movimento: 'entrada', tipo_recebimento: 'dizimo' }));
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition"
+                >
+                  <Plus className="h-4 w-4" /> Registrar Dízimo
+                </button>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden p-6 text-center text-gray-500 text-sm">
+              <Users className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+              <p className="font-semibold text-gray-700">Módulo de Gestão de Dizimistas</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Utilize a barra de pesquisa ou registre novos dízimos diretamente no painel de Lançamentos.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* ─── ABA: CONTAS / CAIXAS ─── */}
         {t.aba === 'contas' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200">
               <div>
                 <h2 className="text-base font-bold text-[#123b63]">Contas e Caixas</h2>
                 <p className="text-sm text-gray-500">Contas bancárias e caixas do ministério</p>
@@ -527,6 +697,49 @@ export default function TesourariaPage() {
                 >
                   <Plus className="h-4 w-4" /> Nova Conta
                 </button>
+              )}
+            </div>
+
+            {/* Listagem de Contas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {t.finContas.length === 0 ? (
+                <div className="col-span-full bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-400 text-sm">
+                  Nenhuma conta cadastrada. Clique no botão acima para adicionar.
+                </div>
+              ) : (
+                t.finContas.map((c) => (
+                  <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
+                          <Building2 className="h-4 w-4 text-[#123b63]" />
+                          {c.nome}
+                          {c.is_padrao && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-semibold">Padrão</span>}
+                        </h3>
+                      </div>
+                    </div>
+
+                    {t.scope.canWrite && (
+                      <div className="pt-3 mt-3 border-t border-gray-100 flex justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            t.setContaEditId(c.id);
+                            t.setShowContaModal(true);
+                          }}
+                          className="text-xs text-[#123b63] font-semibold hover:underline"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => t.setConfirmDelConta(c.id)}
+                          className="text-xs text-red-600 font-semibold hover:underline"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
               )}
             </div>
 
@@ -560,10 +773,10 @@ export default function TesourariaPage() {
         {/* ─── ABA: CATEGORIAS ─── */}
         {t.aba === 'categorias' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200">
               <div>
                 <h2 className="text-base font-bold text-[#123b63]">Categorias Financeiras</h2>
-                <p className="text-sm text-gray-500">Categorias de plano de contas</p>
+                <p className="text-sm text-gray-500">Categorias de plano de contas para entradas e saídas</p>
               </div>
               {t.scope.canDelete && (
                 <button
@@ -576,6 +789,42 @@ export default function TesourariaPage() {
                 >
                   <Plus className="h-4 w-4" /> Nova Categoria
                 </button>
+              )}
+            </div>
+
+            {/* Listagem de Categorias */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {t.finCategorias.length === 0 ? (
+                <div className="col-span-full bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-400 text-sm">
+                  Nenhuma categoria cadastrada.
+                </div>
+              ) : (
+                t.finCategorias.map((cat) => (
+                  <div key={cat.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-base">
+                        {cat.icone || <Tag className="h-4 w-4 text-gray-500" />}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800 text-sm">{cat.nome}</h4>
+                        <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                          cat.tipo_movimento === 'entrada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {cat.tipo_movimento}
+                        </span>
+                      </div>
+                    </div>
+
+                    {t.scope.canDelete && (
+                      <button
+                        onClick={() => t.setConfirmDelCat(cat.id)}
+                        className="text-xs text-red-600 font-semibold hover:underline"
+                      >
+                        Excluir
+                      </button>
+                    )}
+                  </div>
+                ))
               )}
             </div>
 
@@ -603,6 +852,19 @@ export default function TesourariaPage() {
               warningText="Lançamentos vinculados perderão a referência de categoria."
               confirmText="Excluir"
             />
+          </div>
+        )}
+
+        {/* ─── ABA: ARRECADAÇÃO DIGITAL ─── */}
+        {t.aba === 'arrecadacao' && (
+          <div className="space-y-4">
+            <div className="bg-white p-6 rounded-xl border border-gray-200 space-y-3 text-center max-w-lg mx-auto my-8">
+              <QrCode className="h-12 w-12 text-[#123b63] mx-auto" />
+              <h3 className="text-base font-bold text-gray-800">Arrecadação Digital PIX</h3>
+              <p className="text-sm text-gray-500">
+                Gerencie os links de doação digital, ofertas e QR Codes cadastrados no seu plano.
+              </p>
+            </div>
           </div>
         )}
       </div>
