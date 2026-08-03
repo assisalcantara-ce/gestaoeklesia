@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
@@ -6,6 +6,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveEbdScope } from '@/lib/cartoes-templates-sync';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { CheckCircle2, XCircle, Plus, Trash2, Save, UserPlus, Calendar, AlertCircle, Clock } from 'lucide-react';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -127,13 +128,17 @@ export default function EbdChamadaPage() {
 
   const loadBase = useCallback(async (mid: string) => {
     const cid = churchIdRef.current;
-    let congsQ = supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome');
-    if (cid) congsQ = congsQ.eq('id', cid);
-    const [congsR, profsR] = await Promise.all([
-      congsQ,
+    const [orgService, profsR] = await Promise.all([
+      obterEstruturaOrganizacionalService(mid, supabase),
       supabase.from('ebd_professores').select('id, nome').eq('ministry_id', mid).eq('ativo', true).order('nome'),
     ]);
-    setCongregacoes(congsR.data ?? []);
+
+    let div1Options = orgService.getOptionsFormatadas(1);
+    if (cid) {
+      div1Options = div1Options.filter((opt) => opt.id === cid);
+    }
+
+    setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
     setProfessores(profsR.data ?? []);
     // Pré-seleciona a congregação quando o usuário é superintendente
     if (cid) setSelCong(cid);
