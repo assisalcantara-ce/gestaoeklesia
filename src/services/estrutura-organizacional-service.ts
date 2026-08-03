@@ -183,7 +183,7 @@ export async function carregarEstruturaOrganizacional(
   let divisao1: UnidadeOrganizacional[] = [];
   const { data: cData, error: cError } = await supabase
     .from('congregacoes')
-    .select('id, nome, is_sede, is_active, campo_id, supervisao_id, dirigente, status_imovel')
+    .select('*')
     .eq('ministry_id', ministryId)
     .or('is_active.eq.true,is_active.is.null')
     .order('nome');
