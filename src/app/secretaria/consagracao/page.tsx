@@ -9,7 +9,8 @@ import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { useMembers } from '@/hooks/useMembers';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
-import { loadOrgNomenclaturasFromSupabaseOrMigrate, type OrgNomenclaturasState } from '@/lib/org-nomenclaturas';
+import { type OrgNomenclaturasState } from '@/lib/org-nomenclaturas';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { getCargosMinisteriais, type CargoMinisterial } from '@/lib/cargos-utils';
 import { formatCpf, formatPhone } from '@/lib/mascaras';
 import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer';
@@ -182,30 +183,30 @@ export default function ConsagracaoPage() {
     const resolvedMinistryId = await resolveMinistryId(supabase);
     setMinistryId(resolvedMinistryId);
 
-    const orgNomes = await loadOrgNomenclaturasFromSupabaseOrMigrate(supabase, { syncLocalStorage: false });
-    setNomenclaturas(orgNomes);
+    let scopeCongIds: string[] | null = null;
 
     if (resolvedMinistryId) {
-      const [supRes, camposRes, congRes] = await Promise.all([
-        supabase.from('supervisoes').select('id, nome').eq('ministry_id', resolvedMinistryId).order('nome'),
-        supabase.from('campos').select('id, nome, supervisao_id').eq('ministry_id', resolvedMinistryId).order('nome'),
-        supabase.from('congregacoes').select('id, nome, supervisao_id, campo_id').eq('ministry_id', resolvedMinistryId).order('nome')
-      ]);
+      const orgService = await obterEstruturaOrganizacionalService(resolvedMinistryId, supabase);
+      const labels = orgService.getLabels();
+      setNomenclaturas({
+        divisaoPrincipal: { opcao1: labels.nomeDivisao1 },
+        divisaoSecundaria: { opcao1: labels.nomeDivisao2 },
+        divisaoTerciaria: { opcao1: labels.nomeDivisao3 },
+      });
 
-      if (!supRes.error) setSupervisoes((supRes.data as SimpleOption[]) || []);
-      if (!camposRes.error) setCampos((camposRes.data as SimpleOption[]) || []);
-      if (!congRes.error) setCongregacoes((congRes.data as SimpleOption[]) || []);
-    }
+      const div1Regs = orgService.getDivisao1();
+      const div2Regs = orgService.getDivisao2();
+      const div3Regs = orgService.getDivisao3();
 
-    // Determina IDs de congregações visíveis para o supervisor
-    let scopeCongIds: string[] | null = null;
-    if (isSupervisor && ctx.supervisaoId && resolvedMinistryId) {
-      const { data: congsDaSup } = await supabase
-        .from('congregacoes')
-        .select('id')
-        .eq('ministry_id', resolvedMinistryId)
-        .eq('supervisao_id', ctx.supervisaoId);
-      scopeCongIds = (congsDaSup || []).map((c: any) => c.id);
+      setSupervisoes(div1Regs.map((u) => ({ id: u.id, nome: u.nome })));
+      setCampos(div2Regs.map((u) => ({ id: u.id, nome: u.nome, supervisao_id: u.parentId })));
+      setCongregacoes(div3Regs.map((u) => ({ id: u.id, nome: u.nome, campo_id: u.parentId })));
+
+      // Determina IDs de unidades visíveis para o supervisor
+      if (isSupervisor && ctx.supervisaoId) {
+        const uVisiveis = div3Regs.filter((u) => u.parentId === ctx.supervisaoId);
+        scopeCongIds = uVisiveis.map((u) => u.id);
+      }
     }
 
     let query = supabase
