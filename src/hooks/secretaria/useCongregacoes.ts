@@ -827,12 +827,16 @@ export function useCongregacoes() {
     try {
       const orgService = await obterEstruturaOrganizacionalService(ministryIdParam, supabase);
       const div1 = orgService.getDivisao1();
-      setDivisoes1(div1.map((u) => ({
+      setDivisoes1(div1.map((u: any) => ({
         id: u.id,
         nome: u.nome,
+        dirigente: u.dirigente || u.supervisor_nome || null,
+        status_imovel: u.status_imovel || null,
+        campo_id: u.parentId || undefined,
+        supervisao_id: u.supervisao_id || undefined,
         is_active: u.isActive !== false,
         created_at: new Date().toISOString(),
-      })));
+      })) as any);
     } catch (error) {
       setDivisoes1([]);
       const msg = (error as any)?.message || (error as any)?.error_description || '';

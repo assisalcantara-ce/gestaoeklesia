@@ -6,6 +6,9 @@ interface Divisao1 {
   nome: string;
   uf?: string | null;
   supervisao_id?: string;
+  campo_id?: string | null;
+  dirigente?: string | null;
+  status_imovel?: 'PROPRIO' | 'ALUGADO' | 'CEDIDO' | null;
   supervisor_member_id?: string | null;
   supervisor_matricula?: string | null;
   supervisor_nome?: string | null;
@@ -102,12 +105,12 @@ export default function CongregacoesTable({
       <>
         {/* Mobile Cards */}
         <div className="md:hidden space-y-3 mb-6">
-          {divisoes3.length === 0 ? (
+          {divisoes1.length === 0 ? (
             <div className="bg-white border border-gray-200 rounded-lg p-4 text-center text-gray-500">
               Nenhuma {nomeD1} cadastrada
             </div>
           ) : (
-            divisoes3.map(cg => {
+            divisoes1.map(cg => {
               const campo = d2Enabled && cg.campo_id
                 ? divisoes2.find(c => c.id === cg.campo_id) || null
                 : null;
@@ -145,7 +148,7 @@ export default function CongregacoesTable({
                   </div>
                   <div className="mt-3 flex gap-2 flex-wrap">
                     <button
-                      onClick={() => onEditD3(cg)}
+                      onClick={() => onEditD3(cg as any)}
                       className="flex-1 min-w-[90px] px-3 py-2 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition"
                     >
                       Editar
@@ -177,14 +180,14 @@ export default function CongregacoesTable({
                 </tr>
               </thead>
               <tbody>
-                {divisoes3.length === 0 ? (
+                {divisoes1.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
                       Nenhuma {nomeD1} cadastrada
                     </td>
                   </tr>
                 ) : (
-                  divisoes3.map(cg => {
+                  divisoes1.map(cg => {
                     const campo = d2Enabled && cg.campo_id
                       ? divisoes2.find(c => c.id === cg.campo_id) || null
                       : null;
@@ -210,7 +213,7 @@ export default function CongregacoesTable({
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button
-                            onClick={() => onEditD3(cg)}
+                            onClick={() => onEditD3(cg as any)}
                             className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold"
                           >
                             Editar

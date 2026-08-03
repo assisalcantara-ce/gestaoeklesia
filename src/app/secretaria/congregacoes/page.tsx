@@ -113,7 +113,7 @@ export default function CongregacoesPage() {
               <div className="grid grid-cols-1 gap-4 mb-6">
                 <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
                   <p className="text-gray-600 text-sm">Total de {nomeD1}s</p>
-                  <p className="text-2xl font-bold text-blue-600">{divisoes3.length}</p>
+                  <p className="text-2xl font-bold text-blue-600">{divisoes1.length}</p>
                 </div>
               </div>
 

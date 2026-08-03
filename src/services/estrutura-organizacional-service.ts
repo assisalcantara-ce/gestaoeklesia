@@ -183,7 +183,7 @@ export async function carregarEstruturaOrganizacional(
   let divisao1: UnidadeOrganizacional[] = [];
   const { data: cData, error: cError } = await supabase
     .from('congregacoes')
-    .select('id, nome, is_sede, is_active, campo_id, supervisao_id')
+    .select('id, nome, is_sede, is_active, campo_id, supervisao_id, dirigente, status_imovel')
     .eq('ministry_id', ministryId)
     .or('is_active.eq.true,is_active.is.null')
     .order('nome');
@@ -197,6 +197,10 @@ export async function carregarEstruturaOrganizacional(
       isSede: !!item.is_sede,
       isActive: item.is_active !== false,
       parentId: item.campo_id || item.supervisao_id || null,
+      dirigente: item.dirigente || null,
+      status_imovel: item.status_imovel || null,
+      campo_id: item.campo_id || null,
+      supervisao_id: item.supervisao_id || null,
     }));
   } else {
     // Fallback: se a 1ª Divisão do tenant estiver cadastrada na tabela `supervisoes`
