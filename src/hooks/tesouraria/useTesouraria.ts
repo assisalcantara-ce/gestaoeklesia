@@ -476,16 +476,17 @@ export function useTesouraria() {
           setDepartamentos(dData);
         }
 
-        const contasRes = await authenticatedFetch('/api/v1/tesouraria/contas');
-        if (contasRes.ok) {
-          const cList = await contasRes.json();
-          setFinContas(cList);
-        }
+        // Carrega Contas e Categorias diretamente via Supabase
+        const [contasRes, catsRes] = await Promise.all([
+          supabase.from('fin_contas').select('*').eq('is_ativa', true).order('nome'),
+          supabase.from('fin_categorias').select('*').eq('is_ativa', true).order('nome'),
+        ]);
 
-        const catsRes = await authenticatedFetch('/api/v1/tesouraria/categorias');
-        if (catsRes.ok) {
-          const catList = await catsRes.json();
-          setFinCategorias(catList);
+        if (contasRes.data) {
+          setFinContas(contasRes.data);
+        }
+        if (catsRes.data) {
+          setFinCategorias(catsRes.data);
         }
       } catch (err: any) {
         console.error('Erro ao carregar dados iniciais:', err);
@@ -499,21 +500,46 @@ export function useTesouraria() {
     }
   }, [authLoading, bloqueado, supabase]);
 
-  // Carregar lançamentos do mês selecionado
+  // Auxiliar para calcular próximo mês
+  const mesProximo = useCallback((mesStr: string) => {
+    const [y, m] = mesStr.split('-').map(Number);
+    if (m === 12) return `${y + 1}-01`;
+    return `${y}-${String(m + 1).padStart(2, '0')}`;
+  }, []);
+
+  // Carregar lançamentos do mês selecionado via Supabase Client
   const loadLancamentosMes = useCallback(async (mes: string) => {
+    if (!ministryId) return;
     try {
       setLoadingMes(true);
-      const res = await authenticatedFetch(`/api/v1/tesouraria/lancamentos?mes=${mes}`);
-      if (res.ok) {
-        const data = await res.json();
-        setLancamentosMes(Array.isArray(data) ? data : data.data ?? []);
+      let q = supabase
+        .from('tesouraria_lancamentos')
+        .select('*, congregacoes(nome), departamentos(nome, sigla)')
+        .eq('ministry_id', ministryId)
+        .gte('data_lancamento', `${mes}-01`)
+        .lt('data_lancamento', `${mesProximo(mes)}-01`);
+
+      if (scope.isFinanceiroLocal && scope.congregacaoId) {
+        q = q.eq('congregacao_id', scope.congregacaoId);
+      }
+
+      const { data, error } = await q;
+      if (error) {
+        console.error('Erro ao buscar lançamentos do mês:', error);
+      } else if (data) {
+        const formatados: Lancamento[] = data.map((item: any) => ({
+          ...item,
+          congregacao_nome: item.congregacoes?.nome ?? 'Sede / Geral',
+          departamento_nome: item.departamentos?.nome ?? item.departamentos?.sigla ?? '—',
+        }));
+        setLancamentosMes(formatados);
       }
     } catch (err) {
       console.error('Erro ao carregar lançamentos do mês:', err);
     } finally {
       setLoadingMes(false);
     }
-  }, []);
+  }, [ministryId, scope, supabase, mesProximo]);
 
   useEffect(() => {
     if (ministryId) {
