@@ -5,6 +5,7 @@ import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
+import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
@@ -294,7 +295,7 @@ export default function ConsolidadoFinanceiroPage() {
       const fimAnoAnt    = `${anoNum}-01-01`;
 
       const [
-        resCongs,
+        orgService,
         resLancMes,
         resLancMesAnt,
         resLancAno,
@@ -302,12 +303,7 @@ export default function ConsolidadoFinanceiroPage() {
         resCats,
         resDestinos,
       ] = await Promise.all([
-        supabase
-          .from('congregacoes')
-          .select('id, nome')
-          .eq('ministry_id', ministryId)
-          .eq('is_active', true)
-          .order('nome'),
+        obterEstruturaOrganizacionalService(ministryId, supabase),
 
         supabase
           .from('tesouraria_lancamentos')
@@ -351,7 +347,8 @@ export default function ConsolidadoFinanceiroPage() {
           .not('gateway_id', 'is', null),
       ]);
 
-      setCongregacoes((resCongs.data ?? []) as Congregacao[]);
+      const div1Options = orgService.getOptionsFormatadas(1);
+      setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
       setLancMes((resLancMes.data ?? []) as RawLanc[]);
       setLancMesAnt((resLancMesAnt.data ?? []) as RawLancSimples[]);
       setLancAno((resLancAno.data ?? []) as RawLanc[]);
