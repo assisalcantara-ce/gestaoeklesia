@@ -24,9 +24,12 @@ import {
   ChevronRight,
   ArrowUpDown,
   X,
+  Plus,
+  Lock,
 } from 'lucide-react'
 import type {
   DocumentoJuridico,
+  TipoDocumentoJuridico,
   ItemHistoricoVersaoDTO,
 } from '@/types/juridico'
 
@@ -52,16 +55,21 @@ export default function DocumentosPage() {
   // Modais de Ações & Confirmação
   const [selectedDoc, setSelectedDoc] = useState<DocumentoJuridico | null>(null)
   const [modalMode, setModalMode] = useState<
-    'VISUALIZAR' | 'EDITAR' | 'PUBLICAR' | 'NOVA_VERSAO' | 'HISTORICO' | 'ARQUIVAR' | null
+    'CRIAR' | 'VISUALIZAR' | 'EDITAR' | 'PUBLICAR' | 'NOVA_VERSAO' | 'HISTORICO' | 'ARQUIVAR' | null
   >(null)
   const [modalLoading, setModalLoading] = useState(false)
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
-  // Formulários de Edição / Nova Versão
-  const [editForm, setEditForm] = useState({
+  // Formulário de Criação / Edição
+  const [documentoForm, setDocumentoForm] = useState({
+    tipo: 'TERMOS_DE_USO' as TipoDocumentoJuridico,
     titulo: '',
-    conteudo_md: '',
+    versao: '1.0',
     obrigatorio: true,
+    conteudo_md: '',
   })
+
+  // Nova Versão Input
   const [novaVersaoInput, setNovaVersaoInput] = useState('')
   const [historicoVersoes, setHistoricoVersoes] = useState<ItemHistoricoVersaoDTO[]>([])
 
@@ -134,18 +142,55 @@ export default function DocumentosPage() {
     return documentosFiltrados.slice(start, start + itemsPerPage)
   }, [documentosFiltrados, currentPage])
 
+  // Reset e Abertura do Modal de Criação
+  const handleOpenCriarModal = () => {
+    setSelectedDoc(null)
+    setFormErrors({})
+    setDocumentoForm({
+      tipo: 'TERMOS_DE_USO',
+      titulo: '',
+      versao: '1.0',
+      obrigatorio: true,
+      conteudo_md: '',
+    })
+    setModalMode('CRIAR')
+    setActionMessage(null)
+  }
+
   // Handlers de Ações das APIs
   const handleOpenAction = async (doc: DocumentoJuridico, mode: typeof modalMode) => {
     setSelectedDoc(doc)
     setModalMode(mode)
     setOpenMenuId(null)
     setActionMessage(null)
+    setFormErrors({})
 
-    if (mode === 'EDITAR') {
-      setEditForm({
+    if (mode === 'VISUALIZAR') {
+      try {
+        setModalLoading(true)
+        const res = await authenticatedFetch(`/api/admin/juridico/documentos/${doc.id}`)
+        const json = await res.json()
+        if (json.success && json.data) {
+          setSelectedDoc(json.data)
+        }
+      } catch {
+        // fallback para o doc da listagem
+      } finally {
+        setModalLoading(false)
+      }
+    } else if (mode === 'EDITAR') {
+      if (doc.status !== 'RASCUNHO') {
+        setError(`Edição bloqueada: O documento "${doc.titulo}" está no status ${doc.status} e é imutável.`)
+        setModalMode(null)
+        return
+      }
+
+      setDocumentoForm({
+        tipo: doc.tipo,
         titulo: doc.titulo,
-        conteudo_md: doc.conteudo_md,
+        versao: doc.versao,
         obrigatorio: doc.obrigatorio,
+        conteudo_md: doc.conteudo_md,
       })
     } else if (mode === 'NOVA_VERSAO') {
       const parts = doc.versao.split('.')
@@ -167,14 +212,68 @@ export default function DocumentosPage() {
     }
   }
 
+  // Validação do Formulário
+  const validarFormulario = () => {
+    const errors: Record<string, string> = {}
+    if (!documentoForm.titulo.trim()) {
+      errors.titulo = 'O título do documento é obrigatório.'
+    }
+    if (!documentoForm.versao.trim()) {
+      errors.versao = 'A versão é obrigatória.'
+    }
+    if (!documentoForm.conteudo_md.trim()) {
+      errors.conteudo_md = 'O conteúdo em Markdown é obrigatório.'
+    }
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  // POST: Criar Documento
+  const handleSalvarNovoDocumento = async () => {
+    if (!validarFormulario()) return
+
+    try {
+      setModalLoading(true)
+      const res = await authenticatedFetch('/api/admin/juridico/documentos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(documentoForm),
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error)
+
+      setActionMessage(`Documento "${json.data.titulo}" v${json.data.versao} criado com sucesso em Rascunho!`)
+      setModalMode(null)
+      carregarDocumentos()
+    } catch (err: any) {
+      setError(err.message || 'Erro ao criar documento.')
+    } finally {
+      setModalLoading(false)
+    }
+  }
+
+  // PUT: Editar Rascunho
   const handleSalvarEdicao = async () => {
     if (!selectedDoc) return
+    if (!validarFormulario()) return
+
+    if (selectedDoc.status !== 'RASCUNHO') {
+      setError('Documentos PUBLICADOS ou ARQUIVADOS não podem ser alterados.')
+      setModalMode(null)
+      return
+    }
+
     try {
       setModalLoading(true)
       const res = await authenticatedFetch(`/api/admin/juridico/documentos/${selectedDoc.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({
+          titulo: documentoForm.titulo,
+          versao: documentoForm.versao,
+          conteudo_md: documentoForm.conteudo_md,
+          obrigatorio: documentoForm.obrigatorio,
+        }),
       })
       const json = await res.json()
       if (!json.success) throw new Error(json.error)
@@ -189,6 +288,7 @@ export default function DocumentosPage() {
     }
   }
 
+  // POST: Publicar
   const handlePublicar = async () => {
     if (!selectedDoc) return
     try {
@@ -209,14 +309,20 @@ export default function DocumentosPage() {
     }
   }
 
+  // POST: Nova Versão
   const handleCriarNovaVersao = async () => {
     if (!selectedDoc) return
+    if (!novaVersaoInput.trim()) {
+      setFormErrors({ versao: 'Informe a nova versão.' })
+      return
+    }
+
     try {
       setModalLoading(true)
       const res = await authenticatedFetch(`/api/admin/juridico/documentos/${selectedDoc.id}/nova-versao`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ versao: novaVersaoInput }),
+        body: JSON.stringify({ versao: novaVersaoInput.trim() }),
       })
       const json = await res.json()
       if (!json.success) throw new Error(json.error)
@@ -231,6 +337,7 @@ export default function DocumentosPage() {
     }
   }
 
+  // DELETE: Arquivar
   const handleArquivar = async () => {
     if (!selectedDoc) return
     try {
@@ -253,6 +360,20 @@ export default function DocumentosPage() {
 
   return (
     <div className="space-y-6">
+      {/* Top Action Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-white tracking-tight">Catálogo de Documentos Jurídicos</h2>
+          <p className="text-xs text-gray-400">Gerencie termos de uso, políticas de privacidade e modelos de contrato do sistema.</p>
+        </div>
+        <button
+          onClick={handleOpenCriarModal}
+          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg transition-all"
+        >
+          <Plus size={16} /> Novo Documento
+        </button>
+      </div>
+
       {/* Resumo Estatístico */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-gray-950 border border-gray-800 rounded-xl p-5 flex items-center justify-between">
@@ -490,7 +611,7 @@ export default function DocumentosPage() {
 
                       {/* Dropdown ActionMenu */}
                       {openMenuId === doc.id && (
-                        <div className="absolute right-6 top-12 z-20 w-48 bg-gray-950 border border-gray-800 rounded-xl shadow-xl py-1 text-left">
+                        <div className="absolute right-6 top-12 z-20 w-52 bg-gray-950 border border-gray-800 rounded-xl shadow-xl py-1 text-left">
                           <button
                             onClick={() => handleOpenAction(doc, 'VISUALIZAR')}
                             className="w-full px-4 py-2 text-xs text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-2"
@@ -498,12 +619,20 @@ export default function DocumentosPage() {
                             <Eye size={14} /> Visualizar Detalhes
                           </button>
 
-                          {doc.status === 'RASCUNHO' && (
+                          {doc.status === 'RASCUNHO' ? (
                             <button
                               onClick={() => handleOpenAction(doc, 'EDITAR')}
                               className="w-full px-4 py-2 text-xs text-amber-400 hover:bg-gray-800 flex items-center gap-2"
                             >
                               <Edit size={14} /> Editar Rascunho
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              title="Documentos publicados ou arquivados são imutáveis."
+                              className="w-full px-4 py-2 text-xs text-gray-600 cursor-not-allowed flex items-center gap-2 opacity-50"
+                            >
+                              <Lock size={14} /> Editar Bloqueado
                             </button>
                           )}
 
@@ -581,19 +710,20 @@ export default function DocumentosPage() {
         )}
       </div>
 
-      {/* MODAL DE AÇÕES E CONFIRMAÇÃO */}
-      {modalMode && selectedDoc && (
+      {/* MODAL DE AÇÕES, FORMULÁRIO E CONFIRMAÇÃO */}
+      {modalMode && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-gray-950 border border-gray-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl p-6 space-y-5">
+          <div className="bg-gray-950 border border-gray-800 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl p-6 space-y-5">
             {/* Header Modal */}
             <div className="flex items-center justify-between border-b border-gray-800 pb-4">
-              <h3 className="text-base font-bold text-white">
-                {modalMode === 'VISUALIZAR' && 'Detalhes do Documento'}
-                {modalMode === 'EDITAR' && 'Editar Rascunho'}
-                {modalMode === 'PUBLICAR' && 'Confirmar Publicação Oficial'}
-                {modalMode === 'NOVA_VERSAO' && 'Gerar Nova Versão (Rascunho)'}
-                {modalMode === 'HISTORICO' && 'Histórico de Versões'}
-                {modalMode === 'ARQUIVAR' && 'Confirmar Arquivamento'}
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                {modalMode === 'CRIAR' && <><Plus size={18} className="text-blue-400" /> Criar Novo Documento Jurídico</>}
+                {modalMode === 'VISUALIZAR' && <><Eye size={18} className="text-blue-400" /> Detalhes do Documento</>}
+                {modalMode === 'EDITAR' && <><Edit size={18} className="text-amber-400" /> Editar Rascunho</>}
+                {modalMode === 'PUBLICAR' && <><Send size={18} className="text-emerald-400" /> Confirmar Publicação Oficial</>}
+                {modalMode === 'NOVA_VERSAO' && <><GitFork size={18} className="text-blue-400" /> Gerar Nova Versão (Rascunho)</>}
+                {modalMode === 'HISTORICO' && <><History size={18} className="text-gray-400" /> Histórico de Versões</>}
+                {modalMode === 'ARQUIVAR' && <><Trash2 size={18} className="text-red-400" /> Confirmar Arquivamento</>}
               </h3>
               <button
                 onClick={() => setModalMode(null)}
@@ -603,72 +733,165 @@ export default function DocumentosPage() {
               </button>
             </div>
 
-            {/* Conteúdo por modo */}
-            {modalMode === 'VISUALIZAR' && (
-              <div className="space-y-3 text-xs text-gray-300">
-                <div>
-                  <span className="text-gray-500 uppercase tracking-wider font-semibold block mb-1">Título:</span>
-                  <p className="text-sm font-medium text-white">{selectedDoc.titulo}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-gray-500 uppercase tracking-wider font-semibold block mb-1">Tipo:</span>
-                    <p className="font-mono text-gray-300">{selectedDoc.tipo}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 uppercase tracking-wider font-semibold block mb-1">Versão:</span>
-                    <p className="font-mono text-blue-400 font-bold">v{selectedDoc.versao}</p>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-gray-500 uppercase tracking-wider font-semibold block mb-1">Hash SHA-256:</span>
-                  <p className="font-mono text-[11px] bg-gray-900 p-2 rounded border border-gray-800 text-gray-400 break-all">
-                    {selectedDoc.hash_sha256 || 'PENDENTE (RASCUNHO)'}
-                  </p>
-                </div>
-              </div>
-            )}
+            {/* FORMULÁRIO DE CRIAR / EDITAR */}
+            {(modalMode === 'CRIAR' || modalMode === 'EDITAR') && (
+              <div className="space-y-4 text-left">
+                {modalMode === 'CRIAR' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-gray-400 font-medium block mb-1">Tipo de Documento</label>
+                      <select
+                        value={documentoForm.tipo}
+                        onChange={(e) =>
+                          setDocumentoForm({ ...documentoForm, tipo: e.target.value as TipoDocumentoJuridico })
+                        }
+                        className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                      >
+                        <option value="TERMOS_DE_USO">Termos de Uso</option>
+                        <option value="POLITICA_PRIVACIDADE">Política de Privacidade</option>
+                        <option value="CONTRATO_SERVICO">Contrato de Serviço</option>
+                        <option value="ADITIVO">Aditivo</option>
+                        <option value="OUTRO">Outro</option>
+                      </select>
+                    </div>
 
-            {modalMode === 'EDITAR' && (
-              <div className="space-y-4">
+                    <div>
+                      <label className="text-xs text-gray-400 font-medium block mb-1">Versão Inicial</label>
+                      <input
+                        type="text"
+                        value={documentoForm.versao}
+                        onChange={(e) => setDocumentoForm({ ...documentoForm, versao: e.target.value })}
+                        className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                      />
+                      {formErrors.versao && <p className="text-[11px] text-red-400 mt-1">{formErrors.versao}</p>}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="text-xs text-gray-400 font-medium block mb-1">Título do Documento</label>
                   <input
                     type="text"
-                    value={editForm.titulo}
-                    onChange={(e) => setEditForm({ ...editForm, titulo: e.target.value })}
-                    className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                    placeholder="Ex: Termos e Condições Gerais de Uso"
+                    value={documentoForm.titulo}
+                    onChange={(e) => setDocumentoForm({ ...documentoForm, titulo: e.target.value })}
+                    className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
                   />
+                  {formErrors.titulo && <p className="text-[11px] text-red-400 mt-1">{formErrors.titulo}</p>}
                 </div>
+
+                <div className="flex items-center gap-3 py-1">
+                  <input
+                    type="checkbox"
+                    id="chkObrigatorio"
+                    checked={documentoForm.obrigatorio}
+                    onChange={(e) => setDocumentoForm({ ...documentoForm, obrigatorio: e.target.checked })}
+                    className="w-4 h-4 rounded bg-gray-900 border-gray-800 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="chkObrigatorio" className="text-xs text-gray-300 font-medium cursor-pointer">
+                    Exigir aceite obrigatório dos usuários/tenants para acesso ao sistema
+                  </label>
+                </div>
+
                 <div>
-                  <label className="text-xs text-gray-400 font-medium block mb-1">Conteúdo Markdown</label>
+                  <label className="text-xs text-gray-400 font-medium block mb-1">Conteúdo (Markdown)</label>
                   <textarea
-                    rows={5}
-                    value={editForm.conteudo_md}
-                    onChange={(e) => setEditForm({ ...editForm, conteudo_md: e.target.value })}
+                    rows={6}
+                    placeholder="# Título do Documento&#10;&#10;Descreva as cláusulas jurídicas aqui..."
+                    value={documentoForm.conteudo_md}
+                    onChange={(e) => setDocumentoForm({ ...documentoForm, conteudo_md: e.target.value })}
                     className="w-full bg-gray-900 border border-gray-800 rounded-lg p-3 text-xs font-mono text-gray-200 focus:outline-none focus:border-blue-500"
                   />
+                  {formErrors.conteudo_md && <p className="text-[11px] text-red-400 mt-1">{formErrors.conteudo_md}</p>}
                 </div>
               </div>
             )}
 
-            {modalMode === 'PUBLICAR' && (
-              <div className="space-y-3">
+            {/* VISUALIZAR */}
+            {modalMode === 'VISUALIZAR' && selectedDoc && (
+              <div className="space-y-4 text-left text-xs text-gray-300">
+                {modalLoading ? (
+                  <div className="p-6 flex items-center justify-center text-gray-400">
+                    <Loader2 size={24} className="animate-spin text-blue-500" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-4 bg-gray-900/60 p-3 rounded-xl border border-gray-800">
+                      <div>
+                        <span className="text-gray-500 uppercase tracking-wider font-semibold block mb-0.5">Título:</span>
+                        <p className="text-sm font-medium text-white">{selectedDoc.titulo}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 uppercase tracking-wider font-semibold block mb-0.5">Status:</span>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${
+                            selectedDoc.status === 'PUBLICADO'
+                              ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                              : selectedDoc.status === 'RASCUNHO'
+                              ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                              : 'bg-gray-800 text-gray-400'
+                          }`}
+                        >
+                          {selectedDoc.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <span className="text-gray-500 uppercase tracking-wider font-semibold block mb-0.5">Tipo:</span>
+                        <p className="font-mono text-gray-300">{selectedDoc.tipo}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 uppercase tracking-wider font-semibold block mb-0.5">Versão:</span>
+                        <p className="font-mono text-blue-400 font-bold">v{selectedDoc.versao}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 uppercase tracking-wider font-semibold block mb-0.5">Obrigatório:</span>
+                        <p className="font-medium text-white">{selectedDoc.obrigatorio ? 'Sim' : 'Não'}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-gray-500 uppercase tracking-wider font-semibold block mb-1">Hash Criptográfico SHA-256:</span>
+                      <p className="font-mono text-[11px] bg-gray-900 p-2.5 rounded border border-gray-800 text-gray-400 break-all">
+                        {selectedDoc.hash_sha256 || 'PENDENTE DE PUBLICAÇÃO (RASCUNHO)'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <span className="text-gray-500 uppercase tracking-wider font-semibold block mb-1">Conteúdo Markdown:</span>
+                      <div className="bg-gray-900/90 border border-gray-800 rounded-xl p-3 max-h-48 overflow-y-auto font-mono text-[11px] text-gray-300 whitespace-pre-wrap">
+                        {selectedDoc.conteudo_md}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* PUBLICAR */}
+            {modalMode === 'PUBLICAR' && selectedDoc && (
+              <div className="space-y-3 text-left">
                 <p className="text-sm text-gray-300">
                   Tem certeza que deseja publicar oficialmente o documento{' '}
                   <strong className="text-white">"{selectedDoc.titulo}"</strong> versão{' '}
                   <strong className="text-blue-400">v{selectedDoc.versao}</strong>?
                 </p>
-                <div className="p-3 bg-amber-950/40 border border-amber-800/50 rounded-xl text-xs text-amber-300">
-                  ⚠️ <strong>Atenção:</strong> Documentos publicados tornam-se imutáveis e não poderão mais ser alterados ou excluídos.
+                <div className="p-3.5 bg-amber-950/40 border border-amber-800/50 rounded-xl text-xs text-amber-300 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <Lock size={14} /> Imutabilidade Jurídica Garantida
+                  </div>
+                  <p>Uma vez publicado, o documento não poderá mais ser alterado ou excluído. Qualquer atualização futura exigirá a geração de uma nova versão.</p>
                 </div>
               </div>
             )}
 
-            {modalMode === 'NOVA_VERSAO' && (
-              <div className="space-y-3">
+            {/* NOVA VERSÃO */}
+            {modalMode === 'NOVA_VERSAO' && selectedDoc && (
+              <div className="space-y-3 text-left">
                 <p className="text-sm text-gray-300">
-                  Informe a numeração da nova versão a ser derivada de{' '}
+                  Informe a numeração da nova versão a ser derivada do documento publicado{' '}
                   <strong className="text-white">"{selectedDoc.titulo}" (v{selectedDoc.versao})</strong>:
                 </p>
                 <div>
@@ -679,12 +902,14 @@ export default function DocumentosPage() {
                     onChange={(e) => setNovaVersaoInput(e.target.value)}
                     className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-blue-500"
                   />
+                  {formErrors.versao && <p className="text-[11px] text-red-400 mt-1">{formErrors.versao}</p>}
                 </div>
               </div>
             )}
 
+            {/* HISTÓRICO */}
             {modalMode === 'HISTORICO' && (
-              <div className="space-y-3">
+              <div className="space-y-3 text-left">
                 {modalLoading ? (
                   <div className="p-6 flex items-center justify-center text-gray-400">
                     <Loader2 size={24} className="animate-spin text-blue-500" />
@@ -713,11 +938,15 @@ export default function DocumentosPage() {
               </div>
             )}
 
-            {modalMode === 'ARQUIVAR' && (
-              <div className="space-y-3">
+            {/* ARQUIVAR */}
+            {modalMode === 'ARQUIVAR' && selectedDoc && (
+              <div className="space-y-3 text-left">
                 <p className="text-sm text-gray-300">
                   Tem certeza que deseja arquivar o documento{' '}
                   <strong className="text-white">"{selectedDoc.titulo}"</strong>?
+                </p>
+                <p className="text-xs text-gray-500">
+                  O documento será marcado como arquivado e não aparecerá nas listagens ativas.
                 </p>
               </div>
             )}
@@ -731,14 +960,25 @@ export default function DocumentosPage() {
                 Cancelar
               </button>
 
-              {modalMode === 'EDITAR' && (
+              {modalMode === 'CRIAR' && (
                 <button
-                  onClick={handleSalvarEdicao}
+                  onClick={handleSalvarNovoDocumento}
                   disabled={modalLoading}
                   className="px-4 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center gap-2"
                 >
                   {modalLoading && <Loader2 size={14} className="animate-spin" />}
-                  Salvar Rascunho
+                  Salvar Novo Documento
+                </button>
+              )}
+
+              {modalMode === 'EDITAR' && (
+                <button
+                  onClick={handleSalvarEdicao}
+                  disabled={modalLoading}
+                  className="px-4 py-2 text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition-colors flex items-center gap-2"
+                >
+                  {modalLoading && <Loader2 size={14} className="animate-spin" />}
+                  Salvar Alterações
                 </button>
               )}
 
