@@ -77,7 +77,7 @@ export default function DocumentosPage() {
     try {
       setLoading(true)
       setError(null)
-      const res = await authenticatedFetch('/api/admin/juridico/documentos')
+      const res = await authenticatedFetch('/api/v1/admin/juridico/documentos')
       if (!res.ok) {
         throw new Error('Falha ao carregar a lista de documentos jurídicos.')
       }
@@ -168,7 +168,7 @@ export default function DocumentosPage() {
     if (mode === 'VISUALIZAR') {
       try {
         setModalLoading(true)
-        const res = await authenticatedFetch(`/api/admin/juridico/documentos/${doc.id}`)
+        const res = await authenticatedFetch(`/api/v1/admin/juridico/documentos/${doc.id}`)
         const json = await res.json()
         if (json.success && json.data) {
           setSelectedDoc(json.data)
@@ -199,7 +199,7 @@ export default function DocumentosPage() {
     } else if (mode === 'HISTORICO') {
       try {
         setModalLoading(true)
-        const res = await authenticatedFetch(`/api/admin/juridico/documentos/${doc.id}/historico`)
+        const res = await authenticatedFetch(`/api/v1/admin/juridico/documentos/${doc.id}/historico`)
         const json = await res.json()
         if (json.success) {
           setHistoricoVersoes(json.data.versoes || [])
@@ -234,7 +234,7 @@ export default function DocumentosPage() {
 
     try {
       setModalLoading(true)
-      const res = await authenticatedFetch('/api/admin/juridico/documentos', {
+      const res = await authenticatedFetch('/api/v1/admin/juridico/documentos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(documentoForm),
@@ -265,7 +265,7 @@ export default function DocumentosPage() {
 
     try {
       setModalLoading(true)
-      const res = await authenticatedFetch(`/api/admin/juridico/documentos/${selectedDoc.id}`, {
+      const res = await authenticatedFetch(`/api/v1/admin/juridico/documentos/${selectedDoc.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -293,7 +293,7 @@ export default function DocumentosPage() {
     if (!selectedDoc) return
     try {
       setModalLoading(true)
-      const res = await authenticatedFetch(`/api/admin/juridico/documentos/${selectedDoc.id}/publicar`, {
+      const res = await authenticatedFetch(`/api/v1/admin/juridico/documentos/${selectedDoc.id}/publicar`, {
         method: 'POST',
       })
       const json = await res.json()
@@ -319,7 +319,7 @@ export default function DocumentosPage() {
 
     try {
       setModalLoading(true)
-      const res = await authenticatedFetch(`/api/admin/juridico/documentos/${selectedDoc.id}/nova-versao`, {
+      const res = await authenticatedFetch(`/api/v1/admin/juridico/documentos/${selectedDoc.id}/nova-versao`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ versao: novaVersaoInput.trim() }),
@@ -342,7 +342,7 @@ export default function DocumentosPage() {
     if (!selectedDoc) return
     try {
       setModalLoading(true)
-      const res = await authenticatedFetch(`/api/admin/juridico/documentos/${selectedDoc.id}`, {
+      const res = await authenticatedFetch(`/api/v1/admin/juridico/documentos/${selectedDoc.id}`, {
         method: 'DELETE',
       })
       const json = await res.json()
