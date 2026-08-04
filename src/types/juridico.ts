@@ -67,6 +67,22 @@ export interface RespostaHistoricoVersoesDTO {
   versoes: ItemHistoricoVersaoDTO[];
 }
 
+export interface DocumentoPendenteAceiteDTO {
+  id: string;
+  tipo: TipoDocumentoJuridico;
+  titulo: string;
+  versao: string;
+  hash_sha256?: string | null;
+  publicado_em?: string | null;
+  obrigatorio: boolean;
+}
+
+export interface ResultadoValidacaoAceitesDTO {
+  possui_pendencias: boolean;
+  total_pendencias: number;
+  documentos_pendentes: DocumentoPendenteAceiteDTO[];
+}
+
 // ----------------------------------------------------------------------------
 // ESTRUTURAS DE ACEITE ELETRÔNICO
 // ----------------------------------------------------------------------------
