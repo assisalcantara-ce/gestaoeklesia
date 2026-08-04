@@ -29,7 +29,6 @@ export class TesourariaService {
 
   async criarLancamento(
     ministryId: string,
-    userId: string,
     dto: CriarLancamentoDTO
   ): Promise<LancamentoRow> {
     // ── Validações de negócio ──────────────────────────────────────────────
@@ -70,7 +69,6 @@ export class TesourariaService {
       conta_id: dto.conta_id ?? null,
       categoria_id: dto.categoria_id ?? null,
       member_id: dto.member_id ?? null,
-      created_by: userId,
     };
 
     return this.repository.criarLancamento(payload);

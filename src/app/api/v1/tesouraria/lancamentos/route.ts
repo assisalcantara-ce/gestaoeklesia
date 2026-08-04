@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { admin, ministryId, userId } = context;
+  const { admin, ministryId } = context;
 
   // ── 2. Leitura e validação básica do body ────────────────────────────────
   let body: Record<string, any>;
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   try {
     const service = new TesourariaService(admin);
 
-    const lancamento = await service.criarLancamento(ministryId, userId, {
+    const lancamento = await service.criarLancamento(ministryId, {
       data_lancamento:  String(data_lancamento),
       tipo_movimento:   tipo_movimento as 'entrada' | 'saida',
       tipo_recebimento: String(tipo_recebimento),

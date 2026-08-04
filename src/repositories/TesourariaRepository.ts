@@ -18,7 +18,6 @@ export interface LancamentoInsert {
   conta_id?: string | null;
   categoria_id?: string | null;
   member_id?: string | null;
-  created_by?: string | null;
 }
 
 export interface LancamentoRow extends LancamentoInsert {
