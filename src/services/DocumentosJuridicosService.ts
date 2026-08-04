@@ -108,4 +108,51 @@ export class DocumentosJuridicosService {
 
     return this.repository.publicar(id);
   }
+
+  async criarNovaVersao(
+    idOriginal: string,
+    novaVersao: string,
+    criadoPor?: string
+  ): Promise<DocumentoJuridico> {
+    const docOriginal = await this.buscarPorId(idOriginal);
+
+    if (docOriginal.status !== 'PUBLICADO') {
+      throw new Error(
+        `Apenas documentos no status PUBLICADO podem servir de base para uma nova versão. Status atual: ${docOriginal.status}`
+      );
+    }
+
+    if (!novaVersao || novaVersao.trim().length === 0) {
+      throw new Error('A nova versão deve ser informada.');
+    }
+
+    const versaoLimpa = novaVersao.trim();
+    if (versaoLimpa === docOriginal.versao) {
+      throw new Error(`A nova versão deve ser diferente da versão atual (${docOriginal.versao}).`);
+    }
+
+    // Verificar se já existe um documento com o mesmo tipo e mesma nova versão
+    const docsExistentes = await this.repository.listar({ tipo: docOriginal.tipo });
+    const jaExiste = docsExistentes.some((d) => d.versao === versaoLimpa);
+
+    if (jaExiste) {
+      throw new Error(
+        `Já existe um documento do tipo "${docOriginal.tipo}" com a versão "${versaoLimpa}".`
+      );
+    }
+
+    // Duplicar tipo, titulo, conteudo_md, conteudo_html mantendo o vinculo logico
+    return this.repository.criarNovaVersao({
+      tipo: docOriginal.tipo,
+      titulo: docOriginal.titulo,
+      versao: versaoLimpa,
+      conteudo_md: docOriginal.conteudo_md,
+      conteudo_html: docOriginal.conteudo_html || null,
+      hash_sha256: docOriginal.hash_sha256,
+      status: 'RASCUNHO',
+      obrigatorio: docOriginal.obrigatorio,
+      ativo: true,
+      criado_por: criadoPor || null,
+    });
+  }
 }

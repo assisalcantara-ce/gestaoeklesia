@@ -108,4 +108,26 @@ export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJurid
     if (error) throw error;
     return data as DocumentoJuridico;
   }
+
+  async criarNovaVersao(payload: {
+    tipo: string;
+    titulo: string;
+    versao: string;
+    conteudo_md: string;
+    conteudo_html?: string | null;
+    hash_sha256: string;
+    status: 'RASCUNHO';
+    obrigatorio: boolean;
+    ativo: boolean;
+    criado_por?: string | null;
+  }): Promise<DocumentoJuridico> {
+    const { data, error } = await this.client
+      .from(this.table)
+      .insert([payload])
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data as DocumentoJuridico;
+  }
 }

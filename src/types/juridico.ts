@@ -86,6 +86,7 @@ export type TipoEventoAuditoriaJuridica =
   | 'DOCUMENTO_ATUALIZADO'
   | 'DOCUMENTO_ARQUIVADO'
   | 'DOCUMENTO_PUBLICADO'
+  | 'DOCUMENTO_NOVA_VERSAO'
   | 'ACEITE_REGISTRADO';
 
 export interface RegistrarEventoAuditoriaJuridicaDTO {
