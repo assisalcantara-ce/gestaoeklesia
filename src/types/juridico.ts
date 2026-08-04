@@ -76,3 +76,40 @@ export interface RegistrarAceiteDTO {
   user_agent?: string | null;
   payload_aceite?: Record<string, any> | null;
 }
+
+// ----------------------------------------------------------------------------
+// ESTRUTURAS DE AUDITORIA JURÍDICA
+// ----------------------------------------------------------------------------
+
+export type TipoEventoAuditoriaJuridica =
+  | 'DOCUMENTO_CRIADO'
+  | 'DOCUMENTO_ATUALIZADO'
+  | 'DOCUMENTO_ARQUIVADO'
+  | 'DOCUMENTO_PUBLICADO'
+  | 'ACEITE_REGISTRADO';
+
+export interface RegistrarEventoAuditoriaJuridicaDTO {
+  usuario_id: string;
+  ministry_id: string;
+  documento_id: string;
+  versao: string;
+  hash_documento: string;
+  tipo_evento: TipoEventoAuditoriaJuridica;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  detalhes?: Record<string, any> | null;
+}
+
+export interface RegistroAuditoriaJuridicaLog {
+  id: string;
+  usuario_id: string;
+  ministry_id: string;
+  documento_id: string;
+  versao: string;
+  hash_documento: string;
+  tipo_evento: TipoEventoAuditoriaJuridica;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  detalhes?: Record<string, any> | null;
+  created_at: string;
+}
