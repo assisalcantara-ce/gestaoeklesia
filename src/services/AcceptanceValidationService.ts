@@ -43,31 +43,38 @@ export class AcceptanceValidationService {
 
     const documentosObrigatorios = todosDocumentos.filter((doc) => doc.obrigatorio === true);
 
-    // 2. Agrupar por tipo de documento e identificar a versão vigente (a mais recente publicada)
-    const mapaVigentesPorTipo = new Map<string, typeof documentosObrigatorios[0]>();
+    // 2. Agrupar por documento_raiz_id (documento lógico) e identificar a versão vigente (a mais recente publicada)
+    const mapaVigentesPorRaiz = new Map<string, typeof documentosObrigatorios[0]>();
 
     for (const doc of documentosObrigatorios) {
-      const docExistente = mapaVigentesPorTipo.get(doc.tipo);
+      const raizId = doc.documento_raiz_id || doc.id;
+      const docExistente = mapaVigentesPorRaiz.get(raizId);
       if (!docExistente) {
-        mapaVigentesPorTipo.set(doc.tipo, doc);
+        mapaVigentesPorRaiz.set(raizId, doc);
       } else {
-        // Se houver mais de um publicado do mesmo tipo, comparar data de publicação/criação
+        // Se houver mais de um publicado para a mesma raiz lógica, comparar data de publicação/criação
         const dataExistente = new Date(docExistente.publicado_em || docExistente.created_at).getTime();
         const dataNova = new Date(doc.publicado_em || doc.created_at).getTime();
         if (dataNova > dataExistente) {
-          mapaVigentesPorTipo.set(doc.tipo, doc);
+          mapaVigentesPorRaiz.set(raizId, doc);
         }
       }
     }
 
-    const documentosVigentes = Array.from(mapaVigentesPorTipo.values());
+    const documentosVigentes = Array.from(mapaVigentesPorRaiz.values());
     const documentosPendentes: DocumentoPendenteAceiteDTO[] = [];
 
     // Carregar histórico de aceites do usuário no tenant para rastrear a última versão aceita
     const aceitesUsuario = await this.aceitesService.consultarAceitesPorUsuario(cleanUserId, cleanMinistryId);
 
+    // Buscar todas as versões de documentos para resolver documento_raiz_id dos aceites se necessário
+    const todosDocs = await this.documentosService.listarDocumentos({});
+    const mapaDocsPorId = new Map(todosDocs.map((d) => [d.id, d]));
+
     // 3. Para cada documento vigente obrigatório, verificar se o usuário aceitou exatamente essa versão
     for (const doc of documentosVigentes) {
+      const raizIdAtual = doc.documento_raiz_id || doc.id;
+
       const jaAceitouExata = await this.aceitesService.verificarSeUsuarioAceitouVersao(
         cleanMinistryId,
         cleanUserId,
@@ -76,15 +83,20 @@ export class AcceptanceValidationService {
       );
 
       if (!jaAceitouExata) {
-        // Buscar se o usuário já aceitou alguma versão anterior deste mesmo tipo de documento
-        // Rastreando por documento_id ou filtrando aceites históricos do usuário
-        const aceitesDoTipo = aceitesUsuario.filter(
-          (a) => a.documento_id === doc.id || a.documento_id === doc.documento_raiz_id
-        );
+        // Rastrear aceites que pertencem estritamente ao mesmo documento_raiz_id
+        const aceitesDoMesmoDocumento = aceitesUsuario.filter((a) => {
+          if (a.documento_id === doc.id || a.documento_id === raizIdAtual) return true;
+          const docAceito = mapaDocsPorId.get(a.documento_id);
+          if (docAceito) {
+            const raizDocAceito = docAceito.documento_raiz_id || docAceito.id;
+            return raizDocAceito === raizIdAtual;
+          }
+          return false;
+        });
 
-        // Se houver mais de um aceite histórico, pegar o mais recente
-        const ultimoAceite = aceitesDoTipo.length > 0
-          ? aceitesDoTipo.sort((a, b) => new Date(b.aceito_em).getTime() - new Date(a.aceito_em).getTime())[0]
+        // Se houver aceites históricos para este documento_raiz_id, obter o mais recente
+        const ultimoAceite = aceitesDoMesmoDocumento.length > 0
+          ? aceitesDoMesmoDocumento.sort((a, b) => new Date(b.aceito_em).getTime() - new Date(a.aceito_em).getTime())[0]
           : null;
 
         documentosPendentes.push({
