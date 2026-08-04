@@ -70,10 +70,12 @@ export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJurid
     if (dto.conteudo_html !== undefined) payload.conteudo_html = dto.conteudo_html;
     if (dto.obrigatorio !== undefined) payload.obrigatorio = dto.obrigatorio;
 
+    // Trava de banco: Apenas altera se status atual for RASCUNHO
     const { data, error } = await this.client
       .from(this.table)
       .update(payload)
       .eq('id', id)
+      .eq('status', 'RASCUNHO')
       .select('*')
       .single();
 
@@ -94,6 +96,7 @@ export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJurid
   }
 
   async publicar(id: string): Promise<DocumentoJuridico> {
+    // Trava de banco: Apenas publica se status atual for RASCUNHO
     const { data, error } = await this.client
       .from(this.table)
       .update({
@@ -102,6 +105,7 @@ export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJurid
         publicado_em: new Date().toISOString(),
       })
       .eq('id', id)
+      .eq('status', 'RASCUNHO')
       .select('*')
       .single();
 

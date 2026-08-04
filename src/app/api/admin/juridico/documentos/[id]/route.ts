@@ -31,11 +31,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
+  const { id } = await params;
+  const service = new DocumentosJuridicosService(auth.ctx.supabaseAdmin);
+  const auditoriaService = new AuditoriaJuridicaService(auth.ctx.supabaseAdmin);
+  const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null;
+  const userAgent = request.headers.get('user-agent') || null;
+  const ministryId = auth.ctx.adminUser?.ministry_id || '00000000-0000-0000-0000-000000000000';
+
   try {
-    const { id } = await params;
     const body = await request.json();
-    const service = new DocumentosJuridicosService(auth.ctx.supabaseAdmin);
-    const auditoriaService = new AuditoriaJuridicaService(auth.ctx.supabaseAdmin);
 
     const docAtualizado = await service.atualizarRascunho(id, {
       titulo: body.titulo,
@@ -44,10 +48,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       conteudo_html: body.conteudo_html,
       obrigatorio: body.obrigatorio,
     });
-
-    const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null;
-    const userAgent = request.headers.get('user-agent') || null;
-    const ministryId = auth.ctx.adminUser?.ministry_id || '00000000-0000-0000-0000-000000000000';
 
     await auditoriaService.registrarEvento({
       usuario_id: auth.ctx.user.id,
@@ -63,6 +63,24 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ success: true, data: docAtualizado });
   } catch (error: any) {
+    // Registrar auditoria de tentativa bloqueada se for documento não-rascunho
+    try {
+      const docExistente = await service.buscarPorId(id);
+      if (docExistente && docExistente.status !== 'RASCUNHO') {
+        await auditoriaService.registrarEvento({
+          usuario_id: auth.ctx.user.id,
+          ministry_id: ministryId,
+          documento_id: docExistente.id,
+          versao: docExistente.versao,
+          hash_documento: docExistente.hash_sha256 || 'PENDENTE_PUBLICACAO',
+          tipo_evento: 'TENTATIVA_EDICAO_BLOQUEADA',
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          detalhes: { status: docExistente.status, motivo: error?.message },
+        });
+      }
+    } catch { /* silencioso no fallback de auditoria */ }
+
     return NextResponse.json(
       { success: false, error: error?.message || 'Erro ao atualizar rascunho de documento.' },
       { status: 400 }
@@ -74,16 +92,15 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
+  const { id } = await params;
+  const service = new DocumentosJuridicosService(auth.ctx.supabaseAdmin);
+  const auditoriaService = new AuditoriaJuridicaService(auth.ctx.supabaseAdmin);
+  const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null;
+  const userAgent = request.headers.get('user-agent') || null;
+  const ministryId = auth.ctx.adminUser?.ministry_id || '00000000-0000-0000-0000-000000000000';
+
   try {
-    const { id } = await params;
-    const service = new DocumentosJuridicosService(auth.ctx.supabaseAdmin);
-    const auditoriaService = new AuditoriaJuridicaService(auth.ctx.supabaseAdmin);
-
     const docArquivado = await service.arquivarDocumento(id);
-
-    const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null;
-    const userAgent = request.headers.get('user-agent') || null;
-    const ministryId = auth.ctx.adminUser?.ministry_id || '00000000-0000-0000-0000-000000000000';
 
     await auditoriaService.registrarEvento({
       usuario_id: auth.ctx.user.id,
@@ -99,6 +116,24 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ success: true, data: docArquivado });
   } catch (error: any) {
+    // Registrar auditoria de tentativa bloqueada em arquivamento invalido ou delecao fisica
+    try {
+      const docExistente = await service.buscarPorId(id);
+      if (docExistente) {
+        await auditoriaService.registrarEvento({
+          usuario_id: auth.ctx.user.id,
+          ministry_id: ministryId,
+          documento_id: docExistente.id,
+          versao: docExistente.versao,
+          hash_documento: docExistente.hash_sha256 || 'PENDENTE_PUBLICACAO',
+          tipo_evento: 'TENTATIVA_EXCLUSAO_BLOQUEADA',
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          detalhes: { status: docExistente.status, motivo: error?.message },
+        });
+      }
+    } catch { /* silencioso no fallback de auditoria */ }
+
     return NextResponse.json(
       { success: false, error: error?.message || 'Erro ao arquivar documento.' },
       { status: 400 }
