@@ -18,6 +18,7 @@ import {
   Users,
   Link2,
   Briefcase,
+  Scale,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
@@ -75,7 +76,7 @@ export default function AdminSidebar() {
     ...(temAcessoAdmin(role, 'pagamentos') ? [{ label: 'Financeiro', href: '/admin/pagamentos', icon: CreditCard }] : []),
     ...(temAcessoAdmin(role, 'planos') ? [{ label: 'Planos', href: '/admin/planos', icon: BarChart3 }] : []),
     { label: 'Suporte', href: '/admin/suporte', icon: HeadphonesIcon },
-    ...(temAcessoAdmin(role, 'configuracoes_supabase') || temAcessoAdmin(role, 'configuracoes_usuarios') || temAcessoAdmin(role, 'configuracoes_gateway')
+    ...(temAcessoAdmin(role, 'configuracoes_supabase') || temAcessoAdmin(role, 'configuracoes_usuarios') || temAcessoAdmin(role, 'configuracoes_gateway') || role === 'super_admin' || role === 'admin'
       ? [
           {
             label: 'Configurações',
@@ -84,6 +85,7 @@ export default function AdminSidebar() {
               ...(temAcessoAdmin(role, 'configuracoes_supabase') ? [{ label: 'Supabase', href: '/admin/configuracoes/supabase', icon: Database }] : []),
               ...(temAcessoAdmin(role, 'configuracoes_usuarios') ? [{ label: 'Usuários', href: '/admin/configuracoes/usuarios', icon: Users }] : []),
               ...(temAcessoAdmin(role, 'configuracoes_gateway') ? [{ label: 'Gateway', href: '/admin/configuracoes/gateway', icon: Link2 }] : []),
+              { label: 'Jurídico', href: '/admin/configuracoes/juridico/documentos', icon: Scale },
             ],
           },
         ]
