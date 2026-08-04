@@ -127,7 +127,36 @@ export type TipoEventoAuditoriaJuridica =
   | 'TENTATIVA_EDICAO_BLOQUEADA'
   | 'TENTATIVA_ALTERACAO_STATUS_BLOQUEADA'
   | 'TENTATIVA_EXCLUSAO_BLOQUEADA'
-  | 'ACEITE_REGISTRADO';
+  | 'ACEITE_REGISTRADO'
+  | 'CONTRATO_CRIADO';
+
+export interface TenantContrato {
+  id: string;
+  ministry_id: string;
+  documento_base_id?: string | null;
+  documento_raiz_id?: string | null;
+  versao_documento?: string | null;
+  hash_documento?: string | null;
+  plano_contratado?: string | null;
+  numero_contrato?: string | null;
+  status: 'RASCUNHO' | 'AGUARDANDO_ASSINATURA' | 'ATIVO' | 'CANCELADO' | 'EXPIRADO' | 'RESCINDIDO';
+  conteudo_customizado?: string | null;
+  valor_mensal?: number | null;
+  data_inicio: string;
+  data_fim?: string | null;
+  assinado_em?: string | null;
+  assinado_por?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CriarContratoVinculadoDTO {
+  ministry_id: string;
+  plano_contratado: string;
+  valor_mensal?: number | null;
+  data_inicio?: string;
+  assinado_por?: string | null;
+}
 
 export interface RegistrarEventoAuditoriaJuridicaDTO {
   usuario_id: string;

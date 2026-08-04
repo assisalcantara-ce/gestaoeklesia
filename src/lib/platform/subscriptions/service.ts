@@ -56,6 +56,19 @@ export class SubscriptionService {
       endDate
     )
 
+    // Integração Módulo Jurídico: Criar contrato automático ao converter/ativar no Billing
+    try {
+      const { ContratosService } = await import('@/services/ContratosService')
+      const contratosService = new ContratosService(supabaseAdmin)
+      await contratosService.criarContratoAoConverter({
+        ministry_id: ministryId,
+        plano_contratado: planSlug,
+        assinado_por: ministry.user_id || null,
+      })
+    } catch (err: any) {
+      console.warn('[SubscriptionService] Não foi possível vincular contrato jurídico automático:', err?.message || err)
+    }
+
     // 5. Efetivar cadastro na tabela pre_registrations
     const hasPreRegUpdated = await this.markPreRegistrationAsConverted(
       supabaseAdmin,
@@ -114,6 +127,19 @@ export class SubscriptionService {
         .update({ status: 'efetivado' })
         .eq('id', preReg.id)
       hasPreRegUpdated = !error
+    }
+
+    // Integração Módulo Jurídico: Criar vínculo contratual automático ao converter Trial em cliente
+    try {
+      const { ContratosService } = await import('@/services/ContratosService')
+      const contratosService = new ContratosService(supabaseAdmin)
+      await contratosService.criarContratoAoConverter({
+        ministry_id: ministryId,
+        plano_contratado: planFinal,
+        assinado_por: preReg.user_id || null,
+      })
+    } catch (err: any) {
+      console.warn('[SubscriptionService.activateFromPreRegistration] Aviso ao vincular contrato automático:', err?.message || err)
     }
 
     return { success: true, ministryId, wasCreated, hasPreRegUpdated, linkedMinistryUser }
