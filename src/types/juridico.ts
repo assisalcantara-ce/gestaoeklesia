@@ -49,6 +49,24 @@ export interface ListarDocumentosJuridicosFiltros {
   ativo?: boolean;
 }
 
+export interface ItemHistoricoVersaoDTO {
+  id: string;
+  documento_raiz_id: string;
+  versao: string;
+  status: StatusDocumentoJuridico;
+  publicado_em: string | null;
+  created_at: string;
+  ativo: boolean;
+  is_publicado_atual: boolean;
+}
+
+export interface RespostaHistoricoVersoesDTO {
+  documento_raiz_id: string;
+  total_versoes: number;
+  versao_publicada_atual_id: string | null;
+  versoes: ItemHistoricoVersaoDTO[];
+}
+
 // ----------------------------------------------------------------------------
 // ESTRUTURAS DE ACEITE ELETRÔNICO
 // ----------------------------------------------------------------------------

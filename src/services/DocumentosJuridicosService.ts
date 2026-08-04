@@ -4,6 +4,8 @@ import type {
   CriarDocumentoJuridicoDTO,
   AtualizarDocumentoJuridicoRascunhoDTO,
   ListarDocumentosJuridicosFiltros,
+  ItemHistoricoVersaoDTO,
+  RespostaHistoricoVersoesDTO,
 } from '@/types/juridico';
 
 export class DocumentosJuridicosService {
@@ -159,5 +161,34 @@ export class DocumentosJuridicosService {
       ativo: true,
       criado_por: criadoPor || null,
     });
+  }
+
+  async listarHistoricoVersoes(documentoId: string): Promise<RespostaHistoricoVersoesDTO> {
+    const docAlvo = await this.buscarPorId(documentoId);
+    const documentoRaizId = docAlvo.documento_raiz_id || docAlvo.id;
+
+    const listaDocs = await this.repository.listarHistoricoVersoes(documentoRaizId);
+
+    // Identificar qual versão está atualmente PUBLICADA
+    const docPublicadoAtual = listaDocs.find((d) => d.status === 'PUBLICADO' && d.ativo);
+    const versaoPublicadaAtualId = docPublicadoAtual ? docPublicadoAtual.id : null;
+
+    const versoes: ItemHistoricoVersaoDTO[] = listaDocs.map((d) => ({
+      id: d.id,
+      documento_raiz_id: d.documento_raiz_id || d.id,
+      versao: d.versao,
+      status: d.status,
+      publicado_em: d.publicado_em || null,
+      created_at: d.created_at,
+      ativo: d.ativo,
+      is_publicado_atual: d.id === versaoPublicadaAtualId,
+    }));
+
+    return {
+      documento_raiz_id: documentoRaizId,
+      total_versoes: versoes.length,
+      versao_publicada_atual_id: versaoPublicadaAtualId,
+      versoes,
+    };
   }
 }

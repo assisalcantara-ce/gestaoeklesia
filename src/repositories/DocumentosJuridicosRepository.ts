@@ -131,4 +131,15 @@ export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJurid
     if (error) throw error;
     return data as DocumentoJuridico;
   }
+
+  async listarHistoricoVersoes(documentoRaizId: string): Promise<DocumentoJuridico[]> {
+    const { data, error } = await this.client
+      .from(this.table)
+      .select('*')
+      .or(`documento_raiz_id.eq.${documentoRaizId},id.eq.${documentoRaizId}`)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return (data || []) as DocumentoJuridico[];
+  }
 }
