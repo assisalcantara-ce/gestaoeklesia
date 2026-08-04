@@ -92,4 +92,20 @@ export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJurid
     if (error) throw error;
     return data as DocumentoJuridico;
   }
+
+  async publicar(id: string): Promise<DocumentoJuridico> {
+    const { data, error } = await this.client
+      .from(this.table)
+      .update({
+        status: 'PUBLICADO',
+        ativo: true,
+        publicado_em: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data as DocumentoJuridico;
+  }
 }

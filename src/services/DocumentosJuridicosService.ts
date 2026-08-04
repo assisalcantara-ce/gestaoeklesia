@@ -92,4 +92,20 @@ export class DocumentosJuridicosService {
 
     return this.repository.arquivar(id);
   }
+
+  async publicarDocumento(id: string): Promise<DocumentoJuridico> {
+    const docAtual = await this.buscarPorId(id);
+
+    if (docAtual.status === 'PUBLICADO') {
+      throw new Error(`O documento "${docAtual.titulo}" (versão ${docAtual.versao}) já está publicado.`);
+    }
+
+    if (docAtual.status !== 'RASCUNHO') {
+      throw new Error(
+        `Apenas documentos em status RASCUNHO podem ser publicados. Status atual: ${docAtual.status}`
+      );
+    }
+
+    return this.repository.publicar(id);
+  }
 }
