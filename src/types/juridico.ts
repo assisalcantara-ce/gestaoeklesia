@@ -47,3 +47,32 @@ export interface ListarDocumentosJuridicosFiltros {
   status?: StatusDocumentoJuridico;
   ativo?: boolean;
 }
+
+// ----------------------------------------------------------------------------
+// ESTRUTURAS DE ACEITE ELETRÔNICO
+// ----------------------------------------------------------------------------
+
+export interface TenantAceite {
+  id: string;
+  ministry_id: string;
+  user_id: string;
+  documento_id: string;
+  versao_aceita: string;
+  hash_documento: string;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  payload_aceite?: Record<string, any> | null;
+  aceito_em: string;
+  created_at: string;
+}
+
+export interface RegistrarAceiteDTO {
+  ministry_id: string;
+  user_id: string;
+  documento_id: string;
+  versao_aceita: string;
+  hash_documento: string;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  payload_aceite?: Record<string, any> | null;
+}
