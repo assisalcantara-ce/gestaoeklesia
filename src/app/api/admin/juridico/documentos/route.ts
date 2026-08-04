@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       ministry_id: ministryId,
       documento_id: novoDoc.id,
       versao: novoDoc.versao,
-      hash_documento: novoDoc.hash_sha256,
+      hash_documento: novoDoc.hash_sha256 || 'PENDENTE_PUBLICACAO',
       tipo_evento: 'DOCUMENTO_CRIADO',
       ip_address: ipAddress,
       user_agent: userAgent,

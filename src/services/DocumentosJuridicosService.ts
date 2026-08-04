@@ -32,7 +32,7 @@ export class DocumentosJuridicosService {
       titulo: dto.titulo.trim(),
       versao: dto.versao.trim(),
       conteudo_md: dto.conteudo_md.trim(),
-      hash_sha256: 'PENDENTE',
+      hash_sha256: null,
       status: 'RASCUNHO',
       ativo: true,
     });
@@ -141,14 +141,19 @@ export class DocumentosJuridicosService {
       );
     }
 
-    // Duplicar tipo, titulo, conteudo_md, conteudo_html mantendo o vinculo logico
+    // Determinar o documento_raiz_id (na versão matriz pode ser o id dela própria se for o primeiro)
+    const documentoRaizId = docOriginal.documento_raiz_id || docOriginal.id;
+
+    // Duplicar tipo, titulo, conteudo_md, conteudo_html mantendo o vinculo logico via documento_raiz_id
+    // e deixando hash_sha256 como NULL para ser calculado na publicacao
     return this.repository.criarNovaVersao({
+      documento_raiz_id: documentoRaizId,
       tipo: docOriginal.tipo,
       titulo: docOriginal.titulo,
       versao: versaoLimpa,
       conteudo_md: docOriginal.conteudo_md,
       conteudo_html: docOriginal.conteudo_html || null,
-      hash_sha256: docOriginal.hash_sha256,
+      hash_sha256: null,
       status: 'RASCUNHO',
       obrigatorio: docOriginal.obrigatorio,
       ativo: true,

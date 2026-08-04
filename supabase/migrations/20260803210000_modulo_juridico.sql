@@ -10,12 +10,13 @@
 -- 1. TABELA: documentos_juridicos
 CREATE TABLE IF NOT EXISTS public.documentos_juridicos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    documento_raiz_id UUID,
     tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('TERMOS_DE_USO', 'POLITICA_PRIVACIDADE', 'CONTRATO_SERVICO', 'ADITIVO', 'OUTRO')),
     titulo VARCHAR(255) NOT NULL,
     versao VARCHAR(20) NOT NULL,
     conteudo_md TEXT NOT NULL,
     conteudo_html TEXT,
-    hash_sha256 VARCHAR(64) NOT NULL,
+    hash_sha256 VARCHAR(64),
     status VARCHAR(20) NOT NULL DEFAULT 'RASCUNHO' CHECK (status IN ('RASCUNHO', 'PUBLICADO', 'ARQUIVADO')),
     obrigatorio BOOLEAN NOT NULL DEFAULT true,
     ativo BOOLEAN NOT NULL DEFAULT true,
@@ -26,7 +27,24 @@ CREATE TABLE IF NOT EXISTS public.documentos_juridicos (
     CONSTRAINT uk_documentos_juridicos_tipo_versao UNIQUE (tipo, versao)
 );
 
+-- Trigger para definir documento_raiz_id por padrão igual ao próprio id se for nulo na inserção
+CREATE OR REPLACE FUNCTION set_documentos_juridicos_raiz_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.documento_raiz_id IS NULL THEN
+        NEW.documento_raiz_id = NEW.id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_set_documentos_juridicos_raiz_id ON public.documentos_juridicos;
+CREATE TRIGGER trg_set_documentos_juridicos_raiz_id
+    BEFORE INSERT ON public.documentos_juridicos
+    FOR EACH ROW EXECUTE FUNCTION set_documentos_juridicos_raiz_id();
+
 -- Índices documentos_juridicos
+CREATE INDEX IF NOT EXISTS idx_documentos_juridicos_raiz_id ON public.documentos_juridicos(documento_raiz_id);
 CREATE INDEX IF NOT EXISTS idx_documentos_juridicos_tipo_ativo ON public.documentos_juridicos(tipo, ativo);
 CREATE INDEX IF NOT EXISTS idx_documentos_juridicos_status ON public.documentos_juridicos(status);
 CREATE INDEX IF NOT EXISTS idx_documentos_juridicos_publicado_em ON public.documentos_juridicos(publicado_em DESC);

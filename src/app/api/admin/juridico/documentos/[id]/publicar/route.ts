@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       ministry_id: ministryId,
       documento_id: docPublicado.id,
       versao: docPublicado.versao,
-      hash_documento: docPublicado.hash_sha256,
+      hash_documento: docPublicado.hash_sha256 || 'PENDENTE_PUBLICACAO',
       tipo_evento: 'DOCUMENTO_PUBLICADO',
       ip_address: ipAddress,
       user_agent: userAgent,

@@ -18,14 +18,14 @@ export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJurid
     return (this as any)._customClient || super.client;
   }
 
-  async criar(dto: CriarDocumentoJuridicoDTO & { hash_sha256: string; status: 'RASCUNHO'; ativo: boolean }): Promise<DocumentoJuridico> {
+  async criar(dto: CriarDocumentoJuridicoDTO & { hash_sha256?: string | null; status: 'RASCUNHO'; ativo: boolean }): Promise<DocumentoJuridico> {
     const payload = {
       tipo: dto.tipo,
       titulo: dto.titulo,
       versao: dto.versao,
       conteudo_md: dto.conteudo_md,
       conteudo_html: dto.conteudo_html || null,
-      hash_sha256: dto.hash_sha256,
+      hash_sha256: dto.hash_sha256 || null,
       status: dto.status,
       obrigatorio: dto.obrigatorio ?? true,
       ativo: dto.ativo ?? true,
@@ -110,12 +110,13 @@ export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJurid
   }
 
   async criarNovaVersao(payload: {
+    documento_raiz_id: string;
     tipo: string;
     titulo: string;
     versao: string;
     conteudo_md: string;
     conteudo_html?: string | null;
-    hash_sha256: string;
+    hash_sha256?: string | null;
     status: 'RASCUNHO';
     obrigatorio: boolean;
     ativo: boolean;

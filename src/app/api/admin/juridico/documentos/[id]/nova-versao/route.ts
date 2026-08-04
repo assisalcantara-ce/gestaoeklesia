@@ -43,7 +43,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       ministry_id: ministryId,
       documento_id: novaVersaoDoc.id,
       versao: novaVersaoDoc.versao,
-      hash_documento: novaVersaoDoc.hash_sha256,
+      hash_documento: novaVersaoDoc.hash_sha256 || 'PENDENTE_PUBLICACAO',
       tipo_evento: 'DOCUMENTO_NOVA_VERSAO',
       ip_address: ipAddress,
       user_agent: userAgent,

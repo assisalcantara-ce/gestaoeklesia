@@ -9,12 +9,13 @@ export type StatusDocumentoJuridico = 'RASCUNHO' | 'PUBLICADO' | 'ARQUIVADO';
 
 export interface DocumentoJuridico {
   id: string;
+  documento_raiz_id?: string | null;
   tipo: TipoDocumentoJuridico;
   titulo: string;
   versao: string;
   conteudo_md: string;
   conteudo_html?: string | null;
-  hash_sha256: string;
+  hash_sha256?: string | null;
   status: StatusDocumentoJuridico;
   obrigatorio: boolean;
   ativo: boolean;
