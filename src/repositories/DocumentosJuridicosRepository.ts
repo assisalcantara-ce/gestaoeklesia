@@ -1,0 +1,95 @@
+import { BaseRepository } from '@/repositories/shared/baseRepository';
+import type {
+  DocumentoJuridico,
+  CriarDocumentoJuridicoDTO,
+  AtualizarDocumentoJuridicoRascunhoDTO,
+  ListarDocumentosJuridicosFiltros,
+} from '@/types/juridico';
+
+export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJuridico> {
+  constructor(customClient?: any) {
+    super('documentos_juridicos');
+    if (customClient) {
+      (this as any)._customClient = customClient;
+    }
+  }
+
+  protected get client() {
+    return (this as any)._customClient || super.client;
+  }
+
+  async criar(dto: CriarDocumentoJuridicoDTO & { hash_sha256: string; status: 'RASCUNHO'; ativo: boolean }): Promise<DocumentoJuridico> {
+    const payload = {
+      tipo: dto.tipo,
+      titulo: dto.titulo,
+      versao: dto.versao,
+      conteudo_md: dto.conteudo_md,
+      conteudo_html: dto.conteudo_html || null,
+      hash_sha256: dto.hash_sha256,
+      status: dto.status,
+      obrigatorio: dto.obrigatorio ?? true,
+      ativo: dto.ativo ?? true,
+      criado_por: dto.criado_por || null,
+    };
+
+    const { data, error } = await this.client
+      .from(this.table)
+      .insert([payload])
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data as DocumentoJuridico;
+  }
+
+  async buscarPorId(id: string): Promise<DocumentoJuridico | null> {
+    return this.findById(id);
+  }
+
+  async listar(filtros?: ListarDocumentosJuridicosFiltros): Promise<DocumentoJuridico[]> {
+    return this.findAll((builder: any) => {
+      let query = builder;
+      if (filtros?.tipo) {
+        query = query.eq('tipo', filtros.tipo);
+      }
+      if (filtros?.status) {
+        query = query.eq('status', filtros.status);
+      }
+      if (filtros?.ativo !== undefined) {
+        query = query.eq('ativo', filtros.ativo);
+      }
+      return query.order('created_at', { ascending: false });
+    });
+  }
+
+  async atualizarRascunho(id: string, dto: AtualizarDocumentoJuridicoRascunhoDTO): Promise<DocumentoJuridico> {
+    const payload: Record<string, any> = {};
+    if (dto.titulo !== undefined) payload.titulo = dto.titulo;
+    if (dto.versao !== undefined) payload.versao = dto.versao;
+    if (dto.conteudo_md !== undefined) payload.conteudo_md = dto.conteudo_md;
+    if (dto.conteudo_html !== undefined) payload.conteudo_html = dto.conteudo_html;
+    if (dto.obrigatorio !== undefined) payload.obrigatorio = dto.obrigatorio;
+
+    const { data, error } = await this.client
+      .from(this.table)
+      .update(payload)
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data as DocumentoJuridico;
+  }
+
+  async arquivar(id: string): Promise<DocumentoJuridico> {
+    const { data, error } = await this.client
+      .from(this.table)
+      .update({ status: 'ARQUIVADO', ativo: false })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data as DocumentoJuridico;
+  }
+}
