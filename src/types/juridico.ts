@@ -72,6 +72,8 @@ export interface DocumentoPendenteAceiteDTO {
   tipo: TipoDocumentoJuridico;
   titulo: string;
   versao: string;
+  versao_publicada: string;
+  ultima_versao_aceita: string | null;
   hash_sha256?: string | null;
   publicado_em?: string | null;
   obrigatorio: boolean;
