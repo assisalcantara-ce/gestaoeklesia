@@ -663,6 +663,13 @@ export default function TesourariaPage() {
                     <div className="pt-2 border-t border-gray-100 flex justify-between items-center">
                       <button
                         onClick={() => {
+                          const [ano, mes] = t.filtroMes.split('-');
+                          const primDia = `${ano}-${mes}-01`;
+                          const ultDiaObj = new Date(Number(ano), Number(mes), 0);
+                          const ultDia = `${ano}-${mes}-${String(ultDiaObj.getDate()).padStart(2, '0')}`;
+
+                          t.setFechaDataInicio(primDia);
+                          t.setFechaDataFim(ultDia);
                           t.setFechaCongId(c.id);
                           t.setShowFechaModal(true);
                         }}
@@ -684,6 +691,7 @@ export default function TesourariaPage() {
               }}
               cxModal={t.statusMes.find((cx) => cx.id === t.fechaCongId) ?? t.statusMes[0]}
               fechaDataInicio={t.fechaDataInicio}
+              setFechaDataInicio={t.setFechaDataInicio}
               fechaDataFim={t.fechaDataFim}
               setFechaDataFim={t.setFechaDataFim}
               fechaSaldoInicial={t.fechaSaldoInicial}
@@ -694,7 +702,7 @@ export default function TesourariaPage() {
               handleFecharMes={t.handleFecharMes}
               entLivePeriodo={t.entradasFiltradas}
               saiLivePeriodo={t.saidasFiltradas}
-              saldoFinalModal={t.entradasFiltradas - t.saidasFiltradas}
+              saldoFinalModal={(parseFloat(t.fechaSaldoInicial.replace(',', '.')) || 0) + t.entradasFiltradas - t.saidasFiltradas}
               fmtBRL={t.fmtBRL}
             />
           </div>

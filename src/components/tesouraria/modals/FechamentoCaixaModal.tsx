@@ -7,6 +7,7 @@ export interface FechamentoCaixaModalProps {
   onClose: () => void;
   cxModal: any;
   fechaDataInicio: string;
+  setFechaDataInicio?: (val: string) => void;
   fechaDataFim: string;
   setFechaDataFim: (val: string) => void;
   fechaSaldoInicial: string;
@@ -26,6 +27,7 @@ export default function FechamentoCaixaModal({
   onClose,
   cxModal,
   fechaDataInicio,
+  setFechaDataInicio,
   fechaDataFim,
   setFechaDataFim,
   fechaSaldoInicial,
@@ -60,8 +62,8 @@ export default function FechamentoCaixaModal({
             <input
               type="date"
               value={fechaDataInicio}
-              disabled
-              className="w-full border border-gray-100 bg-gray-50 text-gray-500 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
+              onChange={(e) => setFechaDataInicio && setFechaDataInicio(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#123b63]"
             />
           </div>
           <div>
