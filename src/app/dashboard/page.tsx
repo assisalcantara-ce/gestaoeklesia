@@ -687,10 +687,27 @@ export default function DashboardPage() {
           {onboardingProgress && onboardingProgress.showAssistant && !onboardingProgress.isCompleted && (() => {
             const numBlocks = Math.round(onboardingProgress.progressPercent / 10);
             const barStr = '█'.repeat(numBlocks) + '░'.repeat(10 - numBlocks);
+            const uid = userCtx.userId || '';
+
+            const handleCancelarImplantacao = () => {
+              if (uid) {
+                ProductExperienceService.hideAssistant(uid);
+                setOnboardingProgress(prev => prev ? { ...prev, showAssistant: false } : null);
+              }
+            };
+
             return (
-              <div className="bg-gradient-to-r from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-center gap-2">
+              <div className="relative bg-gradient-to-r from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <button
+                  onClick={handleCancelarImplantacao}
+                  title="Cancelar / Ocultar aviso de implantação"
+                  className="absolute top-3 right-3 p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-amber-200/50 transition text-xs font-bold flex items-center gap-1"
+                >
+                  <span className="text-xs">Cancelar</span>
+                  <span className="text-sm font-bold leading-none">✕</span>
+                </button>
+                <div className="space-y-2 flex-1 pr-16 md:pr-0">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xl">🚀</span>
                     <h3 className="text-sm font-bold text-slate-800">Implantação do Ministério</h3>
                     <span className="text-xs font-mono font-bold text-amber-800 bg-amber-200/50 px-2 py-0.5 rounded-full">
@@ -704,12 +721,20 @@ export default function DashboardPage() {
                     Complete as etapas recomendadas para configurar a gestão completa do seu ministério.
                   </p>
                 </div>
-                <button
-                  onClick={() => router.push('/boas-vindas?show=true')}
-                  className="px-5 py-2.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-bold transition shadow-sm self-start md:self-auto shrink-0"
-                >
-                  Continuar Implantação
-                </button>
+                <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+                  <button
+                    onClick={handleCancelarImplantacao}
+                    className="px-3.5 py-2.5 bg-white border border-amber-300 hover:bg-amber-100/80 text-amber-900 rounded-xl text-xs font-semibold transition shadow-sm"
+                  >
+                    Não exibir mais
+                  </button>
+                  <button
+                    onClick={() => router.push('/boas-vindas?show=true')}
+                    className="px-5 py-2.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                  >
+                    Continuar Implantação
+                  </button>
+                </div>
               </div>
             );
           })()}
