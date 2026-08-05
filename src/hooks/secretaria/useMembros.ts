@@ -1349,9 +1349,9 @@ export function useMembros() {
     isAuxiliar,
 
     // Opções de nomenclatura
-    supervisoesOptions: congregacoesOptions,
-    camposOptions: camposOptions,
-    congregacoesOptions: supervisoesOptions,
+    supervisoesOptions: supervisoes,
+    camposOptions: campos,
+    congregacoesOptions: congregacoes,
 
     // Helpers expostos
     maskCpf,
