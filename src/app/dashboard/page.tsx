@@ -233,7 +233,7 @@ export default function DashboardPage() {
         visitantesRes, ultimasCartasRes, ultimosFluxosRes, cartaPedidosRes,
       ] = await Promise.all([
         safeQuery(withScopeMember(supabase.from('members').select('status, role, tipo_cadastro, custom_fields').eq('ministry_id', ministryId))),
-        safeQuery(supabase.from('flow_instances').select('status, tipo_fluxo, created_at').eq('ministry_id', ministryId).order('created_at', { ascending: false }).limit(10)),
+        safeQuery(Promise.resolve({ data: [], count: 0 })),
         safeQuery(
           scopeCongId
             ? supabase.from('cartas_registros').select('id, members!inner(congregacao_id)', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('members.congregacao_id', scopeCongId)
@@ -266,7 +266,7 @@ export default function DashboardPage() {
             : Promise.resolve({ data: [] })
         ),
         safeQuery(supabase.from('ebd_turmas').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('ativo', true)),
-        safeQuery(supabase.from('ebd_chamadas').select('presentes, total_alunos').eq('ministry_id', ministryId).gte('data_chamada', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).limit(100)),
+        safeQuery(supabase.from('ebd_aulas').select('presentes_count, matriculados_count').eq('ministry_id', ministryId).gte('data_aula', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).limit(100)),
         safeQuery(supabase.from('ministry_users').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'ativo')),
         safeQuery(supabase.from('members').select('id').eq('ministry_id', ministryId).eq('role', 'visitante')),
         safeQuery(
@@ -274,7 +274,7 @@ export default function DashboardPage() {
             ? supabase.from('cartas_registros').select('id, template_title, issued_at, members!inner(name, congregacao_id)').eq('ministry_id', ministryId).eq('members.congregacao_id', scopeCongId).order('issued_at', { ascending: false }).limit(5)
             : supabase.from('cartas_registros').select('id, template_title, issued_at, members(name)').eq('ministry_id', ministryId).order('issued_at', { ascending: false }).limit(5)
         ),
-        safeQuery(supabase.from('flow_instances').select('id, status, tipo_fluxo').eq('ministry_id', ministryId).neq('status', 'concluido').limit(5)),
+        safeQuery(Promise.resolve({ data: [], count: 0 })),
         safeQuery(supabase.from('carta_pedidos').select('id, status, tipo_carta').eq('ministry_id', ministryId).neq('status', 'rejeitado').order('created_at', { ascending: false }).limit(3)),
       ]);
 
@@ -369,7 +369,7 @@ export default function DashboardPage() {
       // EBD
       const chamadas = ebdChamadasRes.data ?? [];
       const ebdMediaPresenca = chamadas.length > 0
-        ? Math.round(chamadas.reduce((s: number, c: any) => s + Number(c.presentes ?? 0), 0) / chamadas.length)
+        ? Math.round(chamadas.reduce((s: number, c: any) => s + Number(c.presentes_count ?? c.presentes ?? 0), 0) / chamadas.length)
         : null;
 
       // ── DASHBOARD 2.0 — novas queries ──────────────────────────────────────
@@ -392,7 +392,7 @@ export default function DashboardPage() {
         safeQuery(supabase.from('eventos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'programado').gte('data_inicio', todayStr).lte('data_inicio', in30daysStr)),
         safeQuery(supabase.from('members').select('created_at').eq('ministry_id', ministryId).gte('created_at', twelveMonthsAgo).limit(5000)),
         safeQuery(supabase.from('carta_pedidos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'pendente')),
-        safeQuery(supabase.from('flow_instances').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).in('status', ['pendente', 'em_analise'])),
+        safeQuery(Promise.resolve({ count: 0 })),
       ]);
 
       // PIX vencidos (best-effort — campo status pode não existir)
@@ -578,7 +578,7 @@ export default function DashboardPage() {
     };
 
     run();
-  }, [router, supabase, userCtx.loading, userCtx]);
+  }, [router, supabase, userCtx.loading, userCtx.ministryId]);
 
   const handleLogout = () => supabase.auth.signOut().finally(() => router.push('/'));
 
