@@ -159,9 +159,9 @@ export default function TesourariaToolbar({
             {scope.canWrite && (
               <button
                 onClick={onNovoClick}
-                className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition h-[38px]"
+                className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition h-[38px] whitespace-nowrap"
               >
-                <Plus className="h-4 w-4" /> Novo
+                <Plus className="h-4 w-4" /> Novo lançamento
               </button>
             )}
             {lancamentosMesCount > 0 && (
@@ -173,19 +173,22 @@ export default function TesourariaToolbar({
                 <Download className="h-4 w-4" /> CSV
               </button>
             )}
-            {(filtroMovimento !== '' || filtroTipo !== '' || filtroCong !== '' || filtroDept !== '') && (
-              <button
-                onClick={() => {
-                  setFiltroMovimento('');
-                  setFiltroTipo('');
-                  setFiltroCong('');
-                  setFiltroDept('');
-                }}
-                className="flex items-center gap-2 px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm transition h-[38px]"
-              >
-                Limpar Filtros
-              </button>
-            )}
+            <button
+              onClick={() => {
+                setFiltroMovimento('');
+                setFiltroTipo('');
+                setFiltroCong('');
+                setFiltroDept('');
+              }}
+              disabled={filtroMovimento === '' && filtroTipo === '' && filtroCong === '' && filtroDept === ''}
+              className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition h-[38px] ${
+                filtroMovimento === '' && filtroTipo === '' && filtroCong === '' && filtroDept === ''
+                  ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                  : 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300'
+              }`}
+            >
+              Limpar Filtros
+            </button>
           </div>
 
           {/* Totalizador */}
