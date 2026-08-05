@@ -293,7 +293,7 @@ export function useTesouraria() {
   const [aba, setAba] = useState<Aba>('dashboard');
 
   // Fechamentos
-  const [fechamentos] = useState<Fechamento[]>([]);
+  const [fechamentos, setFechamentos] = useState<Fechamento[]>([]);
   const [abaFechaMes, setAbaFechaMes] = useState(mesAtual());
   const [showFechaModal, setShowFechaModal] = useState(false);
   const [fechaObs, setFechaObs] = useState('');
@@ -481,10 +481,11 @@ export function useTesouraria() {
           setDepartamentos(dData);
         }
 
-        // Carrega Contas e Categorias diretamente via Supabase
-        const [contasRes, catsRes] = await Promise.all([
+        // Carrega Contas, Categorias e Fechamentos anteriores via Supabase
+        const [contasRes, catsRes, fechamentosRes] = await Promise.all([
           supabase.from('fin_contas').select('*').eq('is_ativa', true).order('nome'),
           supabase.from('fin_categorias').select('*').eq('is_ativa', true).order('nome'),
+          supabase.from('tesouraria_fechamentos').select('*').eq('ministry_id', resolvedMid || session.user.id).order('created_at', { ascending: false }),
         ]);
 
         if (contasRes.data) {
@@ -492,6 +493,9 @@ export function useTesouraria() {
         }
         if (catsRes.data) {
           setFinCategorias(catsRes.data);
+        }
+        if (fechamentosRes.data) {
+          setFechamentos(fechamentosRes.data);
         }
       } catch (err: any) {
         console.error('Erro ao carregar dados iniciais:', err);

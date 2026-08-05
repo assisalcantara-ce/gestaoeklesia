@@ -664,12 +664,31 @@ export default function TesourariaPage() {
                       <button
                         onClick={() => {
                           const [ano, mes] = t.filtroMes.split('-');
-                          const primDia = `${ano}-${mes}-01`;
                           const ultDiaObj = new Date(Number(ano), Number(mes), 0);
-                          const ultDia = `${ano}-${mes}-${String(ultDiaObj.getDate()).padStart(2, '0')}`;
+                          const ultDiaDefault = `${ano}-${mes}-${String(ultDiaObj.getDate()).padStart(2, '0')}`;
 
-                          t.setFechaDataInicio(primDia);
-                          t.setFechaDataFim(ultDia);
+                          // Procurar fechamento anterior dessa congregação
+                          const fechamentoAnterior = t.fechamentos.find(
+                            (f) => (f.congregacao_id === c.id || (f as any).cong_id === c.id)
+                          );
+
+                          if (fechamentoAnterior && (fechamentoAnterior as any).data_fim) {
+                            // Se existir data_fim no fechamento anterior, calcula D+1
+                            const dataFimAnt = new Date((fechamentoAnterior as any).data_fim + 'T00:00:00');
+                            dataFimAnt.setDate(dataFimAnt.getDate() + 1);
+                            const proxDiaStr = dataFimAnt.toISOString().split('T')[0];
+                            t.setFechaDataInicio(proxDiaStr);
+
+                            if (fechamentoAnterior.saldo_final !== undefined) {
+                              t.setFechaSaldoInicial(String(fechamentoAnterior.saldo_final));
+                            }
+                          } else {
+                            // Primeiro fechamento: 1º dia do mês
+                            t.setFechaDataInicio(`${ano}-${mes}-01`);
+                            t.setFechaSaldoInicial('0,00');
+                          }
+
+                          t.setFechaDataFim(ultDiaDefault);
                           t.setFechaCongId(c.id);
                           t.setShowFechaModal(true);
                         }}
