@@ -89,18 +89,31 @@ export class TesourariaRepository {
     // 3. Registrar auditoria em audit_logs se o lançamento existia
     if (lancamento) {
       try {
+        const descText = `Exclusão de lançamento financeiro [${lancamento.tipo_movimento?.toUpperCase()}] no valor de R$ ${lancamento.valor} (${lancamento.tipo_recebimento || 'Lançamento'})`;
+
         await this.supabase.from('audit_logs').insert([
           {
             ministry_id: ministryId,
             user_id: userId || null,
+            usuario_id: userId || null,
             action: 'DELETE',
+            acao: 'deletar',
             resource_type: 'tesouraria_lancamentos',
+            modulo: 'financeiro',
+            tabela_afetada: 'tesouraria_lancamentos',
             resource_id: id,
+            registro_id: id,
+            descricao: descText,
             old_data: {
               ...lancamento,
               motivo_exclusao: 'Exclusão solicitada na Tesouraria',
             },
+            dados_anteriores: {
+              ...lancamento,
+              motivo_exclusao: 'Exclusão solicitada na Tesouraria',
+            },
             new_data: null,
+            status: 'sucesso',
             status_code: 200,
           },
         ]);
