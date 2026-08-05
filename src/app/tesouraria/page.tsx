@@ -11,6 +11,7 @@ import FechamentoCaixaModal from '@/components/tesouraria/modals/FechamentoCaixa
 import ContaBancariaModal from '@/components/tesouraria/modals/ContaBancariaModal';
 import CategoriaFinanceiraModal from '@/components/tesouraria/modals/CategoriaFinanceiraModal';
 import ConfirmDeleteModal from '@/components/tesouraria/modals/ConfirmDeleteModal';
+import TesourariaCharts from '@/components/tesouraria/TesourariaCharts';
 import { useTesouraria } from '@/hooks/tesouraria/useTesouraria';
 
 // Componente simples para picker de mês
@@ -469,6 +470,13 @@ export default function TesourariaPage() {
                 </p>
               </div>
             </div>
+
+            {/* Gráficos de Evolução Mensal */}
+            <TesourariaCharts
+              lancamentos={t.lancamentosMes}
+              fmtBRL={t.fmtBRL}
+              filtroMes={t.filtroMes}
+            />
           </div>
         )}
 
