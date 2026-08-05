@@ -46,4 +46,37 @@ export class TesourariaRepository {
 
     return data as LancamentoRow;
   }
+
+  async atualizarLancamento(id: string, ministryId: string, payload: Partial<LancamentoInsert>): Promise<LancamentoRow> {
+    const { data, error } = await this.supabase
+      .from('tesouraria_lancamentos')
+      .update({
+        ...payload,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('ministry_id', ministryId)
+      .select('*')
+      .single();
+
+    if (error) {
+      throw new Error(`Erro ao atualizar lançamento: ${error.message}`);
+    }
+
+    return data as LancamentoRow;
+  }
+
+  async deletarLancamento(id: string, ministryId: string): Promise<boolean> {
+    const { error } = await this.supabase
+      .from('tesouraria_lancamentos')
+      .delete()
+      .eq('id', id)
+      .eq('ministry_id', ministryId);
+
+    if (error) {
+      throw new Error(`Erro ao deletar lançamento: ${error.message}`);
+    }
+
+    return true;
+  }
 }

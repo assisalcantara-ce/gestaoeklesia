@@ -73,4 +73,58 @@ export class TesourariaService {
 
     return this.repository.criarLancamento(payload);
   }
+
+  async atualizarLancamento(
+    id: string,
+    ministryId: string,
+    dto: Partial<CriarLancamentoDTO>
+  ): Promise<LancamentoRow> {
+    if (!id || id.trim().length === 0) {
+      throw new Error('O ID do lançamento é obrigatório para atualização.');
+    }
+
+    if (!ministryId || ministryId.trim().length === 0) {
+      throw new Error('O ministry_id é obrigatório.');
+    }
+
+    if (dto.data_lancamento && !/^\d{4}-\d{2}-\d{2}$/.test(dto.data_lancamento)) {
+      throw new Error('data_lancamento inválida. Use o formato YYYY-MM-DD.');
+    }
+
+    if (dto.tipo_movimento && dto.tipo_movimento !== 'entrada' && dto.tipo_movimento !== 'saida') {
+      throw new Error('tipo_movimento deve ser "entrada" ou "saida".');
+    }
+
+    if (dto.valor !== undefined && (typeof dto.valor !== 'number' || isNaN(dto.valor) || dto.valor <= 0)) {
+      throw new Error('O valor deve ser um número positivo maior que zero.');
+    }
+
+    const payload: Partial<LancamentoInsert> = {};
+    if (dto.data_lancamento) payload.data_lancamento = dto.data_lancamento;
+    if (dto.tipo_movimento) payload.tipo_movimento = dto.tipo_movimento;
+    if (dto.tipo_recebimento) payload.tipo_recebimento = dto.tipo_recebimento.trim();
+    if (dto.valor !== undefined) payload.valor = dto.valor;
+    if (dto.referencia !== undefined) payload.referencia = dto.referencia;
+    if (dto.observacoes !== undefined) payload.observacoes = dto.observacoes;
+    if (dto.descricao !== undefined) payload.descricao = dto.descricao;
+    if (dto.congregacao_id !== undefined) payload.congregacao_id = dto.congregacao_id;
+    if (dto.departamento_id !== undefined) payload.departamento_id = dto.departamento_id;
+    if (dto.conta_id !== undefined) payload.conta_id = dto.conta_id;
+    if (dto.categoria_id !== undefined) payload.categoria_id = dto.categoria_id;
+    if (dto.member_id !== undefined) payload.member_id = dto.member_id;
+
+    return this.repository.atualizarLancamento(id, ministryId, payload);
+  }
+
+  async deletarLancamento(id: string, ministryId: string): Promise<boolean> {
+    if (!id || id.trim().length === 0) {
+      throw new Error('O ID do lançamento é obrigatório para exclusão.');
+    }
+
+    if (!ministryId || ministryId.trim().length === 0) {
+      throw new Error('O ministry_id é obrigatório.');
+    }
+
+    return this.repository.deletarLancamento(id, ministryId);
+  }
 }
