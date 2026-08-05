@@ -292,7 +292,7 @@ export function useTesouraria() {
   const [finContas, setFinContas] = useState<FinConta[]>([]);
   const [finCategorias, setFinCategorias] = useState<FinCategoria[]>([]);
   const [scope, setScope] = useState<UserScope>({
-    isFinanceiroLocal: false, congregacaoId: null, canWrite: true, canDelete: false,
+    isFinanceiroLocal: false, congregacaoId: null, canWrite: true, canDelete: true,
   });
 
   const [loadingData, setLoadingData] = useState(true);
@@ -457,13 +457,16 @@ export function useTesouraria() {
         const userRes = await authenticatedFetch('/api/v1/auth/me');
         if (userRes.ok) {
           const userData = await userRes.json();
-          const userRole = userData.role ?? '';
+          const userRole = String(userData.role ?? '').toLowerCase().trim();
           const cId = userData.congregacao_id ?? null;
+          const isFinLocal = userRole === 'financeiro_local' || userRole === 'tesouraria_local';
+          const isManagerOrAdmin = !userRole || ['super_admin', 'admin', 'administrador', 'tesoureiro_sede', 'tesoureiro_geral', 'financeiro'].includes(userRole);
+
           setScope({
-            isFinanceiroLocal: userRole === 'financeiro_local',
+            isFinanceiroLocal: isFinLocal,
             congregacaoId: cId,
-            canWrite: ['super_admin', 'admin', 'tesoureiro_sede', 'financeiro_local'].includes(userRole),
-            canDelete: ['super_admin', 'admin', 'tesoureiro_sede'].includes(userRole),
+            canWrite: isManagerOrAdmin || isFinLocal,
+            canDelete: isManagerOrAdmin,
           });
         }
 
