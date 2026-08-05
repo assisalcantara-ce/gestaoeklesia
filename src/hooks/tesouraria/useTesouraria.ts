@@ -133,6 +133,7 @@ export interface FormLanc {
   tipo_movimento: 'entrada' | 'saida';
   tipo_recebimento: TipoRecebimento | '';
   categoria_saida: string;
+  forma_pagamento: string;
   valor: string;
   referencia: string;
   observacoes: string;
@@ -194,6 +195,7 @@ const emptyForm = (): FormLanc => ({
   tipo_movimento: 'entrada',
   tipo_recebimento: 'oferta',
   categoria_saida: '',
+  forma_pagamento: 'A VISTA',
   valor: '',
   referencia: '',
   observacoes: '',
@@ -726,6 +728,7 @@ export function useTesouraria() {
       tipo_movimento: l.tipo_movimento,
       tipo_recebimento: (l.tipo_recebimento as TipoRecebimento) || 'dizimo',
       categoria_saida: l.tipo_recebimento || '',
+      forma_pagamento: (l as any).forma_pagamento || 'A VISTA',
       valor: Number(l.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       referencia: l.referencia || '',
       observacoes: l.observacoes || '',
