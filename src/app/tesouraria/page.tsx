@@ -915,9 +915,18 @@ export default function TesourariaPage() {
                 {t.scope.canWrite && (
                   <button
                     onClick={() => {
+                      const catDiz = t.finCategorias.find((c) =>
+                        (c.tipo_movimento === 'entrada' || c.tipo_movimento === 'ambos') &&
+                        (c.nome.toLowerCase().includes('dízimo') || c.nome.toLowerCase().includes('dizimo'))
+                      );
                       t.setAba('lancamentos');
                       t.setShowForm(true);
-                      t.setForm((p) => ({ ...p, tipo_movimento: 'entrada', tipo_recebimento: 'dizimo' }));
+                      t.setForm((p) => ({
+                        ...p,
+                        tipo_movimento: 'entrada',
+                        tipo_recebimento: 'dizimo',
+                        categoria_id: catDiz?.id || p.categoria_id,
+                      }));
                     }}
                     className="flex items-center gap-1.5 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition h-[36px]"
                   >
@@ -931,12 +940,17 @@ export default function TesourariaPage() {
               dizimistas={t.dizimistasFiltrados}
               fmtBRL={t.fmtBRL}
               onRegistrarDizimo={(dizimista) => {
+                const catDiz = t.finCategorias.find((c) =>
+                  (c.tipo_movimento === 'entrada' || c.tipo_movimento === 'ambos') &&
+                  (c.nome.toLowerCase().includes('dízimo') || c.nome.toLowerCase().includes('dizimo'))
+                );
                 t.setAba('lancamentos');
                 t.setShowForm(true);
                 t.setForm((p) => ({
                   ...p,
                   tipo_movimento: 'entrada',
                   tipo_recebimento: 'dizimo',
+                  categoria_id: catDiz?.id || p.categoria_id,
                   dizimista_id: dizimista.id,
                   dizimista_nome: dizimista.nome,
                   is_dizimo_avulso: false,
