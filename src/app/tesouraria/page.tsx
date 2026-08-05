@@ -284,9 +284,12 @@ export default function TesourariaPage() {
                         </select>
                       </div>
 
-                      {/* Campo de Busca de Dizimista se Tipo de Recebimento === 'dizimo' */}
-                      {t.form.tipo_recebimento === 'dizimo' && (
-                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 col-span-full">
+                  {/* Se Tipo de Recebimento === 'dizimo', Bloco em linha inteira (3 colunas) para Dizimista */}
+                  {t.form.tipo_movimento === 'entrada' && t.form.tipo_recebimento === 'dizimo' && (
+                    <div className="col-span-full p-4 bg-slate-50/80 border border-slate-200 rounded-xl space-y-3 shadow-xs">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        {/* Coluna 1: Identificação do Dizimista + Checkbox Avulso */}
+                        <div className="space-y-1.5">
                           <div className="flex justify-between items-center">
                             <label className="block text-xs font-bold text-[#123b63]">
                               Identificação do Dizimista
@@ -314,22 +317,59 @@ export default function TesourariaPage() {
                             <DizimistaSearchInput
                               dizimistas={t.dizimistasFiltrados}
                               selectedNome={t.form.dizimista_nome || ''}
-                              onSelectDizimista={(diz) =>
+                              onSelectDizimista={(diz) => {
+                                const dizCompleto = t.dizimistasFiltrados.find((item) => item.id === diz?.id);
                                 t.setForm((p) => ({
                                   ...p,
                                   dizimista_id: diz?.id || '',
                                   dizimista_nome: diz?.nome || '',
+                                  congregacao_id: dizCompleto?.congregacaoId || p.congregacao_id,
                                   observacoes: diz?.nome ? `Dízimo de ${diz.nome}` : p.observacoes,
-                                }))
-                              }
+                                }));
+                              }}
                             />
                           ) : (
-                            <div className="text-xs text-gray-500 italic bg-gray-100 p-2 rounded-lg border border-gray-200">
-                              Lançamento marcado como Dízimo Avulso. O nome do dizimista não será vinculado neste registro.
+                            <div className="text-xs text-gray-500 italic bg-gray-100 px-3 py-2 rounded-lg border border-gray-200">
+                              Lançamento marcado como Dízimo Avulso.
                             </div>
                           )}
                         </div>
-                      )}
+
+                        {/* Coluna 2: Congregação do Dizimista */}
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-semibold text-gray-600">Congregação do Dizimista</label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={
+                              t.form.is_dizimo_avulso
+                                ? '— (Dízimo Avulso)'
+                                : t.dizimistasFiltrados.find((d) => d.id === t.form.dizimista_id)?.congregacaoNome ||
+                                  (t.form.congregacao_id ? t.congNome(t.form.congregacao_id) : 'Selecione o dizimista')
+                            }
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 font-medium h-[38px]"
+                          />
+                        </div>
+
+                        {/* Coluna 3: Cargo / Vínculo do Dizimista */}
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-semibold text-gray-600">Cargo / Vínculo</label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={
+                              t.form.is_dizimo_avulso
+                                ? 'Dízimo Avulso'
+                                : t.dizimistasFiltrados.find((d) => d.id === t.form.dizimista_id)?.tipoCadastro
+                                ? t.dizimistasFiltrados.find((d) => d.id === t.form.dizimista_id)?.tipoCadastro?.toUpperCase()
+                                : '—'
+                            }
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 font-medium h-[38px]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                     </div>
                   ) : (
                     <div>
