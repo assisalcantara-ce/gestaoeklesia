@@ -587,9 +587,9 @@ export default function TesourariaPage() {
               isOpen={!!t.confirmDel}
               onClose={() => t.setConfirmDel(null)}
               onConfirm={() => t.handleDelete(t.confirmDel!)}
-              title="Excluir Lançamento"
-              description="Tem certeza que deseja remover este lançamento financeiro?"
-              confirmText="Excluir"
+              title="⚠️ Excluir Lançamento Financeiro"
+              description="Esta é uma ação sensível. O lançamento será removido do saldo do período e os dados anteriores serão salvos permanentemente no histórico de auditoria do sistema."
+              confirmText="Sim, Excluir Lançamento"
             />
           </div>
         )}

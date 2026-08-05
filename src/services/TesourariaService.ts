@@ -116,7 +116,7 @@ export class TesourariaService {
     return this.repository.atualizarLancamento(id, ministryId, payload);
   }
 
-  async deletarLancamento(id: string, ministryId: string): Promise<boolean> {
+  async deletarLancamento(id: string, ministryId: string, userId?: string | null): Promise<boolean> {
     if (!id || id.trim().length === 0) {
       throw new Error('O ID do lançamento é obrigatório para exclusão.');
     }
@@ -125,6 +125,6 @@ export class TesourariaService {
       throw new Error('O ministry_id é obrigatório.');
     }
 
-    return this.repository.deletarLancamento(id, ministryId);
+    return this.repository.deletarLancamento(id, ministryId, userId);
   }
 }

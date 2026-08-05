@@ -158,7 +158,7 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const { admin, ministryId } = context;
+  const { admin, ministryId, userId } = context;
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
 
@@ -171,7 +171,7 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const service = new TesourariaService(admin);
-    await service.deletarLancamento(id, ministryId);
+    await service.deletarLancamento(id, ministryId, userId);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error('[DELETE /api/v1/tesouraria/lancamentos]', err);

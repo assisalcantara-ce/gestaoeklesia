@@ -66,7 +66,16 @@ export class TesourariaRepository {
     return data as LancamentoRow;
   }
 
-  async deletarLancamento(id: string, ministryId: string): Promise<boolean> {
+  async deletarLancamento(id: string, ministryId: string, userId?: string | null): Promise<boolean> {
+    // 1. Buscar os dados do lançamento para preservar o histórico/auditoria
+    const { data: lancamento } = await this.supabase
+      .from('tesouraria_lancamentos')
+      .select('*')
+      .eq('id', id)
+      .eq('ministry_id', ministryId)
+      .maybeSingle();
+
+    // 2. Excluir o registro
     const { error } = await this.supabase
       .from('tesouraria_lancamentos')
       .delete()
@@ -75,6 +84,29 @@ export class TesourariaRepository {
 
     if (error) {
       throw new Error(`Erro ao deletar lançamento: ${error.message}`);
+    }
+
+    // 3. Registrar auditoria em audit_logs se o lançamento existia
+    if (lancamento) {
+      try {
+        await this.supabase.from('audit_logs').insert([
+          {
+            ministry_id: ministryId,
+            user_id: userId || null,
+            action: 'DELETE',
+            resource_type: 'tesouraria_lancamentos',
+            resource_id: id,
+            old_data: {
+              ...lancamento,
+              motivo_exclusao: 'Exclusão solicitada na Tesouraria',
+            },
+            new_data: null,
+            status_code: 200,
+          },
+        ]);
+      } catch (auditErr) {
+        console.warn('Aviso: falha ao gravar log de auditoria da exclusão:', auditErr);
+      }
     }
 
     return true;
