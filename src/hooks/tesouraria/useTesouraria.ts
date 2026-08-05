@@ -723,7 +723,7 @@ export function useTesouraria() {
       tipo_movimento: l.tipo_movimento,
       tipo_recebimento: (l.tipo_recebimento as TipoRecebimento) || 'dizimo',
       categoria_saida: l.tipo_recebimento || '',
-      valor: String(l.valor),
+      valor: Number(l.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       referencia: l.referencia || '',
       observacoes: l.observacoes || '',
       descricao: l.descricao || '',
@@ -741,7 +741,8 @@ export function useTesouraria() {
       showModal('Campos obrigatórios', 'Preencha valor e data.', 'error');
       return;
     }
-    const valNum = parseFloat(form.valor.replace(',', '.'));
+    const valClean = form.valor.replace(/\./g, '').replace(',', '.');
+    const valNum = parseFloat(valClean);
     if (isNaN(valNum) || valNum <= 0) {
       showModal('Valor inválido', 'Informe um valor maior que zero.', 'error');
       return;
