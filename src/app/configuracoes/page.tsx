@@ -1327,9 +1327,11 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
   };
 
   useEffect(() => {
-    loadFromSupabaseOrMigrate();
+    if (userCtx.ministryId) {
+      loadFromSupabaseOrMigrate();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userCtx.ministryId]);
 
   const handleSelectChange = (nivel: DivisionKey, value: string) => {
     const selected = (value || '').trim().toUpperCase();
