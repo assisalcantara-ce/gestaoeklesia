@@ -940,6 +940,133 @@ export default function TesourariaPage() {
           </div>
         )}
       </div>
+
+      {/* Bloco Exclusivo de Impressão (Oculto em visualização normal e exibido no @media print) */}
+      <div className="print-only hidden p-8 bg-white text-black space-y-6">
+        {/* Timbre da Igreja */}
+        <div className="flex items-center gap-5 border-b pb-4 border-gray-300">
+          {t.ministerio?.logo ? (
+            <img
+              src={t.ministerio.logo}
+              alt="Logo da Igreja"
+              className="max-h-20 max-w-[120px] object-contain"
+            />
+          ) : (
+            <div className="w-[100px] h-[100px] bg-gray-100 flex items-center justify-center text-xs text-gray-400 border border-gray-200">
+              Sem Logo
+            </div>
+          )}
+          <div className="space-y-1">
+            <h1 className="text-lg font-bold uppercase text-gray-800">
+              {t.ministerio?.nome || 'Gestão Eklesia — Igreja Registrada'}
+            </h1>
+            <p className="text-xs text-gray-500 font-medium">
+              {t.ministerio?.endereco && `Endereço: ${t.ministerio.endereco}`}
+            </p>
+            <div className="flex gap-4 text-xs text-gray-500 font-medium">
+              {t.ministerio?.cnpj && <span>CNPJ: {t.ministerio.cnpj}</span>}
+              {t.ministerio?.telefone && <span>Telefone: {t.ministerio.telefone}</span>}
+              {t.ministerio?.email && <span>E-mail: {t.ministerio.email}</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* Título do Relatório */}
+        <div className="space-y-1">
+          <h2 className="text-base font-bold uppercase tracking-wider text-gray-700">
+            Relatório de Movimentação Financeira — Tesouraria
+          </h2>
+          <p className="text-xs text-gray-400">
+            Período de Referência: <span className="font-semibold text-gray-600">{t.relMes}</span>
+          </p>
+        </div>
+
+        {/* Tabela do Relatório Formato A4 */}
+        <table className="w-full border-collapse text-xs text-left">
+          <thead>
+            <tr className="border-b border-gray-300 bg-gray-50">
+              <th className="py-2.5 px-2 font-bold text-gray-600">Data</th>
+              <th className="py-2.5 px-2 font-bold text-gray-600">Caixa</th>
+              <th className="py-2.5 px-2 font-bold text-gray-600">Departamento</th>
+              <th className="py-2.5 px-2 font-bold text-gray-600">Tipo</th>
+              <th className="py-2.5 px-2 font-bold text-gray-600">Descrição / Ref.</th>
+              <th className="py-2.5 px-2 font-bold text-gray-600 text-right">Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.lancsRelatorioFiltrados.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-4 text-center text-gray-400">
+                  Nenhum lançamento encontrado no período selecionado.
+                </td>
+              </tr>
+            ) : (
+              t.lancsRelatorioFiltrados.map((l) => (
+                <tr key={l.id} className="border-b border-gray-100">
+                  <td className="py-2 px-2">{t.fmtDate(l.data_lancamento)}</td>
+                  <td className="py-2 px-2 uppercase font-medium">{t.congNome(l.congregacao_id)}</td>
+                  <td className="py-2 px-2">{l.departamento_nome || 'Caixa Geral'}</td>
+                  <td className="py-2 px-2 font-medium capitalize">
+                    {t.tipoLabel(l.tipo_recebimento || l.tipo_movimento)}
+                  </td>
+                  <td className="py-2 px-2 text-gray-500">{l.referencia || l.observacoes || '—'}</td>
+                  <td
+                    className={`py-2 px-2 text-right font-bold ${
+                      l.tipo_movimento === 'entrada' ? 'text-green-600' : 'text-red-500'
+                    }`}
+                  >
+                    {l.tipo_movimento === 'entrada' ? '+' : '-'} {t.fmtBRL(l.valor)}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-gray-300 font-bold bg-gray-50">
+              <td colSpan={5} className="py-2.5 px-2 text-right text-gray-700">Totalizadores:</td>
+              <td className="py-2.5 px-2 text-right text-[#123b63]">
+                {t.fmtBRL(t.entradasRelatorio - t.saidasRelatorio)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+
+        {/* Assinatura Responsável */}
+        <div className="pt-12 flex justify-around text-center text-xs">
+          <div className="space-y-1">
+            <div className="w-48 border-b border-gray-400 mx-auto"></div>
+            <p className="font-semibold text-gray-700">Assinatura do Tesoureiro</p>
+          </div>
+          <div className="space-y-1">
+            <div className="w-48 border-b border-gray-400 mx-auto"></div>
+            <p className="font-semibold text-gray-700">Assinatura do Pastor / Dirigente</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Regras CSS globais injetadas para gerenciar visualização no print */}
+      <style jsx global>{`
+        @media print {
+          /* Oculta tudo que não for o bloco exclusivo de impressão */
+          body * {
+            visibility: hidden !important;
+          }
+          .print-only, .print-only * {
+            visibility: visible !important;
+          }
+          .print-only {
+            display: block !important;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+          /* Oculta elementos do sistema Next.js e menus */
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
     </PageLayout>
   );
 }
