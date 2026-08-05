@@ -198,6 +198,7 @@ export default function AuditoriaFinanceiraPage() {
   const [eventoSemLanc, setEventoSemLanc] = useState<EventoAlerta[]>([]);
   const [destinos, setDestinos] = useState<FpDestino[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [systemAuditLogs, setSystemAuditLogs] = useState<any[]>([]);
 
   // Score sort
   const [sortBy, setSortBy] = useState<SortCol>('score');
@@ -213,14 +214,28 @@ export default function AuditoriaFinanceiraPage() {
   // Load audit logs on mount / after auditoria runs
   const loadLogs = useCallback(async (mid: string) => {
     try {
-      const { data, error } = await supabase
-        .from('financial_audit_logs')
-        .select('id, executado_em, tipo_auditoria, resultado, total_alertas, created_at')
-        .eq('ministry_id', mid)
-        .order('executado_em', { ascending: false })
-        .limit(50);
-      if (error) { setLogTableExists(false); return; }
-      setAuditLogs((data ?? []) as AuditLog[]);
+      const [resFinLogs, resSysLogs] = await Promise.all([
+        supabase
+          .from('financial_audit_logs')
+          .select('id, executado_em, tipo_auditoria, resultado, total_alertas, created_at')
+          .eq('ministry_id', mid)
+          .order('executado_em', { ascending: false })
+          .limit(50),
+        supabase
+          .from('audit_logs')
+          .select('*')
+          .eq('ministry_id', mid)
+          .order('created_at', { ascending: false })
+          .limit(100),
+      ]);
+
+      if (!resFinLogs.error && resFinLogs.data) {
+        setAuditLogs(resFinLogs.data as AuditLog[]);
+      }
+
+      if (!resSysLogs.error && resSysLogs.data) {
+        setSystemAuditLogs(resSysLogs.data);
+      }
     } catch {
       setLogTableExists(false);
     }
@@ -556,7 +571,7 @@ export default function AuditoriaFinanceiraPage() {
   ]);
 
   // KPIs
-  const totalCongs     = congregacoes.length + 1; // +1 sede
+  const totalCongs     = congregacoes.length;
   const congsSaudaveis = scoresPorCong.filter(s => s.score >= 90).length;
   const congsPendentes = scoresPorCong.filter(s => s.score >= 50 && s.score < 90).length;
   const congsCriticas  = scoresPorCong.filter(s => s.score < 50).length;
@@ -1285,6 +1300,67 @@ export default function AuditoriaFinanceiraPage() {
                           }
                         </tbody>
                       </table>
+                    </div>
+                    {/* Logs de Auditoria do Sistema (Ações Sensíveis) */}
+                    <div className="mt-8">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                        Registro de Ações Sensíveis e Alterações
+                      </h3>
+                      <p className="text-xs text-gray-500 mb-4">
+                        Histórico completo de exclusões, edições e operações críticas realizadas pelos usuários no sistema.
+                      </p>
+                      <div className="rounded-lg border border-gray-100 overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                              <th className="text-left px-5 py-3">Data / Hora</th>
+                              <th className="text-left px-5 py-3">Ação / Módulo</th>
+                              <th className="text-left px-5 py-3">Descrição da Operação</th>
+                              <th className="text-center px-5 py-3">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {systemAuditLogs.length === 0 ? (
+                              <EmptyRow cols={4} msg="Nenhum log de ação registrado recentemente." />
+                            ) : (
+                              systemAuditLogs.map((log: any, i: number) => {
+                                const acaoStr = log.acao || log.action || '—';
+                                const modStr = log.modulo || log.resource_type || '—';
+                                const descStr = log.descricao || (log.old_data?.motivo_exclusao ? `Exclusão solicitada (${log.resource_id})` : '—');
+                                const isDel = String(acaoStr).toLowerCase().includes('delete') || String(acaoStr).toLowerCase().includes('deletar');
+
+                                return (
+                                  <tr key={log.id || i} className={`border-t border-gray-50 ${i % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
+                                    <td className="px-5 py-3 text-xs text-gray-600 whitespace-nowrap">
+                                      {log.data_criacao ? fmtDateTime(log.data_criacao) : log.created_at ? fmtDateTime(log.created_at) : '—'}
+                                    </td>
+                                    <td className="px-5 py-3">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${
+                                          isDel ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                                        }`}>
+                                          {acaoStr}
+                                        </span>
+                                        <span className="text-xs text-gray-500 font-medium">
+                                          {modStr}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-5 py-3 text-xs text-gray-700 font-medium">
+                                      {descStr}
+                                    </td>
+                                    <td className="px-5 py-3 text-center">
+                                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                        ✓ Sucesso
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </>
                 )}
