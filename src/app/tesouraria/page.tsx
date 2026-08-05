@@ -14,6 +14,7 @@ import ConfirmDeleteModal from '@/components/tesouraria/modals/ConfirmDeleteModa
 import TesourariaCharts from '@/components/tesouraria/TesourariaCharts';
 import FechamentoCaixaTable from '@/components/tesouraria/FechamentoCaixaTable';
 import DizimistasTable from '@/components/tesouraria/DizimistasTable';
+import DizimistaSearchInput from '@/components/tesouraria/DizimistaSearchInput';
 import { useTesouraria } from '@/hooks/tesouraria/useTesouraria';
 
 // Componente customizado e elegante para seleção de Mês e Ano de referência
@@ -256,22 +257,79 @@ export default function TesourariaPage() {
 
                   {/* Tipo de Entrada ou Categoria de Saída */}
                   {t.form.tipo_movimento === 'entrada' ? (
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">
-                        Tipo de recebimento <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={t.form.tipo_recebimento}
-                        onChange={(e) => t.setForm((p) => ({ ...p, tipo_recebimento: e.target.value as any }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      >
-                        <option value="">Selecione</option>
-                        {t.TIPOS.map((tr) => (
-                          <option key={tr.value} value={tr.value}>
-                            {tr.label}
-                          </option>
-                        ))}
-                      </select>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">
+                          Tipo de recebimento <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={t.form.tipo_recebimento}
+                          onChange={(e) =>
+                            t.setForm((p) => ({
+                              ...p,
+                              tipo_recebimento: e.target.value as any,
+                              is_dizimo_avulso: false,
+                              dizimista_id: '',
+                              dizimista_nome: '',
+                            }))
+                          }
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                        >
+                          <option value="">Selecione</option>
+                          {t.TIPOS.map((tr) => (
+                            <option key={tr.value} value={tr.value}>
+                              {tr.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Campo de Busca de Dizimista se Tipo de Recebimento === 'dizimo' */}
+                      {t.form.tipo_recebimento === 'dizimo' && (
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 col-span-full">
+                          <div className="flex justify-between items-center">
+                            <label className="block text-xs font-bold text-[#123b63]">
+                              Identificação do Dizimista
+                            </label>
+                            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={!!t.form.is_dizimo_avulso}
+                                onChange={(e) =>
+                                  t.setForm((p) => ({
+                                    ...p,
+                                    is_dizimo_avulso: e.target.checked,
+                                    dizimista_id: e.target.checked ? '' : p.dizimista_id,
+                                    dizimista_nome: e.target.checked ? '' : p.dizimista_nome,
+                                  }))
+                                }
+                                className="w-4 h-4 text-[#123b63] rounded border-gray-300 focus:ring-[#123b63]"
+                              />
+                              <span className="font-semibold text-gray-700">Dízimo Avulso</span>
+                              <span className="text-[10px] text-gray-400">(dispensar nome)</span>
+                            </label>
+                          </div>
+
+                          {!t.form.is_dizimo_avulso ? (
+                            <DizimistaSearchInput
+                              dizimistas={t.dizimistasFiltrados}
+                              selectedNome={t.form.dizimista_nome || ''}
+                              onSelectDizimista={(diz) =>
+                                t.setForm((p) => ({
+                                  ...p,
+                                  dizimista_id: diz?.id || '',
+                                  dizimista_nome: diz?.nome || '',
+                                  observacoes: diz?.nome ? `Dízimo de ${diz.nome}` : p.observacoes,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <div className="text-xs text-gray-500 italic bg-gray-100 p-2 rounded-lg border border-gray-200">
+                              Lançamento marcado como Dízimo Avulso. O nome do dizimista não será vinculado neste registro.
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div>
@@ -811,8 +869,11 @@ export default function TesourariaPage() {
                   ...p,
                   tipo_movimento: 'entrada',
                   tipo_recebimento: 'dizimo',
+                  dizimista_id: dizimista.id,
+                  dizimista_nome: dizimista.nome,
+                  is_dizimo_avulso: false,
                   observacoes: `Dízimo de ${dizimista.nome}`,
-                  congregacao_id: dizimista.congregacaoId || '',
+                  congregacao_id: dizimista.congregacaoId || p.congregacao_id,
                 }));
               }}
             />

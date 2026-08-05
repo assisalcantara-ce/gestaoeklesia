@@ -142,6 +142,9 @@ export interface FormLanc {
   conta_id: string;
   categoria_id: string;
   is_dizimo: boolean;
+  dizimista_id?: string;
+  dizimista_nome?: string;
+  is_dizimo_avulso?: boolean;
 }
 
 export interface FormConta {
@@ -200,6 +203,9 @@ const emptyForm = (): FormLanc => ({
   conta_id: '',
   categoria_id: '',
   is_dizimo: true,
+  dizimista_id: '',
+  dizimista_nome: '',
+  is_dizimo_avulso: false,
 });
 
 const emptyFormConta = (): FormConta => ({
@@ -738,14 +744,26 @@ export function useTesouraria() {
 
     try {
       setSaving(true);
+
+      let obsFinal = form.observacoes || form.descricao || '';
+      if (form.tipo_recebimento === 'dizimo') {
+        if (form.is_dizimo_avulso) {
+          if (!obsFinal.toLowerCase().includes('avulso')) {
+            obsFinal = obsFinal ? `Dízimo Avulso — ${obsFinal}` : 'Dízimo Avulso';
+          }
+        } else if (form.dizimista_nome && !obsFinal.toLowerCase().includes(form.dizimista_nome.toLowerCase())) {
+          obsFinal = obsFinal ? `Dízimo de ${form.dizimista_nome} — ${obsFinal}` : `Dízimo de ${form.dizimista_nome}`;
+        }
+      }
+
       const payload = {
         data_lancamento: form.data_lancamento,
         tipo_movimento: form.tipo_movimento,
         tipo_recebimento: form.tipo_movimento === 'entrada' ? form.tipo_recebimento : form.categoria_saida,
         valor: valNum,
-        referencia: form.referencia || null,
-        observacoes: form.observacoes || form.descricao || null,
-        descricao: form.observacoes || form.descricao || null,
+        referencia: form.referencia || (form.dizimista_nome ? `Dízimo: ${form.dizimista_nome}` : null),
+        observacoes: obsFinal || null,
+        descricao: obsFinal || null,
         congregacao_id: form.congregacao_id || null,
         departamento_id: form.departamento_id || null,
         conta_id: form.conta_id || null,
