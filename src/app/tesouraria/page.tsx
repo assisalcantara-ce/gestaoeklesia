@@ -481,15 +481,17 @@ export default function TesourariaPage() {
                     )}
                   </div>
 
-                  {/* Forma de pagamento ou tipo de entrada */}
+                  {/* Forma de entrada / Forma de saída */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Forma de pagamento</label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      {t.form.tipo_movimento === 'saida' ? 'Forma de Saída' : 'Forma de Entrada'}
+                    </label>
                     <select
                       value={t.form.forma_pagamento}
                       onChange={(e) => t.setForm((p) => ({ ...p, forma_pagamento: e.target.value }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                     >
-                      <option value="A VISTA">A VISTA</option>
+                      <option value="EM ESPÉCIE">EM ESPÉCIE</option>
                       <option value="PIX">PIX</option>
                       <option value="CARTÃO DE CRÉDITO">CARTÃO DE CRÉDITO</option>
                       <option value="DEPÓSITO BANCÁRIO">DEPÓSITO BANCÁRIO</option>
