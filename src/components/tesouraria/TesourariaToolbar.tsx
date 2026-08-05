@@ -60,7 +60,7 @@ export default function TesourariaToolbar({
 }: TesourariaToolbarProps) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-md">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1">Mês</label>
           <MonthPicker value={filtroMes} onChange={setFiltroMes} className="w-full" />
@@ -133,6 +133,10 @@ export default function TesourariaToolbar({
             </select>
           </div>
         )}
+      </div>
+
+      {/* Linha 2: Departamento + Botões e Métricas */}
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1">Departamento</label>
           <select
@@ -149,41 +153,54 @@ export default function TesourariaToolbar({
             ))}
           </select>
         </div>
-      </div>
 
-      {/* Linha de ações */}
-      <div className="mt-3 flex flex-wrap gap-2 items-center justify-between">
-        <div className="flex gap-2">
-          {scope.canWrite && (
-            <button
-              onClick={onNovoClick}
-              className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition"
+        <div className="sm:col-span-3 flex flex-wrap gap-2 items-center justify-between">
+          <div className="flex gap-2">
+            {scope.canWrite && (
+              <button
+                onClick={onNovoClick}
+                className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition h-[38px]"
+              >
+                <Plus className="h-4 w-4" /> Novo
+              </button>
+            )}
+            {lancamentosMesCount > 0 && (
+              <button
+                onClick={onExportarCSV}
+                className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition h-[38px]"
+                title="Exportar lançamentos filtrados para CSV"
+              >
+                <Download className="h-4 w-4" /> CSV
+              </button>
+            )}
+            {(filtroMovimento !== '' || filtroTipo !== '' || filtroCong !== '' || filtroDept !== '') && (
+              <button
+                onClick={() => {
+                  setFiltroMovimento('');
+                  setFiltroTipo('');
+                  setFiltroCong('');
+                  setFiltroDept('');
+                }}
+                className="flex items-center gap-2 px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm transition h-[38px]"
+              >
+                Limpar Filtros
+              </button>
+            )}
+          </div>
+
+          {/* Totalizador */}
+          <div className="flex gap-3 flex-wrap text-sm items-center h-[38px]">
+            <span className="text-gray-400">{lancsFiltradosCount} reg.</span>
+            <span className="text-green-600 font-semibold">↑ {fmtBRL(entradasFiltradas)}</span>
+            <span className="text-red-500 font-semibold">↓ {fmtBRL(saidasFiltradas)}</span>
+            <span
+              className={`font-bold ${
+                entradasFiltradas - saidasFiltradas >= 0 ? 'text-[#123b63]' : 'text-red-600'
+              }`}
             >
-              <Plus className="h-4 w-4" /> Novo
-            </button>
-          )}
-          {lancamentosMesCount > 0 && (
-            <button
-              onClick={onExportarCSV}
-              className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
-              title="Exportar lançamentos filtrados para CSV"
-            >
-              <Download className="h-4 w-4" /> CSV
-            </button>
-          )}
-        </div>
-        {/* Totalizador */}
-        <div className="flex gap-3 flex-wrap text-sm">
-          <span className="text-gray-400">{lancsFiltradosCount} reg.</span>
-          <span className="text-green-600 font-semibold">↑ {fmtBRL(entradasFiltradas)}</span>
-          <span className="text-red-500 font-semibold">↓ {fmtBRL(saidasFiltradas)}</span>
-          <span
-            className={`font-bold ${
-              entradasFiltradas - saidasFiltradas >= 0 ? 'text-[#123b63]' : 'text-red-600'
-            }`}
-          >
-            = {fmtBRL(entradasFiltradas - saidasFiltradas)}
-          </span>
+              = {fmtBRL(entradasFiltradas - saidasFiltradas)}
+            </span>
+          </div>
         </div>
       </div>
 
