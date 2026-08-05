@@ -14,15 +14,64 @@ import ConfirmDeleteModal from '@/components/tesouraria/modals/ConfirmDeleteModa
 import TesourariaCharts from '@/components/tesouraria/TesourariaCharts';
 import { useTesouraria } from '@/hooks/tesouraria/useTesouraria';
 
-// Componente simples para picker de mês
+// Componente customizado e elegante para seleção de Mês e Ano de referência
 function MonthPicker({ value, onChange, className = '' }: { value: string; onChange: (v: string) => void; className?: string }) {
+  const [anoStr, mesStr] = value.split('-');
+  const ano = parseInt(anoStr || String(new Date().getFullYear()));
+  const mes = parseInt(mesStr || String(new Date().getMonth() + 1));
+
+  const meses = [
+    { value: 1, label: 'Janeiro' },
+    { value: 2, label: 'Fevereiro' },
+    { value: 3, label: 'Março' },
+    { value: 4, label: 'Abril' },
+    { value: 5, label: 'Maio' },
+    { value: 6, label: 'Junho' },
+    { value: 7, label: 'Julho' },
+    { value: 8, label: 'Agosto' },
+    { value: 9, label: 'Setembro' },
+    { value: 10, label: 'Outubro' },
+    { value: 11, label: 'Novembro' },
+    { value: 12, label: 'Dezembro' }
+  ];
+
+  // Gera uma lista dinâmica de anos ao redor do ano atual
+  const anoAtual = new Date().getFullYear();
+  const anos = Array.from({ length: 8 }, (_, i) => anoAtual - 5 + i); // 5 anos anteriores, ano atual, e mais 2 à frente
+
+  const handleMesChange = (novoMes: number) => {
+    onChange(`${anoStr}-${String(novoMes).padStart(2, '0')}`);
+  };
+
+  const handleAnoChange = (novoAno: number) => {
+    onChange(`${novoAno}-${String(mes).padStart(2, '0')}`);
+  };
+
   return (
-    <input
-      type="month"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#123b63] ${className}`}
-    />
+    <div className={`flex gap-1.5 ${className}`}>
+      <select
+        value={mes}
+        onChange={(e) => handleMesChange(Number(e.target.value))}
+        className="flex-1 min-w-[105px] border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-[#123b63] bg-white"
+      >
+        {meses.map((m) => (
+          <option key={m.value} value={m.value}>
+            {m.label}
+          </option>
+        ))}
+      </select>
+      <select
+        value={ano}
+        onChange={(e) => handleAnoChange(Number(e.target.value))}
+        className="w-[72px] border border-gray-200 rounded-lg px-1.5 py-2 text-sm focus:outline-none focus:border-[#123b63] bg-white"
+      >
+        {anos.map((y) => (
+          <option key={y} value={y}>
+            {y}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 
@@ -487,11 +536,10 @@ export default function TesourariaPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Mês de Referência</label>
-                  <input
-                    type="month"
+                  <MonthPicker
                     value={t.relMes}
-                    onChange={(e) => t.setRelMes(e.target.value)}
-                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63]"
+                    onChange={t.setRelMes}
+                    className="h-[36px]"
                   />
                 </div>
                 {t.congregacoes.length > 0 && !t.scope.isFinanceiroLocal && (
