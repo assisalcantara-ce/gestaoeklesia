@@ -12,6 +12,7 @@ import ContaBancariaModal from '@/components/tesouraria/modals/ContaBancariaModa
 import CategoriaFinanceiraModal from '@/components/tesouraria/modals/CategoriaFinanceiraModal';
 import ConfirmDeleteModal from '@/components/tesouraria/modals/ConfirmDeleteModal';
 import TesourariaCharts from '@/components/tesouraria/TesourariaCharts';
+import FechamentoCaixaTable from '@/components/tesouraria/FechamentoCaixaTable';
 import { useTesouraria } from '@/hooks/tesouraria/useTesouraria';
 
 // Componente customizado e elegante para seleção de Mês e Ano de referência
@@ -632,75 +633,51 @@ export default function TesourariaPage() {
         {/* ─── ABA: FECHAMENTO DE CAIXA ─── */}
         {t.aba === 'fechamento' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200">
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
               <div>
                 <h2 className="text-base font-bold text-[#123b63]">Fechamento de Caixa</h2>
                 <p className="text-sm text-gray-500">
-                  Encerramento de períodos financeiros por congregação / unidade
+                  Gestão e encerramento de períodos financeiros por congregação / unidade
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {t.congregacoes.map((c) => {
-                const fecho = t.fechamentos.find((f: any) => f.congregacao_id === c.id || f.cong_id === c.id);
-                return (
-                  <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-gray-800 text-sm">{c.nome}</h3>
-                        <p className="text-xs text-gray-400">Unidade Local</p>
-                      </div>
-                      <span
-                        className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
-                          fecho?.status === 'fechado' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
-                        }`}
-                      >
-                        {fecho?.status === 'fechado' ? 'Fechado' : 'Aberto'}
-                      </span>
-                    </div>
+            <FechamentoCaixaTable
+              congregacoes={t.congregacoes}
+              fechamentos={t.fechamentos}
+              filtroMes={t.filtroMes}
+              fmtBRL={t.fmtBRL}
+              onAbrirModalFechamento={(congId) => {
+                const [ano, mes] = t.filtroMes.split('-');
+                const ultDiaObj = new Date(Number(ano), Number(mes), 0);
+                const ultDiaDefault = `${ano}-${mes}-${String(ultDiaObj.getDate()).padStart(2, '0')}`;
 
-                    <div className="pt-2 border-t border-gray-100 flex justify-between items-center">
-                      <button
-                        onClick={() => {
-                          const [ano, mes] = t.filtroMes.split('-');
-                          const ultDiaObj = new Date(Number(ano), Number(mes), 0);
-                          const ultDiaDefault = `${ano}-${mes}-${String(ultDiaObj.getDate()).padStart(2, '0')}`;
-
-                          // Procurar fechamento anterior dessa congregação
-                          const fechamentoAnterior = t.fechamentos.find(
-                            (f) => (f.congregacao_id === c.id || (f as any).cong_id === c.id)
-                          );
-
-                          if (fechamentoAnterior && (fechamentoAnterior as any).data_fim) {
-                            // Se existir data_fim no fechamento anterior, calcula D+1
-                            const dataFimAnt = new Date((fechamentoAnterior as any).data_fim + 'T00:00:00');
-                            dataFimAnt.setDate(dataFimAnt.getDate() + 1);
-                            const proxDiaStr = dataFimAnt.toISOString().split('T')[0];
-                            t.setFechaDataInicio(proxDiaStr);
-
-                            if (fechamentoAnterior.saldo_final !== undefined) {
-                              t.setFechaSaldoInicial(String(fechamentoAnterior.saldo_final));
-                            }
-                          } else {
-                            // Primeiro fechamento: 1º dia do mês
-                            t.setFechaDataInicio(`${ano}-${mes}-01`);
-                            t.setFechaSaldoInicial('0,00');
-                          }
-
-                          t.setFechaDataFim(ultDiaDefault);
-                          t.setFechaCongId(c.id);
-                          t.setShowFechaModal(true);
-                        }}
-                        className="w-full py-2 bg-[#123b63] text-white text-xs font-semibold rounded-lg hover:bg-[#0f2a45] transition flex items-center justify-center gap-1.5"
-                      >
-                        <Lock className="h-3.5 w-3.5" /> Realizar Fechamento
-                      </button>
-                    </div>
-                  </div>
+                const fechamentoAnterior = t.fechamentos.find(
+                  (f) => (f.congregacao_id === congId || (f as any).cong_id === congId)
                 );
-              })}
-            </div>
+
+                if (fechamentoAnterior && (fechamentoAnterior as any).data_fim) {
+                  const dataFimAnt = new Date((fechamentoAnterior as any).data_fim + 'T00:00:00');
+                  dataFimAnt.setDate(dataFimAnt.getDate() + 1);
+                  const proxDiaStr = dataFimAnt.toISOString().split('T')[0];
+                  t.setFechaDataInicio(proxDiaStr);
+
+                  if (fechamentoAnterior.saldo_final !== undefined) {
+                    t.setFechaSaldoInicial(String(fechamentoAnterior.saldo_final));
+                  }
+                } else {
+                  t.setFechaDataInicio(`${ano}-${mes}-01`);
+                  t.setFechaSaldoInicial('0,00');
+                }
+
+                t.setFechaDataFim(ultDiaDefault);
+                t.setFechaCongId(congId);
+                t.setShowFechaModal(true);
+              }}
+              onImprimirFechamento={() => {
+                window.print();
+              }}
+            />
 
             <FechamentoCaixaModal
               isOpen={t.showFechaModal}
