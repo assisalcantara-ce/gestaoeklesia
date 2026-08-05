@@ -1263,9 +1263,14 @@ export default function AuditoriaFinanceiraPage() {
                   </div>
                 ) : (
                   <>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">
-                      Histórico de Execuções
-                    </h3>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-0.5">
+                        Histórico de Vistorias / Varreduras Automáticas
+                      </h3>
+                      <p className="text-xs text-gray-500 mb-4">
+                        Registra cada vez que o motor de inteligência financeira roda uma análise na base do ministério (ao clicar em &quot;Rodar Auditoria&quot; ou por agendamento automático) e a quantidade de divergências detectadas naquele momento.
+                      </p>
+                    </div>
                     <div className="rounded-lg border border-gray-100 overflow-hidden">
                       <table className="w-full text-sm">
                         <thead>
