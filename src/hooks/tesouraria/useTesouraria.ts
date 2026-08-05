@@ -552,6 +552,67 @@ export function useTesouraria() {
     }
   }, [filtroMes, ministryId, loadLancamentosMes]);
 
+  // Buscar lançamentos quando o mês de referência do Relatório (relMes) alterar
+  const [lancamentosRelMes, setLancamentosRelMes] = useState<Lancamento[]>([]);
+
+  const loadLancamentosRelatorio = useCallback(async (mes: string) => {
+    if (!ministryId) return;
+    try {
+      let q = supabase
+        .from('tesouraria_lancamentos')
+        .select('*, congregacoes(nome), departamentos(nome, sigla)')
+        .eq('ministry_id', ministryId)
+        .gte('data_lancamento', `${mes}-01`)
+        .lt('data_lancamento', `${mesProximo(mes)}-01`);
+
+      if (scope.isFinanceiroLocal && scope.congregacaoId) {
+        q = q.eq('congregacao_id', scope.congregacaoId);
+      }
+
+      const { data, error } = await q;
+      if (error) {
+        console.error('Erro ao buscar lançamentos do relatório:', error);
+      } else if (data) {
+        const formatados: Lancamento[] = data.map((item: any) => ({
+          ...item,
+          congregacao_nome: item.congregacoes?.nome ?? 'Sede / Geral',
+          departamento_nome: item.departamentos?.nome ?? item.departamentos?.sigla ?? '—',
+        }));
+        setLancamentosRelMes(formatados);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar lançamentos do relatório:', err);
+    }
+  }, [ministryId, scope, supabase, mesProximo]);
+
+  useEffect(() => {
+    if (ministryId && aba === 'relatorios') {
+      loadLancamentosRelatorio(relMes);
+    }
+  }, [relMes, ministryId, aba, loadLancamentosRelatorio]);
+
+  // Lançamentos filtrados para o Relatório
+  const lancsRelatorioFiltrados = useMemo(() => {
+    return lancamentosRelMes.filter(l => {
+      // Filtro de Congregação/Caixa do Relatório
+      if (relCong && l.congregacao_id !== relCong) return false;
+      // Filtro de Departamento do Relatório
+      if (relDept && l.departamento_id !== relDept) return false;
+      // Filtro de Tipo de Movimento do Relatório (entradas / saidas / ambos)
+      if (relTipoRel === 'entradas' && l.tipo_movimento !== 'entrada') return false;
+      if (relTipoRel === 'saidas' && l.tipo_movimento !== 'saida') return false;
+      return true;
+    });
+  }, [lancamentosRelMes, relCong, relDept, relTipoRel]);
+
+  const entradasRelatorio = useMemo(() => {
+    return lancsRelatorioFiltrados.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
+  }, [lancsRelatorioFiltrados]);
+
+  const saidasRelatorio = useMemo(() => {
+    return lancsRelatorioFiltrados.filter(l => l.tipo_movimento === 'saida').reduce((s, l) => s + Number(l.valor), 0);
+  }, [lancsRelatorioFiltrados]);
+
   // Lançamentos filtrados
   const lancsFiltrados = useMemo(() => {
     return lancamentosMes.filter(l => {
@@ -909,6 +970,9 @@ export function useTesouraria() {
     setRelDataInicio,
     relDataFim,
     setRelDataFim,
+    lancsRelatorioFiltrados,
+    entradasRelatorio,
+    saidasRelatorio,
     // Contas CRUD
     contasFull,
     loadingContas,

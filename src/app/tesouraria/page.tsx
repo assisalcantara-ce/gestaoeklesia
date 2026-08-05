@@ -523,11 +523,27 @@ export default function TesourariaPage() {
                     <option value="saidas">Apenas Saídas</option>
                   </select>
                 </div>
+                <div className="self-end">
+                  <button
+                    onClick={() => {
+                      t.setRelCong('');
+                      t.setRelTipoRel('ambos');
+                    }}
+                    disabled={t.relCong === '' && t.relTipoRel === 'ambos'}
+                    className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm transition h-[36px] ${
+                      t.relCong === '' && t.relTipoRel === 'ambos'
+                        ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                        : 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300'
+                    }`}
+                  >
+                    Limpar Filtros
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => t.exportarCSV(t.lancsFiltrados, `relatorio_tesouraria_${t.relMes}`)}
+                  onClick={() => t.exportarCSV(t.lancsRelatorioFiltrados, `relatorio_tesouraria_${t.relMes}`)}
                   className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 font-medium transition"
                 >
                   Exportar CSV
@@ -545,17 +561,17 @@ export default function TesourariaPage() {
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
                 <h3 className="font-bold text-[#123b63] text-sm">Resumo Financeiro — {t.relMes}</h3>
-                <span className="text-xs text-gray-500">{t.lancsFiltrados.length} lançamentos encontrados</span>
+                <span className="text-xs text-gray-500">{t.lancsRelatorioFiltrados.length} lançamentos encontrados</span>
               </div>
               <div className="p-4">
                 <TesourariaTable
-                  lancsFiltrados={t.lancsFiltrados}
+                  lancsFiltrados={t.lancsRelatorioFiltrados}
                   fmtDate={t.fmtDate}
                   fmtBRL={t.fmtBRL}
                   TIPOS_SAIDA={t.TIPOS_SAIDA}
                   tipoCor={t.tipoCor}
                   tipoLabel={t.tipoLabel}
-                  totalFiltrado={t.entradasFiltradas - t.saidasFiltradas}
+                  totalFiltrado={t.entradasRelatorio - t.saidasRelatorio}
                   scope={t.scope}
                   handleEdit={t.handleEdit}
                   setConfirmDel={t.setConfirmDel}

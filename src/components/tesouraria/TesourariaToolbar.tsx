@@ -159,7 +159,7 @@ export default function TesourariaToolbar({
             {scope.canWrite && (
               <button
                 onClick={onNovoClick}
-                className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition h-[38px] whitespace-nowrap"
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition h-[38px] whitespace-nowrap"
               >
                 <Plus className="h-4 w-4" /> Novo lançamento
               </button>
