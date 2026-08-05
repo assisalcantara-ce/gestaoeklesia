@@ -192,7 +192,7 @@ export interface UserScope {
 const emptyForm = (): FormLanc => ({
   data_lancamento: new Date().toISOString().split('T')[0],
   tipo_movimento: 'entrada',
-  tipo_recebimento: 'dizimo',
+  tipo_recebimento: 'oferta',
   categoria_saida: '',
   valor: '',
   referencia: '',
@@ -202,7 +202,7 @@ const emptyForm = (): FormLanc => ({
   departamento_id: '',
   conta_id: '',
   categoria_id: '',
-  is_dizimo: true,
+  is_dizimo: false,
   dizimista_id: '',
   dizimista_nome: '',
   is_dizimo_avulso: false,
@@ -625,11 +625,16 @@ export function useTesouraria() {
   }, [ministryId, supabase]);
 
   useEffect(() => {
-    if (ministryId && aba === 'dizimistas') {
+    if (ministryId) {
       loadDizimistasData();
+    }
+  }, [ministryId, loadDizimistasData]);
+
+  useEffect(() => {
+    if (ministryId && aba === 'dizimistas') {
       loadLancamentosMes(abaDizimistaMes);
     }
-  }, [aba, abaDizimistaMes, ministryId, loadDizimistasData, loadLancamentosMes]);
+  }, [aba, abaDizimistaMes, ministryId, loadLancamentosMes]);
 
   // Cruzar membros dizimistas com os lançamentos de dízimo do mês selecionado (abaDizimistaMes)
   const dizimistasCompletos = useMemo(() => {

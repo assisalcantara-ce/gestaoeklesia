@@ -212,7 +212,7 @@ export default function TesourariaPage() {
                         t.setForm((p) => ({
                           ...p,
                           tipo_movimento: mv,
-                          tipo_recebimento: '',
+                          tipo_recebimento: mv === 'entrada' ? 'oferta' : '',
                           categoria_saida: '',
                         }))
                       }
