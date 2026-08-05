@@ -75,7 +75,8 @@ export default function MembrosPage() {
     setCargoSelecionado,
     dadosCargos,
     setDadosCargos,
-    isDizimista: _isDizimista,
+    isDizimista,
+    setIsDizimista,
     dizimosHistorico,
     loadingDizimosHistorico,
 
@@ -428,6 +429,8 @@ export default function MembrosPage() {
                 fecharFormulario={fecharFormulario}
                 dizimosHistorico={dizimosHistorico}
                 loadingDizimosHistorico={loadingDizimosHistorico}
+                isDizimista={isDizimista}
+                setIsDizimista={setIsDizimista}
               />
             </div>
           )}

@@ -34,6 +34,8 @@ export interface MembroFormModalProps {
   fecharFormulario: () => void;
   dizimosHistorico: any[];
   loadingDizimosHistorico: boolean;
+  isDizimista: boolean;
+  setIsDizimista: (val: boolean) => void;
 }
 
 export default function MembroFormModal({
@@ -68,6 +70,8 @@ export default function MembroFormModal({
   fecharFormulario,
   dizimosHistorico,
   loadingDizimosHistorico,
+  isDizimista,
+  setIsDizimista,
 }: MembroFormModalProps) {
   console.log('props recebidas', {
     supervisoesOptions,
@@ -1050,8 +1054,27 @@ export default function MembroFormModal({
           {/* ABA: DÍZIMOS */}
           {activeTab === 'dizimos' && (
             <div className="space-y-4">
+              {/* Checkbox Marcar como dizimista */}
+              <div className="flex items-start gap-3 p-3.5 border border-teal-200 rounded-lg bg-teal-50/50">
+                <input
+                  type="checkbox"
+                  id="chkIsDizimista"
+                  checked={!!isDizimista}
+                  onChange={(e) => setIsDizimista(e.target.checked)}
+                  className="w-5 h-5 mt-0.5 text-teal-600 rounded border-gray-300 focus:ring-teal-500 cursor-pointer"
+                />
+                <div>
+                  <label htmlFor="chkIsDizimista" className="text-sm font-bold text-gray-800 cursor-pointer">
+                    Marcar como dizimista?
+                  </label>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Ao marcar este membro como dizimista, ele será gerenciado no painel de adimplência/inadimplência na aba <strong>Tesouraria → Dizimistas</strong>.
+                  </p>
+                </div>
+              </div>
+
               {!membroEditando ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200">
                   <p className="text-sm">Salve o membro primeiro para visualizar o histórico de dízimos.</p>
                 </div>
               ) : (
