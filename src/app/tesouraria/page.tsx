@@ -13,6 +13,7 @@ import CategoriaFinanceiraModal from '@/components/tesouraria/modals/CategoriaFi
 import ConfirmDeleteModal from '@/components/tesouraria/modals/ConfirmDeleteModal';
 import TesourariaCharts from '@/components/tesouraria/TesourariaCharts';
 import FechamentoCaixaTable from '@/components/tesouraria/FechamentoCaixaTable';
+import DizimistasTable from '@/components/tesouraria/DizimistasTable';
 import { useTesouraria } from '@/hooks/tesouraria/useTesouraria';
 
 // Componente customizado e elegante para seleção de Mês e Ano de referência
@@ -707,17 +708,16 @@ export default function TesourariaPage() {
         {/* ─── ABA: DIZIMISTAS ─── */}
         {t.aba === 'dizimistas' && (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200">
-              <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Mês de Referência</label>
-                  <input
-                    type="month"
+                  <MonthPicker
                     value={t.abaDizimistaMes}
-                    onChange={(e) => t.setAbaDizimistaMes(e.target.value)}
-                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63]"
+                    onChange={(val) => t.setAbaDizimistaMes(val)}
                   />
                 </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Buscar por Nome</label>
                   <input
@@ -725,32 +725,97 @@ export default function TesourariaPage() {
                     placeholder="Nome do dizimista..."
                     value={t.filtroNomeDiz}
                     onChange={(e) => t.setFiltroNomeDiz(e.target.value)}
-                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63]"
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63] h-[36px]"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Congregação</label>
+                  <select
+                    value={t.filtroCongDiz}
+                    onChange={(e) => t.setFiltroCongDiz(e.target.value)}
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63] h-[36px] max-w-[180px]"
+                  >
+                    <option value="">Todas as Congregações</option>
+                    {t.congregacoes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Status de Adimplência</label>
+                  <select
+                    value={t.filtroStatusDiz}
+                    onChange={(e) => t.setFiltroStatusDiz(e.target.value as any)}
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63] h-[36px]"
+                  >
+                    <option value="">Todos os Status</option>
+                    <option value="pago">Adimplentes (Pago)</option>
+                    <option value="pendente">Inadimplentes (Pendente)</option>
+                  </select>
                 </div>
               </div>
 
-              {t.scope.canWrite && (
+              <div className="flex items-center gap-2 w-full md:w-auto justify-end">
                 <button
-                  onClick={() => {
-                    t.setAba('lancamentos');
-                    t.setShowForm(true);
-                    t.setForm((p) => ({ ...p, tipo_movimento: 'entrada', tipo_recebimento: 'dizimo' }));
-                  }}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition"
+                  onClick={() =>
+                    t.exportarCSV(
+                      t.dizimistasFiltrados.map((d) => ({
+                        Nome: d.nome,
+                        Tipo: d.tipoCadastro,
+                        Congregacao: d.congregacaoNome,
+                        Status: d.pagoNoMes ? 'Pago' : 'Pendente',
+                        Valor: d.valorPago,
+                        DataPagamento: d.dataPagamento || '—',
+                      })),
+                      `relatorio_dizimistas_${t.abaDizimistaMes}`
+                    )
+                  }
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 font-medium transition h-[36px]"
                 >
-                  <Plus className="h-4 w-4" /> Registrar Dízimo
+                  Exportar CSV
                 </button>
-              )}
+
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 font-medium transition h-[36px]"
+                >
+                  <Printer className="h-4 w-4" /> Relatório
+                </button>
+
+                {t.scope.canWrite && (
+                  <button
+                    onClick={() => {
+                      t.setAba('lancamentos');
+                      t.setShowForm(true);
+                      t.setForm((p) => ({ ...p, tipo_movimento: 'entrada', tipo_recebimento: 'dizimo' }));
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition h-[36px]"
+                  >
+                    <Plus className="h-4 w-4" /> Registrar Dízimo
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden p-6 text-center text-gray-500 text-sm">
-              <Users className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-              <p className="font-semibold text-gray-700">Módulo de Gestão de Dizimistas</p>
-              <p className="text-xs text-gray-400 mt-1">
-                Utilize a barra de pesquisa ou registre novos dízimos diretamente no painel de Lançamentos.
-              </p>
-            </div>
+            <DizimistasTable
+              dizimistas={t.dizimistasFiltrados}
+              fmtBRL={t.fmtBRL}
+              onRegistrarDizimo={(dizimista) => {
+                t.setAba('lancamentos');
+                t.setShowForm(true);
+                t.setForm((p) => ({
+                  ...p,
+                  tipo_movimento: 'entrada',
+                  tipo_recebimento: 'dizimo',
+                  observacoes: `Dízimo de ${dizimista.nome}`,
+                  congregacao_id: dizimista.congregacaoId || '',
+                }));
+              }}
+            />
           </div>
         )}
 

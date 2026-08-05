@@ -304,13 +304,12 @@ export function useTesouraria() {
   const [fechaCongId, setFechaCongId] = useState<string | null>(null);
 
   // Dizimistas
-  const [dizimistas] = useState<Dizimista[]>([]);
-  const [dizimistaPagamentos] = useState<{ member_id: string; status: string }[]>([]);
-  const [loadingDizimistas] = useState(false);
+  const [dizimistasMembros, setDizimistasMembros] = useState<any[]>([]);
+  const [loadingDizimistas, setLoadingDizimistas] = useState(false);
   const [abaDizimistaMes, setAbaDizimistaMes] = useState(mesAtual());
   const [filtroNomeDiz, setFiltroNomeDiz] = useState('');
-  const [filtroStatusDiz, setFiltroStatusDiz] = useState<'' | 'pago' | 'pendente' | 'avulso'>('');
-  const [filtroConsDiz, setFiltroConsDiz] = useState('');
+  const [filtroStatusDiz, setFiltroStatusDiz] = useState<'' | 'pago' | 'pendente'>('');
+  const [filtroCongDiz, setFiltroCongDiz] = useState('');
 
   // Filtros
   const [filtroCong, setFiltroCong] = useState('');
@@ -595,6 +594,75 @@ export function useTesouraria() {
     }
   }, [relMes, ministryId, aba, loadLancamentosRelatorio]);
 
+  // Carregar lista de Dizimistas (Membros com is_dizimista=true OU tipo_cadastro='ministro')
+  const loadDizimistasData = useCallback(async () => {
+    if (!ministryId) return;
+    try {
+      setLoadingDizimistas(true);
+      // Buscar membros dizimistas ou ministros
+      const { data: membersData, error: memErr } = await supabase
+        .from('members')
+        .select('id, name, tipo_cadastro, is_dizimista, congregacao_id, congregacoes(nome)')
+        .eq('ministry_id', ministryId)
+        .or('is_dizimista.eq.true,tipo_cadastro.eq.ministro');
+
+      if (memErr) {
+        console.error('Erro ao carregar membros dizimistas:', memErr);
+      } else if (membersData) {
+        setDizimistasMembros(membersData);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar dados de dizimistas:', err);
+    } finally {
+      setLoadingDizimistas(false);
+    }
+  }, [ministryId, supabase]);
+
+  useEffect(() => {
+    if (ministryId && aba === 'dizimistas') {
+      loadDizimistasData();
+      loadLancamentosMes(abaDizimistaMes);
+    }
+  }, [aba, abaDizimistaMes, ministryId, loadDizimistasData, loadLancamentosMes]);
+
+  // Cruzar membros dizimistas com os lançamentos de dízimo do mês selecionado (abaDizimistaMes)
+  const dizimistasCompletos = useMemo(() => {
+    return dizimistasMembros.map((m: any) => {
+      const nomeLower = (m.name || '').toLowerCase().trim();
+
+      // Procurar lançamento de dízimo no mês com o nome do membro no observacoes/referencia ou congregacao
+      const lancDizimo = lancamentosMes.find((l) => {
+        if (l.tipo_recebimento !== 'dizimo' && l.tipo_movimento !== 'entrada') return false;
+        const obsLower = (l.observacoes || '').toLowerCase();
+        const refLower = (l.referencia || '').toLowerCase();
+        const descLower = (l.descricao || '').toLowerCase();
+        return obsLower.includes(nomeLower) || refLower.includes(nomeLower) || descLower.includes(nomeLower);
+      });
+
+      return {
+        id: m.id,
+        nome: m.name,
+        tipoCadastro: m.tipo_cadastro || 'membro',
+        congregacaoId: m.congregacao_id,
+        congregacaoNome: m.congregacoes?.nome || 'Sede / Geral',
+        pagoNoMes: !!lancDizimo,
+        valorPago: lancDizimo ? Number(lancDizimo.valor) : 0,
+        dataPagamento: lancDizimo ? lancDizimo.data_lancamento : null,
+      };
+    });
+  }, [dizimistasMembros, lancamentosMes]);
+
+  // Lista de dizimistas filtrada por Nome, Congregação e Status (Adimplente/Inadimplente)
+  const dizimistasFiltrados = useMemo(() => {
+    return dizimistasCompletos.filter((d) => {
+      if (filtroNomeDiz && !d.nome.toLowerCase().includes(filtroNomeDiz.toLowerCase())) return false;
+      if (filtroCongDiz && d.congregacaoId !== filtroCongDiz) return false;
+      if (filtroStatusDiz === 'pago' && !d.pagoNoMes) return false;
+      if (filtroStatusDiz === 'pendente' && d.pagoNoMes) return false;
+      return true;
+    });
+  }, [dizimistasCompletos, filtroNomeDiz, filtroCongDiz, filtroStatusDiz]);
+
   // Lançamentos filtrados para o Relatório
   const lancsRelatorioFiltrados = useMemo(() => {
     return lancamentosRelMes.filter(l => {
@@ -872,20 +940,33 @@ export function useTesouraria() {
   }, [showModal]);
 
   // Exportar CSV
-  const exportarCSV = useCallback((dados: Lancamento[], filename: string) => {
+  const exportarCSV = useCallback((dados: any[], filename: string) => {
     if (!dados || dados.length === 0) return;
-    const headers = ['Data', 'Tipo Movimento', 'Tipo Recebimento / Categoria', 'Valor', 'Congregação', 'Departamento', 'Referência', 'Observações'];
-    const rows = dados.map(l => [
-      l.data_lancamento,
-      l.tipo_movimento === 'entrada' ? 'Entrada' : 'Saída',
-      l.tipo_recebimento || '',
-      l.valor.toFixed(2),
-      l.congregacao_nome || '',
-      l.departamento_nome || '',
-      `"${(l.referencia || '').replace(/"/g, '""')}"`,
-      `"${(l.observacoes || '').replace(/"/g, '""')}"`,
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+
+    let headers: string[] = [];
+    let rows: string[][] = [];
+
+    const emItem = dados[0];
+    if (emItem.data_lancamento !== undefined) {
+      headers = ['Data', 'Tipo Movimento', 'Tipo Recebimento / Categoria', 'Valor', 'Congregação', 'Departamento', 'Referência', 'Observações'];
+      rows = dados.map((l: Lancamento) => [
+        l.data_lancamento,
+        l.tipo_movimento === 'entrada' ? 'Entrada' : 'Saída',
+        l.tipo_recebimento || '',
+        Number(l.valor).toFixed(2),
+        l.congregacao_nome || '',
+        l.departamento_nome || '',
+        `"${(l.referencia || '').replace(/"/g, '""')}"`,
+        `"${(l.observacoes || '').replace(/"/g, '""')}"`,
+      ]);
+    } else {
+      headers = Object.keys(emItem);
+      rows = dados.map((item) =>
+        Object.values(item).map((val) => `"${String(val ?? '').replace(/"/g, '""')}"`)
+      );
+    }
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -930,8 +1011,7 @@ export function useTesouraria() {
     handleFecharMes,
     statusMes,
     // Dizimistas
-    dizimistas,
-    dizimistaPagamentos,
+    dizimistasFiltrados,
     loadingDizimistas,
     abaDizimistaMes,
     setAbaDizimistaMes,
@@ -939,8 +1019,8 @@ export function useTesouraria() {
     setFiltroNomeDiz,
     filtroStatusDiz,
     setFiltroStatusDiz,
-    filtroConsDiz,
-    setFiltroConsDiz,
+    filtroCongDiz,
+    setFiltroCongDiz,
     // Filtros & Lançamentos
     filtroCong,
     setFiltroCong,
