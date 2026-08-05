@@ -257,34 +257,67 @@ export default function TesourariaPage() {
 
                   {/* Tipo de Entrada ou Categoria de Saída */}
                   {t.form.tipo_movimento === 'entrada' ? (
-                    <div className="space-y-2">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">
-                          Tipo de recebimento <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          value={t.form.tipo_recebimento}
-                          onChange={(e) =>
-                            t.setForm((p) => ({
-                              ...p,
-                              tipo_recebimento: e.target.value as any,
-                              is_dizimo_avulso: false,
-                              dizimista_id: '',
-                              dizimista_nome: '',
-                            }))
-                          }
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                        >
-                          <option value="">Selecione</option>
-                          {t.TIPOS.map((tr) => (
-                            <option key={tr.value} value={tr.value}>
-                              {tr.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">
+                        Tipo de recebimento <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={t.form.tipo_recebimento}
+                        onChange={(e) =>
+                          t.setForm((p) => ({
+                            ...p,
+                            tipo_recebimento: e.target.value as any,
+                            is_dizimo_avulso: false,
+                            dizimista_id: '',
+                            dizimista_nome: '',
+                          }))
+                        }
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="">Selecione</option>
+                        {t.TIPOS.map((tr) => (
+                          <option key={tr.value} value={tr.value}>
+                            {tr.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria da despesa</label>
+                      <select
+                        value={t.form.categoria_saida}
+                        onChange={(e) => t.setForm((p) => ({ ...p, categoria_saida: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="">Selecione</option>
+                        {t.TIPOS_SAIDA.map((ts) => (
+                          <option key={ts.value} value={ts.value}>
+                            {ts.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
-                  {/* Se Tipo de Recebimento === 'dizimo', Bloco em linha inteira (3 colunas) para Dizimista */}
+                  {/* Departamento */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Departamento</label>
+                    <select
+                      value={t.form.departamento_id}
+                      onChange={(e) => t.setForm((p) => ({ ...p, departamento_id: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="">Caixa da Igreja</option>
+                      {t.departamentos.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.sigla} – {d.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* LINHA INTEIRA: Bloco de Identificação do Dizimista (se Tipo === 'dizimo') */}
                   {t.form.tipo_movimento === 'entrada' && t.form.tipo_recebimento === 'dizimo' && (
                     <div className="col-span-full p-4 bg-slate-50/80 border border-slate-200 rounded-xl space-y-3 shadow-xs">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
@@ -370,41 +403,6 @@ export default function TesourariaPage() {
                       </div>
                     </div>
                   )}
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria da despesa</label>
-                      <select
-                        value={t.form.categoria_saida}
-                        onChange={(e) => t.setForm((p) => ({ ...p, categoria_saida: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      >
-                        <option value="">Selecione</option>
-                        {t.TIPOS_SAIDA.map((ts) => (
-                          <option key={ts.value} value={ts.value}>
-                            {ts.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Departamento */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Departamento</label>
-                    <select
-                      value={t.form.departamento_id}
-                      onChange={(e) => t.setForm((p) => ({ ...p, departamento_id: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                    >
-                      <option value="">Caixa da Igreja</option>
-                      {t.departamentos.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.sigla} – {d.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
 
                   {/* Valor */}
                   <div>
