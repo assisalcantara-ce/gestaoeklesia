@@ -309,6 +309,8 @@ export default function NomenclaturaPage() {
         try {
           localStorage.setItem('nomenclaturas', JSON.stringify(temp));
           localStorage.setItem(NOMENCLATURAS_SCHEMA_VERSION_KEY, NOMENCLATURAS_SCHEMA_VERSION);
+          window.dispatchEvent(new Event('nomenclaturas_updated'));
+          window.dispatchEvent(new StorageEvent('storage', { key: 'nomenclaturas' }));
         } catch {
           // ignore
         }

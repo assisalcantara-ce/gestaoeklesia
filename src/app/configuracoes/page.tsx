@@ -1404,11 +1404,14 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
         try {
           localStorage.setItem('nomenclaturas', JSON.stringify(temp));
           localStorage.setItem(NOMENCLATURAS_SCHEMA_VERSION_KEY, NOMENCLATURAS_SCHEMA_VERSION);
+          window.dispatchEvent(new Event('nomenclaturas_updated'));
+          window.dispatchEvent(new StorageEvent('storage', { key: 'nomenclaturas' }));
         } catch {
           // ignore
         }
       }
 
+      setNomenclaturasState(temp);
       setIsEditing(false);
       await registrarAcao({
         acao: 'editar',
