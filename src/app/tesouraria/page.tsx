@@ -263,15 +263,27 @@ export default function TesourariaPage() {
                       </label>
                       <select
                         value={t.form.tipo_recebimento}
-                        onChange={(e) =>
-                          t.setForm((p) => ({
-                            ...p,
-                            tipo_recebimento: e.target.value as any,
-                            is_dizimo_avulso: false,
-                            dizimista_id: '',
-                            dizimista_nome: '',
-                          }))
-                        }
+                        onChange={(e) => {
+                          const val = e.target.value as any;
+                          t.setForm((p) => {
+                            let autoCatId = p.categoria_id;
+                            if (val === 'dizimo') {
+                              const catDiz = t.finCategorias.find((c) =>
+                                (c.tipo_movimento === 'entrada' || c.tipo_movimento === 'ambos') &&
+                                (c.nome.toLowerCase().includes('dízimo') || c.nome.toLowerCase().includes('dizimo'))
+                              );
+                              if (catDiz) autoCatId = catDiz.id;
+                            }
+                            return {
+                              ...p,
+                              tipo_recebimento: val,
+                              categoria_id: autoCatId,
+                              is_dizimo_avulso: false,
+                              dizimista_id: '',
+                              dizimista_nome: '',
+                            };
+                          });
+                        }}
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                       >
                         <option value="">Selecione</option>
