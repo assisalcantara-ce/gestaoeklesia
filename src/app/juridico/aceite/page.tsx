@@ -30,19 +30,7 @@ export default function AceiteDocumentoPage() {
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
           setDocumento(json.data[0])
         } else {
-          // Fallback demonstrativo caso ainda não haja documento publicado cadastrado
-          setDocumento({
-            id: 'demo-doc',
-            tipo: 'TERMOS_DE_USO',
-            titulo: 'Termos de Uso e Política de Privacidade da Plataforma',
-            versao: '1.0',
-            conteudo_md: `# Termos Gerais de Uso e Serviços\n\nBem-vindo à plataforma **Gestão Eklésia**.\n\n### 1. Aceite dos Termos\nAo utilizar a plataforma, o usuário declara ter lido, compreendido e concordado com todas as cláusulas deste instrumento jurídico.\n\n### 2. Privacidade e Proteção de Dados\nEm conformidade com a LGPD (Lei Geral de Proteção de Dados - Lei nº 13.709/2018), garantimos o sigilo e a proteção de suas informações pessoais e eclesiásticas.\n\n### 3. Responsabilidade pelo Uso\nO usuário é responsável pela veracidade e exatidão das informações cadastradas na plataforma.\n\n### 4. Modificações dos Termos\nReservamo-nos o direito de alterar estes termos a qualquer momento para adequação legal e melhoria dos serviços.`,
-            status: 'PUBLICADO',
-            obrigatorio: true,
-            ativo: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
+          setDocumento(null)
         }
       } catch (err: any) {
         setError(err.message || 'Erro ao carregar o documento jurídico.')
@@ -54,8 +42,8 @@ export default function AceiteDocumentoPage() {
     carregarDocumento()
   }, [])
 
-  // Botão habilitado apenas quando os dois checkboxes estiverem marcados
-  const isFormValido = chkLido && chkConcordo
+  // Botão habilitado apenas quando houver documento e os dois checkboxes estiverem marcados
+  const isFormValido = Boolean(documento) && chkLido && chkConcordo
 
   const handleAceitarEContinuar = () => {
     // Na v1: ainda NÃO registra o aceite nem integra com middleware de bloqueio
@@ -80,11 +68,17 @@ export default function AceiteDocumentoPage() {
                 {documento?.titulo || 'Documento Jurídico'}
               </h1>
               <p className="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
-                <span>Versão <strong className="font-mono text-blue-400">v{documento?.versao || '1.0'}</strong></span>
-                <span>•</span>
-                <span className="text-emerald-400 font-medium flex items-center gap-1">
-                  <ShieldCheck size={13} /> Oficial Vigente
-                </span>
+                {documento ? (
+                  <>
+                    <span>Versão <strong className="font-mono text-blue-400">v{documento.versao}</strong></span>
+                    <span>•</span>
+                    <span className="text-emerald-400 font-medium flex items-center gap-1">
+                      <ShieldCheck size={13} /> Oficial Vigente
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-gray-500">Nenhum termo ativo localizado</span>
+                )}
               </p>
             </div>
           </div>
@@ -102,9 +96,17 @@ export default function AceiteDocumentoPage() {
               <AlertCircle size={20} className="shrink-0" />
               <p className="text-sm">{error}</p>
             </div>
+          ) : !documento ? (
+            <div className="py-12 px-4 text-center space-y-3">
+              <AlertCircle size={36} className="mx-auto text-amber-400 opacity-80" />
+              <h3 className="text-sm font-semibold text-gray-200">Nenhum termo jurídico publicado</h3>
+              <p className="text-xs text-gray-400 max-w-md mx-auto leading-relaxed">
+                No momento não há nenhum documento jurídico vigente publicado para aceite. Entre em contato com o suporte ou aguarde a publicação oficial.
+              </p>
+            </div>
           ) : (
             <div className="bg-gray-950/70 border border-gray-800/80 rounded-xl p-5 font-mono text-xs text-gray-300 leading-relaxed whitespace-pre-wrap selection:bg-blue-900 selection:text-white">
-              {documento?.conteudo_md}
+              {documento.conteudo_md}
             </div>
           )}
         </div>
@@ -113,24 +115,26 @@ export default function AceiteDocumentoPage() {
         <div className="p-6 border-t border-gray-800 bg-gray-950/80 space-y-5">
           {/* Checkboxes de confirmação */}
           <div className="space-y-3">
-            <label className="flex items-start gap-3 cursor-pointer group">
+            <label className={`flex items-start gap-3 group ${!documento ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
               <input
                 type="checkbox"
                 checked={chkLido}
+                disabled={!documento || loading}
                 onChange={(e) => setChkLido(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded bg-gray-900 border-gray-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                className="mt-0.5 w-4 h-4 rounded bg-gray-900 border-gray-700 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
               />
               <span className="text-xs text-gray-300 group-hover:text-white transition-colors">
                 Li integralmente este documento.
               </span>
             </label>
 
-            <label className="flex items-start gap-3 cursor-pointer group">
+            <label className={`flex items-start gap-3 group ${!documento ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
               <input
                 type="checkbox"
                 checked={chkConcordo}
+                disabled={!documento || loading}
                 onChange={(e) => setChkConcordo(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded bg-gray-900 border-gray-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                className="mt-0.5 w-4 h-4 rounded bg-gray-900 border-gray-700 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
               />
               <span className="text-xs text-gray-300 group-hover:text-white transition-colors">
                 Concordo com os termos apresentados.
