@@ -4,13 +4,17 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
 import { authenticatedFetch } from '@/lib/api-client'
+import { useUserContext } from '@/hooks/useUserContext'
 import { Scale, ShieldCheck, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import type { DocumentoJuridico } from '@/types/juridico'
 
 export default function AceiteDocumentoPage() {
+  const userCtx = useUserContext()
   const [documento, setDocumento] = useState<DocumentoJuridico | null>(null)
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
   // Checkboxes de confirmação obrigatórios
   const [chkLido, setChkLido] = useState(false)
@@ -43,11 +47,38 @@ export default function AceiteDocumentoPage() {
   }, [])
 
   // Botão habilitado apenas quando houver documento e os dois checkboxes estiverem marcados
-  const isFormValido = Boolean(documento) && chkLido && chkConcordo
+  const isFormValido = Boolean(documento) && chkLido && chkConcordo && !submitting
 
-  const handleAceitarEContinuar = () => {
-    // Na v1: ainda NÃO registra o aceite nem integra com middleware de bloqueio
-    alert('Confirmação registrada na interface! A integração com registro e middleware será ativada nas próximas fases.')
+  const handleAceitarEContinuar = async () => {
+    if (!documento || !isFormValido) return
+
+    try {
+      setSubmitting(true)
+      setError(null)
+      setSuccessMsg(null)
+
+      const ministryId = userCtx.ministryId || '00000000-0000-0000-0000-000000000000'
+
+      const res = await authenticatedFetch('/api/v1/juridico/aceite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documento_id: documento.id,
+          ministry_id: ministryId,
+        }),
+      })
+
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Falha ao registrar aceite do documento.')
+      }
+
+      setSuccessMsg(`Aceite eletrônico do documento "${documento.titulo}" (v${documento.versao}) registrado com sucesso!`)
+    } catch (err: any) {
+      setError(err.message || 'Erro ao registrar aceite.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -142,14 +173,31 @@ export default function AceiteDocumentoPage() {
             </label>
           </div>
 
+          {/* Alertas de Erro ou Sucesso */}
+          {successMsg && (
+            <div className="p-4 bg-emerald-950/40 border border-emerald-800/50 rounded-xl flex items-center gap-3 text-emerald-300">
+              <CheckCircle2 size={20} className="shrink-0 text-emerald-400" />
+              <p className="text-xs font-medium">{successMsg}</p>
+            </div>
+          )}
+
           {/* Botão Aceitar e Continuar */}
           <div className="flex items-center justify-end pt-2">
             <button
               onClick={handleAceitarEContinuar}
-              disabled={!isFormValido || loading}
+              disabled={!isFormValido || loading || submitting}
               className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-500 text-white rounded-xl text-xs font-semibold shadow-lg disabled:shadow-none transition-all disabled:cursor-not-allowed"
             >
-              <CheckCircle2 size={16} /> Aceitar e Continuar
+              {submitting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin text-white" />
+                  Registrando Aceite...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={16} /> Aceitar e Continuar
+                </>
+              )}
             </button>
           </div>
         </div>
