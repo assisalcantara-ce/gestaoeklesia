@@ -48,7 +48,7 @@ export class ContratosService {
     const dataInicio = dto.data_inicio ? new Date(dto.data_inicio).toISOString() : new Date().toISOString();
     const numeroContrato = `CTR-${cleanMinistryId.slice(0, 8).toUpperCase()}-${Date.now()}`;
 
-    // 2. Persistir registro do contrato com status = ATIVO
+    // 2. Persistir registro do contrato com status = AGUARDANDO_ASSINATURA (pendente de aceite formal pós-conversão)
     const contratoCriado = await this.repository.criar({
       ministry_id: cleanMinistryId,
       documento_base_id: docVigente.id,
@@ -57,7 +57,7 @@ export class ContratosService {
       hash_documento: docVigente.hash_sha256 || 'HASH_INICIAL_CONTRATO',
       plano_contratado: cleanPlano,
       numero_contrato: numeroContrato,
-      status: 'ATIVO',
+      status: 'AGUARDANDO_ASSINATURA',
       valor_mensal: dto.valor_mensal !== undefined ? dto.valor_mensal : null,
       data_inicio: dataInicio,
       assinado_por: dto.assinado_por || null,
@@ -81,5 +81,16 @@ export class ContratosService {
     });
 
     return contratoCriado;
+  }
+
+  /**
+   * Verifica se o tenant possui algum contrato comercial no status AGUARDANDO_ASSINATURA.
+   * Utilizado para sinalizar o aceite contratual pendente pós-conversão comercial.
+   */
+  async verificarContratoPendenteAssinatura(ministryId: string): Promise<TenantContrato | null> {
+    if (!ministryId || ministryId.trim().length === 0) return null;
+    const contratos = await this.repository.buscarPorMinistryId(ministryId.trim());
+    const pendente = contratos.find((c) => c.status === 'AGUARDANDO_ASSINATURA');
+    return pendente || null;
   }
 }
