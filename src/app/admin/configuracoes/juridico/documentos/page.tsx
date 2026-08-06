@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { authenticatedFetch } from '@/lib/api-client'
 import {
   FileText,
@@ -51,6 +52,50 @@ export default function DocumentosPage() {
 
   // Menu de ações por linha
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [menuCoords, setMenuCoords] = useState<{ top: number; left: number } | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!openMenuId) return
+    const handleClose = () => {
+      setOpenMenuId(null)
+      setMenuCoords(null)
+    }
+    window.addEventListener('scroll', handleClose, true)
+    window.addEventListener('resize', handleClose)
+    return () => {
+      window.removeEventListener('scroll', handleClose, true)
+      window.removeEventListener('resize', handleClose)
+    }
+  }, [openMenuId])
+
+  const toggleMenu = (id: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    if (openMenuId === id) {
+      setOpenMenuId(null)
+      setMenuCoords(null)
+      return
+    }
+
+    const btnRect = e.currentTarget.getBoundingClientRect()
+    const menuWidth = 208 // w-52
+    const menuHeight = 220
+    const spaceBelow = window.innerHeight - btnRect.bottom
+    const spaceAbove = btnRect.top
+
+    const openUpwards = spaceBelow < menuHeight && spaceAbove > spaceBelow
+
+    const top = openUpwards
+      ? Math.max(8, btnRect.top - menuHeight - 6)
+      : Math.min(window.innerHeight - menuHeight - 8, btnRect.bottom + 6)
+    const left = Math.max(8, btnRect.right - menuWidth)
+
+    setMenuCoords({ top, left })
+    setOpenMenuId(id)
+  }
 
   // Modais de Ações & Confirmação
   const [selectedDoc, setSelectedDoc] = useState<DocumentoJuridico | null>(null)
@@ -601,75 +646,88 @@ export default function DocumentosPage() {
                     <td className="px-6 py-4 text-xs text-gray-400">
                       {new Date(doc.created_at).toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="px-6 py-4 text-right relative">
+                    <td className="px-6 py-4 text-right">
                       <button
-                        onClick={() => setOpenMenuId(openMenuId === doc.id ? null : doc.id)}
+                        onClick={(e) => toggleMenu(doc.id, e)}
                         className="p-1.5 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors"
                       >
                         <MoreVertical size={16} />
                       </button>
 
-                      {/* Dropdown ActionMenu */}
-                      {openMenuId === doc.id && (
-                        <div className="absolute right-6 top-12 z-20 w-52 bg-gray-950 border border-gray-800 rounded-xl shadow-xl py-1 text-left">
-                          <button
-                            onClick={() => handleOpenAction(doc, 'VISUALIZAR')}
-                            className="w-full px-4 py-2 text-xs text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-2"
+                      {/* Dropdown ActionMenu via React Portal */}
+                      {isMounted && openMenuId === doc.id && menuCoords && createPortal(
+                        <>
+                          <div
+                            className="fixed inset-0 z-40"
+                            onClick={() => {
+                              setOpenMenuId(null)
+                              setMenuCoords(null)
+                            }}
+                          />
+                          <div
+                            style={{ top: `${menuCoords.top}px`, left: `${menuCoords.left}px` }}
+                            className="fixed z-50 w-52 bg-gray-950 border border-gray-800 rounded-xl shadow-2xl py-1 text-left"
                           >
-                            <Eye size={14} /> Visualizar Detalhes
-                          </button>
-
-                          {doc.status === 'RASCUNHO' ? (
                             <button
-                              onClick={() => handleOpenAction(doc, 'EDITAR')}
-                              className="w-full px-4 py-2 text-xs text-amber-400 hover:bg-gray-800 flex items-center gap-2"
+                              onClick={() => handleOpenAction(doc, 'VISUALIZAR')}
+                              className="w-full px-4 py-2 text-xs text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-2"
                             >
-                              <Edit size={14} /> Editar Rascunho
+                              <Eye size={14} /> Visualizar Detalhes
                             </button>
-                          ) : (
-                            <button
-                              disabled
-                              title="Documentos publicados ou arquivados são imutáveis."
-                              className="w-full px-4 py-2 text-xs text-gray-600 cursor-not-allowed flex items-center gap-2 opacity-50"
-                            >
-                              <Lock size={14} /> Editar Bloqueado
-                            </button>
-                          )}
 
-                          {doc.status === 'RASCUNHO' && (
-                            <button
-                              onClick={() => handleOpenAction(doc, 'PUBLICAR')}
-                              className="w-full px-4 py-2 text-xs text-emerald-400 hover:bg-gray-800 flex items-center gap-2"
-                            >
-                              <Send size={14} /> Publicar Oficialmente
-                            </button>
-                          )}
+                            {doc.status === 'RASCUNHO' ? (
+                              <button
+                                onClick={() => handleOpenAction(doc, 'EDITAR')}
+                                className="w-full px-4 py-2 text-xs text-amber-400 hover:bg-gray-800 flex items-center gap-2"
+                              >
+                                <Edit size={14} /> Editar Rascunho
+                              </button>
+                            ) : (
+                              <button
+                                disabled
+                                title="Documentos publicados ou arquivados são imutáveis."
+                                className="w-full px-4 py-2 text-xs text-gray-600 cursor-not-allowed flex items-center gap-2 opacity-50"
+                              >
+                                <Lock size={14} /> Editar Bloqueado
+                              </button>
+                            )}
 
-                          {doc.status === 'PUBLICADO' && (
-                            <button
-                              onClick={() => handleOpenAction(doc, 'NOVA_VERSAO')}
-                              className="w-full px-4 py-2 text-xs text-blue-400 hover:bg-gray-800 flex items-center gap-2"
-                            >
-                              <GitFork size={14} /> Gerar Nova Versão
-                            </button>
-                          )}
+                            {doc.status === 'RASCUNHO' && (
+                              <button
+                                onClick={() => handleOpenAction(doc, 'PUBLICAR')}
+                                className="w-full px-4 py-2 text-xs text-emerald-400 hover:bg-gray-800 flex items-center gap-2"
+                              >
+                                <Send size={14} /> Publicar Oficialmente
+                              </button>
+                            )}
 
-                          <button
-                            onClick={() => handleOpenAction(doc, 'HISTORICO')}
-                            className="w-full px-4 py-2 text-xs text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-2"
-                          >
-                            <History size={14} /> Ver Histórico Versões
-                          </button>
+                            {doc.status === 'PUBLICADO' && (
+                              <button
+                                onClick={() => handleOpenAction(doc, 'NOVA_VERSAO')}
+                                className="w-full px-4 py-2 text-xs text-blue-400 hover:bg-gray-800 flex items-center gap-2"
+                              >
+                                <GitFork size={14} /> Gerar Nova Versão
+                              </button>
+                            )}
 
-                          {doc.status !== 'ARQUIVADO' && (
                             <button
-                              onClick={() => handleOpenAction(doc, 'ARQUIVAR')}
-                              className="w-full px-4 py-2 text-xs text-red-400 hover:bg-gray-800 flex items-center gap-2"
+                              onClick={() => handleOpenAction(doc, 'HISTORICO')}
+                              className="w-full px-4 py-2 text-xs text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-2"
                             >
-                              <Trash2 size={14} /> Arquivar
+                              <History size={14} /> Ver Histórico Versões
                             </button>
-                          )}
-                        </div>
+
+                            {doc.status !== 'ARQUIVADO' && (
+                              <button
+                                onClick={() => handleOpenAction(doc, 'ARQUIVAR')}
+                                className="w-full px-4 py-2 text-xs text-red-400 hover:bg-gray-800 flex items-center gap-2"
+                              >
+                                <Trash2 size={14} /> Arquivar
+                              </button>
+                            )}
+                          </div>
+                        </>,
+                        document.body
                       )}
                     </td>
                   </tr>
