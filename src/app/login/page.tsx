@@ -153,8 +153,20 @@ export default function LoginPage() {
                 return
               }
             }
+
+            // Integrar verificação de contrato pendente de assinatura (apenas para assinaturas comerciais ativas)
+            const contratoRes = await fetch('/api/v1/juridico/contrato-pendente', {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            if (contratoRes.ok) {
+              const contratoData = await contratoRes.json()
+              if (contratoData?.success && contratoData?.pendente) {
+                router.push('/juridico/aceite')
+                return
+              }
+            }
           } catch (e) {
-            console.error('Erro ao verificar status do trial:', e)
+            console.error('Erro ao verificar status de trial ou contrato pendente:', e)
           }
         }
         if (nextParam) {
