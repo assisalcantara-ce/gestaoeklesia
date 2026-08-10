@@ -82,8 +82,8 @@ export default function MembroFormModal({
   if (!showForm) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col" style={{ height: '90vh' }}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[calc(100vh-2rem)] flex flex-col my-auto">
         {/* Header */}
         <div className="flex justify-between items-center px-4 py-4 border-b-2 border-teal-500 bg-gradient-to-r from-teal-600 to-teal-700 flex-shrink-0">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
