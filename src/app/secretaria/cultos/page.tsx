@@ -440,7 +440,7 @@ export default function CultosPage() {
 
   const isEscritaPermitida = useMemo(() => {
     if (!ctx) return false;
-    return ['administrador', 'suporte', 'secretaria', 'secretario_local', 'presidencia'].includes(ctx.nivel as string);
+    return ['administrador', 'suporte', 'secretaria', 'secretario_geral', 'secretaria_local', 'auxiliar_secretaria', 'presidencia'].includes(ctx.nivel as string);
   }, [ctx]);
 
   // Carregar congregações
