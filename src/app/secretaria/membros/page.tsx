@@ -37,6 +37,8 @@ export default function MembrosPage() {
     setStatusFilter,
     cargoFilter,
     setCargoFilter,
+    sortOrdemAlfabetica,
+    setSortOrdemAlfabetica,
     currentPage,
     setCurrentPage,
     membrosFiltrados,
@@ -341,6 +343,7 @@ export default function MembrosPage() {
                 statusFilter={statusFilter}
                 setStatusFilter={setStatusFilter}
                 setCurrentPage={setCurrentPage}
+                setSortOrdemAlfabetica={setSortOrdemAlfabetica}
                 cargosMinisteriais={cargosMinisteriais as any}
                 membrosFiltradosCount={membrosFiltrados.length}
                 totalMembrosCount={membros.length}
@@ -370,6 +373,8 @@ export default function MembrosPage() {
                 membrosFiltradosCount={membrosFiltrados.length}
                 membrosSelecionados={membrosSelecionados}
                 setMembrosSelecionados={setMembrosSelecionados}
+                sortOrdemAlfabetica={sortOrdemAlfabetica}
+                setSortOrdemAlfabetica={setSortOrdemAlfabetica}
                 maskCpf={maskCpf}
                 isSupervisor={isSupervisor}
                 isAuxiliar={isAuxiliar}

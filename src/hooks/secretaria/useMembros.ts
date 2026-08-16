@@ -280,6 +280,7 @@ export function useMembros() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ATIVO');
   const [cargoFilter, setCargoFilter] = useState('TODOS');
+  const [sortOrdemAlfabetica, setSortOrdemAlfabetica] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -385,17 +386,22 @@ export function useMembros() {
 
   // ─── Filtros e paginação ──────────────────────────────────────────────────────
 
-  const membrosFiltrados = membros.filter((m) => {
-    const matchSearch =
-      m.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.cpf.includes(searchTerm) ||
-      m.matricula.includes(searchTerm);
-    const matchStatus = statusFilter === 'TODOS' || m.status.toUpperCase() === statusFilter;
-    const matchCargo =
-      cargoFilter === 'TODOS' ||
-      (m.cargoMinisterial || '').toUpperCase() === cargoFilter.toUpperCase();
-    return matchSearch && matchStatus && matchCargo;
-  });
+  const membrosFiltrados = membros
+    .filter((m) => {
+      const matchSearch =
+        m.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.cpf.includes(searchTerm) ||
+        m.matricula.includes(searchTerm);
+      const matchStatus = statusFilter === 'TODOS' || m.status.toUpperCase() === statusFilter;
+      const matchCargo =
+        cargoFilter === 'TODOS' ||
+        (m.cargoMinisterial || '').toUpperCase() === cargoFilter.toUpperCase();
+      return matchSearch && matchStatus && matchCargo;
+    })
+    .sort((a, b) => {
+      if (!sortOrdemAlfabetica) return 0;
+      return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
+    });
 
   const totalPages = Math.ceil(membrosFiltrados.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -1280,6 +1286,8 @@ export function useMembros() {
     setStatusFilter,
     cargoFilter,
     setCargoFilter,
+    sortOrdemAlfabetica,
+    setSortOrdemAlfabetica,
     currentPage,
     setCurrentPage,
     membrosFiltrados,

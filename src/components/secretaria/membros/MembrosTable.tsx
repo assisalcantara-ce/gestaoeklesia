@@ -19,6 +19,8 @@ export interface MembrosTableProps {
   membrosFiltradosCount: number;
   membrosSelecionados: Set<string>;
   setMembrosSelecionados: React.Dispatch<React.SetStateAction<Set<string>>>;
+  sortOrdemAlfabetica?: boolean;
+  setSortOrdemAlfabetica?: React.Dispatch<React.SetStateAction<boolean>>;
   maskCpf: (cpf: string) => string;
   isSupervisor: boolean;
   isAuxiliar: boolean;
@@ -43,6 +45,8 @@ export default function MembrosTable({
   membrosFiltradosCount,
   membrosSelecionados,
   setMembrosSelecionados,
+  sortOrdemAlfabetica = false,
+  setSortOrdemAlfabetica,
   maskCpf,
   isSupervisor,
   isAuxiliar,
@@ -161,7 +165,26 @@ export default function MembrosTable({
                 <th className="border-2 border-gray-300 px-4 py-3 text-center font-semibold text-gray-700 w-12">
                   Foto
                 </th>
-                <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Nome</th>
+                <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>Nome</span>
+                    <label
+                      className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-normal text-teal-700 bg-teal-50 hover:bg-teal-100 px-2 py-1 rounded border border-teal-300 transition"
+                      title="Classificar por Ordem Alfabética (A-Z)"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={sortOrdemAlfabetica}
+                        onChange={(e) => {
+                          setSortOrdemAlfabetica?.(e.target.checked);
+                          setCurrentPage(1);
+                        }}
+                        className="w-3.5 h-3.5 text-teal-600 rounded border-teal-400 focus:ring-teal-500 cursor-pointer"
+                      />
+                      <span>A-Z</span>
+                    </label>
+                  </div>
+                </th>
                 <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">CPF</th>
                 <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Cargo</th>
                 <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">

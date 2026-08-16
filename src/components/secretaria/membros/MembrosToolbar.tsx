@@ -10,6 +10,7 @@ export interface MembrosToolbarProps {
   statusFilter: string;
   setStatusFilter: (status: string) => void;
   setCurrentPage: (page: number) => void;
+  setSortOrdemAlfabetica?: (sort: boolean) => void;
   cargosMinisteriais: Array<{ id: string; nome: string; ativo: boolean }>;
   membrosFiltradosCount: number;
   totalMembrosCount: number;
@@ -42,6 +43,7 @@ export default function MembrosToolbar({
   statusFilter,
   setStatusFilter,
   setCurrentPage,
+  setSortOrdemAlfabetica,
   cargosMinisteriais,
   membrosFiltradosCount,
   totalMembrosCount,
@@ -119,6 +121,7 @@ export default function MembrosToolbar({
               setSearchTerm('');
               setStatusFilter('ATIVO');
               setCargoFilter('TODOS');
+              setSortOrdemAlfabetica?.(false);
               setCurrentPage(1);
             }}
             className="w-full md:w-auto mt-0 md:mt-[26px] px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition font-semibold text-sm h-[42px]"
