@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase-client';
 import { ArrowLeft, Download, UploadCloud, AlertTriangle, CheckCircle2, FileText, AlertCircle, Info, Settings, Image, FileImage, ShieldAlert, Play, RefreshCw } from 'lucide-react';
 
 import { useUserContext } from '@/hooks/useUserContext';
+import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 
 interface RowError {
   line: number;
@@ -27,6 +28,7 @@ interface ParsedRow {
 export default function ImportarMembrosPage() {
   const userCtx = useUserContext();
   const supabase = createClient();
+  const [nomeMinisterio, setNomeMinisterio] = useState<string>('Ministério');
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -70,6 +72,21 @@ export default function ImportarMembrosPage() {
     restantes: number;
   } | null>(null);
   const [migrationError, setMigrationError] = useState('');
+
+  useEffect(() => {
+    const carregarConfiguracao = async () => {
+      try {
+        const config = await fetchConfiguracaoIgrejaFromSupabase(supabase, userCtx.ministryId);
+        if (config?.nome) {
+          setNomeMinisterio(config.nome);
+        }
+      } catch (err) {
+        console.error('Erro ao buscar configuração do ministério:', err);
+      }
+    };
+
+    carregarConfiguracao();
+  }, [userCtx.ministryId]);
 
   const fetchPendingPhotosCount = async () => {
     try {
@@ -290,10 +307,10 @@ export default function ImportarMembrosPage() {
       'TSANGUE', 'UF ENDEREÇO', 'UF RG', 'WHATSAPP', 'ZONA'
     ];
     const sampleRow = Array(59).fill('');
-    sampleRow[headersList.indexOf('NOME')] = 'José da Rocha';
+    sampleRow[headersList.indexOf('NOME')] = 'José da Silva';
     sampleRow[headersList.indexOf('CPF')] = '01037113250';
     sampleRow[headersList.indexOf('CONGREGAÇÃO')] = 'Templo Central';
-    sampleRow[headersList.indexOf('CAMPO')] = 'ROCHA ETERNA DE MARITUBA';
+    sampleRow[headersList.indexOf('CAMPO')] = (nomeMinisterio || 'Ministério').toUpperCase();
     sampleRow[headersList.indexOf('SUPERVISAO')] = 'COMIEADEPA';
     sampleRow[headersList.indexOf('SEXO')] = 'MASCULINO';
     sampleRow[headersList.indexOf('STATUS')] = 'ATIVO';
@@ -304,7 +321,7 @@ export default function ImportarMembrosPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'membros_adrocha_modelo.csv');
+    link.setAttribute('download', 'membros_modelo_importacao.csv');
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -793,8 +810,8 @@ export default function ImportarMembrosPage() {
 
   return (
     <PageLayout
-      title="Importador Planilha Legada — AD Rocha"
-      description="Tratamento e importação de membros do arquivo CSV no padrão AD Rocha Eterna."
+      title={`Importador Planilha Legada — ${nomeMinisterio || 'Ministério'}`}
+      description={`Tratamento e importação de membros do arquivo CSV no padrão ${nomeMinisterio || 'Ministério'}.`}
       headerExtra={
         <Link
           href="/secretaria/membros"
@@ -810,7 +827,7 @@ export default function ImportarMembrosPage() {
         {/* Instruções */}
         <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
           <h2 className="text-lg font-bold text-teal-800 mb-4 flex items-center gap-2">
-            <Info className="h-5 w-5" /> Importador de Planilha Ad Rocha
+            <Info className="h-5 w-5" /> Importador de Planilha {nomeMinisterio || 'Ministério'}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
             <div className="space-y-4">
