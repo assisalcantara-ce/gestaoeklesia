@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Cake, Calendar, Search, Phone, Printer } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Cake, Mail, Image as ImageIcon } from 'lucide-react';
 import { Membro } from '@/hooks/secretaria/useMembros';
 
 interface MembrosAniversariantesViewProps {
@@ -16,26 +16,72 @@ const MESES = [
 
 export default function MembrosAniversariantesView({
   membros,
-  setMembroImprimindo,
 }: MembrosAniversariantesViewProps) {
   const [mesSelecionado, setMesSelecionado] = useState<number>(() => new Date().getMonth() + 1);
-  const [busca, setBusca] = useState('');
-  const [filtroCongregacao, setFiltroCongregacao] = useState('TODAS');
 
-  // Extrair congregações únicas
-  const congregacoes = useMemo(() => {
-    const setCong = new Set<string>();
+  // Configuração da mensagem de Aniversário
+  const [mensagemTemplate, setMensagemTemplate] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('@gestaoeklesia/aniversario_msg_template');
+      if (saved) return saved;
+    }
+    return `Feliz Aniversário, {nome}! 🎉\n\nA equipe deseja que Deus te abençoe grandemente neste dia tão especial!\n\nCom carinho,\nSecretaria do Ministério`;
+  });
+
+  const [imagemMensagem, setImagemMensagem] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('@gestaoeklesia/aniversario_msg_imagem') || null;
+    }
+    return null;
+  });
+
+  // Salvar no localStorage sempre que a mensagem ou imagem mudar
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('@gestaoeklesia/aniversario_msg_template', mensagemTemplate);
+    }
+  }, [mensagemTemplate]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (imagemMensagem) {
+        localStorage.setItem('@gestaoeklesia/aniversario_msg_imagem', imagemMensagem);
+      } else {
+        localStorage.removeItem('@gestaoeklesia/aniversario_msg_imagem');
+      }
+    }
+  }, [imagemMensagem]);
+
+  // Contagem de aniversariantes por mês para os cards superiores
+  const contagemPorMes = useMemo(() => {
+    const contagem: Record<number, number> = {
+      1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0,
+      7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0
+    };
+
     membros.forEach(m => {
-      if (m.congregacao) setCong.add(m.congregacao);
+      if (!m.dataNascimento) return;
+      let mesMembro = 0;
+      const raw = m.dataNascimento.trim();
+      if (raw.includes('-')) {
+        const parts = raw.split('-');
+        mesMembro = parseInt(parts[1], 10);
+      } else if (raw.includes('/')) {
+        const parts = raw.split('/');
+        mesMembro = parseInt(parts[1], 10);
+      }
+      if (mesMembro >= 1 && mesMembro <= 12) {
+        contagem[mesMembro] += 1;
+      }
     });
-    return Array.from(setCong).sort();
+
+    return contagem;
   }, [membros]);
 
-  // Filtrar membros aniversariantes do mês selecionado
+  // Lista de aniversariantes filtrados do mês selecionado
   const aniversariantesDoMes = useMemo(() => {
     return membros.filter(membro => {
       if (!membro.dataNascimento) return false;
-      
       let mesMembro = 0;
       const raw = membro.dataNascimento.trim();
       if (raw.includes('-')) {
@@ -45,26 +91,7 @@ export default function MembrosAniversariantesView({
         const parts = raw.split('/');
         mesMembro = parseInt(parts[1], 10);
       }
-
-      if (mesMembro !== mesSelecionado) return false;
-
-      // Filtro de busca (nome, cpf, matricula)
-      if (busca) {
-        const termo = busca.toLowerCase();
-        const matchNome = (membro.nome || '').toLowerCase().includes(termo);
-        const matchCpf = (membro.cpf || '').includes(termo);
-        const matchMatricula = (membro.matricula || '').includes(termo);
-        if (!matchNome && !matchCpf && !matchMatricula) return false;
-      }
-
-      // Filtro de congregação
-      if (filtroCongregacao !== 'TODAS') {
-        if ((membro.congregacao || '').toUpperCase() !== filtroCongregacao.toUpperCase()) {
-          return false;
-        }
-      }
-
-      return true;
+      return mesMembro === mesSelecionado;
     }).sort((a, b) => {
       const getDia = (dt: string) => {
         if (dt.includes('-')) return parseInt(dt.split('-')[2], 10) || 0;
@@ -73,251 +100,244 @@ export default function MembrosAniversariantesView({
       };
       return getDia(a.dataNascimento || '') - getDia(b.dataNascimento || '');
     });
-  }, [membros, mesSelecionado, busca, filtroCongregacao]);
-
-  const calcularIdade = (dataNascimento?: string) => {
-    if (!dataNascimento) return null;
-    let ano = 0, mes = 0, dia = 0;
-    if (dataNascimento.includes('-')) {
-      const parts = dataNascimento.split('-');
-      ano = parseInt(parts[0], 10);
-      mes = parseInt(parts[1], 10) - 1;
-      dia = parseInt(parts[2], 10);
-    } else if (dataNascimento.includes('/')) {
-      const parts = dataNascimento.split('/');
-      dia = parseInt(parts[0], 10);
-      mes = parseInt(parts[1], 10) - 1;
-      ano = parseInt(parts[2], 10);
-    }
-    if (!ano) return null;
-    const nascimento = new Date(ano, mes, dia);
-    const hoje = new Date();
-    let idade = hoje.getFullYear() - nascimento.getFullYear();
-    const m = hoje.getMonth() - nascimento.getMonth();
-    if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) {
-      idade--;
-    }
-    return idade >= 0 ? idade : null;
-  };
+  }, [membros, mesSelecionado]);
 
   const formatarDia = (dataNascimento?: string) => {
     if (!dataNascimento) return '-';
+    let dia = '-';
     if (dataNascimento.includes('-')) {
       const parts = dataNascimento.split('-');
-      return parts[2];
+      dia = parts[2];
     } else if (dataNascimento.includes('/')) {
-      return dataNascimento.split('/')[0];
+      dia = dataNascimento.split('/')[0];
     }
-    return dataNascimento;
+    return dia.padStart(2, '0');
   };
 
-  const hojeDia = new Date().getDate();
-  const hojeMes = new Date().getMonth() + 1;
+  const handleUploadImagem = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImagemMensagem(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Gerar mensagem formatada para um membro específico
+  const gerarTextoMensagem = (membroNome: string, campo?: string, supervisao?: string) => {
+    return mensagemTemplate
+      .replace(/{nome}/gi, membroNome || 'Irmão(ã)')
+      .replace(/{campo}/gi, campo || '')
+      .replace(/{supervisao}/gi, supervisao || '');
+  };
+
+  // Enviar WhatsApp via web API nativa
+  const handleEnviarWhatsApp = (membro: Membro) => {
+    const celularOuZap = (membro.whatsapp || membro.celular || '').replace(/\D/g, '');
+    if (!celularOuZap) {
+      alert(`O membro ${membro.nome} não possui número de celular/WhatsApp cadastrado.`);
+      return;
+    }
+
+    const numeroCompleto = celularOuZap.length <= 11 ? `55${celularOuZap}` : celularOuZap;
+    const texto = encodeURIComponent(gerarTextoMensagem(membro.nome, membro.campo, membro.supervisao));
+    
+    // Abre a API do WhatsApp Web / Desktop conectada no PC
+    window.open(`https://web.whatsapp.com/send?phone=${numeroCompleto}&text=${texto}`, '_blank');
+  };
+
+  // Enviar E-mail nativo
+  const handleEnviarEmail = (membro: Membro) => {
+    if (!membro.email) {
+      alert(`O membro ${membro.nome} não possui e-mail cadastrado.`);
+      return;
+    }
+    const assunto = encodeURIComponent(`Feliz Aniversário, ${membro.nome}! 🎉`);
+    const corpo = encodeURIComponent(gerarTextoMensagem(membro.nome, membro.campo, membro.supervisao));
+    window.open(`mailto:${membro.email}?subject=${assunto}&body=${corpo}`, '_blank');
+  };
+
+  // Exemplo de pré-visualização do primeiro membro da lista ou de um nome genérico
+  const exemploMembroNome = aniversariantesDoMes.length > 0 ? aniversariantesDoMes[0].nome : 'JOÃO DA SILVA';
 
   return (
     <div className="space-y-6">
-      {/* Barra de Filtros e Controles */}
-      <div className="bg-white rounded-lg p-5 shadow-md border-t-4 border-teal-500">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4">
-          <div>
-            <h2 className="text-xl font-bold text-teal-800 flex items-center gap-2">
-              <Cake className="w-6 h-6 text-pink-500" />
-              Aniversariantes do Mês
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Consulte e acompanhe os membros que fazem aniversário no mês selecionado.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 bg-teal-50 px-4 py-2 rounded-lg border border-teal-200">
-            <span className="text-sm font-semibold text-teal-800">Total no mês:</span>
-            <span className="px-2.5 py-0.5 bg-teal-600 text-white font-bold rounded-full text-sm">
-              {aniversariantesDoMes.length}
-            </span>
-          </div>
-        </div>
+      {/* 1. Grid de Meses (Card 4x3) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {MESES.map((nomeMes, index) => {
+          const numMes = index + 1;
+          const isSelected = mesSelecionado === numMes;
+          const qtd = contagemPorMes[numMes] || 0;
 
-        {/* Seleção de Mês em Carrossel/Tabs */}
-        <div className="flex overflow-x-auto gap-2 pb-2 mb-4 scrollbar-thin">
-          {MESES.map((m, idx) => {
-            const numMes = idx + 1;
-            const isSelected = mesSelecionado === numMes;
-            const isAtual = hojeMes === numMes;
-            return (
-              <button
-                key={m}
-                onClick={() => setMesSelecionado(numMes)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
-                  isSelected
-                    ? 'bg-teal-600 text-white shadow-md'
-                    : isAtual
-                    ? 'bg-pink-100 text-pink-800 border border-pink-300 hover:bg-pink-200'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <span>{m}</span>
-                {isAtual && <span className="text-xs bg-pink-500 text-white px-1.5 py-0.2 rounded-full">Atual</span>}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Filtros de Busca e Congregação */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-gray-100">
-          <div>
-            <label className="block text-xs font-semibold text-teal-700 mb-1">Buscar Membro</label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Nome, CPF ou Matrícula..."
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border-2 border-teal-200 rounded-lg text-sm focus:outline-none focus:border-teal-500"
-              />
-              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-teal-700 mb-1">Congregação</label>
-            <select
-              value={filtroCongregacao}
-              onChange={(e) => setFiltroCongregacao(e.target.value)}
-              className="w-full px-3 py-2 border-2 border-teal-200 rounded-lg bg-teal-50 text-sm focus:outline-none focus:border-teal-500"
-            >
-              <option value="TODAS">TODAS AS CONGREGAÇÕES</option>
-              {congregacoes.map(c => (
-                <option key={c} value={c}>{c.toUpperCase()}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-end">
+          return (
             <button
-              onClick={() => {
-                setBusca('');
-                setFiltroCongregacao('TODAS');
-                setMesSelecionado(new Date().getMonth() + 1);
-              }}
-              className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm font-semibold h-[42px]"
+              key={nomeMes}
+              onClick={() => setMesSelecionado(numMes)}
+              className={`p-4 rounded-xl border transition-all text-left flex flex-col justify-between ${
+                isSelected
+                  ? 'border-teal-500 bg-teal-50/50 shadow-md ring-2 ring-teal-500/20'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+              }`}
             >
-              Limpar Filtros
+              <span className={`text-xs font-semibold ${isSelected ? 'text-teal-700 font-bold' : 'text-gray-500'}`}>
+                {nomeMes}
+              </span>
+              <span className={`text-2xl font-bold mt-2 ${isSelected ? 'text-teal-900' : 'text-gray-800'}`}>
+                {qtd}
+              </span>
             </button>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
-      {/* Tabela de Aniversariantes */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
-        <div className="px-6 py-4 bg-teal-700 text-white flex justify-between items-center">
-          <h3 className="font-bold flex items-center gap-2 text-base">
-            <Calendar className="w-5 h-5" />
-            Lista de Aniversariantes — {MESES[mesSelecionado - 1]}
-          </h3>
-          <span className="text-xs bg-teal-800 text-teal-100 px-3 py-1 rounded-full font-medium">
-            {aniversariantesDoMes.length} membro(s) encontrado(s)
-          </span>
+      {/* 2. Conteúdo Principal: Tabela de Aniversariantes + Configurador de Mensagem */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        
+        {/* Lado Esquerdo: Lista de Aniversariantes */}
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+            <h3 className="font-bold text-gray-800 flex items-center gap-2 text-base">
+              <Cake className="w-5 h-5 text-teal-600" />
+              Aniversariantes de {MESES[mesSelecionado - 1]} ({aniversariantesDoMes.length})
+            </h3>
+          </div>
+
+          {aniversariantesDoMes.length === 0 ? (
+            <div className="p-12 text-center text-gray-500 space-y-3">
+              <Cake className="w-12 h-12 text-gray-300 mx-auto" />
+              <p className="font-semibold text-gray-600">Nenhum aniversariante em {MESES[mesSelecionado - 1]}</p>
+              <p className="text-xs text-gray-400">Não há membros com data de nascimento cadastrada neste mês.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-gray-100/80 text-gray-600 font-semibold border-b border-gray-200 text-xs">
+                  <tr>
+                    <th className="px-4 py-3 text-center w-14">Dia</th>
+                    <th className="px-4 py-3">Nome</th>
+                    <th className="px-4 py-3">Campo / Congregação</th>
+                    <th className="px-4 py-3">Contato</th>
+                    <th className="px-4 py-3 text-center">Enviar</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {aniversariantesDoMes.map(membro => {
+                    const dia = formatarDia(membro.dataNascimento);
+                    const temContato = !!(membro.whatsapp || membro.celular);
+
+                    return (
+                      <tr key={membro.id} className="hover:bg-gray-50/80 transition">
+                        <td className="px-4 py-3 text-center">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-teal-100 text-teal-800 font-bold text-xs">
+                            {dia}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-bold text-gray-800 uppercase text-xs">{membro.nome}</div>
+                          <div className="text-[11px] text-gray-400 capitalize">{membro.tipoCadastro || 'membro'}</div>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600">
+                          {membro.campo || membro.congregacao || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600">
+                          <div>{membro.whatsapp || membro.celular || '—'}</div>
+                          {membro.email && (
+                            <div className="text-[10px] text-gray-400 truncate max-w-[140px]">{membro.email}</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handleEnviarWhatsApp(membro)}
+                              title={temContato ? "Enviar WhatsApp conectado" : "Sem contato cadastrado"}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-1 ${
+                                temContato
+                                  ? 'bg-emerald-500 hover:bg-emerald-600 shadow-sm'
+                                  : 'bg-gray-300 cursor-not-allowed'
+                              }`}
+                            >
+                              <span>WhatsApp</span>
+                            </button>
+                            <button
+                              onClick={() => handleEnviarEmail(membro)}
+                              title={membro.email ? "Enviar E-mail" : "Sem e-mail cadastrado"}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-1 ${
+                                membro.email
+                                  ? 'bg-blue-600 hover:bg-blue-700 shadow-sm'
+                                  : 'bg-gray-300 cursor-not-allowed'
+                              }`}
+                            >
+                              <span>E-mail</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        {aniversariantesDoMes.length === 0 ? (
-          <div className="p-12 text-center text-gray-500 space-y-3">
-            <Cake className="w-12 h-12 text-gray-300 mx-auto" />
-            <p className="font-semibold text-lg text-gray-600">Nenhum aniversariante encontrado</p>
-            <p className="text-sm">Não há membros aniversariando no mês de {MESES[mesSelecionado - 1]} com os filtros aplicados.</p>
+        {/* Lado Direito: Painel de Configuração da Mensagem Padrão */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5 space-y-5">
+          <div className="border-b border-gray-100 pb-3">
+            <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+              <Mail className="w-4 h-4 text-teal-600" />
+              Configurar Mensagem Padrão
+            </h3>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Use <code className="text-teal-600 font-semibold">{'{nome}'}</code>, <code className="text-teal-600 font-semibold">{'{campo}'}</code> e <code className="text-teal-600 font-semibold">{'{supervisao}'}</code> como variáveis.
+            </p>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-gray-100 text-gray-700 font-semibold border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-3 text-center w-16">Dia</th>
-                  <th className="px-4 py-3 text-center w-14">Foto</th>
-                  <th className="px-4 py-3">Nome</th>
-                  <th className="px-4 py-3">Idade</th>
-                  <th className="px-4 py-3">Cargo / Função</th>
-                  <th className="px-4 py-3">Contato / WhatsApp</th>
-                  <th className="px-4 py-3">Congregação</th>
-                  {setMembroImprimindo && <th className="px-4 py-3 text-center">Ações</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {aniversariantesDoMes.map(membro => {
-                  const dia = formatarDia(membro.dataNascimento);
-                  const idade = calcularIdade(membro.dataNascimento);
-                  const isHoje = hojeMes === mesSelecionado && parseInt(dia, 10) === hojeDia;
 
-                  return (
-                    <tr
-                      key={membro.id}
-                      className={`hover:bg-teal-50/50 transition ${
-                        isHoje ? 'bg-pink-50/80 font-medium' : ''
-                      }`}
-                    >
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-block px-3 py-1 rounded-full font-bold text-sm ${
-                          isHoje
-                            ? 'bg-pink-600 text-white shadow-sm'
-                            : 'bg-teal-100 text-teal-800'
-                        }`}>
-                          Dia {dia}
-                        </span>
-                        {isHoje && <span className="block text-[10px] text-pink-600 font-bold mt-0.5">HOJE! 🎉</span>}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="w-9 h-10 bg-gray-100 rounded overflow-hidden flex items-center justify-center mx-auto border border-gray-200">
-                          {membro.fotoUrl ? (
-                            <img src={membro.fotoUrl} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-lg text-gray-400">👤</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-gray-800">{membro.nome}</div>
-                        <div className="text-xs text-gray-500">Matrícula: {membro.matricula || '-'}</div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-700">
-                        {idade !== null ? `${idade} anos` : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 text-xs">
-                        <div className="font-medium text-gray-700">{membro.cargoMinisterial || 'Membro'}</div>
-                        {membro.qualFuncao && <div className="text-teal-700">{membro.qualFuncao}</div>}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 text-xs">
-                        {membro.celular || membro.whatsapp ? (
-                          <a
-                            href={`https://wa.me/55${(membro.whatsapp || membro.celular || '').replace(/\D/g, '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-green-700 hover:text-green-800 hover:underline font-medium"
-                          >
-                            <Phone className="w-3.5 h-3.5" />
-                            {membro.whatsapp || membro.celular}
-                          </a>
-                        ) : (
-                          '-'
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 text-xs">
-                        {membro.congregacao || '-'}
-                      </td>
-                      {setMembroImprimindo && (
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => setMembroImprimindo(membro)}
-                            className="p-1.5 text-teal-700 hover:bg-teal-100 rounded-lg transition"
-                            title="Imprimir Ficha do Membro"
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          {/* Campo de Texto da Mensagem */}
+          <div>
+            <textarea
+              rows={6}
+              value={mensagemTemplate}
+              onChange={(e) => setMensagemTemplate(e.target.value)}
+              className="w-full p-3 border-2 border-teal-400/80 rounded-xl text-xs text-gray-800 focus:outline-none focus:border-teal-600 leading-relaxed font-sans shadow-inner"
+              placeholder="Digite o modelo da mensagem de aniversário..."
+            />
           </div>
-        )}
+
+          {/* Imagem da Mensagem (Upload/Preview) */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-gray-700">Imagem da mensagem</label>
+            {imagemMensagem ? (
+              <div className="relative rounded-xl border border-gray-200 overflow-hidden bg-gray-50 group">
+                <img src={imagemMensagem} alt="Imagem da mensagem" className="w-full h-32 object-cover" />
+                <button
+                  onClick={() => setImagemMensagem(null)}
+                  className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-md shadow hover:bg-red-700 transition"
+                >
+                  Remover
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition">
+                <div className="flex flex-col items-center justify-center pt-3 pb-3">
+                  <ImageIcon className="w-6 h-6 text-gray-400 mb-1" />
+                  <p className="text-xs text-gray-500 font-medium">Clique para adicionar uma imagem</p>
+                  <p className="text-[10px] text-gray-400">PNG, JPG, GIF</p>
+                </div>
+                <input type="file" accept="image/*" className="hidden" onChange={handleUploadImagem} />
+              </label>
+            )}
+          </div>
+
+          {/* Card de Pré-Visualização */}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">PRÉ-VISUALIZAÇÃO</span>
+            <div className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed font-sans bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+              {gerarTextoMensagem(exemploMembroNome)}
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
