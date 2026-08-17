@@ -272,7 +272,7 @@ export function useMembros() {
   const [maxMembros, setMaxMembros] = useState<number>(0);
 
   // ── Estado: UI / navegação ───────────────────────────────────────────────────
-  const [dashboardView, setDashboardView] = useState<'overview' | 'list'>('overview');
+  const [dashboardView, setDashboardView] = useState<'overview' | 'list' | 'aniversariantes'>('overview');
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState<MembrosFormTab>('dados');
 

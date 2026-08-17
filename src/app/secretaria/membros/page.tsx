@@ -7,6 +7,7 @@ import MembroCarteirinhaModal from '@/components/secretaria/membros/MembroCartei
 import MembrosToolbar from '@/components/secretaria/membros/MembrosToolbar';
 import MembrosTable from '@/components/secretaria/membros/MembrosTable';
 import MembroFormModal from '@/components/secretaria/membros/MembroFormModal';
+import MembrosAniversariantesView from '@/components/secretaria/membros/MembrosAniversariantesView';
 import { useMembros } from '@/hooks/secretaria/useMembros';
 
 export default function MembrosPage() {
@@ -290,7 +291,7 @@ export default function MembrosPage() {
         <div className="p-6 max-w-[96rem] mx-auto w-full">
           {/* Navegação de Abas */}
           <div className="bg-white rounded-lg shadow-md mb-6 border-b-4 border-teal-500">
-            <div className="flex items-center gap-4 p-4">
+            <div className="flex flex-wrap items-center gap-4 p-4">
               <button
                 onClick={() => setDashboardView('overview')}
                 className={`px-6 py-3 rounded-lg font-semibold transition ${
@@ -306,6 +307,14 @@ export default function MembrosPage() {
                 }`}
               >
                 👥 Dados de Membros
+              </button>
+              <button
+                onClick={() => setDashboardView('aniversariantes')}
+                className={`px-6 py-3 rounded-lg font-semibold transition ${
+                  dashboardView === 'aniversariantes' ? 'bg-teal-600 text-white shadow-lg' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                🎂 Aniversariantes
               </button>
             </div>
           </div>
@@ -436,6 +445,16 @@ export default function MembrosPage() {
                 loadingDizimosHistorico={loadingDizimosHistorico}
                 isDizimista={isDizimista}
                 setIsDizimista={setIsDizimista}
+              />
+            </div>
+          )}
+
+          {/* Vista — Aniversariantes */}
+          {dashboardView === 'aniversariantes' && (
+            <div>
+              <MembrosAniversariantesView
+                membros={membros}
+                setMembroImprimindo={setMembroImprimindo}
               />
             </div>
           )}
