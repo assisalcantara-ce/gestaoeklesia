@@ -98,9 +98,12 @@ export default function InteractiveCanvas({
         }
     }, [elementosSelecionados]);
 
-    const handleElementMouseDown = (e: React.MouseEvent, elemento: ElementoCartao) => {
+    const handleElementMouseDown = (e: React.MouseEvent, elementoParam: ElementoCartao) => {
         e.preventDefault();
         e.stopPropagation();
+
+        // Buscar elemento atualizado da fonte da verdade (elementos prop)
+        const elemento = elementos.find(el => el.id === elementoParam.id) || elementoParam;
 
         // Focar canvas para permitir atalhos de teclado
         canvasRef.current?.focus();
@@ -398,7 +401,7 @@ export default function InteractiveCanvas({
         }
     };
 
-    const renderElemento = (elemento: ElementoCartao) => {
+    const renderElemento = (elemento: ElementoCartao, index: number) => {
         const isSelected = elementoSelecionado?.id === elemento.id;
         const isInSelection = elementosSelecionados.some(el => el.id === elemento.id);
         const isLocked = !!elemento.locked;
@@ -408,6 +411,7 @@ export default function InteractiveCanvas({
             top: `${elemento.y}px`,
             width: `${elemento.largura}px`,
             height: `${elemento.altura}px`,
+            zIndex: index + 1,
             cursor: isLocked ? 'not-allowed' : isDragging ? 'grabbing' : 'grab',
             border: isSelected
                 ? (isLocked ? '2px solid #f59e0b' : '2px solid #3b82f6')
@@ -760,7 +764,7 @@ export default function InteractiveCanvas({
                 }
             }}
         >
-            {elementos.filter(e => e.visivel).map(elemento => renderElemento(elemento))}
+            {elementos.filter(e => e.visivel).map((elemento, index) => renderElemento(elemento, index))}
 
             {/* Box de seleção por área */}
             {isBoxSelecting && (

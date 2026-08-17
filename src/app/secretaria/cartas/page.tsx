@@ -25,7 +25,6 @@ import {
   Italic,
   Lock,
   Minus,
-  Palette,
   Paintbrush,
   Shield,
   Trash2,
@@ -330,6 +329,9 @@ export default function CartasPage() {
   const [draftKey, setDraftKey] = useState('');
   const [draftTipo, setDraftTipo] = useState<TemplateTipo>('custom');
   const [isDraftReady, setIsDraftReady] = useState(false);
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [isEditingVisual, setIsEditingVisual] = useState(false);
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'elementos' | 'variaveis' | 'camadas'>('elementos');
   const lastSelectedTemplateRef = useRef<CartaTemplate | null>(null);
   const [canvasContent, setCanvasContent] = useState<CartaCanvasData>(() => createDefaultCanvas());
   const [selectedCanvasElement, setSelectedCanvasElement] = useState<CartaCanvasElement | null>(null);
@@ -646,27 +648,21 @@ export default function CartasPage() {
   const handleSelectTemplate = (template: CartaTemplate) => {
     setIsDraftReady(false);
     setSelectedTemplate(template);
+    setIsEditingVisual(false);
   };
 
   const handleNewTemplate = () => {
     lastSelectedTemplateRef.current = selectedTemplate;
-    setSelectedTemplate(null);
     setDraftTitle('');
     setDraftKey('');
     setDraftTipo('custom');
-    setIsDraftReady(false);
-    setCanvasContent(createDefaultCanvas());
-    setSelectedCanvasElement(null);
-    setSelectedCanvasElements([]);
+    setShowNewModal(true);
   };
 
   const handleCancelNewTemplate = () => {
-    const fallback = lastSelectedTemplateRef.current || templates[0] || null;
-    if (fallback) {
-      setIsDraftReady(false);
-      setSelectedTemplate(fallback);
-    }
-    lastSelectedTemplateRef.current = null;
+    setShowNewModal(false);
+    setDraftTitle('');
+    setDraftKey('');
   };
 
   const handleCreateDraft = () => {
@@ -680,8 +676,15 @@ export default function CartasPage() {
       });
       return;
     }
-    setDraftKey(normalizeTemplateKey(draftTitle));
+    const key = normalizeTemplateKey(draftTitle);
+    setDraftKey(key);
+    setSelectedTemplate(null);
     setIsDraftReady(true);
+    setCanvasContent(createDefaultCanvas());
+    setSelectedCanvasElement(null);
+    setSelectedCanvasElements([]);
+    setShowNewModal(false);
+    setIsEditingVisual(true);
   };
 
   const handleSaveTemplate = async () => {
@@ -1142,568 +1145,669 @@ export default function CartasPage() {
             <Tabs tabs={visibleTabs} activeTab={activeTab} onTabChange={setActiveTab}>
         {activeTab === 'modelos' && (
           <Section icon="🧩" title="Modelos de Cartas">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-4 space-y-4">
-                <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-xs font-semibold text-gray-600">Modelo</span>
-                    <select
-                      value={selectedTemplate?.id || ''}
-                      onChange={(e) => {
-                        const tpl = templates.find((t) => t.id === e.target.value);
-                        if (tpl) handleSelectTemplate(tpl);
-                      }}
-                      className="min-w-[220px] flex-1 rounded-lg border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
-                    >
-                      <option value="" disabled>Selecione um modelo</option>
-                      {templates.map((tpl) => (
-                        <option key={tpl.id} value={tpl.id}>
-                          {tpl.title}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={handleNewTemplate}
-                      className="text-xs px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
-                    >
-                      + Novo
-                    </button>
-                  </div>
+            {/* Seletor de Modelo Superior */}
+            <div className="mb-6 rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">Modelo Ativo:</span>
+                  <select
+                    value={selectedTemplate?.id || ''}
+                    onChange={(e) => {
+                      const tpl = templates.find((t) => t.id === e.target.value);
+                      if (tpl) handleSelectTemplate(tpl);
+                    }}
+                    className="min-w-[220px] flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+                  >
+                    <option value="" disabled>Selecione um modelo</option>
+                    {templates.map((tpl) => (
+                      <option key={tpl.id} value={tpl.id}>
+                        {tpl.title}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleNewTemplate}
+                    className="text-xs px-4 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
+                  >
+                    + Novo Modelo
+                  </button>
                 </div>
 
-                {!selectedTemplate && (
-                  <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Nome do modelo</h3>
-                    <input
-                      value={draftTitle}
-                      onChange={(e) => setDraftTitle(e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
-                      placeholder="Ex: Carta de Recomendacao"
-                    />
-                    <div className="mt-3 flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={handleCreateDraft}
-                        className="rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700"
-                      >
-                        Criar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCancelNewTemplate}
-                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
+                {selectedTemplate && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsEditingVisual(!isEditingVisual)}
+                      className={`text-xs px-4 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-sm ${
+                        isEditingVisual
+                          ? 'bg-teal-100 text-teal-800 border border-teal-300'
+                          : 'bg-teal-600 text-white hover:bg-teal-700'
+                      }`}
+                    >
+                      <span>{isEditingVisual ? '✏️ Modo Edição Visual (Ativo)' : '✏️ Abrir Editor Visual'}</span>
+                    </button>
                   </div>
                 )}
+              </div>
+            </div>
 
-                <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-700">Propriedades</h3>
-                    {selectedCanvasElement && (
+            {/* Visualização de Edição do Modelo */}
+            {(selectedTemplate || isDraftReady) && (isEditingVisual || isDraftReady) ? (
+              <div className="space-y-4">
+                {/* ESTRUTURA DE 3 COLUNAS */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  
+                  {/* COLUNA 1 (3 cols): PAINEL LATERAL ESQUERDO COM ABAS COMPACTAS */}
+                  <div className="lg:col-span-3 space-y-3">
+                    {/* Navegação de Abas do Painel Esquerdo */}
+                    <div className="flex bg-gray-100/80 p-1 rounded-xl border border-gray-200 gap-1">
                       <button
                         type="button"
-                        onClick={() => toggleCanvasLock(selectedCanvasElement)}
-                        title={selectedCanvasElement.locked ? 'Desbloquear elemento' : 'Bloquear elemento'}
-                        aria-label={selectedCanvasElement.locked ? 'Desbloquear elemento' : 'Bloquear elemento'}
-                        className={`inline-flex items-center justify-center rounded-md border px-2 py-1 text-xs font-semibold ${
-                          selectedCanvasElement.locked
-                            ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
-                            : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                        onClick={() => setActiveSidebarTab('elementos')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 ${
+                          activeSidebarTab === 'elementos'
+                            ? 'bg-white text-teal-800 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
                         }`}
                       >
-                        {selectedCanvasElement.locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                        <span>➕ Elementos</span>
                       </button>
-                    )}
-                  </div>
-                  {!selectedCanvasElement && (
-                    <p className="text-xs text-gray-500">Selecione um elemento no canvas para editar.</p>
-                  )}
-                  {selectedCanvasElement && (
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Tipo</p>
-                        <p className="text-sm font-semibold text-gray-700">
-                          {CANVAS_ELEMENT_LABELS[selectedCanvasElement.tipo]}
-                        </p>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveSidebarTab('variaveis')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 ${
+                          activeSidebarTab === 'variaveis'
+                            ? 'bg-white text-teal-800 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        <span>{'{x}'} Variáveis</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveSidebarTab('camadas')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 relative ${
+                          activeSidebarTab === 'camadas'
+                            ? 'bg-white text-teal-800 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        <span>🥞 Camadas</span>
+                        {canvasContent.elements.length > 0 && (
+                          <span className="text-[10px] bg-teal-100 text-teal-800 font-bold px-1.5 py-0.2 rounded-full">
+                            {canvasContent.elements.length}
+                          </span>
+                        )}
+                      </button>
+                    </div>
 
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
-                          Posicao e tamanho
+                    {/* ABA 1: Adicionar Elementos */}
+                    {activeSidebarTab === 'elementos' && (
+                      <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur space-y-3">
+                        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-100 pb-2">
+                          Inserir no Canvas
+                        </h3>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => addCanvasElement('texto')}
+                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
+                          >
+                            <Type className="h-4 w-4 text-teal-600" />
+                            <span>Texto</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addCanvasElement('linha')}
+                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
+                          >
+                            <Minus className="h-4 w-4 text-teal-600" />
+                            <span>Linha</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addCanvasElement('logo')}
+                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
+                          >
+                            <Shield className="h-4 w-4 text-teal-600" />
+                            <span>Logo</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addCanvasElement('imagem')}
+                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
+                          >
+                            <Image className="h-4 w-4 text-teal-600" />
+                            <span>Imagem</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addCanvasElement('qrcode')}
+                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
+                          >
+                            <span className="text-sm">📱</span>
+                            <span>QR Code</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCanvasImageTargetId(null);
+                              canvasImageInputRef.current?.click();
+                            }}
+                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
+                          >
+                            <Upload className="h-4 w-4 text-teal-600" />
+                            <span>Upload</span>
+                          </button>
+                        </div>
+
+                        <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
+                          <button
+                            type="button"
+                            onClick={() => canvasBackgroundInputRef.current?.click()}
+                            className="w-full flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition shadow-sm"
+                          >
+                            <Paintbrush className="h-3.5 w-3.5 text-teal-600" />
+                            <span>Definir Imagem de Fundo</span>
+                          </button>
+
+                          {canvasContent.backgroundUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setCanvasContent((prev) => ({ ...prev, backgroundUrl: '' }))}
+                              className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 transition"
+                            >
+                              <Eraser className="h-3.5 w-3.5" />
+                              <span>Remover Fundo</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <input
+                          ref={canvasImageInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleCanvasImageUpload(file, canvasImageTargetId ?? undefined);
+                            }
+                            e.currentTarget.value = '';
+                            setCanvasImageTargetId(null);
+                          }}
+                        />
+                        <input
+                          ref={canvasBackgroundInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleCanvasBackgroundUpload(file);
+                            }
+                            e.currentTarget.value = '';
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* ABA 2: Placeholders (Variáveis) */}
+                    {activeSidebarTab === 'variaveis' && (
+                      <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur space-y-3">
+                        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-100 pb-2">
+                          Variáveis Dinâmicas
+                        </h3>
+                        <p className="text-[11px] text-gray-500">
+                          Selecione um elemento de texto e clique no botão para inserir a variável.
                         </p>
-                        <div className="grid grid-cols-4 gap-2">
-                          <div>
-                            <label className="text-[11px] font-semibold text-gray-500" title="Largura">
-                              W
-                            </label>
-                            <input
-                              type="number"
-                              value={selectedCanvasElement.largura}
-                              onChange={(e) =>
-                                updateCanvasElement(selectedCanvasElement.id, { largura: Number(e.target.value) || 0 })
-                              }
-                              className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs"
-                              disabled={selectedCanvasElement.locked}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-gray-500" title="Altura">
-                              H
-                            </label>
-                            <input
-                              type="number"
-                              value={selectedCanvasElement.altura}
-                              onChange={(e) =>
-                                updateCanvasElement(selectedCanvasElement.id, { altura: Number(e.target.value) || 0 })
-                              }
-                              className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs"
-                              disabled={selectedCanvasElement.locked}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-gray-500" title="Posicao X">
-                              X
-                            </label>
-                            <input
-                              type="number"
-                              value={selectedCanvasElement.x}
-                              onChange={(e) =>
-                                updateCanvasElement(selectedCanvasElement.id, { x: Number(e.target.value) || 0 })
-                              }
-                              className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs"
-                              disabled={selectedCanvasElement.locked}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-gray-500" title="Posicao Y">
-                              Y
-                            </label>
-                            <input
-                              type="number"
-                              value={selectedCanvasElement.y}
-                              onChange={(e) =>
-                                updateCanvasElement(selectedCanvasElement.id, { y: Number(e.target.value) || 0 })
-                              }
-                              className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs"
-                              disabled={selectedCanvasElement.locked}
-                            />
-                          </div>
+                        <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                          {PLACEHOLDER_GROUPS.map((group) => (
+                            <div key={group.title}>
+                              <p className="text-[11px] font-bold text-teal-800 mb-1">{group.title}</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {group.items.map((item) => (
+                                  <button
+                                    key={item.key}
+                                    onClick={() => handleInsertPlaceholder(item.key)}
+                                    className="text-[11px] px-2.5 py-1 rounded-full bg-gray-100 hover:bg-teal-100 hover:text-teal-800 text-gray-700 transition font-medium border border-gray-200"
+                                  >
+                                    {item.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
+                    )}
 
-                      {selectedCanvasElement.tipo === 'texto' && (
-                        <>
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
-                              Tamanho da fonte: {selectedCanvasElement.fontSize || 14}px
-                            </p>
-                            <input
-                              type="range"
-                              min={8}
-                              max={72}
-                              value={selectedCanvasElement.fontSize || 14}
-                              onChange={(e) =>
-                                updateCanvasElement(selectedCanvasElement.id, { fontSize: Number(e.target.value) || 14 })
+                    {/* ABA 3: CAMADAS (Organização de elementos do canvas) */}
+                    {activeSidebarTab === 'camadas' && (
+                      <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur space-y-3">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                          <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            Lista de Camadas
+                          </h3>
+                          <span className="text-[10px] text-gray-400 font-semibold">
+                            Frente no topo
+                          </span>
+                        </div>
+                        
+                        {canvasContent.elements.length === 0 ? (
+                          <div className="py-8 text-center text-gray-400 space-y-1">
+                            <p className="text-xs">Nenhuma camada criada.</p>
+                            <p className="text-[10px]">Adicione um elemento na aba "Elementos".</p>
+                          </div>
+                        ) : (
+                          /* Exibe as camadas invertidas (último elemento do array = camada da frente = topo da lista) */
+                          <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
+                            {canvasContent.elements.slice().reverse().map((el, indexInverted) => {
+                              const originalIndex = canvasContent.elements.length - 1 - indexInverted;
+                              const isSelected = selectedCanvasElement?.id === el.id;
+                              let labelResumido = CANVAS_ELEMENT_LABELS[el.tipo] || 'Elemento';
+                              if (el.tipo === 'texto' && el.texto) {
+                                labelResumido = el.texto.replace(/<[^>]*>?/gm, '').slice(0, 22) || 'Texto';
                               }
-                              className="w-full"
-                              disabled={selectedCanvasElement.locked}
-                            />
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Fonte</p>
-                            <select
-                              value={selectedCanvasElement.fonte || 'Calibri'}
-                              onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { fonte: e.target.value })}
-                              className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs"
-                              disabled={selectedCanvasElement.locked}
-                            >
-                              {CANVAS_FONTES.map((font) => (
-                                <option key={font} value={font}>{font}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
-                              Conteudo e formatacao
-                            </p>
-                            <div className="flex flex-wrap items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateCanvasElement(selectedCanvasElement.id, { negrito: !selectedCanvasElement.negrito })
+
+                              const renderIcon = () => {
+                                switch (el.tipo) {
+                                  case 'texto': return <Type className="h-3.5 w-3.5 text-teal-600" />;
+                                  case 'linha': return <Minus className="h-3.5 w-3.5 text-teal-600" />;
+                                  case 'logo': return <Shield className="h-3.5 w-3.5 text-teal-600" />;
+                                  case 'imagem': return <Image className="h-3.5 w-3.5 text-teal-600" />;
+                                  case 'qrcode': return <span className="text-xs">📱</span>;
+                                  default: return <Type className="h-3.5 w-3.5 text-teal-600" />;
                                 }
-                                title="Negrito"
-                                aria-label="Negrito"
-                                className={`inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-semibold ${
-                                  selectedCanvasElement.negrito ? 'bg-[#123b63]/10 text-[#123b63]' : 'text-gray-600'
-                                }`}
-                                disabled={selectedCanvasElement.locked}
-                              >
-                                <Bold className="h-4 w-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateCanvasElement(selectedCanvasElement.id, { italico: !selectedCanvasElement.italico })
-                                }
-                                title="Italico"
-                                aria-label="Italico"
-                                className={`inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-semibold ${
-                                  selectedCanvasElement.italico ? 'bg-[#123b63]/10 text-[#123b63]' : 'text-gray-600'
-                                }`}
-                                disabled={selectedCanvasElement.locked}
-                              >
-                                <Italic className="h-4 w-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateCanvasElement(selectedCanvasElement.id, { sublinhado: !selectedCanvasElement.sublinhado })
-                                }
-                                title="Sublinhado"
-                                aria-label="Sublinhado"
-                                className={`inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-semibold ${
-                                  selectedCanvasElement.sublinhado ? 'bg-[#123b63]/10 text-[#123b63]' : 'text-gray-600'
-                                }`}
-                                disabled={selectedCanvasElement.locked}
-                              >
-                                <Underline className="h-4 w-4" />
-                              </button>
-                              <div className="h-4 w-px bg-gray-200 mx-1" />
-                              {(['left', 'center', 'right'] as const).map((align) => (
-                                <button
-                                  key={align}
-                                  type="button"
-                                  onClick={() => updateCanvasElement(selectedCanvasElement.id, { alinhamento: align })}
-                                  title={align === 'left' ? 'Alinhar a esquerda' : align === 'center' ? 'Centralizar' : 'Alinhar a direita'}
-                                  aria-label={align === 'left' ? 'Alinhar a esquerda' : align === 'center' ? 'Centralizar' : 'Alinhar a direita'}
-                                  className={`inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-semibold ${
-                                    selectedCanvasElement.alinhamento === align
-                                      ? 'bg-[#123b63]/10 text-[#123b63]'
-                                      : 'text-gray-600'
+                              };
+
+                              return (
+                                <div
+                                  key={el.id}
+                                  onClick={() => {
+                                    setSelectedCanvasElement(el);
+                                    setSelectedCanvasElements([el]);
+                                  }}
+                                  className={`flex items-center justify-between p-2.5 rounded-xl text-xs cursor-pointer transition border ${
+                                    isSelected
+                                      ? 'bg-teal-600 text-white font-bold border-teal-700 shadow-sm'
+                                      : 'bg-white text-gray-700 border-gray-200 hover:bg-teal-50/50'
                                   }`}
+                                >
+                                  <div className="flex items-center gap-2 truncate">
+                                    <span className={`p-1 rounded-md ${isSelected ? 'bg-teal-700 text-white' : 'bg-gray-100'}`}>
+                                      {renderIcon()}
+                                    </span>
+                                    <span className="truncate">{labelResumido}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className={`text-[10px] ${isSelected ? 'text-teal-200' : 'text-gray-400'}`}>
+                                      #{originalIndex + 1}
+                                    </span>
+                                    {el.locked && <Lock className="h-3 w-3 opacity-80" />}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                  </div>
+
+                  {/* COLUNA 2 (6 cols): CANVAS CENTRAL */}
+                  <div className="lg:col-span-6 space-y-4">
+                    {/* Área Principal de Renderização do Canvas (Sem barra superior duplicada) */}
+                    <div className="rounded-2xl border border-gray-300 bg-gray-100 p-4 shadow-inner">
+                      <div className="max-h-[780px] overflow-auto flex justify-center">
+                        <InteractiveCanvas
+                          elementos={canvasContent.elements}
+                          elementoSelecionado={selectedCanvasElement}
+                          elementosSelecionados={selectedCanvasElements}
+                          getPreviewText={getCanvasPreviewText}
+                          onElementoSelecionado={setSelectedCanvasElement}
+                          onElementosSelecionados={setSelectedCanvasElements}
+                          onElementoAtualizado={(id, props) => updateCanvasElement(id, props)}
+                          onMultiplosElementosAtualizados={updateMultipleCanvasElements}
+                          onElementosAdicionados={addCanvasElements}
+                          onElementoRemovido={removeCanvasElement}
+                          backgroundUrl={canvasContent.backgroundUrl}
+                          showGrid
+                          gridSize={24}
+                          larguraCanvas={canvasContent.width}
+                          alturaCanvas={canvasContent.height}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* COLUNA 3 (3 cols): PAINEL DE PROPRIEDADES COM AÇÕES CONSOLIDADAS */}
+                  <div className="lg:col-span-3 space-y-4">
+                    <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur space-y-4">
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Propriedades
+                        </h3>
+                        {selectedCanvasElement && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => duplicateCanvasElement(selectedCanvasElement)}
+                              title="Duplicar Elemento"
+                              className="p-1 text-gray-500 hover:text-teal-700 hover:bg-teal-50 rounded transition"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleCanvasLock(selectedCanvasElement)}
+                              title={selectedCanvasElement.locked ? 'Desbloquear Elemento' : 'Bloquear Elemento'}
+                              className={`p-1 rounded transition ${
+                                selectedCanvasElement.locked
+                                  ? 'text-amber-700 bg-amber-50'
+                                  : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                            >
+                              {selectedCanvasElement.locked ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeCanvasElement(selectedCanvasElement.id)}
+                              title="Excluir Elemento"
+                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {!selectedCanvasElement ? (
+                        <div className="p-6 text-center text-gray-400 space-y-2">
+                          <p className="text-xs font-semibold text-gray-500">Nenhum elemento selecionado.</p>
+                          <p className="text-[11px]">Clique em um elemento no canvas ou na lista de Camadas para editar suas propriedades.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4 text-xs">
+                          {/* Tipo e Ações */}
+                          <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg border border-gray-100">
+                            <div>
+                              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">TIPO DE ELEMENTO</span>
+                              <p className="font-bold text-teal-900">{CANVAS_ELEMENT_LABELS[selectedCanvasElement.tipo]}</p>
+                            </div>
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => duplicateCanvasElement(selectedCanvasElement)}
+                                className="px-2 py-1 bg-white text-gray-700 border border-gray-200 rounded text-[10px] font-bold hover:bg-gray-50 transition"
+                              >
+                                Duplicar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeCanvasElement(selectedCanvasElement.id)}
+                                className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded text-[10px] font-bold hover:bg-red-100 transition"
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Posição e Dimensões */}
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">POSIÇÃO E TAMANHO</span>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[10px] font-semibold text-gray-500">Largura (W)</label>
+                                <input
+                                  type="number"
+                                  value={selectedCanvasElement.largura}
+                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { largura: Number(e.target.value) || 0 })}
+                                  className="w-full rounded border border-gray-200 px-2 py-1"
+                                  disabled={selectedCanvasElement.locked}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-semibold text-gray-500">Altura (H)</label>
+                                <input
+                                  type="number"
+                                  value={selectedCanvasElement.altura}
+                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { altura: Number(e.target.value) || 0 })}
+                                  className="w-full rounded border border-gray-200 px-2 py-1"
+                                  disabled={selectedCanvasElement.locked}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-semibold text-gray-500">Posição X</label>
+                                <input
+                                  type="number"
+                                  value={selectedCanvasElement.x}
+                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { x: Number(e.target.value) || 0 })}
+                                  className="w-full rounded border border-gray-200 px-2 py-1"
+                                  disabled={selectedCanvasElement.locked}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-semibold text-gray-500">Posição Y</label>
+                                <input
+                                  type="number"
+                                  value={selectedCanvasElement.y}
+                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { y: Number(e.target.value) || 0 })}
+                                  className="w-full rounded border border-gray-200 px-2 py-1"
+                                  disabled={selectedCanvasElement.locked}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Especificidades do Tipo Texto */}
+                          {selectedCanvasElement.tipo === 'texto' && (
+                            <>
+                              <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                                  TAMANHO DA FONTE: {selectedCanvasElement.fontSize || 14}PX
+                                </label>
+                                <input
+                                  type="range"
+                                  min={8}
+                                  max={72}
+                                  value={selectedCanvasElement.fontSize || 14}
+                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { fontSize: Number(e.target.value) || 14 })}
+                                  className="w-full accent-teal-600"
+                                  disabled={selectedCanvasElement.locked}
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">FONTE</label>
+                                <select
+                                  value={selectedCanvasElement.fonte || 'Calibri'}
+                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { fonte: e.target.value })}
+                                  className="w-full rounded border border-gray-200 px-2 py-1 bg-white"
                                   disabled={selectedCanvasElement.locked}
                                 >
-                                  {align === 'left' ? (
-                                    <AlignLeft className="h-4 w-4" />
-                                  ) : align === 'center' ? (
-                                    <AlignCenter className="h-4 w-4" />
-                                  ) : (
-                                    <AlignRight className="h-4 w-4" />
-                                  )}
-                                </button>
-                              ))}
-                              <div className="h-4 w-px bg-gray-200 mx-1" />
-                              <label
-                                className="inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-semibold text-gray-600"
-                                title="Cor do texto"
-                              >
-                                <Palette className="h-4 w-4" />
+                                  {CANVAS_FONTES.map((font) => (
+                                    <option key={font} value={font}>{font}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">FORMATAÇÃO E COR</label>
+                                <div className="flex flex-wrap items-center gap-1.5 rounded border border-gray-200 bg-white p-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCanvasElement(selectedCanvasElement.id, { negrito: !selectedCanvasElement.negrito })}
+                                    className={`p-1 rounded ${selectedCanvasElement.negrito ? 'bg-teal-100 text-teal-800 font-bold' : 'text-gray-600'}`}
+                                    disabled={selectedCanvasElement.locked}
+                                  >
+                                    <Bold className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCanvasElement(selectedCanvasElement.id, { italico: !selectedCanvasElement.italico })}
+                                    className={`p-1 rounded ${selectedCanvasElement.italico ? 'bg-teal-100 text-teal-800' : 'text-gray-600'}`}
+                                    disabled={selectedCanvasElement.locked}
+                                  >
+                                    <Italic className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCanvasElement(selectedCanvasElement.id, { sublinhado: !selectedCanvasElement.sublinhado })}
+                                    className={`p-1 rounded ${selectedCanvasElement.sublinhado ? 'bg-teal-100 text-teal-800' : 'text-gray-600'}`}
+                                    disabled={selectedCanvasElement.locked}
+                                  >
+                                    <Underline className="h-3.5 w-3.5" />
+                                  </button>
+                                  <div className="h-4 w-px bg-gray-200 mx-0.5" />
+                                  {(['left', 'center', 'right'] as const).map((align) => (
+                                    <button
+                                      key={align}
+                                      type="button"
+                                      onClick={() => updateCanvasElement(selectedCanvasElement.id, { alinhamento: align })}
+                                      className={`p-1 rounded ${selectedCanvasElement.alinhamento === align ? 'bg-teal-100 text-teal-800' : 'text-gray-600'}`}
+                                      disabled={selectedCanvasElement.locked}
+                                    >
+                                      {align === 'left' ? <AlignLeft className="h-3.5 w-3.5" /> : align === 'center' ? <AlignCenter className="h-3.5 w-3.5" /> : <AlignRight className="h-3.5 w-3.5" />}
+                                    </button>
+                                  ))}
+                                  <div className="h-4 w-px bg-gray-200 mx-0.5" />
+                                  {/* Amostra de Cor Visível e Clicável */}
+                                  <label
+                                    className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 bg-gray-50 hover:bg-gray-100 cursor-pointer"
+                                    title="Alterar Cor do Texto"
+                                  >
+                                    <span
+                                      className="w-3.5 h-3.5 rounded-full border border-gray-300 shadow-inner inline-block"
+                                      style={{ backgroundColor: selectedCanvasElement.cor || '#111827' }}
+                                    />
+                                    <input
+                                      type="color"
+                                      value={selectedCanvasElement.cor || '#111827'}
+                                      onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { cor: e.target.value })}
+                                      className="w-0 h-0 opacity-0 absolute"
+                                      disabled={selectedCanvasElement.locked}
+                                    />
+                                  </label>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">CONTEÚDO</label>
+                                <textarea
+                                  rows={4}
+                                  value={selectedCanvasElement.texto || ''}
+                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { texto: e.target.value })}
+                                  className="w-full rounded border border-gray-200 p-2 text-xs focus:border-teal-500 focus:outline-none"
+                                  disabled={selectedCanvasElement.locked}
+                                />
+                              </div>
+                            </>
+                          )}
+
+                          {/* Especificidades do Tipo Linha */}
+                          {selectedCanvasElement.tipo === 'linha' && (
+                            <div className="space-y-3">
+                              <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ESPESSURA DA LINHA</label>
+                                <input
+                                  type="range"
+                                  min={1}
+                                  max={12}
+                                  value={selectedCanvasElement.altura}
+                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { altura: Number(e.target.value) || 2 })}
+                                  className="w-full accent-teal-600"
+                                  disabled={selectedCanvasElement.locked}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">COR DA LINHA</label>
                                 <input
                                   type="color"
                                   value={selectedCanvasElement.cor || '#111827'}
                                   onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { cor: e.target.value })}
-                                  className="ml-2 h-5 w-5 cursor-pointer rounded border border-gray-200"
+                                  className="h-8 w-full rounded border border-gray-200 cursor-pointer"
                                   disabled={selectedCanvasElement.locked}
                                 />
-                              </label>
+                              </div>
                             </div>
-                            <textarea
-                              value={selectedCanvasElement.texto || ''}
-                              onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { texto: e.target.value })}
-                              className="mt-2 w-full min-h-[120px] rounded-md border border-gray-200 px-2 py-1 text-xs"
-                              disabled={selectedCanvasElement.locked}
-                            />
-                          </div>
-                        </>
-                      )}
+                          )}
 
-                      {selectedCanvasElement.tipo === 'linha' && (
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Espessura</p>
-                            <input
-                              type="range"
-                              min={1}
-                              max={12}
-                              value={selectedCanvasElement.altura}
-                              onChange={(e) =>
-                                updateCanvasElement(selectedCanvasElement.id, { altura: Number(e.target.value) || 2 })
-                              }
-                              className="w-full"
-                              disabled={selectedCanvasElement.locked}
-                            />
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Cor</p>
-                            <input
-                              type="color"
-                              value={selectedCanvasElement.cor || '#111827'}
-                              onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { cor: e.target.value })}
-                              className="h-8 w-full rounded-md border border-gray-200"
-                              disabled={selectedCanvasElement.locked}
-                            />
-                          </div>
+                          {/* Especificidades do Tipo Imagem */}
+                          {selectedCanvasElement.tipo === 'imagem' && (
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">URL DA IMAGEM</label>
+                              <input
+                                type="text"
+                                value={selectedCanvasElement.imagemUrl || ''}
+                                onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { imagemUrl: e.target.value })}
+                                className="w-full rounded border border-gray-200 p-1.5 text-xs"
+                                placeholder="https://..."
+                                disabled={selectedCanvasElement.locked}
+                              />
+                            </div>
+                          )}
+
                         </div>
-                      )}
-
-                      {selectedCanvasElement.tipo === 'imagem' && (
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Imagem</p>
-                          <div className="flex flex-col gap-2">
-                            <input
-                              type="text"
-                              value={selectedCanvasElement.imagemUrl || ''}
-                              onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { imagemUrl: e.target.value })}
-                              className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs"
-                              placeholder="URL da imagem"
-                              disabled={selectedCanvasElement.locked}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setCanvasImageTargetId(selectedCanvasElement.id);
-                                canvasImageInputRef.current?.click();
-                              }}
-                              title="Upload imagem"
-                              aria-label="Upload imagem"
-                              className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                              disabled={selectedCanvasElement.locked}
-                            >
-                              <Upload className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {selectedCanvasElement.tipo === 'logo' && (
-                        <p className="text-xs text-gray-500">
-                          O logo utiliza a configuracao da igreja. Edite em Configuracoes.
-                        </p>
                       )}
                     </div>
-                  )}
+                  </div>
+
                 </div>
 
-                <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Placeholders</h3>
-                  <div className="space-y-3 max-h-[360px] overflow-y-auto">
-                    {PLACEHOLDER_GROUPS.map((group) => (
-                      <div key={group.title}>
-                        <p className="text-xs font-semibold text-gray-500 mb-1">{group.title}</p>
-                        <div className="flex flex-wrap gap-2">
-                          {group.items.map((item) => (
-                            <button
-                              key={item.key}
-                              onClick={() => handleInsertPlaceholder(item.key)}
-                              className="text-xs px-3 py-1 rounded-full bg-gray-100/80 hover:bg-gray-200 text-gray-700"
-                            >
-                              {item.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                {/* Botões de Ação Inferiores */}
+                <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-gray-200">
+                  {selectedTemplate?.scope === 'tenant' && systemTemplates[selectedTemplate.template_key] && (
+                    <button
+                      onClick={handleRestoreSystemTemplate}
+                      className="px-4 py-2 rounded-lg border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+                    >
+                      Restaurar Padrão do Sistema
+                    </button>
+                  )}
+                  <button
+                    onClick={handleSaveTemplate}
+                    className="px-6 py-2.5 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 shadow-md transition"
+                    disabled={isSaving || (!selectedTemplate && !isDraftReady)}
+                  >
+                    {isSaving
+                      ? 'Salvando...'
+                      : selectedTemplate?.scope === 'system'
+                      ? 'Salvar como Modelo Personalizado'
+                      : 'Salvar Alterações do Modelo'}
+                  </button>
                 </div>
               </div>
-
-              <div className="lg:col-span-8 space-y-4">
-                {(selectedTemplate || isDraftReady) ? (
+            ) : (
+              /* Estado Vazio quando não está em edição visual */
+              <div className="rounded-2xl border border-dashed border-gray-300 bg-white/80 p-12 text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center mx-auto text-xl font-bold">
+                  🧩
+                </div>
+                {selectedTemplate ? (
                   <>
-                    <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => addCanvasElement('texto')}
-                          title="Adicionar texto"
-                          aria-label="Adicionar texto"
-                          className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                        >
-                          <Type className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => addCanvasElement('linha')}
-                          title="Adicionar linha"
-                          aria-label="Adicionar linha"
-                          className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => addCanvasElement('logo')}
-                          title="Adicionar logo"
-                          aria-label="Adicionar logo"
-                          className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                        >
-                          <Shield className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => addCanvasElement('imagem')}
-                          title="Adicionar imagem"
-                          aria-label="Adicionar imagem"
-                          className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                        >
-                          <Image className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCanvasImageTargetId(null);
-                            canvasImageInputRef.current?.click();
-                          }}
-                          title="Upload imagem"
-                          aria-label="Upload imagem"
-                          className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                        >
-                          <Upload className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => canvasBackgroundInputRef.current?.click()}
-                          title="Definir fundo"
-                          aria-label="Definir fundo"
-                          className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                        >
-                          <Paintbrush className="h-4 w-4" />
-                        </button>
-                        {canvasContent.backgroundUrl && (
-                          <button
-                            type="button"
-                            onClick={() => setCanvasContent((prev) => ({ ...prev, backgroundUrl: '' }))}
-                            title="Remover fundo"
-                            aria-label="Remover fundo"
-                            className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                          >
-                            <Eraser className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                      <input
-                        ref={canvasImageInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            handleCanvasImageUpload(file, canvasImageTargetId ?? undefined);
-                          }
-                          e.currentTarget.value = '';
-                          setCanvasImageTargetId(null);
-                        }}
-                      />
-                      <input
-                        ref={canvasBackgroundInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            handleCanvasBackgroundUpload(file);
-                          }
-                          e.currentTarget.value = '';
-                        }}
-                      />
-                    </div>
-
-                    {selectedCanvasElement && (
-                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white/95 px-3 py-2 shadow-sm">
-                        <div className="text-xs font-semibold text-gray-600">
-                          Selecionado: {CANVAS_ELEMENT_LABELS[selectedCanvasElement.tipo]}
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => duplicateCanvasElement(selectedCanvasElement)}
-                            title="Duplicar"
-                            aria-label="Duplicar"
-                            className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleCanvasLock(selectedCanvasElement)}
-                            title={selectedCanvasElement.locked ? 'Desbloquear' : 'Bloquear'}
-                            aria-label={selectedCanvasElement.locked ? 'Desbloquear' : 'Bloquear'}
-                            className={`inline-flex items-center justify-center rounded-md border px-2 py-1 text-xs font-semibold ${
-                              selectedCanvasElement.locked
-                                ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
-                                : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-                            }`}
-                          >
-                            {selectedCanvasElement.locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeCanvasElement(selectedCanvasElement.id)}
-                            title="Remover"
-                            aria-label="Remover"
-                            className="inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-100"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="rounded-xl border border-gray-200 bg-white/90 p-4 shadow-inner">
-                      <div className="max-h-[720px] overflow-auto">
-                        <div className="mx-auto w-fit">
-                          <InteractiveCanvas
-                            elementos={canvasContent.elements}
-                            elementoSelecionado={selectedCanvasElement}
-                            elementosSelecionados={selectedCanvasElements}
-                            getPreviewText={getCanvasPreviewText}
-                            onElementoSelecionado={setSelectedCanvasElement}
-                            onElementosSelecionados={setSelectedCanvasElements}
-                            onElementoAtualizado={(id, props) => updateCanvasElement(id, props)}
-                            onMultiplosElementosAtualizados={updateMultipleCanvasElements}
-                            onElementosAdicionados={addCanvasElements}
-                            onElementoRemovido={removeCanvasElement}
-                            backgroundUrl={canvasContent.backgroundUrl}
-                            showGrid
-                            gridSize={24}
-                            larguraCanvas={canvasContent.width}
-                            alturaCanvas={canvasContent.height}
-                          />
-                        </div>
-                      </div>
-                    </div>
+                    <h4 className="text-base font-bold text-gray-800">Modelo "{selectedTemplate.title}" Selecionado</h4>
+                    <p className="text-xs text-gray-500 max-w-md mx-auto">
+                      Clique no botão <span className="font-semibold text-teal-700">✏️ Abrir Editor Visual</span> acima para editar a carta em 3 colunas.
+                    </p>
+                    <button
+                      onClick={() => setIsEditingVisual(true)}
+                      className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white text-xs font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
+                    >
+                      ✏️ Abrir Editor Visual
+                    </button>
                   </>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-gray-200 bg-white/80 p-6 text-sm text-gray-500">
-                    Defina o nome do modelo e clique em Criar para liberar o editor.
-                  </div>
+                  <>
+                    <h4 className="text-base font-bold text-gray-800">Nenhum modelo selecionado</h4>
+                    <p className="text-xs text-gray-500 max-w-md mx-auto">
+                      Selecione um modelo existente no seletor acima ou clique em <span className="font-semibold text-teal-700">+ Novo Modelo</span> para criar um do zero.
+                    </p>
+                  </>
                 )}
               </div>
-            </div>
-
-            <div className="flex flex-wrap gap-3 justify-end">
-              {selectedTemplate?.scope === 'tenant' && systemTemplates[selectedTemplate.template_key] && (
-                <button
-                  onClick={handleRestoreSystemTemplate}
-                  className="px-4 py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50"
-                >
-                  Restaurar Padrao
-                </button>
-              )}
-              <button
-                onClick={handleSaveTemplate}
-                className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm hover:bg-teal-700"
-                disabled={isSaving || (!selectedTemplate && !isDraftReady)}
-              >
-                {selectedTemplate?.scope === 'system' ? 'Salvar como Modelo Personalizado' : 'Salvar Modelo'}
-              </button>
-            </div>
+            )}
           </Section>
         )}
 
@@ -1845,8 +1949,65 @@ export default function CartasPage() {
           </Section>
         )}
             </Tabs>
+        </div>
+      </div>
+
+      {/* Modal Compacto de Criar Novo Modelo */}
+      {showNewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4 border border-gray-100 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                <span>🧩</span> Criar Novo Modelo de Carta
+              </h3>
+              <button
+                type="button"
+                onClick={handleCancelNewTemplate}
+                className="text-gray-400 hover:text-gray-600 font-bold text-sm px-2 py-1 rounded"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Nome do Modelo
+              </label>
+              <input
+                type="text"
+                autoFocus
+                value={draftTitle}
+                onChange={(e) => setDraftTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleCreateDraft();
+                  }
+                }}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                placeholder="Ex: Carta de Mudança de Membro"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={handleCancelNewTemplate}
+                className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateDraft}
+                className="rounded-lg bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700 shadow-sm transition"
+              >
+                Criar e Abrir Editor
+              </button>
+            </div>
           </div>
         </div>
+      )}
       </div>
     </PageLayout>
   );
