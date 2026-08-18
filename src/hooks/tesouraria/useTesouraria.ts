@@ -668,7 +668,7 @@ export function useTesouraria() {
     });
   }, [dizimistasMembros, lancamentosMes]);
 
-  // Lista de dizimistas filtrada por Nome, Congregação e Status (Adimplente/Inadimplente)
+  // Lista de dizimistas filtrada por Nome, Congregação e Status (Adimplente/Inadimplente) para a aba Dizimistas
   const dizimistasFiltrados = useMemo(() => {
     return dizimistasCompletos.filter((d) => {
       if (filtroNomeDiz && !d.nome.toLowerCase().includes(filtroNomeDiz.toLowerCase())) return false;
@@ -678,6 +678,14 @@ export function useTesouraria() {
       return true;
     });
   }, [dizimistasCompletos, filtroNomeDiz, filtroCongDiz, filtroStatusDiz]);
+
+  // Lista de dizimistas para o Formulário de Novo Lançamento (filtrado pela congregação do Caixa selecionado)
+  const dizimistasFormulario = useMemo(() => {
+    if (!form.congregacao_id) {
+      return dizimistasCompletos;
+    }
+    return dizimistasCompletos.filter((d) => d.congregacaoId === form.congregacao_id);
+  }, [dizimistasCompletos, form.congregacao_id]);
 
   // Lançamentos filtrados para o Relatório
   const lancsRelatorioFiltrados = useMemo(() => {
@@ -1042,6 +1050,8 @@ export function useTesouraria() {
     statusMes,
     // Dizimistas
     dizimistasFiltrados,
+    dizimistasFormulario,
+    dizimistasCompletos,
     loadingDizimistas,
     abaDizimistaMes,
     setAbaDizimistaMes,

@@ -242,7 +242,20 @@ export default function TesourariaPage() {
                     ) : (
                       <select
                         value={t.form.congregacao_id}
-                        onChange={(e) => t.setForm((p) => ({ ...p, congregacao_id: e.target.value }))}
+                        onChange={(e) => {
+                          const novaCongId = e.target.value;
+                          t.setForm((p) => {
+                            const dizimistaPertence = t.dizimistasCompletos.some(
+                              (d) => d.id === p.dizimista_id && (!novaCongId || d.congregacaoId === novaCongId)
+                            );
+                            return {
+                              ...p,
+                              congregacao_id: novaCongId,
+                              dizimista_id: dizimistaPertence ? p.dizimista_id : '',
+                              dizimista_nome: dizimistaPertence ? p.dizimista_nome : '',
+                            };
+                          });
+                        }}
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                       >
                         <option value="">Selecione o(a) {t.nomenclaturas?.divisao1 || 'congregação'} *</option>
@@ -360,10 +373,10 @@ export default function TesourariaPage() {
 
                           {!t.form.is_dizimo_avulso ? (
                             <DizimistaSearchInput
-                              dizimistas={t.dizimistasFiltrados}
+                              dizimistas={t.dizimistasFormulario}
                               selectedNome={t.form.dizimista_nome || ''}
                               onSelectDizimista={(diz) => {
-                                const dizCompleto = t.dizimistasFiltrados.find((item) => item.id === diz?.id);
+                                const dizCompleto = t.dizimistasFormulario.find((item) => item.id === diz?.id);
                                 t.setForm((p) => ({
                                   ...p,
                                   dizimista_id: diz?.id || '',
@@ -389,7 +402,7 @@ export default function TesourariaPage() {
                             value={
                               t.form.is_dizimo_avulso
                                 ? '— (Dízimo Avulso)'
-                                : t.dizimistasFiltrados.find((d) => d.id === t.form.dizimista_id)?.congregacaoNome ||
+                                : t.dizimistasFormulario.find((d) => d.id === t.form.dizimista_id)?.congregacaoNome ||
                                   (t.form.congregacao_id ? t.congNome(t.form.congregacao_id) : 'Selecione o dizimista')
                             }
                             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 font-medium h-[38px]"
@@ -405,8 +418,8 @@ export default function TesourariaPage() {
                             value={
                               t.form.is_dizimo_avulso
                                 ? 'Dízimo Avulso'
-                                : t.dizimistasFiltrados.find((d) => d.id === t.form.dizimista_id)?.tipoCadastro
-                                ? t.dizimistasFiltrados.find((d) => d.id === t.form.dizimista_id)?.tipoCadastro?.toUpperCase()
+                                : t.dizimistasFormulario.find((d) => d.id === t.form.dizimista_id)?.tipoCadastro
+                                ? t.dizimistasFormulario.find((d) => d.id === t.form.dizimista_id)?.tipoCadastro?.toUpperCase()
                                 : '—'
                             }
                             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 font-medium h-[38px]"
@@ -1183,65 +1196,165 @@ export default function TesourariaPage() {
           </div>
         </div>
 
-        {/* Título do Relatório */}
-        <div className="space-y-1">
-          <h2 className="text-base font-bold uppercase tracking-wider text-gray-700">
-            Relatório de Movimentação Financeira — Tesouraria
-          </h2>
-          <p className="text-xs text-gray-400">
-            Período de Referência: <span className="font-semibold text-gray-600">{t.relMes}</span>
-          </p>
-        </div>
+        {t.aba === 'dizimistas' ? (
+          /* ─── MODELO IMPRESSÃO: RELATÓRIO DE DIZIMISTAS ─── */
+          <>
+            {/* Título e Filtros Aplicados */}
+            <div className="space-y-1">
+              <h2 className="text-base font-bold uppercase tracking-wider text-gray-700">
+                Relatório de Dizimistas
+              </h2>
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-600 font-medium">
+                <p>
+                  Mês de Referência: <span className="font-bold text-gray-800">{t.abaDizimistaMes}</span>
+                </p>
+                <p>
+                  Congregação:{' '}
+                  <span className="font-bold text-gray-800">
+                    {t.filtroCongDiz ? t.congNome(t.filtroCongDiz) : 'Todas as Congregações'}
+                  </span>
+                </p>
+                <p>
+                  Status de Adimplência:{' '}
+                  <span className="font-bold text-gray-800">
+                    {t.filtroStatusDiz === 'pago'
+                      ? 'Adimplentes (Pago)'
+                      : t.filtroStatusDiz === 'pendente'
+                      ? 'Inadimplentes (Pendente)'
+                      : 'Todos os Status'}
+                  </span>
+                </p>
+                {t.filtroNomeDiz && (
+                  <p>
+                    Busca por Nome: <span className="font-bold text-gray-800">"{t.filtroNomeDiz}"</span>
+                  </p>
+                )}
+              </div>
+            </div>
 
-        {/* Tabela do Relatório Formato A4 */}
-        <table className="w-full border-collapse text-xs text-left">
-          <thead>
-            <tr className="border-b border-gray-300 bg-gray-50">
-              <th className="py-2.5 px-2 font-bold text-gray-600">Data</th>
-              <th className="py-2.5 px-2 font-bold text-gray-600">Caixa</th>
-              <th className="py-2.5 px-2 font-bold text-gray-600">Departamento</th>
-              <th className="py-2.5 px-2 font-bold text-gray-600">Tipo</th>
-              <th className="py-2.5 px-2 font-bold text-gray-600">Descrição / Ref.</th>
-              <th className="py-2.5 px-2 font-bold text-gray-600 text-right">Valor</th>
-            </tr>
-          </thead>
-          <tbody>
-            {t.lancsRelatorioFiltrados.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="py-4 text-center text-gray-400">
-                  Nenhum lançamento encontrado no período selecionado.
-                </td>
-              </tr>
-            ) : (
-              t.lancsRelatorioFiltrados.map((l) => (
-                <tr key={l.id} className="border-b border-gray-100">
-                  <td className="py-2 px-2">{t.fmtDate(l.data_lancamento)}</td>
-                  <td className="py-2 px-2 uppercase font-medium">{t.congNome(l.congregacao_id)}</td>
-                  <td className="py-2 px-2">{l.departamento_nome || 'Caixa Geral'}</td>
-                  <td className="py-2 px-2 font-medium capitalize">
-                    {t.tipoLabel(l.tipo_recebimento || l.tipo_movimento)}
+            {/* Tabela de Dizimistas Formato A4 */}
+            <table className="w-full border-collapse text-xs text-left">
+              <thead>
+                <tr className="border-b border-gray-300 bg-gray-50">
+                  <th className="py-2.5 px-2 font-bold text-gray-600">Nome do Dizimista</th>
+                  <th className="py-2.5 px-2 font-bold text-gray-600">Vínculo / Cargo</th>
+                  <th className="py-2.5 px-2 font-bold text-gray-600">Congregação / Caixa</th>
+                  <th className="py-2.5 px-2 font-bold text-gray-600 text-center">Status no Mês</th>
+                  <th className="py-2.5 px-2 font-bold text-gray-600 text-right">Valor Contribuído</th>
+                </tr>
+              </thead>
+              <tbody>
+                {t.dizimistasFiltrados.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-4 text-center text-gray-400">
+                      Nenhum dizimista encontrado para os filtros aplicados.
+                    </td>
+                  </tr>
+                ) : (
+                  t.dizimistasFiltrados.map((d) => (
+                    <tr key={d.id} className="border-b border-gray-100">
+                      <td className="py-2 px-2 font-semibold text-gray-800">{d.nome}</td>
+                      <td className="py-2 px-2 capitalize text-gray-600">{d.tipoCadastro || 'Membro'}</td>
+                      <td className="py-2 px-2 uppercase text-gray-600">{d.congregacaoNome}</td>
+                      <td className="py-2 px-2 text-center">
+                        <span
+                          className={`font-semibold px-2 py-0.5 rounded text-[10px] ${
+                            d.pagoNoMes ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50'
+                          }`}
+                        >
+                          {d.pagoNoMes ? 'Adimplente (Pago)' : 'Inadimplente (Pendente)'}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2 text-right font-bold text-gray-800">
+                        {d.pagoNoMes ? t.fmtBRL(d.valorPago) : '—'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-gray-300 font-bold bg-gray-50 text-xs">
+                  <td colSpan={3} className="py-2.5 px-2 text-gray-700">
+                    Total: {t.dizimistasFiltrados.length} dizimista(s) | Adimplentes:{' '}
+                    {t.dizimistasFiltrados.filter((d) => d.pagoNoMes).length} | Inadimplentes:{' '}
+                    {t.dizimistasFiltrados.filter((d) => !d.pagoNoMes).length}
                   </td>
-                  <td className="py-2 px-2 text-gray-500">{l.referencia || l.observacoes || '—'}</td>
-                  <td
-                    className={`py-2 px-2 text-right font-bold ${
-                      l.tipo_movimento === 'entrada' ? 'text-green-600' : 'text-red-500'
-                    }`}
-                  >
-                    {l.tipo_movimento === 'entrada' ? '+' : '-'} {t.fmtBRL(l.valor)}
+                  <td className="py-2.5 px-2 text-right text-gray-700">Total Contribuído:</td>
+                  <td className="py-2.5 px-2 text-right text-[#123b63]">
+                    {t.fmtBRL(
+                      t.dizimistasFiltrados
+                        .filter((d) => d.pagoNoMes)
+                        .reduce((acc, curr) => acc + curr.valorPago, 0)
+                    )}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-gray-300 font-bold bg-gray-50">
-              <td colSpan={5} className="py-2.5 px-2 text-right text-gray-700">Totalizadores:</td>
-              <td className="py-2.5 px-2 text-right text-[#123b63]">
-                {t.fmtBRL(t.entradasRelatorio - t.saidasRelatorio)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
+              </tfoot>
+            </table>
+          </>
+        ) : (
+          /* ─── MODELO IMPRESSÃO: RELATÓRIO FINANCEIRO GERAL ─── */
+          <>
+            {/* Título do Relatório */}
+            <div className="space-y-1">
+              <h2 className="text-base font-bold uppercase tracking-wider text-gray-700">
+                Relatório de Movimentação Financeira — Tesouraria
+              </h2>
+              <p className="text-xs text-gray-400">
+                Período de Referência: <span className="font-semibold text-gray-600">{t.relMes}</span>
+              </p>
+            </div>
+
+            {/* Tabela do Relatório Formato A4 */}
+            <table className="w-full border-collapse text-xs text-left">
+              <thead>
+                <tr className="border-b border-gray-300 bg-gray-50">
+                  <th className="py-2.5 px-2 font-bold text-gray-600">Data</th>
+                  <th className="py-2.5 px-2 font-bold text-gray-600">Caixa</th>
+                  <th className="py-2.5 px-2 font-bold text-gray-600">Departamento</th>
+                  <th className="py-2.5 px-2 font-bold text-gray-600">Tipo</th>
+                  <th className="py-2.5 px-2 font-bold text-gray-600">Descrição / Ref.</th>
+                  <th className="py-2.5 px-2 font-bold text-gray-600 text-right">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {t.lancsRelatorioFiltrados.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-4 text-center text-gray-400">
+                      Nenhum lançamento encontrado no período selecionado.
+                    </td>
+                  </tr>
+                ) : (
+                  t.lancsRelatorioFiltrados.map((l) => (
+                    <tr key={l.id} className="border-b border-gray-100">
+                      <td className="py-2 px-2">{t.fmtDate(l.data_lancamento)}</td>
+                      <td className="py-2 px-2 uppercase font-medium">{t.congNome(l.congregacao_id)}</td>
+                      <td className="py-2 px-2">{l.departamento_nome || 'Caixa Geral'}</td>
+                      <td className="py-2 px-2 font-medium capitalize">
+                        {t.tipoLabel(l.tipo_recebimento || l.tipo_movimento)}
+                      </td>
+                      <td className="py-2 px-2 text-gray-500">{l.referencia || l.observacoes || '—'}</td>
+                      <td
+                        className={`py-2 px-2 text-right font-bold ${
+                          l.tipo_movimento === 'entrada' ? 'text-green-600' : 'text-red-500'
+                        }`}
+                      >
+                        {l.tipo_movimento === 'entrada' ? '+' : '-'} {t.fmtBRL(l.valor)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-gray-300 font-bold bg-gray-50">
+                  <td colSpan={5} className="py-2.5 px-2 text-right text-gray-700">Totalizadores:</td>
+                  <td className="py-2.5 px-2 text-right text-[#123b63]">
+                    {t.fmtBRL(t.entradasRelatorio - t.saidasRelatorio)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </>
+        )}
 
         {/* Assinatura Responsável */}
         <div className="pt-12 flex justify-around text-center text-xs">

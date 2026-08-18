@@ -989,18 +989,25 @@ export function useMembros() {
     doc.text(`Total de registros: ${membrosFiltrados.length}`, 14, yPos);
     doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth - 14, yPos, { align: 'right' });
 
-    const tableData = membrosFiltrados.map((membro) => [
-      membro.matricula,
-      membro.nome,
-      membro.cpf,
-      membro.cargoMinisterial || '',
-      (membro as any).dadosCargos?.dataConsagracao
-        ? new Date((membro as any).dadosCargos.dataConsagracao).toLocaleDateString('pt-BR')
-        : (membro as any).dataConsagracao
-          ? new Date((membro as any).dataConsagracao).toLocaleDateString('pt-BR')
-          : '-',
-      membro.status === 'ativo' ? 'Ativo' : 'Inativo',
-    ]);
+    const tableData = membrosFiltrados.map((membro) => {
+      const tipo = (membro?.tipoCadastro || '').toLowerCase().trim();
+      const cargoExibicao = tipo === 'ministro'
+        ? ((membro?.cargoMinisterial || '').trim() || 'MINISTRO')
+        : (membro?.tipoCadastro || '').toUpperCase().trim();
+
+      return [
+        membro.matricula,
+        membro.nome,
+        membro.cpf,
+        cargoExibicao,
+        (membro as any).dadosCargos?.dataConsagracao
+          ? new Date((membro as any).dadosCargos.dataConsagracao).toLocaleDateString('pt-BR')
+          : (membro as any).dataConsagracao
+            ? new Date((membro as any).dataConsagracao).toLocaleDateString('pt-BR')
+            : '-',
+        membro.status === 'ativo' ? 'Ativo' : 'Inativo',
+      ];
+    });
 
     autoTable(doc, {
       startY: yPos + 5,

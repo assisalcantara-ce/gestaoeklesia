@@ -65,6 +65,14 @@ export default function MembrosTable({
   setCurrentPage,
   totalPages,
 }: MembrosTableProps) {
+  const getCargoExibicao = (membro: any) => {
+    const tipo = (membro?.tipoCadastro || '').toLowerCase().trim();
+    if (tipo === 'ministro') {
+      return (membro?.cargoMinisterial || '').trim() || 'MINISTRO';
+    }
+    return (membro?.tipoCadastro || '').toUpperCase().trim();
+  };
+
   return (
     <>
       {/* CARDS MOBILE — visíveis apenas em telas < md */}
@@ -104,7 +112,7 @@ export default function MembrosTable({
                 <span className="font-semibold">Congregação:</span> {membro.congregacao || '-'}
               </p>
               <p>
-                <span className="font-semibold">Cargo/Função:</span> {membro.cargoMinisterial || '-'}
+                <span className="font-semibold">Cargo/Função:</span> {getCargoExibicao(membro)}
               </p>
             </div>
             <div className="mt-3 flex gap-2 flex-wrap">
@@ -227,7 +235,7 @@ export default function MembrosTable({
                   </td>
                   <td className="border border-gray-300 px-4 py-3 text-gray-700">{membro.nome}</td>
                   <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.cpf}</td>
-                  <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.cargoMinisterial || ''}</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-600">{getCargoExibicao(membro)}</td>
                   <td className="border border-gray-300 px-4 py-3 text-gray-600">
                     {membro.dataConsagracao
                       ? new Date(membro.dataConsagracao + 'T00:00:00').toLocaleDateString('pt-BR')
