@@ -613,7 +613,7 @@ export function useTesouraria() {
       // Buscar membros dizimistas ou ministros
       const { data: membersData, error: memErr } = await supabase
         .from('members')
-        .select('id, name, tipo_cadastro, is_dizimista, congregacao_id, congregacoes(nome)')
+        .select('id, name, tipo_cadastro, is_dizimista, congregacao_id, custom_fields, congregacoes(nome)')
         .eq('ministry_id', ministryId)
         .or('is_dizimista.eq.true,tipo_cadastro.eq.ministro');
 
@@ -645,6 +645,70 @@ export function useTesouraria() {
   const dizimistasCompletos = useMemo(() => {
     return dizimistasMembros.map((m: any) => {
       const nomeLower = (m.name || '').toLowerCase().trim();
+      const cf = m.custom_fields && typeof m.custom_fields === 'object' ? m.custom_fields : {};
+
+      let resolvedCongId: string | null = null;
+      let resolvedCongNome = 'Sede / Geral';
+
+      // a) members.congregacao_id
+      if (m.congregacao_id) {
+        const found = congregacoes.find((c) => c.id === m.congregacao_id);
+        if (found) {
+          resolvedCongId = found.id;
+          resolvedCongNome = found.nome;
+        } else {
+          resolvedCongId = m.congregacao_id;
+        }
+      }
+
+      // b) custom_fields.congregacao_id
+      if (!resolvedCongId && cf.congregacao_id) {
+        const found = congregacoes.find((c) => c.id === cf.congregacao_id);
+        if (found) {
+          resolvedCongId = found.id;
+          resolvedCongNome = found.nome;
+        }
+      }
+
+      // Helper para buscar congregação por nome (case-insensitive com trim)
+      const findByNome = (nomeText?: string) => {
+        if (!nomeText || typeof nomeText !== 'string') return null;
+        const target = nomeText.toLowerCase().trim();
+        if (!target) return null;
+        return congregacoes.find((c) => (c.nome || '').toLowerCase().trim() === target) || null;
+      };
+
+      // c) custom_fields.supervisao
+      if (!resolvedCongId && cf.supervisao) {
+        const found = findByNome(cf.supervisao);
+        if (found) {
+          resolvedCongId = found.id;
+          resolvedCongNome = found.nome;
+        }
+      }
+
+      // d) custom_fields.congregacao
+      if (!resolvedCongId && cf.congregacao) {
+        const found = findByNome(cf.congregacao);
+        if (found) {
+          resolvedCongId = found.id;
+          resolvedCongNome = found.nome;
+        }
+      }
+
+      // e) m.congregacoes?.nome
+      if (!resolvedCongId && m.congregacoes?.nome) {
+        const found = findByNome(m.congregacoes.nome);
+        if (found) {
+          resolvedCongId = found.id;
+          resolvedCongNome = found.nome;
+        }
+      }
+
+      // Fallback de nome se não tiver sido encontrado na lista `congregacoes`
+      if (resolvedCongNome === 'Sede / Geral') {
+        resolvedCongNome = m.congregacoes?.nome || cf.supervisao || cf.congregacao || 'Sede / Geral';
+      }
 
       // Procurar lançamento de dízimo no mês com o nome do membro no observacoes/referencia ou congregacao
       const lancDizimo = lancamentosMes.find((l) => {
@@ -659,14 +723,14 @@ export function useTesouraria() {
         id: m.id,
         nome: m.name,
         tipoCadastro: m.tipo_cadastro || 'membro',
-        congregacaoId: m.congregacao_id,
-        congregacaoNome: m.congregacoes?.nome || 'Sede / Geral',
+        congregacaoId: resolvedCongId,
+        congregacaoNome: resolvedCongNome,
         pagoNoMes: !!lancDizimo,
         valorPago: lancDizimo ? Number(lancDizimo.valor) : 0,
         dataPagamento: lancDizimo ? lancDizimo.data_lancamento : null,
       };
     });
-  }, [dizimistasMembros, lancamentosMes]);
+  }, [dizimistasMembros, lancamentosMes, congregacoes]);
 
   // Lista de dizimistas filtrada por Nome, Congregação e Status (Adimplente/Inadimplente) para a aba Dizimistas
   const dizimistasFiltrados = useMemo(() => {
