@@ -1142,8 +1142,11 @@ export function useCongregacoes() {
         }
       }
 
-      await loadDivisoes2(ministryId);
-      await loadDivisoes3(ministryId);
+      await Promise.all([
+        loadDivisoes1(ministryId),
+        loadDivisoes2(ministryId),
+        loadDivisoes3(ministryId),
+      ]);
 
       setFormD2({
         supervisao_id: '',
@@ -1209,7 +1212,11 @@ export function useCongregacoes() {
         .eq('id', id)
         .eq('ministry_id', ministryId);
       if (error) throw error;
-      await loadDivisoes2(ministryId);
+      await Promise.all([
+        loadDivisoes1(ministryId),
+        loadDivisoes2(ministryId),
+        loadDivisoes3(ministryId),
+      ]);
     } catch (error) {
       console.error('Erro ao deletar divisão 02:', error);
       await dialog.alert({ title: 'Erro', type: 'error', message: 'Erro ao deletar. Tente novamente.' });
@@ -1452,7 +1459,11 @@ export function useCongregacoes() {
         await deleteFotoIgreja(oldBucket, oldPath);
       }
 
-      await loadDivisoes3(ministryId);
+      await Promise.all([
+        loadDivisoes1(ministryId),
+        loadDivisoes2(ministryId),
+        loadDivisoes3(ministryId),
+      ]);
 
       setFormD3({
         supervisao_id: '',
@@ -1479,13 +1490,17 @@ export function useCongregacoes() {
     } catch (error) {
       console.error('Erro ao salvar divisão 03:', error);
       const errText = formatDbError(error);
+      const isDuplicateName = /idx_congregacoes_ministry_nome_unique/i.test(errText) || /duplicate key/i.test(errText);
       const tableMissing = /public\.congregacoes/i.test(errText) && /could not find the table|schema cache|PGRST205/i.test(errText);
+      
       await dialog.alert({
-        title: 'Erro',
+        title: isDuplicateName ? 'Nome Duplicado' : 'Erro ao Salvar',
         type: 'error',
-        message: tableMissing
-          ? 'Erro ao salvar: a tabela public.congregacoes não existe neste banco. Aplique as migrações pendentes da Estrutura Hierárquica e tente novamente.'
-          : `Erro ao salvar. ${errText}`,
+        message: isDuplicateName
+          ? `Já existe uma ${nomeD1} cadastrada com o nome "${formD3.nome.trim()}" neste ministério.`
+          : (tableMissing
+              ? 'Erro ao salvar: a tabela public.congregacoes não existe neste banco. Aplique as migrações pendentes da Estrutura Hierárquica e tente novamente.'
+              : `Erro ao salvar: ${errText}`),
       });
     }
   };
@@ -1500,7 +1515,11 @@ export function useCongregacoes() {
         .eq('id', id)
         .eq('ministry_id', ministryId);
       if (error) throw error;
-      await loadDivisoes3(ministryId);
+      await Promise.all([
+        loadDivisoes1(ministryId),
+        loadDivisoes2(ministryId),
+        loadDivisoes3(ministryId),
+      ]);
     } catch (error) {
       console.error('Erro ao deletar divisão 03:', error);
       await dialog.alert({ title: 'Erro', type: 'error', message: 'Erro ao deletar. Tente novamente.' });
@@ -1669,8 +1688,11 @@ export function useCongregacoes() {
         }
       }
 
-      await loadDivisoes1(ministryId);
-      await loadDivisoes2(ministryId);
+      await Promise.all([
+        loadDivisoes1(ministryId),
+        loadDivisoes2(ministryId),
+        loadDivisoes3(ministryId),
+      ]);
       
       setFormD1({
         codigo: '',
@@ -1692,8 +1714,16 @@ export function useCongregacoes() {
       setEditingD1(null);
       setShowFormD1(false);
     } catch (error) {
-      console.error('Erro ao salvar:', error);
-      await dialog.alert({ title: 'Erro', type: 'error', message: 'Erro ao salvar. Tente novamente.' });
+      console.error('Erro ao salvar divisão 01:', error);
+      const errRaw = String((error as any)?.message || (error as any)?.details || error || '');
+      const isDuplicateName = /idx_supervisoes_ministry_nome_unique/i.test(errRaw) || /supervisoes_ministry_id_nome_key/i.test(errRaw);
+      await dialog.alert({
+        title: isDuplicateName ? 'Nome Duplicado' : 'Erro ao Salvar',
+        type: 'error',
+        message: isDuplicateName
+          ? `Já existe uma ${nomeD1} cadastrada com o nome "${formD1.nome.trim()}" neste ministério.`
+          : `Erro ao salvar: ${errRaw || 'Tente novamente.'}`
+      });
     }
   };
 
@@ -1710,7 +1740,11 @@ export function useCongregacoes() {
       
       if (error) throw error;
       
-      await loadDivisoes1(ministryId);
+      await Promise.all([
+        loadDivisoes1(ministryId),
+        loadDivisoes2(ministryId),
+        loadDivisoes3(ministryId),
+      ]);
     } catch (error) {
       console.error('Erro ao deletar:', error);
       await dialog.alert({ title: 'Erro', type: 'error', message: 'Erro ao deletar. Tente novamente.' });
