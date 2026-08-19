@@ -16,7 +16,7 @@ import {
 
 interface ElementoCartao {
   id: string;
-  tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha';
+  tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha' | 'forma';
   x: number;
   y: number;
   largura: number;

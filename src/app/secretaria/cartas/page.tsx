@@ -18,7 +18,11 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  ArrowDownToLine,
+  ArrowUpToLine,
   Bold,
+  ChevronDown,
+  ChevronUp,
   Copy,
   Eraser,
   Image,
@@ -26,7 +30,9 @@ import {
   Lock,
   Minus,
   Paintbrush,
+  RotateCcw,
   Shield,
+  Square,
   Trash2,
   Type,
   Underline,
@@ -41,7 +47,7 @@ type TemplateTipo = 'mudanca' | 'transito' | 'desligamento' | 'recomendacao' | '
 
 interface CartaCanvasElement {
   id: string;
-  tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha';
+  tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha' | 'forma';
   x: number;
   y: number;
   largura: number;
@@ -49,6 +55,9 @@ interface CartaCanvasElement {
   fontSize?: number;
   cor?: string;
   backgroundColor?: string;
+  borderColor?: string;
+  borderWidth?: number;
+  borderStyle?: 'solid' | 'dashed' | 'dotted';
   fonte?: string;
   transparencia?: number;
   borderRadius?: number;
@@ -154,6 +163,7 @@ const CANVAS_ELEMENT_LABELS: Record<CartaCanvasElement['tipo'], string> = {
   qrcode: 'QR Code',
   'foto-membro': 'Foto do Membro',
   chapa: 'Chapa',
+  forma: 'Forma / Retângulo',
 };
 
 const PLACEHOLDER_GROUPS = [
@@ -211,13 +221,7 @@ const PLACEHOLDER_LABELS = PLACEHOLDER_GROUPS.reduce<Record<string, string>>((ac
   return acc;
 }, {});
 
-const escapeHtml = (value: string) =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+
 
 const normalizeTemplateKey = (value: string) =>
   value
@@ -302,11 +306,28 @@ const getCanvasPreviewText = (texto: string) => {
     .replace(/\n/g, '<br />');
 };
 
+const sanitizeHtmlText = (text: string) => {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
 const replacePlaceholders = (html: string, map: Record<string, string>) => {
   const regex = /{{\s*([a-zA-Z0-9_.]+)\s*}}/g;
+  // Se o texto tiver tags HTML inline (ex: <b>, <i>, <u>), preservar as tags e apenas higienizar os valores inseridos
+  const containsHtml = /<[a-z][\s\S]*>/i.test(html);
+  if (containsHtml) {
+    return html.replace(regex, (_match, key) => {
+      const value = map[key] ?? '';
+      return sanitizeHtmlText(String(value));
+    });
+  }
   return html.replace(regex, (_match, key) => {
     const value = map[key] ?? '';
-    return escapeHtml(String(value)).replace(/\n/g, '<br />');
+    return sanitizeHtmlText(String(value));
   });
 };
 
@@ -320,6 +341,41 @@ export default function CartasPage() {
   const { fetchMembers } = useMembers();
   const canvasImageInputRef = useRef<HTMLInputElement>(null);
   const canvasBackgroundInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleToggleTextInlineFormat = (tag: 'b' | 'i' | 'u') => {
+    if (!selectedCanvasElement) return;
+    const textarea = textareaRef.current;
+    if (textarea && textarea.selectionStart !== undefined && textarea.selectionEnd !== undefined && textarea.selectionStart !== textarea.selectionEnd) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const originalText = selectedCanvasElement.texto || '';
+      const selectedText = originalText.substring(start, end);
+      const openTag = `<${tag}>`;
+      const closeTag = `</${tag}>`;
+
+      let newText = '';
+      if (selectedText.startsWith(openTag) && selectedText.endsWith(closeTag)) {
+        newText = originalText.substring(0, start) + selectedText.substring(openTag.length, selectedText.length - closeTag.length) + originalText.substring(end);
+      } else {
+        newText = originalText.substring(0, start) + openTag + selectedText + closeTag + originalText.substring(end);
+      }
+
+      updateCanvasElement(selectedCanvasElement.id, { texto: newText });
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(start, start + openTag.length + selectedText.length + closeTag.length);
+        }
+      }, 50);
+      return;
+    }
+
+    // Se nenhum trecho estiver selecionado, alterna a formatação do bloco inteiro
+    if (tag === 'b') updateCanvasElement(selectedCanvasElement.id, { negrito: !selectedCanvasElement.negrito });
+    if (tag === 'i') updateCanvasElement(selectedCanvasElement.id, { italico: !selectedCanvasElement.italico });
+    if (tag === 'u') updateCanvasElement(selectedCanvasElement.id, { sublinhado: !selectedCanvasElement.sublinhado });
+  };
 
   const [activeTab, setActiveTab] = useState('modelos');
   const [templates, setTemplates] = useState<CartaTemplate[]>([]);
@@ -359,6 +415,24 @@ export default function CartasPage() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
+  const [copiedJson, setCopiedJson] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    cancelText: string;
+    variant: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirmar',
+    cancelText: 'Cancelar',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
   const [notification, setNotification] = useState<{
     isOpen: boolean; title: string; message: string;
     type: 'success' | 'error' | 'warning' | 'info'; autoClose: number | undefined;
@@ -405,6 +479,8 @@ export default function CartasPage() {
     [members, selectedMemberId]
   );
 
+  const [congregacoes, setCongregacoes] = useState<Array<{ id: string; nome: string }>>([]);
+
   const buildPlaceholderMap = (member?: Member | null) => {
     const hoje = new Date();
     const cf = (member?.custom_fields && typeof member.custom_fields === 'object') ? member.custom_fields : {};
@@ -415,7 +491,18 @@ export default function CartasPage() {
         member?.cargo_ministerial ||
         ''
       );
-    const congregacao = String((cf as any).congregacao || (cf as any).congregacao_nome || '');
+    
+    // Resolução robusta da Congregação do Membro
+    let congregacaoNome = '';
+    const congId = member?.congregacao_id || (cf as any).congregacao_id;
+    if (congId) {
+      const encontrada = congregacoes.find((c) => c.id === congId);
+      if (encontrada) congregacaoNome = encontrada.nome;
+    }
+    if (!congregacaoNome) {
+      congregacaoNome = String((cf as any).supervisao || (cf as any).congregacao || (cf as any).congregacao_nome || '');
+    }
+
     return {
       'igreja.nome': configIgreja.nome || '',
       'igreja.endereco': configIgreja.endereco || '',
@@ -430,7 +517,7 @@ export default function CartasPage() {
       'membro.telefone': member?.phone || '',
       'membro.matricula': String(member?.matricula || ''),
       'membro.cargo': cargo || '',
-      'membro.congregacao': congregacao || '',
+      'membro.congregacao': congregacaoNome || '',
       'carta.destino': issueFields.destino || '',
       'carta.motivo': issueFields.motivo || '',
       'carta.observacoes': issueFields.observacoes || '',
@@ -506,7 +593,19 @@ export default function CartasPage() {
             `border-radius:${el.borderRadius || 0}px;`,
             `opacity:${el.transparencia ?? 1};`,
           ].join('');
-          return `<div style=\"${style}\"></div>`;
+          return `<div style="${style}"></div>`;
+        }
+
+        if (el.tipo === 'forma') {
+          const style = [
+            baseStyle,
+            `background-color:${el.backgroundColor || '#f3f4f6'};`,
+            `border:${el.borderWidth || 1}px ${el.borderStyle || 'solid'} ${el.borderColor || '#374151'};`,
+            `border-radius:${el.borderRadius || 0}px;`,
+            `opacity:${el.transparencia ?? 1};`,
+            'box-sizing:border-box;',
+          ].join('');
+          return `<div style="${style}"></div>`;
         }
 
         return '';
@@ -531,9 +630,286 @@ export default function CartasPage() {
     return new Date(issuedAt).toLocaleDateString('pt-BR');
   }, [records]);
 
-  const fetchMinData = async () => {
-    return userCtx.ministryId;
+  const fetchMinData = async (): Promise<string | null> => {
+    if (userCtx.ministryId) return userCtx.ministryId;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data: mData } = await supabase
+        .from('members')
+        .select('ministry_id')
+        .eq('id', user.id)
+        .single();
+      return mData?.ministry_id || user.user_metadata?.ministry_id || null;
+    } catch {
+      return null;
+    }
   };
+
+const createSystemTemplate = (
+  id: string,
+  key: string,
+  title: string,
+  tipo: TemplateTipo,
+  tituloCarta: string,
+  textoDeclaracao: string
+): CartaTemplate => ({
+  id,
+  ministry_id: null,
+  template_key: key,
+  title,
+  tipo,
+  scope: 'system',
+  is_active: true,
+  content_json: {
+    mode: 'canvas',
+    canvas: {
+      width: 794,
+      height: 1123,
+      backgroundUrl: '',
+      elements: [
+        {
+          x: 45,
+          y: 26,
+          id: '49a4a289-5962-4b99-8181-40c00858f084',
+          cor: '#111827',
+          tipo: 'logo',
+          fonte: 'Calibri',
+          altura: 101,
+          locked: false,
+          italico: false,
+          largura: 92,
+          negrito: false,
+          visivel: true,
+          fontSize: 12,
+          imagemUrl: '',
+          sublinhado: false,
+          alinhamento: 'left',
+        },
+        {
+          x: 142,
+          y: 24,
+          id: '4cc6787a-9fb7-4628-99a4-72231f43327a',
+          cor: '#111827',
+          tipo: 'texto',
+          fonte: 'Calibri',
+          texto: '{{igreja.nome}}',
+          altura: 32,
+          locked: false,
+          italico: false,
+          largura: 506,
+          negrito: true,
+          visivel: true,
+          fontSize: 22,
+          sublinhado: false,
+          alinhamento: 'left',
+        },
+        {
+          x: 144,
+          y: 54,
+          id: 'cabecalho-endereco',
+          cor: '#374151',
+          tipo: 'texto',
+          fonte: 'Calibri',
+          texto: '{{igreja.endereco}}',
+          altura: 24,
+          locked: false,
+          italico: false,
+          largura: 506,
+          negrito: false,
+          visivel: true,
+          fontSize: 14,
+          sublinhado: false,
+          alinhamento: 'left',
+        },
+        {
+          x: 144,
+          y: 75,
+          id: 'cabecalho-cnpj',
+          cor: '#4B5563',
+          tipo: 'texto',
+          fonte: 'Calibri',
+          texto: 'CNPJ: {{igreja.cnpj}}',
+          altura: 22,
+          locked: false,
+          italico: false,
+          largura: 506,
+          negrito: false,
+          visivel: true,
+          fontSize: 13,
+          sublinhado: false,
+          alinhamento: 'left',
+        },
+        {
+          x: 144,
+          y: 94,
+          id: 'cabecalho-contato',
+          cor: '#4B5563',
+          tipo: 'texto',
+          fonte: 'Calibri',
+          texto: 'Tel: {{igreja.telefone}} | E-mail: {{igreja.email}}',
+          altura: 22,
+          locked: false,
+          italico: false,
+          largura: 506,
+          negrito: false,
+          visivel: true,
+          fontSize: 13,
+          sublinhado: false,
+          alinhamento: 'left',
+        },
+        {
+          x: 32,
+          y: 263,
+          id: '9ef02817-5d45-4078-8819-fcb24c29c58f',
+          cor: '#111827',
+          tipo: 'texto',
+          fonte: 'Calibri',
+          texto: textoDeclaracao,
+          altura: 476,
+          locked: false,
+          italico: false,
+          largura: 618,
+          negrito: false,
+          visivel: true,
+          fontSize: 22,
+          sublinhado: false,
+          alinhamento: 'center',
+        },
+        {
+          x: 0,
+          y: 144,
+          id: '4014e7e1-a741-40b3-a2a1-119e80e5ff67',
+          cor: '#150f95',
+          tipo: 'linha',
+          fonte: 'Calibri',
+          texto: '',
+          altura: 4,
+          locked: false,
+          italico: false,
+          largura: 700,
+          negrito: false,
+          visivel: true,
+          fontSize: 12,
+          sublinhado: false,
+          alinhamento: 'left',
+          borderRadius: 0,
+        },
+        {
+          x: 0,
+          y: 148,
+          id: '1787108727534jtjq91qbj',
+          cor: '#ff0000',
+          tipo: 'linha',
+          fonte: 'Calibri',
+          texto: '',
+          altura: 4,
+          locked: false,
+          italico: false,
+          largura: 700,
+          negrito: false,
+          visivel: true,
+          fontSize: 12,
+          sublinhado: false,
+          alinhamento: 'left',
+          borderRadius: 0,
+        },
+        {
+          x: 153,
+          y: 186,
+          id: '494afeea-9420-486f-bb71-0889883c29c4',
+          cor: '#111827',
+          tipo: 'texto',
+          fonte: 'Calibri',
+          texto: tituloCarta,
+          altura: 48,
+          locked: false,
+          italico: false,
+          largura: 360,
+          negrito: true,
+          visivel: true,
+          fontSize: 26,
+          sublinhado: false,
+          alinhamento: 'center',
+          borderRadius: 0,
+        },
+        {
+          x: 25,
+          y: 994,
+          id: '17871409999000b6o6qgzt',
+          cor: '#111827',
+          tipo: 'texto',
+          fonte: 'Calibri',
+          texto: '<b>DESTINO:</b> {{carta.destino}}',
+          altura: 29,
+          locked: false,
+          italico: false,
+          largura: 643,
+          negrito: false,
+          visivel: true,
+          fontSize: 16,
+          sublinhado: false,
+          alinhamento: 'left',
+          borderRadius: 0,
+        },
+        {
+          x: 24,
+          y: 1028,
+          id: '17871410147888k2nbto2j',
+          cor: '#111827',
+          tipo: 'texto',
+          fonte: 'Calibri',
+          texto: '<b>OBS.: </b>{{carta.observacoes}}',
+          altura: 29,
+          locked: false,
+          italico: false,
+          largura: 643,
+          negrito: false,
+          visivel: true,
+          fontSize: 16,
+          sublinhado: false,
+          alinhamento: 'left',
+          borderRadius: 0,
+        },
+      ],
+    },
+  },
+});
+
+const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
+  createSystemTemplate(
+    'system-mudanca',
+    'mudanca',
+    'Carta de Mudança',
+    'mudanca',
+    'CARTA DE MUDANCA',
+    'Declaramos para os devidos fins que\n<b>{{membro.nome}}, CPF {{membro.cpf}}</b>\n\nFaz parte desta igreja, como MEMBRO fiel e dedicado.\nPor se achar em comunhão com esta Igreja, nós o recomendamos que o recebais no Senhor como usam fazer os Santos..\n\n<b>Congregacao:</b> {{membro.congregacao}} \n<b>Cargo:</b> {{membro.cargo}}\n\nEm fe de verdade, firmamos a presente.\n\n<b>{{data.extenso}}<b>\n</b></b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n'
+  ),
+  createSystemTemplate(
+    'system-transito',
+    'transito',
+    'Carta de Trânsito',
+    'transito',
+    'CARTA DE TRÂNSITO',
+    'Declaramos para os devidos fins que\n<b>{{membro.nome}}, CPF {{membro.cpf}}</b>\n\nMembro desta igreja, encontra-se em viagem ou trânsito temporário.\nRecomendamos que o recebais em comunhão cristã durante o período de sua permanência.\n\n<b>Congregacao:</b> {{membro.congregacao}} \n<b>Cargo:</b> {{membro.cargo}}\n\nEm fe de verdade, firmamos a presente.\n\n<b>{{data.extenso}}<b>\n</b></b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n'
+  ),
+  createSystemTemplate(
+    'system-desligamento',
+    'desligamento',
+    'Carta de Desligamento',
+    'desligamento',
+    'CARTA DE DESLIGAMENTO',
+    'Declaramos para os devidos fins que\n<b>{{membro.nome}}, CPF {{membro.cpf}}</b>\n\nTeve seu desligamento formalizado a seu pedido do rol de membros desta igreja.\nRegistramos nossos agradecimentos pelo período em que esteve em nossa comunhão.\n\n<b>Congregacao:</b> {{membro.congregacao}} \n<b>Cargo:</b> {{membro.cargo}}\n\nEm fe de verdade, firmamos a presente.\n\n<b>{{data.extenso}}<b>\n</b></b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n'
+  ),
+  createSystemTemplate(
+    'system-recomendacao',
+    'recomendacao',
+    'Carta de Recomendação',
+    'recomendacao',
+    'CARTA DE RECOMENDAÇÃO',
+    'Declaramos para os devidos fins que\n<b>{{membro.nome}}, CPF {{membro.cpf}}</b>\n\nÉ membro em plena comunhão desta igreja e o(a) recomendamos carinhosamente aos irmãos para acolhimento nas atividades cristãs.\n\n<b>Congregacao:</b> {{membro.congregacao}} \n<b>Cargo:</b> {{membro.cargo}}\n\nEm fe de verdade, firmamos a presente.\n\n<b>{{data.extenso}}<b>\n</b></b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n'
+  ),
+];
 
   const loadTemplates = async () => {
     const { data, error } = await supabase
@@ -552,22 +928,40 @@ export default function CartasPage() {
       return;
     }
 
-    const rows = (data || []) as CartaTemplate[];
-    const systemRows = rows.filter((t) => t.scope === 'system');
-    const tenantRows = rows.filter((t) => t.scope === 'tenant');
-
+    const dbRows = (data || []) as CartaTemplate[];
+    
+    // DEFAULT_SYSTEM_TEMPLATES define os padrões mais recentes do código
     const systemMap: Record<string, CartaTemplate> = {};
-    systemRows.forEach((t) => {
+    DEFAULT_SYSTEM_TEMPLATES.forEach((t) => {
       systemMap[t.template_key] = t;
     });
-
-    const merged = new Map<string, CartaTemplate>();
-    tenantRows.forEach((t) => merged.set(t.template_key, t));
-    systemRows.forEach((t) => {
-      if (!merged.has(t.template_key)) merged.set(t.template_key, t);
+    // Se o banco trouxer modelos de sistema atualizados, insere/atualiza
+    dbRows.filter((t) => t.scope === 'system').forEach((dbSys) => {
+      systemMap[dbSys.template_key] = dbSys;
     });
 
-    const list = Array.from(merged.values());
+    const tenantRows = dbRows.filter((t) => t.scope === 'tenant');
+    const merged = new Map<string, CartaTemplate>();
+
+    // Insere modelos customizados do tenant
+    tenantRows.forEach((t) => merged.set(t.template_key, t));
+    
+    // Garante os modelos de sistema no mapa
+    Object.values(systemMap).forEach((t) => {
+      if (!merged.has(t.template_key)) {
+        merged.set(t.template_key, t);
+      }
+    });
+
+    // Garante os modelos de sistema mais recentes no mapa (sobrepondo registros antigos no banco)
+    const list = Array.from(merged.values()).map((tpl) => {
+      const sysNative = DEFAULT_SYSTEM_TEMPLATES.find((s) => s.template_key === tpl.template_key);
+      if (sysNative && (tpl.scope === 'system' || !tpl.content_json?.canvas?.elements || tpl.content_json?.canvas?.elements?.length < 11)) {
+        return { ...sysNative };
+      }
+      return tpl;
+    });
+
     setTemplates(list);
     setSystemTemplates(systemMap);
 
@@ -580,10 +974,11 @@ export default function CartasPage() {
       : null;
 
     if (preferred) {
-      setSelectedTemplate(preferred);
+      // Forçar nova referência de objeto para disparar o useEffect de canvasContent
+      setSelectedTemplate({ ...preferred });
     } else if (!selectedTemplate && list.length > 0) {
       const first = list[0];
-      setSelectedTemplate(first);
+      setSelectedTemplate({ ...first });
       setDraftTitle(first.title || '');
       setDraftKey(first.template_key || '');
       setDraftTipo(first.tipo || 'custom');
@@ -611,6 +1006,15 @@ export default function CartasPage() {
     setRecords((data || []) as any[]);
   };
 
+  const loadCongregacoes = async () => {
+    try {
+      const { data } = await supabase.from('congregacoes').select('id, nome');
+      setCongregacoes((data || []) as Array<{ id: string; nome: string }>);
+    } catch {
+      setCongregacoes([]);
+    }
+  };
+
   const loadMembers = async () => {
     try {
       const res = await fetchMembers(1, 500, { status: 'active' });
@@ -628,11 +1032,11 @@ export default function CartasPage() {
       setMinistryId(mid);
       const config = await fetchConfiguracaoIgrejaFromSupabase(supabase);
       setConfigIgreja(config);
-      await Promise.all([loadTemplates(), loadRecords(), loadMembers()]);
+      await Promise.all([loadTemplates(), loadRecords(), loadMembers(), loadCongregacoes()]);
     };
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, bloqueado]);
+  }, [loading, bloqueado, userCtx.ministryId]);
 
   useEffect(() => {
     if (!selectedTemplate) return;
@@ -643,12 +1047,19 @@ export default function CartasPage() {
     setDraftTitle(selectedTemplate.title || '');
     setDraftKey(selectedTemplate.template_key || '');
     setDraftTipo(selectedTemplate.tipo || 'custom');
-  }, [selectedTemplate?.id]);
+  }, [selectedTemplate?.id, selectedTemplate?.template_key, selectedTemplate?.content_json]);
 
   const handleSelectTemplate = (template: CartaTemplate) => {
     setIsDraftReady(false);
-    setSelectedTemplate(template);
-    setIsEditingVisual(false);
+    // Se for um modelo de sistema nativo, forçar sempre o layout nativo atualizado
+    const sysNative = DEFAULT_SYSTEM_TEMPLATES.find((s) => s.template_key === template.template_key);
+    if (sysNative && template.scope === 'system') {
+      setSelectedTemplate({ ...sysNative });
+      setIsEditingVisual(true);
+      return;
+    }
+    setSelectedTemplate({ ...template });
+    setIsEditingVisual(true);
   };
 
   const handleNewTemplate = () => {
@@ -688,7 +1099,15 @@ export default function CartasPage() {
   };
 
   const handleSaveTemplate = async () => {
-    if (!ministryId) {
+    let targetMinistryId = ministryId;
+    if (!targetMinistryId) {
+      targetMinistryId = await fetchMinData();
+      if (targetMinistryId) {
+        setMinistryId(targetMinistryId);
+      }
+    }
+
+    if (!targetMinistryId) {
       setNotification({
         isOpen: true,
         title: 'Aviso',
@@ -712,7 +1131,6 @@ export default function CartasPage() {
     }
 
     const isCreatingNew = !selectedTemplate;
-    const isEditingSystem = selectedTemplate?.scope === 'system';
 
     const existingTenantKeys = new Set(
       templates.filter((tpl) => tpl.scope === 'tenant').map((tpl) => tpl.template_key)
@@ -736,7 +1154,7 @@ export default function CartasPage() {
     setIsSaving(true);
     try {
       const payload = {
-        ministry_id: ministryId,
+        ministry_id: targetMinistryId,
         template_key: finalKey,
         title: draftTitle,
         tipo: draftTipo || 'custom',
@@ -746,15 +1164,23 @@ export default function CartasPage() {
         updated_at: new Date().toISOString(),
       };
 
-      const tenantTarget =
-        selectedTemplate?.scope === 'tenant'
-          ? selectedTemplate
-          : isEditingSystem
-            ? templates.find((tpl) => tpl.scope === 'tenant' && tpl.template_key === finalKey)
-            : null;
+      // Verificar se já existe um modelo no banco para este tenant com a mesma chave
+      const { data: existingTenantDb } = await supabase
+        .from('cartas_templates')
+        .select('id')
+        .eq('ministry_id', targetMinistryId)
+        .eq('template_key', finalKey)
+        .maybeSingle();
 
-      const { error } = tenantTarget
-        ? await supabase.from('cartas_templates').update(payload).eq('id', tenantTarget.id)
+      const tenantTargetId =
+        selectedTemplate?.scope === 'tenant'
+          ? selectedTemplate.id
+          : existingTenantDb?.id ||
+            templates.find((tpl) => tpl.scope === 'tenant' && tpl.template_key === finalKey)?.id ||
+            null;
+
+      const { error } = tenantTargetId
+        ? await supabase.from('cartas_templates').update(payload).eq('id', tenantTargetId)
         : await supabase.from('cartas_templates').insert(payload);
 
       if (error) throw error;
@@ -791,34 +1217,104 @@ export default function CartasPage() {
     }
   };
 
-  const handleRestoreSystemTemplate = async () => {
-    if (!selectedTemplate || selectedTemplate.scope !== 'tenant') return;
-    try {
-      await supabase.from('cartas_templates').delete().eq('id', selectedTemplate.id);
-      setNotification({
-        isOpen: true,
-        title: 'Sucesso',
-        message: 'Modelo restaurado para o padrao do sistema.',
-        type: 'success',
-        autoClose: 3000,
-      });
-      await loadTemplates();
-    } catch (err: any) {
-      setNotification({
-        isOpen: true,
-        title: 'Erro',
-        message: err?.message || 'Erro ao restaurar modelo',
-        type: 'error',
-        autoClose: undefined,
-      });
-    }
+  const handleRestoreNativeTemplate = (templateKey: string) => {
+    if (!ministryId) return;
+    const sysNative = DEFAULT_SYSTEM_TEMPLATES.find((s) => s.template_key === templateKey);
+    if (!sysNative) return;
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Restaurar Modelo Nativo',
+      message: `Deseja restaurar a "${sysNative.title}" para o modelo nativo padrão do sistema? Suas alterações salvas para este modelo serão descartadas.`,
+      confirmText: 'Restaurar Padrão',
+      cancelText: 'Cancelar',
+      variant: 'warning',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          setIsSaving(true);
+          await supabase
+            .from('cartas_templates')
+            .delete()
+            .eq('ministry_id', ministryId)
+            .eq('template_key', templateKey);
+
+          setNotification({
+            isOpen: true,
+            title: 'Modelo Restaurado',
+            message: `O modelo "${sysNative.title}" foi restaurado para o padrão nativo original com sucesso.`,
+            type: 'success',
+            autoClose: 4000,
+          });
+
+          setSelectedTemplate({ ...sysNative });
+          await loadTemplates();
+        } catch (err: any) {
+          setNotification({
+            isOpen: true,
+            title: 'Erro',
+            message: err?.message || 'Erro ao restaurar modelo nativo',
+            type: 'error',
+            autoClose: undefined,
+          });
+        } finally {
+          setIsSaving(false);
+        }
+      },
+    });
   };
+
+  const handleDeleteTenantTemplate = (templateId: string, title: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Modelo de Carta',
+      message: `Tem certeza que deseja excluir permanentemente o modelo "${title}"? Esta ação não poderá ser desfeita.`,
+      confirmText: 'Excluir Modelo',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          setIsSaving(true);
+          const { error } = await supabase.from('cartas_templates').delete().eq('id', templateId);
+          if (error) throw error;
+
+          setNotification({
+            isOpen: true,
+            title: 'Modelo Excluído',
+            message: `O modelo "${title}" foi excluído com sucesso.`,
+            type: 'success',
+            autoClose: 3000,
+          });
+
+          setSelectedTemplate(null);
+          await loadTemplates();
+        } catch (err: any) {
+          setNotification({
+            isOpen: true,
+            title: 'Erro',
+            message: err?.message || 'Erro ao excluir modelo',
+            type: 'error',
+            autoClose: undefined,
+          });
+        } finally {
+          setIsSaving(false);
+        }
+      },
+    });
+  };
+
+
 
   const updateCanvasElement = (id: string, props: Partial<CartaCanvasElement>) => {
     setCanvasContent((prev) => ({
       ...prev,
       elements: prev.elements.map((el) => (el.id === id ? { ...el, ...props } : el)),
     }));
+    setSelectedCanvasElement((prev) => (prev && prev.id === id ? { ...prev, ...props } : prev));
+    setSelectedCanvasElements((prev) =>
+      prev.map((el) => (el.id === id ? { ...el, ...props } : el))
+    );
   };
 
   const updateMultipleCanvasElements = (
@@ -851,6 +1347,50 @@ export default function CartasPage() {
     }
   };
 
+  const moveLayerUp = (id: string) => {
+    setCanvasContent((prev) => {
+      const idx = prev.elements.findIndex((el) => el.id === id);
+      if (idx < 0 || idx >= prev.elements.length - 1) return prev;
+      const copy = [...prev.elements];
+      const temp = copy[idx];
+      copy[idx] = copy[idx + 1];
+      copy[idx + 1] = temp;
+      return { ...prev, elements: copy };
+    });
+  };
+
+  const moveLayerDown = (id: string) => {
+    setCanvasContent((prev) => {
+      const idx = prev.elements.findIndex((el) => el.id === id);
+      if (idx <= 0) return prev;
+      const copy = [...prev.elements];
+      const temp = copy[idx];
+      copy[idx] = copy[idx - 1];
+      copy[idx - 1] = temp;
+      return { ...prev, elements: copy };
+    });
+  };
+
+  const bringToFront = (id: string) => {
+    setCanvasContent((prev) => {
+      const idx = prev.elements.findIndex((el) => el.id === id);
+      if (idx < 0 || idx === prev.elements.length - 1) return prev;
+      const target = prev.elements[idx];
+      const filtered = prev.elements.filter((el) => el.id !== id);
+      return { ...prev, elements: [...filtered, target] };
+    });
+  };
+
+  const sendToBack = (id: string) => {
+    setCanvasContent((prev) => {
+      const idx = prev.elements.findIndex((el) => el.id === id);
+      if (idx <= 0) return prev;
+      const target = prev.elements[idx];
+      const filtered = prev.elements.filter((el) => el.id !== id);
+      return { ...prev, elements: [target, ...filtered] };
+    });
+  };
+
   const duplicateCanvasElement = (element: CartaCanvasElement) => {
     const offset = 16;
     const clone: CartaCanvasElement = {
@@ -875,16 +1415,22 @@ export default function CartasPage() {
   ) => {
     const isText = tipo === 'texto';
     const isLine = tipo === 'linha';
+    const isForma = tipo === 'forma';
     const base: CartaCanvasElement = {
       id: createElementId(),
       tipo,
       x: 48,
       y: 48,
-      largura: isLine ? 320 : isText ? 360 : 200,
-      altura: isLine ? 3 : isText ? 48 : 140,
+      largura: isLine ? 320 : isText ? 360 : isForma ? 240 : 200,
+      altura: isLine ? 3 : isText ? 48 : isForma ? 160 : 140,
       fontSize: isText ? 16 : 12,
       fonte: 'Calibri',
       cor: isLine ? '#111827' : '#111827',
+      backgroundColor: isForma ? '#f3f4f6' : undefined,
+      borderColor: isForma ? '#374151' : undefined,
+      borderWidth: isForma ? 1 : undefined,
+      borderStyle: isForma ? 'solid' : undefined,
+      borderRadius: isForma ? 4 : 0,
       alinhamento: 'left' as const,
       negrito: false,
       italico: false,
@@ -901,16 +1447,7 @@ export default function CartasPage() {
     setSelectedCanvasElements([base]);
   };
 
-  useEffect(() => {
-    if (!selectedCanvasElement) return;
-    const updated = canvasContent.elements.find((el) => el.id === selectedCanvasElement.id) || null;
-    setSelectedCanvasElement(updated);
-    if (updated) {
-      setSelectedCanvasElements((prev) =>
-        prev.map((el) => (el.id === updated.id ? updated : el))
-      );
-    }
-  }, [canvasContent]);
+
 
   const handleInsertPlaceholder = (key: string) => {
     if (!selectedCanvasElement || selectedCanvasElement.tipo !== 'texto') {
@@ -1174,7 +1711,54 @@ export default function CartasPage() {
                 </div>
 
                 {selectedTemplate && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Botão de Exclusão para modelos criados pelo Tenant (ou botão de Restaurar para nativos) */}
+                    {DEFAULT_SYSTEM_TEMPLATES.some((s) => s.template_key === selectedTemplate.template_key) ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreNativeTemplate(selectedTemplate.template_key)}
+                        disabled={isSaving}
+                        className="text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-sm bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-300"
+                        title="Restaurar este modelo para o padrão nativo original do sistema"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
+                        <span>Restaurar modelo nativo</span>
+                      </button>
+                    ) : (
+                      selectedTemplate.scope === 'tenant' && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTenantTemplate(selectedTemplate.id, selectedTemplate.title)}
+                          disabled={isSaving}
+                          className="text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-sm bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                          title="Excluir este modelo permanentemente"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                          <span>Excluir modelo</span>
+                        </button>
+                      )
+                    )}
+
+                    <button
+                      onClick={() => {
+                        const jsonStructure = {
+                          template_key: selectedTemplate.template_key || draftKey,
+                          title: selectedTemplate.title || draftTitle,
+                          tipo: selectedTemplate.tipo || draftTipo || 'custom',
+                          scope: selectedTemplate.scope || 'tenant',
+                          content_json: serializeCanvasContent(canvasContent),
+                        };
+                        const formattedJson = JSON.stringify(jsonStructure, null, 2);
+                        navigator.clipboard.writeText(formattedJson);
+                        setCopiedJson(true);
+                        setTimeout(() => setCopiedJson(false), 2500);
+                      }}
+                      className="text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-sm bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
+                      title="Copiar JSON estruturado do modelo para clipboard"
+                    >
+                      <span>{copiedJson ? '✅ JSON Copiado!' : '📋 Copiar JSON'}</span>
+                    </button>
+
                     <button
                       onClick={() => setIsEditingVisual(!isEditingVisual)}
                       className={`text-xs px-4 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-sm ${
@@ -1278,6 +1862,14 @@ export default function CartasPage() {
                           >
                             <Image className="h-4 w-4 text-teal-600" />
                             <span>Imagem</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addCanvasElement('forma')}
+                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
+                          >
+                            <Square className="h-4 w-4 text-teal-600" />
+                            <span>Forma</span>
                           </button>
                           <button
                             type="button"
@@ -1402,8 +1994,7 @@ export default function CartasPage() {
                         ) : (
                           /* Exibe as camadas invertidas (último elemento do array = camada da frente = topo da lista) */
                           <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
-                            {canvasContent.elements.slice().reverse().map((el, indexInverted) => {
-                              const originalIndex = canvasContent.elements.length - 1 - indexInverted;
+                            {canvasContent.elements.slice().reverse().map((el) => {
                               const isSelected = selectedCanvasElement?.id === el.id;
                               let labelResumido = CANVAS_ELEMENT_LABELS[el.tipo] || 'Elemento';
                               if (el.tipo === 'texto' && el.texto) {
@@ -1441,10 +2032,51 @@ export default function CartasPage() {
                                     <span className="truncate">{labelResumido}</span>
                                   </div>
                                   <div className="flex items-center gap-1">
-                                    <span className={`text-[10px] ${isSelected ? 'text-teal-200' : 'text-gray-400'}`}>
-                                      #{originalIndex + 1}
-                                    </span>
-                                    {el.locked && <Lock className="h-3 w-3 opacity-80" />}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        bringToFront(el.id);
+                                      }}
+                                      title="Trazer para a Frente Absoluta"
+                                      className={`p-1 rounded hover:bg-black/10 transition ${isSelected ? 'text-white' : 'text-gray-500'}`}
+                                    >
+                                      <ArrowUpToLine className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        moveLayerUp(el.id);
+                                      }}
+                                      title="Subir uma Camada"
+                                      className={`p-1 rounded hover:bg-black/10 transition ${isSelected ? 'text-white' : 'text-gray-500'}`}
+                                    >
+                                      <ChevronUp className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        moveLayerDown(el.id);
+                                      }}
+                                      title="Descer uma Camada"
+                                      className={`p-1 rounded hover:bg-black/10 transition ${isSelected ? 'text-white' : 'text-gray-500'}`}
+                                    >
+                                      <ChevronDown className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        sendToBack(el.id);
+                                      }}
+                                      title="Enviar para o Fundo Absoluto"
+                                      className={`p-1 rounded hover:bg-black/10 transition ${isSelected ? 'text-white' : 'text-gray-500'}`}
+                                    >
+                                      <ArrowDownToLine className="h-3 w-3" />
+                                    </button>
+                                    {el.locked && <Lock className="h-3 w-3 opacity-80 ml-1" />}
                                   </div>
                                 </div>
                               );
@@ -1554,6 +2186,49 @@ export default function CartasPage() {
                             </div>
                           </div>
 
+                          {/* Ordem da Camada / Nível z-index */}
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ORDEM DA CAMADA</span>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => bringToFront(selectedCanvasElement.id)}
+                                className="flex items-center justify-center gap-1 py-1.5 px-2 bg-gray-50 hover:bg-teal-50 text-gray-700 hover:text-teal-800 border border-gray-200 rounded-lg text-[11px] font-semibold transition"
+                                title="Mover para a frente de todos os elementos"
+                              >
+                                <ArrowUpToLine className="h-3.5 w-3.5 text-teal-600" />
+                                <span>Para Frente</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => sendToBack(selectedCanvasElement.id)}
+                                className="flex items-center justify-center gap-1 py-1.5 px-2 bg-gray-50 hover:bg-teal-50 text-gray-700 hover:text-teal-800 border border-gray-200 rounded-lg text-[11px] font-semibold transition"
+                                title="Mover para trás de todos os elementos"
+                              >
+                                <ArrowDownToLine className="h-3.5 w-3.5 text-teal-600" />
+                                <span>Para o Fundo</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveLayerUp(selectedCanvasElement.id)}
+                                className="flex items-center justify-center gap-1 py-1.5 px-2 bg-gray-50 hover:bg-teal-50 text-gray-700 hover:text-teal-800 border border-gray-200 rounded-lg text-[11px] font-semibold transition"
+                                title="Avançar 1 nível para cima"
+                              >
+                                <ChevronUp className="h-3.5 w-3.5 text-teal-600" />
+                                <span>Avançar</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveLayerDown(selectedCanvasElement.id)}
+                                className="flex items-center justify-center gap-1 py-1.5 px-2 bg-gray-50 hover:bg-teal-50 text-gray-700 hover:text-teal-800 border border-gray-200 rounded-lg text-[11px] font-semibold transition"
+                                title="Recuar 1 nível para baixo"
+                              >
+                                <ChevronDown className="h-3.5 w-3.5 text-teal-600" />
+                                <span>Recuar</span>
+                              </button>
+                            </div>
+                          </div>
+
                           {/* Posição e Dimensões */}
                           <div>
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">POSIÇÃO E TAMANHO</span>
@@ -1605,16 +2280,27 @@ export default function CartasPage() {
                           {selectedCanvasElement.tipo === 'texto' && (
                             <>
                               <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                                  TAMANHO DA FONTE: {selectedCanvasElement.fontSize || 14}PX
-                                </label>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                                    TAMANHO DA FONTE (PX)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={8}
+                                    max={120}
+                                    value={selectedCanvasElement.fontSize || 14}
+                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { fontSize: Number(e.target.value) || 14 })}
+                                    className="w-14 text-right rounded border border-gray-200 px-1.5 py-0.5 text-xs font-bold text-teal-900 focus:border-teal-500 focus:outline-none"
+                                    disabled={selectedCanvasElement.locked}
+                                  />
+                                </div>
                                 <input
                                   type="range"
                                   min={8}
                                   max={72}
                                   value={selectedCanvasElement.fontSize || 14}
                                   onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { fontSize: Number(e.target.value) || 14 })}
-                                  className="w-full accent-teal-600"
+                                  className="w-full accent-teal-600 cursor-pointer"
                                   disabled={selectedCanvasElement.locked}
                                 />
                               </div>
@@ -1638,25 +2324,28 @@ export default function CartasPage() {
                                 <div className="flex flex-wrap items-center gap-1.5 rounded border border-gray-200 bg-white p-1.5">
                                   <button
                                     type="button"
-                                    onClick={() => updateCanvasElement(selectedCanvasElement.id, { negrito: !selectedCanvasElement.negrito })}
+                                    onClick={() => handleToggleTextInlineFormat('b')}
                                     className={`p-1 rounded ${selectedCanvasElement.negrito ? 'bg-teal-100 text-teal-800 font-bold' : 'text-gray-600'}`}
                                     disabled={selectedCanvasElement.locked}
+                                    title="Negrito no trecho selecionado ou bloco"
                                   >
                                     <Bold className="h-3.5 w-3.5" />
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => updateCanvasElement(selectedCanvasElement.id, { italico: !selectedCanvasElement.italico })}
+                                    onClick={() => handleToggleTextInlineFormat('i')}
                                     className={`p-1 rounded ${selectedCanvasElement.italico ? 'bg-teal-100 text-teal-800' : 'text-gray-600'}`}
                                     disabled={selectedCanvasElement.locked}
+                                    title="Itálico no trecho selecionado ou bloco"
                                   >
                                     <Italic className="h-3.5 w-3.5" />
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => updateCanvasElement(selectedCanvasElement.id, { sublinhado: !selectedCanvasElement.sublinhado })}
+                                    onClick={() => handleToggleTextInlineFormat('u')}
                                     className={`p-1 rounded ${selectedCanvasElement.sublinhado ? 'bg-teal-100 text-teal-800' : 'text-gray-600'}`}
                                     disabled={selectedCanvasElement.locked}
+                                    title="Sublinhado no trecho selecionado ou bloco"
                                   >
                                     <Underline className="h-3.5 w-3.5" />
                                   </button>
@@ -1696,10 +2385,11 @@ export default function CartasPage() {
                               <div>
                                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">CONTEÚDO</label>
                                 <textarea
+                                  ref={textareaRef}
                                   rows={4}
                                   value={selectedCanvasElement.texto || ''}
                                   onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { texto: e.target.value })}
-                                  className="w-full rounded border border-gray-200 p-2 text-xs focus:border-teal-500 focus:outline-none"
+                                  className="w-full rounded border border-gray-200 p-2 text-xs focus:border-teal-500 focus:outline-none font-mono"
                                   disabled={selectedCanvasElement.locked}
                                 />
                               </div>
@@ -1734,6 +2424,119 @@ export default function CartasPage() {
                             </div>
                           )}
 
+                          {/* Especificidades do Tipo Forma / Retângulo */}
+                          {selectedCanvasElement.tipo === 'forma' && (
+                            <div className="space-y-3 border-t border-gray-100 pt-3">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">PROPRIEDADES DA FORMA</span>
+                              
+                              {/* Cor de Fundo / Preenchimento */}
+                              <div>
+                                <label className="text-[10px] font-semibold text-gray-500 block mb-1">Cor de Preenchimento</label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="color"
+                                    value={selectedCanvasElement.backgroundColor || '#f3f4f6'}
+                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { backgroundColor: e.target.value })}
+                                    className="h-7 w-10 rounded border border-gray-200 cursor-pointer p-0.5"
+                                    disabled={selectedCanvasElement.locked}
+                                  />
+                                  <input
+                                    type="text"
+                                    value={selectedCanvasElement.backgroundColor || '#f3f4f6'}
+                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { backgroundColor: e.target.value })}
+                                    className="flex-1 rounded border border-gray-200 px-2 py-1 text-xs uppercase"
+                                    disabled={selectedCanvasElement.locked}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Cor do Contorno */}
+                              <div>
+                                <label className="text-[10px] font-semibold text-gray-500 block mb-1">Cor do Contorno (Borda)</label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="color"
+                                    value={selectedCanvasElement.borderColor || '#374151'}
+                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { borderColor: e.target.value })}
+                                    className="h-7 w-10 rounded border border-gray-200 cursor-pointer p-0.5"
+                                    disabled={selectedCanvasElement.locked}
+                                  />
+                                  <input
+                                    type="text"
+                                    value={selectedCanvasElement.borderColor || '#374151'}
+                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { borderColor: e.target.value })}
+                                    className="flex-1 rounded border border-gray-200 px-2 py-1 text-xs uppercase"
+                                    disabled={selectedCanvasElement.locked}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Espessura e Estilo da Borda */}
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-[10px] font-semibold text-gray-500 block mb-1">Espessura (px)</label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={30}
+                                    value={selectedCanvasElement.borderWidth ?? 1}
+                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { borderWidth: Number(e.target.value) || 0 })}
+                                    className="w-full rounded border border-gray-200 px-2 py-1 text-xs"
+                                    disabled={selectedCanvasElement.locked}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-semibold text-gray-500 block mb-1">Estilo do Contorno</label>
+                                  <select
+                                    value={selectedCanvasElement.borderStyle || 'solid'}
+                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { borderStyle: e.target.value as any })}
+                                    className="w-full rounded border border-gray-200 px-2 py-1 text-xs bg-white"
+                                    disabled={selectedCanvasElement.locked}
+                                  >
+                                    <option value="solid">Sólido</option>
+                                    <option value="dashed">Tracejado</option>
+                                    <option value="dotted">Pontilhado</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              {/* Arredondamento dos Cantos */}
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="text-[10px] font-semibold text-gray-500">Arredondamento dos Cantos (px)</label>
+                                  <span className="text-xs font-bold text-teal-800">{selectedCanvasElement.borderRadius || 0}px</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={100}
+                                  value={selectedCanvasElement.borderRadius || 0}
+                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { borderRadius: Number(e.target.value) || 0 })}
+                                  className="w-full accent-teal-600"
+                                  disabled={selectedCanvasElement.locked}
+                                />
+                              </div>
+
+                              {/* Transparência */}
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="text-[10px] font-semibold text-gray-500">Opacidade / Transparência</label>
+                                  <span className="text-xs font-bold text-teal-800">{Math.round((selectedCanvasElement.transparencia ?? 1) * 100)}%</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min={0.1}
+                                  max={1}
+                                  step={0.05}
+                                  value={selectedCanvasElement.transparencia ?? 1}
+                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { transparencia: Number(e.target.value) })}
+                                  className="w-full accent-teal-600"
+                                  disabled={selectedCanvasElement.locked}
+                                />
+                              </div>
+                            </div>
+                          )}
+
                           {/* Especificidades do Tipo Imagem */}
                           {selectedCanvasElement.tipo === 'imagem' && (
                             <div className="space-y-2">
@@ -1758,12 +2561,13 @@ export default function CartasPage() {
 
                 {/* Botões de Ação Inferiores */}
                 <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-gray-200">
-                  {selectedTemplate?.scope === 'tenant' && systemTemplates[selectedTemplate.template_key] && (
+                  {selectedTemplate && DEFAULT_SYSTEM_TEMPLATES.some((s) => s.template_key === selectedTemplate.template_key) && (
                     <button
-                      onClick={handleRestoreSystemTemplate}
-                      className="px-4 py-2 rounded-lg border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+                      onClick={() => handleRestoreNativeTemplate(selectedTemplate.template_key)}
+                      className="px-4 py-2 rounded-lg border border-amber-300 bg-amber-50 text-xs font-bold text-amber-800 hover:bg-amber-100 transition flex items-center gap-1.5"
                     >
-                      Restaurar Padrão do Sistema
+                      <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
+                      <span>Restaurar Padrão Nativo</span>
                     </button>
                   )}
                   <button
@@ -2003,6 +2807,64 @@ export default function CartasPage() {
                 className="rounded-lg bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700 shadow-sm transition"
               >
                 Criar e Abrir Editor
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal de Confirmação Personalizado */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl border border-gray-100 animate-in zoom-in-95 duration-150">
+            {/* Cabeçalho */}
+            <div
+              className={`flex items-center gap-3 px-6 py-4 border-b ${
+                confirmModal.variant === 'danger'
+                  ? 'border-red-500 bg-gradient-to-r from-red-600 to-red-700 text-white'
+                  : confirmModal.variant === 'warning'
+                  ? 'border-amber-500 bg-gradient-to-r from-amber-500 to-amber-600 text-white'
+                  : 'border-teal-500 bg-gradient-to-r from-teal-600 to-teal-700 text-white'
+              }`}
+            >
+              <span className="text-2xl">
+                {confirmModal.variant === 'danger' ? '⚠️' : confirmModal.variant === 'warning' ? '🔄' : 'ℹ️'}
+              </span>
+              <h3 className="text-base font-bold tracking-wide">{confirmModal.title}</h3>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-700 leading-relaxed font-medium">
+                {confirmModal.message}
+              </p>
+              {confirmModal.variant === 'danger' && (
+                <div className="rounded-xl border border-red-200 bg-red-50/70 p-3 flex items-start gap-2 text-xs text-red-800">
+                  <span className="font-bold">⚠️ Atenção:</span> Esta ação removerá o modelo permanentemente.
+                </div>
+              )}
+            </div>
+
+            {/* Ações */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+                className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100 transition shadow-sm"
+              >
+                {confirmModal.cancelText}
+              </button>
+              <button
+                type="button"
+                onClick={confirmModal.onConfirm}
+                className={`rounded-xl px-5 py-2 text-xs font-bold text-white shadow-md transition ${
+                  confirmModal.variant === 'danger'
+                    ? 'bg-red-600 hover:bg-red-700 shadow-red-600/20'
+                    : confirmModal.variant === 'warning'
+                    ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'
+                    : 'bg-teal-600 hover:bg-teal-700 shadow-teal-600/20'
+                }`}
+              >
+                {confirmModal.confirmText}
               </button>
             </div>
           </div>

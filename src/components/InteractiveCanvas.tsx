@@ -7,7 +7,7 @@ import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 
 interface ElementoCartao {
     id: string;
-    tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha';
+    tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha' | 'forma';
     x: number;
     y: number;
     largura: number;
@@ -15,6 +15,9 @@ interface ElementoCartao {
     fontSize?: number;
     cor?: string;
     backgroundColor?: string;
+    borderColor?: string;
+    borderWidth?: number;
+    borderStyle?: 'solid' | 'dashed' | 'dotted';
     fonte?: string;
     transparencia?: number;
     borderRadius?: number;
@@ -90,10 +93,10 @@ export default function InteractiveCanvas({
     const canvasRef = useRef<HTMLDivElement>(null);
 
     // Auto-focar o canvas sempre que a seleção muda e o foco está fora dele.
-    // Isso garante que setas do teclado e Ctrl+C/V funcionem logo após
-    // adicionar um elemento via botão externo (que retém o foco).
+    // Evita roubar o foco se o usuário estiver interagindo com um input/range/select do painel de propriedades.
     useEffect(() => {
-        if (elementosSelecionados.length > 0 && document.activeElement !== canvasRef.current) {
+        const isEditingInput = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+        if (elementosSelecionados.length > 0 && document.activeElement !== canvasRef.current && !isEditingInput) {
             canvasRef.current?.focus();
         }
     }, [elementosSelecionados]);
@@ -618,6 +621,22 @@ export default function InteractiveCanvas({
                             backgroundColor: elemento.cor || '#111',
                             borderRadius: `${elemento.borderRadius || 0}px`,
                             opacity: elemento.transparencia || 1
+                        }}
+                    />
+                );
+                break;
+
+            case 'forma':
+                conteudo = (
+                    <div
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            backgroundColor: elemento.backgroundColor || '#f3f4f6',
+                            border: `${elemento.borderWidth ?? 1}px ${elemento.borderStyle || 'solid'} ${elemento.borderColor || '#374151'}`,
+                            borderRadius: `${elemento.borderRadius || 0}px`,
+                            opacity: elemento.transparencia ?? 1,
+                            boxSizing: 'border-box',
                         }}
                     />
                 );
