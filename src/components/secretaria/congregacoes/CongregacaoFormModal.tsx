@@ -103,7 +103,7 @@ interface CongregacaoFormModalProps {
   fotoIgrejaUrlInput: string;
   setFotoIgrejaUrlInput: React.Dispatch<React.SetStateAction<string>>;
   setFotoIgrejaChange: React.Dispatch<React.SetStateAction<FotoIgrejaChange>>;
-  availableDivisoes3ForCurrentD2: Divisao3[];
+  availableDivisoes3ForCurrentD2: (Divisao3 | Divisao1)[];
   availableDivisoes2ForCurrentD1: Divisao2[];
   selectedD1IdsForD2: string[];
   setSelectedD1IdsForD2: React.Dispatch<React.SetStateAction<string[]>>;
@@ -610,7 +610,7 @@ export default function CongregacaoFormModal({
                         className="h-4 w-4"
                       />
                       <span className="text-gray-800 font-semibold">{cg.nome}</span>
-                      <span className="text-gray-500">{`${cg.cidade || '-'} / ${cg.uf || '-'}`}</span>
+                      <span className="text-gray-500">{`${(cg as any).cidade || (cg as any).municipio || '-'} / ${cg.uf || '-'}`}</span>
                     </label>
                   );
                 })}

@@ -367,7 +367,7 @@ export default function CongregacoesPage() {
                     municipio: (c.municipio as any) || '',
                     uf: ''
                   });
-                  setSelectedD1IdsForD2(divisoes3.filter(cg => cg.campo_id === c.id).map(cg => cg.id));
+                  setSelectedD1IdsForD2(divisoes1.filter((cg: any) => cg.campo_id === c.id).map(cg => cg.id));
                   setPastorResults([]);
                   setPastorStatus(c.pastor_member_id ? 'selected' : 'idle');
                   setPastorMsg(c.pastor_member_id ? 'Pastor selecionado.' : '');

@@ -832,7 +832,7 @@ export function useCongregacoes() {
         nome: u.nome,
         dirigente: u.dirigente || u.supervisor_nome || null,
         status_imovel: u.status_imovel || null,
-        campo_id: u.parentId || undefined,
+        campo_id: u.campo_id || u.parentId || undefined,
         supervisao_id: u.supervisao_id || undefined,
         is_active: u.isActive !== false,
         created_at: new Date().toISOString(),
@@ -848,10 +848,16 @@ export function useCongregacoes() {
     try {
       const orgService = await obterEstruturaOrganizacionalService(ministryIdParam, supabase);
       const div2 = orgService.getDivisao2();
-      setDivisoes2(div2.map((u) => ({
+      setDivisoes2(div2.map((u: any) => ({
         id: u.id,
+        ministry_id: ministryIdParam,
         nome: u.nome,
-        supervisao_id: u.parentId || undefined,
+        supervisao_id: u.parentId || u.supervisao_id || undefined,
+        municipio: u.municipio || null,
+        pastor_nome: u.pastor_nome || null,
+        pastor_member_id: u.pastor_member_id || null,
+        pastor_data_posse: u.pastor_data_posse || null,
+        is_sede: !!u.is_sede,
         is_active: u.isActive !== false,
       })) as any);
     } catch (error) {
@@ -1098,12 +1104,12 @@ export function useCongregacoes() {
 
       if (campoId) {
         const nowIso = new Date().toISOString();
-        const existing = divisoes3
-          .filter(cg => cg.campo_id === campoId)
+        const existing = divisoes1
+          .filter((cg: any) => cg.campo_id === campoId)
           .map(cg => cg.id);
         const availableIds = new Set(
-          divisoes3
-            .filter(cg => !cg.campo_id || cg.campo_id === campoId)
+          divisoes1
+            .filter((cg: any) => !cg.campo_id || cg.campo_id === campoId)
             .map(cg => cg.id)
         );
         const selected = selectedD1IdsForD2.filter(id => availableIds.has(id));
@@ -1765,7 +1771,7 @@ export function useCongregacoes() {
     d3Enabled ? { id: 'divisao3', label: `${nomeD3}s (3ª)`, icon: '3️⃣' } : null
   ].filter(Boolean) as { id: string; label: string; icon: string }[];
 
-  const availableDivisoes3ForCurrentD2 = divisoes3.filter(cg => !cg.campo_id || cg.campo_id === editingD2?.id);
+  const availableDivisoes3ForCurrentD2 = divisoes1.filter((cg: any) => !cg.campo_id || cg.campo_id === editingD2?.id);
   const availableDivisoes2ForCurrentD1 = divisoes2.filter(c => !c.supervisao_id || c.supervisao_id === editingD1?.id);
 
   return {

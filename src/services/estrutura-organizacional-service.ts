@@ -228,7 +228,7 @@ export async function carregarEstruturaOrganizacional(
   let divisao2: UnidadeOrganizacional[] = [];
   const { data: camposData, error: camposError } = await supabase
     .from('campos')
-    .select('id, nome, is_active, supervisao_id')
+    .select('id, nome, is_active, supervisao_id, municipio, pastor_nome, pastor_member_id, pastor_data_posse, is_sede')
     .eq('ministry_id', ministryId)
     .or('is_active.eq.true,is_active.is.null')
     .order('nome');
@@ -241,6 +241,12 @@ export async function carregarEstruturaOrganizacional(
       tabelaOrigem: 'campos',
       isActive: item.is_active !== false,
       parentId: item.supervisao_id || null,
+      supervisao_id: item.supervisao_id || null,
+      municipio: item.municipio || null,
+      pastor_nome: item.pastor_nome || null,
+      pastor_member_id: item.pastor_member_id || null,
+      pastor_data_posse: item.pastor_data_posse || null,
+      is_sede: !!item.is_sede,
     }));
   }
 

@@ -132,7 +132,7 @@ export default function CongregacoesTable({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-800 break-words">{cg.nome}</p>
-                      <p className="text-xs text-gray-500">Setor: {campo ? formatCampoLabel(campo) : (supervisao ? formatSupervisaoLabel(supervisao) : '-')}</p>
+                      <p className="text-xs text-gray-500">{d2Enabled ? nomeD2 : (d3Enabled ? nomeD3 : 'Vínculo')}: {campo ? formatCampoLabel(campo) : (supervisao ? formatSupervisaoLabel(supervisao) : '-')}</p>
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs font-bold flex-shrink-0 ${
                       cg.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -172,7 +172,9 @@ export default function CongregacoesTable({
             <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="bg-gray-200 text-gray-800">
-                  <th className="px-4 py-3 text-left font-semibold">SETOR</th>
+                  <th className="px-4 py-3 text-left font-semibold">
+                    {d2Enabled ? nomeD2.toUpperCase() : (d3Enabled ? nomeD3.toUpperCase() : 'VÍNCULO')}
+                  </th>
                   <th className="px-4 py-3 text-left font-semibold">NOME</th>
                   <th className="px-4 py-3 text-left font-semibold">DIRIGENTE</th>
                   <th className="px-4 py-3 text-left font-semibold">CONDIÇÃO</th>
@@ -252,13 +254,13 @@ export default function CongregacoesTable({
               const sup = d3Enabled && c.supervisao_id
                 ? divisoes1.find(s => s.id === c.supervisao_id) || null
                 : null;
-              const qtdCongregacoes = divisoes3.filter(cg => cg.campo_id === c.id).length;
+              const qtdCongregacoes = divisoes1.filter(cg => cg.campo_id === c.id).length;
               return (
                 <div key={c.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm border-l-4 border-blue-500">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-800 break-words">{c.nome}</p>
-                      <p className="text-xs text-gray-500">Supervisão: {sup ? formatSupervisaoLabel(sup) : '-'}</p>
+                      {d3Enabled && <p className="text-xs text-gray-500">{nomeD3}: {sup ? formatSupervisaoLabel(sup) : '-'}</p>}
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs font-bold flex-shrink-0 ${
                       c.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -268,7 +270,8 @@ export default function CongregacoesTable({
                   </div>
                   <div className="mt-2 space-y-1 text-xs text-gray-600 break-words">
                     <p><span className="font-semibold">Responsável:</span> {c.pastor_nome || '-'}</p>
-                    <p><span className="font-semibold">Congregações:</span> {qtdCongregacoes}</p>
+                    <p><span className="font-semibold">Município:</span> {c.municipio || '-'}</p>
+                    <p><span className="font-semibold">Qtd. {nomeD1}s:</span> {qtdCongregacoes}</p>
                     <p><span className="font-semibold">Sede:</span> {c.is_sede ? 'Sim' : 'Não'}</p>
                   </div>
                   <div className="mt-3 flex gap-2 flex-wrap">
@@ -297,7 +300,11 @@ export default function CongregacoesTable({
             <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">REGIONAL</th>
+                  {d3Enabled && (
+                    <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">
+                      {nomeD3.toUpperCase()}
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">NOME</th>
                   <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">PASTOR/SUPERVISOR</th>
                   <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">MUNICÍPIO</th>
@@ -308,7 +315,7 @@ export default function CongregacoesTable({
               <tbody>
                 {divisoes2.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
+                    <td colSpan={d3Enabled ? 6 : 5} className="px-4 py-6 text-center text-gray-500">
                       Nenhum {nomeD2} cadastrado
                     </td>
                   </tr>
@@ -317,10 +324,12 @@ export default function CongregacoesTable({
                     const sup = d3Enabled && c.supervisao_id
                       ? divisoes1.find(s => s.id === c.supervisao_id) || null
                       : null;
-                    const qtdCongregacoes = divisoes3.filter(cg => cg.campo_id === c.id).length;
+                    const qtdCongregacoes = divisoes1.filter(cg => cg.campo_id === c.id).length;
                     return (
                       <tr key={c.id} className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-700">{sup ? formatSupervisaoLabel(sup) : '-'}</td>
+                        {d3Enabled && (
+                          <td className="px-4 py-3 text-gray-700">{sup ? formatSupervisaoLabel(sup) : '-'}</td>
+                        )}
                         <td className="px-4 py-3 text-gray-700 font-semibold">{c.nome}</td>
                         <td className="px-4 py-3 text-gray-700">{c.pastor_nome || '-'}</td>
                         <td className="px-4 py-3 text-gray-700">{c.municipio || '-'}</td>
