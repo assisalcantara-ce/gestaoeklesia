@@ -318,6 +318,7 @@ export function useTesouraria() {
   const [filtroNomeDiz, setFiltroNomeDiz] = useState('');
   const [filtroStatusDiz, setFiltroStatusDiz] = useState<'' | 'pago' | 'pendente'>('');
   const [filtroCongDiz, setFiltroCongDiz] = useState('');
+  const [showAddDizimistaModal, setShowAddDizimistaModal] = useState(false);
 
   // Filtros
   const [filtroCong, setFiltroCong] = useState('');
@@ -456,19 +457,33 @@ export function useTesouraria() {
           setMinisterio(mData);
         }
 
-        const userRes = await authenticatedFetch('/api/v1/auth/me');
-        if (userRes.ok) {
-          const userData = await userRes.json();
-          const userRole = String(userData.role ?? '').toLowerCase().trim();
-          const cId = userData.congregacao_id ?? null;
-          const isFinLocal = userRole === 'financeiro_local' || userRole === 'tesouraria_local';
-          const isManagerOrAdmin = !userRole || ['super_admin', 'admin', 'administrador', 'tesoureiro_sede', 'tesoureiro_geral', 'financeiro'].includes(userRole);
+        // Busca perfil no ministry_users para determinar o escopo correto do usuário
+        const { data: mu } = await supabase
+          .from('ministry_users')
+          .select('role, permissions, congregacao_id')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        if (mu) {
+          const perms: string[] = Array.isArray(mu.permissions) ? mu.permissions : [];
+          const userRole = String(mu.role ?? '').toLowerCase().trim();
+          const cId = mu.congregacao_id ?? null;
+
+          const isTesoureiroGeral = perms.includes('TESOUREIRO_GERAL') || perms.includes('FINANCEIRO') || perms.includes('ADMINISTRADOR') || ['admin', 'super_admin', 'dono', 'manager'].includes(userRole);
+          const isFinLocal = !isTesoureiroGeral && (perms.includes('FINANCEIRO_LOCAL') || perms.includes('TESOURARIA_LOCAL') || !!cId);
 
           setScope({
             isFinanceiroLocal: isFinLocal,
-            congregacaoId: cId,
-            canWrite: isManagerOrAdmin || isFinLocal,
-            canDelete: isManagerOrAdmin,
+            congregacaoId: isFinLocal ? cId : null,
+            canWrite: true,
+            canDelete: isTesoureiroGeral,
+          });
+        } else {
+          setScope({
+            isFinanceiroLocal: false,
+            congregacaoId: null,
+            canWrite: true,
+            canDelete: true,
           });
         }
 
@@ -1252,6 +1267,9 @@ export function useTesouraria() {
     loadingWebhooks,
     webhookFiltroProcessado,
     setWebhookFiltroProcessado,
+    loadDizimistasData,
+    showAddDizimistaModal,
+    setShowAddDizimistaModal,
     // Gráficos
     dadosGrafico,
     periodoGrafico,

@@ -4,13 +4,14 @@ export const dynamic = 'force-dynamic';
 
 import PageLayout from '@/components/PageLayout';
 import NotificationModal from '@/components/NotificationModal';
-import { Plus, X, TrendingUp, Building2, Tag, Users, Lock, List, Printer, QrCode } from 'lucide-react';
+import { Plus, X, TrendingUp, Building2, Tag, Users, Lock, List, Printer, QrCode, UserPlus } from 'lucide-react';
 import TesourariaTable from '@/components/tesouraria/TesourariaTable';
 import TesourariaToolbar from '@/components/tesouraria/TesourariaToolbar';
 import FechamentoCaixaModal from '@/components/tesouraria/modals/FechamentoCaixaModal';
 import ContaBancariaModal from '@/components/tesouraria/modals/ContaBancariaModal';
 import CategoriaFinanceiraModal from '@/components/tesouraria/modals/CategoriaFinanceiraModal';
 import ConfirmDeleteModal from '@/components/tesouraria/modals/ConfirmDeleteModal';
+import AdicionarDizimistaModal from '@/components/tesouraria/modals/AdicionarDizimistaModal';
 import TesourariaCharts from '@/components/tesouraria/TesourariaCharts';
 import FechamentoCaixaTable from '@/components/tesouraria/FechamentoCaixaTable';
 import DizimistasTable from '@/components/tesouraria/DizimistasTable';
@@ -926,25 +927,33 @@ export default function TesourariaPage() {
                 </button>
 
                 {t.scope.canWrite && (
-                  <button
-                    onClick={() => {
-                      const catDiz = t.finCategorias.find((c) =>
-                        (c.tipo_movimento === 'entrada' || c.tipo_movimento === 'ambos') &&
-                        (c.nome.toLowerCase().includes('dízimo') || c.nome.toLowerCase().includes('dizimo'))
-                      );
-                      t.setAba('lancamentos');
-                      t.setShowForm(true);
-                      t.setForm((p) => ({
-                        ...p,
-                        tipo_movimento: 'entrada',
-                        tipo_recebimento: 'dizimo',
-                        categoria_id: catDiz?.id || p.categoria_id,
-                      }));
-                    }}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition h-[36px]"
-                  >
-                    <Plus className="h-4 w-4" /> Registrar Dízimo
-                  </button>
+                  <>
+                    <button
+                      onClick={() => t.setShowAddDizimistaModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-[#123b63] text-[#123b63] bg-[#123b63]/5 hover:bg-[#123b63]/10 rounded-lg text-sm font-semibold transition h-[36px]"
+                    >
+                      <UserPlus className="h-4 w-4" /> Adicionar Dizimista
+                    </button>
+                    <button
+                      onClick={() => {
+                        const catDiz = t.finCategorias.find((c) =>
+                          (c.tipo_movimento === 'entrada' || c.tipo_movimento === 'ambos') &&
+                          (c.nome.toLowerCase().includes('dízimo') || c.nome.toLowerCase().includes('dizimo'))
+                        );
+                        t.setAba('lancamentos');
+                        t.setShowForm(true);
+                        t.setForm((p) => ({
+                          ...p,
+                          tipo_movimento: 'entrada',
+                          tipo_recebimento: 'dizimo',
+                          categoria_id: catDiz?.id || p.categoria_id,
+                        }));
+                      }}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition h-[36px]"
+                    >
+                      <Plus className="h-4 w-4" /> Registrar Dízimo
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -1368,6 +1377,15 @@ export default function TesourariaPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal para Adicionar Dizimista */}
+      <AdicionarDizimistaModal
+        isOpen={t.showAddDizimistaModal}
+        onClose={() => t.setShowAddDizimistaModal(false)}
+        ministryId={t.ministryId}
+        onSuccess={t.loadDizimistasData}
+        showModal={t.showModal}
+      />
 
       {/* Regras CSS globais injetadas para gerenciar visualização no print */}
       <style jsx global>{`
