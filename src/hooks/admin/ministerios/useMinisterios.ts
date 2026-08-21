@@ -6,16 +6,12 @@ import { authenticatedFetch } from '@/lib/api-client'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 
 interface UseMinisteriosOptions {
-  currentPage: number
-  itemsPerPage: number
   isAuthenticated: boolean
   adminUser: any
   setError: (msg: string) => void
 }
 
 export function useMinisterios({
-  currentPage,
-  itemsPerPage,
   isAuthenticated,
   adminUser,
   setError,
@@ -30,7 +26,7 @@ export function useMinisterios({
     const timeoutId = setTimeout(() => controller.abort(), 15000)
     try {
       setLoading(true)
-      const response = await authenticatedFetch(`/api/v1/admin/ministries?page=${currentPage}&limit=${itemsPerPage}`, {
+      const response = await authenticatedFetch(`/api/v1/admin/ministries?limit=1000`, {
         signal: controller.signal,
       })
       if (!response.ok) {
@@ -64,7 +60,7 @@ export function useMinisterios({
     if (isAuthenticated && adminUser) {
       fetchMinisterios()
     }
-  }, [isAuthenticated, adminUser, currentPage])
+  }, [isAuthenticated, adminUser])
 
   return {
     ministerios,

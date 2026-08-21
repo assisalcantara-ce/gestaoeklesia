@@ -77,8 +77,6 @@ export default function MinisteriosPage() {
     loading,
     fetchMinisterios,
   } = useMinisterios({
-    currentPage,
-    itemsPerPage,
     isAuthenticated,
     adminUser,
     setError,
@@ -390,6 +388,17 @@ export default function MinisteriosPage() {
     })
   }, [ministerios, searchTerm, statusFilter, planFilter, trialFilter])
 
+  // Resetar página quando os filtros mudarem
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter, planFilter, trialFilter])
+
+  // Paginação no client-side
+  const paginatedMinisterios = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage
+    return filteredMinisterios.slice(start, start + itemsPerPage)
+  }, [filteredMinisterios, currentPage, itemsPerPage])
+
   return (
     <div className="flex h-screen bg-gray-900">
       <AdminSidebar />
@@ -588,7 +597,7 @@ export default function MinisteriosPage() {
             {/* Lista de ministérios */}
             <MinisteriosTable
               loading={loading}
-              ministerios={filteredMinisterios}
+              ministerios={paginatedMinisterios}
               totalItems={filteredMinisterios.length}
               currentPage={currentPage}
               itemsPerPage={itemsPerPage}
