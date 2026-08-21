@@ -1098,11 +1098,11 @@ export default function TesourariaPage() {
               )}
             </div>
 
-            {/* Listagem de Categorias */}
+            {/* Listagem de Categorias de Plano de Contas */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {t.finCategorias.length === 0 ? (
                 <div className="col-span-full bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-400 text-sm">
-                  Nenhuma categoria cadastrada.
+                  Nenhuma categoria personalizada cadastrada.
                 </div>
               ) : (
                 t.finCategorias.map((cat) => (
@@ -1132,6 +1132,36 @@ export default function TesourariaPage() {
                   </div>
                 ))
               )}
+            </div>
+
+            {/* Cabeçalho Categorias de Despesas Padrão */}
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 mt-6">
+              <div>
+                <h3 className="text-base font-bold text-[#123b63]">Categorias de Despesa (Saídas Padrão)</h3>
+                <p className="text-sm text-gray-500">Tipos de despesas pré-configurados no sistema para lançamentos de saída</p>
+              </div>
+            </div>
+
+            {/* Listagem de Categorias de Despesa */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {t.TIPOS_SAIDA.map((ts) => (
+                <div key={ts.value} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold text-xs">
+                      ↓
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-800 text-sm">{ts.label}</h4>
+                      <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800">
+                        Saída
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-gray-400 font-medium bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                    Sistema
+                  </span>
+                </div>
+              ))}
             </div>
 
             <CategoriaFinanceiraModal
