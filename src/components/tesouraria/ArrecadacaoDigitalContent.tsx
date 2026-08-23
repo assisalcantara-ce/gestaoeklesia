@@ -95,6 +95,7 @@ export default function ArrecadacaoDigitalContent({
   // Filtros de busca e status
   const [statusFiltro, setStatusFiltro] = useState<'ativo' | 'inativo'>('ativo');
   const [buscaTexto, setBuscaTexto] = useState('');
+  const [buscaExtrato, setBuscaExtrato] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('');
   const [congFiltro, setCongFiltro] = useState('');
 
