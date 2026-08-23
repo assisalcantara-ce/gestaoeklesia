@@ -92,11 +92,17 @@ export default function ArrecadacaoDigitalContent({
   });
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
-  // Filtros
-  const [filtroStatus, setFiltroStatus] = useState<'' | 'ativo' | 'inativo'>('');
-  const [filtroTipo, setFiltroTipo] = useState('');
-  const [filtroCong, setFiltroCong] = useState('');
-  const [buscaExtrato, setBuscaExtrato] = useState('');
+  // Filtros de busca e status
+  const [statusFiltro, setStatusFiltro] = useState<'ativo' | 'inativo'>('ativo');
+  const [buscaTexto, setBuscaTexto] = useState('');
+  const [tipoFiltro, setTipoFiltro] = useState('');
+  const [congFiltro, setCongFiltro] = useState('');
+
+  // Estado de Paginação Backend
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   // 1. Carregar status do gateway ASAAS
   useEffect(() => {
@@ -114,24 +120,60 @@ export default function ArrecadacaoDigitalContent({
       .catch(() => {});
   }, []);
 
-  // 2. Carregar Destinos via GET /api/v1/ministry/payment-destinations
+  // 2. Carregar Destinos via GET /api/v1/ministry/payment-destinations (Paginado no servidor)
   const loadDestinos = useCallback(async () => {
     try {
       setLoadingDestinos(true);
-      const res = await authenticatedFetch('/api/v1/ministry/payment-destinations');
+
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('pageSize', String(pageSize));
+      params.set('is_ativo', statusFiltro === 'ativo' ? 'true' : 'false');
+
+      if (buscaTexto.trim()) params.set('q', buscaTexto.trim());
+      if (tipoFiltro) params.set('tipo', tipoFiltro);
+      if (congFiltro) params.set('congregacao_id', congFiltro);
+
+      const res = await authenticatedFetch(`/api/v1/ministry/payment-destinations?${params.toString()}`);
       if (!res.ok) throw new Error('Erro ao carregar destinos.');
       const json = await res.json();
+
       setDestinos(json.data ?? []);
+      if (json.meta) {
+        setTotalCount(json.meta.totalCount ?? 0);
+        setTotalPages(json.meta.totalPages ?? 1);
+      }
     } catch (err: any) {
       showModal('Erro', err.message || 'Falha ao buscar destinos de arrecadação.', 'error');
     } finally {
       setLoadingDestinos(false);
     }
-  }, [showModal]);
+  }, [page, pageSize, statusFiltro, buscaTexto, tipoFiltro, congFiltro, showModal]);
 
   useEffect(() => {
     loadDestinos();
   }, [loadDestinos, destinosUpdatedKey]);
+
+  // Resetar para página 1 ao alterar filtros
+  const handleStatusFiltroChange = (newStatus: 'ativo' | 'inativo') => {
+    setStatusFiltro(newStatus);
+    setPage(1);
+  };
+
+  const handleBuscaChange = (val: string) => {
+    setBuscaTexto(val);
+    setPage(1);
+  };
+
+  const handleTipoFiltroChange = (val: string) => {
+    setTipoFiltro(val);
+    setPage(1);
+  };
+
+  const handleCongFiltroChange = (val: string) => {
+    setCongFiltro(val);
+    setPage(1);
+  };
 
   // 3. Carregar Cobranças / Extrato PIX via Supabase Client ou API do Supabase
   const loadCobrancas = useCallback(async () => {
@@ -154,7 +196,6 @@ export default function ArrecadacaoDigitalContent({
       if (error) throw error;
       setCobrancas((data as any) ?? []);
     } catch {
-      // Ignora erro se a tabela ainda estiver vazia
       setCobrancas([]);
     } finally {
       setLoadingCobrancas(false);
@@ -167,19 +208,41 @@ export default function ArrecadacaoDigitalContent({
     }
   }, [subAba, loadCobrancas]);
 
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+
   // Alternar Status de Ativação do Destino
-  const handleToggleAtivo = async (id: string, currentAtivo: boolean) => {
+  const handleToggleAtivo = async (id: string, currentAtivo: boolean, hasStaticPix: boolean) => {
+    if (deactivatingId) return; // Evita duplo clique
+
+    if (currentAtivo) {
+      const confirmMsg = hasStaticPix
+        ? 'Este destino possui um QR Code PIX ativo. Ao desativá-lo, o QR Code impresso anteriormente deixará de aceitar novos pagamentos. Deseja continuar?'
+        : 'Deseja realmente desativar este destino de arrecadação?';
+
+      if (!window.confirm(confirmMsg)) {
+        return;
+      }
+    }
+
     try {
+      setDeactivatingId(id);
       const res = await authenticatedFetch(`/api/v1/ministry/payment-destinations/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_ativo: !currentAtivo }),
       });
-      if (!res.ok) throw new Error('Falha ao alterar status.');
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || 'Falha ao alterar status do destino.');
+      }
+
       showModal('Sucesso', `Destino ${!currentAtivo ? 'ativado' : 'desativado'} com sucesso!`);
       loadDestinos();
     } catch (err: any) {
-      showModal('Erro', err.message, 'error');
+      showModal('Erro ao desativar', err.message || 'O QR Code não pôde ser desativado no ASAAS.', 'error');
+    } finally {
+      setDeactivatingId(null);
     }
   };
 
@@ -197,15 +260,6 @@ export default function ArrecadacaoDigitalContent({
   const totalArrecadadoGlobal = destinos.reduce((acc, d) => acc + (d.total_arrecadado ?? 0), 0);
   const destinosAtivosCount = destinos.filter((d) => d.is_ativo).length;
   const transacoesPagasCount = cobrancas.filter((c) => c.status === 'pago').length;
-
-  // Filtragem de Destinos
-  const destinosFiltrados = destinos.filter((d) => {
-    if (filtroStatus === 'ativo' && !d.is_ativo) return false;
-    if (filtroStatus === 'inativo' && d.is_ativo) return false;
-    if (filtroTipo && d.tipo_recebimento !== filtroTipo) return false;
-    if (filtroCong && d.congregacao_id !== filtroCong) return false;
-    return true;
-  });
 
   // Filtragem de Extrato
   const cobrancasFiltradas = cobrancas.filter((c) => {
@@ -232,6 +286,10 @@ export default function ArrecadacaoDigitalContent({
     expirado: { label: 'Expirado', cls: 'bg-rose-100 text-rose-800 border-rose-200', icon: AlertCircle },
     estornado: { label: 'Estornado', cls: 'bg-[#123b63]/10 text-[#123b63] border-[#123b63]/20', icon: AlertCircle },
   };
+
+  // Faixa exibida na paginação
+  const startItem = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endItem = Math.min(page * pageSize, totalCount);
 
   return (
     <div className="space-y-6">
@@ -282,8 +340,8 @@ export default function ArrecadacaoDigitalContent({
             <QrCode className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Destinos / QR Codes Ativos</p>
-            <h3 className="text-xl font-extrabold text-slate-800 mt-0.5">{destinosAtivosCount} ativo(s)</h3>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Destinos Exibidos</p>
+            <h3 className="text-xl font-extrabold text-slate-800 mt-0.5">{destinosAtivosCount} item(ns)</h3>
           </div>
         </div>
 
@@ -308,7 +366,7 @@ export default function ArrecadacaoDigitalContent({
               : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
-          Destinos & QR Codes ({destinos.length})
+          Destinos & QR Codes ({totalCount})
         </button>
         <button
           onClick={() => setSubAba('extrato')}
@@ -322,149 +380,278 @@ export default function ArrecadacaoDigitalContent({
         </button>
       </div>
 
-      {/* ── 3. VISÃO DESTINOS & QR CODES ── */}
+      {/* ── 3. VISÃO TABELA DE DESTINOS COM PAGINAÇÃO ── */}
       {subAba === 'destinos' && (
         <div className="space-y-4">
-          {/* Barra de Filtros de Destinos */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap gap-3 items-center text-xs">
-            <Filter className="h-4 w-4 text-slate-400" />
-            <select
-              value={filtroStatus}
-              onChange={(e) => setFiltroStatus(e.target.value as any)}
-              className="border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-semibold"
-            >
-              <option value="">Todos os Status</option>
-              <option value="ativo">Apenas Ativos</option>
-              <option value="inativo">Apenas Inativos</option>
-            </select>
-
-            <select
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
-              className="border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-semibold"
-            >
-              <option value="">Todos os Tipos</option>
-              <option value="dizimo">Dízimo</option>
-              <option value="oferta">Oferta</option>
-              <option value="missoes">Missões</option>
-              <option value="doacao">Doação</option>
-              <option value="campanha_local">Campanha</option>
-              <option value="evento_local">Evento</option>
-            </select>
-
-            <select
-              value={filtroCong}
-              onChange={(e) => setFiltroCong(e.target.value)}
-              className="border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-semibold"
-            >
-              <option value="">Todas as Congregações</option>
-              {congregacoes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Grid de Destinos */}
-          {loadingDestinos ? (
-            <div className="p-12 bg-white rounded-2xl border border-slate-200 text-center text-slate-400 text-xs">
-              Carregando destinos de arrecadação...
-            </div>
-          ) : destinosFiltrados.length === 0 ? (
-            <div className="p-12 bg-white rounded-2xl border border-slate-200 text-center space-y-3">
-              <QrCode className="h-12 w-12 text-slate-300 mx-auto" />
-              <p className="text-sm font-bold text-slate-700">Nenhum destino de arrecadação cadastrado</p>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Crie links e QR Codes dinâmicos para dízimos, ofertas e eventos para receber pagamentos via PIX diretamente no caixa.
-              </p>
+          {/* Barra de Busca e Filtros de Destinos */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between text-xs">
+            {/* Abas/Toggle de Status: Ativos x Inativos */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
               <button
-                onClick={onOpenNovoDestino}
-                className="mt-2 px-4 py-2 bg-[#123b63] text-white text-xs font-bold rounded-xl"
+                onClick={() => handleStatusFiltroChange('ativo')}
+                className={`px-4 py-1.5 rounded-lg font-bold transition text-xs ${
+                  statusFiltro === 'ativo'
+                    ? 'bg-white text-emerald-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                + Criar Primeiro Destino
+                Ativos
+              </button>
+              <button
+                onClick={() => handleStatusFiltroChange('inativo')}
+                className={`px-4 py-1.5 rounded-lg font-bold transition text-xs ${
+                  statusFiltro === 'inativo'
+                    ? 'bg-white text-slate-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Inativos
               </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {destinosFiltrados.map((d) => {
-                const isCopied = copiedToken === d.public_token;
 
-                return (
-                  <div
-                    key={d.id}
-                    className={`bg-white rounded-2xl p-5 border transition flex flex-col justify-between space-y-4 ${
-                      d.is_ativo ? 'border-slate-200 shadow-sm hover:shadow-md' : 'border-slate-200 bg-slate-50/70 opacity-75'
-                    }`}
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="px-2.5 py-0.5 bg-[#123b63]/10 text-[#123b63] text-[10px] font-bold rounded-full uppercase tracking-wider">
-                          {TIPO_LABELS[d.tipo_recebimento] ?? d.tipo_recebimento}
-                        </span>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            d.is_ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
-                          }`}
-                        >
-                          {d.is_ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                      </div>
-
-                      <h3 className="text-base font-extrabold text-slate-800 leading-snug">{d.label}</h3>
-                      <p className="text-xs text-slate-500 font-medium">
-                        📍 {d.congregacoes?.nome ?? 'Sede / Todas as Congregações'}
-                      </p>
-
-                      {d.descricao && <p className="text-xs text-slate-600 line-clamp-2">{d.descricao}</p>}
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-100 space-y-3">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500">Total Arrecadado:</span>
-                        <span className="font-bold text-slate-800">{fmtBRL(d.total_arrecadado ?? 0)}</span>
-                      </div>
-
-                      {/* Ações do Card */}
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        <button
-                          onClick={() => onOpenQrModal(d)}
-                          className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition"
-                        >
-                          <QrCode className="h-3.5 w-3.5 text-[#123b63]" /> Ver QR
-                        </button>
-                        <button
-                          onClick={() => handleCopyLink(d.public_token)}
-                          className={`px-3 py-2 text-xs font-bold rounded-xl flex items-center gap-1 transition ${
-                            isCopied ? 'bg-emerald-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-white'
-                          }`}
-                          title="Copiar link público de doação"
-                        >
-                          {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        </button>
-                        <button
-                          onClick={() => onOpenEditDestino(d.id)}
-                          className="p-2 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl transition"
-                          title="Editar destino"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleToggleAtivo(d.id, d.is_ativo)}
-                          className={`p-2 border rounded-xl transition ${
-                            d.is_ativo ? 'border-amber-200 text-amber-700 hover:bg-amber-50' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
-                          }`}
-                          title={d.is_ativo ? 'Desativar destino' : 'Ativar destino'}
-                        >
-                          {d.is_ativo ? <Trash2 className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            {/* Input de Busca Textual */}
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex-1 max-w-md">
+              <Search className="h-4 w-4 text-slate-400 shrink-0" />
+              <input
+                type="text"
+                value={buscaTexto}
+                onChange={(e) => handleBuscaChange(e.target.value)}
+                placeholder="Buscar destino por nome ou congregação..."
+                className="w-full text-xs outline-none bg-transparent text-slate-800 placeholder-slate-400 font-medium"
+              />
             </div>
-          )}
+
+            {/* Selects de Filtros Adicionais */}
+            <div className="flex items-center gap-2 shrink-0">
+              <Filter className="h-4 w-4 text-slate-400 hidden sm:block" />
+              <select
+                value={tipoFiltro}
+                onChange={(e) => handleTipoFiltroChange(e.target.value)}
+                className="border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 font-semibold outline-none"
+              >
+                <option value="">Todos os Tipos</option>
+                <option value="dizimo">Dízimo</option>
+                <option value="oferta">Oferta</option>
+                <option value="missoes">Missões</option>
+                <option value="doacao">Doação</option>
+                <option value="campanha_local">Campanha</option>
+                <option value="evento_local">Evento</option>
+              </select>
+
+              <select
+                value={congFiltro}
+                onChange={(e) => handleCongFiltroChange(e.target.value)}
+                className="border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 font-semibold outline-none"
+              >
+                <option value="">Todas as Congregações</option>
+                {congregacoes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Tabela Operacional de Destinos */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            {loadingDestinos ? (
+              <div className="p-12 text-center text-xs text-slate-400">
+                Carregando destinos de arrecadação...
+              </div>
+            ) : destinos.length === 0 ? (
+              <div className="p-12 text-center space-y-3">
+                <QrCode className="h-12 w-12 text-slate-300 mx-auto" />
+                <p className="text-sm font-bold text-slate-700">
+                  {buscaTexto
+                    ? 'Nenhum destino encontrado para a busca informada'
+                    : statusFiltro === 'ativo'
+                    ? 'Nenhum destino ativo cadastrado'
+                    : 'Nenhum destino inativo encontrado'}
+                </p>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  {buscaTexto
+                    ? 'Tente utilizar termos diferentes ou limpar o campo de pesquisa.'
+                    : 'Crie links e QR Codes dinâmicos para dízimos, ofertas e eventos.'}
+                </p>
+                {statusFiltro === 'ativo' && !buscaTexto && (
+                  <button
+                    onClick={onOpenNovoDestino}
+                    className="mt-2 px-4 py-2 bg-[#123b63] text-white text-xs font-bold rounded-xl"
+                  >
+                    + Criar Primeiro Destino
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
+                      <th className="py-3.5 px-4">Destino / Finalidade</th>
+                      <th className="py-3.5 px-4">Congregação</th>
+                      <th className="py-3.5 px-4">Tipo</th>
+                      <th className="py-3.5 px-4 text-right">Total Arrecadado</th>
+                      <th className="py-3.5 px-4 text-center">QR Pix</th>
+                      <th className="py-3.5 px-4 text-center">Status</th>
+                      <th className="py-3.5 px-4 text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {destinos.map((d) => {
+                      const isCopied = copiedToken === d.public_token;
+                      const hasStaticPix = Boolean(d.pix_payload);
+
+                      return (
+                        <tr
+                          key={d.id}
+                          className={`hover:bg-slate-50/80 transition ${
+                            !d.is_ativo ? 'bg-slate-50/50 text-slate-500' : ''
+                          }`}
+                        >
+                          {/* Nome/Label do Destino */}
+                          <td className="py-3.5 px-4">
+                            <p className="font-extrabold text-slate-800 text-xs">{d.label}</p>
+                            {d.descricao && (
+                              <p className="text-[11px] text-slate-400 line-clamp-1 max-w-xs">{d.descricao}</p>
+                            )}
+                          </td>
+
+                          {/* Congregação */}
+                          <td className="py-3.5 px-4 text-slate-700 font-medium">
+                            📍 {d.congregacoes?.nome ?? 'Sede / Todas as Congregações'}
+                          </td>
+
+                          {/* Tipo de Recebimento */}
+                          <td className="py-3.5 px-4">
+                            <span className="inline-block px-2.5 py-0.5 bg-[#123b63]/10 text-[#123b63] text-[10px] font-bold rounded-full uppercase tracking-wider">
+                              {TIPO_LABELS[d.tipo_recebimento] ?? d.tipo_recebimento}
+                            </span>
+                          </td>
+
+                          {/* Total Arrecadado */}
+                          <td className="py-3.5 px-4 text-right font-extrabold text-slate-800">
+                            {fmtBRL(d.total_arrecadado ?? 0)}
+                          </td>
+
+                          {/* QR Pix Indicator */}
+                          <td className="py-3.5 px-4 text-center">
+                            {hasStaticPix ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md">
+                                <QrCode className="h-3 w-3" /> Pix Estático
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md">
+                                Web Link
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Status */}
+                          <td className="py-3.5 px-4 text-center">
+                            <span
+                              className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                                d.is_ativo
+                                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                  : 'bg-slate-200 text-slate-600 border border-slate-300'
+                              }`}
+                            >
+                              {d.is_ativo ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </td>
+
+                          {/* Ações Operacionais */}
+                          <td className="py-3.5 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => onOpenQrModal(d)}
+                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-bold rounded-lg flex items-center gap-1 transition"
+                                title="Visualizar/Imprimir QR Code"
+                              >
+                                <QrCode className="h-3.5 w-3.5 text-[#123b63]" /> Ver QR
+                              </button>
+
+                              <button
+                                onClick={() => handleCopyLink(d.public_token)}
+                                className={`p-1.5 rounded-lg text-xs font-bold transition ${
+                                  isCopied ? 'bg-emerald-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-white'
+                                }`}
+                                title="Copiar link público"
+                              >
+                                {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                              </button>
+
+                              <button
+                                onClick={() => onOpenEditDestino(d.id)}
+                                className="p-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg transition"
+                                title="Editar destino"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </button>
+
+                              {d.is_ativo ? (
+                                <button
+                                  disabled={deactivatingId === d.id}
+                                  onClick={() => handleToggleAtivo(d.id, d.is_ativo, hasStaticPix)}
+                                  className="p-1.5 border border-amber-200 text-amber-700 hover:bg-amber-50 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Desativar destino"
+                                >
+                                  {deactivatingId === d.id ? (
+                                    <Clock className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  )}
+                                </button>
+                              ) : (
+                                <span
+                                  className="p-1.5 border border-slate-200 text-slate-400 rounded-lg cursor-not-allowed opacity-60"
+                                  title="Reativação não suportada no momento"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Rodapé da Tabela com Controles de Paginação */}
+            {totalCount > 0 && (
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+                <div>
+                  Exibindo <span className="font-bold text-slate-800">{startItem}–{endItem}</span> de{' '}
+                  <span className="font-bold text-slate-800">{totalCount}</span> destinos
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={page <= 1 || loadingDestinos}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    Anterior
+                  </button>
+
+                  <span className="font-bold text-slate-700 px-2">
+                    Página {page} de {totalPages}
+                  </span>
+
+                  <button
+                    disabled={page >= totalPages || loadingDestinos}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

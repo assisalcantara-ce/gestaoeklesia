@@ -199,51 +199,213 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
         </div>
       </div>
 
-      {/* Cartaz Exclusivo de Impressão A4 */}
-      <div className="print-only hidden p-12 bg-white text-slate-900 text-center space-y-8 max-w-2xl mx-auto border-4 border-[#123b63] rounded-3xl">
-        <div className="space-y-2 border-b-2 border-slate-200 pb-6">
-          <p className="text-sm font-bold uppercase tracking-widest text-[#123b63]">
-            {destino.congregacoes?.nome ?? 'Igreja Registrada'}
-          </p>
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900">
-            {destino.label}
-          </h1>
-          <span className="inline-block px-4 py-1 bg-slate-100 text-slate-800 text-sm font-bold rounded-full uppercase tracking-wider">
-            Contribua via PIX — {TIPO_LABELS[destino.tipo_recebimento] ?? destino.tipo_recebimento}
-          </span>
-        </div>
-
-        <div className="py-4 flex flex-col items-center justify-center space-y-4">
-          <div className="p-4 bg-white border-4 border-slate-900 rounded-3xl shadow-lg inline-block">
-            <QRCodeSVG
-              value={qrCodeValue}
-              size={260}
-              level="H"
-              includeMargin={true}
-            />
+      {/* Cartaz Exclusivo de Impressão A4 Profissional */}
+      <div className="destino-print-only hidden">
+        <div className="a4-poster">
+          {/* Cabeçalho / Instituição e Congregação */}
+          <div className="poster-header">
+            <p className="poster-institution">GESTÃO EKLÉSIA</p>
+            <p className="poster-[#123b63] poster-congregation">
+              📍 {destino.congregacoes?.nome ?? 'Sede / Todas as Congregações'}
+            </p>
+            <h1 className="poster-destination-title">{destino.label}</h1>
+            <div className="poster-tag">
+              CONTRIBUA VIA PIX — {TIPO_LABELS[destino.tipo_recebimento] ?? destino.tipo_recebimento}
+            </div>
           </div>
 
-          <div className="space-y-1">
-            <p className="text-xl font-extrabold text-[#123b63]">
-              {hasStaticPix ? '📱 ABRA O APP DO SEU BANCO E LEIA O QR CODE' : '📷 APONTE A CÂMERA DO SEU CELULAR'}
-            </p>
-            <p className="text-sm text-slate-600 font-semibold">
-              {hasStaticPix
-                ? 'Escolha pagar via PIX no seu banco, escaneie o código e confirme o valor desejado.'
-                : 'Acesse a página de contribuição para digitar o valor e pagar via PIX.'}
+          {/* Área Central: QR Code Estático Grande */}
+          <div className="poster-body">
+            <div className="poster-qr-frame">
+              <QRCodeSVG
+                value={qrCodeValue}
+                size={340}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+
+            {destino.valor_fixo && (
+              <div className="poster-valor-sugerido">
+                Valor Sugerido: {fmtBRL(Number(destino.valor_fixo))}
+              </div>
+            )}
+
+            <div className="poster-instructions">
+              <p className="poster-main-action">
+                {hasStaticPix
+                  ? 'ABRA O APP DO SEU BANCO E LEIA O QR CODE'
+                  : '📷 APONTE A CÂMERA DO SEU CELULAR'}
+              </p>
+              <p className="poster-sub-action">
+                {hasStaticPix
+                  ? 'Escolha pagar via PIX no seu banco, escaneie o código acima e confirme o valor desejado.'
+                  : 'Acesse a página de contribuição para digitar o valor e pagar via PIX.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Área Secundária: Pix Copia e Cola / Rodapé */}
+          <div className="poster-footer">
+            {hasStaticPix && destino.pix_payload && (
+              <div className="poster-copia-cola-box">
+                <span className="poster-copia-cola-label">PIX Copia e Cola:</span>
+                <span className="poster-copia-cola-code">{destino.pix_payload}</span>
+              </div>
+            )}
+            <p className="poster-[#123b63] poster-web-url">
+              {publicUrl}
             </p>
           </div>
-        </div>
-
-        <div className="border-t-2 border-slate-200 pt-6 space-y-2">
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
-            Ou acesse diretamente pelo endereço web:
-          </p>
-          <p className="text-base font-mono font-bold text-[#123b63] bg-slate-50 py-2 px-4 rounded-xl border border-slate-200 inline-block">
-            {publicUrl}
-          </p>
         </div>
       </div>
+
+      {/* Regras CSS Específicas de Impressão para o Cartaz */}
+      <style jsx global>{`
+        @media print {
+          /* Garante que o cartaz do destino tenha prioridade total se aberto */
+          body * {
+            visibility: hidden !important;
+          }
+          .destino-print-only, .destino-print-only * {
+            visibility: visible !important;
+          }
+          .destino-print-only {
+            display: flex !important;
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            min-height: 100vh;
+            background: #ffffff !important;
+            padding: 20px;
+          }
+          .a4-poster {
+            width: 100%;
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 40px 32px;
+            border: 4px solid #123b63;
+            border-radius: 28px;
+            background: #ffffff;
+            text-align: center;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+          }
+          .poster-header {
+            margin-bottom: 24px;
+            width: 100%;
+          }
+          .poster-institution {
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            color: #123b63;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+          }
+          .poster-congregation {
+            font-size: 16px;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 12px;
+          }
+          .poster-destination-title {
+            font-size: 36px;
+            font-weight: 900;
+            color: #0f172a;
+            line-height: 1.1;
+            margin-bottom: 14px;
+          }
+          .poster-tag {
+            display: inline-block;
+            padding: 6px 18px;
+            background: #f1f5f9;
+            color: #0f172a;
+            font-size: 13px;
+            font-weight: 800;
+            border-radius: 9999px;
+            letter-spacing: 0.05em;
+          }
+          .poster-body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 24px;
+            width: 100%;
+          }
+          .poster-qr-frame {
+            padding: 20px;
+            background: #ffffff;
+            border: 4px solid #0f172a;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+          }
+          .poster-valor-sugerido {
+            font-size: 16px;
+            font-weight: 800;
+            color: #047857;
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            padding: 6px 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+          }
+          .poster-instructions {
+            max-width: 500px;
+          }
+          .poster-main-action {
+            font-size: 18px;
+            font-weight: 900;
+            color: #123b63;
+            margin-bottom: 6px;
+            letter-spacing: 0.02em;
+          }
+          .poster-sub-action {
+            font-size: 13px;
+            font-weight: 600;
+            color: #64748b;
+            line-height: 1.4;
+          }
+          .poster-footer {
+            border-top: 2px border #e2e8f0;
+            padding-top: 20px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+          }
+          .poster-copia-cola-box {
+            background: #f8fafc;
+            border: 1px border #cbd5e1;
+            border-radius: 12px;
+            padding: 8px 14px;
+            max-width: 90%;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 10px;
+            color: #334155;
+          }
+          .poster-copia-cola-label {
+            font-weight: 800;
+            color: #0f172a;
+            margin-right: 6px;
+          }
+          .poster-web-url {
+            font-size: 12px;
+            font-weight: 700;
+            font-family: monospace;
+            color: #123b63;
+          }
+        }
+      `}</style>
     </>
   );
 }

@@ -1,21 +1,68 @@
-/**
- * GET  /api/v1/ministry/payment-destinations/[id]
- * PUT  /api/v1/ministry/payment-destinations/[id]
- * DELETE /api/v1/ministry/payment-destinations/[id]
- *
- * Permissões:
- *   GET:    administrador | financeiro | financeiro_local
- *   PUT:    administrador | financeiro
- *   DELETE: administrador  (soft-delete via is_ativo = false)
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
 import { isArrecadacaoDigitalAllowedForTenant } from '@/lib/plan-permissions';
+import { decryptCredentials } from '@/lib/ministry-credentials';
+import { deleteAsaasStaticPixQrCode } from '@/lib/asaas-eventos';
 
 export const dynamic = 'force-dynamic';
 
 type Ctx = { params: Promise<{ id: string }> };
+
+// Função auxiliar para remover QR Code estático do ASAAS antes de desativar
+async function removeAsaasStaticQrCodeIfPresent(
+  admin: any,
+  ministryId: string,
+  destinationId: string
+): Promise<{ success: boolean; error?: string }> {
+  // 1. Busca o destino para verificar se tem pix_qr_code_id
+  const { data: dest } = await admin
+    .from('fin_payment_destinations')
+    .select('id, pix_qr_code_id, gateway_id, is_ativo')
+    .eq('id', destinationId)
+    .eq('ministry_id', ministryId)
+    .maybeSingle();
+
+  if (!dest) {
+    return { success: false, error: 'Destino não encontrado.' };
+  }
+
+  // Se o destino não possui pix_qr_code_id (legado), não precisa chamar ASAAS
+  if (!dest.pix_qr_code_id) {
+    return { success: true };
+  }
+
+  // 2. Busca o gateway ASAAS do tenant para obter as credenciais
+  const { data: gw } = await admin
+    .from('ministry_payment_gateways')
+    .select('id, encrypted_credentials')
+    .eq('id', dest.gateway_id || '')
+    .eq('ministry_id', ministryId)
+    .eq('gateway', 'asaas')
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (!gw?.encrypted_credentials) {
+    return {
+      success: false,
+      error: 'Gateway ASAAS do tenant não encontrado ou inativo. O QR Code não pôde ser desativado.',
+    };
+  }
+
+  // 3. Descriptografa credenciais e executa o DELETE no ASAAS
+  try {
+    const creds = decryptCredentials(gw.encrypted_credentials);
+    const apiKey = creds.apiKey ?? creds.api_key ?? '';
+    if (!apiKey) throw new Error('API Key ausente nas credenciais.');
+
+    await deleteAsaasStaticPixQrCode(apiKey, dest.pix_qr_code_id);
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: `Não foi possível desativar o QR Code no ASAAS: ${err.message || 'Erro de comunicação'}.`,
+    };
+  }
+}
 
 // ─── GET ──────────────────────────────────────────────────────────────────────
 export async function GET(request: NextRequest, context: Ctx) {
@@ -101,6 +148,17 @@ export async function PUT(request: NextRequest, context: Ctx) {
     return NextResponse.json({ error: 'Tipo de recebimento inválido.' }, { status: 400 });
   }
 
+  // Se está solicitando desativação (is_ativo === false), tentar remover o QR Code no ASAAS primeiro
+  if ('is_ativo' in body && body.is_ativo === false) {
+    const removalResult = await removeAsaasStaticQrCodeIfPresent(ctx.admin, ctx.ministryId, id);
+    if (!removalResult.success) {
+      return NextResponse.json(
+        { error: removalResult.error || 'Falha ao desativar QR Code no ASAAS.' },
+        { status: 502 }
+      );
+    }
+  }
+
   const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
   for (const field of ALLOWED) {
     if (field in body) {
@@ -143,8 +201,17 @@ export async function DELETE(request: NextRequest, context: Ctx) {
   const canDelete = ctx.isOwner || ctx.nivel === 'administrador';
   if (!canDelete) {
     return NextResponse.json(
-      { error: 'Somente ADMINISTRADOR pode desativar destinos permanentemente.' },
+      { error: 'Somente ADMINISTRADOR pode desativar destinos.' },
       { status: 403 }
+    );
+  }
+
+  // Tenta desativar no ASAAS primeiro
+  const removalResult = await removeAsaasStaticQrCodeIfPresent(ctx.admin, ctx.ministryId, id);
+  if (!removalResult.success) {
+    return NextResponse.json(
+      { error: removalResult.error || 'Falha ao desativar QR Code no ASAAS.' },
+      { status: 502 }
     );
   }
 

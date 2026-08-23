@@ -43,6 +43,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 });
   }
 
+  const urlObj = new URL(request.url);
+  const page = Math.max(1, parseInt(urlObj.searchParams.get('page') || '1', 10));
+  const pageSize = Math.min(100, Math.max(1, parseInt(urlObj.searchParams.get('pageSize') || '20', 10)));
+  const isAtivoParam = urlObj.searchParams.get('is_ativo');
+  const querySearch = (urlObj.searchParams.get('q') || '').trim();
+  const tipoParam = urlObj.searchParams.get('tipo') || '';
+  const congParam = urlObj.searchParams.get('congregacao_id') || '';
+
   let query = ctx.admin
     .from('fin_payment_destinations')
     .select(`
@@ -51,22 +59,49 @@ export async function GET(request: NextRequest) {
       pix_qr_code_id, pix_payload, pix_external_reference,
       valor_fixo, is_ativo, expires_at, created_at, updated_at,
       congregacoes(nome)
-    `)
-    .eq('ministry_id', ctx.ministryId)
-    .order('created_at', { ascending: false });
+    `, { count: 'exact' })
+    .eq('ministry_id', ctx.ministryId);
+
+  // Filtro por status (is_ativo)
+  if (isAtivoParam === 'true') {
+    query = query.eq('is_ativo', true);
+  } else if (isAtivoParam === 'false') {
+    query = query.eq('is_ativo', false);
+  }
+
+  // Filtro por tipo
+  if (tipoParam) {
+    query = query.eq('tipo_recebimento', tipoParam);
+  }
+
+  // Filtro por congregação
+  if (congParam) {
+    query = query.eq('congregacao_id', congParam);
+  }
 
   // FINANCEIRO_LOCAL: só vê a própria congregação
   if (ctx.nivel === 'financeiro_local' && ctx.congregacaoId) {
     query = query.eq('congregacao_id', ctx.congregacaoId);
   }
 
-  const { data, error } = await query;
+  // Busca textual por label do destino
+  if (querySearch) {
+    query = query.ilike('label', `%${querySearch}%`);
+  }
+
+  // Ordenação e Paginação (range zero-indexed)
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  query = query.order('created_at', { ascending: false }).range(from, to);
+
+  const { data, error, count } = await query;
 
   if (error) {
     return NextResponse.json({ error: 'Erro ao buscar destinos.' }, { status: 500 });
   }
 
-  // Total arrecadado por destino
+  // Total arrecadado por destino para a página atual
   const ids = (data ?? []).map((d) => d.id);
   const totals: Record<string, number> = {};
 
@@ -88,7 +123,15 @@ export async function GET(request: NextRequest) {
     total_arrecadado: totals[d.id] ?? 0,
   }));
 
-  return NextResponse.json({ data: enriched });
+  return NextResponse.json({
+    data: enriched,
+    meta: {
+      page,
+      pageSize,
+      totalCount: count ?? 0,
+      totalPages: Math.ceil((count ?? 0) / pageSize),
+    },
+  });
 }
 
 // ─── POST — cria destino ──────────────────────────────────────────────────────

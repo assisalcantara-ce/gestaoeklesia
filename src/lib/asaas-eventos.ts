@@ -260,3 +260,18 @@ export async function createAsaasStaticPixQrCode(
   };
 }
 
+/**
+ * Remove um QR Code PIX Estático no ASAAS pelo pixQrCodeId.
+ */
+export async function deleteAsaasStaticPixQrCode(
+  apiKey: string,
+  pixQrCodeId: string
+): Promise<void> {
+  await asaasRequest<{ deleted: boolean }>(
+    apiKey,
+    `/pix/qrCodes/static/${pixQrCodeId}`,
+    { method: 'DELETE' }
+  );
+}
+
+
