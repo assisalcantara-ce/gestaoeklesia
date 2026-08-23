@@ -16,6 +16,9 @@ import TesourariaCharts from '@/components/tesouraria/TesourariaCharts';
 import FechamentoCaixaTable from '@/components/tesouraria/FechamentoCaixaTable';
 import DizimistasTable from '@/components/tesouraria/DizimistasTable';
 import DizimistaSearchInput from '@/components/tesouraria/DizimistaSearchInput';
+import DestinoQrModal from '@/components/tesouraria/modals/DestinoQrModal';
+import DestinoModal from '@/components/tesouraria/modals/DestinoModal';
+import ArrecadacaoDigitalContent from '@/components/tesouraria/ArrecadacaoDigitalContent';
 import { useTesouraria } from '@/hooks/tesouraria/useTesouraria';
 
 // Componente customizado e elegante para seleção de Mês e Ano de referência
@@ -1193,17 +1196,54 @@ export default function TesourariaPage() {
 
         {/* ─── ABA: ARRECADAÇÃO DIGITAL ─── */}
         {t.aba === 'arrecadacao' && (
-          <div className="space-y-4">
-            <div className="bg-white p-6 rounded-xl border border-gray-200 space-y-3 text-center max-w-lg mx-auto my-8">
-              <QrCode className="h-12 w-12 text-[#123b63] mx-auto" />
-              <h3 className="text-base font-bold text-gray-800">Arrecadação Digital PIX</h3>
-              <p className="text-sm text-gray-500">
-                Gerencie os links de doação digital, ofertas e QR Codes cadastrados no seu plano.
-              </p>
-            </div>
-          </div>
+          <ArrecadacaoDigitalContent
+            congregacoes={t.congregacoes}
+            fmtBRL={t.fmtBRL}
+            fmtDate={t.fmtDate}
+            showModal={t.showModal}
+            onOpenNovoDestino={() => {
+              t.setDestinoEditId(null);
+              t.setShowDestinoModal(true);
+            }}
+            onOpenEditDestino={(id) => {
+              t.setDestinoEditId(id);
+              t.setShowDestinoModal(true);
+            }}
+            onOpenQrModal={(destino) => {
+              t.setQrDestino(destino as any);
+              t.setShowQrModal(true);
+            }}
+            destinosUpdatedKey={t.destinosUpdatedKey ?? 0}
+          />
         )}
       </div>
+
+      {/* Modais de Arrecadação Digital */}
+      <DestinoModal
+        isOpen={t.showDestinoModal}
+        onClose={() => {
+          t.setShowDestinoModal(false);
+          t.setDestinoEditId(null);
+        }}
+        destinoId={t.destinoEditId}
+        congregacoes={t.congregacoes}
+        contas={t.contasFull}
+        categorias={t.categoriasFull}
+        onSuccess={() => {
+          t.setDestinosUpdatedKey((k: number) => (k ?? 0) + 1);
+        }}
+        showModal={t.showModal}
+      />
+
+      <DestinoQrModal
+        isOpen={t.showQrModal}
+        onClose={() => {
+          t.setShowQrModal(false);
+          t.setQrDestino(null);
+        }}
+        destino={t.qrDestino as any}
+        fmtBRL={t.fmtBRL}
+      />
 
       {/* Bloco Exclusivo de Impressão (Oculto em visualização normal e exibido no @media print) */}
       <div className="print-only hidden p-8 bg-white text-black space-y-6">

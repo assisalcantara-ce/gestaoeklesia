@@ -378,6 +378,7 @@ export function useTesouraria() {
   const [savingDestino] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrDestino, setQrDestino] = useState<{ token: string; label: string } | null>(null);
+  const [destinosUpdatedKey, setDestinosUpdatedKey] = useState<number>(0);
   const [filtroDestinoStatus, setFiltroDestinoStatus] = useState<'' | 'ativo' | 'inativo'>('');
   const [filtroDestinoTipo, setFiltroDestinoTipo] = useState('');
   const [filtroDestinoCong, setFiltroDestinoCong] = useState('');
@@ -1238,6 +1239,8 @@ export function useTesouraria() {
     setShowQrModal,
     qrDestino,
     setQrDestino,
+    destinosUpdatedKey,
+    setDestinosUpdatedKey,
     filtroDestinoStatus,
     setFiltroDestinoStatus,
     filtroDestinoTipo,
