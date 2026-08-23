@@ -186,13 +186,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Buscar registro existente para saber se há credenciais salvas
+    // Buscar registro existente para saber se há credenciais e ambiente salvos
     const { data: existing } = await ctx.admin
       .from('ministry_payment_gateways')
-      .select('id, encrypted_credentials, webhook_token')
+      .select('id, environment, encrypted_credentials, webhook_token')
       .eq('ministry_id', ctx.ministryId)
       .eq('gateway', gateway)
       .maybeSingle()
+
+    // Determinar o ambiente alvo: prioriza body.environment, senão preserva o existing.environment, senão usa 'sandbox' como fallback
+    const targetEnv: 'sandbox' | 'production' = (body.environment as 'sandbox' | 'production') ?? (existing?.environment as 'sandbox' | 'production') ?? 'sandbox'
 
     // Criptografar novas credenciais se enviadas, senão manter as existentes
     let encrypted: string | undefined
@@ -207,8 +210,8 @@ export async function POST(request: NextRequest) {
     const upsertPayload: Record<string, any> = {
       ministry_id:         ctx.ministryId,
       gateway,
-      environment,
-      display_name:        display_name ?? `${gateway.toUpperCase()} ${environment}`,
+      environment:         targetEnv,
+      display_name:        display_name ?? `${gateway.toUpperCase()} ${targetEnv}`,
       status:              encrypted || existing?.encrypted_credentials ? 'configured' : 'not_configured',
       configured_by:       ctx.userId,
       updated_at:          new Date().toISOString(),
@@ -280,7 +283,7 @@ export async function POST(request: NextRequest) {
             if (apiKey) {
               const webhookResult = await ensureAsaasWebhook({
                 apiKey,
-                environment: environment as 'sandbox' | 'production',
+                environment: targetEnv,
                 webhookToken: String(savedRow.webhook_token),
                 ministryName: ministry?.name ?? 'Ministério',
               })
