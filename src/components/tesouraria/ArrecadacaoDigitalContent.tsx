@@ -32,6 +32,9 @@ export interface PaymentDestino {
   valor_fixo?: number | null;
   descricao?: string | null;
   public_token: string;
+  pix_qr_code_id?: string | null;
+  pix_payload?: string | null;
+  pix_external_reference?: string | null;
   is_ativo: boolean;
   expires_at?: string | null;
   total_arrecadado?: number;

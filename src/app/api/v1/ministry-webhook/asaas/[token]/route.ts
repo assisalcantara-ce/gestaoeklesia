@@ -69,13 +69,62 @@ export async function POST(
 
   const ministryId = gw.ministry_id as string;
 
+  const pixQrCodeId = String(payment?.pixQrCodeId ?? '');
+
   // ── Fase A: Arrecadação Digital — verificar fin_payment_charges ────────────
-  const { data: digitalCharge } = await admin
+  let { data: digitalCharge } = await admin
     .from('fin_payment_charges')
     .select('id, status, destination_id, valor_solicitado, valor_pago, tesouraria_lancamento_id')
     .eq('gateway_charge_id', chargeId)
     .eq('ministry_id', ministryId)
     .maybeSingle();
+
+  // Se não encontrou cobrança prévia, verifica se o pagamento veio de um QR Code PIX Estático (pixQrCodeId)
+  if (!digitalCharge && pixQrCodeId && PAID_EVENTS.has(event)) {
+    const { data: destByQr } = await admin
+      .from('fin_payment_destinations')
+      .select('id, ministry_id')
+      .eq('pix_qr_code_id', pixQrCodeId)
+      .eq('ministry_id', ministryId)
+      .maybeSingle();
+
+    if (destByQr) {
+      const nowStr = new Date().toISOString();
+      const valorPago = Number(payment?.value ?? 0);
+      const paidAtStr = String(payment?.paymentDate ?? payment?.confirmedDate ?? nowStr);
+      const extRefStr = String(payment?.externalReference ?? `fpd:${destByQr.id.replace(/-/g, '')}`);
+      const idempotencyKeyStr = `${destByQr.id}_${chargeId}`;
+
+      // Cria o registro da cobrança paga advinda do QR Code Estático
+      const { data: createdCharge } = await admin
+        .from('fin_payment_charges')
+        .insert({
+          ministry_id:          ministryId,
+          destination_id:       destByQr.id,
+          gateway:              'asaas',
+          gateway_charge_id:    chargeId,
+          gateway_customer_id:  String(payment?.customer ?? ''),
+          gateway_external_ref: extRefStr,
+          charge_type:          'pix_estatico',
+          payment_method:       'pix',
+          valor_solicitado:     valorPago,
+          valor_pago:           valorPago,
+          payer_name:           'Doador PIX',
+          status:               'pago',
+          paid_at:              paidAtStr,
+          gateway_response:     payload,
+          idempotency_key:      idempotencyKeyStr,
+          created_at:           nowStr,
+          updated_at:           nowStr,
+        })
+        .select('id, status, destination_id, valor_solicitado, valor_pago, tesouraria_lancamento_id')
+        .single();
+
+      if (createdCharge) {
+        digitalCharge = createdCharge;
+      }
+    }
+  }
 
   if (digitalCharge) {
     const now = new Date().toISOString();

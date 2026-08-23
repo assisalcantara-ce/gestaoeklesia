@@ -200,3 +200,63 @@ export function futureDateStr(days: number): string {
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
 }
+
+// ─── QR Code PIX Estático ASAAS ───────────────────────────────────────────────
+
+export interface AsaasStaticPixQrCode {
+  id: string; // pixQrCodeId (ex: "ALCANTAR00000691906868ASA")
+  payload: string; // BR Code EMV copia e cola
+  externalReference: string;
+  description?: string;
+}
+
+/**
+ * Obtém uma Chave PIX ativa na conta ASAAS do tenant.
+ */
+export async function getAsaasActivePixAddressKey(apiKey: string): Promise<string> {
+  const res = await asaasRequest<{ data: Array<{ key: string; status: string }> }>(
+    apiKey,
+    '/pix/addressKeys?limit=10',
+    { method: 'GET' }
+  );
+
+  const activeKey = res.data?.find((k) => k.status === 'ACTIVE')?.key || res.data?.[0]?.key;
+  if (!activeKey) {
+    throw new Error('Nenhuma chave PIX ativa encontrada no cadastro ASAAS desta instituição.');
+  }
+  return activeKey;
+}
+
+/**
+ * Cria um QR Code PIX Estático permanente no ASAAS sem valor fixado.
+ */
+export async function createAsaasStaticPixQrCode(
+  apiKey: string,
+  addressKey: string,
+  description: string,
+  externalRef: string
+): Promise<AsaasStaticPixQrCode> {
+  const res = await asaasRequest<{
+    id: string;
+    payload: string;
+    externalReference: string;
+    description?: string;
+  }>(apiKey, '/pix/qrCodes/static', {
+    method: 'POST',
+    body: JSON.stringify({
+      addressKey,
+      description: description.slice(0, 500),
+      format: 'ALL',
+      allowsMultiplePayments: true,
+      externalReference: externalRef,
+    }),
+  });
+
+  return {
+    id: res.id,
+    payload: res.payload,
+    externalReference: res.externalReference,
+    description: res.description,
+  };
+}
+

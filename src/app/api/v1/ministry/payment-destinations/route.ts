@@ -12,6 +12,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
 import { isArrecadacaoDigitalAllowedForTenant } from '@/lib/plan-permissions';
+import { decryptCredentials } from '@/lib/ministry-credentials';
+import { getAsaasActivePixAddressKey, createAsaasStaticPixQrCode } from '@/lib/asaas-eventos';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +48,7 @@ export async function GET(request: NextRequest) {
     .select(`
       id, ministry_id, gateway_id, congregacao_id, conta_id, categoria_id,
       tipo_recebimento, label, descricao, cor, icone, public_token,
+      pix_qr_code_id, pix_payload, pix_external_reference,
       valor_fixo, is_ativo, expires_at, created_at, updated_at,
       congregacoes(nome)
     `)
@@ -124,7 +127,6 @@ export async function POST(request: NextRequest) {
     congregacao_id,
     conta_id,
     categoria_id,
-    gateway_id,
     valor_fixo,
     descricao,
     expires_at,
@@ -157,20 +159,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Resolve gateway: usa o fornecido ou busca o ASAAS ativo do ministério
-  let resolvedGatewayId = (gateway_id as string | undefined) ?? null;
-  if (!resolvedGatewayId) {
-    const { data: gw } = await ctx.admin
-      .from('ministry_payment_gateways')
-      .select('id')
-      .eq('ministry_id', ctx.ministryId)
-      .eq('gateway', 'asaas')
-      .eq('is_active', true)
-      .maybeSingle();
-    resolvedGatewayId = gw?.id ?? null;
-  }
+  // Resolve gateway com credenciais
+  const { data: gw } = await ctx.admin
+    .from('ministry_payment_gateways')
+    .select('id, encrypted_credentials')
+    .eq('ministry_id', ctx.ministryId)
+    .eq('gateway', 'asaas')
+    .eq('is_active', true)
+    .maybeSingle();
 
-  if (!resolvedGatewayId) {
+  if (!gw?.id || !gw.encrypted_credentials) {
     return NextResponse.json(
       {
         error:
@@ -181,11 +179,55 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const resolvedGatewayId = gw.id;
+
+  // Descriptografa credenciais do ASAAS do tenant para obter a apiKey
+  let apiKey: string;
+  try {
+    const creds = decryptCredentials(gw.encrypted_credentials);
+    apiKey = creds.apiKey ?? creds.api_key ?? '';
+    if (!apiKey) throw new Error('apiKey ausente');
+  } catch {
+    return NextResponse.json(
+      { error: 'Credenciais do ASAAS inválidas ou não configuradas corretamente.' },
+      { status: 422 }
+    );
+  }
+
   const now = new Date().toISOString();
+  const tempDestinationId = crypto.randomUUID();
+  const externalRef = `fpd:${tempDestinationId.replace(/-/g, '')}`;
+
+  let pixQrCodeId: string | null = null;
+  let pixPayload: string | null = null;
+  let pixExternalRef: string | null = null;
+
+  // Gera o QR Code PIX Estático no ASAAS sem valor fixado
+  try {
+    const activeKey = await getAsaasActivePixAddressKey(apiKey);
+    const descText = `${String(label).trim()} (${String(tipo_recebimento)})`;
+
+    const staticQr = await createAsaasStaticPixQrCode(
+      apiKey,
+      activeKey,
+      descText,
+      externalRef
+    );
+
+    pixQrCodeId = staticQr.id;
+    pixPayload = staticQr.payload;
+    pixExternalRef = staticQr.externalReference;
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: `Erro ao gerar QR Code PIX Estático no ASAAS: ${err.message}` },
+      { status: 502 }
+    );
+  }
 
   const { data, error } = await ctx.admin
     .from('fin_payment_destinations')
     .insert({
+      id:               tempDestinationId,
       ministry_id:      ctx.ministryId,
       gateway_id:       resolvedGatewayId,
       congregacao_id:   congId ?? null,
@@ -195,6 +237,9 @@ export async function POST(request: NextRequest) {
       label:            String(label).trim().slice(0, 100),
       descricao:        descricao ? String(descricao).trim().slice(0, 500) : null,
       valor_fixo:       valor_fixo != null ? Number(valor_fixo) : null,
+      pix_qr_code_id:   pixQrCodeId,
+      pix_payload:      pixPayload,
+      pix_external_reference: pixExternalRef,
       expires_at:       expires_at ? new Date(String(expires_at)).toISOString() : null,
       is_ativo:         true,
       created_at:       now,
@@ -203,6 +248,7 @@ export async function POST(request: NextRequest) {
     .select(`
       id, ministry_id, gateway_id, congregacao_id, conta_id, categoria_id,
       tipo_recebimento, label, descricao, public_token,
+      pix_qr_code_id, pix_payload, pix_external_reference,
       valor_fixo, is_ativo, expires_at, created_at, updated_at
     `)
     .single();
