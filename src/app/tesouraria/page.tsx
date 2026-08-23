@@ -164,6 +164,8 @@ export default function TesourariaPage() {
               setFiltroMovimento={t.setFiltroMovimento}
               filtroTipo={t.filtroTipo}
               setFiltroTipo={t.setFiltroTipo}
+              filtroOrigem={t.filtroOrigem}
+              setFiltroOrigem={t.setFiltroOrigem}
               filtroCong={t.filtroCong}
               setFiltroCong={t.setFiltroCong}
               filtroDept={t.filtroDept}

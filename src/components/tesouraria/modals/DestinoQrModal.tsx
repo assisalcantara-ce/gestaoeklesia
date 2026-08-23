@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Check, Printer, X, ExternalLink } from 'lucide-react';
+import { Copy, Check, Printer, X, ExternalLink, Grid, FileText } from 'lucide-react';
 
 interface DestinoQrModalProps {
   isOpen: boolean;
@@ -22,6 +22,8 @@ interface DestinoQrModalProps {
 export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: DestinoQrModalProps) {
   const [copied, setCopied] = useState(false);
   const [copiedPayload, setCopiedPayload] = useState(false);
+  const [showPrintOptionModal, setShowPrintOptionModal] = useState(false);
+  const [printLayout, setPrintLayout] = useState<'1' | '8'>('1');
 
   if (!isOpen || !destino) return null;
 
@@ -46,8 +48,13 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
     } catch {}
   };
 
-  const handlePrint = () => {
-    window.print();
+  // Aciona a impressão no navegador após definir o layout desejado
+  const executePrint = (layout: '1' | '8') => {
+    setPrintLayout(layout);
+    setShowPrintOptionModal(false);
+    setTimeout(() => {
+      window.print();
+    }, 150);
   };
 
   const TIPO_LABELS: Record<string, string> = {
@@ -59,9 +66,79 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
     evento_local: 'Evento',
   };
 
+  const congregacaoNome = destino.congregacoes?.nome ?? 'Sede / Todas as Congregações';
+  const tipoFormatado = TIPO_LABELS[destino.tipo_recebimento] ?? destino.tipo_recebimento;
+
+  // Componente Reutilizável da Arte Visual Fiel aos Modelos Uploaded
+  const PosterCard = ({ isGrid = false }: { isGrid?: boolean }) => (
+    <div className={`poster-card ${isGrid ? 'grid-card' : 'single-card'}`}>
+      {/* Moldura Externa do Cartaz */}
+      <div className="card-border">
+        {/* Cabeçalho Azul com Faixa Verde */}
+        <div className="card-header">
+          <h2 className="header-title">CONTRIBUA VIA PIX</h2>
+          <div className="header-green-line" />
+        </div>
+
+        {/* Orientação Curta */}
+        <p className="instruction-text">Aponte a câmera do seu celular para o QR Code</p>
+
+        {/* Moldura do QR Code */}
+        <div className="qr-wrapper">
+          <QRCodeSVG
+            value={qrCodeValue}
+            size={isGrid ? 100 : 250}
+            level="H"
+            includeMargin={false}
+          />
+        </div>
+
+        {/* Valor Fixo (opcional) */}
+        {destino.valor_fixo && (
+          <div className="card-valor">
+            Valor Sugerido: {fmtBRL(Number(destino.valor_fixo))}
+          </div>
+        )}
+
+        {/* Barra de Instrução com Ícone do Celular */}
+        <div className="action-bar">
+          <div className="phone-icon-box">
+            <svg className="phone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="5" y="2" width="14" height="20" rx="3" />
+              <line x1="12" y1="18" x2="12" y2="18.01" strokeWidth="3" />
+            </svg>
+          </div>
+          <div className="action-text">
+            <span className="action-main">LEIA O QR CODE</span>
+            <span className="action-sub">ESCOLHA O VALOR &bull; CONFIRME</span>
+          </div>
+        </div>
+
+        {/* Rodapé Inspiracional Bíblico */}
+        {!isGrid && (
+          <div className="footer-biblical">
+            <div className="divider-line">
+              <span className="heart-icon">♡</span>
+            </div>
+            <p className="scripture-headline">Sua generosidade transforma vidas!</p>
+            <p className="scripture-sub font-bold">DEUS AMA QUEM DÁ COM ALEGRIA.</p>
+            <p className="scripture-ref">2 CORÍNTIOS 9:7</p>
+          </div>
+        )}
+
+        {isGrid && (
+          <div className="grid-footer-biblical">
+            <p className="scripture-headline">Sua generosidade transforma vidas!</p>
+            <p className="scripture-ref">2 CORÍNTIOS 9:7</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <>
-      {/* Modal na Interface Web */}
+      {/* Modal Principal na Interface Web */}
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 no-print">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5 border border-slate-100 relative">
           <button
@@ -73,11 +150,11 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
 
           <div className="text-center space-y-1">
             <span className="inline-block px-2.5 py-0.5 bg-[#123b63]/10 text-[#123b63] text-xs font-bold rounded-full uppercase tracking-wider">
-              {TIPO_LABELS[destino.tipo_recebimento] ?? destino.tipo_recebimento}
+              {tipoFormatado}
             </span>
             <h3 className="text-xl font-extrabold text-slate-800">{destino.label}</h3>
             <p className="text-xs text-slate-500 font-medium">
-              📍 {destino.congregacoes?.nome ?? 'Sede / Todas as Congregações'}
+              📍 {congregacaoNome}
             </p>
           </div>
 
@@ -99,7 +176,7 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
             </p>
           </div>
 
-          {/* QR Code Canvas */}
+          {/* QR Code Canvas na Interface Web */}
           <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col items-center justify-center space-y-3">
             <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-200">
               <QRCodeSVG
@@ -182,10 +259,10 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
           {/* Botões de Ação */}
           <div className="flex gap-2 pt-2">
             <button
-              onClick={handlePrint}
+              onClick={() => setShowPrintOptionModal(true)}
               className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition"
             >
-              <Printer className="h-4 w-4" /> Imprimir Cartaz QR Code
+              <Printer className="h-4 w-4 text-[#123b63]" /> Imprimir Cartaz QR Code
             </button>
             <a
               href={publicUrl}
@@ -199,210 +276,368 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
         </div>
       </div>
 
-      {/* Cartaz Exclusivo de Impressão A4 Profissional */}
-      <div className="destino-print-only hidden">
-        <div className="a4-poster">
-          {/* Cabeçalho / Instituição e Congregação */}
-          <div className="poster-header">
-            <p className="poster-institution">GESTÃO EKLÉSIA</p>
-            <p className="poster-[#123b63] poster-congregation">
-              📍 {destino.congregacoes?.nome ?? 'Sede / Todas as Congregações'}
-            </p>
-            <h1 className="poster-destination-title">{destino.label}</h1>
-            <div className="poster-tag">
-              CONTRIBUA VIA PIX — {TIPO_LABELS[destino.tipo_recebimento] ?? destino.tipo_recebimento}
-            </div>
-          </div>
-
-          {/* Área Central: QR Code Estático Grande */}
-          <div className="poster-body">
-            <div className="poster-qr-frame">
-              <QRCodeSVG
-                value={qrCodeValue}
-                size={340}
-                level="H"
-                includeMargin={true}
-              />
+      {/* ── MODAL SECUNDÁRIO: ESCOLHA DE LAYOUT DE IMPRESSÃO ── */}
+      {showPrintOptionModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 no-print">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-200 space-y-4 text-center animate-in fade-in zoom-in duration-150">
+            <div className="w-12 h-12 bg-[#123b63]/10 text-[#123b63] rounded-full flex items-center justify-center mx-auto">
+              <Printer className="h-6 w-6" />
             </div>
 
-            {destino.valor_fixo && (
-              <div className="poster-valor-sugerido">
-                Valor Sugerido: {fmtBRL(Number(destino.valor_fixo))}
-              </div>
-            )}
-
-            <div className="poster-instructions">
-              <p className="poster-main-action">
-                {hasStaticPix
-                  ? 'ABRA O APP DO SEU BANCO E LEIA O QR CODE'
-                  : '📷 APONTE A CÂMERA DO SEU CELULAR'}
-              </p>
-              <p className="poster-sub-action">
-                {hasStaticPix
-                  ? 'Escolha pagar via PIX no seu banco, escaneie o código acima e confirme o valor desejado.'
-                  : 'Acesse a página de contribuição para digitar o valor e pagar via PIX.'}
+            <div>
+              <h4 className="text-base font-extrabold text-slate-800">Como deseja imprimir?</h4>
+              <p className="text-xs text-slate-500 mt-1">
+                Escolha o formato de disposição do cartaz na folha A4.
               </p>
             </div>
-          </div>
 
-          {/* Área Secundária: Pix Copia e Cola / Rodapé */}
-          <div className="poster-footer">
-            {hasStaticPix && destino.pix_payload && (
-              <div className="poster-copia-cola-box">
-                <span className="poster-copia-cola-label">PIX Copia e Cola:</span>
-                <span className="poster-copia-cola-code">{destino.pix_payload}</span>
-              </div>
-            )}
-            <p className="poster-[#123b63] poster-web-url">
-              {publicUrl}
-            </p>
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={() => executePrint('1')}
+                className="w-full p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl flex items-center gap-3 text-left transition group"
+              >
+                <div className="p-2 bg-white rounded-lg border border-slate-200 text-[#123b63] group-hover:border-[#123b63]">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-extrabold text-slate-800">1 por folha A4</p>
+                  <p className="text-[11px] text-slate-500">Cartaz grande centralizado para púlpitos ou paredes</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => executePrint('8')}
+                className="w-full p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl flex items-center gap-3 text-left transition group"
+              >
+                <div className="p-2 bg-white rounded-lg border border-slate-200 text-[#123b63] group-hover:border-[#123b63]">
+                  <Grid className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-extrabold text-slate-800">8 por folha A4</p>
+                  <p className="text-[11px] text-slate-500">Grade 2x4 com mini-cartazes para panfletos ou bancos</p>
+                </div>
+              </button>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => setShowPrintOptionModal(false)}
+                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* ── ELEMENTOS EXCLUSIVOS DE IMPRESSÃO A4 (ISOLADO) ── */}
+      <div className="destino-print-only hidden">
+        {printLayout === '1' ? (
+          <div className="print-page-single">
+            <PosterCard isGrid={false} />
+          </div>
+        ) : (
+          <div className="print-page-grid">
+            {Array.from({ length: 8 }).map((_, idx) => (
+              <PosterCard key={idx} isGrid={true} />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Regras CSS Específicas de Impressão para o Cartaz */}
+      {/* ── CSS ISOLADO DE IMPRESSÃO A4 ── */}
       <style jsx global>{`
         @media print {
-          /* Garante que o cartaz do destino tenha prioridade total se aberto */
-          body * {
-            visibility: hidden !important;
+          @page {
+            size: A4 portrait;
+            margin: 0;
           }
+
+          /* Esconde todo o resto da aplicação de forma absoluta */
+          body, body * {
+            visibility: hidden !important;
+            overflow: hidden !important;
+          }
+
+          /* Exibe exclusivamente o container do cartaz */
           .destino-print-only, .destino-print-only * {
             visibility: visible !important;
           }
+
           .destino-print-only {
-            display: flex !important;
-            justify-content: center;
-            align-items: center;
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            min-height: 100vh;
+            display: block !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 210mm !important;
+            height: 297mm !important;
             background: #ffffff !important;
-            padding: 20px;
+            box-sizing: border-box !important;
+            z-index: 999999 !important;
           }
-          .a4-poster {
-            width: 100%;
-            max-width: 680px;
-            margin: 0 auto;
-            padding: 40px 32px;
-            border: 4px solid #123b63;
-            border-radius: 28px;
-            background: #ffffff;
-            text-align: center;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
+
+          /* ── ESTILOS DA ARTE VISUAL FIEL AOS MODELOS ── */
+          .poster-card {
+            box-sizing: border-box !important;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
           }
-          .poster-header {
-            margin-bottom: 24px;
-            width: 100%;
+
+          .card-border {
+            width: 100% !important;
+            height: 100% !important;
+            border: 3px solid #053361 !important;
+            border-radius: 24px !important;
+            padding: 16px 14px 12px 14px !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            background: #ffffff !important;
           }
-          .poster-institution {
-            font-size: 14px;
-            font-weight: 800;
-            letter-spacing: 0.15em;
-            color: #123b63;
-            text-transform: uppercase;
-            margin-bottom: 4px;
+
+          .grid-card .card-border {
+            border-width: 2px !important;
+            border-radius: 14px !important;
+            padding: 6px 6px 4px 6px !important;
           }
-          .poster-congregation {
-            font-size: 16px;
-            font-weight: 700;
-            color: #475569;
-            margin-bottom: 12px;
+
+          /* Cabeçalho Azul com Faixa Verde */
+          .card-header {
+            width: 100% !important;
+            background: #053361 !important;
+            border-radius: 12px !important;
+            padding: 12px 16px 10px 16px !important;
+            text-align: center !important;
+            box-sizing: border-box !important;
           }
-          .poster-destination-title {
-            font-size: 36px;
-            font-weight: 900;
-            color: #0f172a;
-            line-height: 1.1;
-            margin-bottom: 14px;
+
+          .grid-card .card-header {
+            border-radius: 8px !important;
+            padding: 4px 6px 3px 6px !important;
           }
-          .poster-tag {
-            display: inline-block;
-            padding: 6px 18px;
-            background: #f1f5f9;
-            color: #0f172a;
-            font-size: 13px;
-            font-weight: 800;
-            border-radius: 9999px;
-            letter-spacing: 0.05em;
+
+          .header-title {
+            color: #ffffff !important;
+            font-size: 26px !important;
+            font-weight: 900 !important;
+            letter-spacing: 0.05em !important;
+            margin: 0 !important;
+            text-transform: uppercase !important;
+            line-height: 1 !important;
           }
-          .poster-body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 24px;
-            width: 100%;
+
+          .grid-card .header-title {
+            font-size: 11px !important;
+            letter-spacing: 0.02em !important;
           }
-          .poster-qr-frame {
-            padding: 20px;
-            background: #ffffff;
-            border: 4px solid #0f172a;
-            border-radius: 24px;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
+
+          .header-green-line {
+            width: 48px !important;
+            height: 4px !important;
+            background: #048a47 !important;
+            margin: 6px auto 0 auto !important;
+            border-radius: 2px !important;
           }
-          .poster-valor-sugerido {
-            font-size: 16px;
-            font-weight: 800;
-            color: #047857;
-            background: #ecfdf5;
-            border: 1px solid #a7f3d0;
-            padding: 6px 16px;
-            border-radius: 12px;
-            margin-bottom: 16px;
+
+          .grid-card .header-green-line {
+            width: 20px !important;
+            height: 2px !important;
+            margin-top: 2px !important;
           }
-          .poster-instructions {
-            max-width: 500px;
+
+          /* Texto de Instrução Direta */
+          .instruction-text {
+            color: #0f2942 !important;
+            font-size: 14px !important;
+            font-weight: 800 !important;
+            margin: 12px 0 8px 0 !important;
+            text-align: center !important;
           }
-          .poster-main-action {
-            font-size: 18px;
-            font-weight: 900;
-            color: #123b63;
-            margin-bottom: 6px;
-            letter-spacing: 0.02em;
+
+          .grid-card .instruction-text {
+            font-size: 7.5px !important;
+            margin: 3px 0 2px 0 !important;
+            font-weight: 700 !important;
           }
-          .poster-sub-action {
-            font-size: 13px;
-            font-weight: 600;
-            color: #64748b;
-            line-height: 1.4;
+
+          /* Moldura do QR Code */
+          .qr-wrapper {
+            background: #ffffff !important;
+            border: 2px solid #e2e8f0 !important;
+            border-radius: 24px !important;
+            padding: 16px !important;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.04) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            margin: 4px 0 !important;
           }
-          .poster-footer {
-            border-top: 2px border #e2e8f0;
-            padding-top: 20px;
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
+
+          .single-card .qr-wrapper {
+            border-radius: 28px !important;
+            padding: 22px !important;
           }
-          .poster-copia-cola-box {
-            background: #f8fafc;
-            border: 1px border #cbd5e1;
-            border-radius: 12px;
-            padding: 8px 14px;
-            max-width: 90%;
-            word-break: break-all;
-            font-family: monospace;
-            font-size: 10px;
-            color: #334155;
+
+          .grid-card .qr-wrapper {
+            border-radius: 10px !important;
+            padding: 4px !important;
+            border-width: 1px !important;
           }
-          .poster-copia-cola-label {
-            font-weight: 800;
-            color: #0f172a;
-            margin-right: 6px;
+
+          .card-valor {
+            font-size: 14px !important;
+            font-weight: 800 !important;
+            color: #047857 !important;
+            background: #ecfdf5 !important;
+            border: 1px solid #a7f3d0 !important;
+            padding: 3px 12px !important;
+            border-radius: 8px !important;
+            margin: 2px 0 !important;
           }
-          .poster-web-url {
-            font-size: 12px;
-            font-weight: 700;
-            font-family: monospace;
-            color: #123b63;
+
+          .grid-card .card-valor {
+            font-size: 7.5px !important;
+            padding: 1px 4px !important;
+          }
+
+          /* Barra de Instrução com Ícone do Celular */
+          .action-bar {
+            width: 100% !important;
+            background: #ebf6f0 !important;
+            border-radius: 14px !important;
+            padding: 10px 14px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 12px !important;
+            box-sizing: border-box !important;
+            margin-top: 6px !important;
+          }
+
+          .grid-card .action-bar {
+            border-radius: 6px !important;
+            padding: 3px 6px !important;
+            gap: 4px !important;
+            margin-top: 2px !important;
+          }
+
+          .phone-icon-box {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            color: #048a47 !important;
+          }
+
+          .phone-svg {
+            width: 28px !important;
+            height: 28px !important;
+            stroke: #048a47 !important;
+          }
+
+          .grid-card .phone-svg {
+            width: 12px !important;
+            height: 12px !important;
+          }
+
+          .action-text {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            text-align: left !important;
+          }
+
+          .grid-card .action-text {
+            align-items: center !important;
+            text-align: center !important;
+          }
+
+          .action-main {
+            color: #048a47 !important;
+            font-size: 15px !important;
+            font-weight: 900 !important;
+            letter-spacing: 0.04em !important;
+            line-height: 1.1 !important;
+          }
+
+          .grid-card .action-main {
+            font-size: 7.5px !important;
+          }
+
+          .action-sub {
+            color: #0f2942 !important;
+            font-size: 11px !important;
+            font-weight: 900 !important;
+            letter-spacing: 0.03em !important;
+          }
+
+          .grid-card .action-sub {
+            font-size: 5.5px !important;
+          }
+
+          /* Rodapé Bíblico Inspiracional */
+          .footer-biblical {
+            width: 100% !important;
+            text-align: center !important;
+            margin-top: 10px !important;
+          }
+
+          .divider-line {
+            width: 80% !important;
+            height: 1px !important;
+            background: #a7f3d0 !important;
+            margin: 0 auto 8px auto !important;
+            position: relative !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+          }
+
+          .heart-icon {
+            background: #ffffff !important;
+            padding: 0 6px !important;
+            color: #048a47 !important;
+            font-size: 14px !important;
+          }
+
+          .scripture-headline {
+            font-family: 'Georgia', serif, italic !important;
+            font-style: italic !important;
+            color: #048a47 !important;
+            font-size: 16px !important;
+            margin: 0 0 2px 0 !important;
+          }
+
+          .scripture-sub {
+            color: #1e293b !important;
+            font-size: 10px !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.05em !important;
+            margin: 0 0 1px 0 !important;
+          }
+
+          .scripture-ref {
+            color: #475569 !important;
+            font-size: 9.5px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.06em !important;
+            margin: 0 !important;
+          }
+
+          .grid-footer-biblical {
+            text-align: center !important;
+            margin-top: 2px !important;
+          }
+
+          .grid-footer-biblical .scripture-headline {
+            font-size: 6.5px !important;
+          }
+
+          .grid-footer-biblical .scripture-ref {
+            font-size: 5.5px !important;
           }
         }
       `}</style>

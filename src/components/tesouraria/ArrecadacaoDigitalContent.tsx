@@ -6,7 +6,6 @@ import {
   Plus,
   Copy,
   Check,
-  Edit2,
   Trash2,
   ShieldCheck,
   TrendingUp,
@@ -210,10 +209,11 @@ export default function ArrecadacaoDigitalContent({
   }, [subAba, loadCobrancas]);
 
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Alternar Status de Ativação do Destino
   const handleToggleAtivo = async (id: string, currentAtivo: boolean, hasStaticPix: boolean) => {
-    if (deactivatingId) return; // Evita duplo clique
+    if (deactivatingId || deletingId) return; // Evita duplo clique
 
     if (currentAtivo) {
       const confirmMsg = hasStaticPix
@@ -244,6 +244,35 @@ export default function ArrecadacaoDigitalContent({
       showModal('Erro ao desativar', err.message || 'O QR Code não pôde ser desativado no ASAAS.', 'error');
     } finally {
       setDeactivatingId(null);
+    }
+  };
+
+  // Excluir definitivamente um destino inativo
+  const handleDeletePermanente = async (id: string, label: string) => {
+    if (deactivatingId || deletingId) return; // Evita duplo clique
+
+    const confirmMsg = `Excluir destino "${label}"?\n\nEste destino está inativo e seu QR Code PIX já foi desativado no ASAAS. A exclusão é permanente e não pode ser desfeita.`;
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
+    try {
+      setDeletingId(id);
+      const res = await authenticatedFetch(`/api/v1/ministry/payment-destinations/${id}`, {
+        method: 'DELETE',
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || 'Não foi possível excluir o destino.');
+      }
+
+      showModal('Sucesso', `Destino "${label}" excluído permanentemente com sucesso!`);
+      loadDestinos();
+    } catch (err: any) {
+      showModal('Não é possível excluir', err.message || 'Falha ao excluir destino.', 'error');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -582,17 +611,9 @@ export default function ArrecadacaoDigitalContent({
                                 {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                               </button>
 
-                              <button
-                                onClick={() => onOpenEditDestino(d.id)}
-                                className="p-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg transition"
-                                title="Editar destino"
-                              >
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </button>
-
                               {d.is_ativo ? (
                                 <button
-                                  disabled={deactivatingId === d.id}
+                                  disabled={deactivatingId === d.id || deletingId === d.id}
                                   onClick={() => handleToggleAtivo(d.id, d.is_ativo, hasStaticPix)}
                                   className="p-1.5 border border-amber-200 text-amber-700 hover:bg-amber-50 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                                   title="Desativar destino"
@@ -600,16 +621,23 @@ export default function ArrecadacaoDigitalContent({
                                   {deactivatingId === d.id ? (
                                     <Clock className="h-3.5 w-3.5 animate-spin" />
                                   ) : (
-                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <XCircle className="h-3.5 w-3.5" />
                                   )}
                                 </button>
                               ) : (
-                                <span
-                                  className="p-1.5 border border-slate-200 text-slate-400 rounded-lg cursor-not-allowed opacity-60"
-                                  title="Reativação não suportada no momento"
+                                <button
+                                  disabled={deletingId === d.id || deactivatingId === d.id}
+                                  onClick={() => handleDeletePermanente(d.id, d.label)}
+                                  className="px-2 py-1.5 border border-rose-200 text-rose-700 hover:bg-rose-50 rounded-lg transition text-[11px] font-bold flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Excluir destino definitivamente"
                                 >
-                                  <Check className="h-3.5 w-3.5" />
-                                </span>
+                                  {deletingId === d.id ? (
+                                    <Clock className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  )}
+                                  Excluir
+                                </button>
                               )}
                             </div>
                           </td>

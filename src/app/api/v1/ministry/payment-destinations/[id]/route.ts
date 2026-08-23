@@ -181,7 +181,7 @@ export async function PUT(request: NextRequest, context: Ctx) {
   return NextResponse.json({ data });
 }
 
-// ─── DELETE — soft delete ─────────────────────────────────────────────────────
+// ─── DELETE — exclusão física de destino inativo ──────────────────────────────
 export async function DELETE(request: NextRequest, context: Ctx) {
   const { id } = await context.params;
   const ctx = await resolveTenantAuth(request);
@@ -201,28 +201,73 @@ export async function DELETE(request: NextRequest, context: Ctx) {
   const canDelete = ctx.isOwner || ctx.nivel === 'administrador';
   if (!canDelete) {
     return NextResponse.json(
-      { error: 'Somente ADMINISTRADOR pode desativar destinos.' },
+      { error: 'Somente ADMINISTRADOR pode excluir destinos.' },
       { status: 403 }
     );
   }
 
-  // Tenta desativar no ASAAS primeiro
-  const removalResult = await removeAsaasStaticQrCodeIfPresent(ctx.admin, ctx.ministryId, id);
-  if (!removalResult.success) {
+  // 1. Busca o destino para verificar status
+  const { data: dest } = await ctx.admin
+    .from('fin_payment_destinations')
+    .select('id, is_ativo, label')
+    .eq('id', id)
+    .eq('ministry_id', ctx.ministryId)
+    .maybeSingle();
+
+  if (!dest) {
+    return NextResponse.json({ error: 'Destino não encontrado.' }, { status: 404 });
+  }
+
+  // 2. REGRA DE NEGÓCIO: Destino ATIVO não pode ser excluído diretamente
+  if (dest.is_ativo) {
     return NextResponse.json(
-      { error: removalResult.error || 'Falha ao desativar QR Code no ASAAS.' },
-      { status: 502 }
+      { error: 'Destinos ativos não podem ser excluídos diretamente. Desative o destino primeiro.' },
+      { status: 400 }
     );
   }
 
+  // 3. VERIFICAÇÃO DE DEPENDÊNCIAS / HISTÓRICO FINANCEIRO
+  // a) Verifica se existem cobranças vinculadas (fin_payment_charges)
+  const { count: chargesCount } = await ctx.admin
+    .from('fin_payment_charges')
+    .select('id', { count: 'exact', head: true })
+    .eq('destination_id', id);
+
+  if (chargesCount && chargesCount > 0) {
+    return NextResponse.json(
+      {
+        error: `O destino "${dest.label}" possui ${chargesCount} cobrança(s)/doação(ões) no histórico financeiro e não pode ser excluído para preservar os registros contábeis.`,
+        code: 'HAS_FINANCIAL_HISTORY',
+      },
+      { status: 400 }
+    );
+  }
+
+  // b) Verifica se existem eventos de webhook vinculados (fin_webhook_events)
+  const { count: webhooksCount } = await ctx.admin
+    .from('fin_webhook_events')
+    .select('id', { count: 'exact', head: true })
+    .eq('destination_id', id);
+
+  if (webhooksCount && webhooksCount > 0) {
+    return NextResponse.json(
+      {
+        error: `O destino "${dest.label}" possui eventos de webhook associados no histórico e não pode ser excluído.`,
+        code: 'HAS_WEBHOOK_HISTORY',
+      },
+      { status: 400 }
+    );
+  }
+
+  // 4. Executa a exclusão física do registro
   const { error } = await ctx.admin
     .from('fin_payment_destinations')
-    .update({ is_ativo: false, updated_at: new Date().toISOString() })
+    .delete()
     .eq('id', id)
     .eq('ministry_id', ctx.ministryId);
 
   if (error) {
-    return NextResponse.json({ error: 'Erro ao desativar destino.' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro ao excluir destino.', detail: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

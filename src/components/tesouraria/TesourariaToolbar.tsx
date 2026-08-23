@@ -9,6 +9,8 @@ export interface TesourariaToolbarProps {
   setFiltroMovimento: (val: '' | 'entrada' | 'saida') => void;
   filtroTipo: string;
   setFiltroTipo: (val: string) => void;
+  filtroOrigem?: '' | 'manual' | 'arrecadacao_digital';
+  setFiltroOrigem?: (val: '' | 'manual' | 'arrecadacao_digital') => void;
   filtroCong: string;
   setFiltroCong: (val: string) => void;
   filtroDept: string;
@@ -39,6 +41,8 @@ export default function TesourariaToolbar({
   setFiltroMovimento,
   filtroTipo,
   setFiltroTipo,
+  filtroOrigem = '',
+  setFiltroOrigem,
   filtroCong,
   setFiltroCong,
   filtroDept,
@@ -60,7 +64,7 @@ export default function TesourariaToolbar({
 }: TesourariaToolbarProps) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-md">
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1">Mês</label>
           <MonthPicker value={filtroMes} onChange={setFiltroMes} className="w-full" />
@@ -100,7 +104,7 @@ export default function TesourariaToolbar({
           <select
             value={filtroTipo}
             onChange={(e) => setFiltroTipo(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
           >
             <option value="">Todos os tipos</option>
             {filtroMovimento === 'saida'
@@ -116,13 +120,25 @@ export default function TesourariaToolbar({
                 ))}
           </select>
         </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1">Origem</label>
+          <select
+            value={filtroOrigem}
+            onChange={(e) => setFiltroOrigem?.(e.target.value as any)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white font-medium text-slate-800"
+          >
+            <option value="">Todas as origens</option>
+            <option value="manual">Manual</option>
+            <option value="arrecadacao_digital">Arrecadação Digital PIX</option>
+          </select>
+        </div>
         {!scope.isFinanceiroLocal && (
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Caixa</label>
             <select
               value={filtroCong}
               onChange={(e) => setFiltroCong(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
             >
               <option value="">Todas as congregações</option>
               {congregacoes.map((c) => (
@@ -142,7 +158,7 @@ export default function TesourariaToolbar({
           <select
             value={filtroDept}
             onChange={(e) => setFiltroDept(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
           >
             <option value="">Todos os departamentos</option>
             {departamentos.map((d) => (
@@ -177,12 +193,13 @@ export default function TesourariaToolbar({
               onClick={() => {
                 setFiltroMovimento('');
                 setFiltroTipo('');
+                setFiltroOrigem?.('');
                 setFiltroCong('');
                 setFiltroDept('');
               }}
-              disabled={filtroMovimento === '' && filtroTipo === '' && filtroCong === '' && filtroDept === ''}
+              disabled={filtroMovimento === '' && filtroTipo === '' && filtroOrigem === '' && filtroCong === '' && filtroDept === ''}
               className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition h-[38px] ${
-                filtroMovimento === '' && filtroTipo === '' && filtroCong === '' && filtroDept === ''
+                filtroMovimento === '' && filtroTipo === '' && filtroOrigem === '' && filtroCong === '' && filtroDept === ''
                   ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
                   : 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300'
               }`}

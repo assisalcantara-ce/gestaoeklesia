@@ -324,6 +324,7 @@ export function useTesouraria() {
   const [filtroCong, setFiltroCong] = useState('');
   const [filtroDept, setFiltroDept] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroOrigem, setFiltroOrigem] = useState<'' | 'manual' | 'arrecadacao_digital'>( '');
   const [filtroMovimento, setFiltroMovimento] = useState<'' | 'entrada' | 'saida'>('');
   const [filtroMes, setFiltroMes] = useState(mesAtual());
   const [loadingMes, setLoadingMes] = useState(false);
@@ -796,9 +797,17 @@ export function useTesouraria() {
       if (filtroTipo && l.tipo_recebimento !== filtroTipo) return false;
       if (filtroCong && l.congregacao_id !== filtroCong) return false;
       if (filtroDept && l.departamento_id !== filtroDept) return false;
+
+      // Filtro de Origem (Manual vs Arrecadação Digital PIX)
+      if (filtroOrigem) {
+        const isDigitalPix = l.origem_modulo === 'gateway' && l.forma_pagamento === 'pix';
+        if (filtroOrigem === 'arrecadacao_digital' && !isDigitalPix) return false;
+        if (filtroOrigem === 'manual' && isDigitalPix) return false;
+      }
+
       return true;
     });
-  }, [lancamentosMes, filtroMovimento, filtroTipo, filtroCong, filtroDept]);
+  }, [lancamentosMes, filtroMovimento, filtroTipo, filtroCong, filtroDept, filtroOrigem]);
 
   const entradasFiltradas = useMemo(() => {
     return lancsFiltrados.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
@@ -1148,6 +1157,8 @@ export function useTesouraria() {
     setFiltroDept,
     filtroTipo,
     setFiltroTipo,
+    filtroOrigem,
+    setFiltroOrigem,
     filtroMovimento,
     setFiltroMovimento,
     filtroMes,
