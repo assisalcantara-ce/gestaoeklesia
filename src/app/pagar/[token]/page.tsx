@@ -272,56 +272,20 @@ export default function PagarPage() {
           )}
         </div>
 
+        {/* Informação explicativa do destino */}
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 mb-5 text-center text-xs text-slate-600">
+          Sua contribuição será destinada diretamente para a congregação{' '}
+          <strong className="text-slate-800">{destino.congregacao_nome ?? 'Sede Principal'}</strong> na categoria{' '}
+          <strong className="text-slate-800">{destino.tipo_label}</strong>.
+        </div>
+
         {/* Formulário */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              Seu nome <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={nome}
-              onChange={e => setNome(e.target.value)}
-              placeholder="João da Silva"
-              required
-              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              E-mail <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="joao@email.com"
-              required
-              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              CPF ou CNPJ <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={cpfCnpj}
-              onChange={e => setCpfCnpj(e.target.value)}
-              placeholder="000.000.000-00"
-              required
-              maxLength={18}
-              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
-            />
-          </div>
-
-          {/* Valor: só exibe se não for fixo */}
-          {destino.valor_fixo == null && (
+          {/* Valor: Campo principal */}
+          {destino.valor_fixo == null ? (
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Valor (R$) <span className="text-red-500">*</span>
+              <label className="block text-sm font-bold text-slate-800 mb-1">
+                Valor da Contribuição (R$) <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -332,22 +296,70 @@ export default function PagarPage() {
                 max="99999.99"
                 step="0.01"
                 required
-                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]"
+                autoFocus
+                className="w-full border-2 border-[#123b63] rounded-xl px-4 py-3 text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#123b63]"
               />
             </div>
-          )}
+          ) : null}
+
+          {/* Dados Opcionais do Doador */}
+          <div className="pt-2 border-t border-slate-100 space-y-3">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              Identificação (Opcional)
+            </p>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Seu nome <span className="text-slate-400 font-normal">(Opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={nome}
+                onChange={e => setNome(e.target.value)}
+                placeholder="Deixe em branco para doar anonimamente"
+                className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-[#123b63]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                E-mail <span className="text-slate-400 font-normal">(Opcional)</span>
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="Para receber o comprovante por e-mail"
+                className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-[#123b63]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                CPF / CNPJ <span className="text-slate-400 font-normal">(Opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={cpfCnpj}
+                onChange={e => setCpfCnpj(e.target.value)}
+                placeholder="000.000.000-00"
+                maxLength={18}
+                className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-[#123b63]"
+              />
+            </div>
+          </div>
 
           {payError && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-2">{payError}</p>
+            <p className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">{payError}</p>
           )}
 
           <button
             type="submit"
             disabled={paying}
-            className="w-full py-3 bg-[#123b63] text-white rounded-xl font-semibold text-sm hover:bg-[#1a4f85] transition disabled:opacity-60 flex items-center justify-center gap-2"
+            className="w-full py-3.5 bg-[#123b63] text-white rounded-xl font-bold text-sm hover:bg-[#1a4f85] transition shadow-md hover:shadow-lg disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {paying && <Loader2 className="h-4 w-4 animate-spin" />}
-            {paying ? 'Gerando PIX...' : 'Gerar QR Code PIX'}
+            {paying ? 'Gerando Código PIX...' : 'Gerar PIX para Pagamento'}
           </button>
         </form>
 

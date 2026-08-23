@@ -89,16 +89,14 @@ export async function POST(request: NextRequest, context: Ctx) {
     return NextResponse.json({ error: 'JSON inválido.' }, { status: 400 });
   }
 
-  const nome    = String(body.nome    ?? '').trim().slice(0, 150);
-  const email   = String(body.email   ?? '').trim().toLowerCase().slice(0, 255);
+  const rawNome = String(body.nome ?? '').trim().slice(0, 150);
+  const rawEmail = String(body.email ?? '').trim().toLowerCase().slice(0, 255);
   const cpfCnpj = String(body.cpfCnpj ?? '').replace(/\D/g, '').slice(0, 14) || null;
 
-  if (!nome) {
-    return NextResponse.json({ error: 'Nome é obrigatório.' }, { status: 400 });
-  }
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return NextResponse.json({ error: 'E-mail inválido.' }, { status: 400 });
-  }
+  const nome = rawNome || 'Doador Anônimo';
+  const email = (rawEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail))
+    ? rawEmail
+    : 'doacao.anonima@gestaoeklesia.com.br';
 
   const admin = createServerClient();
 
