@@ -2188,8 +2188,16 @@ function GatewaysContent({ onNotification }: { onNotification: (title: string, m
                 <input
                   type="password"
                   value={formFields.api_key ?? ''}
-                  onChange={e => setFormFields(f => ({ ...f, api_key: e.target.value }))}
-                  placeholder="$aac_..."
+                  onChange={e => {
+                    const val = e.target.value
+                    setFormFields(f => ({ ...f, api_key: val }))
+                    if (val.startsWith('$aact_prod_')) {
+                      setEnvField('production')
+                    } else if (val.startsWith('$aact_hmlg_')) {
+                      setEnvField('sandbox')
+                    }
+                  }}
+                  placeholder="$aact_..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
                   autoComplete="new-password"
                 />

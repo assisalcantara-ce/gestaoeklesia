@@ -27,8 +27,8 @@ type Gateway = 'asaas' | 'efi'
 const VALID_GATEWAYS: Gateway[] = ['asaas', 'efi']
 
 const ASAAS_URLS: Record<string, string> = {
-  sandbox:    'https://sandbox.asaas.com/api/v3/myAccount',
-  production: 'https://www.asaas.com/api/v3/myAccount',
+  sandbox:    'https://api-sandbox.asaas.com/v3/myAccount',
+  production: 'https://api.asaas.com/v3/myAccount',
 }
 
 // ─── POST /api/v1/ministry/gateway/test ───────────────────────────────────────
