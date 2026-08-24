@@ -33,7 +33,6 @@ export default function TesourariaTable({
 }: TesourariaTableProps) {
   const [selectedLanc, setSelectedLanc] = useState<any | null>(null);
   const [chargeDetails, setChargeDetails] = useState<any | null>(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Abrir modal de detalhes e buscar enriquecimento em fin_payment_charges se necessário
   const handleOpenDetails = async (lanc: any) => {
@@ -42,7 +41,6 @@ export default function TesourariaTable({
 
     if (lanc.origem_id) {
       try {
-        setLoadingDetails(true);
         const { createClient } = await import('@/lib/supabase-client');
         const supabase = createClient();
         const { data } = await supabase
@@ -61,8 +59,6 @@ export default function TesourariaTable({
         }
       } catch {
         // Se falhar o fetch adicional, os dados principais do lançamento continuam sendo exibidos
-      } finally {
-        setLoadingDetails(false);
       }
     }
   };
