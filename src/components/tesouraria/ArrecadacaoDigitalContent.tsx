@@ -65,7 +65,6 @@ interface ArrecadacaoDigitalContentProps {
   fmtDate: (d: string) => string;
   showModal: (title: string, message: string, type?: 'success' | 'error' | 'info') => void;
   onOpenNovoDestino: () => void;
-  onOpenEditDestino: (id: string) => void;
   onOpenQrModal: (destino: PaymentDestino) => void;
   destinosUpdatedKey: number;
 }
@@ -76,7 +75,6 @@ export default function ArrecadacaoDigitalContent({
   fmtDate,
   showModal,
   onOpenNovoDestino,
-  onOpenEditDestino,
   onOpenQrModal,
   destinosUpdatedKey,
 }: ArrecadacaoDigitalContentProps) {

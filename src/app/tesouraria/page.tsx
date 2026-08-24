@@ -1207,10 +1207,6 @@ export default function TesourariaPage() {
               t.setDestinoEditId(null);
               t.setShowDestinoModal(true);
             }}
-            onOpenEditDestino={(id) => {
-              t.setDestinoEditId(id);
-              t.setShowDestinoModal(true);
-            }}
             onOpenQrModal={(destino) => {
               t.setQrDestino(destino as any);
               t.setShowQrModal(true);
