@@ -18,6 +18,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/api-client';
+import ConfirmDeleteModal from '@/components/tesouraria/modals/ConfirmDeleteModal';
 
 interface Congregacao { id: string; nome: string }
 
@@ -209,22 +210,32 @@ export default function ArrecadacaoDigitalContent({
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Estados para Modais Customizados de Confirmação
+  const [confirmDesativarDestino, setConfirmDesativarDestino] = useState<{
+    id: string;
+    hasStaticPix: boolean;
+  } | null>(null);
+
+  const [confirmExcluirDestino, setConfirmExcluirDestino] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+
   // Alternar Status de Ativação do Destino
-  const handleToggleAtivo = async (id: string, currentAtivo: boolean, hasStaticPix: boolean) => {
+  const handleToggleAtivo = (id: string, currentAtivo: boolean, hasStaticPix: boolean) => {
     if (deactivatingId || deletingId) return; // Evita duplo clique
 
     if (currentAtivo) {
-      const confirmMsg = hasStaticPix
-        ? 'Este destino possui um QR Code PIX ativo. Ao desativá-lo, o QR Code impresso anteriormente deixará de aceitar novos pagamentos. Deseja continuar?'
-        : 'Deseja realmente desativar este destino de arrecadação?';
-
-      if (!window.confirm(confirmMsg)) {
-        return;
-      }
+      setConfirmDesativarDestino({ id, hasStaticPix });
+    } else {
+      executeToggleAtivo(id, false);
     }
+  };
 
+  const executeToggleAtivo = async (id: string, currentAtivo: boolean) => {
     try {
       setDeactivatingId(id);
+      setConfirmDesativarDestino(null);
       const res = await authenticatedFetch(`/api/v1/ministry/payment-destinations/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -246,16 +257,15 @@ export default function ArrecadacaoDigitalContent({
   };
 
   // Excluir definitivamente um destino inativo
-  const handleDeletePermanente = async (id: string, label: string) => {
+  const handleDeletePermanente = (id: string, label: string) => {
     if (deactivatingId || deletingId) return; // Evita duplo clique
+    setConfirmExcluirDestino({ id, label });
+  };
 
-    const confirmMsg = `Excluir destino "${label}"?\n\nEste destino está inativo e seu QR Code PIX já foi desativado no ASAAS. A exclusão é permanente e não pode ser desfeita.`;
-    if (!window.confirm(confirmMsg)) {
-      return;
-    }
-
+  const executeDeletePermanente = async (id: string, label: string) => {
     try {
       setDeletingId(id);
+      setConfirmExcluirDestino(null);
       const res = await authenticatedFetch(`/api/v1/ministry/payment-destinations/${id}`, {
         method: 'DELETE',
       });
@@ -771,6 +781,37 @@ export default function ArrecadacaoDigitalContent({
           </div>
         </div>
       )}
+
+      {/* ── MODAL CUSTOMIZADO: CONFIRMAÇÃO DE DESATIVAÇÃO ── */}
+      <ConfirmDeleteModal
+        isOpen={!!confirmDesativarDestino}
+        onClose={() => setConfirmDesativarDestino(null)}
+        onConfirm={() =>
+          confirmDesativarDestino && executeToggleAtivo(confirmDesativarDestino.id, true)
+        }
+        title="⚠️ Desativar Destino de Arrecadação"
+        description={
+          confirmDesativarDestino?.hasStaticPix
+            ? 'Este destino possui um QR Code PIX ativo no ASAAS. Ao desativá-lo, o QR Code impresso anteriormente deixará de aceitar novos pagamentos.'
+            : 'Deseja realmente desativar este destino de arrecadação?'
+        }
+        warningText="Você poderá reativar visualmente este destino mais tarde se necessário."
+        confirmText="Sim, Desativar Destino"
+      />
+
+      {/* ── MODAL CUSTOMIZADO: CONFIRMAÇÃO DE EXCLUSÃO DEFINITIVA ── */}
+      <ConfirmDeleteModal
+        isOpen={!!confirmExcluirDestino}
+        onClose={() => setConfirmExcluirDestino(null)}
+        onConfirm={() =>
+          confirmExcluirDestino &&
+          executeDeletePermanente(confirmExcluirDestino.id, confirmExcluirDestino.label)
+        }
+        title={`🗑️ Excluir Destino "${confirmExcluirDestino?.label || ''}"?`}
+        description="Este destino está inativo e seu QR Code PIX já foi removido no ASAAS. A exclusão é física, permanente e não pode ser desfeita."
+        warningText="Apenas destinos sem histórico financeiro contábil associado poderão ser excluídos fisicamente."
+        confirmText="Sim, Excluir Definitivamente"
+      />
     </div>
   );
 }
