@@ -28,6 +28,9 @@ export interface Lancamento {
   conta_id?: string | null;
   categoria_id?: string | null;
   member_id?: string | null;
+  origem_modulo?: string | null;
+  forma_pagamento?: string | null;
+  origem_id?: string | null;
   congregacao_nome?: string;
   departamento_nome?: string;
 }
