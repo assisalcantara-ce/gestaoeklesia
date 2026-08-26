@@ -4,8 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   QrCode,
   Plus,
-  Copy,
-  Check,
   Trash2,
   ShieldCheck,
   TrendingUp,
@@ -31,7 +29,6 @@ export interface PaymentDestino {
   categoria_id?: string | null;
   valor_fixo?: number | null;
   descricao?: string | null;
-  public_token: string;
   pix_qr_code_id?: string | null;
   pix_payload?: string | null;
   pix_external_reference?: string | null;
@@ -55,7 +52,6 @@ export interface FinCobrancaCharge {
   tesouraria_lancamento_id?: string | null;
   fin_payment_destinations?: {
     label: string;
-    public_token: string;
     congregacoes?: { nome: string } | null;
   } | null;
 }
@@ -88,7 +84,6 @@ export default function ArrecadacaoDigitalContent({
     configured: false,
     active: false,
   });
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   // Filtros de busca e status
   const [statusFiltro, setStatusFiltro] = useState<'ativo' | 'inativo'>('ativo');
@@ -186,7 +181,7 @@ export default function ArrecadacaoDigitalContent({
           id, destination_id, gateway_charge_id, valor_solicitado, valor_pago,
           payer_name, payer_document, status, paid_at, created_at, tesouraria_lancamento_id,
           fin_payment_destinations (
-            label, public_token, congregacoes (nome)
+            label, congregacoes (nome)
           )
         `)
         .order('created_at', { ascending: false })
@@ -284,15 +279,7 @@ export default function ArrecadacaoDigitalContent({
     }
   };
 
-  // Copiar link público
-  const handleCopyLink = async (token: string) => {
-    const url = `https://app.gestaoeklesia.com.br/pagar/${token}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopiedToken(token);
-      setTimeout(() => setCopiedToken(null), 2000);
-    } catch {}
-  };
+
 
   // Métricas Computadas
   const totalArrecadadoGlobal = destinos.reduce((acc, d) => acc + (d.total_arrecadado ?? 0), 0);
@@ -537,7 +524,6 @@ export default function ArrecadacaoDigitalContent({
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {destinos.map((d) => {
-                      const isCopied = copiedToken === d.public_token;
                       const hasStaticPix = Boolean(d.pix_payload);
 
                       return (
@@ -603,20 +589,10 @@ export default function ArrecadacaoDigitalContent({
                             <div className="flex items-center justify-center gap-1.5">
                               <button
                                 onClick={() => onOpenQrModal(d)}
-                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-bold rounded-lg flex items-center gap-1 transition"
-                                title="Visualizar/Imprimir QR Code"
+                                className="px-2.5 py-1.5 bg-[#123b63] hover:bg-[#1a4f85] text-white text-[11px] font-bold rounded-lg flex items-center gap-1 transition"
+                                title="Visualizar/Imprimir QR Code PIX"
                               >
-                                <QrCode className="h-3.5 w-3.5 text-[#123b63]" /> Ver QR
-                              </button>
-
-                              <button
-                                onClick={() => handleCopyLink(d.public_token)}
-                                className={`p-1.5 rounded-lg text-xs font-bold transition ${
-                                  isCopied ? 'bg-emerald-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-white'
-                                }`}
-                                title="Copiar link público"
-                              >
-                                {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                                <QrCode className="h-3.5 w-3.5 text-white" /> Ver QR Code PIX
                               </button>
 
                               {d.is_ativo ? (

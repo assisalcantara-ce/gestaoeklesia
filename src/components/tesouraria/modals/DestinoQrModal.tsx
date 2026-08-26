@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Check, Printer, X, ExternalLink, Grid, FileText } from 'lucide-react';
+import { Copy, Check, Printer, X, Grid, FileText } from 'lucide-react';
 
 interface DestinoQrModalProps {
   isOpen: boolean;
@@ -10,7 +10,6 @@ interface DestinoQrModalProps {
   destino: {
     id: string;
     label: string;
-    public_token: string;
     pix_payload?: string | null;
     tipo_recebimento: string;
     valor_fixo?: number | null;
@@ -20,24 +19,13 @@ interface DestinoQrModalProps {
 }
 
 export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: DestinoQrModalProps) {
-  const [copied, setCopied] = useState(false);
   const [copiedPayload, setCopiedPayload] = useState(false);
   const [showPrintOptionModal, setShowPrintOptionModal] = useState(false);
   const [printLayout, setPrintLayout] = useState<'1' | '8'>('1');
 
   if (!isOpen || !destino) return null;
 
-  const hasStaticPix = Boolean(destino.pix_payload);
-  const qrCodeValue = destino.pix_payload || `https://app.gestaoeklesia.com.br/pagar/${destino.public_token}`;
-  const publicUrl = `https://app.gestaoeklesia.com.br/pagar/${destino.public_token}`;
-
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(publicUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {}
-  };
+  const qrCodeValue = destino.pix_payload ?? '';
 
   const handleCopyPayload = async () => {
     if (!destino.pix_payload) return;
@@ -159,20 +147,12 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
           </div>
 
           {/* Destaque Explicativo */}
-          <div className={`p-3 rounded-xl text-center text-xs space-y-1 border ${
-            hasStaticPix
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              : 'bg-amber-50 border-amber-200 text-amber-900'
-          }`}>
+          <div className="p-3 rounded-xl text-center text-xs space-y-1 border bg-emerald-50 border-emerald-200 text-emerald-900">
             <p className="font-bold uppercase tracking-wide">
-              {hasStaticPix ? 'QR Code PIX de Pagamento' : 'QR Code de Acesso à Arrecadação'}
+              QR Code PIX de Pagamento
             </p>
             <p className="text-[11px]">
-              {hasStaticPix ? (
-                <>Abra o <strong>aplicativo do seu banco</strong> e leia este QR Code para contribuir via PIX.</>
-              ) : (
-                <>Aponte a <strong>câmera do celular</strong> para abrir a página de contribuição.</>
-              )}
+              Abra o <strong>aplicativo do seu banco</strong> e leia este QR Code para contribuir via PIX.
             </p>
           </div>
 
@@ -193,15 +173,15 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
             )}
           </div>
 
-          {/* Pix Copia e Cola / Link Público */}
-          {hasStaticPix ? (
+          {/* Pix Copia e Cola */}
+          {destino.pix_payload && (
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-600">Pix Copia e Cola (Banco)</label>
               <div className="flex gap-2 items-center">
                 <input
                   type="text"
                   readOnly
-                  value={destino.pix_payload ?? ''}
+                  value={destino.pix_payload}
                   className="flex-1 bg-slate-100 border border-slate-200 text-slate-700 text-xs font-mono rounded-xl px-3 py-2.5 outline-none select-all truncate"
                 />
                 <button
@@ -224,54 +204,16 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
                 </button>
               </div>
             </div>
-          ) : (
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-600">Link Público de Doação</label>
-              <div className="flex gap-2 items-center">
-                <input
-                  type="text"
-                  readOnly
-                  value={publicUrl}
-                  className="flex-1 bg-slate-100 border border-slate-200 text-slate-700 text-xs font-mono rounded-xl px-3 py-2.5 outline-none select-all"
-                />
-                <button
-                  onClick={handleCopyLink}
-                  className={`px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
-                    copied
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-slate-800 text-white hover:bg-slate-700'
-                  }`}
-                >
-                  {copied ? (
-                    <>
-                      <Check className="h-3.5 w-3.5" /> Copiado
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3.5 w-3.5" /> Copiar
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
           )}
 
           {/* Botões de Ação */}
           <div className="flex gap-2 pt-2">
             <button
               onClick={() => setShowPrintOptionModal(true)}
-              className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition"
+              className="w-full py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition"
             >
               <Printer className="h-4 w-4 text-[#123b63]" /> Imprimir Cartaz QR Code
             </button>
-            <a
-              href={publicUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2.5 bg-[#123b63] hover:bg-[#1a4f85] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition"
-            >
-              <ExternalLink className="h-3.5 w-3.5" /> Testar Link Web
-            </a>
           </div>
         </div>
       </div>
@@ -331,313 +273,270 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
         </div>
       )}
 
-      {/* ── ELEMENTOS EXCLUSIVOS DE IMPRESSÃO A4 (ISOLADO) ── */}
-      <div className="destino-print-only hidden">
-        {printLayout === '1' ? (
-          <div className="print-page-single">
-            <PosterCard isGrid={false} />
-          </div>
-        ) : (
-          <div className="print-page-grid">
-            {Array.from({ length: 8 }).map((_, idx) => (
-              <PosterCard key={idx} isGrid={true} />
-            ))}
-          </div>
-        )}
-      </div>
+      {/* ── ELEMENTOS EXCLUSIVOS DE IMPRESSÃO A4 (ISOLADOS E INDEPENDENTES) ── */}
+      {printLayout === '1' && (
+        <div className="pix-print-a4-single">
+          <PosterCard isGrid={false} />
+        </div>
+      )}
 
-      {/* ── CSS ISOLADO DE IMPRESSÃO A4 ── */}
+      {printLayout === '8' && (
+        <div className="pix-print-a4-grid">
+          {Array.from({ length: 8 }).map((_, idx) => (
+            <PosterCard key={idx} isGrid={true} />
+          ))}
+        </div>
+      )}
+
+      {/* ── CSS RIGOROSO DE IMPRESSÃO A4 (1 PÁGINA FIXA) ── */}
       <style jsx global>{`
         @media print {
           @page {
             size: A4 portrait;
-            margin: 0;
+            margin: 0 !important;
           }
 
-          /* Esconde todo o resto da aplicação de forma absoluta */
-          body, body * {
-            visibility: hidden !important;
+          /* Oculta absolutamente toda a aplicação e modais de tela */
+          html, body {
+            width: 210mm !important;
+            height: 297mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
             overflow: hidden !important;
+            background: #ffffff !important;
           }
 
-          /* Exibe exclusivamente o container do cartaz */
-          .destino-print-only, .destino-print-only * {
+          body * {
+            visibility: hidden !important;
+          }
+
+          /* Exibe exclusivamente o container de impressão ativo */
+          .pix-print-a4-single, .pix-print-a4-single *,
+          .pix-print-a4-grid, .pix-print-a4-grid * {
             visibility: visible !important;
           }
 
-          .destino-print-only {
-            display: block !important;
-            position: fixed !important;
+          /* ── MODELO 1 POR FOLHA (A4 COMPLETA 190mm x 277mm) ── */
+          .pix-print-a4-single {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
             width: 210mm !important;
             height: 297mm !important;
+            padding: 10mm !important;
+            box-sizing: border-box !important;
             background: #ffffff !important;
-            box-sizing: border-box !important;
-            z-index: 999999 !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
+            break-after: avoid !important;
+            break-inside: avoid !important;
+            overflow: hidden !important;
           }
 
-          /* ── ESTILOS DA ARTE VISUAL FIEL AOS MODELOS ── */
-          .poster-card {
+          .pix-print-a4-single .single-card {
+            width: 190mm !important;
+            height: 275mm !important;
             box-sizing: border-box !important;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
           }
 
-          .card-border {
+          .single-card .card-border {
             width: 100% !important;
             height: 100% !important;
-            border: 3px solid #053361 !important;
-            border-radius: 24px !important;
-            padding: 16px 14px 12px 14px !important;
+            border: 4px solid #053361 !important;
+            border-radius: 28px !important;
+            padding: 20px 24px 18px 24px !important;
             box-sizing: border-box !important;
             display: flex !important;
             flex-direction: column !important;
             align-items: center !important;
             justify-content: space-between !important;
-            background: #ffffff !important;
           }
 
-          .grid-card .card-border {
-            border-width: 2px !important;
-            border-radius: 14px !important;
-            padding: 6px 6px 4px 6px !important;
-          }
-
-          /* Cabeçalho Azul com Faixa Verde */
-          .card-header {
+          .single-card .card-header {
             width: 100% !important;
             background: #053361 !important;
-            border-radius: 12px !important;
-            padding: 12px 16px 10px 16px !important;
+            border-radius: 16px !important;
+            padding: 16px 20px 14px 20px !important;
             text-align: center !important;
-            box-sizing: border-box !important;
           }
 
-          .grid-card .card-header {
-            border-radius: 8px !important;
-            padding: 4px 6px 3px 6px !important;
-          }
-
-          .header-title {
-            color: #ffffff !important;
-            font-size: 26px !important;
+          .single-card .header-title {
+            font-size: 36px !important;
             font-weight: 900 !important;
-            letter-spacing: 0.05em !important;
-            margin: 0 !important;
-            text-transform: uppercase !important;
-            line-height: 1 !important;
+            letter-spacing: 0.06em !important;
           }
 
-          .grid-card .header-title {
-            font-size: 11px !important;
-            letter-spacing: 0.02em !important;
+          .single-card .header-green-line {
+            width: 70px !important;
+            height: 5px !important;
+            margin-top: 8px !important;
           }
 
-          .header-green-line {
-            width: 48px !important;
-            height: 4px !important;
-            background: #048a47 !important;
-            margin: 6px auto 0 auto !important;
-            border-radius: 2px !important;
-          }
-
-          .grid-card .header-green-line {
-            width: 20px !important;
-            height: 2px !important;
-            margin-top: 2px !important;
-          }
-
-          /* Texto de Instrução Direta */
-          .instruction-text {
-            color: #0f2942 !important;
-            font-size: 14px !important;
+          .single-card .instruction-text {
+            font-size: 18px !important;
             font-weight: 800 !important;
-            margin: 12px 0 8px 0 !important;
-            text-align: center !important;
-          }
-
-          .grid-card .instruction-text {
-            font-size: 7.5px !important;
-            margin: 3px 0 2px 0 !important;
-            font-weight: 700 !important;
-          }
-
-          /* Moldura do QR Code */
-          .qr-wrapper {
-            background: #ffffff !important;
-            border: 2px solid #e2e8f0 !important;
-            border-radius: 24px !important;
-            padding: 16px !important;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.04) !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            margin: 4px 0 !important;
+            margin: 14px 0 10px 0 !important;
           }
 
           .single-card .qr-wrapper {
-            border-radius: 28px !important;
-            padding: 22px !important;
+            border-radius: 32px !important;
+            padding: 24px !important;
+            border-width: 3px !important;
           }
 
-          .grid-card .qr-wrapper {
-            border-radius: 10px !important;
-            padding: 4px !important;
-            border-width: 1px !important;
+          .single-card .action-bar {
+            border-radius: 18px !important;
+            padding: 14px 20px !important;
+            gap: 16px !important;
           }
 
-          .card-valor {
+          .single-card .phone-svg {
+            width: 38px !important;
+            height: 38px !important;
+          }
+
+          .single-card .action-main {
+            font-size: 20px !important;
+          }
+
+          .single-card .action-sub {
             font-size: 14px !important;
-            font-weight: 800 !important;
-            color: #047857 !important;
-            background: #ecfdf5 !important;
-            border: 1px solid #a7f3d0 !important;
-            padding: 3px 12px !important;
-            border-radius: 8px !important;
-            margin: 2px 0 !important;
           }
 
-          .grid-card .card-valor {
-            font-size: 7.5px !important;
-            padding: 1px 4px !important;
+          .single-card .footer-biblical {
+            margin-top: 14px !important;
           }
 
-          /* Barra de Instrução com Ícone do Celular */
-          .action-bar {
-            width: 100% !important;
-            background: #ebf6f0 !important;
-            border-radius: 14px !important;
-            padding: 10px 14px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            gap: 12px !important;
+          .single-card .scripture-headline {
+            font-size: 20px !important;
+          }
+
+          .single-card .scripture-sub {
+            font-size: 13px !important;
+          }
+
+          .single-card .scripture-ref {
+            font-size: 12px !important;
+          }
+
+
+          /* ── MODELO 8 POR FOLHA (GRADE FIXA 2 colunas x 4 linhas EM 1 PÁGINA) ── */
+          .pix-print-a4-grid {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            grid-template-rows: repeat(4, 1fr) !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 210mm !important;
+            height: 297mm !important;
+            padding: 6mm 5mm !important;
+            gap: 3mm 4mm !important;
             box-sizing: border-box !important;
-            margin-top: 6px !important;
+            background: #ffffff !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
+            break-after: avoid !important;
+            break-inside: avoid !important;
+            overflow: hidden !important;
           }
 
-          .grid-card .action-bar {
-            border-radius: 6px !important;
-            padding: 3px 6px !important;
-            gap: 4px !important;
-            margin-top: 2px !important;
+          .pix-print-a4-grid .grid-card {
+            width: 96mm !important;
+            height: 68mm !important;
+            box-sizing: border-box !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            overflow: hidden !important;
           }
 
-          .phone-icon-box {
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            color: #048a47 !important;
-          }
-
-          .phone-svg {
-            width: 28px !important;
-            height: 28px !important;
-            stroke: #048a47 !important;
-          }
-
-          .grid-card .phone-svg {
-            width: 12px !important;
-            height: 12px !important;
-          }
-
-          .action-text {
+          .grid-card .card-border {
+            width: 100% !important;
+            height: 100% !important;
+            border: 2px solid #053361 !important;
+            border-radius: 12px !important;
+            padding: 5px 6px 4px 6px !important;
+            box-sizing: border-box !important;
             display: flex !important;
             flex-direction: column !important;
-            align-items: flex-start !important;
-            text-align: left !important;
+            align-items: center !important;
+            justify-content: space-between !important;
           }
 
-          .grid-card .action-text {
-            align-items: center !important;
+          .grid-card .card-header {
+            width: 100% !important;
+            background: #053361 !important;
+            border-radius: 6px !important;
+            padding: 3px 4px 2px 4px !important;
             text-align: center !important;
           }
 
-          .action-main {
-            color: #048a47 !important;
-            font-size: 15px !important;
+          .grid-card .header-title {
+            font-size: 10px !important;
             font-weight: 900 !important;
-            letter-spacing: 0.04em !important;
-            line-height: 1.1 !important;
+            letter-spacing: 0.02em !important;
+            line-height: 1 !important;
+          }
+
+          .grid-card .header-green-line {
+            width: 16px !important;
+            height: 2px !important;
+            margin: 2px auto 0 auto !important;
+          }
+
+          .grid-card .instruction-text {
+            font-size: 7px !important;
+            font-weight: 700 !important;
+            margin: 2px 0 1px 0 !important;
+          }
+
+          .grid-card .qr-wrapper {
+            border-radius: 8px !important;
+            padding: 3px !important;
+            border-width: 1px !important;
+            margin: 1px 0 !important;
+          }
+
+          .grid-card .action-bar {
+            border-radius: 5px !important;
+            padding: 2px 4px !important;
+            gap: 4px !important;
+            margin-top: 1px !important;
+          }
+
+          .grid-card .phone-svg {
+            width: 11px !important;
+            height: 11px !important;
           }
 
           .grid-card .action-main {
-            font-size: 7.5px !important;
-          }
-
-          .action-sub {
-            color: #0f2942 !important;
-            font-size: 11px !important;
+            font-size: 7px !important;
             font-weight: 900 !important;
-            letter-spacing: 0.03em !important;
+            line-height: 1 !important;
           }
 
           .grid-card .action-sub {
             font-size: 5.5px !important;
-          }
-
-          /* Rodapé Bíblico Inspiracional */
-          .footer-biblical {
-            width: 100% !important;
-            text-align: center !important;
-            margin-top: 10px !important;
-          }
-
-          .divider-line {
-            width: 80% !important;
-            height: 1px !important;
-            background: #a7f3d0 !important;
-            margin: 0 auto 8px auto !important;
-            position: relative !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-          }
-
-          .heart-icon {
-            background: #ffffff !important;
-            padding: 0 6px !important;
-            color: #048a47 !important;
-            font-size: 14px !important;
-          }
-
-          .scripture-headline {
-            font-family: 'Georgia', serif, italic !important;
-            font-style: italic !important;
-            color: #048a47 !important;
-            font-size: 16px !important;
-            margin: 0 0 2px 0 !important;
-          }
-
-          .scripture-sub {
-            color: #1e293b !important;
-            font-size: 10px !important;
             font-weight: 800 !important;
-            letter-spacing: 0.05em !important;
-            margin: 0 0 1px 0 !important;
+            line-height: 1 !important;
           }
 
-          .scripture-ref {
-            color: #475569 !important;
-            font-size: 9.5px !important;
-            font-weight: 700 !important;
-            letter-spacing: 0.06em !important;
+          .grid-card .grid-footer-biblical {
+            margin-top: 1px !important;
+            text-align: center !important;
+          }
+
+          .grid-card .grid-footer-biblical .scripture-headline {
+            font-size: 6px !important;
             margin: 0 !important;
           }
 
-          .grid-footer-biblical {
-            text-align: center !important;
-            margin-top: 2px !important;
-          }
-
-          .grid-footer-biblical .scripture-headline {
-            font-size: 6.5px !important;
-          }
-
-          .grid-footer-biblical .scripture-ref {
-            font-size: 5.5px !important;
+          .grid-card .grid-footer-biblical .scripture-ref {
+            font-size: 5px !important;
+            margin: 0 !important;
           }
         }
       `}</style>

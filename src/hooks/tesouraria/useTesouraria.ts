@@ -327,6 +327,7 @@ export function useTesouraria() {
   const [filtroCong, setFiltroCong] = useState('');
   const [filtroDept, setFiltroDept] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroOrigem, setFiltroOrigem] = useState<'' | 'manual' | 'arrecadacao_digital'>( '');
   const [filtroMovimento, setFiltroMovimento] = useState<'' | 'entrada' | 'saida'>('');
   const [filtroMes, setFiltroMes] = useState(mesAtual());
@@ -586,6 +587,33 @@ export function useTesouraria() {
     }
   }, [filtroMes, ministryId, loadLancamentosMes]);
 
+  // Subscription em Tempo Real (Supabase Realtime) para a tabela `tesouraria_lancamentos`
+  useEffect(() => {
+    if (!ministryId) return;
+
+    const channelName = `realtime-tesouraria-lancamentos-${ministryId}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tesouraria_lancamentos',
+          filter: `ministry_id=eq.${ministryId}`,
+        },
+        () => {
+          // Atualiza a lista de lançamentos do mês em tempo real ao detectar INSERT/UPDATE/DELETE no banco
+          loadLancamentosMes(filtroMes);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [ministryId, filtroMes, loadLancamentosMes, supabase]);
+
   // Buscar lançamentos quando o mês de referência do Relatório (relMes) alterar
   const [lancamentosRelMes, setLancamentosRelMes] = useState<Lancamento[]>([]);
 
@@ -798,6 +826,7 @@ export function useTesouraria() {
     return lancamentosMes.filter(l => {
       if (filtroMovimento && l.tipo_movimento !== filtroMovimento) return false;
       if (filtroTipo && l.tipo_recebimento !== filtroTipo) return false;
+      if (filtroCategoria && l.categoria_id !== filtroCategoria) return false;
       if (filtroCong && l.congregacao_id !== filtroCong) return false;
       if (filtroDept && l.departamento_id !== filtroDept) return false;
 
@@ -810,7 +839,7 @@ export function useTesouraria() {
 
       return true;
     });
-  }, [lancamentosMes, filtroMovimento, filtroTipo, filtroCong, filtroDept, filtroOrigem]);
+  }, [lancamentosMes, filtroMovimento, filtroTipo, filtroCategoria, filtroCong, filtroDept, filtroOrigem]);
 
   const entradasFiltradas = useMemo(() => {
     return lancsFiltrados.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
@@ -1043,6 +1072,17 @@ export function useTesouraria() {
         showModal('Erro', json.error ?? 'Falha ao salvar categoria.', 'error');
         return;
       }
+
+      // Recarrega a lista de categorias atualizada do Supabase
+      const { data: updatedCats } = await supabase
+        .from('fin_categorias')
+        .select('*')
+        .eq('is_ativa', true)
+        .order('nome');
+      if (updatedCats) {
+        setFinCategorias(updatedCats);
+      }
+
       showModal('Sucesso!', catEditId ? 'Categoria atualizada.' : 'Categoria criada.');
       setShowCatModal(false);
       setCatEditId(null);
@@ -1052,7 +1092,7 @@ export function useTesouraria() {
     } finally {
       setSavingCat(false);
     }
-  }, [formCat, catEditId, showModal]);
+  }, [formCat, catEditId, showModal, supabase]);
 
   const handleDeleteCat = useCallback(async (id: string) => {
     try {
@@ -1062,12 +1102,23 @@ export function useTesouraria() {
         showModal('Erro', json.error ?? 'Falha ao excluir categoria.', 'error');
         return;
       }
+
+      // Recarrega a lista de categorias atualizada do Supabase
+      const { data: updatedCats } = await supabase
+        .from('fin_categorias')
+        .select('*')
+        .eq('is_ativa', true)
+        .order('nome');
+      if (updatedCats) {
+        setFinCategorias(updatedCats);
+      }
+
       showModal('Excluída!', 'Categoria removida.');
       setConfirmDelCat(null);
     } catch (err: any) {
       showModal('Erro', err.message, 'error');
     }
-  }, [showModal]);
+  }, [showModal, supabase]);
 
   // Exportar CSV
   const exportarCSV = useCallback((dados: any[], filename: string) => {
@@ -1160,6 +1211,8 @@ export function useTesouraria() {
     setFiltroDept,
     filtroTipo,
     setFiltroTipo,
+    filtroCategoria,
+    setFiltroCategoria,
     filtroOrigem,
     setFiltroOrigem,
     filtroMovimento,

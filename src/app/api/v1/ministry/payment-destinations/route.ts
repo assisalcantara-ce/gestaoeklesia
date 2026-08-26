@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     .from('fin_payment_destinations')
     .select(`
       id, ministry_id, gateway_id, congregacao_id, conta_id, categoria_id,
-      tipo_recebimento, label, descricao, cor, icone, public_token,
+      tipo_recebimento, label, descricao, cor, icone,
       pix_qr_code_id, pix_payload, pix_external_reference,
       valor_fixo, is_ativo, expires_at, created_at, updated_at,
       congregacoes(nome)
@@ -290,7 +290,7 @@ export async function POST(request: NextRequest) {
     })
     .select(`
       id, ministry_id, gateway_id, congregacao_id, conta_id, categoria_id,
-      tipo_recebimento, label, descricao, public_token,
+      tipo_recebimento, label, descricao,
       pix_qr_code_id, pix_payload, pix_external_reference,
       valor_fixo, is_ativo, expires_at, created_at, updated_at
     `)

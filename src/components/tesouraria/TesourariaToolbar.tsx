@@ -9,6 +9,8 @@ export interface TesourariaToolbarProps {
   setFiltroMovimento: (val: '' | 'entrada' | 'saida') => void;
   filtroTipo: string;
   setFiltroTipo: (val: string) => void;
+  filtroCategoria?: string;
+  setFiltroCategoria?: (val: string) => void;
   filtroOrigem?: '' | 'manual' | 'arrecadacao_digital';
   setFiltroOrigem?: (val: '' | 'manual' | 'arrecadacao_digital') => void;
   filtroCong: string;
@@ -21,6 +23,7 @@ export interface TesourariaToolbarProps {
   };
   congregacoes: Array<{ id: string; nome: string }>;
   departamentos: Array<{ id: string; nome: string; sigla?: string }>;
+  finCategorias?: Array<{ id: string; nome: string; icone?: string; tipo_movimento?: string }>;
   TIPOS: Array<{ value: string; label: string }>;
   TIPOS_SAIDA: Array<{ value: string; label: string }>;
   MonthPicker: React.ComponentType<{ value: string; onChange: (v: string) => void; className?: string }>;
@@ -41,6 +44,8 @@ export default function TesourariaToolbar({
   setFiltroMovimento,
   filtroTipo,
   setFiltroTipo,
+  filtroCategoria = '',
+  setFiltroCategoria,
   filtroOrigem = '',
   setFiltroOrigem,
   filtroCong,
@@ -50,6 +55,7 @@ export default function TesourariaToolbar({
   scope,
   congregacoes,
   departamentos,
+  finCategorias,
   TIPOS,
   TIPOS_SAIDA,
   MonthPicker,
@@ -64,7 +70,7 @@ export default function TesourariaToolbar({
 }: TesourariaToolbarProps) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-md">
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1">Mês</label>
           <MonthPicker value={filtroMes} onChange={setFiltroMes} className="w-full" />
@@ -83,6 +89,7 @@ export default function TesourariaToolbar({
                 onClick={() => {
                   setFiltroMovimento(opt.v);
                   setFiltroTipo('');
+                  setFiltroCategoria?.('');
                 }}
                 className={`flex-1 text-xs font-medium transition px-1 ${
                   filtroMovimento === opt.v
@@ -116,6 +123,25 @@ export default function TesourariaToolbar({
               : TIPOS.map((t) => (
                   <option key={t.value} value={t.value}>
                     {t.label}
+                  </option>
+                ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1">Categoria Financeira</label>
+          <select
+            value={filtroCategoria}
+            onChange={(e) => setFiltroCategoria?.(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+          >
+            <option value="">Todas as categorias</option>
+            {finCategorias &&
+              finCategorias
+                .filter((c) => !filtroMovimento || c.tipo_movimento === filtroMovimento || c.tipo_movimento === 'ambos')
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.icone ? `${c.icone} ` : ''}
+                    {c.nome}
                   </option>
                 ))}
           </select>

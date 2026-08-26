@@ -164,6 +164,8 @@ export default function TesourariaPage() {
               setFiltroMovimento={t.setFiltroMovimento}
               filtroTipo={t.filtroTipo}
               setFiltroTipo={t.setFiltroTipo}
+              filtroCategoria={t.filtroCategoria}
+              setFiltroCategoria={t.setFiltroCategoria}
               filtroOrigem={t.filtroOrigem}
               setFiltroOrigem={t.setFiltroOrigem}
               filtroCong={t.filtroCong}
@@ -173,6 +175,7 @@ export default function TesourariaPage() {
               scope={t.scope}
               congregacoes={t.congregacoes}
               departamentos={t.departamentos}
+              finCategorias={t.finCategorias}
               TIPOS={t.TIPOS}
               TIPOS_SAIDA={t.TIPOS_SAIDA}
               MonthPicker={MonthPicker}
