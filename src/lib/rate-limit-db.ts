@@ -31,7 +31,6 @@ export async function consumeRateLimit(params: {
   windowMs: number
   now?: number
 }): Promise<RateLimitResult> {
-  const now = params.now ?? Date.now()
   const supabase = createServerClient()
 
   const windowSeconds = Math.max(Math.floor(params.windowMs / 1000), 1)
@@ -43,20 +42,20 @@ export async function consumeRateLimit(params: {
   } as any)
 
   if (error) {
-    const fallback = checkRateLimit({ key: params.bucketKey, limit: params.limit, windowMs: params.windowMs, now })
+    const fallback = checkRateLimit(params.bucketKey, params.limit, params.windowMs)
     if (fallback.allowed) {
-      return { ...fallback, source: 'memory' }
+      return { allowed: true, remaining: fallback.remaining, resetAt: fallback.resetAt, source: 'memory' }
     }
-    return { ...fallback, source: 'memory' }
+    return { allowed: false, remaining: 0, resetAt: fallback.resetAt, retryAfterSeconds: fallback.retryAfterSeconds, source: 'memory' }
   }
 
   const row = Array.isArray(data) ? data[0] : data
   if (!row) {
-    const fallback = checkRateLimit({ key: params.bucketKey, limit: params.limit, windowMs: params.windowMs, now })
+    const fallback = checkRateLimit(params.bucketKey, params.limit, params.windowMs)
     if (fallback.allowed) {
-      return { ...fallback, source: 'memory' }
+      return { allowed: true, remaining: fallback.remaining, resetAt: fallback.resetAt, source: 'memory' }
     }
-    return { ...fallback, source: 'memory' }
+    return { allowed: false, remaining: 0, resetAt: fallback.resetAt, retryAfterSeconds: fallback.retryAfterSeconds, source: 'memory' }
   }
 
   const allowed = Boolean((row as any).allowed)

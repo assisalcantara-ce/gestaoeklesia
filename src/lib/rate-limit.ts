@@ -1,63 +1,79 @@
-type RateLimitResult =
-  | {
-      allowed: true
-      remaining: number
-      resetAt: number
-    }
-  | {
-      allowed: false
-      remaining: 0
-      resetAt: number
-      retryAfterSeconds: number
-    }
+import { NextRequest } from 'next/server';
 
-type Bucket = {
-  count: number
-  resetAt: number
+interface RateLimitStore {
+  count: number;
+  resetAt: number;
 }
 
-function getStore(): Map<string, Bucket> {
-  const g = globalThis as unknown as { __gestaoeklesiaRateLimitStore?: Map<string, Bucket> }
-  if (!g.__gestaoeklesiaRateLimitStore) g.__gestaoeklesiaRateLimitStore = new Map()
-  return g.__gestaoeklesiaRateLimitStore
-}
+const ipRequestMap = new Map<string, RateLimitStore>();
 
-export function checkRateLimit(params: {
-  key: string
-  limit: number
-  windowMs: number
-  now?: number
-}): RateLimitResult {
-  const now = params.now ?? Date.now()
-  const store = getStore()
-
-  const existing = store.get(params.key)
-  if (!existing || existing.resetAt <= now) {
-    const resetAt = now + params.windowMs
-    store.set(params.key, { count: 1, resetAt })
-    return {
-      allowed: true,
-      remaining: Math.max(params.limit - 1, 0),
-      resetAt,
+// Limpar registros antigos da memória a cada 5 minutos
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of ipRequestMap.entries()) {
+    if (now > record.resetAt) {
+      ipRequestMap.delete(ip);
     }
   }
+}, 5 * 60 * 1000);
 
-  if (existing.count >= params.limit) {
-    const retryAfterSeconds = Math.max(Math.ceil((existing.resetAt - now) / 1000), 1)
+export function getClientIp(req: NextRequest): string {
+  const xForwardedFor = req.headers.get('x-forwarded-for');
+  if (xForwardedFor) {
+    const firstIp = xForwardedFor.split(',')[0].trim();
+    if (firstIp) return firstIp;
+  }
+  const xRealIp = req.headers.get('x-real-ip');
+  if (xRealIp) return xRealIp.trim();
+
+  return '127.0.0.1';
+}
+
+/**
+ * Rate Limiter simples em memória por IP ou por Chave customizada.
+ * @param reqOrKey NextRequest ou string key
+ * @param limit Número máximo de requisições por janela
+ * @param windowMs Duração da janela em milissegundos
+ * @returns objeto com allowed, remaining, resetAt e retryAfterSeconds
+ */
+export function checkRateLimit(
+  reqOrKey: NextRequest | string,
+  limit: number = 10,
+  windowMs: number = 60 * 1000
+): { allowed: boolean; remaining: number; resetAt: number; retryAfterSeconds: number } {
+  const key = typeof reqOrKey === 'string' ? reqOrKey : getClientIp(reqOrKey);
+  const now = Date.now();
+  const record = ipRequestMap.get(key);
+
+  if (!record || now > record.resetAt) {
+    const resetAt = now + windowMs;
+    ipRequestMap.set(key, {
+      count: 1,
+      resetAt,
+    });
+    return {
+      allowed: true,
+      remaining: limit - 1,
+      resetAt,
+      retryAfterSeconds: 0,
+    };
+  }
+
+  if (record.count >= limit) {
+    const retryAfterSeconds = Math.ceil((record.resetAt - now) / 1000);
     return {
       allowed: false,
       remaining: 0,
-      resetAt: existing.resetAt,
-      retryAfterSeconds,
-    }
+      resetAt: record.resetAt,
+      retryAfterSeconds: retryAfterSeconds > 0 ? retryAfterSeconds : 1,
+    };
   }
 
-  existing.count += 1
-  store.set(params.key, existing)
-
+  record.count += 1;
   return {
     allowed: true,
-    remaining: Math.max(params.limit - existing.count, 0),
-    resetAt: existing.resetAt,
-  }
+    remaining: limit - record.count,
+    resetAt: record.resetAt,
+    retryAfterSeconds: 0,
+  };
 }

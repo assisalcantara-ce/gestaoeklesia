@@ -5,6 +5,8 @@
 import { authenticatedFetch } from '@/lib/api-client';
 
 export interface ConfiguracaoIgreja {
+    id?: string;
+    slug?: string;
     nome: string;
     endereco: string;
     cnpj: string;

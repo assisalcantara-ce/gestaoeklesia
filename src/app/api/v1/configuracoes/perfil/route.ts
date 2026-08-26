@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     // Busca dados em ministries usando service_role (ctx.admin) — sem RLS
     const { data: ministryData, error: ministryErr } = await ctx.admin
       .from('ministries')
-      .select('name, email_admin, cnpj_cpf, phone, website, description, logo_url, created_at')
+      .select('id, slug, name, email_admin, cnpj_cpf, phone, website, description, logo_url, created_at')
       .eq('id', ctx.ministryId)
       .maybeSingle();
 
@@ -55,6 +55,8 @@ export async function GET(request: NextRequest) {
     const churchProfile = (configRow as any)?.church_profile || {};
 
     const responseData = {
+      id: ministryData?.id || ctx.ministryId,
+      slug: ministryData?.slug || '',
       nome: ministryData?.name || CONFIGURACAO_PADRAO.nome,
       endereco: churchProfile.endereco || CONFIGURACAO_PADRAO.endereco,
       cnpj: ministryData?.cnpj_cpf || '',

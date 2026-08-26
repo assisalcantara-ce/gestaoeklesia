@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useMembers } from '@/hooks/useMembers';
 import { useUserContext } from '@/hooks/useUserContext';
 import { getCargosMinisteriais, type CargoMinisterial } from '@/lib/cargos-utils';
-import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
+import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { getMensagemSemTemplate } from '@/lib/cartoes-utils';
 import { createClient } from '@/lib/supabase-client';
 import { loadTemplatesForCurrentUser } from '@/lib/cartoes-templates-sync';
@@ -341,7 +341,7 @@ export function useMembros() {
   const cpfInputRef = useRef<HTMLInputElement>(null);
 
   // ── Estado: configuração da igreja ──────────────────────────────────────────
-  const [configIgreja, setConfigIgreja] = useState({
+  const [configIgreja, setConfigIgreja] = useState<ConfiguracaoIgreja>({
     nome: 'Igreja/Ministério',
     endereco: '',
     cnpj: '',

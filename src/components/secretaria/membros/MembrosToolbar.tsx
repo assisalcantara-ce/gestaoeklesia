@@ -18,6 +18,7 @@ export interface MembrosToolbarProps {
   limiteMembrosAtingido: boolean;
   maxMembros: number;
   abrirNovoCadastro: () => void;
+  abrirCadastroPublico?: () => void;
   ultimoCadastro: any;
   gerarProximaMatricula: () => string;
   setDadosPessoais: (data: any) => void;
@@ -51,6 +52,7 @@ export default function MembrosToolbar({
   limiteMembrosAtingido,
   maxMembros,
   abrirNovoCadastro,
+  abrirCadastroPublico,
   ultimoCadastro,
   gerarProximaMatricula,
   setDadosPessoais,
@@ -151,6 +153,14 @@ export default function MembrosToolbar({
             <div className="flex flex-wrap gap-2 w-full md:w-auto">
               {!isSupervisor && (
                 <>
+                  <button
+                    onClick={() => abrirCadastroPublico?.()}
+                    className="px-4 py-2 bg-[#123b63] text-white hover:bg-[#0d2a47] rounded-lg transition font-semibold text-sm flex items-center gap-2 w-full sm:w-auto cursor-pointer shadow-sm"
+                    title="Ver QR Code e link público do portal de cadastros de membros"
+                  >
+                    <span>📱</span>
+                    <span>Cadastro Público</span>
+                  </button>
                   <Link
                     href="/secretaria/membros/importar"
                     className="px-4 py-2 bg-teal-600 text-white hover:bg-teal-700 rounded-lg transition font-semibold text-sm flex items-center gap-2 w-full sm:w-auto cursor-pointer"

@@ -10,8 +10,12 @@ import MembroFormModal from '@/components/secretaria/membros/MembroFormModal';
 import MembrosAniversariantesView from '@/components/secretaria/membros/MembrosAniversariantesView';
 import { useMembros } from '@/hooks/secretaria/useMembros';
 
+import { useState } from 'react';
+import PublicMemberQrModal from '@/components/secretaria/membros/PublicMemberQrModal';
+
 export default function MembrosPage() {
   const { bloqueado } = useRequireModulo('secretaria');
+  const [showPublicQrModal, setShowPublicQrModal] = useState(false);
 
   const {
     // Estado: membros e configuração
@@ -360,6 +364,7 @@ export default function MembrosPage() {
                 limiteMembrosAtingido={limiteMembrosAtingido}
                 maxMembros={maxMembros}
                 abrirNovoCadastro={abrirNovoCadastro}
+                abrirCadastroPublico={() => setShowPublicQrModal(true)}
                 ultimoCadastro={ultimoCadastro}
                 gerarProximaMatricula={gerarProximaMatricula}
                 setDadosPessoais={setDadosPessoais}
@@ -460,6 +465,14 @@ export default function MembrosPage() {
           )}
         </div>
       </div>
+
+      {/* Modal QR Code de Cadastro Público */}
+      <PublicMemberQrModal
+        isOpen={showPublicQrModal}
+        onClose={() => setShowPublicQrModal(false)}
+        institutionIdentifier={configIgreja.slug || (configIgreja as any).id || ''}
+        institutionName={configIgreja.nome || 'Igreja'}
+      />
     </>
   );
 }
