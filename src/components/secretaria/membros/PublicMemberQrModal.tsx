@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import html2canvas from 'html2canvas';
 import { Copy, Check, Printer, Download, X, QrCode, Globe, Smartphone, Building2 } from 'lucide-react';
 
 interface PublicMemberQrModalProps {
@@ -9,6 +10,7 @@ interface PublicMemberQrModalProps {
   onClose: () => void;
   institutionIdentifier: string; // slug ou id do ministério
   institutionName: string;
+  logoUrl?: string;
 }
 
 export default function PublicMemberQrModal({
@@ -16,8 +18,10 @@ export default function PublicMemberQrModal({
   onClose,
   institutionIdentifier,
   institutionName,
+  logoUrl,
 }: PublicMemberQrModalProps) {
   const [copied, setCopied] = useState(false);
+  const [generatingPng, setGeneratingPng] = useState(false);
 
   if (!isOpen || !institutionIdentifier) return null;
 
@@ -33,33 +37,34 @@ export default function PublicMemberQrModal({
     } catch {}
   };
 
-  const handleDownloadQr = () => {
-    const svgElement = document.getElementById('public-member-qr-svg');
-    if (!svgElement) return;
+  // Gerar a imagem PNG exatamente igual ao cartaz de impressão usando html2canvas
+  const handleDownloadPosterPng = async () => {
+    const posterElement = document.getElementById('a4-poster-printable-card');
+    if (!posterElement) return;
 
-    const svgData = new XMLSerializer().serializeToString(svgElement);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
+    try {
+      setGeneratingPng(true);
 
-    img.onload = () => {
-      canvas.width = img.width + 80;
-      canvas.height = img.height + 80;
-      if (ctx) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 40, 40);
-        const pngFile = canvas.toDataURL('image/png');
-        const downloadLink = document.createElement('a');
-        downloadLink.href = pngFile;
-        downloadLink.download = `qr-code-cadastro-membros-${institutionIdentifier}.png`;
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-      }
-    };
+      const canvas = await html2canvas(posterElement, {
+        scale: 3, // Alta resolução (impressão HD)
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
 
-    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+      const image = canvas.toDataURL('image/png', 1.0);
+      const downloadLink = document.createElement('a');
+      downloadLink.href = image;
+      downloadLink.download = `cartaz-cadastro-membros-${institutionIdentifier}.png`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    } catch (err) {
+      console.error('Erro ao gerar imagem PNG do cartaz:', err);
+    } finally {
+      setGeneratingPng(false);
+    }
   };
 
   const handlePrint = () => {
@@ -75,9 +80,17 @@ export default function PublicMemberQrModal({
           {/* Cabeçalho do Modal */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-[#123b63] text-white shadow-md shadow-[#123b63]/20">
-                <QrCode className="h-5 w-5" />
-              </div>
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={institutionName}
+                  className="h-10 w-10 object-contain rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
+                />
+              ) : (
+                <div className="p-2.5 rounded-xl bg-[#123b63] text-white shadow-md shadow-[#123b63]/20">
+                  <QrCode className="h-5 w-5" />
+                </div>
+              )}
               <div>
                 <h3 className="text-base font-extrabold text-slate-800 tracking-tight">
                   Cadastro Público de Membros
@@ -158,11 +171,12 @@ export default function PublicMemberQrModal({
           <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
             <button
               type="button"
-              onClick={handleDownloadQr}
-              className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition flex items-center gap-2"
+              onClick={handleDownloadPosterPng}
+              disabled={generatingPng}
+              className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition flex items-center gap-2 disabled:opacity-50"
             >
               <Download className="h-4 w-4 text-slate-600" />
-              Baixar Imagem PNG
+              {generatingPng ? 'Gerando PNG...' : 'Baixar Imagem PNG'}
             </button>
             
             <button
@@ -178,28 +192,32 @@ export default function PublicMemberQrModal({
         </div>
       </div>
 
-      {/* ── LAYOUT DE IMPRESSÃO A4 PROFISSIONAL (VISÍVEL APENAS AO IMPRIMIR) ── */}
+      {/* ── LAYOUT DE IMPRESSÃO A4 PROFISSIONAL (VISÍVEL APENAS AO IMPRIMIR E USADO NA GERAÇÃO DO PNG) ── */}
       <div className="member-qr-print-a4">
-        <div className="a4-poster-container">
+        <div id="a4-poster-printable-card" className="a4-poster-container">
           
-          {/* Topo / Header da Igreja */}
+          {/* Topo / Header da Igreja com Logomarca Dinâmica */}
           <div className="poster-header">
             <div className="church-icon-badge">
-              <Building2 className="w-10 h-10 text-[#053361]" />
+              {logoUrl ? (
+                <img src={logoUrl} alt={institutionName} className="church-logo-img" />
+              ) : (
+                <Building2 className="w-10 h-10 text-[#053361]" />
+              )}
             </div>
             <h1 className="church-title">{institutionName}</h1>
-            <div className="subtitle-badge">RECADASTRAMENTO & ATUALIZAÇÃO CADASTRAIL</div>
+            <div className="subtitle-badge">RECADASTRAMENTO & ATUALIZAÇÃO CADASTRAL</div>
           </div>
 
           {/* Chamada Principal */}
-          <div className="poster-[#053361] instruction-box">
+          <div className="instruction-box">
             <h2 className="headline-text">MANTENHA SEU CADASTRO ATUALIZADO!</h2>
             <p className="sub-headline">
               Aponte a câmera do seu celular para o QR Code abaixo e atualize suas informações de forma rápida e segura.
             </p>
           </div>
 
-          {/* Moldura Centralizada do QR Code */}
+          {/* Moldura Centralizada do QR Code (SEM O LINK/URL NA IMPRESSÃO) */}
           <div className="qr-frame-wrapper">
             <div className="qr-inner-card">
               <QRCodeSVG
@@ -209,32 +227,31 @@ export default function PublicMemberQrModal({
                 includeMargin={true}
               />
             </div>
-            <div className="qr-url-badge">{publicUrl}</div>
           </div>
 
-          {/* Instruções em Passos */}
-          <div className="steps-container">
-            <div className="step-card">
-              <div className="step-number">1</div>
-              <div className="step-content">
+          {/* Instruções em Passos (EMPILHADOS UM ACIMA DO OUTRO) */}
+          <div className="steps-container-vertical">
+            <div className="step-card-row">
+              <div className="step-number-badge">1</div>
+              <div className="step-content-row">
                 <strong>Aponte a Câmera</strong>
-                <span>Abra a câmera do celular no QR Code</span>
+                <span>Abra a câmera do celular no QR Code acima</span>
               </div>
             </div>
 
-            <div className="step-card">
-              <div className="step-number">2</div>
-              <div className="step-content">
+            <div className="step-card-row">
+              <div className="step-number-badge">2</div>
+              <div className="step-content-row">
                 <strong>Informe seu CPF</strong>
-                <span>Digite seu CPF para identificar seu registro</span>
+                <span>Digite seu CPF para consultar ou iniciar seu registro</span>
               </div>
             </div>
 
-            <div className="step-card">
-              <div className="step-number">3</div>
-              <div className="step-content">
+            <div className="step-card-row">
+              <div className="step-number-badge">3</div>
+              <div className="step-content-row">
                 <strong>Atualize seus Dados</strong>
-                <span>Confira e atualize seu endereço e contatos</span>
+                <span>Confira e mantenha seus contatos e endereço atualizados</span>
               </div>
             </div>
           </div>
@@ -244,7 +261,7 @@ export default function PublicMemberQrModal({
             <p className="footer-notice">
               Sem login ou senhas • Rápido, prático e 100% seguro
             </p>
-            <p className="footer-[#123b63] brand">
+            <p className="footer-brand">
               Gestão Eklésia — Plataforma de Gestão Eclesiástica
             </p>
           </div>
@@ -254,7 +271,7 @@ export default function PublicMemberQrModal({
 
       {/* ── CSS DE IMPRESSÃO EXCLUSIVO PARA FOLHA A4 ── */}
       <style jsx global>{`
-        /* Esconde o container de impressão na tela normal */
+        /* Esconde o container de impressão na tela normal da web */
         .member-qr-print-a4 {
           display: none !important;
         }
@@ -297,179 +314,186 @@ export default function PublicMemberQrModal({
             top: 0 !important;
             width: 210mm !important;
             height: 297mm !important;
-            padding: 10mm !important;
+            padding: 8mm !important;
             box-sizing: border-box !important;
             background: #ffffff !important;
           }
+        }
 
-          .a4-poster-container {
-            width: 190mm !important;
-            height: 277mm !important;
-            border: 4px solid #053361 !important;
-            border-radius: 24px !important;
-            padding: 24px !important;
-            box-sizing: border-box !important;
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: center !important;
-            justify-content: space-between !important;
-            text-align: center !important;
-            background: #ffffff !important;
-          }
+        /* Estilos do Cartaz A4 (usado tanto no print quanto no html2canvas para PNG) */
+        .a4-poster-container {
+          width: 190mm !important;
+          height: 277mm !important;
+          border: 4px solid #053361 !important;
+          border-radius: 24px !important;
+          padding: 20px 24px !important;
+          box-sizing: border-box !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          text-align: center !important;
+          background: #ffffff !important;
+          font-family: system-ui, -apple-system, sans-serif !important;
+        }
 
-          /* Topo */
-          .church-icon-badge {
-            width: 60px !important;
-            height: 60px !important;
-            background: #f0f4f8 !important;
-            border-radius: 16px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            margin: 0 auto 8px auto !important;
-            border: 1px solid #cbd5e1 !important;
-          }
+        /* Topo */
+        .poster-header {
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+        }
 
-          .church-title {
-            font-size: 26px !important;
-            font-weight: 900 !important;
-            color: #053361 !important;
-            text-transform: uppercase !important;
-            letter-spacing: -0.02em !important;
-            margin: 0 0 6px 0 !important;
-            line-height: 1.1 !important;
-          }
+        .church-icon-badge {
+          width: 68px !important;
+          height: 68px !important;
+          background: #ffffff !important;
+          border-radius: 18px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          margin: 0 auto 6px auto !important;
+          border: 2px solid #e2e8f0 !important;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+          overflow: hidden !important;
+        }
 
-          .subtitle-badge {
-            display: inline-block !important;
-            background: #053361 !important;
-            color: #ffffff !important;
-            font-size: 11px !important;
-            font-weight: 800 !important;
-            padding: 4px 14px !important;
-            border-radius: 20px !important;
-            letter-spacing: 0.08em !important;
-          }
+        .church-logo-img {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: contain !important;
+          padding: 4px !important;
+        }
 
-          /* Caixa de Chamada */
-          .instruction-box {
-            margin: 10px 0 !important;
-          }
+        .church-title {
+          font-size: 24px !important;
+          font-weight: 900 !important;
+          color: #053361 !important;
+          text-transform: uppercase !important;
+          letter-spacing: -0.01em !important;
+          margin: 0 0 4px 0 !important;
+          line-height: 1.1 !important;
+        }
 
-          .headline-text {
-            font-size: 22px !important;
-            font-weight: 900 !important;
-            color: #053361 !important;
-            margin: 0 0 6px 0 !important;
-            letter-spacing: 0.02em !important;
-          }
+        .subtitle-badge {
+          display: inline-block !important;
+          background: #053361 !important;
+          color: #ffffff !important;
+          font-size: 10px !important;
+          font-weight: 800 !important;
+          padding: 4px 14px !important;
+          border-radius: 20px !important;
+          letter-spacing: 0.08em !important;
+        }
 
-          .sub-headline {
-            font-size: 13px !important;
-            color: #475569 !important;
-            max-width: 140mm !important;
-            margin: 0 auto !important;
-            line-height: 1.3 !important;
-          }
+        /* Caixa de Chamada */
+        .instruction-box {
+          margin: 4px 0 !important;
+        }
 
-          /* Moldura do QR Code */
-          .qr-frame-wrapper {
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: center !important;
-            margin: 8px 0 !important;
-          }
+        .headline-text {
+          font-size: 21px !important;
+          font-weight: 900 !important;
+          color: #053361 !important;
+          margin: 0 0 4px 0 !important;
+          letter-spacing: 0.02em !important;
+        }
 
-          .qr-inner-card {
-            background: #ffffff !important;
-            padding: 20px !important;
-            border-radius: 24px !important;
-            border: 3px solid #053361 !important;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
-          }
+        .sub-headline {
+          font-size: 12px !important;
+          color: #475569 !important;
+          max-width: 150mm !important;
+          margin: 0 auto !important;
+          line-height: 1.3 !important;
+        }
 
-          .qr-url-badge {
-            margin-top: 12px !important;
-            font-family: monospace !important;
-            font-size: 11px !important;
-            color: #334155 !important;
-            background: #f1f5f9 !important;
-            padding: 4px 16px !important;
-            border-radius: 20px !important;
-            border: 1px solid #cbd5e1 !important;
-          }
+        /* Moldura do QR Code */
+        .qr-frame-wrapper {
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          margin: 4px 0 !important;
+        }
 
-          /* Passos */
-          .steps-container {
-            display: flex !important;
-            justify-content: space-between !important;
-            width: 100% !important;
-            gap: 12px !important;
-            margin: 10px 0 !important;
-          }
+        .qr-inner-card {
+          background: #ffffff !important;
+          padding: 16px !important;
+          border-radius: 24px !important;
+          border: 3px solid #053361 !important;
+          box-shadow: 0 8px 20px -4px rgba(5, 51, 97, 0.15) !important;
+        }
 
-          .step-card {
-            flex: 1 !important;
-            background: #f8fafc !important;
-            border: 1px solid #e2e8f0 !important;
-            border-radius: 14px !important;
-            padding: 10px 8px !important;
-            display: flex !important;
-            align-items: center !important;
-            gap: 10px !important;
-            text-align: left !important;
-          }
+        /* Passos Empilhados Verticalmente */
+        .steps-container-vertical {
+          display: flex !important;
+          flex-direction: column !important;
+          width: 100% !important;
+          gap: 8px !important;
+          margin: 6px 0 !important;
+        }
 
-          .step-number {
-            width: 32px !important;
-            height: 32px !important;
-            background: #053361 !important;
-            color: #ffffff !important;
-            border-radius: 10px !important;
-            font-size: 16px !important;
-            font-weight: 900 !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            shrink: 0 !important;
-          }
+        .step-card-row {
+          width: 100% !important;
+          background: #f8fafc !important;
+          border: 1.5px solid #cbd5e1 !important;
+          border-radius: 12px !important;
+          padding: 8px 14px !important;
+          display: flex !important;
+          align-items: center !important;
+          gap: 14px !important;
+          text-align: left !important;
+          box-sizing: border-box !important;
+        }
 
-          .step-content {
-            display: flex !important;
-            flex-direction: column !important;
-          }
+        .step-number-badge {
+          width: 30px !important;
+          height: 30px !important;
+          background: #053361 !important;
+          color: #ffffff !important;
+          border-radius: 10px !important;
+          font-size: 15px !important;
+          font-weight: 900 !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          shrink: 0 !important;
+        }
 
-          .step-content strong {
-            font-size: 11px !important;
-            color: #0f172a !important;
-            line-height: 1.2 !important;
-          }
+        .step-content-row {
+          display: flex !important;
+          flex-direction: column !important;
+        }
 
-          .step-content span {
-            font-size: 9px !important;
-            color: #64748b !important;
-            line-height: 1.1 !important;
-          }
+        .step-content-row strong {
+          font-size: 12px !important;
+          color: #0f172a !important;
+          line-height: 1.2 !important;
+        }
 
-          /* Rodapé */
-          .poster-footer {
-            border-top: 1px border #e2e8f0 !important;
-            padding-top: 8px !important;
-            width: 100% !important;
-          }
+        .step-content-row span {
+          font-size: 10px !important;
+          color: #64748b !important;
+          line-height: 1.1 !important;
+        }
 
-          .footer-notice {
-            font-size: 11px !important;
-            font-weight: 700 !important;
-            color: #053361 !important;
-            margin: 0 0 2px 0 !important;
-          }
+        /* Rodapé */
+        .poster-footer {
+          border-top: 1px solid #e2e8f0 !important;
+          padding-top: 8px !important;
+          width: 100% !important;
+        }
 
-          .footer-brand {
-            font-size: 9px !important;
-            color: #94a3b8 !important;
-            margin: 0 !important;
-          }
+        .footer-notice {
+          font-size: 11px !important;
+          font-weight: 800 !important;
+          color: #053361 !important;
+          margin: 0 0 2px 0 !important;
+        }
+
+        .footer-brand {
+          font-size: 9.5px !important;
+          color: #64748b !important;
+          margin: 0 !important;
         }
       `}</style>
     </>

@@ -472,6 +472,7 @@ export default function MembrosPage() {
         onClose={() => setShowPublicQrModal(false)}
         institutionIdentifier={configIgreja.slug || (configIgreja as any).id || ''}
         institutionName={configIgreja.nome || 'Igreja'}
+        logoUrl={configIgreja.logo}
       />
     </>
   );
