@@ -557,10 +557,10 @@ export default function PublicMemberPage({ params }: PageProps) {
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="col-span-1 sm:col-span-1">
                     <label className="block text-xs font-bold text-slate-600 mb-1">CEP</label>
-                    <div className="relative flex items-center">
+                    <div className="flex gap-1.5">
                       <input
                         type="text"
                         placeholder="00000-000"
@@ -568,31 +568,30 @@ export default function PublicMemberPage({ params }: PageProps) {
                         onChange={(e) => setFormData({ ...formData, cep: formatCep(e.target.value) })}
                         onBlur={handleCepBlur}
                         maxLength={9}
-                        className="w-full pl-3 pr-9 py-2.5 border border-slate-300 rounded-xl text-sm outline-none focus:border-[#123b63]"
+                        className="flex-1 min-w-0 px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none focus:border-[#123b63]"
                       />
                       <button
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
-                          // Blur no input ativo para remover o foco e disparar a busca
                           if (document.activeElement instanceof HTMLElement) {
                             document.activeElement.blur();
                           }
                           handleCepBlur();
                         }}
                         disabled={searchingCep || formData.cep.replace(/\D/g, '').length !== 8}
-                        title="Buscar endereço pelo CEP"
-                        className="absolute right-1.5 p-1.5 text-slate-400 hover:text-[#123b63] hover:bg-slate-100 rounded-lg transition active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="px-3 py-2.5 bg-[#123b63] hover:bg-[#0d2a47] text-white font-bold rounded-xl text-xs shadow-sm transition active:scale-95 flex items-center gap-1 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {searchingCep ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-[#123b63]" />
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
-                          <Search className="h-4 w-4" />
+                          <Search className="h-3.5 w-3.5" />
                         )}
+                        <span>Buscar</span>
                       </button>
                     </div>
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <label className="block text-xs font-bold text-slate-600 mb-1">Logradouro / Rua</label>
                     <input
                       type="text"
