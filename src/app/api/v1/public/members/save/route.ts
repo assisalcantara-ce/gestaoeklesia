@@ -123,32 +123,39 @@ export async function POST(request: NextRequest) {
     .or(`cpf.eq.${cleanCpf},cpf.eq.${formattedCpf}`)
     .maybeSingle();
 
+  // Helper para sanitizar valores: converte string vazia em null
+  const cleanVal = (val: any) => {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'string' && val.trim() === '') return null;
+    return val;
+  };
+
   // ── 6. LÓGICA DE UPDATE (Membro já existente) ──────────────────────────────
   if (existingMember) {
     // Para membro existente, montar o payload contendo EXCLUSIVAMENTE os campos públicos permitidos
     const updatePayload: Record<string, any> = {
-      email: typeof normalizedBody.email === 'string' ? normalizedBody.email.toLowerCase() : normalizedBody.email ?? null,
-      phone: normalizedBody.phone ?? null,
-      celular: normalizedBody.celular ?? null,
-      whatsapp: normalizedBody.whatsapp ?? null,
-      data_nascimento: normalizedBody.data_nascimento ?? null,
-      sexo: normalizedBody.sexo ?? null,
-      estado_civil: normalizedBody.estado_civil ?? null,
-      nome_conjuge: normalizedBody.nome_conjuge ?? null,
-      cpf_conjuge: normalizedBody.cpf_conjuge ?? null,
-      data_nascimento_conjuge: normalizedBody.data_nascimento_conjuge ?? null,
-      profissao: normalizedBody.profissao ?? null,
-      cep: normalizedBody.cep ?? null,
-      logradouro: normalizedBody.logradouro ?? null,
-      numero: normalizedBody.numero ?? null,
-      bairro: normalizedBody.bairro ?? null,
-      complemento: normalizedBody.complemento ?? null,
-      cidade: normalizedBody.cidade ?? null,
-      estado: normalizedBody.estado ?? null,
-      escolaridade: normalizedBody.escolaridade ?? null,
-      nacionalidade: normalizedBody.nacionalidade ?? null,
-      naturalidade: normalizedBody.naturalidade ?? null,
-      uf_naturalidade: normalizedBody.uf_naturalidade ?? null,
+      email: typeof normalizedBody.email === 'string' && normalizedBody.email.trim() ? normalizedBody.email.toLowerCase().trim() : null,
+      phone: cleanVal(normalizedBody.phone),
+      celular: cleanVal(normalizedBody.celular),
+      whatsapp: cleanVal(normalizedBody.whatsapp),
+      data_nascimento: cleanVal(normalizedBody.data_nascimento),
+      sexo: cleanVal(normalizedBody.sexo),
+      estado_civil: cleanVal(normalizedBody.estado_civil),
+      nome_conjuge: cleanVal(normalizedBody.nome_conjuge),
+      cpf_conjuge: cleanVal(normalizedBody.cpf_conjuge),
+      data_nascimento_conjuge: cleanVal(normalizedBody.data_nascimento_conjuge),
+      profissao: cleanVal(normalizedBody.profissao),
+      cep: cleanVal(normalizedBody.cep),
+      logradouro: cleanVal(normalizedBody.logradouro),
+      numero: cleanVal(normalizedBody.numero),
+      bairro: cleanVal(normalizedBody.bairro),
+      complemento: cleanVal(normalizedBody.complemento),
+      cidade: cleanVal(normalizedBody.cidade),
+      estado: cleanVal(normalizedBody.estado),
+      escolaridade: cleanVal(normalizedBody.escolaridade),
+      nacionalidade: cleanVal(normalizedBody.nacionalidade),
+      naturalidade: cleanVal(normalizedBody.naturalidade),
+      uf_naturalidade: cleanVal(normalizedBody.uf_naturalidade),
       updated_at: new Date().toISOString(),
     };
 
@@ -161,7 +168,7 @@ export async function POST(request: NextRequest) {
     if (updateErr) {
       console.error('[POST /api/v1/public/members/save] Update error:', updateErr);
       return NextResponse.json(
-        { error: 'Erro ao atualizar dados cadastrais do membro.' },
+        { error: updateErr.message || 'Erro ao atualizar dados cadastrais do membro.' },
         { status: 500 }
       );
     }
@@ -204,31 +211,31 @@ export async function POST(request: NextRequest) {
     ministry_id: ministryId,
     name: normalizedBody.name.trim(),
     cpf: cleanCpf,
-    email: typeof normalizedBody.email === 'string' ? normalizedBody.email.toLowerCase() : normalizedBody.email ?? null,
-    phone: normalizedBody.phone ?? null,
-    celular: normalizedBody.celular ?? null,
-    whatsapp: normalizedBody.whatsapp ?? null,
-    data_nascimento: normalizedBody.data_nascimento ?? null,
-    sexo: normalizedBody.sexo ?? null,
-    estado_civil: normalizedBody.estado_civil ?? null,
-    nome_conjuge: normalizedBody.nome_conjuge ?? null,
-    cpf_conjuge: normalizedBody.cpf_conjuge ?? null,
-    data_nascimento_conjuge: normalizedBody.data_nascimento_conjuge ?? null,
-    profissao: normalizedBody.profissao ?? null,
-    cep: normalizedBody.cep ?? null,
-    logradouro: normalizedBody.logradouro ?? null,
-    numero: normalizedBody.numero ?? null,
-    bairro: normalizedBody.bairro ?? null,
-    complemento: normalizedBody.complemento ?? null,
-    cidade: normalizedBody.cidade ?? null,
-    estado: normalizedBody.estado ?? null,
-    escolaridade: normalizedBody.escolaridade ?? null,
-    nacionalidade: normalizedBody.nacionalidade ?? null,
-    naturalidade: normalizedBody.naturalidade ?? null,
-    uf_naturalidade: normalizedBody.uf_naturalidade ?? null,
+    email: typeof normalizedBody.email === 'string' && normalizedBody.email.trim() ? normalizedBody.email.toLowerCase().trim() : null,
+    phone: cleanVal(normalizedBody.phone),
+    celular: cleanVal(normalizedBody.celular),
+    whatsapp: cleanVal(normalizedBody.whatsapp),
+    data_nascimento: cleanVal(normalizedBody.data_nascimento),
+    sexo: cleanVal(normalizedBody.sexo),
+    estado_civil: cleanVal(normalizedBody.estado_civil),
+    nome_conjuge: cleanVal(normalizedBody.nome_conjuge),
+    cpf_conjuge: cleanVal(normalizedBody.cpf_conjuge),
+    data_nascimento_conjuge: cleanVal(normalizedBody.data_nascimento_conjuge),
+    profissao: cleanVal(normalizedBody.profissao),
+    cep: cleanVal(normalizedBody.cep),
+    logradouro: cleanVal(normalizedBody.logradouro),
+    numero: cleanVal(normalizedBody.numero),
+    bairro: cleanVal(normalizedBody.bairro),
+    complemento: cleanVal(normalizedBody.complemento),
+    cidade: cleanVal(normalizedBody.cidade),
+    estado: cleanVal(normalizedBody.estado),
+    escolaridade: cleanVal(normalizedBody.escolaridade),
+    nacionalidade: cleanVal(normalizedBody.nacionalidade),
+    naturalidade: cleanVal(normalizedBody.naturalidade),
+    uf_naturalidade: cleanVal(normalizedBody.uf_naturalidade),
     tipo_cadastro: 'membro',
     status: 'active',
-    member_since: new Date().toISOString(),
+    member_since: new Date().toISOString().split('T')[0],
   };
 
   const { error: insertErr } = await admin
@@ -245,7 +252,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: 'Erro ao registrar novo membro.' },
+      { error: insertErr.message || 'Erro ao registrar novo membro.' },
       { status: 500 }
     );
   }
