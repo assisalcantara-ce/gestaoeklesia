@@ -580,14 +580,14 @@ export default function PublicMemberPage({ params }: PageProps) {
                           handleCepBlur();
                         }}
                         disabled={searchingCep || formData.cep.replace(/\D/g, '').length !== 8}
-                        className="px-3 py-2.5 bg-[#123b63] hover:bg-[#0d2a47] text-white font-bold rounded-xl text-xs shadow-sm transition active:scale-95 flex items-center gap-1 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Buscar CEP"
+                        className="px-3 py-2.5 bg-[#123b63] hover:bg-[#0d2a47] text-white font-bold rounded-xl shadow-sm transition active:scale-95 flex items-center justify-center shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {searchingCep ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <Search className="h-3.5 w-3.5" />
+                          <Search className="h-4 w-4" />
                         )}
-                        <span>Buscar</span>
                       </button>
                     </div>
                   </div>
