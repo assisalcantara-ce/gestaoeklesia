@@ -469,7 +469,7 @@ export default function PublicMemberPage({ params }: PageProps) {
                     <label className="block text-xs font-bold text-slate-600 mb-1">Nacionalidade</label>
                     <input
                       type="text"
-                      placeholder="Ex: Brasileira"
+                      placeholder="Ex: BRASILEIRA"
                       value={formData.nacionalidade}
                       onChange={(e) => setFormData({ ...formData, nacionalidade: e.target.value })}
                       className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none"
@@ -477,13 +477,13 @@ export default function PublicMemberPage({ params }: PageProps) {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1">Naturalidade / UF</label>
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <input
                         type="text"
                         placeholder="Cidade"
                         value={formData.naturalidade}
                         onChange={(e) => setFormData({ ...formData, naturalidade: e.target.value })}
-                        className="flex-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none"
+                        className="col-span-2 w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none min-w-0"
                       />
                       <input
                         type="text"
@@ -491,7 +491,7 @@ export default function PublicMemberPage({ params }: PageProps) {
                         placeholder="UF"
                         value={formData.uf_naturalidade}
                         onChange={(e) => setFormData({ ...formData, uf_naturalidade: e.target.value.toUpperCase() })}
-                        className="w-16 px-2 py-2.5 border border-slate-300 rounded-xl text-sm uppercase text-center outline-none"
+                        className="col-span-1 w-full px-2 py-2.5 border border-slate-300 rounded-xl text-sm uppercase text-center outline-none min-w-0"
                       />
                     </div>
                   </div>
