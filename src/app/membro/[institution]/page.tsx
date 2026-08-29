@@ -244,30 +244,31 @@ export default function PublicMemberPage({ params }: PageProps) {
       ctx.fillRect(0, 0, targetWidth, targetHeight);
 
       ctx.save();
-      // Mover origem para o centro do canvas
+      // Mover origem para o centro do canvas (180, 240)
       ctx.translate(targetWidth / 2, targetHeight / 2);
       ctx.rotate((rotation * Math.PI) / 180);
 
-      // Dimensoes fisicas do container de preview no modal (w-56 = 224px, h-72 = 288px)
-      const previewViewportWidth = 224;
-      const previewViewportHeight = 288;
-
-      // Fator de multiplicacao entre a tela de preview do usuario e a imagem real exportada no Canvas (360 / 224 = 1.6071)
-      const factorX = targetWidth / previewViewportWidth;
-      const factorY = targetHeight / previewViewportHeight;
-
-      // Calcular dimensoes equivalentes ao 'object-cover' do CSS no container 224x288
-      const coverRatio = Math.max(previewViewportWidth / img.width, previewViewportHeight / img.height);
+      // No CSS da preview:
+      // a div externa tem 224x288px (proporção 3:4).
+      // a tag <img> possui w-full h-full object-cover.
+      // a imagem sem zoom já é redimensionada por (coverScale) para cobrir 224x288.
+      // Em seguida, o transform aplica scale(zoom) e translateX(position.x) translateY(position.y) em pixels da própria imagem.
       
-      // Aplicar o zoom e ajustar para o tamanho real do Canvas exportado
-      const drawWidth = img.width * coverRatio * zoom * factorX;
-      const drawHeight = img.height * coverRatio * zoom * factorY;
+      // Proporção de escala cover da imagem para caber no Canvas de 360x480 (3:4):
+      const canvasCoverScale = Math.max(targetWidth / img.width, targetHeight / img.height);
 
-      // Posiçao deslocada proporcionalmente (position.x * factorX, position.y * factorY)
-      const offsetX = position.x * factorX;
-      const offsetY = position.y * factorY;
+      // Largura e altura desenhadas com zoom
+      const drawWidth = img.width * canvasCoverScale * zoom;
+      const drawHeight = img.height * canvasCoverScale * zoom;
 
-      // Desenhar no Canvas centralizado com as translaçoes exatas do preview
+      // Na preview, a div tem 224px de largura e o canvas tem 360px.
+      // O fator de escala dos controles (translateX/translateY) em relação ao canvas é exatamente (360 / 224)
+      const scaleFactor = targetWidth / 224;
+
+      const offsetX = position.x * scaleFactor;
+      const offsetY = position.y * scaleFactor;
+
+      // Desenhar centralizado com o deslocamento exato
       ctx.drawImage(
         img,
         -drawWidth / 2 + offsetX,
