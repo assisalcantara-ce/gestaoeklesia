@@ -248,16 +248,30 @@ export default function PublicMemberPage({ params }: PageProps) {
       ctx.translate(targetWidth / 2, targetHeight / 2);
       ctx.rotate((rotation * Math.PI) / 180);
 
-      // Calcular dimensões proporcionais
-      const scaleCover = Math.max(targetWidth / img.width, targetHeight / img.height);
-      const drawWidth = img.width * scaleCover * zoom;
-      const drawHeight = img.height * scaleCover * zoom;
+      // Dimensoes fisicas do container de preview no modal (w-56 = 224px, h-72 = 288px)
+      const previewViewportWidth = 224;
+      const previewViewportHeight = 288;
 
-      // Desenhar com translação e zoom ajustados pelo usuário
+      // Fator de multiplicacao entre a tela de preview do usuario e a imagem real exportada no Canvas (360 / 224 = 1.6071)
+      const factorX = targetWidth / previewViewportWidth;
+      const factorY = targetHeight / previewViewportHeight;
+
+      // Calcular dimensoes equivalentes ao 'object-cover' do CSS no container 224x288
+      const coverRatio = Math.max(previewViewportWidth / img.width, previewViewportHeight / img.height);
+      
+      // Aplicar o zoom e ajustar para o tamanho real do Canvas exportado
+      const drawWidth = img.width * coverRatio * zoom * factorX;
+      const drawHeight = img.height * coverRatio * zoom * factorY;
+
+      // Posiçao deslocada proporcionalmente (position.x * factorX, position.y * factorY)
+      const offsetX = position.x * factorX;
+      const offsetY = position.y * factorY;
+
+      // Desenhar no Canvas centralizado com as translaçoes exatas do preview
       ctx.drawImage(
         img,
-        -drawWidth / 2 + position.x,
-        -drawHeight / 2 + position.y,
+        -drawWidth / 2 + offsetX,
+        -drawHeight / 2 + offsetY,
         drawWidth,
         drawHeight
       );
