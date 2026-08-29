@@ -616,7 +616,7 @@ export default function PublicMemberPage({ params }: PageProps) {
                 {/* UPLOAD / EXIBIÇÃO DA FOTO DE PERFIL */}
                 <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                   <div className="relative group shrink-0">
-                    <div className="w-24 h-24 rounded-2xl overflow-hidden bg-slate-200 border-2 border-[#123b63]/30 shadow-md flex items-center justify-center relative">
+                    <div className="w-24 h-32 rounded-2xl overflow-hidden bg-slate-200 border-2 border-[#123b63]/30 shadow-md flex items-center justify-center relative">
                       {formData.foto_url ? (
                         <img
                           src={formData.foto_url}
@@ -1160,6 +1160,53 @@ export default function PublicMemberPage({ params }: PageProps) {
                       className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
                     >
                       <ZoomIn className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Controle de Posição / Ajuste Fino */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <span className="text-xs font-bold text-slate-700">Ajustar posição:</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setPosition((p) => ({ ...p, y: p.y - 15 }))}
+                      title="Mover para cima"
+                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPosition((p) => ({ ...p, y: p.y + 15 }))}
+                      title="Mover para baixo"
+                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
+                    >
+                      ▼
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPosition((p) => ({ ...p, x: p.x - 15 }))}
+                      title="Mover para esquerda"
+                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
+                    >
+                      ◀
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPosition((p) => ({ ...p, x: p.x + 15 }))}
+                      title="Mover para direita"
+                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
+                    >
+                      ▶
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPosition({ x: 0, y: 0 })}
+                      title="Centralizar foto"
+                      className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded ml-1"
+                    >
+                      Reset
                     </button>
                   </div>
                 </div>
