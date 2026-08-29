@@ -248,12 +248,6 @@ export default function PublicMemberPage({ params }: PageProps) {
       ctx.translate(targetWidth / 2, targetHeight / 2);
       ctx.rotate((rotation * Math.PI) / 180);
 
-      // No CSS da preview:
-      // a div externa tem 224x288px (proporção 3:4).
-      // a tag <img> possui w-full h-full object-cover.
-      // a imagem sem zoom já é redimensionada por (coverScale) para cobrir 224x288.
-      // Em seguida, o transform aplica scale(zoom) e translateX(position.x) translateY(position.y) em pixels da própria imagem.
-      
       // Proporção de escala cover da imagem para caber no Canvas de 360x480 (3:4):
       const canvasCoverScale = Math.max(targetWidth / img.width, targetHeight / img.height);
 
@@ -262,9 +256,11 @@ export default function PublicMemberPage({ params }: PageProps) {
       const drawHeight = img.height * canvasCoverScale * zoom;
 
       // Na preview, a div tem 224px de largura e o canvas tem 360px.
-      // O fator de escala dos controles (translateX/translateY) em relação ao canvas é exatamente (360 / 224)
+      // O fator de escala dos controles em relação ao canvas é (360 / 224)
       const scaleFactor = targetWidth / 224;
 
+      // No CSS transform, quando a imagem está rotacionada ou ampliada (scale(zoom)),
+      // o translateX e translateY aplicados em pixels do preview são multiplicados pelo fator de tela e pelo zoom da imagem.
       const offsetX = position.x * scaleFactor;
       const offsetY = position.y * scaleFactor;
 
@@ -1117,7 +1113,7 @@ export default function PublicMemberPage({ params }: PageProps) {
                       alt="Ajuste de enquadramento da foto"
                       className="w-full h-full object-cover pointer-events-none"
                       style={{
-                        transform: `rotate(${rotation}deg) scale(${zoom}) translateX(${position.x}px) translateY(${position.y}px)`,
+                        transform: `translate(${position.x}px, ${position.y}px) rotate(${rotation}deg) scale(${zoom})`,
                         transformOrigin: 'center',
                         transition: isDragging ? 'none' : 'transform 0.05s ease-out',
                       }}
