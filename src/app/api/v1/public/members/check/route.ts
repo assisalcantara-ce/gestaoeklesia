@@ -131,7 +131,8 @@ export async function POST(request: NextRequest) {
       escolaridade,
       nacionalidade,
       naturalidade,
-      uf_naturalidade
+      uf_naturalidade,
+      foto_url
     `)
     .eq('ministry_id', ministryId)
     .or(`cpf.eq.${cleanCpf},cpf.eq.${formattedCpf}`)
@@ -181,6 +182,7 @@ export async function POST(request: NextRequest) {
       nacionalidade: member.nacionalidade ?? '',
       naturalidade: member.naturalidade ?? '',
       uf_naturalidade: member.uf_naturalidade ?? '',
+      foto_url: member.foto_url ?? '',
     },
   });
 }

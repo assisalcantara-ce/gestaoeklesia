@@ -17,6 +17,9 @@ import {
   Heart,
   Briefcase,
   Sparkles,
+  Camera,
+  Upload,
+  User,
 } from 'lucide-react';
 
 interface PageProps {
@@ -49,6 +52,7 @@ interface MemberFormData {
   nacionalidade: string;
   naturalidade: string;
   uf_naturalidade: string;
+  foto_url: string;
 }
 
 const EMPTY_FORM: MemberFormData = {
@@ -75,6 +79,7 @@ const EMPTY_FORM: MemberFormData = {
   nacionalidade: '',
   naturalidade: '',
   uf_naturalidade: '',
+  foto_url: '',
 };
 
 function formatCpf(val: string) {
@@ -115,8 +120,55 @@ export default function PublicMemberPage({ params }: PageProps) {
   const [checking, setChecking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchingCep, setSearchingCep] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string>('');
+
+  // Upload da foto do membro para a API pública
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setErrorMessage('Formato de foto inválido. Utilize JPG, PNG ou WEBP.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage('A foto não pode ultrapassar 5MB.');
+      return;
+    }
+
+    try {
+      setUploadingPhoto(true);
+      setErrorMessage(null);
+
+      const body = new FormData();
+      body.append('file', file);
+      body.append('institution', institution);
+
+      const res = await fetch('/api/v1/public/members/upload-photo', {
+        method: 'POST',
+        body,
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        setErrorMessage(json.error || 'Erro ao enviar a foto. Tente novamente.');
+        return;
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        foto_url: json.url,
+      }));
+    } catch {
+      setErrorMessage('Erro de conexão ao enviar a foto.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   // Mascarar CPF no input
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -208,6 +260,7 @@ export default function PublicMemberPage({ params }: PageProps) {
           nacionalidade: json.data.nacionalidade || '',
           naturalidade: json.data.naturalidade || '',
           uf_naturalidade: json.data.uf_naturalidade || '',
+          foto_url: json.data.foto_url || '',
         });
       } else {
         setIsExisting(false);
@@ -261,6 +314,7 @@ export default function PublicMemberPage({ params }: PageProps) {
         nacionalidade: formData.nacionalidade.trim(),
         naturalidade: formData.naturalidade.trim(),
         uf_naturalidade: formData.uf_naturalidade.toUpperCase().trim(),
+        foto_url: formData.foto_url,
       };
 
       const res = await fetch('/api/v1/public/members/save', {
@@ -410,7 +464,61 @@ export default function PublicMemberPage({ params }: PageProps) {
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-[#123b63] border-b pb-1.5 uppercase tracking-wider">
                   <UserCheck className="h-4 w-4" />
-                  <span>Dados Pessoais</span>
+                  <span>Dados Pessoais & Foto</span>
+                </div>
+
+                {/* UPLOAD / EXIBIÇÃO DA FOTO DE PERFIL */}
+                <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div className="relative group shrink-0">
+                    <div className="w-24 h-24 rounded-2xl overflow-hidden bg-slate-200 border-2 border-[#123b63]/30 shadow-md flex items-center justify-center relative">
+                      {formData.foto_url ? (
+                        <img
+                          src={formData.foto_url}
+                          alt="Foto de perfil do membro"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User className="w-12 h-12 text-slate-400" />
+                      )}
+                      
+                      {uploadingPhoto && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white">
+                          <Loader2 className="w-6 h-6 animate-spin" />
+                        </div>
+                      )}
+                    </div>
+
+                    <label className="absolute -bottom-2 -right-2 p-2 bg-[#123b63] hover:bg-[#0d2a47] text-white rounded-xl shadow-lg cursor-pointer transition active:scale-95">
+                      <Camera className="w-4 h-4" />
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handlePhotoUpload}
+                        disabled={uploadingPhoto}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="text-center sm:text-left space-y-1">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Foto de Perfil
+                    </h4>
+                    <p className="text-xs text-slate-500 max-w-xs">
+                      Envie uma foto legível para a credencial e identificação do membro (JPG, PNG ou WEBP até 5MB).
+                    </p>
+                    <label className="inline-flex items-center gap-1.5 text-xs font-bold text-[#123b63] hover:underline cursor-pointer pt-1">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{formData.foto_url ? 'Alterar foto de perfil' : 'Enviar foto do celular'}</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handlePhotoUpload}
+                        disabled={uploadingPhoto}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
                 </div>
 
                 <div>

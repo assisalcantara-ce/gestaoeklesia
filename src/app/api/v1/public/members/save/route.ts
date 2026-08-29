@@ -104,12 +104,13 @@ export async function POST(request: NextRequest) {
 
   const ministryId = ministry.id;
 
-  // ── 4. Normalizar os textos da requisição (preservando emails e datas) ──────
+  // ── 4. Normalizar os textos da requisição (preservando emails, datas e foto_url) ──────
   const normalizedBody = normalizePayloadToUppercase(body, {
     preserveKeys: [
       'email',
       'data_nascimento',
       'data_nascimento_conjuge',
+      'foto_url',
     ],
   }) as Record<string, any>;
 
@@ -156,6 +157,7 @@ export async function POST(request: NextRequest) {
       nacionalidade: cleanVal(normalizedBody.nacionalidade),
       naturalidade: cleanVal(normalizedBody.naturalidade),
       uf_naturalidade: cleanVal(normalizedBody.uf_naturalidade),
+      foto_url: cleanVal(normalizedBody.foto_url),
       updated_at: new Date().toISOString(),
     };
 
@@ -233,6 +235,7 @@ export async function POST(request: NextRequest) {
     nacionalidade: cleanVal(normalizedBody.nacionalidade),
     naturalidade: cleanVal(normalizedBody.naturalidade),
     uf_naturalidade: cleanVal(normalizedBody.uf_naturalidade),
+    foto_url: cleanVal(normalizedBody.foto_url),
     tipo_cadastro: 'membro',
     status: 'active',
     member_since: new Date().toISOString().split('T')[0],
