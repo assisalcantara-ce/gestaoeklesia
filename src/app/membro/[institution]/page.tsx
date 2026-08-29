@@ -20,6 +20,13 @@ import {
   Camera,
   Upload,
   User,
+  RotateCcw,
+  RotateCw,
+  ZoomIn,
+  ZoomOut,
+  Check,
+  Crop,
+  X,
 } from 'lucide-react';
 
 interface PageProps {
@@ -124,8 +131,17 @@ export default function PublicMemberPage({ params }: PageProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string>('');
 
-  // Upload da foto do membro para a API pública
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Crop Modal States
+  const [fotoOriginal, setFotoOriginal] = useState<string | null>(null);
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  // Selecionar arquivo de foto para iniciar o ajuste/corte
+  const handleSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -134,28 +150,143 @@ export default function PublicMemberPage({ params }: PageProps) {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMessage('A foto não pode ultrapassar 5MB.');
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMessage('A imagem original não pode ultrapassar 10MB.');
       return;
     }
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      if (evt.target?.result) {
+        setFotoOriginal(evt.target.result as string);
+        setZoom(1);
+        setRotation(0);
+        setPosition({ x: 0, y: 0 });
+        setShowCropModal(true);
+      }
+    };
+    reader.readAsDataURL(file);
+    // Reset do input file para permitir selecionar o mesmo arquivo novamente
+    e.target.value = '';
+  };
+
+  // Funções de interação de Pan/Arrastar na foto
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPosition({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Suporte a Touch para Smartphones (Mobile-first)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      setIsDragging(true);
+      setDragStart({ x: touch.clientX - position.x, y: touch.clientY - position.y });
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    setPosition({
+      x: touch.clientX - dragStart.x,
+      y: touch.clientY - dragStart.y,
+    });
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setZoom((prev) => Math.min(Math.max(prev + delta, 1), 3.5));
+  };
+
+  // Gerar o Canvas final enquadrado (300x400 px padrão 3x4) e subir para o storage
+  const handleConfirmCropAndUpload = async () => {
+    if (!fotoOriginal) return;
 
     try {
       setUploadingPhoto(true);
       setErrorMessage(null);
 
-      const body = new FormData();
-      body.append('file', file);
-      body.append('institution', institution);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Resolução padrão do avatar/credencial (300x400 px)
+      const targetWidth = 360;
+      const targetHeight = 480;
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = fotoOriginal;
+      });
+
+      // Fundo neutro
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, targetWidth, targetHeight);
+
+      ctx.save();
+      // Mover origem para o centro do canvas
+      ctx.translate(targetWidth / 2, targetHeight / 2);
+      ctx.rotate((rotation * Math.PI) / 180);
+
+      // Calcular dimensões proporcionais
+      const scaleCover = Math.max(targetWidth / img.width, targetHeight / img.height);
+      const drawWidth = img.width * scaleCover * zoom;
+      const drawHeight = img.height * scaleCover * zoom;
+
+      // Desenhar com translação e zoom ajustados pelo usuário
+      ctx.drawImage(
+        img,
+        -drawWidth / 2 + position.x,
+        -drawHeight / 2 + position.y,
+        drawWidth,
+        drawHeight
+      );
+      ctx.restore();
+
+      // Converter o canvas processado para Blob PNG/JPEG
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92)
+      );
+
+      if (!blob) {
+        setErrorMessage('Falha ao processar enquadramento da foto.');
+        return;
+      }
+
+      // Enviar Blob via FormData para a API pública
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', blob, 'foto-membro.jpg');
+      formDataUpload.append('institution', institution);
 
       const res = await fetch('/api/v1/public/members/upload-photo', {
         method: 'POST',
-        body,
+        body: formDataUpload,
       });
 
       const json = await res.json();
 
       if (!res.ok) {
-        setErrorMessage(json.error || 'Erro ao enviar a foto. Tente novamente.');
+        setErrorMessage(json.error || 'Erro ao enviar a foto enquadrada.');
         return;
       }
 
@@ -163,8 +294,12 @@ export default function PublicMemberPage({ params }: PageProps) {
         ...prev,
         foto_url: json.url,
       }));
-    } catch {
-      setErrorMessage('Erro de conexão ao enviar a foto.');
+
+      setShowCropModal(false);
+      setFotoOriginal(null);
+    } catch (err: any) {
+      console.error('Erro no crop/upload da foto:', err);
+      setErrorMessage('Erro de conexão ao salvar a foto enquadrada.');
     } finally {
       setUploadingPhoto(false);
     }
@@ -493,7 +628,7 @@ export default function PublicMemberPage({ params }: PageProps) {
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
-                        onChange={handlePhotoUpload}
+                        onChange={handleSelectFile}
                         disabled={uploadingPhoto}
                         className="hidden"
                       />
@@ -505,15 +640,15 @@ export default function PublicMemberPage({ params }: PageProps) {
                       Foto de Perfil
                     </h4>
                     <p className="text-xs text-slate-500 max-w-xs">
-                      Envie uma foto legível para a credencial e identificação do membro (JPG, PNG ou WEBP até 5MB).
+                      Selecione a foto do celular e ajuste o enquadramento perfeito (JPG, PNG ou WEBP até 10MB).
                     </p>
                     <label className="inline-flex items-center gap-1.5 text-xs font-bold text-[#123b63] hover:underline cursor-pointer pt-1">
                       <Upload className="w-3.5 h-3.5" />
-                      <span>{formData.foto_url ? 'Alterar foto de perfil' : 'Enviar foto do celular'}</span>
+                      <span>{formData.foto_url ? 'Alterar foto de perfil' : 'Enviar e ajustar foto'}</span>
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
-                        onChange={handlePhotoUpload}
+                        onChange={handleSelectFile}
                         disabled={uploadingPhoto}
                         className="hidden"
                       />
@@ -916,6 +1051,169 @@ export default function PublicMemberPage({ params }: PageProps) {
         </div>
 
       </div>
+
+      {/* ── MODAL INTERATIVO DE CORTE E ENQUADRAMENTO DA FOTO (MOBILE & DESKTOP) ── */}
+      {showCropModal && fotoOriginal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full overflow-hidden flex flex-col">
+            
+            {/* Header do Modal de Corte */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-[#123b63]/10 text-[#123b63]">
+                  <Crop className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-extrabold text-slate-800">Enquadrar Foto de Perfil</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCropModal(false);
+                  setFotoOriginal(null);
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* ÁREA DE CROP INTERATIVA COM CANVAS / TOUCH / MOUSE */}
+            <div className="p-5 space-y-4 text-center bg-slate-100/60">
+              <p className="text-xs text-slate-500 font-medium">
+                Arraste a imagem para centralizar o rosto no enquadramento
+              </p>
+
+              {/* Viewport do Crop (3:4 ratio) */}
+              <div className="flex justify-center">
+                <div
+                  className="relative w-56 h-72 rounded-2xl overflow-hidden bg-slate-900 border-4 border-[#123b63] shadow-2xl cursor-grab active:cursor-grabbing select-none touch-none"
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseUp}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleMouseUp}
+                  onWheel={handleWheel}
+                >
+                  <div className="w-full h-full absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <img
+                      src={fotoOriginal}
+                      alt="Ajuste de enquadramento da foto"
+                      className="w-full h-full object-cover pointer-events-none"
+                      style={{
+                        transform: `rotate(${rotation}deg) scale(${zoom}) translateX(${position.x}px) translateY(${position.y}px)`,
+                        transformOrigin: 'center',
+                        transition: isDragging ? 'none' : 'transform 0.05s ease-out',
+                      }}
+                    />
+                  </div>
+
+                  {/* Guia de enquadramento facial tipo oval/3x4 */}
+                  <div className="absolute inset-0 border-2 border-white/40 rounded-xl pointer-events-none flex items-center justify-center">
+                    <div className="w-40 h-52 border border-dashed border-white/60 rounded-full opacity-60"></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CONTROLES DE ZOOM E ROTAÇÃO */}
+              <div className="space-y-3 bg-white p-3.5 rounded-xl border border-slate-200 text-left">
+                {/* Controle de Zoom */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                      <ZoomIn className="w-3.5 h-3.5 text-[#123b63]" />
+                      <span>Zoom: {zoom.toFixed(1)}x</span>
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setZoom((z) => Math.max(z - 0.2, 1))}
+                      className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
+                    >
+                      <ZoomOut className="w-4 h-4" />
+                    </button>
+                    <input
+                      type="range"
+                      min="1"
+                      max="3.5"
+                      step="0.05"
+                      value={zoom}
+                      onChange={(e) => setZoom(parseFloat(e.target.value))}
+                      className="flex-1 accent-[#123b63] h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setZoom((z) => Math.min(z + 0.2, 3.5))}
+                      className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Controle de Rotação */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <span className="text-xs font-bold text-slate-700">Girar foto:</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRotation((r) => (r - 90) % 360)}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1 transition"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> 90° Esq
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRotation((r) => (r + 90) % 360)}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1 transition"
+                    >
+                      <RotateCw className="w-3.5 h-3.5" /> 90° Dir
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Rodapé com Ação de Confirmar Enquadramento */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCropModal(false);
+                  setFotoOriginal(null);
+                }}
+                disabled={uploadingPhoto}
+                className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmCropAndUpload}
+                disabled={uploadingPhoto}
+                className="flex-1 py-2.5 bg-[#123b63] hover:bg-[#0d2a47] text-white font-bold rounded-xl text-xs shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {uploadingPhoto ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    Confirmar Foto
+                  </>
+                )}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
