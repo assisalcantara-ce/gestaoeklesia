@@ -1140,14 +1140,14 @@ export default function PublicMemberPage({ params }: PageProps) {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setZoom((z) => Math.max(z - 0.2, 1))}
+                      onClick={() => setZoom((z) => Math.max(z - 0.15, 0.6))}
                       className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
                     >
                       <ZoomOut className="w-4 h-4" />
                     </button>
                     <input
                       type="range"
-                      min="1"
+                      min="0.6"
                       max="3.5"
                       step="0.05"
                       value={zoom}
@@ -1156,7 +1156,7 @@ export default function PublicMemberPage({ params }: PageProps) {
                     />
                     <button
                       type="button"
-                      onClick={() => setZoom((z) => Math.min(z + 0.2, 3.5))}
+                      onClick={() => setZoom((z) => Math.min(z + 0.15, 3.5))}
                       className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
                     >
                       <ZoomIn className="w-4 h-4" />
@@ -1170,7 +1170,7 @@ export default function PublicMemberPage({ params }: PageProps) {
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setPosition((p) => ({ ...p, y: p.y - 15 }))}
+                      onClick={() => setPosition((p) => ({ ...p, y: p.y - 30 }))}
                       title="Mover para cima"
                       className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
                     >
@@ -1178,15 +1178,15 @@ export default function PublicMemberPage({ params }: PageProps) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPosition((p) => ({ ...p, y: p.y + 15 }))}
-                      title="Mover para baixo"
+                      onClick={() => setPosition((p) => ({ ...p, y: p.y + 30 }))}
+                      title="Mover para baixo (descer foto)"
                       className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
                     >
                       ▼
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPosition((p) => ({ ...p, x: p.x - 15 }))}
+                      onClick={() => setPosition((p) => ({ ...p, x: p.x - 30 }))}
                       title="Mover para esquerda"
                       className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
                     >
@@ -1194,7 +1194,7 @@ export default function PublicMemberPage({ params }: PageProps) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPosition((p) => ({ ...p, x: p.x + 15 }))}
+                      onClick={() => setPosition((p) => ({ ...p, x: p.x + 30 }))}
                       title="Mover para direita"
                       className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
                     >
