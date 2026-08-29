@@ -127,7 +127,7 @@ export interface MesDados {
   totalAcumulado: number;
 }
 
-export type Aba = 'dashboard' | 'lancamentos' | 'relatorios' | 'fechamento' | 'dizimistas' | 'contas' | 'categorias' | 'arrecadacao';
+export type Aba = 'dashboard' | 'lancamentos' | 'relatorios' | 'fechamento' | 'dizimistas' | 'contas' | 'categorias' | 'arrecadacao' | 'faturas';
 export type SubAbaArrecadacao = 'destinos' | 'cobrancas' | 'webhooks';
 export type TipoRecebimento = 'dizimo' | 'oferta' | 'oferta_especial' | 'outros';
 

@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import PageLayout from '@/components/PageLayout';
 import NotificationModal from '@/components/NotificationModal';
-import { Plus, X, TrendingUp, Building2, Tag, Users, Lock, List, Printer, QrCode, UserPlus } from 'lucide-react';
+import { Plus, X, TrendingUp, Building2, Tag, Users, Lock, List, Printer, QrCode, UserPlus, FileText } from 'lucide-react';
 import TesourariaTable from '@/components/tesouraria/TesourariaTable';
 import TesourariaToolbar from '@/components/tesouraria/TesourariaToolbar';
 import FechamentoCaixaModal from '@/components/tesouraria/modals/FechamentoCaixaModal';
@@ -19,6 +19,7 @@ import DizimistaSearchInput from '@/components/tesouraria/DizimistaSearchInput';
 import DestinoQrModal from '@/components/tesouraria/modals/DestinoQrModal';
 import DestinoModal from '@/components/tesouraria/modals/DestinoModal';
 import ArrecadacaoDigitalContent from '@/components/tesouraria/ArrecadacaoDigitalContent';
+import FaturasContent from '@/components/tesouraria/FaturasContent';
 import { useTesouraria } from '@/hooks/tesouraria/useTesouraria';
 
 // Componente customizado e elegante para seleção de Mês e Ano de referência
@@ -134,6 +135,7 @@ export default function TesourariaPage() {
             { id: 'contas' as const, label: 'Contas / Caixas', icon: Building2 },
             { id: 'categorias' as const, label: 'Categorias', icon: Tag },
             { id: 'arrecadacao' as const, label: 'Arrecadação Digital', icon: QrCode },
+            { id: 'faturas' as const, label: 'Faturas', icon: FileText },
           ].map((tab) => {
             const Icon = tab.icon;
             const active = t.aba === tab.id;
@@ -1216,6 +1218,11 @@ export default function TesourariaPage() {
             }}
             destinosUpdatedKey={t.destinosUpdatedKey ?? 0}
           />
+        )}
+
+        {/* ─── ABA: FATURAS ─── */}
+        {t.aba === 'faturas' && (
+          <FaturasContent />
         )}
       </div>
 
