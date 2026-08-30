@@ -41,8 +41,8 @@ export default function FaturasContent() {
           .from('platform_billing_invoices')
           .select('*')
           .eq('ministry_id', ministryId)
-          .order('due_date', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false });
+          .order('due_date', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: true });
 
         if (error) {
           console.error('Erro ao buscar faturas no Supabase:', error);
@@ -65,7 +65,7 @@ export default function FaturasContent() {
           .sort((a: Fatura, b: Fatura) => {
             const dateA = a.vencimento ? new Date(a.vencimento).getTime() : (a.data ? new Date(a.data).getTime() : 0);
             const dateB = b.vencimento ? new Date(b.vencimento).getTime() : (b.data ? new Date(b.data).getTime() : 0);
-            return dateB - dateA;
+            return dateA - dateB;
           });
 
         setFaturas(faturasFormatadas);
