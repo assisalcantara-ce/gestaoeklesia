@@ -41,6 +41,7 @@ export default function FaturasContent() {
           .from('platform_billing_invoices')
           .select('*')
           .eq('ministry_id', ministryId)
+          .order('due_date', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false });
 
         if (error) {
@@ -49,17 +50,23 @@ export default function FaturasContent() {
           return;
         }
 
-        const faturasFormatadas = (data || []).map((inv: any) => ({
-          id: inv.id,
-          plano_slug: inv.plano_slug || 'PLANO',
-          valor: parseFloat(inv.amount || 0),
-          status: (inv.status || 'pending').toLowerCase(),
-          vencimento: inv.due_date,
-          period_start: inv.period_start,
-          period_end: inv.period_end,
-          asaas_invoice_url: inv.asaas_invoice_url ?? null,
-          data: inv.created_at,
-        }));
+        const faturasFormatadas = (data || [])
+          .map((inv: any) => ({
+            id: inv.id,
+            plano_slug: inv.plano_slug || 'PLANO',
+            valor: parseFloat(inv.amount || 0),
+            status: (inv.status || 'pending').toLowerCase(),
+            vencimento: inv.due_date,
+            period_start: inv.period_start,
+            period_end: inv.period_end,
+            asaas_invoice_url: inv.asaas_invoice_url ?? null,
+            data: inv.created_at,
+          }))
+          .sort((a: Fatura, b: Fatura) => {
+            const dateA = a.vencimento ? new Date(a.vencimento).getTime() : (a.data ? new Date(a.data).getTime() : 0);
+            const dateB = b.vencimento ? new Date(b.vencimento).getTime() : (b.data ? new Date(b.data).getTime() : 0);
+            return dateB - dateA;
+          });
 
         setFaturas(faturasFormatadas);
       } catch (err) {
