@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase-client';
+import { useUserContext } from '@/hooks/useUserContext';
 import { FileText } from 'lucide-react';
 
 interface Fatura {
@@ -18,6 +19,7 @@ interface Fatura {
 
 export default function FaturasContent() {
   const supabase = createClient();
+  const userCtx = useUserContext();
   const [faturas, setFaturas] = useState<Fatura[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('TODAS');
@@ -27,32 +29,31 @@ export default function FaturasContent() {
     const carregarFaturas = async () => {
       try {
         setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
+        const ministryId = userCtx.ministryId;
+
+        if (!ministryId) {
+          setFaturas([]);
           setLoading(false);
           return;
         }
 
-        const res = await fetch('/api/v1/invoices', {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
+        const { data, error } = await supabase
+          .from('platform_billing_invoices')
+          .select('*')
+          .eq('ministry_id', ministryId)
+          .order('created_at', { ascending: false });
 
-        if (!res.ok) {
-          console.error('Erro ao buscar faturas API status:', res.status);
+        if (error) {
+          console.error('Erro ao buscar faturas no Supabase:', error);
           setFaturas([]);
           return;
         }
 
-        const json = await res.json();
-        const data = json.data || [];
-
         const faturasFormatadas = (data || []).map((inv: any) => ({
           id: inv.id,
-          plano_slug: inv.plano_slug,
-          valor: parseFloat(inv.amount),
-          status: inv.status.toLowerCase(),
+          plano_slug: inv.plano_slug || 'PLANO',
+          valor: parseFloat(inv.amount || 0),
+          status: (inv.status || 'pending').toLowerCase(),
           vencimento: inv.due_date,
           period_start: inv.period_start,
           period_end: inv.period_end,
@@ -70,7 +71,7 @@ export default function FaturasContent() {
     };
 
     carregarFaturas();
-  }, []);
+  }, [userCtx.ministryId]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
