@@ -561,16 +561,10 @@ export default function InteractiveCanvas({
                 const isTransparentBg = !elemento.backgroundColor || elemento.backgroundColor === 'transparent';
                 conteudo = elemento.imagemUrl ? (
                     <div
-                        className={isTransparentBg ? "image-checkerboard" : ""}
                         style={{
                             width: '100%',
                             height: '100%',
                             backgroundColor: isTransparentBg ? 'transparent' : elemento.backgroundColor,
-                            backgroundImage: isTransparentBg
-                                ? 'linear-gradient(45deg, #e5e7eb 25%, transparent 25%, transparent 75%, #e5e7eb 75%), linear-gradient(45deg, #e5e7eb 25%, #ffffff 25%, #ffffff 75%, #e5e7eb 75%)'
-                                : 'none',
-                            backgroundSize: isTransparentBg ? '12px 12px' : 'auto',
-                            backgroundPosition: isTransparentBg ? '0 0, 6px 6px' : '0 0',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
