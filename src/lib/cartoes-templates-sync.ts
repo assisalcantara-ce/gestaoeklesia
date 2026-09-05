@@ -35,9 +35,14 @@ function getSupabaseErrorText(error: any): string {
 
 function isCartoesTemplatesUnavailableError(error: any): boolean {
   const text = getSupabaseErrorText(error).toLowerCase();
+  const status = (error as any)?.status;
   return (
+    status === 403 ||
     (text.includes('cartoes_templates') && (text.includes('schema cache') || text.includes('could not find the table'))) ||
     text.includes('pgrst205') ||
+    text.includes('pgrst301') ||
+    text.includes('403') ||
+    text.includes('forbidden') ||
     text.includes('permission denied') ||
     text.includes('not authorized') ||
     text.includes('violates row-level security') ||
