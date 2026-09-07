@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import TechnicalAccessBanner from '@/components/admin/technical/TechnicalAccessBanner';
+import GlobalFinancialBanner from '@/components/financeiro/GlobalFinancialBanner';
 import { ReactNode } from 'react';
 
 // Prefixos de rota que exibem o Sidebar
@@ -37,6 +38,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return (
       <>
         <TechnicalAccessBanner />
+        <GlobalFinancialBanner />
         {children}
       </>
     );
@@ -45,6 +47,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col h-screen bg-[#f4f6f9] overflow-x-hidden">
       <TechnicalAccessBanner />
+      <GlobalFinancialBanner />
       <div className="flex flex-1 min-h-0 min-w-0">
         <Sidebar />
         <main className="flex-1 min-h-0 min-w-0 flex flex-col">
@@ -54,3 +57,4 @@ export default function AppShell({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
