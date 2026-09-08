@@ -10,6 +10,7 @@ import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { ProductExperienceService } from '@/lib/services/product-experience';
 import { ExperienceCenter } from '@/services/experience/ExperienceCenter';
+import Link from 'next/link';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -17,6 +18,7 @@ import {
 import {
   TrendingUp, TrendingDown, Wallet,
   Building2, Users, Award, CalendarDays,
+  Cake, MessageCircle, Gift,
 } from 'lucide-react';
 
 // helpers
@@ -43,6 +45,14 @@ interface HealthScore {
   scoreFinal: number;
   classificacao: 'excelente' | 'saudavel' | 'atencao' | 'critica';
 }
+interface AniversarianteHoje {
+  id: string;
+  nome: string;
+  foto_url?: string | null;
+  celular?: string | null;
+  cargo?: string | null;
+}
+
 interface DashData {
   totalMembros: number;
   membrosBatizados: number;
@@ -74,6 +84,8 @@ interface DashData {
   mensagemPresidencia: { titulo: string; conteudo_texto: string | null; video_url: string | null; video_tipo: string } | null;
   crescimentoMembros: { mes: string; total: number }[];
   nomeMinisterio: string;
+  aniversariantesHoje: AniversarianteHoje[];
+  totalAniversariantesMes: number;
 }
 
 const EMPTY: DashData = {
@@ -90,6 +102,8 @@ const EMPTY: DashData = {
   mensagemPresidencia: null,
   crescimentoMembros: [],
   nomeMinisterio: '',
+  aniversariantesHoje: [],
+  totalAniversariantesMes: 0,
 };
 
 async function safeQuery(promise: Promise<any>, fallback: any = { data: [], count: 0 }): Promise<any> {
@@ -232,7 +246,7 @@ export default function DashboardPage() {
         ebdTurmasRes, ebdChamadasRes, usuariosRes,
         visitantesRes, ultimasCartasRes, ultimosFluxosRes, cartaPedidosRes,
       ] = await Promise.all([
-        safeQuery(withScopeMember(supabase.from('members').select('status, role, tipo_cadastro, custom_fields').eq('ministry_id', ministryId))),
+        safeQuery(withScopeMember(supabase.from('members').select('id, name, status, role, tipo_cadastro, custom_fields, data_nascimento, foto_url, celular, whatsapp').eq('ministry_id', ministryId))),
         safeQuery(Promise.resolve({ data: [], count: 0 })),
         safeQuery(
           scopeCongId
@@ -292,6 +306,48 @@ export default function DashboardPage() {
         return bat === true || bat === 'true' || bat === 1 || (typeof bat === 'string' && bat.trim() !== '');
       }).length;
       const membrosAtivos    = membros.filter((m: any) => (m.status ?? 'active') === 'active').length;
+
+      // Aniversariantes do Dia e do Mês
+      const hojeMonth = agora.getMonth() + 1;
+      const hojeDay   = agora.getDate();
+      const aniversariantesHoje: AniversarianteHoje[] = [];
+      let totalAniversariantesMes = 0;
+
+      for (const m of todosOsMembros) {
+        const cf = m.custom_fields && typeof m.custom_fields === 'object' ? m.custom_fields : {};
+        const dtStr = String(m.data_nascimento || cf.dataNascimento || cf.data_nascimento || '').trim();
+        if (!dtStr) continue;
+
+        let mMonth: number | null = null;
+        let mDay: number | null = null;
+
+        if (dtStr.includes('-')) {
+          const parts = dtStr.split('T')[0].split('-');
+          if (parts.length === 3) {
+            mMonth = parseInt(parts[1], 10);
+            mDay   = parseInt(parts[2], 10);
+          }
+        } else if (dtStr.includes('/')) {
+          const parts = dtStr.split('/');
+          if (parts.length >= 2) {
+            mDay   = parseInt(parts[0], 10);
+            mMonth = parseInt(parts[1], 10);
+          }
+        }
+
+        if (mMonth === hojeMonth) {
+          totalAniversariantesMes++;
+          if (mDay === hojeDay) {
+            aniversariantesHoje.push({
+              id: m.id,
+              nome: m.name || cf.nome || 'Membro',
+              foto_url: m.foto_url || cf.fotoUrl || null,
+              celular: m.celular || m.whatsapp || cf.celular || cf.whatsapp || null,
+              cargo: m.role || cf.cargoMinisterial || null,
+            });
+          }
+        }
+      }
 
       // fluxos
       const fluxos          = fluxosRes.data ?? [];
@@ -544,6 +600,8 @@ export default function DashboardPage() {
         mensagemPresidencia,
         crescimentoMembros,
         nomeMinisterio: currentMinistry?.nome || currentMinistry?.name || '',
+        aniversariantesHoje,
+        totalAniversariantesMes,
       });
 
       // Busca o status do onboarding
@@ -875,34 +933,108 @@ export default function DashboardPage() {
           {/* ── GRÁFICOS: FATIA + BARRAS + BARRAS ────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-            {/* Pie: Situação dos Membros */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h3 className="text-sm font-bold text-[#1E3A5F]">Situação dos Membros</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Distribuição geral</p>
-              {loadingDash ? (
-                <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
-              ) : statusPie.length === 0 ? (
-                <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Sem dados</div>
-              ) : (
-                <ResponsiveContainer width="100%" height={210}>
-                  <PieChart>
-                    <Pie
-                      data={statusPie}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={52}
-                      outerRadius={80}
-                      paddingAngle={3}
-                    >
-                      {statusPie.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                    </Pie>
-                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} />
-                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#6b7280' }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
+            {/* Card: Aniversariantes do Dia */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-teal-50 text-teal-600">
+                      <Cake className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-[#1E3A5F]">Aniversariantes do Dia</h3>
+                      <p className="text-xs text-gray-400">
+                        {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    href="/secretaria/membros?view=aniversariantes"
+                    className="text-[11px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200/60 px-3 py-1.5 rounded-lg transition flex items-center gap-1 shrink-0"
+                  >
+                    <span>Ver Módulo</span>
+                    <span>→</span>
+                  </Link>
+                </div>
+
+                {loadingDash ? (
+                  <div className="h-44 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
+                ) : dash.aniversariantesHoje.length > 0 ? (
+                  <div className="space-y-2.5 my-2 max-h-[190px] overflow-y-auto pr-1">
+                    {dash.aniversariantesHoje.map((aniv) => {
+                      const initials = obterIniciais(aniv.nome) || 'MB';
+                      const celClean = (aniv.celular || '').replace(/\D/g, '');
+                      const waUrl = celClean
+                        ? `https://wa.me/55${celClean}?text=${encodeURIComponent(`Parabéns, ${aniv.nome}! Que Deus abençoe rica e abundantemente sua vida neste dia tão especial! 🎉🎂`)}`
+                        : null;
+
+                      return (
+                        <div
+                          key={aniv.id}
+                          className="flex items-center justify-between p-2.5 rounded-xl bg-teal-50/50 border border-teal-100/60 hover:bg-teal-50 transition"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {aniv.foto_url ? (
+                              <img
+                                src={aniv.foto_url}
+                                alt={aniv.nome}
+                                className="w-9 h-9 rounded-full object-cover border border-teal-300 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-full bg-teal-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                                {initials}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-gray-900 truncate">{aniv.nome}</p>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded">
+                                <span>🎉</span> Hoje!
+                              </span>
+                            </div>
+                          </div>
+
+                          {waUrl ? (
+                            <a
+                              href={waUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white text-[10px] font-bold rounded-lg transition flex items-center gap-1 shrink-0 shadow-2xs"
+                              title="Enviar parabéns pelo WhatsApp"
+                            >
+                              <MessageCircle className="h-3 w-3" />
+                              <span>WhatsApp</span>
+                            </a>
+                          ) : (
+                            <span className="text-[10px] font-medium text-gray-400 italic shrink-0">Sem contato</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="h-44 flex flex-col items-center justify-center text-center p-3 my-1 bg-gray-50/60 rounded-xl border border-dashed border-gray-200">
+                    <div className="p-3 rounded-full bg-amber-50 text-amber-500 mb-2">
+                      <Cake className="h-6 w-6" />
+                    </div>
+                    <p className="text-xs font-bold text-gray-700">Nenhum aniversariante hoje</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5 max-w-[200px]">
+                      Nenhum membro faz aniversário neste dia. {dash.totalAniversariantesMes} comemoram neste mês.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+                <span className="text-[11px] text-gray-500">
+                  Total este mês: <strong className="text-teal-700 font-bold">{dash.totalAniversariantesMes}</strong>
+                </span>
+                <Link
+                  href="/secretaria/membros?view=aniversariantes"
+                  className="text-[11px] font-bold text-teal-600 hover:underline"
+                >
+                  Abrir lista
+                </Link>
+              </div>
             </div>
 
             {/* Bar: Top Congregações por membros */}

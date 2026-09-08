@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useMembers } from '@/hooks/useMembers';
 import { useUserContext } from '@/hooks/useUserContext';
 import { getCargosMinisteriais, type CargoMinisterial } from '@/lib/cargos-utils';
@@ -272,7 +273,23 @@ export function useMembros() {
   const [maxMembros, setMaxMembros] = useState<number>(0);
 
   // ── Estado: UI / navegação ───────────────────────────────────────────────────
-  const [dashboardView, setDashboardView] = useState<'overview' | 'list' | 'aniversariantes'>('overview');
+  const searchParams = useSearchParams();
+  const initialView = (() => {
+    const v = searchParams?.get('view') || searchParams?.get('tab') || searchParams?.get('aba');
+    if (v === 'aniversariantes') return 'aniversariantes';
+    if (v === 'list' || v === 'membros') return 'list';
+    return 'overview';
+  })();
+  const [dashboardView, setDashboardView] = useState<'overview' | 'list' | 'aniversariantes'>(initialView);
+
+  useEffect(() => {
+    const v = searchParams?.get('view') || searchParams?.get('tab') || searchParams?.get('aba');
+    if (v === 'aniversariantes') {
+      setDashboardView('aniversariantes');
+    } else if (v === 'list' || v === 'membros') {
+      setDashboardView('list');
+    }
+  }, [searchParams]);
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState<MembrosFormTab>('dados');
 
