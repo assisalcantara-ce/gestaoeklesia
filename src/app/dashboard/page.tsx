@@ -18,7 +18,7 @@ import {
 import {
   TrendingUp, TrendingDown, Wallet,
   Building2, Users, Award, CalendarDays,
-  Cake, MessageCircle, Gift,
+  Cake, MessageCircle,
 } from 'lucide-react';
 
 // helpers
