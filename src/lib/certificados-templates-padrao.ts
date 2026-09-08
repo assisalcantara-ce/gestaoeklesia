@@ -581,7 +581,7 @@ export const CERTIFICADOS_TEMPLATES_PADRAO = [
     chave: 'casamento-padrao',
     categoria: 'casamento' as const,
     ativo: true,
-    backgroundUrl: '/img/cert_casamento.jpg',
+    backgroundUrl: '/img/certificado_casamento.jpg',
     elementos: [
       {
         id: '9234a664-4f9a-4c7d-9ddd-490c0dbb4a76',

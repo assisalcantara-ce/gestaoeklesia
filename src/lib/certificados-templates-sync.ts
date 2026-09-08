@@ -32,7 +32,6 @@ function getSupabaseErrorText(error: any): string {
   }
 }
 
-
 export async function fetchCertificadosTemplatesFromSupabase(
   supabase: SupabaseClient,
   ministryId: string
@@ -190,8 +189,8 @@ export async function loadCertificadosTemplatesForCurrentUser(
           .from('certificados_templates')
           .upsert(row as any, { onConflict: 'ministry_id,template_key' });
         if (!error) fromDb.push({ ...padrao, ativo: true });
-      } else if (!existente.backgroundUrl && padrao.backgroundUrl) {
-        // Template existente sem background — atualizar apenas backgroundUrl e cargo_key
+      } else if (padrao.backgroundUrl && (!existente.backgroundUrl || existente.backgroundUrl !== padrao.backgroundUrl)) {
+        // Template existente com background diferente ou ausente — atualizar para o background nativo oficial
         const updatedData = { ...existente, backgroundUrl: padrao.backgroundUrl, cargo_key: cargoKey };
         await supabase
           .from('certificados_templates')
