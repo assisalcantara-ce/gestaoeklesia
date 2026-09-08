@@ -666,12 +666,6 @@ export default function DashboardPage() {
     { label: 'Configurações',     icon: '⚙️',  href: '/configuracoes',          modulo: 'configuracoes' },
   ].filter(a => userCtx.podeAcessar(a.modulo));
 
-  const statusPie = [
-    { name: 'Ativos',     value: dash.membrosAtivos,                                                          color: '#16A34A' },
-    { name: 'Inativos',   value: Math.max(0, dash.totalMembros - dash.membrosAtivos - dash.membrosVisitantes), color: '#6B7280' },
-    { name: 'Visitantes', value: dash.membrosVisitantes,                                                      color: '#2563EB' },
-  ].filter(d => d.value > 0);
-
   const congBarData = [...dash.congregacoesData]
     .sort((a, b) => b.membrosAtivos - a.membrosAtivos)
     .slice(0, 8)
