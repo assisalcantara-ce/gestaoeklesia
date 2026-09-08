@@ -19,7 +19,7 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
   { path: '/secretaria/ativar-fluxo',          id: 'ativar-fluxo'         },
   { path: '/secretaria/funcionarios',          id: 'funcionarios'         },
   { path: '/secretaria/consagracao',           id: 'consagracao'          },
-  { path: '/secretaria/certificados',          id: 'certificados'         },
+  { path: '/configuracoes/certificados',       id: 'certificados'         },
   { path: '/secretaria/departamentos',         id: 'departamentos'        },
   { path: '/secretaria/casamento',             id: 'casamento'            },
   { path: '/secretaria/relatorio-espiritual',  id: 'relatorio-espiritual' },
@@ -106,7 +106,7 @@ export default function Sidebar() {
     'casamento': 'secretaria',
     'cartas': 'secretaria',
     'cartas-pedidos': 'secretaria',
-    'certificados': 'secretaria',
+    'certificados': 'configuracoes',
     'relatorio-espiritual': 'acolhimento',
     'relatorios-acolhimento': 'acolhimento',
     'cultos': 'acolhimento',
@@ -148,7 +148,6 @@ export default function Sidebar() {
         { id: 'casamento',             label: 'Casamento',              icon: '💍', path: '/secretaria/casamento',              modulo: 'gestao'           },
         { id: 'cartas',                label: 'Cartas ministeriais',    icon: '📜', path: '/secretaria/cartas',                 modulo: 'gestao'          },
         { id: 'cartas-pedidos',        label: 'Pedidos de Cartas',      icon: '✉️', path: '/secretaria/cartas/pedidos',         modulo: 'secretaria_local' },
-        { id: 'certificados',          label: 'Certificados',           icon: '🎓', path: '/secretaria/certificados',           modulo: 'gestao'          },
         { id: 'relatorios-secretaria', label: 'Relatórios',              icon: '📋', path: '/secretaria/relatorios',             modulo: 'gestao'          },
         { id: 'sorteios',              label: 'Sorteios',                icon: '🎰', path: '/secretaria/sorteios',               modulo: 'secretaria_local' },
       ]
@@ -226,6 +225,7 @@ export default function Sidebar() {
       submenu: [
         { id: 'config-geral',   label: 'Geral',        icon: '⚙️', path: '/configuracoes'           },
         { id: 'config-cartoes', label: 'Cartões',      icon: '🎫', path: '/configuracoes/cartoes'   },
+        { id: 'certificados',   label: 'Certificados', icon: '🎓', path: '/configuracoes/certificados', modulo: 'configuracoes' },
         { id: 'ativar-fluxo',   label: 'Ativar Fluxo', icon: '🔄', path: '/secretaria/ativar-fluxo' },
       ]
     },

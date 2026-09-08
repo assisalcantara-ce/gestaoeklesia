@@ -204,7 +204,7 @@ export default function ConfiguracoesCertificadosPage() {
   };
 
   const templatePadrao = templateEmEdicao
-    ? CERTIFICADOS_TEMPLATES_PADRAO.find((p) => p.chave === templateEmEdicao.chave)
+    ? CERTIFICADOS_TEMPLATES_PADRAO.find((p) => p.chave === templateEmEdicao.chave || p.id === templateEmEdicao.id || p.id === templateEmEdicao.chave)
     : null;
 
   const handleResetarParaPadrao = async () => {

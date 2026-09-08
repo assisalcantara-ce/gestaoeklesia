@@ -26,17 +26,10 @@ export default function SecretariaCertificadosPage() {
   const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
-    if (ctx.loading || bloqueado) return;
-    (async () => {
-      const res = await loadCertificadosTemplatesForCurrentUser(supabase);
-      setTemplates(res.templates as CertificadoTemplate[]);
-      setLoadingData(false);
-    })();
-  }, [ctx.loading, bloqueado, supabase]);
+    router.replace('/configuracoes/certificados');
+  }, [router]);
 
-  if (ctx.loading) return <div className="p-8">Carregando...</div>;
-  if (bloqueado) return null;
-  if (loadingData) return <div className="p-8">Carregando...</div>;
+  return <div className="p-8 text-gray-500">Redirecionando para Configurações &gt; Certificados...</div>;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
