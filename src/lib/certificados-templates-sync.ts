@@ -127,7 +127,7 @@ export async function loadCertificadosTemplatesForCurrentUser(
     const ministryId = await resolveMinistryId(supabase);
     if (!ministryId) return { templates: [], ministryId: null };
 
-    const fromDb = await fetchCertificadosTemplatesFromSupabase(supabase, ministryId);
+    let fromDb = await fetchCertificadosTemplatesFromSupabase(supabase, ministryId);
 
     // Mapa de template_id -> cargo_key e backgroundUrl para fallback em templates antigos no banco
     const padraoMap = new Map(
@@ -160,6 +160,19 @@ export async function loadCertificadosTemplatesForCurrentUser(
     // Normaliza nome para comparação insensível a acento e case
     const normalizeStr = (s: string) =>
       (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Limpar modelos duplicados ou intitulados 'CASAMENTO' em maiúsculas criados anteriormente
+    const duplicados = fromDb.filter((t: any) => t.nome === 'CASAMENTO' || t.name === 'CASAMENTO');
+    if (duplicados.length > 0) {
+      const keysToDelete = duplicados.map((d: any) => d.template_key || d.id);
+      await supabase
+        .from('certificados_templates')
+        .delete()
+        .eq('ministry_id', ministryId)
+        .in('template_key', keysToDelete);
+      
+      fromDb = fromDb.filter((t: any) => t.nome !== 'CASAMENTO' && t.name !== 'CASAMENTO');
+    }
 
     // Auto-seed: para cada template padrão, verifica se o ministério já tem esse template pelo ID/chave
     for (const padrao of CERTIFICADOS_TEMPLATES_PADRAO) {
