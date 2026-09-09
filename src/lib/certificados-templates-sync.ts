@@ -161,8 +161,16 @@ export async function loadCertificadosTemplatesForCurrentUser(
     const normalizeStr = (s: string) =>
       (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-    // Limpar modelos duplicados ou intitulados 'CASAMENTO' em maiúsculas criados anteriormente
-    const duplicados = fromDb.filter((t: any) => t.nome === 'CASAMENTO' || t.name === 'CASAMENTO');
+    // Limpar modelos duplicados ou intitulados em MAIÚSCULAS criados anteriormente (ex: 'CASAMENTO', 'APRESENTAÇÃO DE CRIANÇAS')
+    const duplicados = fromDb.filter((t: any) => {
+      const n = (t.nome || t.name || '').trim();
+      return (
+        n === 'CASAMENTO' ||
+        n === 'APRESENTAÇÃO DE CRIANÇAS' ||
+        n === 'APRESENTACAO DE CRIANCAS' ||
+        (n.length > 3 && n === n.toUpperCase() && CERTIFICADOS_TEMPLATES_PADRAO.some((p) => normalizeStr(p.nome) === normalizeStr(n)))
+      );
+    });
     if (duplicados.length > 0) {
       const keysToDelete = duplicados.map((d: any) => d.template_key || d.id);
       await supabase
@@ -171,7 +179,8 @@ export async function loadCertificadosTemplatesForCurrentUser(
         .eq('ministry_id', ministryId)
         .in('template_key', keysToDelete);
       
-      fromDb = fromDb.filter((t: any) => t.nome !== 'CASAMENTO' && t.name !== 'CASAMENTO');
+      const setKeysToDelete = new Set(keysToDelete);
+      fromDb = fromDb.filter((t: any) => !setKeysToDelete.has(t.template_key || t.id));
     }
 
     // Auto-seed: para cada template padrão, verifica se o ministério já tem esse template pelo ID/chave
