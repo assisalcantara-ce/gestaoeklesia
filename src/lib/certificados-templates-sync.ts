@@ -168,6 +168,8 @@ export async function loadCertificadosTemplatesForCurrentUser(
         n === 'CASAMENTO' ||
         n === 'APRESENTAÇÃO DE CRIANÇAS' ||
         n === 'APRESENTACAO DE CRIANCAS' ||
+        n === 'EBD' ||
+        n === 'ebd' ||
         (n.length > 3 && n === n.toUpperCase() && CERTIFICADOS_TEMPLATES_PADRAO.some((p) => normalizeStr(p.nome) === normalizeStr(n)))
       );
     });
