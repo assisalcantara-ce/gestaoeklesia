@@ -189,9 +189,19 @@ export async function loadCertificadosTemplatesForCurrentUser(
           .from('certificados_templates')
           .upsert(row as any, { onConflict: 'ministry_id,template_key' });
         if (!error) fromDb.push({ ...padrao, ativo: true });
-      } else if (padrao.backgroundUrl && (!existente.backgroundUrl || existente.backgroundUrl !== padrao.backgroundUrl)) {
-        // Template existente com background diferente ou ausente — atualizar para o background nativo oficial
-        const updatedData = { ...existente, backgroundUrl: padrao.backgroundUrl, cargo_key: cargoKey };
+      } else if (
+        padrao.backgroundUrl &&
+        (!existente.backgroundUrl ||
+          existente.backgroundUrl !== padrao.backgroundUrl ||
+          (padrao.id === 'casamento-padrao' && JSON.stringify(existente.elementos) !== JSON.stringify(padrao.elementos)))
+      ) {
+        // Template existente com background ou elementos desatualizados — atualizar para o modelo nativo oficial
+        const updatedData = {
+          ...existente,
+          backgroundUrl: padrao.backgroundUrl,
+          elementos: padrao.elementos,
+          cargo_key: cargoKey,
+        };
         await supabase
           .from('certificados_templates')
           .update({ template_data: updatedData })

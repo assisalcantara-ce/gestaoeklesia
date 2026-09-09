@@ -1,0 +1,81 @@
+{
+  "name": "Casamento",
+  "template_key": "casamento-padrao",
+  "categoria": "casamento",
+  "template_data": {
+    "elementos": [
+      {
+        "x": 170,
+        "y": 197,
+        "id": "9234a664-4f9a-4c7d-9ddd-490c0dbb4a76",
+        "cor": "#804000",
+        "tipo": "texto",
+        "fonte": "Comic Sans MS",
+        "texto": "{conjuge1_nome} & {conjuge2_nome}",
+        "altura": 45,
+        "largura": 501,
+        "visivel": true,
+        "fontSize": 17,
+        "alinhamento": "center"
+      },
+      {
+        "x": 27,
+        "y": 250,
+        "id": "c97c56fa-c19e-4661-83d1-9c4adadac07a",
+        "cor": "#111827",
+        "tipo": "logo",
+        "fonte": "Arial",
+        "altura": 143,
+        "largura": 118,
+        "visivel": true,
+        "fontSize": 16,
+        "alinhamento": "left"
+      },
+      {
+        "x": 173,
+        "y": 435,
+        "id": "68da61f0-7617-4b4f-a6af-908c6d3305fc",
+        "cor": "#804000",
+        "tipo": "texto",
+        "fonte": "Arial",
+        "texto": "{data_casamento}",
+        "altura": 24,
+        "largura": 125,
+        "visivel": true,
+        "fontSize": 12,
+        "alinhamento": "center"
+      },
+      {
+        "x": 303,
+        "y": 436,
+        "id": "1777042538568yzp8hio",
+        "cor": "#804000",
+        "tipo": "texto",
+        "fonte": "Arial",
+        "texto": "{pastor_nome}",
+        "altura": 25,
+        "locked": false,
+        "largura": 224,
+        "visivel": true,
+        "fontSize": 12,
+        "alinhamento": "center"
+      },
+      {
+        "x": 533,
+        "y": 436,
+        "id": "1777042568503977ruyb",
+        "cor": "#804000",
+        "tipo": "texto",
+        "fonte": "Arial",
+        "texto": "{local_casamento}",
+        "altura": 27,
+        "locked": false,
+        "largura": 151,
+        "visivel": true,
+        "fontSize": 12,
+        "alinhamento": "center"
+      }
+    ],
+    "backgroundUrl": "/img/certificado_casamento.jpg"
+  }
+}
