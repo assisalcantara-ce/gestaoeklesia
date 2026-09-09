@@ -1,0 +1,67 @@
+{
+  "name": "Batismo nas Águas",
+  "template_key": "batismo-aguas-padrao",
+  "categoria": "batismo-aguas",
+  "template_data": {
+    "elementos": [
+      {
+        "x": 163,
+        "y": 203,
+        "id": "921cf954-f87e-49ae-914d-b8c3f574e56a",
+        "cor": "#804000",
+        "tipo": "texto",
+        "fonte": "Comic Sans MS",
+        "texto": "{candidato_nome}",
+        "altura": 51,
+        "largura": 507,
+        "negrito": false,
+        "visivel": true,
+        "fontSize": 22,
+        "alinhamento": "center"
+      },
+      {
+        "x": 266,
+        "y": 433,
+        "id": "522dfa0d-dc57-4ab9-850f-9b8b6725210c",
+        "cor": "#804000",
+        "tipo": "texto",
+        "fonte": "Comic Sans MS",
+        "texto": "{data_batismo}",
+        "altura": 26,
+        "largura": 148,
+        "visivel": true,
+        "fontSize": 12,
+        "alinhamento": "center"
+      },
+      {
+        "x": 423,
+        "y": 432,
+        "id": "17770396541354ijgnlo",
+        "cor": "#804000",
+        "tipo": "texto",
+        "fonte": "Comic Sans MS",
+        "texto": "{local_batismo}",
+        "altura": 29,
+        "locked": false,
+        "largura": 181,
+        "visivel": true,
+        "fontSize": 12,
+        "alinhamento": "center"
+      },
+      {
+        "x": 24,
+        "y": 453,
+        "id": "5e1f2800-3fa0-42d1-84c7-76409776df3d",
+        "cor": "#111827",
+        "tipo": "logo",
+        "fonte": "Arial",
+        "altura": 114,
+        "largura": 109,
+        "visivel": true,
+        "fontSize": 16,
+        "alinhamento": "left"
+      }
+    ],
+    "backgroundUrl": "/img/certificado_batismo.png"
+  }
+}
