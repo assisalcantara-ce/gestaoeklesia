@@ -71,41 +71,17 @@ export async function POST(request: NextRequest) {
 
     const isInstitucional = doc.escopo === 'INSTITUCIONAL' || ['CONTRATO_SERVICO', 'ADITIVO'].includes(doc.tipo);
 
-    // Se o documento for INSTITUCIONAL, validar se o usuário possui papel de representante autorizado (owner ou administrador)
+    // Se o documento for INSTITUCIONAL, validar estritamente se o usuário é o MASTER/Proprietário oficial do tenant
     if (isInstitucional) {
-      const { data: ministryUser } = await supabaseAdmin
-        .from('ministry_users')
-        .select('role, permissions')
-        .eq('user_id', userId)
-        .eq('ministry_id', cleanMinistryId)
-        .maybeSingle();
+      const { isMasterUsuarioMinisterio } = await import('@/lib/tenant-auth');
+      const isMaster = await isMasterUsuarioMinisterio(supabaseAdmin, userId, cleanMinistryId);
 
-      const { data: ownedMinistry } = await supabaseAdmin
-        .from('ministries')
-        .select('id')
-        .eq('id', cleanMinistryId)
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      const isOwner = Boolean(ownedMinistry);
-
-      let isAdmin = false;
-      if (ministryUser) {
-        const role = (ministryUser.role || '').toLowerCase();
-        const permissions = Array.isArray(ministryUser.permissions)
-          ? ministryUser.permissions.map((p: any) => String(p).toUpperCase())
-          : [];
-
-        if (role === 'admin' || role === 'administrador' || permissions.includes('ADMINISTRADOR')) {
-          isAdmin = true;
-        }
-      }
-
-      if (!isOwner && !isAdmin) {
+      if (!isMaster) {
         return NextResponse.json(
           {
             success: false,
-            error: 'Apenas os representantes autorizados do ministério (Proprietário ou Administrador) podem assinar ou aceitar documentos institucionais/contratuais.',
+            code: 'LEGAL_REPRESENTATIVE_REQUIRED',
+            error: 'Apenas o usuário MASTER (responsável principal do ministério/tenant) possui autoridade legal para aceitar e assinar documentos institucionais e contratuais.',
           },
           { status: 403 }
         );

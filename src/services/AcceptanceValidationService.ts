@@ -71,6 +71,10 @@ export class AcceptanceValidationService {
     const todosDocs = await this.documentosService.listarDocumentos({});
     const mapaDocsPorId = new Map(todosDocs.map((d) => [d.id, d]));
 
+    // Rastrear se o usuário é o MASTER oficial do tenant
+    const { isMasterUsuarioMinisterio } = await import('@/lib/tenant-auth');
+    const isMaster = await isMasterUsuarioMinisterio(this.documentosService['repository']['client'], cleanUserId, cleanMinistryId);
+
     // 3. Para cada documento vigente obrigatório, verificar se o aceite já ocorreu de acordo com seu escopo
     for (const doc of documentosVigentes) {
       const raizIdAtual = doc.documento_raiz_id || doc.id;
@@ -79,7 +83,12 @@ export class AcceptanceValidationService {
       let jaAceitou = false;
 
       if (isInstitucional) {
-        // Documentos INSTITUCIONAL: Se QUALQUER usuário autorizado do tenant já aceitou esta versão, está resolvido para todos
+        // Se o documento é INSTITUCIONAL mas o usuário autenticado NÃO é o MASTER responsável, ele não possui autoridade e não deve receber a pendência
+        if (!isMaster) {
+          continue;
+        }
+
+        // Para o MASTER: verificar se o tenant já possui aceite desta versão institucional
         jaAceitou = await this.aceitesService.verificarSeTenantAceitouVersaoInstitucional(
           cleanMinistryId,
           doc.id,

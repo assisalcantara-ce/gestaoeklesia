@@ -81,6 +81,25 @@ async function findOwnedMinistry(
   return adminData?.id ? String(adminData.id) : null;
 }
 
+export async function isMasterUsuarioMinisterio(
+  admin: ReturnType<typeof createServerClient> | SupabaseLike,
+  userId: string,
+  ministryId: string
+): Promise<boolean> {
+  if (!userId || !ministryId) return false;
+  const cleanUserId = userId.trim();
+  const cleanMinistryId = ministryId.trim();
+
+  const { data: ownedMinistry } = await admin
+    .from('ministries')
+    .select('id')
+    .eq('id', cleanMinistryId)
+    .eq('user_id', cleanUserId)
+    .maybeSingle();
+
+  return Boolean(ownedMinistry);
+}
+
 export async function validarVinculoUsuarioMinisterio(
   admin: ReturnType<typeof createServerClient> | SupabaseLike,
   userId: string,
