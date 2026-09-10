@@ -1,0 +1,78 @@
+{
+  "name": "Diaconisa",
+  "categoria": "ministerial",
+  "template_data": {
+    "elementos": [
+      {
+        "x": 115,
+        "y": 192,
+        "id": "f06e1232-1ebb-45a5-9a95-969b79f72915",
+        "cor": "#111827",
+        "tipo": "logo",
+        "fonte": "Arial",
+        "altura": 125,
+        "largura": 99,
+        "visivel": true,
+        "fontSize": 16,
+        "alinhamento": "left"
+      },
+      {
+        "x": 206,
+        "y": 221,
+        "id": "9875d06a-3d97-44d1-b673-bf6890e0c4e2",
+        "cor": "#804000",
+        "tipo": "texto",
+        "fonte": "Comic Sans MS",
+        "texto": "{ministro_nome}",
+        "altura": 39,
+        "largura": 456,
+        "visivel": true,
+        "fontSize": 22,
+        "alinhamento": "center"
+      },
+      {
+        "x": 206,
+        "y": 478,
+        "id": "9a743a50-48f1-45de-aeec-14acbb9759fd",
+        "cor": "#804000",
+        "tipo": "texto",
+        "fonte": "Arial",
+        "texto": "{nome_igreja}",
+        "altura": 24,
+        "largura": 212,
+        "visivel": true,
+        "fontSize": 12,
+        "alinhamento": "right"
+      },
+      {
+        "x": 441,
+        "y": 477,
+        "id": "1777048014058ql55s0s",
+        "cor": "#804000",
+        "tipo": "texto",
+        "fonte": "Arial",
+        "texto": "{data_consagracao}",
+        "altura": 24,
+        "locked": false,
+        "largura": 212,
+        "visivel": true,
+        "fontSize": 12,
+        "alinhamento": "left"
+      },
+      {
+        "id": "553fd6a6-c6b0-413e-b40d-fb5be4f8beb8",
+        "tipo": "qrcode",
+        "x": 735,
+        "y": 489,
+        "largura": 76,
+        "altura": 80,
+        "fontSize": 16,
+        "cor": "#111827",
+        "fonte": "Arial",
+        "alinhamento": "left",
+        "visivel": true
+      }
+    ],
+    "backgroundUrl": "/img/diaconisa.png"
+  }
+}

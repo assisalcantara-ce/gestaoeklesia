@@ -217,7 +217,7 @@ export async function loadCertificadosTemplatesForCurrentUser(
         padrao.backgroundUrl &&
         (!existente.backgroundUrl ||
           existente.backgroundUrl !== padrao.backgroundUrl ||
-          ((padrao.id === 'casamento-padrao' || padrao.id === 'batismo-aguas-padrao') && JSON.stringify(existente.elementos) !== JSON.stringify(padrao.elementos)))
+          ((padrao.id === 'casamento-padrao' || padrao.id === 'batismo-aguas-padrao' || padrao.id === 'diaconisa-padrao') && JSON.stringify(existente.elementos) !== JSON.stringify(padrao.elementos)))
       ) {
         // Template existente com background ou elementos desatualizados — atualizar para o modelo nativo oficial
         const updatedData = {
