@@ -58,7 +58,12 @@ export default function FaturasPage() {
       const { data, error: qError } = await query;
       if (qError) throw qError;
 
-      setInvoices(data || []);
+      const validInvoices = (data || []).filter((inv: any) => {
+        const st = String(inv.status || '').toLowerCase().trim();
+        return st !== 'canceled' && st !== 'cancelado' && st !== 'cancelled';
+      });
+
+      setInvoices(validInvoices);
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar as faturas.');
     } finally {

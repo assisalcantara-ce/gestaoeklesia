@@ -47,6 +47,36 @@ export async function POST(request: NextRequest) {
     const cleanDocumentoId = documento_id.trim();
     const cleanMinistryId = ministry_id.trim();
 
+    // Validar vínculo real entre o usuário autenticado e o ministério informado
+    const { data: ministryUser } = await supabaseAdmin
+      .from('ministry_users')
+      .select('ministry_id')
+      .eq('user_id', userId)
+      .eq('ministry_id', cleanMinistryId)
+      .maybeSingle();
+
+    let temVinculo = Boolean(ministryUser);
+
+    if (!temVinculo) {
+      const { data: ownedMinistry } = await supabaseAdmin
+        .from('ministries')
+        .select('id')
+        .eq('id', cleanMinistryId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (ownedMinistry) {
+        temVinculo = true;
+      }
+    }
+
+    if (!temVinculo) {
+      return NextResponse.json(
+        { success: false, error: 'Acesso negado: você não possui vínculo com este ministério.' },
+        { status: 403 }
+      );
+    }
+
     // 1. Localizar o documento e verificar se está PUBLICADO
     const docsService = new DocumentosJuridicosService(supabaseAdmin);
     const doc = await docsService.buscarPorId(cleanDocumentoId);

@@ -73,7 +73,10 @@ export default function AceiteDocumentoPage() {
         throw new Error(json.error || 'Falha ao registrar aceite do documento.')
       }
 
-      setSuccessMsg(`Aceite eletrônico do documento "${documento.titulo}" (v${documento.versao}) registrado com sucesso!`)
+      setSuccessMsg(`Aceite eletrônico do documento "${documento.titulo}" (v${documento.versao}) registrado com sucesso! Redirecionando...`)
+      setTimeout(() => {
+        window.location.href = '/dashboard'
+      }, 1500)
     } catch (err: any) {
       setError(err.message || 'Erro ao registrar aceite.')
     } finally {

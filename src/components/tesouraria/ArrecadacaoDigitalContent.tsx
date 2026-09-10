@@ -188,7 +188,11 @@ export default function ArrecadacaoDigitalContent({
         .limit(100);
 
       if (error) throw error;
-      setCobrancas((data as any) ?? []);
+      const validCobrancas = ((data as any) ?? []).filter((c: any) => {
+        const st = String(c.status || '').toLowerCase().trim();
+        return st !== 'canceled' && st !== 'cancelado' && st !== 'cancelled' && st !== 'cancelada';
+      });
+      setCobrancas(validCobrancas);
     } catch {
       setCobrancas([]);
     } finally {
@@ -284,7 +288,10 @@ export default function ArrecadacaoDigitalContent({
   // Métricas Computadas
   const totalArrecadadoGlobal = destinos.reduce((acc, d) => acc + (d.total_arrecadado ?? 0), 0);
   const destinosAtivosCount = destinos.filter((d) => d.is_ativo).length;
-  const transacoesPagasCount = cobrancas.filter((c) => c.status === 'pago').length;
+  const transacoesPagasCount = cobrancas.filter((c) => {
+    const st = String(c.status || '').toLowerCase().trim();
+    return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
+  }).length;
 
   // Filtragem de Extrato
   const cobrancasFiltradas = cobrancas.filter((c) => {

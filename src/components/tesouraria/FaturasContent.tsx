@@ -51,6 +51,10 @@ export default function FaturasContent() {
         }
 
         const faturasFormatadas = (data || [])
+          .filter((inv: any) => {
+            const st = String(inv.status || '').toLowerCase().trim();
+            return st !== 'canceled' && st !== 'cancelado' && st !== 'cancelled';
+          })
           .map((inv: any) => ({
             id: inv.id,
             plano_slug: inv.plano_slug || 'PLANO',
