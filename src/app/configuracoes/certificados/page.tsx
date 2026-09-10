@@ -8,7 +8,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
-import { AlignCenter, AlignLeft, AlignRight, Award, Bold, Clipboard, Copy, Download, Image as ImageIcon, Italic, Shield, Type, Underline } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, Award, Bold, Clipboard, Copy, Download, Image as ImageIcon, Italic, QrCode, Shield, Type, Underline } from 'lucide-react';
 
 const FONTES_DISPONIVEIS = [
   'Arial', 'Arial Black', 'Georgia', 'Times New Roman', 'Verdana',
@@ -29,10 +29,11 @@ import {
 const CERTIFICADO_CANVAS = { largura: 840, altura: 595 };
 
 const ELEMENTOS_TIPOS = [
-  { tipo: 'texto',  label: 'Texto',  icone: <Type className="h-5 w-5" /> },
-  { tipo: 'logo',   label: 'Logo',   icone: <Shield className="h-5 w-5" /> },
-  { tipo: 'imagem', label: 'Imagem', icone: <ImageIcon className="h-5 w-5" /> },
-  { tipo: 'chapa',  label: 'Chapa',  icone: <Award className="h-5 w-5" /> },
+  { tipo: 'texto',  label: 'Texto',   icone: <Type className="h-5 w-5" /> },
+  { tipo: 'logo',   label: 'Logo',    icone: <Shield className="h-5 w-5" /> },
+  { tipo: 'imagem', label: 'Imagem',  icone: <ImageIcon className="h-5 w-5" /> },
+  { tipo: 'chapa',  label: 'Chapa',   icone: <Award className="h-5 w-5" /> },
+  { tipo: 'qrcode', label: 'QR Code', icone: <QrCode className="h-5 w-5" /> },
 ];
 
 interface CertificadoElemento {
@@ -258,8 +259,8 @@ export default function ConfiguracoesCertificadosPage() {
       tipo,
       x: 40,
       y: 40,
-      largura: tipo === 'logo' ? 90 : tipo === 'imagem' ? 160 : tipo === 'chapa' ? 200 : 320,
-      altura:  tipo === 'logo' ? 90 : tipo === 'imagem' ? 120 : tipo === 'chapa' ? 40  : 40,
+      largura: tipo === 'logo' || tipo === 'qrcode' ? 90 : tipo === 'imagem' ? 160 : tipo === 'chapa' ? 200 : 320,
+      altura:  tipo === 'logo' || tipo === 'qrcode' ? 90 : tipo === 'imagem' ? 120 : tipo === 'chapa' ? 40  : 40,
       fontSize: 16,
       cor: '#111827',
       fonte: 'Arial',

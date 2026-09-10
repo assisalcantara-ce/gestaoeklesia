@@ -5,6 +5,8 @@ import { obterPreviewTexto } from '@/lib/cartoes-utils';
 import { createClient } from '@/lib/supabase-client';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 
+import { QRCodeSVG } from 'qrcode.react';
+
 interface ElementoCartao {
     id: string;
     tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha' | 'forma';
@@ -471,7 +473,7 @@ export default function InteractiveCanvas({
                 break;
 
             case 'qrcode':
-                // Gerar QR code dinamicamente (placeholder por enquanto no editor)
+                // Gerar QR code apontando para a verificação da carteirinha digital
                 conteudo = (
                     <div
                         style={{
@@ -479,14 +481,20 @@ export default function InteractiveCanvas({
                             height: '100%',
                             backgroundColor: '#fff',
                             display: 'flex',
+                            flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: '10px',
-                            color: '#666',
-                            border: '1px solid #ddd'
+                            padding: '4px',
+                            boxSizing: 'border-box',
+                            borderRadius: '4px',
+                            border: '1px solid #e5e7eb'
                         }}
                     >
-                        📱 QR Code
+                        <QRCodeSVG
+                            value={typeof window !== 'undefined' ? `${window.location.origin}/app/carteirinha` : 'https://app.gestaoeklesia.com.br/app/carteirinha'}
+                            size={Math.min(elemento.largura, elemento.altura) - 8}
+                            fgColor={elemento.cor || '#000000'}
+                        />
                     </div>
                 );
                 break;
