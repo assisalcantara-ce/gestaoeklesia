@@ -937,6 +937,7 @@ export default function PublicMemberPage({ params }: PageProps) {
                       <option value="DIVORCIADO">Divorciado(a)</option>
                       <option value="VIUVO">Viúvo(a)</option>
                       <option value="UNIAO_ESTAVEL">União Estável</option>
+                      <option value="OUTROS">Outros</option>
                     </select>
                   </div>
 

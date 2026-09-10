@@ -290,6 +290,10 @@ export default function MembroFormModal({
                     <option value="">- Escolha -</option>
                     <option value="solteiro">{dadosPessoais.sexo === 'FEMININO' ? 'Solteira' : 'Solteiro'}</option>
                     <option value="casado">{dadosPessoais.sexo === 'FEMININO' ? 'Casada' : 'Casado'}</option>
+                    <option value="divorciado">{dadosPessoais.sexo === 'FEMININO' ? 'Divorciada' : 'Divorciado'}</option>
+                    <option value="viuvo">{dadosPessoais.sexo === 'FEMININO' ? 'Viúva' : 'Viúvo'}</option>
+                    <option value="uniao_estavel">União Estável</option>
+                    <option value="outros">Outros</option>
                   </select>
                 </div>
               </div>

@@ -195,6 +195,8 @@ export function substituirPlaceholders(texto: string, membro: any, nomenclaturas
       else if (normalizado === 'solteiro') valor = isFeminino ? 'Solteira' : 'Solteiro';
       else if (normalizado === 'viuvo') valor = isFeminino ? 'Viúva' : 'Viúvo';
       else if (normalizado === 'divorciado') valor = isFeminino ? 'Divorciada' : 'Divorciado';
+      else if (normalizado === 'uniao_estavel' || normalizado === 'uniao estavel') valor = 'União Estável';
+      else if (normalizado === 'outros' || normalizado === 'outro') valor = 'Outros';
       else valor = membro.estadoCivil || '';
     }
 
