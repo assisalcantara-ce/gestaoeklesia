@@ -125,35 +125,73 @@ export class ContratosService {
     let conteudoEfetivo: string | null = null;
 
     if (contrato) {
-      // Prioridade 1: Conteúdo customizado salvo diretamente no contrato
-      if (contrato.conteudo_customizado && contrato.conteudo_customizado.trim().length > 0) {
-        conteudoEfetivo = contrato.conteudo_customizado;
+      // Verificar se o contrato necessita de reparação de snapshot (se for legado, sem conteudo_customizado ou com plano PADRAO)
+      const precisaReparacao =
+        !contrato.conteudo_customizado ||
+        contrato.conteudo_customizado.trim().length === 0 ||
+        contrato.conteudo_customizado.includes('Pessoa jurídica regularmente cadastrada') ||
+        contrato.conteudo_customizado.includes('{{CONTRATANTE_NOME}}') ||
+        contrato.plano_contratado === 'PADRAO' ||
+        !contrato.plano_contratado;
+
+      if (precisaReparacao) {
+        try {
+          const { MaterializacaoContratoService } = await import('@/services/MaterializacaoContratoService');
+          const matService = new MaterializacaoContratoService((this.repository as any).client);
+          const dadosTenant = await matService.obterDadosOficiaisTenant(cleanMinistryId, contrato.assinado_por || undefined);
+
+          // Buscar documento base para servir de matriz
+          let docBaseParaMatriz: import('@/types/juridico').DocumentoJuridico | null = documentoBase;
+          if (!docBaseParaMatriz) {
+            const documentosPublicados = await this.documentosService.listarDocumentos({
+              tipo: 'CONTRATO_SERVICO',
+              status: 'PUBLICADO',
+              ativo: true,
+            });
+            docBaseParaMatriz = documentosPublicados[0] || null;
+          }
+
+          if (docBaseParaMatriz) {
+            const matResultado = matService.materializarConteudo(docBaseParaMatriz.conteudo_md, dadosTenant);
+
+            const payloadAtualizacao = {
+              documento_base_id: contrato.documento_base_id || docBaseParaMatriz.id,
+              documento_raiz_id: contrato.documento_raiz_id || docBaseParaMatriz.documento_raiz_id || docBaseParaMatriz.id,
+              versao_documento: contrato.versao_documento || docBaseParaMatriz.versao,
+              hash_documento: matResultado.hashSha256,
+              plano_contratado: dadosTenant.planoNome,
+              valor_mensal: contrato.valor_mensal !== null && contrato.valor_mensal !== undefined ? contrato.valor_mensal : dadosTenant.valorMensal,
+              conteudo_customizado: matResultado.conteudoMaterializado,
+              numero_contrato: contrato.numero_contrato || dadosTenant.numeroContrato,
+            };
+
+            // Atualizar o banco de dados com a materialização oficial
+            await (this.repository as any).client
+              .from('tenant_contratos')
+              .update(payloadAtualizacao)
+              .eq('id', contrato.id);
+
+            // Atualizar objeto em memória para retorno consistente
+            contrato.conteudo_customizado = matResultado.conteudoMaterializado;
+            contrato.hash_documento = matResultado.hashSha256;
+            contrato.plano_contratado = dadosTenant.planoNome;
+            contrato.valor_mensal = payloadAtualizacao.valor_mensal;
+            contrato.numero_contrato = payloadAtualizacao.numero_contrato;
+            documentoBase = docBaseParaMatriz;
+          }
+        } catch (repErr) {
+          console.warn('[ContratosService] Erro ao efetuar reparação de contrato legado:', repErr);
+        }
       }
 
-      // Prioridade 2: Buscar documento base específico vinculado pelo documento_base_id
-      if (contrato.documento_base_id) {
+      // Definir conteúdo efetivo do snapshot impresso
+      conteudoEfetivo = contrato.conteudo_customizado || null;
+
+      // Se ainda não tiver documento base carregado, carregar por documento_base_id
+      if (!documentoBase && contrato.documento_base_id) {
         try {
           documentoBase = await this.documentosService.buscarPorId(contrato.documento_base_id);
-          if (!conteudoEfetivo && documentoBase) {
-            conteudoEfetivo = documentoBase.conteudo_md;
-          }
-        } catch {
-          // Documento base pode ter sido removido ou não encontrado
-        }
-      }
-
-      // Prioridade 3: Se ainda não tiver documento base, buscar por documento_raiz_id + versao_documento
-      if (!documentoBase && contrato.documento_raiz_id && contrato.versao_documento) {
-        const historicoVersoes = await this.documentosService.listarHistoricoVersoes(contrato.documento_raiz_id);
-        const versaoCorrespondente = historicoVersoes.versoes.find((v) => v.versao === contrato.versao_documento);
-        if (versaoCorrespondente) {
-          try {
-            documentoBase = await this.documentosService.buscarPorId(versaoCorrespondente.id);
-            if (!conteudoEfetivo && documentoBase) {
-              conteudoEfetivo = documentoBase.conteudo_md;
-            }
-          } catch {}
-        }
+        } catch {}
       }
 
       // Buscar informações do usuário representante que realizou a assinatura (se assinado_por estiver preenchido)
