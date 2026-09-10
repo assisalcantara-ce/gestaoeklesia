@@ -176,17 +176,17 @@ export default function MembrosPage() {
       {/* Modal de Crop de Foto */}
       {mostrarCropModal && fotoOriginal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full">
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b-2 border-teal-500 bg-gradient-to-r from-teal-600 to-teal-700">
+            <div className="flex justify-between items-center px-6 py-4 border-b-2 border-teal-500 bg-gradient-to-r from-teal-600 to-teal-700 shrink-0">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <span>🖼️</span> Enquadrar Foto (3x4)
               </h2>
               <button onClick={cancelarCropFoto} className="text-white hover:text-gray-100 text-2xl">✕</button>
             </div>
 
-            {/* Conteúdo */}
-            <div className="p-6 space-y-4">
+            {/* Conteúdo com scroll quando a tela for pequena */}
+            <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               {/* Área de Preview */}
               <div className="bg-gray-100 rounded-lg p-4 flex justify-center">
                 <div
@@ -263,8 +263,8 @@ export default function MembrosPage() {
               </div>
             </div>
 
-            {/* Botões */}
-            <div className="flex gap-4 px-6 py-4 border-t border-gray-300 bg-gray-50">
+            {/* Botões (Fixo no rodapé) */}
+            <div className="flex gap-4 px-6 py-4 border-t border-gray-300 bg-gray-50 shrink-0">
               <button onClick={confirmarCropFoto} className="flex-1 px-4 py-2 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg hover:from-teal-700 hover:to-teal-800 transition font-bold text-sm">
                 ✓ Confirmar Enquadramento
               </button>
