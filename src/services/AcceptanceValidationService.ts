@@ -23,7 +23,8 @@ export class AcceptanceValidationService {
    */
   async verificarPendenciasAceite(
     userId: string,
-    ministryId: string
+    ministryId: string,
+    modoRegularizacao: boolean = false
   ): Promise<ResultadoValidacaoAceitesDTO> {
     if (!userId || userId.trim().length === 0) {
       throw new Error('O ID do usuário é obrigatório para validação de aceites.');
@@ -88,12 +89,31 @@ export class AcceptanceValidationService {
           continue;
         }
 
-        // Para o MASTER: verificar se o tenant já possui aceite desta versão institucional
-        jaAceitou = await this.aceitesService.verificarSeTenantAceitouVersaoInstitucional(
-          cleanMinistryId,
-          doc.id,
-          doc.versao
-        );
+        if (modoRegularizacao) {
+          const { ContratosRepository } = await import('@/repositories/ContratosRepository');
+          const repo = new ContratosRepository(this.documentosService['repository']['client']);
+          const contratos = await repo.buscarPorMinistryId(cleanMinistryId);
+          const possuiMaterializadoIntegro = contratos.some(
+            (c) =>
+              c.status === 'ATIVO' &&
+              c.snapshot_status === 'INTEGRO_IMUTAVEL' &&
+              c.conteudo_customizado &&
+              c.conteudo_customizado.trim().length > 0
+          );
+
+          if (possuiMaterializadoIntegro) {
+            jaAceitou = true;
+          } else {
+            jaAceitou = false;
+          }
+        } else {
+          // Para o MASTER: verificar se o tenant já possui aceite desta versão institucional
+          jaAceitou = await this.aceitesService.verificarSeTenantAceitouVersaoInstitucional(
+            cleanMinistryId,
+            doc.id,
+            doc.versao
+          );
+        }
       } else {
         // Documentos INDIVIDUAL: O próprio usuário autenticado precisa ter aceitado esta versão
         jaAceitou = await this.aceitesService.verificarSeUsuarioAceitouVersao(

@@ -27,6 +27,7 @@ const SIDEBAR_PREFIXES = [
   '/suporte',
   '/configuracoes',
   '/agenda',
+  '/juridico/meu-contrato',
 ];
 
 export default function AppShell({ children }: { children: ReactNode }) {

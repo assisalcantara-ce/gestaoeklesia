@@ -159,7 +159,7 @@ export interface TenantContrato {
   hash_documento?: string | null;
   plano_contratado?: string | null;
   numero_contrato?: string | null;
-  status: 'RASCUNHO' | 'AGUARDANDO_ASSINATURA' | 'ATIVO' | 'CANCELADO' | 'EXPIRADO' | 'RESCINDIDO';
+  status: 'RASCUNHO' | 'AGUARDANDO_ASSINATURA' | 'ATIVO' | 'CANCELADO' | 'EXPIRADO' | 'RESCINDIDO' | 'SUBSTITUIDO';
   conteudo_customizado?: string | null;
   valor_mensal?: number | null;
   data_inicio: string;
@@ -169,6 +169,7 @@ export interface TenantContrato {
   snapshot_status?: SnapshotStatusContrato;
   origem_snapshot?: OrigemSnapshotContrato;
   integridade_verificada?: boolean;
+  contrato_substituido_id?: string | null;
   created_at: string;
   updated_at: string;
 }

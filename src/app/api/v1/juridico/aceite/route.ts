@@ -88,9 +88,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Materializar dados reais do contrato se for um documento INSTITUCIONAL
+    const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null;
+    const userAgent = request.headers.get('user-agent') || null;
+
+    let registroAceite: any = null;
     let conteudoMaterializado: string | null = null;
-    let hashDocumentoFinal = doc.hash_sha256 || null;
+    let hashDocumentoFinal: string | null = doc.hash_sha256 || null;
     let planoComercialReal: string = 'starter';
     let valorMensalReal: number | null = null;
 
@@ -104,74 +107,71 @@ export async function POST(request: NextRequest) {
       hashDocumentoFinal = matResultado.hashSha256;
       planoComercialReal = dadosTenant.planoNome;
       valorMensalReal = dadosTenant.valorMensal;
-    } else if (!hashDocumentoFinal) {
-      const crypto = require('crypto');
-      hashDocumentoFinal = crypto.createHash('sha256').update(doc.conteudo_md || '').digest('hex');
-    }
 
-    // 2. Registrar o aceite via AceitesService
-    const aceitesService = new AceitesService(supabaseAdmin);
-    const auditoriaService = new AuditoriaJuridicaService(supabaseAdmin);
-
-    const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null;
-    const userAgent = request.headers.get('user-agent') || null;
-
-    const registroAceite = await aceitesService.registrarAceite({
-      ministry_id: cleanMinistryId,
-      user_id: userId,
-      documento_id: doc.id,
-      versao_aceita: doc.versao,
-      hash_documento: hashDocumentoFinal!,
-      ip_address: ipAddress,
-      user_agent: userAgent,
-      payload_aceite: {
-        origem: 'TELA_ACEITE_JURIDICO',
-        escopo: doc.escopo,
-        hash_sha256_materializado: hashDocumentoFinal,
-      },
-    });
-
-    // 3. Se for um documento INSTITUCIONAL (Contrato de Serviço / Aditivo), sincronizar com tenant_contratos salvando o snapshot imutável
-    if (isInstitucional) {
       const { ContratosRepository } = await import('@/repositories/ContratosRepository');
       const contratosRepo = new ContratosRepository(supabaseAdmin);
-
       const contratosExistentes = await contratosRepo.buscarPorMinistryId(cleanMinistryId);
-      const contratoAtual = contratosExistentes[0] || null;
+      const contratoLegado = contratosExistentes.find(
+        (c) => c.status === 'ATIVO' && (!c.conteudo_customizado || c.snapshot_status === 'HERDADO_MATRIZ')
+      );
 
-      const payloadContrato = {
-        documento_base_id: doc.id,
-        documento_raiz_id: doc.documento_raiz_id || doc.id,
-        versao_documento: doc.versao,
-        hash_documento: hashDocumentoFinal,
-        plano_contratado: planoComercialReal,
-        valor_mensal: valorMensalReal,
-        conteudo_customizado: conteudoMaterializado,
-        snapshot_status: 'INTEGRO_IMUTAVEL' as const,
-        origem_snapshot: 'CELEBRACAO_ORIGINAL' as const,
-        integridade_verificada: true,
-        status: 'ATIVO' as const,
-        assinado_em: new Date().toISOString(),
-        assinado_por: userId,
-      };
+      const versaoAceitaRPC = contratoLegado ? `${doc.versao}-REGULARIZADO` : doc.versao;
 
-      if (contratoAtual) {
-        // Atualizar contrato existente para ATIVO com o snapshot impresso
-        await supabaseAdmin
-          .from('tenant_contratos')
-          .update(payloadContrato)
-          .eq('id', contratoAtual.id);
-      } else {
-        // Criar registro de contrato ATIVO para o tenant com o snapshot impresso
-        await contratosRepo.criar({
-          ministry_id: cleanMinistryId,
-          ...payloadContrato,
-          data_inicio: new Date().toISOString(),
-        });
+      // Executar regularização contratual atômica via RPC PostgreSQL
+      const { data: rpcRes, error: rpcErr } = await supabaseAdmin.rpc('regularizar_contrato_tenant', {
+        p_ministry_id: cleanMinistryId,
+        p_user_id: userId,
+        p_documento_id: doc.id,
+        p_versao_documento: doc.versao,
+        p_versao_aceita: versaoAceitaRPC,
+        p_hash_documento: hashDocumentoFinal,
+        p_plano_contratado: planoComercialReal,
+        p_valor_mensal: valorMensalReal,
+        p_conteudo_customizado: conteudoMaterializado,
+        p_numero_contrato: dadosTenant.numeroContrato,
+        p_ip_address: ipAddress,
+        p_user_agent: userAgent,
+      });
+
+      if (rpcErr) {
+        console.error('[POST /juridico/aceite] Erro na RPC regularizar_contrato_tenant:', rpcErr);
+        throw new Error(`Falha ao registrar contrato materializado: ${rpcErr.message}`);
       }
+
+      registroAceite = {
+        id: rpcRes?.aceite_id || doc.id,
+        ministry_id: cleanMinistryId,
+        user_id: userId,
+        documento_id: doc.id,
+        versao_aceita: versaoAceitaRPC,
+        hash_documento: hashDocumentoFinal,
+        created_at: new Date().toISOString(),
+      };
+    } else {
+      if (!hashDocumentoFinal) {
+        const crypto = require('crypto');
+        hashDocumentoFinal = crypto.createHash('sha256').update(doc.conteudo_md || '').digest('hex');
+      }
+
+      const aceitesService = new AceitesService(supabaseAdmin);
+      registroAceite = await aceitesService.registrarAceite({
+        ministry_id: cleanMinistryId,
+        user_id: userId,
+        documento_id: doc.id,
+        versao_aceita: doc.versao,
+        hash_documento: hashDocumentoFinal!,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+        payload_aceite: {
+          origem: 'TELA_ACEITE_JURIDICO',
+          escopo: doc.escopo,
+          hash_sha256_materializado: hashDocumentoFinal,
+        },
+      });
     }
 
     // 4. Registrar auditoria jurídica obrigatória
+    const auditoriaService = new AuditoriaJuridicaService(supabaseAdmin);
     await auditoriaService.registrarEvento({
       usuario_id: userId,
       ministry_id: cleanMinistryId,
@@ -182,9 +182,10 @@ export async function POST(request: NextRequest) {
       ip_address: ipAddress,
       user_agent: userAgent,
       detalhes: {
-        aceite_id: registroAceite.id,
+        aceite_id: registroAceite?.id,
         origem: 'TELA_ACEITE_JURIDICO',
         escopo: doc.escopo,
+        is_institucional: isInstitucional,
       },
     });
 

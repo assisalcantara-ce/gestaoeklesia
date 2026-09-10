@@ -165,6 +165,30 @@ export default function MeuContratoPage() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Banner de Regularização quando for Contrato Legado Classe C */}
+          {(detalhes?.diagnostico_integridade?.snapshot_pendente || contrato?.snapshot_status === 'HERDADO_MATRIZ' || contrato?.plano_contratado === 'PADRAO') && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle size={22} className="shrink-0 text-amber-600 mt-0.5" />
+                <div>
+                  <h3 className="text-sm font-bold text-amber-900">
+                    📄 Registro Histórico de Referência
+                  </h3>
+                  <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                    Este contrato faz parte do histórico inicial da instituição. O plano comercial e a qualificação cadastral imutável não foram materializados na celebração antiga. O aceite original e o hash criptográfico foram totalmente preservados.
+                  </p>
+                </div>
+              </div>
+              <a
+                href="/juridico/aceite?regularizar=true"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors shrink-0"
+              >
+                <ShieldCheck size={16} />
+                Regularizar Contrato / Emitir Novo Contrato Materializado
+              </a>
+            </div>
+          )}
+
           {/* Card Principal — Metadados do Contrato */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -196,7 +220,9 @@ export default function MeuContratoPage() {
                   <ShieldCheck size={14} className="text-blue-500" /> Plano Contratado
                 </p>
                 <p className="text-base font-bold text-gray-800">
-                  {contrato.plano_contratado ? contrato.plano_contratado.toUpperCase() : 'NÃO ESPECIFICADO'}
+                  {contrato.plano_contratado && contrato.plano_contratado.toUpperCase() !== 'PADRAO'
+                    ? contrato.plano_contratado.toUpperCase()
+                    : 'Plano não materializado no registro histórico'}
                 </p>
               </div>
 

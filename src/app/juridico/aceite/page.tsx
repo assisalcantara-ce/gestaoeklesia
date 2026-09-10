@@ -37,8 +37,11 @@ export default function AceiteDocumentoPage() {
           return
         }
 
+        const searchParams = new URLSearchParams(window.location.search);
+        const isRegularizacao = searchParams.get('regularizar') === 'true';
+
         const res = await authenticatedFetch(
-          `/api/v1/juridico/verificar-pendencias?ministry_id=${encodeURIComponent(ministryId)}`
+          `/api/v1/juridico/verificar-pendencias?ministry_id=${encodeURIComponent(ministryId)}${isRegularizacao ? '&regularizar=true' : ''}`
         )
 
         if (!res.ok) {
@@ -55,7 +58,7 @@ export default function AceiteDocumentoPage() {
           if (!json.data.possui_pendencias || pendentes.length === 0) {
             setSuccessMsg('Todos os termos jurídicos obrigatórios já estão aceitos e em dia! Redirecionando...')
             setTimeout(() => {
-              window.location.href = '/dashboard'
+              window.location.href = isRegularizacao ? '/juridico/meu-contrato' : '/dashboard'
             }, 1500)
           }
         } else {
@@ -103,6 +106,9 @@ export default function AceiteDocumentoPage() {
         throw new Error(json.error || 'Falha ao registrar aceite do documento.')
       }
 
+      const searchParams = new URLSearchParams(window.location.search);
+      const isRegularizacao = searchParams.get('regularizar') === 'true';
+
       // Se houver mais documentos pendentes na fila
       if (currentIndex < documentos.length - 1) {
         setSuccessMsg(`Aceite do termo "${documentoAtual.titulo}" registrado com sucesso! Carregando próximo documento...`)
@@ -114,9 +120,9 @@ export default function AceiteDocumentoPage() {
         }, 1200)
       } else {
         // Todos os documentos foram aceitos
-        setSuccessMsg(`Todos os aceites jurídicos foram registrados com sucesso! Redirecionando para o sistema...`)
+        setSuccessMsg(`Aceite registrado com sucesso! Redirecionando para Meu Contrato...`)
         setTimeout(() => {
-          window.location.href = '/dashboard'
+          window.location.href = isRegularizacao ? '/juridico/meu-contrato' : '/dashboard'
         }, 1500)
       }
     } catch (err: any) {

@@ -45,8 +45,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const modoRegularizacao = searchParams.get('regularizar') === 'true';
+
     const validationService = new AcceptanceValidationService(supabaseAdmin);
-    const resultado = await validationService.verificarPendenciasAceite(authData.user.id, ministryId);
+    const resultado = await validationService.verificarPendenciasAceite(authData.user.id, ministryId, modoRegularizacao);
 
     return NextResponse.json({
       success: true,
