@@ -139,6 +139,17 @@ export type TipoEventoAuditoriaJuridica =
   | 'ACEITE_REGISTRADO'
   | 'CONTRATO_CRIADO';
 
+export type SnapshotStatusContrato =
+  | 'INTEGRO_IMUTAVEL'
+  | 'RECONSTRUIDO_HISTORICO'
+  | 'HERDADO_MATRIZ'
+  | 'REQUER_REGULARIZACAO';
+
+export type OrigemSnapshotContrato =
+  | 'CELEBRACAO_ORIGINAL'
+  | 'MIGRATION_SANEAMENTO'
+  | 'MODELO_BASE';
+
 export interface TenantContrato {
   id: string;
   ministry_id: string;
@@ -155,6 +166,9 @@ export interface TenantContrato {
   data_fim?: string | null;
   assinado_em?: string | null;
   assinado_por?: string | null;
+  snapshot_status?: SnapshotStatusContrato;
+  origem_snapshot?: OrigemSnapshotContrato;
+  integridade_verificada?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -172,6 +186,19 @@ export interface ItemHistoricoDocumentoInstitucionalDTO {
   conteudo_md?: string | null;
 }
 
+export interface DiagnosticoIntegridadeContratoDTO {
+  possui_snapshot: boolean;
+  hash_consistente_com_aceite: boolean;
+  contem_placeholders: boolean;
+  contem_texto_generico_legado: boolean;
+  plano_valido: boolean;
+  snapshot_status: SnapshotStatusContrato;
+  origem_snapshot: OrigemSnapshotContrato;
+  integridade_verificada: boolean;
+  snapshot_pendente: boolean;
+  tipo_visualizacao: 'SNAPSHOT_IMUTAVEL' | 'MODELO_BASE_HISTORICO' | 'AGUARDANDO_ACEITE';
+}
+
 export interface DetalhesContratoTenantDTO {
   contrato: TenantContrato | null;
   documento_base: DocumentoJuridico | null;
@@ -182,6 +209,7 @@ export interface DetalhesContratoTenantDTO {
   } | null;
   conteudo_efetivo: string | null;
   historico_documentos: ItemHistoricoDocumentoInstitucionalDTO[];
+  diagnostico_integridade?: DiagnosticoIntegridadeContratoDTO;
 }
 
 export interface CriarContratoVinculadoDTO {
