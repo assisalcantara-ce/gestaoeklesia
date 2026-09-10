@@ -93,4 +93,142 @@ export class ContratosService {
     const pendente = contratos.find((c) => c.status === 'AGUARDANDO_ASSINATURA');
     return pendente || null;
   }
+
+  /**
+   * Busca os detalhes completos do contrato e histórico de documentos institucionais do tenant.
+   * Método tenant-safe que busca a versão histórica exata contratada e o histórico de aceites institucionais.
+   */
+  async buscarDetalhesContratoTenant(ministryId: string): Promise<import('@/types/juridico').DetalhesContratoTenantDTO> {
+    if (!ministryId || ministryId.trim().length === 0) {
+      throw new Error('O ID do ministério (ministry_id) é obrigatório.');
+    }
+
+    const cleanMinistryId = ministryId.trim();
+
+    // 1. Buscar o contrato mais recente do tenant
+    const contratos = await this.repository.buscarPorMinistryId(cleanMinistryId);
+    const contrato = contratos[0] || null;
+
+    let documentoBase: import('@/types/juridico').DocumentoJuridico | null = null;
+    let assinadoPorUsuario: { id: string; email?: string | null; full_name?: string | null } | null = null;
+    let conteudoEfetivo: string | null = null;
+
+    if (contrato) {
+      // Prioridade 1: Conteúdo customizado salvo diretamente no contrato
+      if (contrato.conteudo_customizado && contrato.conteudo_customizado.trim().length > 0) {
+        conteudoEfetivo = contrato.conteudo_customizado;
+      }
+
+      // Prioridade 2: Buscar documento base específico vinculado pelo documento_base_id
+      if (contrato.documento_base_id) {
+        try {
+          documentoBase = await this.documentosService.buscarPorId(contrato.documento_base_id);
+          if (!conteudoEfetivo && documentoBase) {
+            conteudoEfetivo = documentoBase.conteudo_md;
+          }
+        } catch {
+          // Documento base pode ter sido removido ou não encontrado
+        }
+      }
+
+      // Prioridade 3: Se ainda não tiver documento base, buscar por documento_raiz_id + versao_documento
+      if (!documentoBase && contrato.documento_raiz_id && contrato.versao_documento) {
+        const historicoVersoes = await this.documentosService.listarHistoricoVersoes(contrato.documento_raiz_id);
+        const versaoCorrespondente = historicoVersoes.versoes.find((v) => v.versao === contrato.versao_documento);
+        if (versaoCorrespondente) {
+          try {
+            documentoBase = await this.documentosService.buscarPorId(versaoCorrespondente.id);
+            if (!conteudoEfetivo && documentoBase) {
+              conteudoEfetivo = documentoBase.conteudo_md;
+            }
+          } catch {}
+        }
+      }
+
+      // Buscar informações do usuário representante que realizou a assinatura (se assinado_por estiver preenchido)
+      if (contrato.assinado_por) {
+        const client = (this.repository as any).client;
+        const { data: userData } = await client
+          .from('profiles')
+          .select('id, email, full_name, nome')
+          .eq('id', contrato.assinado_por)
+          .maybeSingle();
+
+        if (userData) {
+          assinadoPorUsuario = {
+            id: userData.id,
+            email: userData.email || null,
+            full_name: userData.full_name || userData.nome || null,
+          };
+        } else {
+          assinadoPorUsuario = { id: contrato.assinado_por };
+        }
+      }
+    }
+
+    // 2. Montar histórico de documentos e contratos institucionais do tenant
+    // Buscar todos os aceites do tenant
+    const { data: todosAceites } = await (this.repository as any).client
+      .from('tenant_aceites')
+      .select('*')
+      .eq('ministry_id', cleanMinistryId)
+      .order('aceito_em', { ascending: false });
+
+    const aceitesDoTenant = (todosAceites || []) as import('@/types/juridico').TenantAceite[];
+
+    // Buscar todos os documentos jurídicos para mapear tipo, escopo e conteúdo
+    const todosDocs = await this.documentosService.listarDocumentos({});
+    const mapaDocs = new Map(todosDocs.map((d) => [d.id, d]));
+
+    // Filtrar apenas aceites institucionais (CONTRATO_SERVICO, ADITIVO ou escopo INSTITUCIONAL)
+    const aceitesInstitucionais = aceitesDoTenant.filter((a) => {
+      const doc = mapaDocs.get(a.documento_id);
+      if (!doc) return true; // Se não achar o doc, inclui no histórico preventivamente
+      return doc.escopo === 'INSTITUCIONAL' || ['CONTRATO_SERVICO', 'ADITIVO'].includes(doc.tipo);
+    });
+
+    // Coletar IDs de usuários para resolver nomes
+    const userIds = Array.from(new Set(aceitesInstitucionais.map((a) => a.user_id).filter(Boolean)));
+    const mapaUsuarios = new Map<string, { full_name?: string | null; email?: string | null }>();
+
+    if (userIds.length > 0) {
+      const { data: profiles } = await (this.repository as any).client
+        .from('profiles')
+        .select('id, email, full_name, nome')
+        .in('id', userIds);
+
+      (profiles || []).forEach((p: any) => {
+        mapaUsuarios.set(p.id, {
+          email: p.email || null,
+          full_name: p.full_name || p.nome || null,
+        });
+      });
+    }
+
+    const historicoDocumentos: import('@/types/juridico').ItemHistoricoDocumentoInstitucionalDTO[] = aceitesInstitucionais.map((a) => {
+      const doc = mapaDocs.get(a.documento_id);
+      const userObj = mapaUsuarios.get(a.user_id);
+
+      return {
+        id: a.id,
+        tipo: doc?.tipo || 'CONTRATO_SERVICO',
+        titulo: doc?.titulo || 'Contrato de Prestação de Serviços',
+        versao: a.versao_aceita,
+        hash_sha256: a.hash_documento,
+        aceito_em: a.aceito_em,
+        aceito_por_id: a.user_id,
+        aceito_por_nome: userObj?.full_name || null,
+        aceito_por_email: userObj?.email || null,
+        conteudo_md: doc?.conteudo_md || null,
+      };
+    });
+
+    return {
+      contrato,
+      documento_base: documentoBase,
+      assinado_por_usuario: assinadoPorUsuario,
+      conteudo_efetivo: conteudoEfetivo,
+      historico_documentos: historicoDocumentos,
+    };
+  }
 }

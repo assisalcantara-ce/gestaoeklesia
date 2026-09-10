@@ -96,4 +96,28 @@ export class AceitesService {
 
     return !!aceite;
   }
+
+  async verificarSeTenantAceitouVersaoInstitucional(
+    ministryId: string,
+    documentoId: string,
+    versaoAceita: string
+  ): Promise<boolean> {
+    if (!ministryId || ministryId.trim().length === 0) {
+      throw new Error('O ID do ministério é obrigatório para verificar o aceite institucional.');
+    }
+    if (!documentoId || documentoId.trim().length === 0) {
+      throw new Error('O ID do documento é obrigatório para verificar o aceite institucional.');
+    }
+    if (!versaoAceita || versaoAceita.trim().length === 0) {
+      throw new Error('A versão aceita é obrigatória para verificar o aceite institucional.');
+    }
+
+    const aceite = await this.repository.buscarAceiteInstitucionalEspecifico(
+      ministryId.trim(),
+      documentoId.trim(),
+      versaoAceita.trim()
+    );
+
+    return !!aceite;
+  }
 }

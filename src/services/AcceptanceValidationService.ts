@@ -71,18 +71,31 @@ export class AcceptanceValidationService {
     const todosDocs = await this.documentosService.listarDocumentos({});
     const mapaDocsPorId = new Map(todosDocs.map((d) => [d.id, d]));
 
-    // 3. Para cada documento vigente obrigatório, verificar se o usuário aceitou exatamente essa versão
+    // 3. Para cada documento vigente obrigatório, verificar se o aceite já ocorreu de acordo com seu escopo
     for (const doc of documentosVigentes) {
       const raizIdAtual = doc.documento_raiz_id || doc.id;
+      const isInstitucional = doc.escopo === 'INSTITUCIONAL';
 
-      const jaAceitouExata = await this.aceitesService.verificarSeUsuarioAceitouVersao(
-        cleanMinistryId,
-        cleanUserId,
-        doc.id,
-        doc.versao
-      );
+      let jaAceitou = false;
 
-      if (!jaAceitouExata) {
+      if (isInstitucional) {
+        // Documentos INSTITUCIONAL: Se QUALQUER usuário autorizado do tenant já aceitou esta versão, está resolvido para todos
+        jaAceitou = await this.aceitesService.verificarSeTenantAceitouVersaoInstitucional(
+          cleanMinistryId,
+          doc.id,
+          doc.versao
+        );
+      } else {
+        // Documentos INDIVIDUAL: O próprio usuário autenticado precisa ter aceitado esta versão
+        jaAceitou = await this.aceitesService.verificarSeUsuarioAceitouVersao(
+          cleanMinistryId,
+          cleanUserId,
+          doc.id,
+          doc.versao
+        );
+      }
+
+      if (!jaAceitou) {
         // Rastrear aceites que pertencem estritamente ao mesmo documento_raiz_id
         const aceitesDoMesmoDocumento = aceitesUsuario.filter((a) => {
           if (a.documento_id === doc.id || a.documento_id === raizIdAtual) return true;
@@ -102,6 +115,7 @@ export class AcceptanceValidationService {
         documentosPendentes.push({
           id: doc.id,
           tipo: doc.tipo,
+          escopo: doc.escopo || (['CONTRATO_SERVICO', 'ADITIVO'].includes(doc.tipo) ? 'INSTITUCIONAL' : 'INDIVIDUAL'),
           titulo: doc.titulo,
           versao: doc.versao,
           versao_publicada: doc.versao,
@@ -109,6 +123,7 @@ export class AcceptanceValidationService {
           hash_sha256: doc.hash_sha256,
           publicado_em: doc.publicado_em,
           obrigatorio: doc.obrigatorio,
+          conteudo_md: doc.conteudo_md,
         });
       }
     }

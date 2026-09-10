@@ -35,6 +35,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Sessão inválida ou expirada.' }, { status: 401 });
     }
 
+    const { validarVinculoUsuarioMinisterio } = await import('@/lib/tenant-auth');
+    const temVinculo = await validarVinculoUsuarioMinisterio(supabaseAdmin, authData.user.id, ministryId);
+
+    if (!temVinculo) {
+      return NextResponse.json(
+        { success: false, error: 'Acesso negado: você não possui vínculo com este ministério.' },
+        { status: 403 }
+      );
+    }
+
     const validationService = new AcceptanceValidationService(supabaseAdmin);
     const resultado = await validationService.verificarPendenciasAceite(authData.user.id, ministryId);
 

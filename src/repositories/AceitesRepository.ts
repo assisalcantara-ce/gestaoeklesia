@@ -73,4 +73,23 @@ export class AceitesRepository extends BaseRepository<TenantAceite> {
     if (error) throw error;
     return data as TenantAceite | null;
   }
+
+  async buscarAceiteInstitucionalEspecifico(
+    ministryId: string,
+    documentoId: string,
+    versaoAceita: string
+  ): Promise<TenantAceite | null> {
+    const { data, error } = await this.client
+      .from(this.table)
+      .select('*')
+      .eq('ministry_id', ministryId)
+      .eq('documento_id', documentoId)
+      .eq('versao_aceita', versaoAceita)
+      .order('aceito_em', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data as TenantAceite | null;
+  }
 }

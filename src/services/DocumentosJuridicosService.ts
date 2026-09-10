@@ -108,7 +108,11 @@ export class DocumentosJuridicosService {
       );
     }
 
-    return this.repository.publicar(id);
+    // Calcular hash SHA-256 real do conteudo_md
+    const crypto = await import('crypto');
+    const hashSha256 = crypto.createHash('sha256').update(docAtual.conteudo_md || '').digest('hex');
+
+    return this.repository.publicar(id, hashSha256);
   }
 
   async criarNovaVersao(
@@ -146,11 +150,12 @@ export class DocumentosJuridicosService {
     // Determinar o documento_raiz_id (na versão matriz pode ser o id dela própria se for o primeiro)
     const documentoRaizId = docOriginal.documento_raiz_id || docOriginal.id;
 
-    // Duplicar tipo, titulo, conteudo_md, conteudo_html mantendo o vinculo logico via documento_raiz_id
+    // Duplicar tipo, escopo, titulo, conteudo_md, conteudo_html mantendo o vinculo logico via documento_raiz_id
     // e deixando hash_sha256 como NULL para ser calculado na publicacao
     return this.repository.criarNovaVersao({
       documento_raiz_id: documentoRaizId,
       tipo: docOriginal.tipo,
+      escopo: docOriginal.escopo,
       titulo: docOriginal.titulo,
       versao: versaoLimpa,
       conteudo_md: docOriginal.conteudo_md,

@@ -1,6 +1,7 @@
 import { BaseRepository } from '@/repositories/shared/baseRepository';
 import type {
   DocumentoJuridico,
+  EscopoDocumentoJuridico,
   CriarDocumentoJuridicoDTO,
   AtualizarDocumentoJuridicoRascunhoDTO,
   ListarDocumentosJuridicosFiltros,
@@ -18,9 +19,14 @@ export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJurid
     return (this as any)._customClient || super.client;
   }
 
-  async criar(dto: CriarDocumentoJuridicoDTO & { hash_sha256?: string | null; status: 'RASCUNHO'; ativo: boolean }): Promise<DocumentoJuridico> {
+  async criar(dto: CriarDocumentoJuridicoDTO & { escopo?: EscopoDocumentoJuridico; hash_sha256?: string | null; status: 'RASCUNHO'; ativo: boolean }): Promise<DocumentoJuridico> {
+    const escopoDefault: EscopoDocumentoJuridico =
+      dto.escopo ||
+      (['CONTRATO_SERVICO', 'ADITIVO'].includes(dto.tipo) ? 'INSTITUCIONAL' : 'INDIVIDUAL');
+
     const payload = {
       tipo: dto.tipo,
+      escopo: escopoDefault,
       titulo: dto.titulo,
       versao: dto.versao,
       conteudo_md: dto.conteudo_md,
@@ -52,6 +58,9 @@ export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJurid
       if (filtros?.tipo) {
         query = query.eq('tipo', filtros.tipo);
       }
+      if (filtros?.escopo) {
+        query = query.eq('escopo', filtros.escopo);
+      }
       if (filtros?.status) {
         query = query.eq('status', filtros.status);
       }
@@ -69,6 +78,7 @@ export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJurid
     if (dto.conteudo_md !== undefined) payload.conteudo_md = dto.conteudo_md;
     if (dto.conteudo_html !== undefined) payload.conteudo_html = dto.conteudo_html;
     if (dto.obrigatorio !== undefined) payload.obrigatorio = dto.obrigatorio;
+    if (dto.escopo !== undefined) payload.escopo = dto.escopo;
 
     // Trava de banco: Apenas altera se status atual for RASCUNHO
     const { data, error } = await this.client
@@ -95,15 +105,21 @@ export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJurid
     return data as DocumentoJuridico;
   }
 
-  async publicar(id: string): Promise<DocumentoJuridico> {
+  async publicar(id: string, hashSha256?: string): Promise<DocumentoJuridico> {
     // Trava de banco: Apenas publica se status atual for RASCUNHO
+    const updatePayload: Record<string, any> = {
+      status: 'PUBLICADO',
+      ativo: true,
+      publicado_em: new Date().toISOString(),
+    };
+
+    if (hashSha256) {
+      updatePayload.hash_sha256 = hashSha256;
+    }
+
     const { data, error } = await this.client
       .from(this.table)
-      .update({
-        status: 'PUBLICADO',
-        ativo: true,
-        publicado_em: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', id)
       .eq('status', 'RASCUNHO')
       .select('*')
@@ -116,6 +132,7 @@ export class DocumentosJuridicosRepository extends BaseRepository<DocumentoJurid
   async criarNovaVersao(payload: {
     documento_raiz_id: string;
     tipo: string;
+    escopo: EscopoDocumentoJuridico;
     titulo: string;
     versao: string;
     conteudo_md: string;

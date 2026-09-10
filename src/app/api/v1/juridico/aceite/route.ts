@@ -48,27 +48,8 @@ export async function POST(request: NextRequest) {
     const cleanMinistryId = ministry_id.trim();
 
     // Validar vínculo real entre o usuário autenticado e o ministério informado
-    const { data: ministryUser } = await supabaseAdmin
-      .from('ministry_users')
-      .select('ministry_id')
-      .eq('user_id', userId)
-      .eq('ministry_id', cleanMinistryId)
-      .maybeSingle();
-
-    let temVinculo = Boolean(ministryUser);
-
-    if (!temVinculo) {
-      const { data: ownedMinistry } = await supabaseAdmin
-        .from('ministries')
-        .select('id')
-        .eq('id', cleanMinistryId)
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (ownedMinistry) {
-        temVinculo = true;
-      }
-    }
+    const { validarVinculoUsuarioMinisterio } = await import('@/lib/tenant-auth');
+    const temVinculo = await validarVinculoUsuarioMinisterio(supabaseAdmin, userId, cleanMinistryId);
 
     if (!temVinculo) {
       return NextResponse.json(
@@ -88,6 +69,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const isInstitucional = doc.escopo === 'INSTITUCIONAL' || ['CONTRATO_SERVICO', 'ADITIVO'].includes(doc.tipo);
+
+    // Se o documento for INSTITUCIONAL, validar se o usuário possui papel de representante autorizado (owner ou administrador)
+    if (isInstitucional) {
+      const { data: ministryUser } = await supabaseAdmin
+        .from('ministry_users')
+        .select('role, permissions')
+        .eq('user_id', userId)
+        .eq('ministry_id', cleanMinistryId)
+        .maybeSingle();
+
+      const { data: ownedMinistry } = await supabaseAdmin
+        .from('ministries')
+        .select('id')
+        .eq('id', cleanMinistryId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const isOwner = Boolean(ownedMinistry);
+
+      let isAdmin = false;
+      if (ministryUser) {
+        const role = (ministryUser.role || '').toLowerCase();
+        const permissions = Array.isArray(ministryUser.permissions)
+          ? ministryUser.permissions.map((p: any) => String(p).toUpperCase())
+          : [];
+
+        if (role === 'admin' || role === 'administrador' || permissions.includes('ADMINISTRADOR')) {
+          isAdmin = true;
+        }
+      }
+
+      if (!isOwner && !isAdmin) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Apenas os representantes autorizados do ministério (Proprietário ou Administrador) podem assinar ou aceitar documentos institucionais/contratuais.',
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Calcular hash SHA-256 real do documento se não constar no registro
+    const hashDocumento = doc.hash_sha256 || (() => {
+      const crypto = require('crypto');
+      return crypto.createHash('sha256').update(doc.conteudo_md || '').digest('hex');
+    })();
+
     // 2. Registrar o aceite via AceitesService
     const aceitesService = new AceitesService(supabaseAdmin);
     const auditoriaService = new AuditoriaJuridicaService(supabaseAdmin);
@@ -100,25 +130,65 @@ export async function POST(request: NextRequest) {
       user_id: userId,
       documento_id: doc.id,
       versao_aceita: doc.versao,
-      hash_documento: doc.hash_sha256 || 'HASH_INICIAL_PUBLICADO',
+      hash_documento: hashDocumento,
       ip_address: ipAddress,
       user_agent: userAgent,
-      payload_aceite: { origem: 'TELA_ACEITE_JURIDICO' },
+      payload_aceite: { origem: 'TELA_ACEITE_JURIDICO', escopo: doc.escopo },
     });
 
-    // 3. Registrar auditoria jurídica obrigatória
+    // 3. Se for um documento INSTITUCIONAL (Contrato de Serviço / Aditivo), sincronizar com tenant_contratos
+    if (isInstitucional) {
+      const { ContratosRepository } = await import('@/repositories/ContratosRepository');
+      const contratosRepo = new ContratosRepository(supabaseAdmin);
+
+      const contratosExistentes = await contratosRepo.buscarPorMinistryId(cleanMinistryId);
+      const contratoAtual = contratosExistentes[0] || null;
+
+      if (contratoAtual) {
+        // Atualizar contrato existente para ATIVO
+        await supabaseAdmin
+          .from('tenant_contratos')
+          .update({
+            documento_base_id: doc.id,
+            documento_raiz_id: doc.documento_raiz_id || doc.id,
+            versao_documento: doc.versao,
+            hash_documento: hashDocumento,
+            status: 'ATIVO',
+            assinado_em: new Date().toISOString(),
+            assinado_por: userId,
+          })
+          .eq('id', contratoAtual.id);
+      } else {
+        // Criar registro de contrato ATIVO para o tenant
+        await contratosRepo.criar({
+          ministry_id: cleanMinistryId,
+          documento_base_id: doc.id,
+          documento_raiz_id: doc.documento_raiz_id || doc.id,
+          versao_documento: doc.versao,
+          hash_documento: hashDocumento,
+          plano_contratado: 'PADRAO',
+          status: 'ATIVO',
+          data_inicio: new Date().toISOString(),
+          assinado_em: new Date().toISOString(),
+          assinado_por: userId,
+        });
+      }
+    }
+
+    // 4. Registrar auditoria jurídica obrigatória
     await auditoriaService.registrarEvento({
       usuario_id: userId,
       ministry_id: cleanMinistryId,
       documento_id: doc.id,
       versao: doc.versao,
-      hash_documento: doc.hash_sha256 || 'HASH_INICIAL_PUBLICADO',
+      hash_documento: hashDocumento,
       tipo_evento: 'ACEITE_REGISTRADO',
       ip_address: ipAddress,
       user_agent: userAgent,
       detalhes: {
         aceite_id: registroAceite.id,
         origem: 'TELA_ACEITE_JURIDICO',
+        escopo: doc.escopo,
       },
     });
 

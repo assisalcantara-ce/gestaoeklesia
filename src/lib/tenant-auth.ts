@@ -81,7 +81,68 @@ async function findOwnedMinistry(
   return adminData?.id ? String(adminData.id) : null;
 }
 
-export async function resolveTenantAuth(request: NextRequest): Promise<TenantAuthContext> {
+export async function validarVinculoUsuarioMinisterio(
+  admin: ReturnType<typeof createServerClient> | SupabaseLike,
+  userId: string,
+  ministryId: string
+): Promise<boolean> {
+  if (!userId || !ministryId) return false;
+  const cleanUserId = userId.trim();
+  const cleanMinistryId = ministryId.trim();
+
+  const { data: ministryUser } = await admin
+    .from('ministry_users')
+    .select('ministry_id')
+    .eq('user_id', cleanUserId)
+    .eq('ministry_id', cleanMinistryId)
+    .maybeSingle();
+
+  if (ministryUser) return true;
+
+  const { data: ownedMinistry } = await admin
+    .from('ministries')
+    .select('id')
+    .eq('id', cleanMinistryId)
+    .eq('user_id', cleanUserId)
+    .maybeSingle();
+
+  return Boolean(ownedMinistry);
+}
+
+export async function requireLegalAcceptance(
+  context: TenantAuthContext,
+  request?: NextRequest
+): Promise<void> {
+  if (request) {
+    const pathname = new URL(request.url).pathname;
+    const isExempt = [
+      '/api/v1/juridico',
+      '/api/v1/admin',
+      '/api/v1/public',
+      '/api/v1/auth',
+      '/api/v1/signup',
+      '/api/v1/trial',
+      '/api/v1/onboarding',
+      '/api/v1/contact',
+      '/api/v1/my-ip',
+    ].some((prefix) => pathname === prefix || pathname.startsWith(prefix + '/'));
+
+    if (isExempt) return;
+  }
+
+  const { AcceptanceValidationService } = await import('@/services/AcceptanceValidationService');
+  const service = new AcceptanceValidationService(context.admin);
+  const resultado = await service.verificarPendenciasAceite(context.userId, context.ministryId);
+
+  if (resultado.possui_pendencias) {
+    throw new Error('LEGAL_ACCEPTANCE_REQUIRED');
+  }
+}
+
+export async function resolveTenantAuth(
+  request: NextRequest,
+  options?: { checkLegalAcceptance?: boolean }
+): Promise<TenantAuthContext> {
   const supabase = createServerClientFromRequest(request);
   const admin = createServerClient();
 
@@ -95,10 +156,12 @@ export async function resolveTenantAuth(request: NextRequest): Promise<TenantAut
     throw new Error('UNAUTHORIZED');
   }
 
+  let context: TenantAuthContext;
+
   const ministryUser = await findMinistryUser(supabase, admin, user.id);
   if (ministryUser?.ministry_id) {
     const nivel = resolveNivel(ministryUser.role, ministryUser.permissions) ?? 'operador';
-    return {
+    context = {
       supabase,
       admin,
       userId: user.id,
@@ -110,25 +173,31 @@ export async function resolveTenantAuth(request: NextRequest): Promise<TenantAut
       supervisaoId: ministryUser.supervisao_id ? String(ministryUser.supervisao_id) : null,
       isOwner: false,
     };
+  } else {
+    const ministryId = await findOwnedMinistry(supabase, admin, user.id);
+    if (!ministryId) {
+      throw new Error('NO_MINISTRY');
+    }
+
+    context = {
+      supabase,
+      admin,
+      userId: user.id,
+      ministryId,
+      nivel: 'administrador',
+      roles: ['ADMINISTRADOR'],
+      permissions: ['ADMINISTRADOR'],
+      congregacaoId: null,
+      supervisaoId: null,
+      isOwner: true,
+    };
   }
 
-  const ministryId = await findOwnedMinistry(supabase, admin, user.id);
-  if (!ministryId) {
-    throw new Error('NO_MINISTRY');
+  if (options?.checkLegalAcceptance) {
+    await requireLegalAcceptance(context, request);
   }
 
-  return {
-    supabase,
-    admin,
-    userId: user.id,
-    ministryId,
-    nivel: 'administrador',
-    roles: ['ADMINISTRADOR'],
-    permissions: ['ADMINISTRADOR'],
-    congregacaoId: null,
-    supervisaoId: null,
-    isOwner: true,
-  };
+  return context;
 }
 
 export function requireTenantRole(context: TenantAuthContext, required: string[] | string): void {

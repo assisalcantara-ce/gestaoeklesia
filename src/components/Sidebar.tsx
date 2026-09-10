@@ -20,6 +20,7 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
   { path: '/secretaria/funcionarios',          id: 'funcionarios'         },
   { path: '/secretaria/consagracao',           id: 'consagracao'          },
   { path: '/configuracoes/certificados',       id: 'certificados'         },
+  { path: '/juridico/meu-contrato',            id: 'meu-contrato'         },
   { path: '/secretaria/departamentos',         id: 'departamentos'        },
   { path: '/secretaria/casamento',             id: 'casamento'            },
   { path: '/secretaria/relatorio-espiritual',  id: 'relatorio-espiritual' },
@@ -113,6 +114,7 @@ export default function Sidebar() {
     'visitantes': 'acolhimento',
     'sorteios': 'secretaria',
     'config-geral': 'configuracoes',
+    'meu-contrato': 'configuracoes',
     'config-cartoes': 'configuracoes',
     'ativar-fluxo': 'configuracoes',
     // Todos os IDs EBD → raiz 'ebd' (EbdSidebarMenu gerencia expansão interna)
@@ -224,6 +226,7 @@ export default function Sidebar() {
       modulo: 'configuracoes',
       submenu: [
         { id: 'config-geral',   label: 'Geral',        icon: '⚙️', path: '/configuracoes'           },
+        { id: 'meu-contrato',   label: 'Meu Contrato', icon: '📄', path: '/juridico/meu-contrato'    },
         { id: 'config-cartoes', label: 'Cartões',      icon: '🎫', path: '/configuracoes/cartoes'   },
         { id: 'certificados',   label: 'Certificados', icon: '🎓', path: '/configuracoes/certificados', modulo: 'configuracoes' },
         { id: 'ativar-fluxo',   label: 'Ativar Fluxo', icon: '🔄', path: '/secretaria/ativar-fluxo' },

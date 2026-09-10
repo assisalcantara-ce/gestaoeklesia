@@ -7,10 +7,13 @@ export type TipoDocumentoJuridico =
 
 export type StatusDocumentoJuridico = 'RASCUNHO' | 'PUBLICADO' | 'ARQUIVADO';
 
+export type EscopoDocumentoJuridico = 'INDIVIDUAL' | 'INSTITUCIONAL';
+
 export interface DocumentoJuridico {
   id: string;
   documento_raiz_id?: string | null;
   tipo: TipoDocumentoJuridico;
+  escopo: EscopoDocumentoJuridico;
   titulo: string;
   versao: string;
   conteudo_md: string;
@@ -27,6 +30,7 @@ export interface DocumentoJuridico {
 
 export interface CriarDocumentoJuridicoDTO {
   tipo: TipoDocumentoJuridico;
+  escopo?: EscopoDocumentoJuridico;
   titulo: string;
   versao: string;
   conteudo_md: string;
@@ -41,10 +45,12 @@ export interface AtualizarDocumentoJuridicoRascunhoDTO {
   conteudo_md?: string;
   conteudo_html?: string | null;
   obrigatorio?: boolean;
+  escopo?: EscopoDocumentoJuridico;
 }
 
 export interface ListarDocumentosJuridicosFiltros {
   tipo?: TipoDocumentoJuridico;
+  escopo?: EscopoDocumentoJuridico;
   status?: StatusDocumentoJuridico;
   ativo?: boolean;
 }
@@ -70,6 +76,7 @@ export interface RespostaHistoricoVersoesDTO {
 export interface DocumentoPendenteAceiteDTO {
   id: string;
   tipo: TipoDocumentoJuridico;
+  escopo: EscopoDocumentoJuridico;
   titulo: string;
   versao: string;
   versao_publicada: string;
@@ -77,6 +84,7 @@ export interface DocumentoPendenteAceiteDTO {
   hash_sha256?: string | null;
   publicado_em?: string | null;
   obrigatorio: boolean;
+  conteudo_md?: string | null;
 }
 
 export interface ResultadoValidacaoAceitesDTO {
@@ -148,6 +156,31 @@ export interface TenantContrato {
   assinado_por?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ItemHistoricoDocumentoInstitucionalDTO {
+  id: string;
+  tipo: TipoDocumentoJuridico;
+  titulo: string;
+  versao: string;
+  hash_sha256?: string | null;
+  aceito_em: string;
+  aceito_por_id: string;
+  aceito_por_nome?: string | null;
+  aceito_por_email?: string | null;
+  conteudo_md?: string | null;
+}
+
+export interface DetalhesContratoTenantDTO {
+  contrato: TenantContrato | null;
+  documento_base: DocumentoJuridico | null;
+  assinado_por_usuario: {
+    id: string;
+    email?: string | null;
+    full_name?: string | null;
+  } | null;
+  conteudo_efetivo: string | null;
+  historico_documentos: ItemHistoricoDocumentoInstitucionalDTO[];
 }
 
 export interface CriarContratoVinculadoDTO {
