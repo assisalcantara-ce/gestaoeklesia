@@ -27,9 +27,16 @@ export class ContratosService {
     }
 
     const cleanMinistryId = dto.ministry_id.trim();
-    const cleanPlano = dto.plano_contratado.trim();
 
-    // 1. Localizar o documento PUBLICADO vigente do tipo CONTRATO_SERVICO
+    // 1. Localizar o plano comercial real do tenant via MaterializacaoContratoService
+    const { MaterializacaoContratoService } = await import('@/services/MaterializacaoContratoService');
+    const matService = new MaterializacaoContratoService(this.repository['client']);
+    const dadosTenant = await matService.obterDadosOficiaisTenant(cleanMinistryId, dto.assinado_por || undefined);
+
+    const cleanPlano = dadosTenant.planoNome;
+    const valorMensalReal = dto.valor_mensal !== undefined ? dto.valor_mensal : dadosTenant.valorMensal;
+
+    // 2. Localizar o documento PUBLICADO vigente do tipo CONTRATO_SERVICO
     const documentosPublicados = await this.documentosService.listarDocumentos({
       tipo: 'CONTRATO_SERVICO',
       status: 'PUBLICADO',
@@ -45,20 +52,24 @@ export class ContratosService {
       (a, b) => new Date(b.publicado_em || b.created_at).getTime() - new Date(a.publicado_em || a.created_at).getTime()
     )[0];
 
-    const dataInicio = dto.data_inicio ? new Date(dto.data_inicio).toISOString() : new Date().toISOString();
-    const numeroContrato = `CTR-${cleanMinistryId.slice(0, 8).toUpperCase()}-${Date.now()}`;
+    // Materializar o conteúdo contratual com os dados oficiais do tenant
+    const matResultado = matService.materializarConteudo(docVigente.conteudo_md, dadosTenant);
 
-    // 2. Persistir registro do contrato com status = AGUARDANDO_ASSINATURA (pendente de aceite formal pós-conversão)
+    const dataInicio = dto.data_inicio ? new Date(dto.data_inicio).toISOString() : new Date().toISOString();
+    const numeroContrato = dadosTenant.numeroContrato;
+
+    // 3. Persistir registro do contrato com status = AGUARDANDO_ASSINATURA e snapshot imutável
     const contratoCriado = await this.repository.criar({
       ministry_id: cleanMinistryId,
       documento_base_id: docVigente.id,
       documento_raiz_id: docVigente.documento_raiz_id || docVigente.id,
       versao_documento: docVigente.versao,
-      hash_documento: docVigente.hash_sha256 || 'HASH_INICIAL_CONTRATO',
+      hash_documento: matResultado.hashSha256,
       plano_contratado: cleanPlano,
       numero_contrato: numeroContrato,
+      conteudo_customizado: matResultado.conteudoMaterializado,
       status: 'AGUARDANDO_ASSINATURA',
-      valor_mensal: dto.valor_mensal !== undefined ? dto.valor_mensal : null,
+      valor_mensal: valorMensalReal,
       data_inicio: dataInicio,
       assinado_por: dto.assinado_por || null,
     });

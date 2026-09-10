@@ -88,11 +88,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Calcular hash SHA-256 real do documento se não constar no registro
-    const hashDocumento = doc.hash_sha256 || (() => {
+    // Materializar dados reais do contrato se for um documento INSTITUCIONAL
+    let conteudoMaterializado: string | null = null;
+    let hashDocumentoFinal = doc.hash_sha256 || null;
+    let planoComercialReal: string = 'starter';
+    let valorMensalReal: number | null = null;
+
+    if (isInstitucional) {
+      const { MaterializacaoContratoService } = await import('@/services/MaterializacaoContratoService');
+      const matService = new MaterializacaoContratoService(supabaseAdmin);
+      const dadosTenant = await matService.obterDadosOficiaisTenant(cleanMinistryId, userId);
+      const matResultado = matService.materializarConteudo(doc.conteudo_md, dadosTenant);
+
+      conteudoMaterializado = matResultado.conteudoMaterializado;
+      hashDocumentoFinal = matResultado.hashSha256;
+      planoComercialReal = dadosTenant.planoNome;
+      valorMensalReal = dadosTenant.valorMensal;
+    } else if (!hashDocumentoFinal) {
       const crypto = require('crypto');
-      return crypto.createHash('sha256').update(doc.conteudo_md || '').digest('hex');
-    })();
+      hashDocumentoFinal = crypto.createHash('sha256').update(doc.conteudo_md || '').digest('hex');
+    }
 
     // 2. Registrar o aceite via AceitesService
     const aceitesService = new AceitesService(supabaseAdmin);
@@ -106,13 +121,17 @@ export async function POST(request: NextRequest) {
       user_id: userId,
       documento_id: doc.id,
       versao_aceita: doc.versao,
-      hash_documento: hashDocumento,
+      hash_documento: hashDocumentoFinal!,
       ip_address: ipAddress,
       user_agent: userAgent,
-      payload_aceite: { origem: 'TELA_ACEITE_JURIDICO', escopo: doc.escopo },
+      payload_aceite: {
+        origem: 'TELA_ACEITE_JURIDICO',
+        escopo: doc.escopo,
+        hash_sha256_materializado: hashDocumentoFinal,
+      },
     });
 
-    // 3. Se for um documento INSTITUCIONAL (Contrato de Serviço / Aditivo), sincronizar com tenant_contratos
+    // 3. Se for um documento INSTITUCIONAL (Contrato de Serviço / Aditivo), sincronizar com tenant_contratos salvando o snapshot imutável
     if (isInstitucional) {
       const { ContratosRepository } = await import('@/repositories/ContratosRepository');
       const contratosRepo = new ContratosRepository(supabaseAdmin);
@@ -120,33 +139,31 @@ export async function POST(request: NextRequest) {
       const contratosExistentes = await contratosRepo.buscarPorMinistryId(cleanMinistryId);
       const contratoAtual = contratosExistentes[0] || null;
 
+      const payloadContrato = {
+        documento_base_id: doc.id,
+        documento_raiz_id: doc.documento_raiz_id || doc.id,
+        versao_documento: doc.versao,
+        hash_documento: hashDocumentoFinal,
+        plano_contratado: planoComercialReal,
+        valor_mensal: valorMensalReal,
+        conteudo_customizado: conteudoMaterializado,
+        status: 'ATIVO' as const,
+        assinado_em: new Date().toISOString(),
+        assinado_por: userId,
+      };
+
       if (contratoAtual) {
-        // Atualizar contrato existente para ATIVO
+        // Atualizar contrato existente para ATIVO com o snapshot impresso
         await supabaseAdmin
           .from('tenant_contratos')
-          .update({
-            documento_base_id: doc.id,
-            documento_raiz_id: doc.documento_raiz_id || doc.id,
-            versao_documento: doc.versao,
-            hash_documento: hashDocumento,
-            status: 'ATIVO',
-            assinado_em: new Date().toISOString(),
-            assinado_por: userId,
-          })
+          .update(payloadContrato)
           .eq('id', contratoAtual.id);
       } else {
-        // Criar registro de contrato ATIVO para o tenant
+        // Criar registro de contrato ATIVO para o tenant com o snapshot impresso
         await contratosRepo.criar({
           ministry_id: cleanMinistryId,
-          documento_base_id: doc.id,
-          documento_raiz_id: doc.documento_raiz_id || doc.id,
-          versao_documento: doc.versao,
-          hash_documento: hashDocumento,
-          plano_contratado: 'PADRAO',
-          status: 'ATIVO',
+          ...payloadContrato,
           data_inicio: new Date().toISOString(),
-          assinado_em: new Date().toISOString(),
-          assinado_por: userId,
         });
       }
     }
@@ -157,7 +174,7 @@ export async function POST(request: NextRequest) {
       ministry_id: cleanMinistryId,
       documento_id: doc.id,
       versao: doc.versao,
-      hash_documento: hashDocumento,
+      hash_documento: hashDocumentoFinal!,
       tipo_evento: 'ACEITE_REGISTRADO',
       ip_address: ipAddress,
       user_agent: userAgent,

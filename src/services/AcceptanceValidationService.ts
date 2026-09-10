@@ -121,6 +121,24 @@ export class AcceptanceValidationService {
           ? aceitesDoMesmoDocumento.sort((a, b) => new Date(b.aceito_em).getTime() - new Date(a.aceito_em).getTime())[0]
           : null;
 
+        let conteudoMdFinal = doc.conteudo_md;
+        let hashSha256Final = doc.hash_sha256;
+
+        // Se for documento INSTITUCIONAL, materializar com os dados reais do tenant para o MASTER
+        if (isInstitucional) {
+          try {
+            const { MaterializacaoContratoService } = await import('@/services/MaterializacaoContratoService');
+            const matService = new MaterializacaoContratoService(this.documentosService['repository']['client']);
+            const dadosTenant = await matService.obterDadosOficiaisTenant(cleanMinistryId, cleanUserId);
+            const matResultado = matService.materializarConteudo(doc.conteudo_md, dadosTenant);
+
+            conteudoMdFinal = matResultado.conteudoMaterializado;
+            hashSha256Final = matResultado.hashSha256;
+          } catch (matErr) {
+            console.warn('[AcceptanceValidationService] Aviso ao materializar documento institucional:', matErr);
+          }
+        }
+
         documentosPendentes.push({
           id: doc.id,
           tipo: doc.tipo,
@@ -129,10 +147,11 @@ export class AcceptanceValidationService {
           versao: doc.versao,
           versao_publicada: doc.versao,
           ultima_versao_aceita: ultimoAceite ? ultimoAceite.versao_aceita : null,
-          hash_sha256: doc.hash_sha256,
+          hash_sha256: hashSha256Final,
           publicado_em: doc.publicado_em,
           obrigatorio: doc.obrigatorio,
-          conteudo_md: doc.conteudo_md,
+          conteudo_md: conteudoMdFinal,
+          conteudo_md_materializado: conteudoMdFinal,
         });
       }
     }

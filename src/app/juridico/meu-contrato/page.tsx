@@ -196,7 +196,7 @@ export default function MeuContratoPage() {
                   <ShieldCheck size={14} className="text-blue-500" /> Plano Contratado
                 </p>
                 <p className="text-base font-bold text-gray-800">
-                  {contrato.plano_contratado?.toUpperCase() || 'PADRAO'}
+                  {contrato.plano_contratado ? contrato.plano_contratado.toUpperCase() : 'NÃO ESPECIFICADO'}
                 </p>
               </div>
 

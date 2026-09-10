@@ -85,6 +85,7 @@ export interface DocumentoPendenteAceiteDTO {
   publicado_em?: string | null;
   obrigatorio: boolean;
   conteudo_md?: string | null;
+  conteudo_md_materializado?: string | null;
 }
 
 export interface ResultadoValidacaoAceitesDTO {
