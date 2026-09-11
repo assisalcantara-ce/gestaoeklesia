@@ -166,7 +166,9 @@ export default function MeuContratoPage() {
       ) : (
         <div className="space-y-6">
           {/* Banner de Regularização quando for Contrato Legado Classe C */}
-          {(detalhes?.diagnostico_integridade?.snapshot_pendente || contrato?.snapshot_status === 'HERDADO_MATRIZ' || contrato?.plano_contratado === 'PADRAO') && (
+          {(detalhes?.diagnostico_integridade?.snapshot_pendente ||
+            contrato?.snapshot_status === 'HERDADO_MATRIZ' ||
+            !contrato?.conteudo_customizado) && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3">
                 <AlertTriangle size={22} className="shrink-0 text-amber-600 mt-0.5" />

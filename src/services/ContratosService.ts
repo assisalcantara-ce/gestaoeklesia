@@ -122,7 +122,8 @@ export class ContratosService {
 
     // 1. Buscar o contrato mais recente do tenant (consulta READ-ONLY)
     const contratos = await this.repository.buscarPorMinistryId(cleanMinistryId);
-    const contrato = contratos[0] || null;
+    // Seleciona preferencialmente o contrato ATIVO vigência atual
+    const contrato = contratos.find((c) => c.status === 'ATIVO') || contratos[0] || null;
 
     let documentoBase: import('@/types/juridico').DocumentoJuridico | null = null;
     let assinadoPorUsuario: { id: string; email?: string | null; full_name?: string | null } | null = null;
