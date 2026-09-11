@@ -16,7 +16,8 @@ import { useBillingActions } from '@/hooks/admin/ministerios/useBillingActions'
 import { friendlyError, formatPhoneDisplay } from '@/lib/admin/ministerios/helpers'
 import { getDetailedStatus } from '@/lib/admin/ministerios/status'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
-import { ShieldCheck, Award, Clock, CreditCard, Users, Church, LogIn, Key, Eye, Wrench, FileText, AlertTriangle, AlertCircle, XCircle } from 'lucide-react'
+import CockpitJuridicoTab from '@/components/admin/ministerios/CockpitJuridicoTab'
+import { ShieldCheck, Award, Clock, CreditCard, Users, Church, LogIn, Key, Eye, Wrench, FileText, AlertTriangle, AlertCircle, XCircle, Scale } from 'lucide-react'
 
 interface CockpitPageProps {
   params: Promise<{ id: string }>
@@ -31,7 +32,7 @@ export default function CockpitPage({ params }: CockpitPageProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [activeTab, setActiveTab] = useState<'resumo' | 'financeiro' | 'usuarios' | 'congregacoes' | 'uso' | 'auditoria' | 'suporte'>('resumo')
+  const [activeTab, setActiveTab] = useState<'resumo' | 'financeiro' | 'usuarios' | 'congregacoes' | 'uso' | 'auditoria' | 'suporte' | 'juridico'>('resumo')
   const router = useRouter()
   const errorRef = useRef<HTMLDivElement>(null)
 
@@ -372,6 +373,14 @@ export default function CockpitPage({ params }: CockpitPageProps) {
                   <FileText className="w-4 h-4" />
                   <span>Ver Auditoria</span>
                 </button>
+
+                <button
+                  onClick={() => setActiveTab('juridico')}
+                  className="flex items-center gap-3 p-3 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/30 hover:border-blue-500/50 text-blue-300 rounded-lg text-sm font-medium transition text-left cursor-pointer"
+                >
+                  <Scale className="w-4 h-4" />
+                  <span>Contrato & Jurídico</span>
+                </button>
               </div>
             </div>
 
@@ -469,6 +478,7 @@ export default function CockpitPage({ params }: CockpitPageProps) {
               <div className="flex flex-wrap gap-2">
                 {[
                   { id: 'resumo', label: '📋 Resumo Cadastral' },
+                  { id: 'juridico', label: '⚖️ Contrato & Jurídico' },
                   { id: 'suporte', label: '🎧 Histórico de Suporte' },
                   { id: 'financeiro', label: '💳 Financeiro Asaas' },
                   { id: 'usuarios', label: '🔑 Acesso e Usuários' },
@@ -493,6 +503,9 @@ export default function CockpitPage({ params }: CockpitPageProps) {
 
             {/* Conteúdo das Abas */}
             <div className="bg-gray-800/40 border border-gray-700/50 rounded-xl p-6">
+              {activeTab === 'juridico' && (
+                <CockpitJuridicoTab ministryId={ministry.id} ministryName={ministry.name} />
+              )}
               {activeTab === 'resumo' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
