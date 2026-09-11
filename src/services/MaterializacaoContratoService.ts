@@ -90,47 +90,21 @@ export class MaterializacaoContratoService {
       }
     }
 
-    // 4. Resolver Plano Comercial Oficial (sem fallback genérico fictício como "PADRAO")
-    const planSlug = String(ministry.plan || '').toLowerCase();
+    // 4. Resolver Plano Comercial Oficial via PlanResolutionService (tabela oficial subscription_plans)
+    const { PlanResolutionService } = await import('@/lib/platform/billing/PlanResolutionService');
+    const planoResolvido = await PlanResolutionService.resolveMinistryPlan(this.client, cleanMinistryId);
+
     let planoNome: string | null = null;
     let valorMensal: number | null = null;
 
-    if (planSlug) {
-      // Buscar no cadastro oficial da tabela `plans`
-      const { data: planRow } = await this.client
-        .from('plans')
-        .select('name, price, slug')
-        .eq('slug', planSlug)
-        .maybeSingle();
-
-      if (planRow) {
-        planoNome = planRow.name;
-        valorMensal = planRow.price !== undefined ? Number(planRow.price) : null;
-      } else {
-        // Mapeamento das constantes de planos da aplicação (PLANOS_DISPONIBLES)
-        const mapPlanos: Record<string, { nome: string; preco: number }> = {
-          starter: { nome: 'Starter', preco: 99 },
-          intermediario: { nome: 'Intermediário', preco: 199 },
-          profissional: { nome: 'Profissional', preco: 299 },
-          expert: { nome: 'Expert', preco: 499 },
-          basic: { nome: 'Starter', preco: 99 },
-          professional: { nome: 'Profissional', preco: 299 },
-          enterprise: { nome: 'Expert', preco: 499 },
-        };
-
-        if (mapPlanos[planSlug]) {
-          planoNome = mapPlanos[planSlug].nome;
-          valorMensal = mapPlanos[planSlug].preco;
-        } else {
-          // Formatar slug limpo se for um plano comercial customizado cadastrado
-          planoNome = planSlug.charAt(0).toUpperCase() + planSlug.slice(1);
-        }
-      }
+    if (planoResolvido) {
+      planoNome = planoResolvido.name;
+      valorMensal = planoResolvido.price_monthly;
     }
 
-    // Se o plano ainda estiver indefinido (ex: cadastro corrompido sem plano), bloquear com erro técnico explícito
+    // Se o plano ainda estiver indefinido ou for inválido, bloquear com erro técnico explícito
     if (!planoNome) {
-      throw new Error(`Inconsistência cadastral: O ministério "${ministry.name || cleanMinistryId}" não possui um plano comercial ativo válido definido.`);
+      throw new Error(`Inconsistência cadastral: O ministério "${ministry.name || cleanMinistryId}" não possui um plano comercial ativo válido definido na plataforma.`);
     }
 
     const dataInicio = ministry.subscription_start_date || ministry.created_at || new Date().toISOString();

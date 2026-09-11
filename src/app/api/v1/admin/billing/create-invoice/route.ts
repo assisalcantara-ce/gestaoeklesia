@@ -69,34 +69,39 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const { PlanResolutionService } = await import('@/lib/platform/billing/PlanResolutionService')
+
     let planId: string | null = null
-    let planSlug = 'avulsa'
+    let planSlug: string | null = null
     let totalAmount = 0
     let descriptionBase = ''
 
     if (plano_slug) {
-      // Buscar subscription_plan
-      const { data: plan, error: planError } = await supabase
-        .from('subscription_plans')
-        .select('*')
-        .eq('slug', plano_slug.toLowerCase())
-        .maybeSingle()
-
-      if (planError || !plan) {
+      const plan = await PlanResolutionService.resolveBySlug(supabase, plano_slug)
+      if (!plan) {
         return NextResponse.json(
-          { error: `Plano com o slug '${plano_slug}' não encontrado` },
+          { error: `Plano comercial com o slug '${plano_slug}' não é válido ou não foi encontrado` },
           { status: 404 }
         )
       }
       planId = plan.id
       planSlug = plan.slug
-      totalAmount = Number(plan.price_monthly) * 12
-      descriptionBase = `Assinatura Anual Gestão Eklesia - Plano ${plan.name}`
+      totalAmount = amount ? Number(amount) : Number(plan.price_monthly) * 12
+      descriptionBase = customDescription
+        ? String(customDescription).trim()
+        : `Assinatura Anual Gestão Eklesia - Plano ${plan.name}`
     } else {
+      // Tentar herdar o plano comercial já configurado no ministério
+      const ministryPlan = await PlanResolutionService.resolveMinistryPlan(supabase, ministry_id)
+      if (ministryPlan) {
+        planId = ministryPlan.id
+        planSlug = ministryPlan.slug
+      }
+
       totalAmount = Number(amount)
       if (Number.isNaN(totalAmount) || totalAmount <= 0) {
         return NextResponse.json(
-          { error: 'Valor inválido para fatura avulsa' },
+          { error: 'Valor inválido para a cobrança' },
           { status: 400 }
         )
       }

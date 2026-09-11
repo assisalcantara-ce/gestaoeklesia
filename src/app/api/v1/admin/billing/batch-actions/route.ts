@@ -188,6 +188,26 @@ export async function POST(request: NextRequest) {
       }
 
       // 3.2 Gerar o novo cronograma de parcelas com o novo dia de vencimento
+      const { PlanResolutionService } = await import('@/lib/platform/billing/PlanResolutionService')
+      let planSlug = null
+      let planId = null
+
+      if (plano_slug) {
+        const p = await PlanResolutionService.resolveBySlug(supabase, plano_slug)
+        if (p) {
+          planSlug = p.slug
+          planId = p.id
+        }
+      }
+
+      if (!planSlug) {
+        const pMin = await PlanResolutionService.resolveMinistryPlan(supabase, ministry_id)
+        if (pMin) {
+          planSlug = pMin.slug
+          planId = pMin.id
+        }
+      }
+
       const today = new Date()
       const newInvoicesToInsert = []
 
@@ -197,7 +217,8 @@ export async function POST(request: NextRequest) {
 
         newInvoicesToInsert.push({
           ministry_id,
-          plano_slug: plano_slug || 'avulsa',
+          subscription_plan_id: planId,
+          plano_slug: planSlug,
           status: 'pending',
           amount: amountVal,
           due_date: dueDateStr,

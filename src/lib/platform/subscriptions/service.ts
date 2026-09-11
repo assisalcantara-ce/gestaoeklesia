@@ -40,8 +40,22 @@ export class SubscriptionService {
     // 1. Buscar ministério atual para auditoria
     const ministry = await this.fetchMinistry(supabaseAdmin, ministryId)
     
-    // 2. Resolver o ID do plano cadastrado
-    const planRow = await this.resolvePlan(supabaseAdmin, planSlug)
+    // 2. Resolver o plano comercial oficial garantindo que slugs não-comerciais nunca sobrescrevam a licença
+    const { PlanResolutionService } = await import('@/lib/platform/billing/PlanResolutionService')
+    let resolvedPlan = await PlanResolutionService.resolveBySlug(supabaseAdmin, planSlug)
+
+    // Se o planSlug for 'avulsa' ou não reconhecido, tentar manter o plano já configurado no ministério
+    if (!resolvedPlan) {
+      resolvedPlan = await PlanResolutionService.resolveMinistryPlan(supabaseAdmin, ministryId)
+    }
+
+    // Se ainda assim não encontrar, fallback seguro para 'starter'
+    if (!resolvedPlan) {
+      resolvedPlan = await PlanResolutionService.resolveBySlug(supabaseAdmin, 'starter')
+    }
+
+    const finalPlanSlug = resolvedPlan?.slug || 'starter'
+    const finalPlanId = resolvedPlan?.id || null
 
     // 3. Calcular o período de vigência
     const { startDate, endDate } = this.calculateSubscriptionPeriod(validityMonths)
@@ -50,8 +64,8 @@ export class SubscriptionService {
     const updatedMinistry = await this.updateMinistrySubscription(
       supabaseAdmin,
       ministryId,
-      planSlug,
-      planRow?.id || null,
+      finalPlanSlug,
+      finalPlanId,
       startDate,
       endDate
     )
@@ -62,7 +76,7 @@ export class SubscriptionService {
       const contratosService = new ContratosService(supabaseAdmin)
       await contratosService.criarContratoAoConverter({
         ministry_id: ministryId,
-        plano_contratado: planSlug,
+        plano_contratado: finalPlanSlug,
       })
     } catch (err: any) {
       console.warn('[SubscriptionService] Não foi possível vincular contrato jurídico automático:', err?.message || err)
