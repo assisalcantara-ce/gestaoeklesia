@@ -272,18 +272,26 @@ export default function CockpitJuridicoTab({ ministryId, ministryName: _ministry
             <User size={15} className="text-purple-400" /> Representante Legal / Assinante
           </h4>
           <div className="space-y-2 text-xs">
-            <div className="flex justify-between py-1 border-b border-gray-800/60">
-              <span className="text-gray-400">Nome:</span>
-              <span className="text-white font-medium">{assinante?.full_name || 'Responsável Legal do Ministério'}</span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-gray-800/60">
-              <span className="text-gray-400">E-mail:</span>
-              <span className="text-gray-300">{assinante?.email || 'E-mail cadastrado'}</span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-gray-800/60">
-              <span className="text-gray-400">User ID:</span>
-              <span className="text-gray-400 font-mono text-[11px]">{assinante?.id || contrato.assinado_por || '-'}</span>
-            </div>
+            {contrato.assinado_em && contrato.status !== 'AGUARDANDO_ASSINATURA' ? (
+              <>
+                <div className="flex justify-between py-1 border-b border-gray-800/60">
+                  <span className="text-gray-400">Nome:</span>
+                  <span className="text-white font-medium">{assinante?.full_name || 'Responsável Legal do Ministério'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-gray-800/60">
+                  <span className="text-gray-400">E-mail:</span>
+                  <span className="text-gray-300">{assinante?.email || 'E-mail cadastrado'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-gray-800/60">
+                  <span className="text-gray-400">User ID:</span>
+                  <span className="text-gray-400 font-mono text-[11px]">{assinante?.id || contrato.assinado_por || '-'}</span>
+                </div>
+              </>
+            ) : (
+              <div className="py-2 text-gray-400 italic">
+                Pendente de assinatura eletrônica
+              </div>
+            )}
           </div>
         </div>
 

@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
         data_inicio: c.data_inicio,
         data_fim: c.data_fim || null,
         assinado_em: c.assinado_em || (ultimoAceite ? ultimoAceite.aceito_em : null),
-        assinado_por: c.assinado_por || (ultimoAceite ? ultimoAceite.user_id : null),
+        assinado_por: (c.assinado_em ? c.assinado_por : null) || (ultimoAceite ? ultimoAceite.user_id : null),
         created_at: c.created_at,
         updated_at: c.updated_at,
         ultimo_aceite: ultimoAceite,

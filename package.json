@@ -9,7 +9,8 @@
     "build": "npm run check:migrations && next build",
     "start": "next start",
     "lint": "node ./scripts/run-eslint.cjs",
-    "seed:flows": "node ./scripts/seed-flow-templates.cjs"
+    "seed:flows": "node ./scripts/seed-flow-templates.cjs",
+    "test": "node --test test/**/*.test.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

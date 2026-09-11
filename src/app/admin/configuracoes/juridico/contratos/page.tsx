@@ -591,24 +591,32 @@ export default function ContratosPage() {
                             <User size={14} className="text-indigo-400" /> Representante Assinante
                           </h4>
                           <div className="space-y-2 text-xs">
-                            <div className="flex justify-between py-1 border-b border-gray-800/60">
-                              <span className="text-gray-400">Nome:</span>
-                              <span className="text-white font-medium">
-                                {detalhesData?.assinado_por_usuario?.full_name || 'Representante Principal'}
-                              </span>
-                            </div>
-                            <div className="flex justify-between py-1 border-b border-gray-800/60">
-                              <span className="text-gray-400">E-mail:</span>
-                              <span className="text-gray-300">
-                                {detalhesData?.assinado_por_usuario?.email || 'E-mail cadastrado'}
-                              </span>
-                            </div>
-                            <div className="flex justify-between py-1 border-b border-gray-800/60">
-                              <span className="text-gray-400">User ID:</span>
-                              <span className="text-gray-400 font-mono text-[11px]">
-                                {detalhesData?.assinado_por_usuario?.id || selectedContrato.assinado_por || '-'}
-                              </span>
-                            </div>
+                            {selectedContrato.assinado_em && selectedContrato.status !== 'AGUARDANDO_ASSINATURA' ? (
+                              <>
+                                <div className="flex justify-between py-1 border-b border-gray-800/60">
+                                  <span className="text-gray-400">Nome:</span>
+                                  <span className="text-white font-medium">
+                                    {detalhesData?.assinado_por_usuario?.full_name || 'Representante Principal'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-800/60">
+                                  <span className="text-gray-400">E-mail:</span>
+                                  <span className="text-gray-300">
+                                    {detalhesData?.assinado_por_usuario?.email || 'E-mail cadastrado'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-800/60">
+                                  <span className="text-gray-400">User ID:</span>
+                                  <span className="text-gray-400 font-mono text-[11px]">
+                                    {detalhesData?.assinado_por_usuario?.id || selectedContrato.assinado_por || '-'}
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="py-2 text-gray-400 italic">
+                                Pendente de assinatura eletrônica
+                              </div>
+                            )}
                           </div>
                         </div>
 

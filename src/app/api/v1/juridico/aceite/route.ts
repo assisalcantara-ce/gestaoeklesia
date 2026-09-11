@@ -71,17 +71,40 @@ export async function POST(request: NextRequest) {
 
     const isInstitucional = doc.escopo === 'INSTITUCIONAL' || ['CONTRATO_SERVICO', 'ADITIVO'].includes(doc.tipo);
 
-    // Se o documento for INSTITUCIONAL, validar estritamente se o usuário é o MASTER/Proprietário oficial do tenant
+    // Se o documento for INSTITUCIONAL, validar estritamente se o usuário possui permissão/role ADMINISTRADOR
     if (isInstitucional) {
+      // 1. Verificar se é o proprietário (ministries.user_id)
       const { isMasterUsuarioMinisterio } = await import('@/lib/tenant-auth');
-      const isMaster = await isMasterUsuarioMinisterio(supabaseAdmin, userId, cleanMinistryId);
+      const isOwner = await isMasterUsuarioMinisterio(supabaseAdmin, userId, cleanMinistryId);
 
-      if (!isMaster) {
+      let isAdmin = isOwner;
+
+      if (!isAdmin) {
+        // 2. Verificar em ministry_users se possui role ou permissão ADMINISTRADOR
+        const { data: muData } = await supabaseAdmin
+          .from('ministry_users')
+          .select('role, permissions')
+          .eq('user_id', userId)
+          .eq('ministry_id', cleanMinistryId)
+          .limit(1)
+          .maybeSingle();
+
+        if (muData) {
+          const { resolveRoles, normalizePermissions } = await import('@/lib/access-control');
+          const roles = resolveRoles(muData.role, muData.permissions);
+          const perms = normalizePermissions(muData.permissions);
+          if (roles.includes('ADMINISTRADOR') || perms.includes('ADMINISTRADOR') || String(muData.role).toLowerCase() === 'admin') {
+            isAdmin = true;
+          }
+        }
+      }
+
+      if (!isAdmin) {
         return NextResponse.json(
           {
             success: false,
-            code: 'LEGAL_REPRESENTATIVE_REQUIRED',
-            error: 'Apenas o usuário MASTER (responsável principal do ministério/tenant) possui autoridade legal para aceitar e assinar documentos institucionais e contratuais.',
+            code: 'ADMIN_REQUIRED',
+            error: 'Apenas usuários com perfil ADMINISTRADOR podem assinar contratos institucionais.',
           },
           { status: 403 }
         );

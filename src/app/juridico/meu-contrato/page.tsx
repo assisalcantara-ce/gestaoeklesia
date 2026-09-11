@@ -251,7 +251,9 @@ export default function MeuContratoPage() {
                   <UserCheck size={14} className="text-blue-500" /> Assinado por
                 </p>
                 <p className="text-sm font-semibold text-gray-800">
-                  {detalhes?.assinado_por_usuario?.full_name || detalhes?.assinado_por_usuario?.email || (contrato.assinado_por ? `ID: ${contrato.assinado_por.slice(0, 8)}...` : 'Representante Autorizado')}
+                  {contrato.assinado_em && contrato.status !== 'AGUARDANDO_ASSINATURA'
+                    ? detalhes?.assinado_por_usuario?.full_name || detalhes?.assinado_por_usuario?.email || (contrato.assinado_por ? `ID: ${contrato.assinado_por.slice(0, 8)}...` : 'Representante Autorizado')
+                    : 'Pendente de assinatura'}
                 </p>
                 {contrato.assinado_em && (
                   <p className="text-[11px] text-gray-400">

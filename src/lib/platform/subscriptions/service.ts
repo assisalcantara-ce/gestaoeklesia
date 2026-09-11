@@ -63,7 +63,6 @@ export class SubscriptionService {
       await contratosService.criarContratoAoConverter({
         ministry_id: ministryId,
         plano_contratado: planSlug,
-        assinado_por: ministry.user_id || null,
       })
     } catch (err: any) {
       console.warn('[SubscriptionService] Não foi possível vincular contrato jurídico automático:', err?.message || err)
@@ -136,7 +135,6 @@ export class SubscriptionService {
       await contratosService.criarContratoAoConverter({
         ministry_id: ministryId,
         plano_contratado: planFinal,
-        assinado_por: preReg.user_id || null,
       })
     } catch (err: any) {
       console.warn('[SubscriptionService.activateFromPreRegistration] Aviso ao vincular contrato automático:', err?.message || err)

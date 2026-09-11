@@ -75,12 +75,13 @@ export class ContratosService {
       origem_snapshot: 'CELEBRACAO_ORIGINAL',
       integridade_verificada: true,
       data_inicio: dataInicio,
-      assinado_por: dto.assinado_por || null,
+      assinado_por: null,
+      assinado_em: null,
     });
 
     // 3. Registrar auditoria obrigatória da criação do contrato
     await this.auditoriaService.registrarEvento({
-      usuario_id: dto.assinado_por || '00000000-0000-0000-0000-000000000000',
+      usuario_id: '00000000-0000-0000-0000-000000000000',
       ministry_id: cleanMinistryId,
       documento_id: docVigente.id,
       versao: docVigente.versao,
@@ -160,8 +161,8 @@ export class ContratosService {
         conteudoEfetivo = documentoBase.conteudo_md;
       }
 
-      // Buscar informações do usuário representante que realizou a assinatura (se assinado_por estiver preenchido)
-      if (contrato.assinado_por) {
+      // Buscar informações do usuário representante que realizou a assinatura (somente se houver assinatura efetiva)
+      if (contrato.assinado_por && contrato.assinado_em && contrato.status !== 'AGUARDANDO_ASSINATURA') {
         const client = (this.repository as any).client;
         const usuarioResolvido = await resolverUsuarioIndividual(client, contrato.assinado_por);
 

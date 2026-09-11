@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
-import { SubscriptionService } from '@/lib/platform'
+import { PlatformBillingReconciliationService } from '@/lib/platform'
 
 export const dynamic = 'force-dynamic';
 
@@ -85,148 +85,37 @@ export async function POST(request: NextRequest) {
       .eq('asaas_payment_id', asaasPaymentId)
       .maybeSingle()
 
+    // Se o pagamento não for uma fatura de platform_billing_invoices (ex: outro módulo ou evento desconhecido),
+    // responder HTTP 200 com skipped para JAMAIS bloquear ou penalizar a fila do Asaas.
     if (invoiceError || !invoice) {
       if (webhookEventId) {
         await supabase
           .from('asaas_webhook_events')
           .update({
-            process_status: 'error',
-            process_error: 'Invoice not found for asaas_payment_id',
+            process_status: 'skipped',
+            process_error: 'Payment not found in platform_billing_invoices',
             processed_at: new Date().toISOString(),
           })
           .eq('id', webhookEventId)
       }
-      return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+      return NextResponse.json({
+        received: true,
+        skipped: true,
+        reason: 'payment_not_found',
+        asaas_payment_id: asaasPaymentId,
+      })
     }
 
-    // Se já estiver no status final idêntico, finalizar sem reprocessar
-    if (invoice.status === newStatus) {
-      if (webhookEventId) {
-        await supabase
-          .from('asaas_webhook_events')
-          .update({
-            process_status: 'processed',
-            processed_at: new Date().toISOString(),
-          })
-          .eq('id', webhookEventId)
-      }
-      return NextResponse.json({ skipped: true, message: `Invoice already in status ${newStatus}` })
-    }
+    // 4. Processar o pagamento através do serviço oficial unificado de reconciliação/baixa
+    const result = await PlatformBillingReconciliationService.processInvoicePayment({
+      supabaseAdmin: supabase,
+      invoice,
+      asaasPayment: payment,
+      eventId,
+      origin: 'webhook',
+    })
 
-    // 4. Montar o payload de atualização garantindo isolamento por ministry_id
-    const nowIso = new Date().toISOString()
-    const updateData: Record<string, any> = {
-      status: newStatus,
-      updated_at: nowIso,
-    }
-
-    if (newStatus === 'paid') {
-      updateData.paid_at = nowIso
-    }
-
-    let updateErrorObj = null
-    try {
-      const { error } = await supabase
-        .from('platform_billing_invoices')
-        .update(updateData as any)
-        .eq('id', invoice.id)
-        .eq('ministry_id', invoice.ministry_id)
-
-      if (error) {
-        // Fallback: se a coluna paid_at ainda não tiver sido adicionada via migration, tenta sem paid_at
-        if (error.message?.includes('paid_at') || error.code === '42703') {
-          delete updateData.paid_at
-          const { error: fallbackError } = await supabase
-            .from('platform_billing_invoices')
-            .update(updateData)
-            .eq('id', invoice.id)
-            .eq('ministry_id', invoice.ministry_id)
-          updateErrorObj = fallbackError
-        } else {
-          updateErrorObj = error
-        }
-      }
-    } catch (e: any) {
-      updateErrorObj = e
-    }
-
-    if (updateErrorObj) {
-      if (webhookEventId) {
-        await supabase
-          .from('asaas_webhook_events')
-          .update({
-            process_status: 'error',
-            process_error: updateErrorObj.message,
-            processed_at: new Date().toISOString(),
-          })
-          .eq('id', webhookEventId)
-      }
-      return NextResponse.json({ error: `Erro ao atualizar fatura: ${updateErrorObj.message}` }, { status: 400 })
-    }
-
-    // 5. Se o pagamento foi confirmado/recebido, acionar ativacao de assinatura
-    if (newStatus === 'paid') {
-      const subscriptionService = new SubscriptionService()
-      const activationResult = await subscriptionService.activateSubscription(
-        supabase,
-        invoice.ministry_id,
-        invoice.plano_slug,
-        12 // Vigência padrão de 12 meses
-      )
-
-      if (!activationResult || !activationResult.success) {
-        if (webhookEventId) {
-          await supabase
-            .from('asaas_webhook_events')
-            .update({
-              process_status: 'error',
-              process_error: 'Erro ao processar ativação de assinatura via domínio',
-              processed_at: new Date().toISOString(),
-            })
-            .eq('id', webhookEventId)
-        }
-        return NextResponse.json({ error: 'Erro ao processar ativação de assinatura via domínio no webhook' }, { status: 400 })
-      }
-
-      // Atualizar oportunidade comercial para "Convertido" se aplicável
-      try {
-        const { data: opt } = await supabase
-          .from('oportunidades_comerciais')
-          .select('id, status')
-          .eq('ministry_id', invoice.ministry_id)
-          .maybeSingle()
-
-        if (opt && opt.status !== 'Convertido') {
-          const statusAnterior = opt.status || 'Novo'
-          const obs = 'Conversão comercial concluída automaticamente após confirmação do pagamento ASAAS.'
-          
-          await supabase
-            .from('oportunidades_comerciais')
-            .update({
-              status: 'Convertido',
-              observacao_interna: obs,
-              updated_at: new Date().toISOString(),
-              updated_by: 'Asaas Webhook'
-            })
-            .eq('id', opt.id)
-
-          await supabase
-            .from('oportunidades_comerciais_historico')
-            .insert([{
-              oportunidade_id: opt.id,
-              status_anterior: statusAnterior,
-              status_novo: 'Convertido',
-              usuario: 'Asaas Webhook',
-              observacao: obs,
-              created_at: new Date().toISOString()
-            }])
-        }
-      } catch (err) {
-        console.warn('Erro ao atualizar oportunidade/ticket no webhook Asaas:', err)
-      }
-    }
-
-    // 6. Atualizar status do webhook_event para 'processed'
+    // 5. Atualizar status do webhook_event para 'processed'
     if (webhookEventId) {
       await supabase
         .from('asaas_webhook_events')
@@ -238,26 +127,12 @@ export async function POST(request: NextRequest) {
         .eq('id', webhookEventId)
     }
 
-    // 7. Auditoria em admin_audit_logs se a tabela existir
-    try {
-      await supabase
-        .from('admin_audit_logs')
-        .insert([{
-          action: `payment_${newStatus}_webhook`,
-          entity_type: 'platform_billing_invoices',
-          entity_id: invoice.id,
-          changes: {
-            status: newStatus,
-            payment_id: asaasPaymentId,
-            ministry_id: invoice.ministry_id,
-          },
-          status: 'success',
-        }])
-    } catch {
-      // Ignora silenciosamente se a tabela não existir
-    }
-
-    return NextResponse.json({ success: true, status: newStatus })
+    return NextResponse.json({
+      received: true,
+      success: result.success,
+      status: result.status,
+      already_synced: result.alreadySynced || false,
+    })
   } catch (err: any) {
     if (webhookEventId) {
       try {
