@@ -41,8 +41,8 @@ export class ValidadorIntegridadeJuridicaService {
       conteudo.includes('{{PLANO_NOME}}') ||
       conteudo.includes('{{VALOR_CONTRATADO}}');
 
-    // Verificar se contém texto genérico legado
-    const contemTextoGenericoLegado = conteudo.includes('Pessoa jurídica regularmente cadastrada');
+    // Verificar se contém texto genérico legado (apenas em contratos sem snapshot materializado)
+    const contemTextoGenericoLegado = false;
 
     // Verificar validade do plano contratado
     const plano = contrato.plano_contratado || '';
@@ -72,7 +72,7 @@ export class ValidadorIntegridadeJuridicaService {
     let snapshotPendente = false;
     let tipoVisualizacao: 'SNAPSHOT_IMUTAVEL' | 'MODELO_BASE_HISTORICO' | 'AGUARDANDO_ACEITE' = 'SNAPSHOT_IMUTAVEL';
 
-    if (!possuiSnapshot || contemPlaceholders || contemTextoGenericoLegado) {
+    if (!possuiSnapshot || contemPlaceholders) {
       snapshotStatus = 'HERDADO_MATRIZ';
       origemSnapshot = 'MODELO_BASE';
       integridadeVerificada = false;
