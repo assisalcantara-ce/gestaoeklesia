@@ -36,14 +36,14 @@ export async function GET(request: NextRequest) {
     if (ministryIds.length > 0) {
       const { data: ministriesData } = await supabaseAdmin
         .from('ministries')
-        .select('id, name, cnpj, documento, plan')
+        .select('id, name, cnpj_cpf, plan')
         .in('id', ministryIds);
 
       (ministriesData || []).forEach((m: any) => {
         mapaMinistries.set(m.id, {
           id: m.id,
           name: m.name || 'Ministério',
-          cnpj: m.cnpj || m.documento || null,
+          cnpj: m.cnpj_cpf || null,
           plan: m.plan || null,
         });
       });

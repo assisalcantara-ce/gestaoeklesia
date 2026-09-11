@@ -1,5 +1,6 @@
-import { SupabaseClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { resolverUsuarioIndividual } from '@/lib/user-resolver';
 
 export interface DadosMaterializacaoTenant {
   ministryId: string;
@@ -55,20 +56,15 @@ export class MaterializacaoContratoService {
     let emailMaster: string | null = null;
 
     if (masterId) {
-      const { data: profile } = await this.client
-        .from('profiles')
-        .select('email, full_name, nome')
-        .eq('id', masterId)
-        .maybeSingle();
-
-      if (profile) {
-        nomeMaster = profile.full_name || profile.nome || null;
-        emailMaster = profile.email || null;
+      const usuarioResolvido = await resolverUsuarioIndividual(this.client, masterId);
+      if (usuarioResolvido) {
+        nomeMaster = usuarioResolvido.name || null;
+        emailMaster = usuarioResolvido.email || null;
       }
     }
 
     // 3. Resolver CNPJ e Endereço das tabelas de configuração ou campos de ministries
-    let cnpj: string | null = ministry.cnpj || ministry.documento || null;
+    let cnpj: string | null = ministry.cnpj_cpf || ministry.cnpj || ministry.documento || null;
     let endereco: string | null = ministry.endereco || null;
 
     // Se não tiver cnpj/endereço em ministries, buscar na tabela `igreja_config` ou `configuracoes`

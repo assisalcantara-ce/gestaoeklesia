@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-guard';
+import { resolverUsuariosEmLote } from '@/lib/user-resolver';
 
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin(request);
@@ -78,21 +79,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 4. Buscar perfis de usuários em lote
-    const mapaUsuarios = new Map<string, { name: string; email: string | null }>();
-    if (userIds.length > 0) {
-      const { data: profData } = await supabaseAdmin
-        .from('profiles')
-        .select('id, email, full_name, nome')
-        .in('id', userIds);
-
-      (profData || []).forEach((p: any) => {
-        mapaUsuarios.set(p.id, {
-          name: p.full_name || p.nome || p.email || 'Usuário',
-          email: p.email || null,
-        });
-      });
-    }
+    // 4. Buscar perfis de usuários em lote (utilizando a fonte de usuários real do sistema)
+    const mapaUsuarios = await resolverUsuariosEmLote(supabaseAdmin, userIds as string[]);
 
     // 5. Montar estrutura formatada
     let resultado = logs.map((log: any) => {

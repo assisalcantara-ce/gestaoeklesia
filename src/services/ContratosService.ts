@@ -1,6 +1,7 @@
 import { ContratosRepository } from '@/repositories/ContratosRepository';
 import { DocumentosJuridicosService } from '@/services/DocumentosJuridicosService';
 import { AuditoriaJuridicaService } from '@/services/AuditoriaJuridicaService';
+import { resolverUsuarioIndividual } from '@/lib/user-resolver';
 import type { TenantContrato, CriarContratoVinculadoDTO } from '@/types/juridico';
 
 export class ContratosService {
@@ -162,17 +163,13 @@ export class ContratosService {
       // Buscar informações do usuário representante que realizou a assinatura (se assinado_por estiver preenchido)
       if (contrato.assinado_por) {
         const client = (this.repository as any).client;
-        const { data: userData } = await client
-          .from('profiles')
-          .select('id, email, full_name, nome')
-          .eq('id', contrato.assinado_por)
-          .maybeSingle();
+        const usuarioResolvido = await resolverUsuarioIndividual(client, contrato.assinado_por);
 
-        if (userData) {
+        if (usuarioResolvido) {
           assinadoPorUsuario = {
-            id: userData.id,
-            email: userData.email || null,
-            full_name: userData.full_name || userData.nome || null,
+            id: usuarioResolvido.id,
+            email: usuarioResolvido.email || null,
+            full_name: usuarioResolvido.name || null,
           };
         } else {
           assinadoPorUsuario = { id: contrato.assinado_por };

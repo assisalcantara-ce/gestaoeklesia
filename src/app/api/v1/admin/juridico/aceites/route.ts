@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-guard';
 import { AceitesRepository } from '@/repositories/AceitesRepository';
+import { resolverUsuariosEmLote } from '@/lib/user-resolver';
 import type { TenantAceite } from '@/types/juridico';
 
 export async function GET(request: NextRequest) {
@@ -41,34 +42,20 @@ export async function GET(request: NextRequest) {
     if (ministryIds.length > 0) {
       const { data: minData } = await supabaseAdmin
         .from('ministries')
-        .select('id, name, cnpj, documento')
+        .select('id, name, cnpj_cpf')
         .in('id', ministryIds);
 
       (minData || []).forEach((m: any) => {
         mapaMinistries.set(m.id, {
           id: m.id,
           name: m.name || 'Ministério',
-          cnpj: m.cnpj || m.documento || null,
+          cnpj: m.cnpj_cpf || null,
         });
       });
     }
 
-    // 4. Buscar perfis de usuários em lote
-    const mapaUsuarios = new Map<string, { id: string; name: string; email: string | null }>();
-    if (userIds.length > 0) {
-      const { data: profData } = await supabaseAdmin
-        .from('profiles')
-        .select('id, email, full_name, nome')
-        .in('id', userIds);
-
-      (profData || []).forEach((p: any) => {
-        mapaUsuarios.set(p.id, {
-          id: p.id,
-          name: p.full_name || p.nome || p.email || 'Usuário',
-          email: p.email || null,
-        });
-      });
-    }
+    // 4. Buscar perfis de usuários em lote (utilizando a fonte de usuários real do sistema)
+    const mapaUsuarios = await resolverUsuariosEmLote(supabaseAdmin, userIds as string[]);
 
     // 5. Buscar documentos em lote
     const mapaDocs = new Map<string, { id: string; titulo: string; tipo: string; versao: string; escopo?: string }>();
