@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- Migration: 20260911220000_platform_corporate_finance.sql
 -- Descrição: Estrutura da Central Financeira Corporativa da Gestão Eklésia
 -- Módulos: Categorias Corporativas, Receitas Manuais, Despesas e Saldos
@@ -91,7 +91,7 @@ CREATE POLICY super_admin_manage_platform_fin_categories
       SELECT 1 FROM public.admin_users au
       WHERE au.user_id = auth.uid()
         AND au.is_active = true
-        AND (au.role = 'admin' OR au.role = 'super_admin' OR au.capabilities @> '[pagamentos]'::jsonb)
+        AND (au.role = 'admin' OR au.can_manage_payments = true)
     )
   );
 
@@ -104,7 +104,7 @@ CREATE POLICY super_admin_manage_platform_manual_revenues
       SELECT 1 FROM public.admin_users au
       WHERE au.user_id = auth.uid()
         AND au.is_active = true
-        AND (au.role = 'admin' OR au.role = 'super_admin' OR au.capabilities @> '[pagamentos]'::jsonb)
+        AND (au.role = 'admin' OR au.can_manage_payments = true)
     )
   );
 
@@ -117,7 +117,7 @@ CREATE POLICY super_admin_manage_platform_expenses
       SELECT 1 FROM public.admin_users au
       WHERE au.user_id = auth.uid()
         AND au.is_active = true
-        AND (au.role = 'admin' OR au.role = 'super_admin' OR au.capabilities @> '[pagamentos]'::jsonb)
+        AND (au.role = 'admin' OR au.can_manage_payments = true)
     )
   );
 
@@ -130,7 +130,7 @@ CREATE POLICY super_admin_manage_platform_financial_balances
       SELECT 1 FROM public.admin_users au
       WHERE au.user_id = auth.uid()
         AND au.is_active = true
-        AND (au.role = 'admin' OR au.role = 'super_admin' OR au.capabilities @> '[pagamentos]'::jsonb)
+        AND (au.role = 'admin' OR au.can_manage_payments = true)
     )
   );
 
