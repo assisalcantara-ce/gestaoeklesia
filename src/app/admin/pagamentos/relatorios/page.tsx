@@ -199,12 +199,12 @@ export default function RelatoriosFinanceirosPage() {
   }
 
     return (
-    <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden">
+    <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden print:bg-white print:text-black print:h-auto print:overflow-visible">
       <AdminSidebar />
 
-      <main className="flex-1 flex flex-col overflow-y-auto">
+      <main className="flex-1 flex flex-col overflow-y-auto print:overflow-visible print:p-0 print:m-0 print:w-full print:max-w-none">
         {/* Cabeçalho Executivo */}
-        <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur px-8 py-6 sticky top-0 z-10">
+        <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur px-8 py-6 sticky top-0 z-10 print:hidden">
           <div className="max-w-7xl mx-auto space-y-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-gray-400">
               <Link href="/admin/dashboard" className="hover:text-white transition">
@@ -271,9 +271,11 @@ export default function RelatoriosFinanceirosPage() {
           </div>
         </header>
 
-        <div className="p-8 max-w-7xl w-full mx-auto space-y-6">
+        <div className="p-8 max-w-7xl w-full mx-auto space-y-6 print:p-0 print:m-0 print:max-w-none print:w-full">
           {/* Navegação por Abas da Central Financeira */}
-          <FinanceNavTabs activeTab={activeTab} onSelectTab={(tab) => setActiveTab(tab)} />
+          <div className="print:hidden">
+            <FinanceNavTabs activeTab={activeTab} onSelectTab={(tab) => setActiveTab(tab)} />
+          </div>
 
           {/* Renderização Condicional das Abas Operacionais */}
           {activeTab === 'statement' && (

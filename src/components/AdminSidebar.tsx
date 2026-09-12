@@ -93,7 +93,7 @@ export default function AdminSidebar() {
   ]
 
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className="flex h-screen bg-gray-900 print:hidden">
       {/* Sidebar */}
       <aside
         className={`bg-gray-950 text-white transition-all duration-300 ${
