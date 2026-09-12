@@ -102,8 +102,14 @@ export interface LettersStats {
     total: number;
     emitidas: number;
     canceladas: number;
+    cartasEmitidas: number;
+    declaracoesEmitidas: number;
   };
   porTipo: Record<string, number>;
+  porCategoria: {
+    carta: number;
+    declaracao: number;
+  };
 }
 
 export interface BaptismsAndActsStats {
@@ -860,10 +866,16 @@ export class SecretaryReportsService {
       }
     }
 
-    const { data: registrosData, error: registrosError } = await this.supabase
+    let registrosQuery = this.supabase
       .from('cartas_registros')
-      .select('status')
+      .select('status, categoria, members(congregacao_id)')
       .eq('ministry_id', ministryId);
+
+    if (congregacaoId) {
+      registrosQuery = registrosQuery.eq('members.congregacao_id', congregacaoId);
+    }
+
+    const { data: registrosData, error: registrosError } = await registrosQuery;
 
     if (registrosError) {
       throw new Error(`Erro ao buscar registros de cartas emitidas: ${registrosError.message}`);
@@ -872,11 +884,28 @@ export class SecretaryReportsService {
     const registrosList = registrosData || [];
     let emitidas = 0;
     let canceladas = 0;
+    let cartasEmitidas = 0;
+    let declaracoesEmitidas = 0;
+    const porCategoria = {
+      carta: 0,
+      declaracao: 0,
+    };
 
     for (const r of registrosList) {
       const s = (r.status || '').toLowerCase();
-      if (s === 'emitida') emitidas++;
-      else if (s === 'cancelada') canceladas++;
+      const cat = (r.categoria === 'declaracao' ? 'declaracao' : 'carta') as 'carta' | 'declaracao';
+      porCategoria[cat] = (porCategoria[cat] || 0) + 1;
+
+      if (s === 'emitida' || !s) {
+        emitidas++;
+        if (cat === 'declaracao') {
+          declaracoesEmitidas++;
+        } else {
+          cartasEmitidas++;
+        }
+      } else if (s === 'cancelada') {
+        canceladas++;
+      }
     }
 
     return {
@@ -890,8 +919,11 @@ export class SecretaryReportsService {
         total: registrosList.length,
         emitidas,
         canceladas,
+        cartasEmitidas,
+        declaracoesEmitidas,
       },
       porTipo,
+      porCategoria,
     };
   }
 

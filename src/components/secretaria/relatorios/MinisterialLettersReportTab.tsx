@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   MailCheck,
+  FileText,
   Printer,
   ChevronLeft,
   ChevronRight,
@@ -38,7 +39,7 @@ export default function MinisterialLettersReportTab({
   congregacaoId,
   congregacaoNome,
 }: MinisterialLettersReportTabProps) {
-  const [subAba, setSubAba] = useState<'pedidos' | 'emitidas'>('pedidos');
+  const [subAba, setSubAba] = useState<'pedidos' | 'emitidas'>('emitidas');
 
   // Estado da lista
   const [items, setItems] = useState<any[]>([]);
@@ -51,6 +52,8 @@ export default function MinisterialLettersReportTab({
   // Filtros
   const [statusFilter, setStatusFilter] = useState('todos');
   const [tipoCartaFilter, setTipoCartaFilter] = useState('todos');
+  const [categoriaFilter, setCategoriaFilter] = useState<'todos' | 'carta' | 'declaracao'>('todos');
+  const [currentStats, setCurrentStats] = useState<LettersStats>(initialLettersStats);
 
   const fetchLetters = useCallback(async () => {
     setLoading(true);
@@ -59,6 +62,7 @@ export default function MinisterialLettersReportTab({
       url.searchParams.set('tipoConsulta', subAba);
       if (statusFilter !== 'todos') url.searchParams.set('status', statusFilter);
       if (tipoCartaFilter !== 'todos') url.searchParams.set('tipoCarta', tipoCartaFilter);
+      if (categoriaFilter !== 'todos') url.searchParams.set('categoria', categoriaFilter);
       if (congregacaoId && congregacaoId !== 'todas') url.searchParams.set('congregacao_id', congregacaoId);
       url.searchParams.set('page', String(page));
       url.searchParams.set('limit', String(limit));
@@ -69,66 +73,108 @@ export default function MinisterialLettersReportTab({
         setItems(json.data || []);
         setTotal(json.total || 0);
         setTotalPages(json.totalPages || 1);
+        if (json.stats) {
+          setCurrentStats(json.stats);
+        }
       }
     } catch (err) {
-      console.error('Erro ao consultar cartas ministeriais:', err);
+      console.error('Erro ao consultar cartas e declarações:', err);
     } finally {
       setLoading(false);
     }
-  }, [subAba, statusFilter, tipoCartaFilter, congregacaoId, page, limit]);
+  }, [subAba, statusFilter, tipoCartaFilter, categoriaFilter, congregacaoId, page, limit]);
 
   useEffect(() => {
     fetchLetters();
   }, [fetchLetters]);
 
-  const stats = initialLettersStats;
+  const stats = currentStats || initialLettersStats;
+  const totalEmitidos = stats.registrosEmitidos?.total || 0;
+  const cartasEmitidas = stats.registrosEmitidos?.cartasEmitidas ?? (stats.registrosEmitidos?.emitidas || 0);
+  const declaracoesEmitidas = stats.registrosEmitidos?.declaracoesEmitidas ?? 0;
 
   return (
     <div className="space-y-6">
       {/* ─── CABEÇALHO OFICIAL DE IMPRESSÃO A4 (hidden em tela, visível em print) ─── */}
       <ReportPrintHeader
-        title={subAba === 'pedidos' ? 'Relatório de Solicitações de Cartas Ministeriais' : 'Relação Oficial de Cartas Emitidas'}
+        title={subAba === 'pedidos' ? 'Relatório de Solicitações de Cartas Ministeriais' : 'Relação Oficial de Documentos Emitidos (Cartas e Declarações)'}
         periodoOuData={`Posição em ${new Date().toLocaleDateString('pt-BR')}`}
         congregacaoNome={congregacaoNome}
       />
 
-      {/* ─── CARDS DE INDICADORES DE CARTAS ──────────────────────────────────── */}
-      <div>
-        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-2 print:hidden">
-          <MailCheck className="w-4 h-4 text-[#123b63]" />
-          Indicadores Consolidados de Cartas Ministeriais
-        </h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Total de Solicitações
-            </span>
-            <p className="text-3xl font-extrabold text-[#123b63] mt-2">{stats.pedidos.total}</p>
-            <p className="text-xs text-gray-500 mt-1">Pedidos registrados</p>
-          </div>
+      {/* ─── CARDS DE INDICADORES: DOCUMENTOS EMITIDOS & PEDIDOS DE CARTAS ────── */}
+      <div className="space-y-4">
+        {/* Seção 1: Documentos Emitidos */}
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2.5 flex items-center gap-2 print:hidden">
+            <FileText className="w-4 h-4 text-teal-700" />
+            Documentos Emitidos (Consolidado)
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Total de Documentos
+              </span>
+              <p className="text-2xl font-extrabold text-[#123b63] mt-1.5">{totalEmitidos}</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">Cartas e Declarações emitidas</p>
+            </div>
 
-          <div className="bg-white rounded-2xl border border-amber-200 bg-amber-50/40 p-5 shadow-sm">
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-800">
-              Aguardando Autorização
-            </span>
-            <p className="text-3xl font-extrabold text-amber-600 mt-2">{stats.pedidos.pendentes}</p>
-            <p className="text-xs text-amber-700 mt-1">Pendentes de deferimento</p>
-          </div>
+            <div className="bg-white rounded-2xl border border-blue-200 bg-blue-50/40 p-4 shadow-sm">
+              <span className="text-xs font-semibold uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
+                <span>📜</span> Cartas Emitidas
+              </span>
+              <p className="text-2xl font-extrabold text-blue-700 mt-1.5">{cartasEmitidas}</p>
+              <p className="text-[11px] text-blue-600 mt-0.5">Cartas ministeriais finalizadas</p>
+            </div>
 
-          <div className="bg-white rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm">
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800">
-              Pedidos Autorizados
-            </span>
-            <p className="text-3xl font-extrabold text-emerald-600 mt-2">{stats.pedidos.autorizados}</p>
-            <p className="text-xs text-emerald-700 mt-1">Aprovados pela liderança</p>
+            <div className="bg-white rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 shadow-sm">
+              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                <span>📄</span> Declarações Emitidas
+              </span>
+              <p className="text-2xl font-extrabold text-emerald-700 mt-1.5">{declaracoesEmitidas}</p>
+              <p className="text-[11px] text-emerald-600 mt-0.5">Declarações oficiais diretas</p>
+            </div>
           </div>
+        </div>
 
-          <div className="bg-white rounded-2xl border border-blue-200 bg-blue-50/40 p-5 shadow-sm">
-            <span className="text-xs font-semibold uppercase tracking-wider text-blue-800">
-              Cartas Emitidas
-            </span>
-            <p className="text-3xl font-extrabold text-blue-700 mt-2">{stats.registrosEmitidos.emitidas}</p>
-            <p className="text-xs text-blue-700 mt-1">Documentos finalizados</p>
+        {/* Seção 2: Pedidos de Cartas Ministeriais (Exclusivo para Cartas) */}
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2.5 flex items-center gap-2 print:hidden">
+            <MailCheck className="w-4 h-4 text-amber-700" />
+            Solicitações / Pedidos de Cartas Ministeriais
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Total de Pedidos
+              </span>
+              <p className="text-2xl font-extrabold text-[#123b63] mt-1.5">{stats.pedidos?.total || 0}</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">Pedidos registrados</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-amber-200 bg-amber-50/40 p-4 shadow-sm">
+              <span className="text-xs font-semibold uppercase tracking-wider text-amber-800">
+                Aguardando Autorização
+              </span>
+              <p className="text-2xl font-extrabold text-amber-600 mt-1.5">{stats.pedidos?.pendentes || 0}</p>
+              <p className="text-[11px] text-amber-700 mt-0.5">Pendentes de deferimento</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 shadow-sm">
+              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800">
+                Pedidos Autorizados
+              </span>
+              <p className="text-2xl font-extrabold text-emerald-600 mt-1.5">{stats.pedidos?.autorizados || 0}</p>
+              <p className="text-[11px] text-emerald-700 mt-0.5">Aprovados pela liderança</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-red-200 bg-red-50/40 p-4 shadow-sm">
+              <span className="text-xs font-semibold uppercase tracking-wider text-red-800">
+                Pedidos Rejeitados
+              </span>
+              <p className="text-2xl font-extrabold text-red-600 mt-1.5">{stats.pedidos?.rejeitados || 0}</p>
+              <p className="text-[11px] text-red-700 mt-0.5">Indeferidos</p>
+            </div>
           </div>
         </div>
       </div>
@@ -139,30 +185,32 @@ export default function MinisterialLettersReportTab({
           <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
             <button
               onClick={() => {
-                setSubAba('pedidos');
-                setPage(1);
-              }}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-                subAba === 'pedidos'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Solicitações / Pedidos ({stats.pedidos.total})
-            </button>
-
-            <button
-              onClick={() => {
                 setSubAba('emitidas');
                 setPage(1);
               }}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
                 subAba === 'emitidas'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Documentos Emitidos ({stats.registrosEmitidos.total})
+              <span>📄</span>
+              <span>Documentos Emitidos ({totalEmitidos})</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setSubAba('pedidos');
+                setPage(1);
+              }}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
+                subAba === 'pedidos'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <span>✉️</span>
+              <span>Pedidos de Cartas ({stats.pedidos?.total || 0})</span>
             </button>
           </div>
 
@@ -176,16 +224,80 @@ export default function MinisterialLettersReportTab({
             </button>
 
             <Link
-              href="/secretaria/cartas/pedidos"
+              href="/secretaria/cartas"
               className="flex items-center gap-1 px-3 py-1.5 bg-[#123b63] hover:bg-[#0e2f50] text-white text-xs font-semibold rounded-lg transition"
             >
-              Gerenciar Cartas
+              Emitir / Modelos
               <ExternalLink className="w-3 h-3" />
             </Link>
           </div>
         </div>
 
-        {/* Filtros da Tabela */}
+        {/* Filtros da Tabela de Documentos Emitidos */}
+        {subAba === 'emitidas' && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 text-xs">
+            <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-lg border border-gray-200">
+              <span className="text-[11px] font-bold text-gray-500 uppercase px-1.5">Categoria:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setCategoriaFilter('todos');
+                  setPage(1);
+                }}
+                className={`px-2.5 py-1 rounded text-xs font-semibold transition ${
+                  categoriaFilter === 'todos'
+                    ? 'bg-teal-600 text-white shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Todas ({totalEmitidos})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCategoriaFilter('carta');
+                  setPage(1);
+                }}
+                className={`px-2.5 py-1 rounded text-xs font-semibold transition flex items-center gap-1 ${
+                  categoriaFilter === 'carta'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-blue-700 hover:bg-blue-50'
+                }`}
+              >
+                <span>📜</span> Cartas ({cartasEmitidas})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCategoriaFilter('declaracao');
+                  setPage(1);
+                }}
+                className={`px-2.5 py-1 rounded text-xs font-semibold transition flex items-center gap-1 ${
+                  categoriaFilter === 'declaracao'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-emerald-700 hover:bg-emerald-50'
+                }`}
+              >
+                <span>📄</span> Declarações ({declaracoesEmitidas})
+              </button>
+            </div>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              className="border border-gray-200 rounded-lg px-2.5 py-1.5 bg-gray-50 text-gray-700"
+            >
+              <option value="todos">Todos os Status</option>
+              <option value="emitida">Emitida</option>
+              <option value="cancelada">Cancelada</option>
+            </select>
+          </div>
+        )}
+
+        {/* Filtros da Tabela de Pedidos */}
         {subAba === 'pedidos' && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 text-xs">
             <select
@@ -220,18 +332,18 @@ export default function MinisterialLettersReportTab({
         )}
       </div>
 
-      {/* ─── TABELA DE SOLICITAÇÕES / CARTAS EMITIDAS ────────────────────────── */}
+      {/* ─── TABELA DE DOCUMENTOS EMITIDOS / SOLICITAÇÕES ─────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:rounded-none">
         {loading ? (
           <div className="py-16 text-center text-gray-400">
             <div className="w-8 h-8 rounded-full border-3 border-[#123b63] border-t-transparent animate-spin mx-auto mb-2" />
-            <p className="text-xs">Consultando registros de cartas...</p>
+            <p className="text-xs">Consultando registros...</p>
           </div>
         ) : items.length === 0 ? (
           <div className="py-16 text-center text-gray-400">
             <MailCheck className="w-10 h-10 mx-auto text-gray-300 mb-2 stroke-1" />
             <p className="text-sm font-medium text-gray-500">
-              Nenhum registro de carta encontrado para os filtros selecionados.
+              Nenhum registro encontrado para os filtros selecionados.
             </p>
           </div>
         ) : subAba === 'pedidos' ? (
@@ -290,35 +402,50 @@ export default function MinisterialLettersReportTab({
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-500 uppercase tracking-wider font-semibold print:bg-gray-100 print:text-black">
-                  <th className="py-3 px-4">Data Emissão</th>
+                  <th className="py-3 px-4">Categoria</th>
+                  <th className="py-3 px-4">Título do Documento</th>
                   <th className="py-3 px-4">Membro</th>
-                  <th className="py-3 px-4">Template / Modelo</th>
                   <th className="py-3 px-4">Congregação</th>
+                  <th className="py-3 px-4">Data Emissão</th>
                   <th className="py-3 px-4">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {items.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50/80 transition-colors print:break-inside-avoid">
-                    <td className="py-3 px-4 whitespace-nowrap text-gray-600">
-                      {r.issued_at ? new Date(r.issued_at).toLocaleDateString('pt-BR') : '—'}
-                    </td>
-                    <td className="py-3 px-4 font-semibold text-gray-900">
-                      {r.membro_nome}
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      {r.template_title}
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      {r.congregacao_nome || 'Sede / Principal'}
-                    </td>
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-                        {r.status === 'emitida' ? 'Emitida' : r.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {items.map((r) => {
+                  const isDeclaracao = r.categoria === 'declaracao';
+                  return (
+                    <tr key={r.id} className="hover:bg-gray-50/80 transition-colors print:break-inside-avoid">
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                            isDeclaracao
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : 'bg-blue-50 text-blue-800 border-blue-200'
+                          }`}
+                        >
+                          {isDeclaracao ? '📄 Declaração' : '📜 Carta'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-semibold text-gray-900">
+                        {r.template_title}
+                      </td>
+                      <td className="py-3 px-4 text-gray-700">
+                        {r.membro_nome}
+                      </td>
+                      <td className="py-3 px-4 text-gray-600">
+                        {r.congregacao_nome || 'Sede / Principal'}
+                      </td>
+                      <td className="py-3 px-4 whitespace-nowrap text-gray-600">
+                        {r.issued_at ? new Date(r.issued_at).toLocaleDateString('pt-BR') : '—'}
+                      </td>
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                          {r.status === 'emitida' ? 'Emitida' : r.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

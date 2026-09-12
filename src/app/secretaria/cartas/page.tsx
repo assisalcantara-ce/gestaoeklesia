@@ -12,7 +12,16 @@ import { useUserContext } from '@/hooks/useUserContext';
 import { createClient } from '@/lib/supabase-client';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { useMembers } from '@/hooks/useMembers';
-import type { Member } from '@/types/supabase';
+import type {
+  Member,
+  TemplateCategoria,
+  TemplateTipo,
+  TemplateScope,
+  CartaCanvasElement,
+  CartaCanvasData,
+  CartaTemplate,
+  CartaRegistro,
+} from '@/types/supabase';
 import { Manrope, Playfair_Display } from 'next/font/google';
 import {
   AlignCenter,
@@ -42,70 +51,8 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-type TemplateScope = 'system' | 'tenant';
-type TemplateTipo = 'mudanca' | 'transito' | 'desligamento' | 'recomendacao' | 'custom';
-
-interface CartaCanvasElement {
-  id: string;
-  tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha' | 'forma';
-  x: number;
-  y: number;
-  largura: number;
-  altura: number;
-  fontSize?: number;
-  cor?: string;
-  backgroundColor?: string;
-  borderColor?: string;
-  borderWidth?: number;
-  borderStyle?: 'solid' | 'dashed' | 'dotted';
-  fonte?: string;
-  transparencia?: number;
-  borderRadius?: number;
-  texto?: string;
-  alinhamento?: 'left' | 'center' | 'right';
-  negrito?: boolean;
-  italico?: boolean;
-  sublinhado?: boolean;
-  sombreado?: boolean;
-  imagemUrl?: string;
-  locked?: boolean;
-  visivel: boolean;
-}
-
-interface CartaCanvasData {
-  width: number;
-  height: number;
-  backgroundUrl?: string;
-  elements: CartaCanvasElement[];
-}
-
 const headingFont = Playfair_Display({ subsets: ['latin'], weight: ['600', '700'] });
 const bodyFont = Manrope({ subsets: ['latin'], weight: ['400', '500', '600'] });
-
-interface CartaTemplate {
-  id: string;
-  ministry_id: string | null;
-  template_key: string;
-  title: string;
-  tipo: TemplateTipo;
-  scope: TemplateScope;
-  content_json: any;
-  is_active: boolean;
-  updated_at?: string | null;
-}
-
-interface CartaRegistro {
-  id: string;
-  member_id: string | null;
-  template_id: string | null;
-  template_key: string | null;
-  template_title: string | null;
-  status: string;
-  rendered_html: string | null;
-  issued_at: string | null;
-  payload_snapshot: any;
-  template_snapshot: any;
-}
 
 const CANVAS_A4 = { width: 794, height: 1123 };
 
@@ -390,6 +337,11 @@ export default function CartasPage() {
   const [activeSidebarTab, setActiveSidebarTab] = useState<'elementos' | 'variaveis' | 'camadas'>('elementos');
   const lastSelectedTemplateRef = useRef<CartaTemplate | null>(null);
   const [canvasContent, setCanvasContent] = useState<CartaCanvasData>(() => createDefaultCanvas());
+  const [categoriaFilter, setCategoriaFilter] = useState<'todas' | 'carta' | 'declaracao'>('todas');
+  const [emitirCategoria, setEmitirCategoria] = useState<'todas' | 'carta' | 'declaracao'>('todas');
+  const [historicoCategoria, setHistoricoCategoria] = useState<'todas' | 'carta' | 'declaracao'>('todas');
+  const [historicoBusca, setHistoricoBusca] = useState('');
+  const [draftCategoria, setDraftCategoria] = useState<TemplateCategoria>('carta');
   const [selectedCanvasElement, setSelectedCanvasElement] = useState<CartaCanvasElement | null>(null);
   const [selectedCanvasElements, setSelectedCanvasElements] = useState<CartaCanvasElement[]>([]);
   const [canvasImageTargetId, setCanvasImageTargetId] = useState<string | null>(null);
@@ -468,10 +420,10 @@ export default function CartasPage() {
     }
   }, [isAuxiliar, isOperador, activeTab]);
 
-  // Templates disponíveis para operador: apenas transito e recomendacao
-  const TIPOS_LIVRES: TemplateTipo[] = ['transito', 'recomendacao'];
+  // Templates disponíveis para operador: cartas de trânsito/recomendação e declarações oficiais
+  const TIPOS_LIVRES: TemplateTipo[] = ['transito', 'recomendacao', 'membro_ativo', 'batismo', 'cargo', 'apresentacao_crianca'];
   const templatesFiltrados = isOperador
-    ? templates.filter(t => TIPOS_LIVRES.includes(t.tipo))
+    ? templates.filter(t => TIPOS_LIVRES.includes(t.tipo) || t.categoria === 'declaracao')
     : templates;
 
   const selectedMember = useMemo(
@@ -651,14 +603,17 @@ const createSystemTemplate = (
   key: string,
   title: string,
   tipo: TemplateTipo,
-  tituloCarta: string,
-  textoDeclaracao: string
+  categoria: TemplateCategoria,
+  tituloDocumento: string,
+  textoDeclaracao: string,
+  isDeclaracao = false
 ): CartaTemplate => ({
   id,
   ministry_id: null,
   template_key: key,
   title,
   tipo,
+  categoria,
   scope: 'system',
   is_active: true,
   content_json: {
@@ -766,7 +721,7 @@ const createSystemTemplate = (
           tipo: 'texto',
           fonte: 'Calibri',
           texto: textoDeclaracao,
-          altura: 476,
+          altura: 520,
           locked: false,
           italico: false,
           largura: 618,
@@ -815,99 +770,150 @@ const createSystemTemplate = (
           borderRadius: 0,
         },
         {
-          x: 153,
+          x: 100,
           y: 186,
           id: '494afeea-9420-486f-bb71-0889883c29c4',
           cor: '#111827',
           tipo: 'texto',
           fonte: 'Calibri',
-          texto: tituloCarta,
+          texto: tituloDocumento,
           altura: 48,
           locked: false,
           italico: false,
-          largura: 360,
+          largura: 480,
           negrito: true,
           visivel: true,
-          fontSize: 26,
+          fontSize: 24,
           sublinhado: false,
           alinhamento: 'center',
           borderRadius: 0,
         },
-        {
-          x: 25,
-          y: 994,
-          id: '17871409999000b6o6qgzt',
-          cor: '#111827',
-          tipo: 'texto',
-          fonte: 'Calibri',
-          texto: '<b>DESTINO:</b> {{carta.destino}}',
-          altura: 29,
-          locked: false,
-          italico: false,
-          largura: 643,
-          negrito: false,
-          visivel: true,
-          fontSize: 16,
-          sublinhado: false,
-          alinhamento: 'left',
-          borderRadius: 0,
-        },
-        {
-          x: 24,
-          y: 1028,
-          id: '17871410147888k2nbto2j',
-          cor: '#111827',
-          tipo: 'texto',
-          fonte: 'Calibri',
-          texto: '<b>OBS.: </b>{{carta.observacoes}}',
-          altura: 29,
-          locked: false,
-          italico: false,
-          largura: 643,
-          negrito: false,
-          visivel: true,
-          fontSize: 16,
-          sublinhado: false,
-          alinhamento: 'left',
-          borderRadius: 0,
-        },
+        ...(isDeclaracao
+          ? []
+          : [
+              {
+                x: 25,
+                y: 994,
+                id: '17871409999000b6o6qgzt',
+                cor: '#111827',
+                tipo: 'texto' as const,
+                fonte: 'Calibri',
+                texto: '<b>DESTINO:</b> {{carta.destino}}',
+                altura: 29,
+                locked: false,
+                italico: false,
+                largura: 643,
+                negrito: false,
+                visivel: true,
+                fontSize: 16,
+                sublinhado: false,
+                alinhamento: 'left' as const,
+                borderRadius: 0,
+              },
+              {
+                x: 24,
+                y: 1028,
+                id: '17871410147888k2nbto2j',
+                cor: '#111827',
+                tipo: 'texto' as const,
+                fonte: 'Calibri',
+                texto: '<b>OBS.: </b>{{carta.observacoes}}',
+                altura: 29,
+                locked: false,
+                italico: false,
+                largura: 643,
+                negrito: false,
+                visivel: true,
+                fontSize: 16,
+                sublinhado: false,
+                alinhamento: 'left' as const,
+                borderRadius: 0,
+              },
+            ]),
       ],
     },
   },
 });
 
 const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
+  // ─── CARTAS MINISTERIAIS ──────────────────────────────────────────────────
   createSystemTemplate(
     'system-mudanca',
     'mudanca',
     'Carta de Mudança',
     'mudanca',
-    'CARTA DE MUDANCA',
-    'Declaramos para os devidos fins que\n<b>{{membro.nome}}, CPF {{membro.cpf}}</b>\n\nFaz parte desta igreja, como MEMBRO fiel e dedicado.\nPor se achar em comunhão com esta Igreja, nós o recomendamos que o recebais no Senhor como usam fazer os Santos..\n\n<b>Congregacao:</b> {{membro.congregacao}} \n<b>Cargo:</b> {{membro.cargo}}\n\nEm fe de verdade, firmamos a presente.\n\n<b>{{data.extenso}}<b>\n</b></b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n'
+    'carta',
+    'CARTA DE MUDANÇA',
+    'Declaramos para os devidos fins que\n<b>{{membro.nome}}, CPF {{membro.cpf}}</b>\n\nFaz parte desta igreja, como MEMBRO fiel e dedicado.\nPor se achar em comunhão com esta Igreja, nós o recomendamos que o recebais no Senhor como usam fazer os Santos..\n\n<b>Congregação:</b> {{membro.congregacao}} \n<b>Cargo:</b> {{membro.cargo}}\n\nEm fé de verdade, firmamos a presente.\n\n<b>{{data.extenso}}</b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n'
   ),
   createSystemTemplate(
     'system-transito',
     'transito',
     'Carta de Trânsito',
     'transito',
+    'carta',
     'CARTA DE TRÂNSITO',
-    'Declaramos para os devidos fins que\n<b>{{membro.nome}}, CPF {{membro.cpf}}</b>\n\nMembro desta igreja, encontra-se em viagem ou trânsito temporário.\nRecomendamos que o recebais em comunhão cristã durante o período de sua permanência.\n\n<b>Congregacao:</b> {{membro.congregacao}} \n<b>Cargo:</b> {{membro.cargo}}\n\nEm fe de verdade, firmamos a presente.\n\n<b>{{data.extenso}}<b>\n</b></b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n'
+    'Declaramos para os devidos fins que\n<b>{{membro.nome}}, CPF {{membro.cpf}}</b>\n\nMembro desta igreja, encontra-se em viagem ou trânsito temporário.\nRecomendamos que o recebais em comunhão cristã durante o período de sua permanência.\n\n<b>Congregação:</b> {{membro.congregacao}} \n<b>Cargo:</b> {{membro.cargo}}\n\nEm fé de verdade, firmamos a presente.\n\n<b>{{data.extenso}}</b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n'
   ),
   createSystemTemplate(
     'system-desligamento',
     'desligamento',
     'Carta de Desligamento',
     'desligamento',
+    'carta',
     'CARTA DE DESLIGAMENTO',
-    'Declaramos para os devidos fins que\n<b>{{membro.nome}}, CPF {{membro.cpf}}</b>\n\nTeve seu desligamento formalizado a seu pedido do rol de membros desta igreja.\nRegistramos nossos agradecimentos pelo período em que esteve em nossa comunhão.\n\n<b>Congregacao:</b> {{membro.congregacao}} \n<b>Cargo:</b> {{membro.cargo}}\n\nEm fe de verdade, firmamos a presente.\n\n<b>{{data.extenso}}<b>\n</b></b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n'
+    'Declaramos para os devidos fins que\n<b>{{membro.nome}}, CPF {{membro.cpf}}</b>\n\nTeve seu desligamento formalizado a seu pedido do rol de membros desta igreja.\nRegistramos nossos agradecimentos pelo período em que esteve em nossa comunhão.\n\n<b>Congregação:</b> {{membro.congregacao}} \n<b>Cargo:</b> {{membro.cargo}}\n\nEm fé de verdade, firmamos a presente.\n\n<b>{{data.extenso}}</b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n'
   ),
   createSystemTemplate(
     'system-recomendacao',
     'recomendacao',
     'Carta de Recomendação',
     'recomendacao',
+    'carta',
     'CARTA DE RECOMENDAÇÃO',
-    'Declaramos para os devidos fins que\n<b>{{membro.nome}}, CPF {{membro.cpf}}</b>\n\nÉ membro em plena comunhão desta igreja e o(a) recomendamos carinhosamente aos irmãos para acolhimento nas atividades cristãs.\n\n<b>Congregacao:</b> {{membro.congregacao}} \n<b>Cargo:</b> {{membro.cargo}}\n\nEm fe de verdade, firmamos a presente.\n\n<b>{{data.extenso}}<b>\n</b></b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n'
+    'Declaramos para os devidos fins que\n<b>{{membro.nome}}, CPF {{membro.cpf}}</b>\n\nÉ membro em plena comunhão desta igreja e o(a) recomendamos carinhosamente aos irmãos para acolhimento nas atividades cristãs.\n\n<b>Congregação:</b> {{membro.congregacao}} \n<b>Cargo:</b> {{membro.cargo}}\n\nEm fé de verdade, firmamos a presente.\n\n<b>{{data.extenso}}</b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n'
+  ),
+
+  // ─── DECLARAÇÕES OFICIAIS ────────────────────────────────────────────────
+  createSystemTemplate(
+    'system-declaracao-membro-ativo',
+    'membro_ativo',
+    'Declaração de Membro Ativo',
+    'membro_ativo',
+    'declaracao',
+    'DECLARAÇÃO DE MEMBRO ATIVO',
+    'Declaramos para os devidos fins a quem possa interessar que\n<b>{{membro.nome}}</b>, portador(a) do CPF nº <b>{{membro.cpf}}</b>,\né membro ativo(a) e regular do rol de membros desta instituição religiosa,\nencontrando-se em plena comunhão com a comunidade e seus estatutos.\n\n<b>Congregação:</b> {{membro.congregacao}}\n<b>Cargo/Função:</b> {{membro.cargo}}\n\nPor ser expressão da verdade, firmamos a presente declaração.\n\n<b>{{data.extenso}}</b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n',
+    true
+  ),
+  createSystemTemplate(
+    'system-declaracao-batismo',
+    'batismo',
+    'Declaração de Batismo nas Águas',
+    'batismo',
+    'declaracao',
+    'DECLARAÇÃO DE BATISMO NAS ÁGUAS',
+    'Certificamos para os devidos fins de direito eclesiástico que\n<b>{{membro.nome}}</b>, portador(a) do CPF nº <b>{{membro.cpf}}</b>,\nprofessou publicamente sua fé em Jesus Cristo e foi batizado(a) nas águas conforme a ordenança bíblica,\npassando a integrar a comunhão do corpo de Cristo nesta Igreja.\n\n<b>Congregação:</b> {{membro.congregacao}}\n\nPor ser verdade, emitimos o presente documento.\n\n<b>{{data.extenso}}</b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n',
+    true
+  ),
+  createSystemTemplate(
+    'system-declaracao-cargo',
+    'cargo',
+    'Declaração de Exercício de Cargo',
+    'cargo',
+    'declaracao',
+    'DECLARAÇÃO DE EXERCÍCIO DE CARGO',
+    'Declaramos para os devidos fins ministeriais e civis que\n<b>{{membro.nome}}</b>, portador(a) do CPF nº <b>{{membro.cpf}}</b>,\nexercita oficialmente a função/cargo de <b>{{membro.cargo}}</b>\nno âmbito de <b>{{igreja.nome}}</b>, desenvolvendo suas atividades com zelo e dedicação cristã.\n\n<b>Congregação:</b> {{membro.congregacao}}\n\nFirmamos a presente declaração para que produza os efeitos necessários.\n\n<b>{{data.extenso}}</b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n',
+    true
+  ),
+  createSystemTemplate(
+    'system-declaracao-apresentacao',
+    'apresentacao_crianca',
+    'Declaração de Apresentação de Criança',
+    'apresentacao_crianca',
+    'declaracao',
+    'DECLARAÇÃO DE APRESENTAÇÃO DE CRIANÇA',
+    'Certificamos para fins de registro eclesiástico que a criança foi solenemente apresentada ao Senhor Jesus Cristo\nem culto público nesta Igreja, recebendo a oração intercessória e bênção pastoral da congregação,\nconforme os preceitos das Sagradas Escrituras.\n\n<b>Responsável/Membro:</b> {{membro.nome}}\n<b>Congregação:</b> {{membro.congregacao}}\n\nEm fé de verdade, passamos a presente declaração.\n\n<b>{{data.extenso}}</b>\n\n________________________________________\n<b>{{pastor.responsavel}}</b> - Pastor Presidente\n',
+    true
   ),
 ];
 
@@ -1067,6 +1073,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
     setDraftTitle('');
     setDraftKey('');
     setDraftTipo('custom');
+    setDraftCategoria('carta');
     setShowNewModal(true);
   };
 
@@ -1074,6 +1081,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
     setShowNewModal(false);
     setDraftTitle('');
     setDraftKey('');
+    setDraftCategoria('carta');
   };
 
   const handleCreateDraft = () => {
@@ -1151,6 +1159,11 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
 
     const finalKey = isCreatingNew ? buildUniqueKey(baseKey) : baseKey;
 
+    const inferredCategoria: TemplateCategoria =
+      selectedTemplate?.categoria ||
+      draftCategoria ||
+      (['membro_ativo', 'batismo', 'cargo', 'apresentacao_crianca'].includes(draftTipo) ? 'declaracao' : 'carta');
+
     setIsSaving(true);
     try {
       const payload = {
@@ -1158,6 +1171,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         template_key: finalKey,
         title: draftTitle,
         tipo: draftTipo || 'custom',
+        categoria: inferredCategoria,
         scope: 'tenant' as TemplateScope,
         content_json: serializeCanvasContent(canvasContent),
         is_active: true,
@@ -1562,12 +1576,15 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         data: { user },
       } = await supabase.auth.getUser();
 
+      const docCategoria: TemplateCategoria = selectedTemplate.categoria || 'carta';
+
       const payload = {
         ministry_id: ministryId,
         member_id: selectedMember.id,
         template_id: selectedTemplate.id,
         template_key: selectedTemplate.template_key,
         template_title: selectedTemplate.title,
+        categoria: docCategoria,
         status: 'emitida',
         payload_snapshot: map,
         template_snapshot: serializeCanvasContent(canvasContent),
@@ -1582,7 +1599,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
       setNotification({
         isOpen: true,
         title: 'Sucesso',
-        message: 'Carta emitida com sucesso!',
+        message: docCategoria === 'declaracao' ? 'Declaração emitida com sucesso!' : 'Carta emitida com sucesso!',
         type: 'success',
         autoClose: 3000,
       });
@@ -1593,7 +1610,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
       setNotification({
         isOpen: true,
         title: 'Erro',
-        message: err?.message || 'Erro ao emitir carta',
+        message: err?.message || 'Erro ao emitir documento',
         type: 'error',
         autoClose: undefined,
       });
@@ -1620,8 +1637,8 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
 
   return (
     <PageLayout
-      title="Cartas Ministeriais"
-      description="Criar modelos, emitir e reimprimir cartas ministeriais"
+      title="Cartas e Declarações"
+      description="Criar modelos, emitir e reimprimir cartas e declarações oficiais"
       activeMenu="cartas"
     >
       <NotificationModal
@@ -1645,10 +1662,10 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-[0.3em] text-amber-600">Secretaria geral</p>
               <h2 className={`${headingFont.className} text-2xl md:text-3xl text-[#123b63]`}>
-                Cartas com elegancia e rapidez
+                Cartas e Declarações com elegância e rapidez
               </h2>
               <p className="text-sm text-gray-600 max-w-xl">
-                Crie modelos com identidade visual, emita em segundos e reimprima com consistencia.
+                Crie modelos com identidade visual, emita em segundos e reimprima com consistência.
               </p>
             </div>
             <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
@@ -1663,14 +1680,14 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                 className="rounded-xl border border-white/70 bg-white/80 p-3 text-center shadow-sm backdrop-blur motion-safe:animate-rise-in"
                 style={{ animationDelay: '0.1s' }}
               >
-                <p className="text-[11px] uppercase tracking-[0.2em] text-gray-400">Emitidas</p>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-gray-400">Emitidos</p>
                 <p className="text-lg font-semibold text-[#123b63]">{records.length}</p>
               </div>
               <div
                 className="rounded-xl border border-white/70 bg-white/80 p-3 text-center shadow-sm backdrop-blur motion-safe:animate-rise-in"
                 style={{ animationDelay: '0.15s' }}
               >
-                <p className="text-[11px] uppercase tracking-[0.2em] text-gray-400">Ultima emissao</p>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-gray-400">Última emissão</p>
                 <p className="text-sm font-semibold text-[#123b63]">{lastIssuedLabel}</p>
               </div>
             </div>
@@ -1681,33 +1698,94 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
           <div className="p-4 md:p-6">
             <Tabs tabs={visibleTabs} activeTab={activeTab} onTabChange={setActiveTab}>
         {activeTab === 'modelos' && (
-          <Section icon="🧩" title="Modelos de Cartas">
-            {/* Seletor de Modelo Superior */}
-            <div className="mb-6 rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
-                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">Modelo Ativo:</span>
-                  <select
-                    value={selectedTemplate?.id || ''}
-                    onChange={(e) => {
-                      const tpl = templates.find((t) => t.id === e.target.value);
-                      if (tpl) handleSelectTemplate(tpl);
-                    }}
-                    className="min-w-[220px] flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
-                  >
-                    <option value="" disabled>Selecione um modelo</option>
-                    {templates.map((tpl) => (
-                      <option key={tpl.id} value={tpl.id}>
-                        {tpl.title}
-                      </option>
-                    ))}
-                  </select>
+          <Section icon="🧩" title="Modelos de Documentos">
+            {/* Filtros por Categoria e Seletor de Modelo Superior */}
+            <div className="mb-6 space-y-4">
+              {/* Barra de Filtros de Categoria */}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/85 p-3 shadow-sm backdrop-blur">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wider mr-2">Filtrar:</span>
                   <button
-                    onClick={handleNewTemplate}
-                    className="text-xs px-4 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
+                    type="button"
+                    onClick={() => setCategoriaFilter('todas')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                      categoriaFilter === 'todas'
+                        ? 'bg-teal-600 text-white shadow-sm'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
                   >
-                    + Novo Modelo
+                    Todos ({templates.length})
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setCategoriaFilter('carta')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                      categoriaFilter === 'carta'
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                    }`}
+                  >
+                    <span>📜</span>
+                    <span>Cartas ({templates.filter((t) => (t.categoria || 'carta') === 'carta').length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCategoriaFilter('declaracao')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                      categoriaFilter === 'declaracao'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    }`}
+                  >
+                    <span>📄</span>
+                    <span>Declarações ({templates.filter((t) => t.categoria === 'declaracao').length})</span>
+                  </button>
+                </div>
+                <div className="text-xs text-gray-500 font-medium">
+                  Exibindo {templates.filter((t) => categoriaFilter === 'todas' || (t.categoria || 'carta') === categoriaFilter).length} modelo(s)
+                </div>
+              </div>
+
+              {/* Seletor de Modelo Ativo */}
+              <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                    <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">Modelo Ativo:</span>
+                    <select
+                      value={selectedTemplate?.id || ''}
+                      onChange={(e) => {
+                        const tpl = templates.find((t) => t.id === e.target.value);
+                        if (tpl) handleSelectTemplate(tpl);
+                      }}
+                      className="min-w-[220px] flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+                    >
+                      <option value="" disabled>Selecione um modelo</option>
+                      {templates
+                        .filter((t) => categoriaFilter === 'todas' || (t.categoria || 'carta') === categoriaFilter)
+                        .map((tpl) => (
+                          <option key={tpl.id} value={tpl.id}>
+                            {tpl.categoria === 'declaracao' ? '📄 [Declaração] ' : '📜 [Carta] '}{tpl.title}
+                          </option>
+                        ))}
+                    </select>
+                    {selectedTemplate && (
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                          selectedTemplate.categoria === 'declaracao'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : 'bg-blue-100 text-blue-800 border border-blue-200'
+                        }`}
+                      >
+                        {selectedTemplate.categoria === 'declaracao' ? '📄 Declaração' : '📜 Carta'}
+                      </span>
+                    )}
+                    <button
+                      onClick={handleNewTemplate}
+                      className="text-xs px-4 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
+                    >
+                      + Novo Modelo
+                    </button>
+                  </div>
                 </div>
 
                 {selectedTemplate && (
@@ -2616,12 +2694,65 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         )}
 
         {activeTab === 'emitir' && (
-          <Section icon="📄" title="Emitir Carta">
+          <Section icon="📄" title="Emitir Documento">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <div className="lg:col-span-4 space-y-4">
                 <div className="rounded-2xl border border-white/70 bg-white/85 p-5 shadow-xl/10 space-y-4 backdrop-blur">
+                  {/* Seletor Rápido de Categoria para Emissão */}
                   <div>
-                    <label className="text-xs font-semibold text-gray-600">Modelo</label>
+                    <label className="text-xs font-semibold text-gray-600 block mb-1">Tipo de Documento</label>
+                    <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-100 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setEmitirCategoria('todas')}
+                        className={`py-1.5 text-xs font-bold rounded-md transition ${
+                          emitirCategoria === 'todas'
+                            ? 'bg-white text-teal-700 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        Todos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEmitirCategoria('carta')}
+                        className={`py-1.5 text-xs font-bold rounded-md transition flex items-center justify-center gap-1 ${
+                          emitirCategoria === 'carta'
+                            ? 'bg-white text-blue-700 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        <span>📜</span> Cartas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEmitirCategoria('declaracao')}
+                        className={`py-1.5 text-xs font-bold rounded-md transition flex items-center justify-center gap-1 ${
+                          emitirCategoria === 'declaracao'
+                            ? 'bg-white text-emerald-700 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        <span>📄</span> Declarações
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-gray-600">Modelo Selecionado</label>
+                      {selectedTemplate && (
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            selectedTemplate.categoria === 'declaracao'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}
+                        >
+                          {selectedTemplate.categoria === 'declaracao' ? '📄 Declaração' : '📜 Carta'}
+                        </span>
+                      )}
+                    </div>
                     <select
                       value={selectedTemplate?.id || ''}
                       onChange={(e) => {
@@ -2631,9 +2762,13 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                       className="w-full rounded-lg border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
                     >
                       <option value="" disabled>Selecione o modelo</option>
-                      {templatesFiltrados.map((tpl) => (
-                        <option key={tpl.id} value={tpl.id}>{tpl.title}</option>
-                      ))}
+                      {templatesFiltrados
+                        .filter((t) => emitirCategoria === 'todas' || (t.categoria || 'carta') === emitirCategoria)
+                        .map((tpl) => (
+                          <option key={tpl.id} value={tpl.id}>
+                            {tpl.categoria === 'declaracao' ? '📄 [Declaração] ' : '📜 [Carta] '}{tpl.title}
+                          </option>
+                        ))}
                     </select>
                   </div>
 
@@ -2673,7 +2808,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                       value={issueFields.destino}
                       onChange={(e) => setIssueFields((prev) => ({ ...prev, destino: e.target.value }))}
                       className="w-full rounded-lg border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
-                      placeholder="Para qual igreja/ministro"
+                      placeholder="Para qual igreja/ministro ou finalidade"
                     />
                   </div>
                   <div>
@@ -2686,36 +2821,41 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-gray-600">Observacoes</label>
+                    <label className="text-xs font-semibold text-gray-600">Observações</label>
                     <textarea
                       value={issueFields.observacoes}
                       onChange={(e) => setIssueFields((prev) => ({ ...prev, observacoes: e.target.value }))}
                       className="w-full min-h-[80px] rounded-lg border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
-                      placeholder="Observacoes adicionais"
+                      placeholder="Observações adicionais"
                     />
                   </div>
                   <button
                     onClick={handleIssueLetter}
-                    className="w-full rounded-lg bg-teal-600 px-4 py-2 text-sm text-white hover:bg-teal-700"
+                    className="w-full rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-teal-700 shadow-md transition"
                     disabled={isIssuing}
                   >
-                    Emitir Carta
+                    {isIssuing
+                      ? 'Emitindo...'
+                      : selectedTemplate?.categoria === 'declaracao'
+                      ? 'Emitir Declaração'
+                      : 'Emitir Carta'}
                   </button>
                 </div>
               </div>
               <div className="lg:col-span-8">
                 <div className="rounded-2xl border border-white/70 bg-white/85 p-5 shadow-xl/10 backdrop-blur">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-gray-700">Preview</h3>
+                    <h3 className="text-sm font-semibold text-gray-700">Pré-visualização do Documento</h3>
                     <button
                       onClick={() => handlePrintHtml(previewHtml)}
-                      className="rounded-lg bg-gray-100 px-3 py-1 text-sm hover:bg-gray-200"
+                      className="rounded-lg bg-gray-100 px-3 py-1 text-sm font-medium hover:bg-gray-200 transition flex items-center gap-1.5"
                     >
-                      Imprimir
+                      <span>🖨️</span>
+                      <span>Imprimir</span>
                     </button>
                   </div>
                   <div
-                    className="min-h-[420px] rounded-xl border border-gray-200 bg-white/95 p-6 shadow-inner"
+                    className="min-h-[420px] rounded-xl border border-gray-200 bg-white/95 p-6 shadow-inner overflow-auto"
                     dangerouslySetInnerHTML={{ __html: previewHtml }}
                   />
                 </div>
@@ -2725,29 +2865,144 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         )}
 
         {activeTab === 'historico' && (
-          <Section icon="🗂️" title="Historico de Cartas">
-            <div className="rounded-2xl border border-white/70 bg-white/85 p-5 shadow-xl/10 backdrop-blur">
-              <div className="space-y-3">
-                {records.map((rec) => (
-                  <div
-                    key={rec.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white/90 p-4 shadow-sm"
+          <Section icon="🗂️" title="Histórico de Documentos Emitidos">
+            <div className="space-y-4">
+              {/* Barra de Filtros e Busca no Histórico */}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm backdrop-blur">
+                {/* Filtro por Categoria */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wider mr-1">Filtrar:</span>
+                  <button
+                    type="button"
+                    onClick={() => setHistoricoCategoria('todas')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                      historicoCategoria === 'todas'
+                        ? 'bg-teal-600 text-white shadow-sm'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
                   >
-                    <div>
-                      <p className="text-sm font-semibold text-gray-700">{rec.template_title || rec.template_key || 'Carta'}</p>
-                      <p className="text-xs text-gray-500">Emitida em: {rec.issued_at ? new Date(rec.issued_at).toLocaleDateString('pt-BR') : '-'}</p>
+                    Todos ({records.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHistoricoCategoria('carta')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                      historicoCategoria === 'carta'
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                    }`}
+                  >
+                    <span>📜</span>
+                    <span>Cartas ({records.filter((r) => (r.categoria || 'carta') === 'carta').length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHistoricoCategoria('declaracao')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                      historicoCategoria === 'declaracao'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    }`}
+                  >
+                    <span>📄</span>
+                    <span>Declarações ({records.filter((r) => r.categoria === 'declaracao').length})</span>
+                  </button>
+                </div>
+
+                {/* Campo de Busca */}
+                <div className="flex-1 min-w-[220px] max-w-md">
+                  <input
+                    type="text"
+                    value={historicoBusca}
+                    onChange={(e) => setHistoricoBusca(e.target.value)}
+                    placeholder="Buscar por título ou destinatário..."
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Lista de Registros */}
+              <div className="rounded-2xl border border-white/70 bg-white/85 p-5 shadow-xl/10 backdrop-blur">
+                <div className="space-y-3">
+                  {records
+                    .filter((rec) => {
+                      const matchesCat =
+                        historicoCategoria === 'todas' ||
+                        (rec.categoria || 'carta') === historicoCategoria;
+                      if (!matchesCat) return false;
+                      if (!historicoBusca.trim()) return true;
+                      const term = historicoBusca.toLowerCase();
+                      const title = (rec.template_title || rec.template_key || '').toLowerCase();
+                      const membroNome = String((rec.payload_snapshot as any)?.['membro.nome'] || '').toLowerCase();
+                      return title.includes(term) || membroNome.includes(term);
+                    })
+                    .map((rec) => {
+                      const isDeclaracao = rec.categoria === 'declaracao';
+                      const snapshot = (rec.payload_snapshot && typeof rec.payload_snapshot === 'object') ? rec.payload_snapshot as Record<string, any> : {};
+                      const membroNome = snapshot['membro.nome'] || snapshot['membro_nome'] || '';
+                      return (
+                        <div
+                          key={rec.id}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white/90 p-4 shadow-sm hover:border-teal-200 transition"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                  isDeclaracao
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                }`}
+                              >
+                                {isDeclaracao ? '📄 Declaração' : '📜 Carta'}
+                              </span>
+                              <p className="text-sm font-semibold text-gray-800">
+                                {rec.template_title || rec.template_key || (isDeclaracao ? 'Declaração' : 'Carta')}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                              {membroNome && (
+                                <span>
+                                  <strong>Membro:</strong> {membroNome}
+                                </span>
+                              )}
+                              <span>
+                                <strong>Emitido em:</strong>{' '}
+                                {rec.issued_at ? new Date(rec.issued_at).toLocaleDateString('pt-BR') : '-'}
+                              </span>
+                              {rec.status && (
+                                <span className="capitalize">
+                                  <strong>Status:</strong> {rec.status}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handlePrintHtml(rec.rendered_html || previewHtml)}
+                            className="rounded-lg bg-gray-100 px-3.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-teal-50 hover:text-teal-700 border border-gray-200 transition flex items-center gap-1.5"
+                          >
+                            <span>🖨️</span>
+                            <span>Reimprimir</span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  {!records.filter((rec) => {
+                    const matchesCat =
+                      historicoCategoria === 'todas' ||
+                      (rec.categoria || 'carta') === historicoCategoria;
+                    if (!matchesCat) return false;
+                    if (!historicoBusca.trim()) return true;
+                    const term = historicoBusca.toLowerCase();
+                    const title = (rec.template_title || rec.template_key || '').toLowerCase();
+                    const membroNome = String((rec.payload_snapshot as any)?.['membro.nome'] || '').toLowerCase();
+                    return title.includes(term) || membroNome.includes(term);
+                  }).length && (
+                    <div className="py-8 text-center text-sm text-gray-500 space-y-1">
+                      <p>Nenhum documento emitido encontrado com os filtros atuais.</p>
                     </div>
-                    <button
-                      onClick={() => handlePrintHtml(rec.rendered_html || previewHtml)}
-                      className="rounded-lg bg-gray-100 px-3 py-1 text-sm hover:bg-gray-200"
-                    >
-                      Reimprimir
-                    </button>
-                  </div>
-                ))}
-                {!records.length && (
-                  <p className="text-sm text-gray-500">Nenhuma carta emitida ainda.</p>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </Section>
@@ -2762,7 +3017,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4 border border-gray-100 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
-                <span>🧩</span> Criar Novo Modelo de Carta
+                <span>🧩</span> Criar Novo Modelo de Documento
               </h3>
               <button
                 type="button"
@@ -2771,6 +3026,45 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
               >
                 ✕
               </button>
+            </div>
+
+            {/* Seletor de Categoria do Novo Modelo */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                Categoria do Documento
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDraftCategoria('carta')}
+                  className={`p-3 rounded-xl border text-left transition flex items-start gap-2.5 ${
+                    draftCategoria === 'carta'
+                      ? 'border-blue-500 bg-blue-50/70 text-blue-900 ring-2 ring-blue-500/20'
+                      : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  <span className="text-lg">📜</span>
+                  <div>
+                    <p className="text-xs font-bold">Carta</p>
+                    <p className="text-[11px] text-gray-500">Recomendação, mudança, etc.</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraftCategoria('declaracao')}
+                  className={`p-3 rounded-xl border text-left transition flex items-start gap-2.5 ${
+                    draftCategoria === 'declaracao'
+                      ? 'border-emerald-500 bg-emerald-50/70 text-emerald-900 ring-2 ring-emerald-500/20'
+                      : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  <span className="text-lg">📄</span>
+                  <div>
+                    <p className="text-xs font-bold">Declaração</p>
+                    <p className="text-[11px] text-gray-500">Membro ativo, batismo, cargo</p>
+                  </div>
+                </button>
+              </div>
             </div>
 
             <div>
@@ -2789,7 +3083,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                   }
                 }}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                placeholder="Ex: Carta de Mudança de Membro"
+                placeholder={draftCategoria === 'declaracao' ? 'Ex: Declaração de Membro Ativo' : 'Ex: Carta de Mudança de Membro'}
               />
             </div>
 

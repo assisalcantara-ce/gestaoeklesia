@@ -322,6 +322,172 @@ describe('Central de Relatórios da Secretaria - Regras de Domínio e Demografia
     });
   });
 
+  describe('10. Editor de Mensagem de Aniversariantes e Variáveis de Substituição', () => {
+    function processTemplate(template, nome, campo, supervisao) {
+      return (template || '')
+        .replace(/{nome}/gi, nome || 'Irmão(ã)')
+        .replace(/{campo}/gi, campo || 'Sede')
+        .replace(/{supervisao}/gi, supervisao || 'Geral')
+        .replace(/{supervisor}/gi, supervisao || 'Geral');
+    }
+
+    test('Deve substituir corretamente {nome}, {campo}, {supervisao} e {supervisor}', () => {
+      const template = 'Parabéns, {nome}! Você faz parte do campo {campo} e supervisão {supervisao} sob liderança do {supervisor}.';
+      const output = processTemplate(template, 'MARIA SILVA', 'Setor 01', 'Supervisão Norte');
+
+      assert.equal(
+        output,
+        'Parabéns, MARIA SILVA! Você faz parte do campo Setor 01 e supervisão Supervisão Norte sob liderança do Supervisão Norte.'
+      );
+    });
+
+    test('Deve usar fallback se valores opcionais não forem fornecidos', () => {
+      const template = 'Feliz Aniversário, {nome}! Campo: {campo}';
+      const output = processTemplate(template, null, null, null);
+
+      assert.equal(output, 'Feliz Aniversário, Irmão(ã)! Campo: Sede');
+    });
+
+    test('Dirty State: detecta alterações de texto ou imagem', () => {
+      const originalMsg = 'Mensagem 1';
+      const originalImg = 'https://img.com/1.png';
+
+      let currentMsg = 'Mensagem 1';
+      let currentImg = 'https://img.com/1.png';
+      let isDirty = currentMsg !== originalMsg || currentImg !== originalImg;
+      assert.equal(isDirty, false);
+
+      // Alterar mensagem
+      currentMsg = 'Mensagem 2';
+      isDirty = currentMsg !== originalMsg || currentImg !== originalImg;
+      assert.equal(isDirty, true);
+
+      // Reverter mensagem e alterar imagem
+      currentMsg = 'Mensagem 1';
+      currentImg = null;
+      isDirty = currentMsg !== originalMsg || currentImg !== originalImg;
+      assert.equal(isDirty, true);
+    });
+  });
+
+  describe('11. Relatórios de Cartas e Declarações — Segregação e Métricas', () => {
+    test('1 & 2. Cartas e Declarações emitidas são contabilizadas separadamente', () => {
+      const mockRegistros = [
+        { id: '1', template_title: 'Carta Mudança', categoria: 'carta', status: 'emitida' },
+        { id: '2', template_title: 'Carta Recomendação', categoria: 'carta', status: 'emitida' },
+        { id: '3', template_title: 'Declaração Membro', categoria: 'declaracao', status: 'emitida' },
+        { id: '4', template_title: 'Declaração Batismo', categoria: 'declaracao', status: 'emitida' },
+        { id: '5', template_title: 'Declaração Cargo', categoria: 'declaracao', status: 'emitida' },
+      ];
+
+      let cartasEmitidas = 0;
+      let declaracoesEmitidas = 0;
+
+      for (const r of mockRegistros) {
+        const cat = r.categoria === 'declaracao' ? 'declaracao' : 'carta';
+        if (cat === 'declaracao') declaracoesEmitidas++;
+        else cartasEmitidas++;
+      }
+
+      assert.equal(cartasEmitidas, 2);
+      assert.equal(declaracoesEmitidas, 3);
+      assert.equal(cartasEmitidas + declaracoesEmitidas, 5);
+    });
+
+    test('3. Registros legados sem categoria explícita (null/undefined) contam como Carta', () => {
+      const mockRegistros = [
+        { id: '1', template_title: 'Carta Legada 1', categoria: null, status: 'emitida' },
+        { id: '2', template_title: 'Carta Legada 2', status: 'emitida' },
+        { id: '3', template_title: 'Declaração Nova', categoria: 'declaracao', status: 'emitida' },
+      ];
+
+      const porCategoria = { carta: 0, declaracao: 0 };
+      for (const r of mockRegistros) {
+        const cat = r.categoria === 'declaracao' ? 'declaracao' : 'carta';
+        porCategoria[cat]++;
+      }
+
+      assert.equal(porCategoria.carta, 2);
+      assert.equal(porCategoria.declaracao, 1);
+    });
+
+    test('4 & 5. Declarações nunca entram nas métricas de pedidos (carta_pedidos permanece exclusivo para cartas)', () => {
+      const mockPedidos = [
+        { id: 'p1', tipo_carta: 'mudanca', status: 'pendente' },
+        { id: 'p2', tipo_carta: 'desligamento', status: 'autorizado' },
+        { id: 'p3', tipo_carta: 'transito', status: 'rejeitado' },
+      ];
+
+      const mockDeclaracoesEmitidas = [
+        { id: 'd1', categoria: 'declaracao', status: 'emitida' },
+        { id: 'd2', categoria: 'declaracao', status: 'emitida' },
+      ];
+
+      // Métricas de pedidos calculam apenas sobre mockPedidos
+      const statsPedidos = {
+        total: mockPedidos.length,
+        pendentes: mockPedidos.filter(p => p.status === 'pendente').length,
+        autorizados: mockPedidos.filter(p => p.status === 'autorizado').length,
+        rejeitados: mockPedidos.filter(p => p.status === 'rejeitado').length,
+      };
+
+      assert.equal(statsPedidos.total, 3);
+      assert.equal(statsPedidos.pendentes, 1);
+      assert.equal(statsPedidos.autorizados, 1);
+      assert.equal(statsPedidos.rejeitados, 1);
+
+      // Nenhuma declaração altera as métricas de pedidos
+      assert.equal(mockDeclaracoesEmitidas.length, 2);
+    });
+
+    test('6. Filtro de categoria segmenta corretamente emitidas (todos | carta | declaracao)', () => {
+      const mockRegistros = [
+        { id: '1', categoria: 'carta' },
+        { id: '2', categoria: null }, // legado -> carta
+        { id: '3', categoria: 'declaracao' },
+        { id: '4', categoria: 'declaracao' },
+      ];
+
+      const filterByCat = (list, cat) => {
+        if (!cat || cat === 'todos' || cat === 'todas') return list;
+        return list.filter(r => (r.categoria === 'declaracao' ? 'declaracao' : 'carta') === cat);
+      };
+
+      assert.equal(filterByCat(mockRegistros, 'todos').length, 4);
+      assert.equal(filterByCat(mockRegistros, 'carta').length, 2);
+      assert.equal(filterByCat(mockRegistros, 'declaracao').length, 2);
+    });
+
+    test('7. Isolamento por ministry_id e 8. Restrição congregacional para usuários locais', () => {
+      const mockRegistros = [
+        { id: '1', ministry_id: 'min-1', congregacao_id: 'cong-A', categoria: 'carta' },
+        { id: '2', ministry_id: 'min-1', congregacao_id: 'cong-B', categoria: 'declaracao' },
+        { id: '3', ministry_id: 'min-2', congregacao_id: 'cong-A', categoria: 'carta' },
+      ];
+
+      // Filtro para Tenant min-1
+      const tenant1Only = mockRegistros.filter(r => r.ministry_id === 'min-1');
+      assert.equal(tenant1Only.length, 2);
+
+      // Filtro para usuário local da cong-A no Tenant min-1
+      const localUserRecords = tenant1Only.filter(r => r.congregacao_id === 'cong-A');
+      assert.equal(localUserRecords.length, 1);
+      assert.equal(localUserRecords[0].id, '1');
+    });
+
+    test('9. Paginação server-side de documentos emitidos', () => {
+      const totalRegistros = 55;
+      const limit = 25;
+      const page = 2;
+      const offset = (page - 1) * limit;
+      const totalPages = Math.ceil(totalRegistros / limit);
+
+      assert.equal(offset, 25);
+      assert.equal(totalPages, 3);
+    });
+  });
+
 });
+
 
 

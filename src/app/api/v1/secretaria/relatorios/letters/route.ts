@@ -1,11 +1,12 @@
 /**
- * API ROUTE: Consulta Paginada de Cartas Ministeriais para a Central de Relatórios
+ * API ROUTE: Consulta Paginada de Cartas e Declarações para a Central de Relatórios
  * GET /api/v1/secretaria/relatorios/letters
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
 import { isLocalNivel } from '@/lib/access-control';
+import { SecretaryReportsService } from '@/services/secretary-reports-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const tipoConsulta = searchParams.get('tipoConsulta') || 'pedidos'; // 'pedidos' ou 'emitidas'
+  const categoria = searchParams.get('categoria'); // 'todos' | 'carta' | 'declaracao'
   const status = searchParams.get('status');
   const tipoCarta = searchParams.get('tipoCarta');
   const requestedCongregacaoId = searchParams.get('congregacao_id');
@@ -40,11 +42,26 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const service = new SecretaryReportsService(admin);
+    const stats = await service.getLettersStats(ministryId, effectiveCongregacaoId);
+
     if (tipoConsulta === 'emitidas') {
       let query = admin
         .from('cartas_registros')
-        .select('id, template_title, template_key, status, issued_at, created_at, member_id, members(name, congregacoes(nome))', { count: 'exact' })
+        .select('id, template_title, template_key, categoria, status, issued_by, issued_at, created_at, member_id, members(name, congregacoes(nome))', { count: 'exact' })
         .eq('ministry_id', ministryId);
+
+      if (effectiveCongregacaoId) {
+        query = query.eq('members.congregacao_id', effectiveCongregacaoId);
+      }
+
+      if (categoria && categoria !== 'todos' && categoria !== 'todas') {
+        if (categoria === 'declaracao') {
+          query = query.eq('categoria', 'declaracao');
+        } else if (categoria === 'carta') {
+          query = query.or('categoria.eq.carta,categoria.is.null');
+        }
+      }
 
       if (status && status !== 'todos') {
         query = query.eq('status', status);
@@ -58,9 +75,11 @@ export async function GET(request: NextRequest) {
 
       const items = (data || []).map((r: any) => ({
         id: r.id,
-        template_title: r.template_title || 'Carta Ministerial',
+        template_title: r.template_title || (r.categoria === 'declaracao' ? 'Declaração Oficial' : 'Carta Ministerial'),
         template_key: r.template_key,
-        status: r.status,
+        categoria: r.categoria === 'declaracao' ? 'declaracao' : 'carta',
+        status: r.status || 'emitida',
+        issued_by: r.issued_by || null,
         issued_at: r.issued_at || r.created_at,
         membro_nome: r.members?.name || 'Não identificado',
         congregacao_nome: r.members?.congregacoes?.nome || null,
@@ -70,13 +89,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: items,
+        stats,
         page,
         limit,
         total,
         totalPages: Math.ceil(total / limit) || 1,
       });
     } else {
-      // Pedidos de Cartas
+      // Pedidos de Cartas (exclusivo para cartas_pedidos)
       let query = admin
         .from('carta_pedidos')
         .select('id, solicitante_nome, membro_nome, membro_cargo, tipo_carta, destino, observacoes, status, autorizador_nome, data_autorizacao, motivo_rejeicao, created_at, congregacoes(nome)', { count: 'exact' })
@@ -115,6 +135,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: items,
+        stats,
         page,
         limit,
         total,
@@ -123,7 +144,7 @@ export async function GET(request: NextRequest) {
     }
   } catch (error: any) {
     return NextResponse.json(
-      { success: false, error: error.message || 'Erro ao consultar cartas ministeriais.' },
+      { success: false, error: error.message || 'Erro ao consultar cartas e declarações.' },
       { status: 500 }
     );
   }

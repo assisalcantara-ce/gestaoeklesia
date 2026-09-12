@@ -52,7 +52,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
       { id: 'apresentacao-criancas', label: 'Apresentação de Crianças', icon: '🧒', path: '/secretaria/apresentacao-criancas', modulo: 'secretaria_local', featureFlag: 'kids_module', planFeature: 'has_modulo_kids' },
       { id: 'batismo-aguas', label: 'Batismo nas Águas', icon: '✝️', path: '/secretaria/batismo-aguas', modulo: 'secretaria_local' },
       { id: 'casamento', label: 'Casamento', icon: '💍', path: '/secretaria/casamento', modulo: 'gestao' },
-      { id: 'cartas', label: 'Cartas ministeriais', icon: '📜', path: '/secretaria/cartas', modulo: 'gestao' },
+      { id: 'cartas', label: 'Cartas e Declarações', icon: '📜', path: '/secretaria/cartas', modulo: 'gestao' },
       { id: 'cartas-pedidos', label: 'Pedidos de Cartas', icon: '✉️', path: '/secretaria/cartas/pedidos', modulo: 'secretaria_local' },
       { id: 'relatorios-secretaria', label: 'Relatórios', icon: '📋', path: '/secretaria/relatorios', modulo: 'gestao' },
       { id: 'funcionarios', label: 'Funcionários', icon: '👔', path: '/secretaria/funcionarios', modulo: 'gestao', featureFlag: 'employees_module', planFeature: 'has_modulo_funcionarios' },

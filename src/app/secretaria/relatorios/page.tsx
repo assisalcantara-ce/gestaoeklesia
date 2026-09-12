@@ -44,7 +44,7 @@ const TABS: { id: TabId; label: string; icon: any }[] = [
   { id: 'membros', label: 'Membros & Demografia', icon: Users },
   { id: 'crescimento', label: 'Crescimento & Movimentação', icon: TrendingUp },
   { id: 'aniversariantes', label: 'Aniversariantes', icon: Cake },
-  { id: 'cartas', label: 'Cartas Ministeriais', icon: MailCheck },
+  { id: 'cartas', label: 'Cartas e Declarações', icon: MailCheck },
   { id: 'batismos', label: 'Batismos & Atos', icon: Cross },
   { id: 'personalizados', label: 'Relatórios Personalizados', icon: SlidersHorizontal },
 ];

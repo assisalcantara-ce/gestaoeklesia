@@ -65,6 +65,8 @@ export async function GET(request: NextRequest) {
       website: ministryData?.website || '',
       descricao: ministryData?.description || '',
       responsavel: churchProfile.responsavel || CONFIGURACAO_PADRAO.responsavel || '',
+      mensagem_aniversario: churchProfile.mensagem_aniversario || '',
+      imagem_aniversario: churchProfile.imagem_aniversario || null,
       dataCadastro: ministryData?.created_at ? new Date(ministryData.created_at).toISOString().split('T')[0] : '',
       logo: ministryData?.logo_url || '',
     };
@@ -98,7 +100,19 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Body JSON inválido.' }, { status: 400 });
     }
 
-    const { nome, email, cnpj, telefone, website, descricao, logo, endereco, responsavel } = body || {};
+    const {
+      nome,
+      email,
+      cnpj,
+      telefone,
+      website,
+      descricao,
+      logo,
+      endereco,
+      responsavel,
+      mensagem_aniversario,
+      imagem_aniversario,
+    } = body || {};
 
     // 1. Atualizar tabela ministries com service_role (ctx.admin)
     const updateMinistry: Record<string, any> = {};
@@ -123,7 +137,13 @@ export async function PUT(request: NextRequest) {
     }
 
     // 2. Atualizar tabela configurations com service_role (ctx.admin)
-    if (typeof endereco === 'string' || typeof responsavel === 'string') {
+    const hasConfigChanges =
+      typeof endereco === 'string' ||
+      typeof responsavel === 'string' ||
+      typeof mensagem_aniversario === 'string' ||
+      imagem_aniversario !== undefined;
+
+    if (hasConfigChanges) {
       const { data: configRow } = await ctx.admin
         .from('configurations')
         .select('church_profile')
@@ -135,6 +155,8 @@ export async function PUT(request: NextRequest) {
         ...existingProfile,
         ...(typeof endereco === 'string' ? { endereco } : {}),
         ...(typeof responsavel === 'string' ? { responsavel } : {}),
+        ...(typeof mensagem_aniversario === 'string' ? { mensagem_aniversario } : {}),
+        ...(imagem_aniversario !== undefined ? { imagem_aniversario } : {}),
       };
 
       const { error: upsertErr } = await ctx.admin

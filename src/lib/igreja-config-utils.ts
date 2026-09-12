@@ -17,6 +17,8 @@ export interface ConfiguracaoIgreja {
     responsavel?: string;
     dataCadastro?: string;
     logo: string; // Base64 da imagem
+    mensagem_aniversario?: string;
+    imagem_aniversario?: string | null;
 }
 
 // Configuração padrão
@@ -29,7 +31,9 @@ const CONFIGURACAO_PADRAO: ConfiguracaoIgreja = {
     website: '',
     descricao: '',
     responsavel: '',
-    logo: ''
+    logo: '',
+    mensagem_aniversario: '',
+    imagem_aniversario: null,
 };
 
 /**

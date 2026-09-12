@@ -131,6 +131,75 @@ export type Member = {
   updated_at: string
 }
 
+export type TemplateCategoria = 'carta' | 'declaracao'
+export type TemplateTipo = 'mudanca' | 'transito' | 'desligamento' | 'recomendacao' | 'membro_ativo' | 'batismo' | 'cargo' | 'apresentacao_crianca' | 'custom'
+export type TemplateScope = 'system' | 'tenant'
+
+export type CartaCanvasElement = {
+  id: string
+  tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha' | 'forma'
+  x: number
+  y: number
+  largura: number
+  altura: number
+  fontSize?: number
+  cor?: string
+  backgroundColor?: string
+  borderColor?: string
+  borderWidth?: number
+  borderStyle?: 'solid' | 'dashed' | 'dotted'
+  fonte?: string
+  transparencia?: number
+  borderRadius?: number
+  texto?: string
+  alinhamento?: 'left' | 'center' | 'right'
+  negrito?: boolean
+  italico?: boolean
+  sublinhado?: boolean
+  sombreado?: boolean
+  imagemUrl?: string
+  locked?: boolean
+  visivel: boolean
+}
+
+export type CartaCanvasData = {
+  width: number
+  height: number
+  backgroundUrl?: string
+  elements: CartaCanvasElement[]
+}
+
+export type CartaTemplate = {
+  id: string
+  ministry_id: string | null
+  template_key: string
+  title: string
+  tipo: TemplateTipo
+  categoria: TemplateCategoria
+  scope: TemplateScope
+  content_json: any
+  is_active: boolean
+  updated_at?: string | null
+  created_at?: string
+}
+
+export type CartaRegistro = {
+  id: string
+  ministry_id: string
+  member_id: string | null
+  template_id: string | null
+  template_key: string | null
+  template_title: string | null
+  categoria: TemplateCategoria
+  status: string
+  rendered_html: string | null
+  issued_by?: string | null
+  issued_at: string | null
+  created_at?: string
+  payload_snapshot: any
+  template_snapshot: any
+}
+
 export type CartaoTemplate = {
   id: string
   ministry_id: string

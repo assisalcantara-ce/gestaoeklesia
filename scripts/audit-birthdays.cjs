@@ -20,31 +20,20 @@ const key = env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(url, key);
 
 async function run() {
-  const { data: ministries } = await supabase.from('ministries').select('id, name');
+  const { data: configs, error } = await supabase
+    .from('configurations')
+    .select('*')
+    .limit(5);
 
-  for (const min of ministries) {
-    const { data: members, count } = await supabase
-      .from('members')
-      .select('id, name, status, role, tipo_cadastro, data_nascimento, congregacao_id', { count: 'exact' })
-      .eq('ministry_id', min.id);
-
-    if (count === 0) continue;
-
-    const monthCountAll = { 1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0,9:0,10:0,11:0,12:0 };
-    (members || []).forEach(m => {
-      if (m.data_nascimento) {
-        const raw = String(m.data_nascimento).trim();
-        let mes = 0;
-        if (raw.includes('-')) mes = parseInt(raw.split('-')[1], 10);
-        else if (raw.includes('/')) mes = parseInt(raw.split('/')[1], 10);
-        if (mes >= 1 && mes <= 12) {
-          monthCountAll[mes]++;
-        }
-      }
+  if (error) {
+    console.error('Erro configurations:', error);
+  } else {
+    console.log('CONFIGURATIONS ENCONTRADAS:');
+    configs.forEach(c => {
+      console.log('Ministry ID:', c.ministry_id);
+      console.log('Keys:', Object.keys(c));
+      console.log('Row:', JSON.stringify(c, null, 2));
     });
-
-    console.log(`\nMINISTRY: "${min.name}" | ID: ${min.id} | Total: ${count}`);
-    console.log('DISTRIBUIÇÃO:', JSON.stringify(monthCountAll));
   }
 }
 
