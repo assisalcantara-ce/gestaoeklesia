@@ -34,12 +34,16 @@ import {
   ChevronUp,
   Copy,
   Eraser,
+  FileCheck,
   Image,
   Italic,
   Lock,
   Minus,
   Paintbrush,
+  Plus,
+  Printer,
   RotateCcw,
+  Save,
   Shield,
   Square,
   Trash2,
@@ -336,6 +340,7 @@ export default function CartasPage() {
   const [isEditingVisual, setIsEditingVisual] = useState(false);
   const [activeSidebarTab, setActiveSidebarTab] = useState<'elementos' | 'variaveis' | 'camadas'>('elementos');
   const lastSelectedTemplateRef = useRef<CartaTemplate | null>(null);
+  const lastSavedSnapshotRef = useRef<string>('');
   const [canvasContent, setCanvasContent] = useState<CartaCanvasData>(() => createDefaultCanvas());
   const [categoriaFilter, setCategoriaFilter] = useState<'todas' | 'carta' | 'declaracao'>('todas');
   const [emitirCategoria, setEmitirCategoria] = useState<'todas' | 'carta' | 'declaracao'>('todas');
@@ -368,6 +373,19 @@ export default function CartasPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
   const [copiedJson, setCopiedJson] = useState(false);
+
+  // Verificação de alterações não salvas no modelo ativo
+  const currentSnapshot = useMemo(() => {
+    return JSON.stringify({
+      title: draftTitle,
+      canvas: canvasContent,
+    });
+  }, [draftTitle, canvasContent]);
+
+  const isDirty = useMemo(() => {
+    if (!lastSavedSnapshotRef.current) return false;
+    return currentSnapshot !== lastSavedSnapshotRef.current;
+  }, [currentSnapshot]);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -1050,9 +1068,14 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
     setCanvasContent(canvas);
     setSelectedCanvasElement(null);
     setSelectedCanvasElements([]);
-    setDraftTitle(selectedTemplate.title || '');
+    const title = selectedTemplate.title || '';
+    setDraftTitle(title);
     setDraftKey(selectedTemplate.template_key || '');
     setDraftTipo(selectedTemplate.tipo || 'custom');
+    lastSavedSnapshotRef.current = JSON.stringify({
+      title,
+      canvas,
+    });
   }, [selectedTemplate?.id, selectedTemplate?.template_key, selectedTemplate?.content_json]);
 
   const handleSelectTemplate = (template: CartaTemplate) => {
@@ -1096,12 +1119,17 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
       return;
     }
     const key = normalizeTemplateKey(draftTitle);
+    const newCanvas = createDefaultCanvas();
     setDraftKey(key);
     setSelectedTemplate(null);
     setIsDraftReady(true);
-    setCanvasContent(createDefaultCanvas());
+    setCanvasContent(newCanvas);
     setSelectedCanvasElement(null);
     setSelectedCanvasElements([]);
+    lastSavedSnapshotRef.current = JSON.stringify({
+      title: draftTitle,
+      canvas: newCanvas,
+    });
     setShowNewModal(false);
     setIsEditingVisual(true);
   };
@@ -1198,6 +1226,11 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         : await supabase.from('cartas_templates').insert(payload);
 
       if (error) throw error;
+
+      lastSavedSnapshotRef.current = JSON.stringify({
+        title: draftTitle,
+        canvas: canvasContent,
+      });
 
       setNotification({
         isOpen: true,
@@ -1699,19 +1732,35 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
             <Tabs tabs={visibleTabs} activeTab={activeTab} onTabChange={setActiveTab}>
         {activeTab === 'modelos' && (
           <Section icon="🧩" title="Modelos de Documentos">
-            {/* Filtros por Categoria e Seletor de Modelo Superior */}
+            {/* Cabeçalho da Seção de Modelos com Botão de Novo Modelo */}
             <div className="mb-6 space-y-4">
-              {/* Barra de Filtros de Categoria */}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/85 p-3 shadow-sm backdrop-blur">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wider mr-2">Filtrar:</span>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-gray-100">
+                <div>
+                  <h3 className="text-base font-bold text-gray-800">Modelos de Documentos</h3>
+                  <p className="text-xs text-gray-500">
+                    Gerencie os modelos de cartas ministeriais e declarações oficiais do ministério.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleNewTemplate}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition shadow-sm self-start sm:self-auto"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Novo Modelo</span>
+                </button>
+              </div>
+
+              {/* Segmented Control de Categoria */}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50/80 p-1.5">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => setCategoriaFilter('todas')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
                       categoriaFilter === 'todas'
-                        ? 'bg-teal-600 text-white shadow-sm'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? 'bg-white text-teal-800 shadow-sm border border-gray-200'
+                        : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
                     Todos ({templates.length})
@@ -1719,10 +1768,10 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                   <button
                     type="button"
                     onClick={() => setCategoriaFilter('carta')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
                       categoriaFilter === 'carta'
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                        ? 'bg-white text-blue-800 shadow-sm border border-blue-200'
+                        : 'text-gray-600 hover:text-blue-800'
                     }`}
                   >
                     <span>📜</span>
@@ -1731,35 +1780,51 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                   <button
                     type="button"
                     onClick={() => setCategoriaFilter('declaracao')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
                       categoriaFilter === 'declaracao'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        ? 'bg-white text-emerald-800 shadow-sm border border-emerald-200'
+                        : 'text-gray-600 hover:text-emerald-800'
                     }`}
                   >
                     <span>📄</span>
                     <span>Declarações ({templates.filter((t) => t.categoria === 'declaracao').length})</span>
                   </button>
                 </div>
-                <div className="text-xs text-gray-500 font-medium">
+                <div className="text-xs text-gray-500 font-medium px-2">
                   Exibindo {templates.filter((t) => categoriaFilter === 'todas' || (t.categoria || 'carta') === categoriaFilter).length} modelo(s)
                 </div>
               </div>
 
-              {/* Seletor de Modelo Ativo */}
-              <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
-                    <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">Modelo Ativo:</span>
+              {/* Card Institucional: Modelo Selecionado */}
+              <div className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm backdrop-blur">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  {/* Seletor Principal */}
+                  <div className="flex-1 space-y-1.5 min-w-[280px]">
+                    <div className="flex items-center gap-2">
+                      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                        Modelo Ativo
+                      </label>
+                      {selectedTemplate && (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide ${
+                            selectedTemplate.categoria === 'declaracao'
+                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                              : 'bg-blue-50 text-blue-800 border border-blue-200'
+                          }`}
+                        >
+                          {selectedTemplate.categoria === 'declaracao' ? '📄 DECLARAÇÃO OFICIAL' : '📜 CARTA MINISTERIAL'}
+                        </span>
+                      )}
+                    </div>
                     <select
                       value={selectedTemplate?.id || ''}
                       onChange={(e) => {
                         const tpl = templates.find((t) => t.id === e.target.value);
                         if (tpl) handleSelectTemplate(tpl);
                       }}
-                      className="min-w-[220px] flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
                     >
-                      <option value="" disabled>Selecione um modelo</option>
+                      <option value="" disabled>Selecione um modelo para editar</option>
                       {templates
                         .filter((t) => categoriaFilter === 'todas' || (t.categoria || 'carta') === categoriaFilter)
                         .map((tpl) => (
@@ -1768,87 +1833,61 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                           </option>
                         ))}
                     </select>
-                    {selectedTemplate && (
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                          selectedTemplate.categoria === 'declaracao'
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                            : 'bg-blue-100 text-blue-800 border border-blue-200'
-                        }`}
-                      >
-                        {selectedTemplate.categoria === 'declaracao' ? '📄 Declaração' : '📜 Carta'}
-                      </span>
-                    )}
-                    <button
-                      onClick={handleNewTemplate}
-                      className="text-xs px-4 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
-                    >
-                      + Novo Modelo
-                    </button>
                   </div>
-                </div>
 
-                {selectedTemplate && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* Botão de Exclusão para modelos criados pelo Tenant (ou botão de Restaurar para nativos) */}
-                    {DEFAULT_SYSTEM_TEMPLATES.some((s) => s.template_key === selectedTemplate.template_key) ? (
-                      <button
-                        type="button"
-                        onClick={() => handleRestoreNativeTemplate(selectedTemplate.template_key)}
-                        disabled={isSaving}
-                        className="text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-sm bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-300"
-                        title="Restaurar este modelo para o padrão nativo original do sistema"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
-                        <span>Restaurar modelo nativo</span>
-                      </button>
-                    ) : (
-                      selectedTemplate.scope === 'tenant' && (
+                  {/* Ações Secundárias Agrupadas */}
+                  {selectedTemplate && (
+                    <div className="flex flex-wrap items-center gap-2 self-end lg:self-center">
+                      {DEFAULT_SYSTEM_TEMPLATES.some((s) => s.template_key === selectedTemplate.template_key) ? (
                         <button
                           type="button"
-                          onClick={() => handleDeleteTenantTemplate(selectedTemplate.id, selectedTemplate.title)}
+                          onClick={() => handleRestoreNativeTemplate(selectedTemplate.template_key)}
                           disabled={isSaving}
-                          className="text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-sm bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
-                          title="Excluir este modelo permanentemente"
+                          className="text-xs px-3 py-2 rounded-xl font-medium transition flex items-center gap-1.5 bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200"
+                          title="Restaurar este modelo para o padrão nativo do sistema"
                         >
-                          <Trash2 className="h-3.5 w-3.5 text-red-600" />
-                          <span>Excluir modelo</span>
+                          <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
+                          <span>Restaurar Nativo</span>
                         </button>
-                      )
-                    )}
+                      ) : (
+                        selectedTemplate.scope === 'tenant' && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTenantTemplate(selectedTemplate.id, selectedTemplate.title)}
+                            disabled={isSaving}
+                            className="text-xs px-3 py-2 rounded-xl font-medium transition flex items-center gap-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                            title="Excluir este modelo"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                            <span>Excluir</span>
+                          </button>
+                        )
+                      )}
 
-                    <button
-                      onClick={() => {
-                        const jsonStructure = {
-                          template_key: selectedTemplate.template_key || draftKey,
-                          title: selectedTemplate.title || draftTitle,
-                          tipo: selectedTemplate.tipo || draftTipo || 'custom',
-                          scope: selectedTemplate.scope || 'tenant',
-                          content_json: serializeCanvasContent(canvasContent),
-                        };
-                        const formattedJson = JSON.stringify(jsonStructure, null, 2);
-                        navigator.clipboard.writeText(formattedJson);
-                        setCopiedJson(true);
-                        setTimeout(() => setCopiedJson(false), 2500);
-                      }}
-                      className="text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-sm bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
-                      title="Copiar JSON estruturado do modelo para clipboard"
-                    >
-                      <span>{copiedJson ? '✅ JSON Copiado!' : '📋 Copiar JSON'}</span>
-                    </button>
-
-                    <button
-                      onClick={() => setIsEditingVisual(!isEditingVisual)}
-                      className={`text-xs px-4 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-sm ${
-                        isEditingVisual
-                          ? 'bg-teal-100 text-teal-800 border border-teal-300'
-                          : 'bg-teal-600 text-white hover:bg-teal-700'
-                      }`}
-                    >
-                      <span>{isEditingVisual ? '✏️ Modo Edição Visual (Ativo)' : '✏️ Abrir Editor Visual'}</span>
-                    </button>
-                  </div>
-                )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const jsonStructure = {
+                            template_key: selectedTemplate.template_key || draftKey,
+                            title: selectedTemplate.title || draftTitle,
+                            tipo: selectedTemplate.tipo || draftTipo || 'custom',
+                            scope: selectedTemplate.scope || 'tenant',
+                            content_json: serializeCanvasContent(canvasContent),
+                          };
+                          const formattedJson = JSON.stringify(jsonStructure, null, 2);
+                          navigator.clipboard.writeText(formattedJson);
+                          setCopiedJson(true);
+                          setTimeout(() => setCopiedJson(false), 2500);
+                        }}
+                        className="text-xs px-3 py-2 rounded-xl font-medium transition flex items-center gap-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
+                        title="Copiar JSON do modelo para área de transferência"
+                      >
+                        <Copy className="h-3.5 w-3.5 text-gray-500" />
+                        <span>{copiedJson ? 'Copiado!' : 'Copiar JSON'}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2637,28 +2676,47 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
 
                 </div>
 
-                {/* Botões de Ação Inferiores */}
-                <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-gray-200">
-                  {selectedTemplate && DEFAULT_SYSTEM_TEMPLATES.some((s) => s.template_key === selectedTemplate.template_key) && (
-                    <button
-                      onClick={() => handleRestoreNativeTemplate(selectedTemplate.template_key)}
-                      className="px-4 py-2 rounded-lg border border-amber-300 bg-amber-50 text-xs font-bold text-amber-800 hover:bg-amber-100 transition flex items-center gap-1.5"
+                {/* Barra Institucional de Salvamento com Status */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl border border-gray-200 bg-white/95 shadow-sm backdrop-blur">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                        isDirty
+                          ? 'bg-amber-50 text-amber-800 border border-amber-300'
+                          : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      }`}
                     >
-                      <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
-                      <span>Restaurar Padrão Nativo</span>
+                      <span className={`w-2 h-2 rounded-full ${isDirty ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                      {isDirty ? 'Alterações não salvas' : 'Modelo atualizado'}
+                    </span>
+                    {selectedTemplate?.scope === 'system' && (
+                      <span className="text-[11px] text-gray-500 font-medium">
+                        (Modelo nativo — salvar criará sua versão personalizada)
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveTemplate}
+                      disabled={isSaving || (!isDirty && !isDraftReady)}
+                      className={`px-6 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm ${
+                        isSaving || (!isDirty && !isDraftReady)
+                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300'
+                          : 'bg-teal-600 hover:bg-teal-700 text-white shadow-md'
+                      }`}
+                    >
+                      <Save className="h-4 w-4" />
+                      <span>
+                        {isSaving
+                          ? 'Salvando Modelo...'
+                          : selectedTemplate?.scope === 'system'
+                          ? 'Salvar como Modelo Personalizado'
+                          : 'Salvar Modelo'}
+                      </span>
                     </button>
-                  )}
-                  <button
-                    onClick={handleSaveTemplate}
-                    className="px-6 py-2.5 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 shadow-md transition"
-                    disabled={isSaving || (!selectedTemplate && !isDraftReady)}
-                  >
-                    {isSaving
-                      ? 'Salvando...'
-                      : selectedTemplate?.scope === 'system'
-                      ? 'Salvar como Modelo Personalizado'
-                      : 'Salvar Alterações do Modelo'}
-                  </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -2695,19 +2753,28 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
 
         {activeTab === 'emitir' && (
           <Section icon="📄" title="Emitir Documento">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-4 space-y-4">
-                <div className="rounded-2xl border border-white/70 bg-white/85 p-5 shadow-xl/10 space-y-4 backdrop-blur">
-                  {/* Seletor Rápido de Categoria para Emissão */}
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600 block mb-1">Tipo de Documento</label>
-                    <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-100 rounded-lg">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Formulário Guiado em Passos (Coluna Esquerda) */}
+              <div className="lg:col-span-5 space-y-4">
+                <div className="rounded-2xl border border-white/80 bg-white/90 p-5 shadow-sm space-y-5 backdrop-blur">
+                  
+                  {/* Passo 1: Tipo de Documento */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-100 text-[11px] font-bold text-teal-800">
+                        1
+                      </span>
+                      <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        Tipo de Documento
+                      </label>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-100 rounded-xl">
                       <button
                         type="button"
                         onClick={() => setEmitirCategoria('todas')}
-                        className={`py-1.5 text-xs font-bold rounded-md transition ${
+                        className={`py-2 text-xs font-bold rounded-lg transition ${
                           emitirCategoria === 'todas'
-                            ? 'bg-white text-teal-700 shadow-sm'
+                            ? 'bg-white text-teal-800 shadow-sm'
                             : 'text-gray-600 hover:text-gray-900'
                         }`}
                       >
@@ -2716,37 +2783,47 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                       <button
                         type="button"
                         onClick={() => setEmitirCategoria('carta')}
-                        className={`py-1.5 text-xs font-bold rounded-md transition flex items-center justify-center gap-1 ${
+                        className={`py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1 ${
                           emitirCategoria === 'carta'
-                            ? 'bg-white text-blue-700 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-900'
+                            ? 'bg-white text-blue-800 shadow-sm'
+                            : 'text-gray-600 hover:text-blue-800'
                         }`}
                       >
-                        <span>📜</span> Cartas
+                        <span>📜</span>
+                        <span>Cartas</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setEmitirCategoria('declaracao')}
-                        className={`py-1.5 text-xs font-bold rounded-md transition flex items-center justify-center gap-1 ${
+                        className={`py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1 ${
                           emitirCategoria === 'declaracao'
-                            ? 'bg-white text-emerald-700 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-900'
+                            ? 'bg-white text-emerald-800 shadow-sm'
+                            : 'text-gray-600 hover:text-emerald-800'
                         }`}
                       >
-                        <span>📄</span> Declarações
+                        <span>📄</span>
+                        <span>Declarações</span>
                       </button>
                     </div>
                   </div>
 
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-semibold text-gray-600">Modelo Selecionado</label>
+                  {/* Passo 2: Seleção do Modelo */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-100 text-[11px] font-bold text-teal-800">
+                          2
+                        </span>
+                        <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Modelo do Documento
+                        </label>
+                      </div>
                       {selectedTemplate && (
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
                             selectedTemplate.categoria === 'declaracao'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-blue-100 text-blue-800'
+                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                              : 'bg-blue-50 text-blue-800 border border-blue-200'
                           }`}
                         >
                           {selectedTemplate.categoria === 'declaracao' ? '📄 Declaração' : '📜 Carta'}
@@ -2759,9 +2836,9 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                         const tpl = templatesFiltrados.find((t) => t.id === e.target.value);
                         if (tpl) handleSelectTemplate(tpl);
                       }}
-                      className="w-full rounded-lg border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
                     >
-                      <option value="" disabled>Selecione o modelo</option>
+                      <option value="" disabled>Selecione o modelo desejado</option>
                       {templatesFiltrados
                         .filter((t) => emitirCategoria === 'todas' || (t.categoria || 'carta') === emitirCategoria)
                         .map((tpl) => (
@@ -2772,92 +2849,166 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                     </select>
                   </div>
 
-                  {/* Aviso para operador sobre cartas que exigem autorização */}
+                  {/* Aviso de Operador Sede (Cartas restritas) */}
                   {isOperador && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                      <p className="text-xs font-semibold text-amber-700 mb-1">Carta de Mudança ou Desligamento?</p>
-                      <p className="text-xs text-amber-600 mb-2">
-                        Essas cartas precisam de autorização da Sede. Envie um pedido e acompanhe o status.
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 space-y-2">
+                      <div className="flex items-center gap-2 text-amber-800">
+                        <span className="text-sm">⚠️</span>
+                        <p className="text-xs font-bold">Carta de Mudança ou Desligamento?</p>
+                      </div>
+                      <p className="text-xs text-amber-700 leading-relaxed">
+                        Essas cartas exigem autorização da Sede. Envie um pedido de carta e acompanhe o fluxo.
                       </p>
                       <button
                         type="button"
                         onClick={() => router.push('/secretaria/cartas/pedidos')}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition shadow-sm"
                       >
-                        <Send size={12} />
-                        Solicitar à Secretaria
+                        <Send className="h-3 w-3" />
+                        <span>Solicitar Carta à Secretaria Geral</span>
                       </button>
                     </div>
                   )}
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600">Membro</label>
+
+                  {/* Passo 3: Selecione o Membro */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-100 text-[11px] font-bold text-teal-800">
+                        3
+                      </span>
+                      <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        Membro Destinatário
+                      </label>
+                    </div>
                     <select
                       value={selectedMemberId}
                       onChange={(e) => setSelectedMemberId(e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-medium text-gray-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
                     >
-                      <option value="">Selecione o membro</option>
+                      <option value="">Selecione o membro...</option>
                       {members.map((m) => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
+                        <option key={m.id} value={m.id}>
+                          {m.name} {m.cargo_ministerial ? `(${m.cargo_ministerial})` : ''}
+                        </option>
                       ))}
                     </select>
+
+                    {/* Resumo do Membro Selecionado */}
+                    {selectedMember && (
+                      <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-2.5 text-xs text-teal-900 flex items-center justify-between">
+                        <div>
+                          <p className="font-bold">{selectedMember.name}</p>
+                          <p className="text-[11px] text-teal-700">
+                            {selectedMember.email || selectedMember.phone || 'Sem contato cadastrado'}
+                          </p>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
+                          {selectedMember.status || 'Ativo'}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600">Destino</label>
-                    <input
-                      value={issueFields.destino}
-                      onChange={(e) => setIssueFields((prev) => ({ ...prev, destino: e.target.value }))}
-                      className="w-full rounded-lg border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
-                      placeholder="Para qual igreja/ministro ou finalidade"
-                    />
+
+                  {/* Passo 4: Informações Adicionais */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-100 text-[11px] font-bold text-teal-800">
+                        4
+                      </span>
+                      <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        Informações do Documento
+                      </label>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-500 block mb-1">
+                        Destino / Finalidade
+                      </label>
+                      <input
+                        value={issueFields.destino}
+                        onChange={(e) => setIssueFields((prev) => ({ ...prev, destino: e.target.value }))}
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+                        placeholder="Ex: Igreja Evangélica Betel / Fins acadêmicos"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-500 block mb-1">
+                        Motivo
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={issueFields.motivo}
+                        onChange={(e) => setIssueFields((prev) => ({ ...prev, motivo: e.target.value }))}
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+                        placeholder="Descreva o motivo ou justificativa"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-500 block mb-1">
+                        Observações Complementares
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={issueFields.observacoes}
+                        onChange={(e) => setIssueFields((prev) => ({ ...prev, observacoes: e.target.value }))}
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+                        placeholder="Observações internas ou adicionais"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600">Motivo</label>
-                    <textarea
-                      value={issueFields.motivo}
-                      onChange={(e) => setIssueFields((prev) => ({ ...prev, motivo: e.target.value }))}
-                      className="w-full min-h-[80px] rounded-lg border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
-                      placeholder="Descreva o motivo"
-                    />
+
+                  {/* Passo 5: Ação de Emissão */}
+                  <div className="pt-2 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={handleIssueLetter}
+                      className="w-full rounded-xl bg-teal-600 px-4 py-3 text-xs font-bold text-white hover:bg-teal-700 shadow-md transition flex items-center justify-center gap-2"
+                      disabled={isIssuing || !selectedTemplate || !selectedMemberId}
+                    >
+                      <FileCheck className="h-4 w-4" />
+                      <span>
+                        {isIssuing
+                          ? 'Emitindo Documento...'
+                          : selectedTemplate?.categoria === 'declaracao'
+                          ? 'Emitir Declaração Oficial'
+                          : 'Emitir Carta Ministerial'}
+                      </span>
+                    </button>
+                    {!selectedMemberId && (
+                      <p className="text-[11px] text-center text-gray-400 mt-1.5">
+                        * Selecione um membro para habilitar a emissão.
+                      </p>
+                    )}
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600">Observações</label>
-                    <textarea
-                      value={issueFields.observacoes}
-                      onChange={(e) => setIssueFields((prev) => ({ ...prev, observacoes: e.target.value }))}
-                      className="w-full min-h-[80px] rounded-lg border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
-                      placeholder="Observações adicionais"
-                    />
-                  </div>
-                  <button
-                    onClick={handleIssueLetter}
-                    className="w-full rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-teal-700 shadow-md transition"
-                    disabled={isIssuing}
-                  >
-                    {isIssuing
-                      ? 'Emitindo...'
-                      : selectedTemplate?.categoria === 'declaracao'
-                      ? 'Emitir Declaração'
-                      : 'Emitir Carta'}
-                  </button>
                 </div>
               </div>
-              <div className="lg:col-span-8">
-                <div className="rounded-2xl border border-white/70 bg-white/85 p-5 shadow-xl/10 backdrop-blur">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-gray-700">Pré-visualização do Documento</h3>
+
+              {/* Pré-visualização do Documento em A4 (Coluna Direita) */}
+              <div className="lg:col-span-7">
+                <div className="rounded-2xl border border-white/80 bg-white/90 p-5 shadow-sm backdrop-blur space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">👁️</span>
+                      <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        Pré-visualização em Tempo Real (A4)
+                      </h3>
+                    </div>
                     <button
+                      type="button"
                       onClick={() => handlePrintHtml(previewHtml)}
-                      className="rounded-lg bg-gray-100 px-3 py-1 text-sm font-medium hover:bg-gray-200 transition flex items-center gap-1.5"
+                      className="rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-teal-50 hover:text-teal-800 transition flex items-center gap-1.5 shadow-sm"
                     >
-                      <span>🖨️</span>
-                      <span>Imprimir</span>
+                      <Printer className="h-3.5 w-3.5 text-gray-600" />
+                      <span>Imprimir / PDF</span>
                     </button>
                   </div>
                   <div
-                    className="min-h-[420px] rounded-xl border border-gray-200 bg-white/95 p-6 shadow-inner overflow-auto"
-                    dangerouslySetInnerHTML={{ __html: previewHtml }}
-                  />
+                    className="min-h-[500px] max-h-[820px] rounded-xl border border-gray-200 bg-gray-100 p-4 shadow-inner overflow-auto flex justify-center"
+                  >
+                    <div
+                      className="bg-white shadow-md"
+                      dangerouslySetInnerHTML={{ __html: previewHtml }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
