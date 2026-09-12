@@ -404,6 +404,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'ID do ministério é obrigatório' }, { status: 400 })
     }
 
+    // 1. Remover eventuais fechamentos de caixa prévios para não disparar trigger fn_bloquear_periodo_fechado
+    await supabase
+      .from('tesouraria_fechamentos')
+      .delete()
+      .eq('ministry_id', id)
+
     const { data, error } = await supabase
       .from('ministries')
       .delete()
