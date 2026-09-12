@@ -10,6 +10,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import type { LettersStats } from '@/services/secretary-reports-service';
+import { authenticatedFetch } from '@/lib/api-client';
 import ReportPrintHeader from './ReportPrintHeader';
 
 interface MinisterialLettersReportTabProps {
@@ -62,7 +63,7 @@ export default function MinisterialLettersReportTab({
       url.searchParams.set('page', String(page));
       url.searchParams.set('limit', String(limit));
 
-      const res = await fetch(url.toString(), { headers: { 'Cache-Control': 'no-cache' } });
+      const res = await authenticatedFetch(url.toString(), { headers: { 'Cache-Control': 'no-cache' } });
       const json = await res.json();
       if (json.success) {
         setItems(json.data || []);

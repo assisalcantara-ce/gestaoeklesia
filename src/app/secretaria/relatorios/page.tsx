@@ -18,6 +18,7 @@ import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useUserContext } from '@/hooks/useUserContext';
 import { createClient } from '@/lib/supabase-client';
+import { authenticatedFetch } from '@/lib/api-client';
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import ExecutiveOverviewTab from '@/components/secretaria/relatorios/ExecutiveOverviewTab';
 import BirthdaysReportTab from '@/components/secretaria/relatorios/BirthdaysReportTab';
@@ -88,7 +89,7 @@ export default function RelatoriosSecretariaPage() {
         url.searchParams.set('congregacao_id', selectedCongregacao);
       }
 
-      const res = await fetch(url.toString(), {
+      const res = await authenticatedFetch(url.toString(), {
         headers: { 'Cache-Control': 'no-cache' },
       });
 

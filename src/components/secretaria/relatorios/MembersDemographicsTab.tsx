@@ -27,6 +27,7 @@ import type {
   DemographicsSummary,
   IncompleteProfileItem,
 } from '@/services/secretary-reports-service';
+import { authenticatedFetch } from '@/lib/api-client';
 import ReportPrintHeader from './ReportPrintHeader';
 
 interface MembersDemographicsTabProps {
@@ -111,7 +112,7 @@ export default function MembersDemographicsTab({
       url.searchParams.set('page', String(membersPage));
       url.searchParams.set('limit', String(membersLimit));
 
-      const res = await fetch(url.toString(), { headers: { 'Cache-Control': 'no-cache' } });
+      const res = await authenticatedFetch(url.toString(), { headers: { 'Cache-Control': 'no-cache' } });
       const json = await res.json();
       if (json.success) {
         setMembersData(json.data || []);
@@ -151,7 +152,7 @@ export default function MembersDemographicsTab({
       url.searchParams.set('page', String(auditPage));
       url.searchParams.set('limit', String(auditLimit));
 
-      const res = await fetch(url.toString(), { headers: { 'Cache-Control': 'no-cache' } });
+      const res = await authenticatedFetch(url.toString(), { headers: { 'Cache-Control': 'no-cache' } });
       const json = await res.json();
       if (json.success) {
         setAuditData(json.data || []);
@@ -184,7 +185,7 @@ export default function MembersDemographicsTab({
       if (faixaEtariaFilter !== 'todos') url.searchParams.set('faixa_etaria', faixaEtariaFilter);
       url.searchParams.set('export', 'true');
 
-      const res = await fetch(url.toString());
+      const res = await authenticatedFetch(url.toString());
       const json = await res.json();
       if (!json.success || !json.data) return;
 

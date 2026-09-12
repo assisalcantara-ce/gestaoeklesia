@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+import { authenticatedFetch } from '@/lib/api-client';
 import ReportPrintHeader from './ReportPrintHeader';
 
 interface CustomReportBuilderTabProps {
@@ -292,7 +293,7 @@ export default function CustomReportBuilderTab({
         params.set('page', String(currentPage));
         params.set('limit', String(currentLimit));
 
-        const res = await fetch(`/api/v1/secretaria/relatorios/members?${params.toString()}`);
+        const res = await authenticatedFetch(`/api/v1/secretaria/relatorios/members?${params.toString()}`);
         const data = await res.json();
 
         if (!res.ok || !data.success) {
@@ -378,7 +379,7 @@ export default function CustomReportBuilderTab({
       if (congregacaoId && congregacaoId !== 'todas') params.set('congregacao_id', congregacaoId);
       params.set('export', 'true');
 
-      const res = await fetch(`/api/v1/secretaria/relatorios/members?${params.toString()}`);
+      const res = await authenticatedFetch(`/api/v1/secretaria/relatorios/members?${params.toString()}`);
       const data = await res.json();
 
       if (!res.ok || !data.success) {
