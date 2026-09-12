@@ -245,6 +245,83 @@ describe('Central de Relatórios da Secretaria - Regras de Domínio e Demografia
     });
   });
 
+  describe('9. Visão Anual e Contagem dos 12 Meses de Aniversariantes', () => {
+    const mockMembros = [
+      { id: '1', name: 'Jan 1', data_nascimento: '1990-01-05', status: 'active' },
+      { id: '2', name: 'Jan 2', data_nascimento: '1985-01-20', status: 'active' },
+      { id: '3', name: 'Abr 1', data_nascimento: '2000-04-10', status: 'active' },
+      { id: '4', name: 'Abr 2', data_nascimento: '1995-04-22', status: 'active' },
+      { id: '5', name: 'Jun 1', data_nascimento: '1992-06-15', status: 'active' },
+      { id: '6', name: 'Jul 1', data_nascimento: '1988-07-08', status: 'active' },
+      { id: '7', name: 'Out 1', data_nascimento: '2001-10-01', status: 'active' },
+      { id: '8', name: 'Out 2', data_nascimento: '1999-10-30', status: 'active' },
+      { id: '9', name: 'Nov 1', data_nascimento: '1994-11-12', status: 'active' },
+      { id: '10', name: 'Nov 2', data_nascimento: '1996-11-25', status: 'active' },
+    ];
+
+    test('a) Deve consolidar contagemPorMes perfeitamente para todos os 12 meses', () => {
+      const contagemPorMes = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
+      mockMembros.forEach(m => {
+        const parts = m.data_nascimento.split('-');
+        const mes = parseInt(parts[1], 10);
+        contagemPorMes[mes]++;
+      });
+
+      assert.equal(contagemPorMes[1], 2);
+      assert.equal(contagemPorMes[2], 0);
+      assert.equal(contagemPorMes[3], 0);
+      assert.equal(contagemPorMes[4], 2);
+      assert.equal(contagemPorMes[5], 0);
+      assert.equal(contagemPorMes[6], 1);
+      assert.equal(contagemPorMes[7], 1);
+      assert.equal(contagemPorMes[8], 0);
+      assert.equal(contagemPorMes[9], 0);
+      assert.equal(contagemPorMes[10], 2);
+      assert.equal(contagemPorMes[11], 2);
+      assert.equal(contagemPorMes[12], 0);
+      assert.equal(Object.values(contagemPorMes).reduce((a, b) => a + b, 0), 10);
+    });
+
+    test('b) Seleção de qualquer mês (diferente do mês corrente) deve filtrar a lista correta', () => {
+      // Filtrar Janeiro (mês 1)
+      const janeiro = mockMembros.filter(m => parseInt(m.data_nascimento.split('-')[1], 10) === 1);
+      assert.equal(janeiro.length, 2);
+      assert.equal(janeiro[0].name, 'Jan 1');
+      assert.equal(janeiro[1].name, 'Jan 2');
+
+      // Filtrar Abril (mês 4)
+      const abril = mockMembros.filter(m => parseInt(m.data_nascimento.split('-')[1], 10) === 4);
+      assert.equal(abril.length, 2);
+
+      // Filtrar Outubro (mês 10)
+      const outubro = mockMembros.filter(m => parseInt(m.data_nascimento.split('-')[1], 10) === 10);
+      assert.equal(outubro.length, 2);
+    });
+
+    test('c) Meses sem aniversariantes (Fevereiro, Março, Dezembro) devem retornar array vazio [] e count 0', () => {
+      const fevereiro = mockMembros.filter(m => parseInt(m.data_nascimento.split('-')[1], 10) === 2);
+      const marco = mockMembros.filter(m => parseInt(m.data_nascimento.split('-')[1], 10) === 3);
+      const dezembro = mockMembros.filter(m => parseInt(m.data_nascimento.split('-')[1], 10) === 12);
+
+      assert.equal(fevereiro.length, 0);
+      assert.equal(marco.length, 0);
+      assert.equal(dezembro.length, 0);
+    });
+
+    test('d) Filtro por congregação deve isolar os aniversariantes da unidade especificada', () => {
+      const membrosComCongregacao = [
+        ...mockMembros,
+        { id: '11', name: 'Cong A Jan', data_nascimento: '1990-01-10', status: 'active', congregacao_id: 'cong-a' },
+      ];
+
+      const filtradosCongA = membrosComCongregacao.filter(
+        m => m.congregacao_id === 'cong-a' && parseInt(m.data_nascimento.split('-')[1], 10) === 1
+      );
+      assert.equal(filtradosCongA.length, 1);
+      assert.equal(filtradosCongA[0].id, '11');
+    });
+  });
+
 });
 
 

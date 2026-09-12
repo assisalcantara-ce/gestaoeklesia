@@ -15,9 +15,13 @@ import ReportPrintHeader from './ReportPrintHeader';
 
 interface BirthdaysReportTabProps {
   initialBirthdays: {
-    hoje: BirthdayItem[];
-    semana: BirthdayItem[];
-    mes: BirthdayItem[];
+    hoje?: BirthdayItem[];
+    semana?: BirthdayItem[];
+    mes?: BirthdayItem[];
+    proximos_30?: BirthdayItem[];
+    todos?: BirthdayItem[];
+    contagemPorMes?: Record<number, number>;
+    totalAnual?: number;
   };
   congregacaoNome?: string | null;
   ministryId: string;
@@ -40,19 +44,37 @@ export default function BirthdaysReportTab({
   const currentMonthNum = now.getMonth() + 1;
   const currentDayNum = now.getDate();
 
+  // Mapa de contagens seguras por mês
+  const contagemPorMes = useMemo(() => {
+    if (initialBirthdays.contagemPorMes) {
+      return initialBirthdays.contagemPorMes;
+    }
+    const counts: Record<number, number> = {
+      1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0,
+      7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0,
+    };
+    const pool = initialBirthdays.todos || initialBirthdays.mes || [];
+    pool.forEach((item) => {
+      if (item.mes >= 1 && item.mes <= 12) {
+        counts[item.mes] = (counts[item.mes] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [initialBirthdays]);
+
   // Lista base filtrada de acordo com a seleção
   const listaBase = useMemo(() => {
     if (tipoFiltro === 'hoje') {
-      return initialBirthdays.hoje;
+      return initialBirthdays.hoje || [];
     }
     if (tipoFiltro === 'semana') {
-      return initialBirthdays.semana;
-    }
-    if (tipoFiltro === 'mes') {
-      return initialBirthdays.mes.filter((item) => item.mes === mesSelecionado);
+      return initialBirthdays.semana || [];
     }
     if (tipoFiltro === 'proximos_30') {
-      // Ordenar e filtrar para os próximos 30 dias a partir de hoje
+      if (initialBirthdays.proximos_30 && initialBirthdays.proximos_30.length > 0) {
+        return initialBirthdays.proximos_30;
+      }
+      const pool = initialBirthdays.todos || initialBirthdays.mes || [];
       const getDiffDays = (item: BirthdayItem) => {
         let bday = new Date(now.getFullYear(), item.mes - 1, item.dia);
         const ref = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -60,12 +82,14 @@ export default function BirthdaysReportTab({
         return Math.round((bday.getTime() - ref.getTime()) / (1000 * 60 * 60 * 24));
       };
 
-      return initialBirthdays.mes
+      return pool
         .map((item) => ({ ...item, diffDays: getDiffDays(item) }))
         .filter((item) => item.diffDays >= 0 && item.diffDays <= 30)
         .sort((a, b) => a.diffDays - b.diffDays);
     }
-    return initialBirthdays.mes;
+    // tipoFiltro === 'mes'
+    const pool = initialBirthdays.todos || initialBirthdays.mes || [];
+    return pool.filter((item) => item.mes === mesSelecionado);
   }, [tipoFiltro, mesSelecionado, initialBirthdays, now]);
 
   // Filtro de busca textual
@@ -95,6 +119,11 @@ export default function BirthdaysReportTab({
     return `Mês de ${MESES_NOMES[mesSelecionado - 1]}`;
   };
 
+  const totalHoje = initialBirthdays.hoje?.length || 0;
+  const totalSemana = initialBirthdays.semana?.length || 0;
+  const totalProximos30 = initialBirthdays.proximos_30?.length || 0;
+  const totalAnual = initialBirthdays.totalAnual ?? (initialBirthdays.todos?.length || 0);
+
   return (
     <div className="space-y-6">
       {/* ─── CABEÇALHO OFICIAL DE IMPRESSÃO A4 (hidden na tela, visible no print) ─── */}
@@ -103,6 +132,50 @@ export default function BirthdaysReportTab({
         periodoOuData={getSubtituloPeriodo()}
         congregacaoNome={congregacaoNome}
       />
+
+      {/* ─── GRID DE MESES (12 MESES) - PRINT:HIDDEN ─────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 print:hidden">
+        {MESES_NOMES.map((nomeMes, index) => {
+          const numMes = index + 1;
+          const isSelected = tipoFiltro === 'mes' && mesSelecionado === numMes;
+          const isCurrent = currentMonthNum === numMes;
+          const qtd = contagemPorMes[numMes] || 0;
+
+          return (
+            <button
+              key={nomeMes}
+              onClick={() => {
+                setTipoFiltro('mes');
+                setMesSelecionado(numMes);
+              }}
+              className={`p-3.5 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                isSelected
+                  ? 'border-purple-600 bg-purple-50/80 shadow-sm ring-2 ring-purple-600/20'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50 shadow-xs'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`text-xs font-bold ${isSelected ? 'text-purple-900' : 'text-gray-700'}`}>
+                  {nomeMes}
+                </span>
+                {isCurrent && (
+                  <span className="text-[9px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+                    Mês Atual
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 flex items-baseline justify-between">
+                <span className={`text-xl font-black ${qtd > 0 ? (isSelected ? 'text-purple-700' : 'text-gray-900') : 'text-gray-300'}`}>
+                  {qtd}
+                </span>
+                <span className="text-[10px] text-gray-400 font-medium">
+                  {qtd === 1 ? 'membro' : 'membros'}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
 
       {/* ─── CONTROLES DE TELA (PRINT:HIDDEN) ─────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm print:hidden space-y-4">
@@ -113,7 +186,7 @@ export default function BirthdaysReportTab({
               Mural de Aniversariantes
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Consulte e imprima listas de aniversários para boletins, murais e mensagens pastorais.
+              Consulte e imprima listas de aniversários para boletins, murais e mensagens pastorais. Total anual cadastrado: <strong className="text-gray-800">{totalAnual}</strong>.
             </p>
           </div>
 
@@ -137,7 +210,7 @@ export default function BirthdaysReportTab({
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            Hoje ({initialBirthdays.hoje.length})
+            Hoje ({totalHoje})
           </button>
 
           <button
@@ -149,7 +222,7 @@ export default function BirthdaysReportTab({
             }`}
           >
             <Calendar className="w-3.5 h-3.5" />
-            Esta Semana ({initialBirthdays.semana.length})
+            Esta Semana ({totalSemana})
           </button>
 
           <button
@@ -160,7 +233,7 @@ export default function BirthdaysReportTab({
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            Por Mês
+            Por Mês ({MESES_NOMES[mesSelecionado - 1]}: {contagemPorMes[mesSelecionado] || 0})
           </button>
 
           <button
@@ -171,7 +244,7 @@ export default function BirthdaysReportTab({
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            Próximos 30 Dias
+            Próximos 30 Dias ({totalProximos30})
           </button>
 
           {/* Seletor de Mês (quando tipo === 'mes') */}
@@ -183,7 +256,7 @@ export default function BirthdaysReportTab({
             >
               {MESES_NOMES.map((m, idx) => (
                 <option key={idx + 1} value={idx + 1}>
-                  {m}
+                  {m} ({contagemPorMes[idx + 1] || 0})
                 </option>
               ))}
             </select>

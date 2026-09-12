@@ -54,18 +54,14 @@ export async function GET(request: NextRequest) {
       growthTrends,
       lettersStats,
       baptismsAndActs,
-      aniversariantesHoje,
-      aniversariantesSemana,
-      aniversariantesMes,
+      aniversariantesSummary,
     ] = await Promise.all([
       service.getExecutiveMetrics(ministryId, effectiveCongregacaoId),
       service.getDemographicsSummary(ministryId, effectiveCongregacaoId),
       service.getGrowthTrends(ministryId, 12),
       service.getLettersStats(ministryId, effectiveCongregacaoId),
       service.getBaptismsAndActsStats(ministryId, { congregacaoId: effectiveCongregacaoId }),
-      service.getBirthdays(ministryId, { tipo: 'hoje', congregacaoId: effectiveCongregacaoId }),
-      service.getBirthdays(ministryId, { tipo: 'semana', congregacaoId: effectiveCongregacaoId }),
-      service.getBirthdays(ministryId, { tipo: 'mes', congregacaoId: effectiveCongregacaoId }),
+      service.getBirthdaysSummary(ministryId, effectiveCongregacaoId),
     ]);
 
     return NextResponse.json({
@@ -78,11 +74,7 @@ export async function GET(request: NextRequest) {
         growthTrends,
         lettersStats,
         baptismsAndActs,
-        aniversariantes: {
-          hoje: aniversariantesHoje,
-          semana: aniversariantesSemana,
-          mes: aniversariantesMes,
-        },
+        aniversariantes: aniversariantesSummary,
       },
     });
   } catch (error: any) {

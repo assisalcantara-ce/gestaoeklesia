@@ -81,6 +81,16 @@ export interface BirthdayItem {
   isHoje: boolean;
 }
 
+export interface BirthdaysSummaryData {
+  hoje: BirthdayItem[];
+  semana: BirthdayItem[];
+  mes: BirthdayItem[];
+  proximos_30: BirthdayItem[];
+  todos: BirthdayItem[];
+  contagemPorMes: Record<number, number>;
+  totalAnual: number;
+}
+
 export interface LettersStats {
   pedidos: {
     total: number;
@@ -596,12 +606,12 @@ export class SecretaryReportsService {
   }
 
   /**
-   * 5. Aniversariantes do Período (Hoje, Semana, Mês, Próximos 30 dias)
+   * 5. Aniversariantes do Período (Hoje, Semana, Mês, Próximos 30 dias, Todos/Ano)
    */
   async getBirthdays(
     ministryId: string,
     params: {
-      tipo: 'hoje' | 'semana' | 'mes' | 'proximos_30';
+      tipo: 'hoje' | 'semana' | 'mes' | 'proximos_30' | 'todos' | 'ano';
       mesSelecionado?: number;
       congregacaoId?: string | null;
     }
@@ -648,6 +658,8 @@ export class SecretaryReportsService {
         match = birthMonth === currentMonth;
       } else if (params.tipo === 'proximos_30') {
         match = isBirthdayInNextDays(m.data_nascimento, 30, now);
+      } else if (params.tipo === 'todos' || params.tipo === 'ano') {
+        match = true;
       }
 
       if (match) {
@@ -688,6 +700,129 @@ export class SecretaryReportsService {
       if (a.mes !== b.mes) return a.mes - b.mes;
       return a.dia - b.dia;
     });
+  }
+
+  /**
+   * 5.1 Resumo Completo Anual de Aniversariantes com Contagens por Mês
+   */
+  async getBirthdaysSummary(
+    ministryId: string,
+    congregacaoId?: string | null
+  ): Promise<BirthdaysSummaryData> {
+    let query = this.supabase
+      .from('members')
+      .select('id, name, data_nascimento, phone, celular, whatsapp, congregacao_id, congregacoes(nome)')
+      .eq('ministry_id', ministryId)
+      .eq('status', 'active')
+      .not('data_nascimento', 'is', null);
+
+    if (congregacaoId) {
+      query = query.eq('congregacao_id', congregacaoId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`Erro ao consultar resumo de aniversariantes: ${error.message}`);
+    }
+
+    const members = data || [];
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentDay = now.getDate();
+
+    const contagemPorMes: Record<number, number> = {
+      1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0,
+      7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0,
+    };
+
+    const todos: BirthdayItem[] = [];
+    const hoje: BirthdayItem[] = [];
+    const semana: BirthdayItem[] = [];
+    const mes: BirthdayItem[] = [];
+    const proximos_30: BirthdayItem[] = [];
+
+    for (const m of members) {
+      if (!m.data_nascimento) continue;
+      const parts = m.data_nascimento.split('T')[0].split('-');
+      if (parts.length !== 3) continue;
+
+      const birthMonth = parseInt(parts[1], 10);
+      const birthDay = parseInt(parts[2], 10);
+
+      if (birthMonth >= 1 && birthMonth <= 12) {
+        contagemPorMes[birthMonth] = (contagemPorMes[birthMonth] || 0) + 1;
+      }
+
+      const isHoje = birthMonth === currentMonth && birthDay === currentDay;
+      const idadeAtual = calculateAge(m.data_nascimento, now) || 0;
+      const jaFezEsteAno =
+        birthMonth < currentMonth ||
+        (birthMonth === currentMonth && birthDay <= currentDay);
+      const idadeCompletara = jaFezEsteAno ? idadeAtual : idadeAtual + 1;
+      const telefone = m.whatsapp || m.celular || m.phone || '';
+
+      const item: BirthdayItem = {
+        id: m.id,
+        name: m.name || 'Sem Nome',
+        data_nascimento: m.data_nascimento,
+        idadeAtual,
+        idadeCompletara,
+        dia: birthDay,
+        mes: birthMonth,
+        telefone,
+        congregacao_id: m.congregacao_id,
+        congregacao_nome: (m.congregacoes as any)?.nome || null,
+        isHoje,
+      };
+
+      todos.push(item);
+
+      if (isHoje) {
+        hoje.push(item);
+      }
+
+      if (isBirthdayInCurrentWeek(m.data_nascimento, now)) {
+        semana.push(item);
+      }
+
+      if (birthMonth === currentMonth) {
+        mes.push(item);
+      }
+
+      if (isBirthdayInNextDays(m.data_nascimento, 30, now)) {
+        proximos_30.push(item);
+      }
+    }
+
+    const sortFn = (a: BirthdayItem, b: BirthdayItem) => {
+      if (a.mes !== b.mes) return a.mes - b.mes;
+      return a.dia - b.dia;
+    };
+
+    todos.sort(sortFn);
+    hoje.sort(sortFn);
+    semana.sort(sortFn);
+    mes.sort(sortFn);
+
+    proximos_30.sort((a, b) => {
+      const getDiffDays = (item: BirthdayItem) => {
+        let bday = new Date(now.getFullYear(), item.mes - 1, item.dia);
+        const ref = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (bday < ref) bday = new Date(now.getFullYear() + 1, item.mes - 1, item.dia);
+        return bday.getTime() - ref.getTime();
+      };
+      return getDiffDays(a) - getDiffDays(b);
+    });
+
+    return {
+      hoje,
+      semana,
+      mes,
+      proximos_30,
+      todos,
+      contagemPorMes,
+      totalAnual: todos.length,
+    };
   }
 
   /**
