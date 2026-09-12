@@ -337,7 +337,6 @@ export default function CartasPage() {
   const [draftTipo, setDraftTipo] = useState<TemplateTipo>('custom');
   const [isDraftReady, setIsDraftReady] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
-  const [isEditingVisual, setIsEditingVisual] = useState(false);
   const [activeSidebarTab, setActiveSidebarTab] = useState<'elementos' | 'variaveis' | 'camadas'>('elementos');
   const lastSelectedTemplateRef = useRef<CartaTemplate | null>(null);
   const lastSavedSnapshotRef = useRef<string>('');
@@ -1084,11 +1083,23 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
     const sysNative = DEFAULT_SYSTEM_TEMPLATES.find((s) => s.template_key === template.template_key);
     if (sysNative && template.scope === 'system') {
       setSelectedTemplate({ ...sysNative });
-      setIsEditingVisual(true);
       return;
     }
     setSelectedTemplate({ ...template });
-    setIsEditingVisual(true);
+  };
+
+  const handleCategoryFilterChange = (newCat: 'todas' | 'carta' | 'declaracao') => {
+    setCategoriaFilter(newCat);
+    if (newCat === 'todas') return;
+
+    // Se o modelo selecionado atualmente não pertence à categoria escolhida, selecionar o primeiro compatível
+    const currentCat = selectedTemplate?.categoria || 'carta';
+    if (currentCat !== newCat) {
+      const firstMatch = templates.find((t) => (t.categoria || 'carta') === newCat);
+      if (firstMatch) {
+        handleSelectTemplate(firstMatch);
+      }
+    }
   };
 
   const handleNewTemplate = () => {
@@ -1131,7 +1142,6 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
       canvas: newCanvas,
     });
     setShowNewModal(false);
-    setIsEditingVisual(true);
   };
 
   const handleSaveTemplate = async () => {
@@ -1756,7 +1766,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => setCategoriaFilter('todas')}
+                    onClick={() => handleCategoryFilterChange('todas')}
                     className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
                       categoriaFilter === 'todas'
                         ? 'bg-white text-teal-800 shadow-sm border border-gray-200'
@@ -1767,7 +1777,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCategoriaFilter('carta')}
+                    onClick={() => handleCategoryFilterChange('carta')}
                     className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
                       categoriaFilter === 'carta'
                         ? 'bg-white text-blue-800 shadow-sm border border-blue-200'
@@ -1779,7 +1789,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCategoriaFilter('declaracao')}
+                    onClick={() => handleCategoryFilterChange('declaracao')}
                     className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
                       categoriaFilter === 'declaracao'
                         ? 'bg-white text-emerald-800 shadow-sm border border-emerald-200'
@@ -1891,8 +1901,8 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
               </div>
             </div>
 
-            {/* Visualização de Edição do Modelo */}
-            {(selectedTemplate || isDraftReady) && (isEditingVisual || isDraftReady) ? (
+            {/* Visualização de Edição Direta do Modelo */}
+            {selectedTemplate || isDraftReady ? (
               <div className="space-y-4">
                 {/* ESTRUTURA DE 3 COLUNAS */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -2720,32 +2730,23 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                 </div>
               </div>
             ) : (
-              /* Estado Vazio quando não está em edição visual */
+              /* Estado Vazio quando não há nenhum modelo cadastrado/selecionado */
               <div className="rounded-2xl border border-dashed border-gray-300 bg-white/80 p-12 text-center space-y-3">
                 <div className="w-12 h-12 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center mx-auto text-xl font-bold">
                   🧩
                 </div>
-                {selectedTemplate ? (
-                  <>
-                    <h4 className="text-base font-bold text-gray-800">Modelo "{selectedTemplate.title}" Selecionado</h4>
-                    <p className="text-xs text-gray-500 max-w-md mx-auto">
-                      Clique no botão <span className="font-semibold text-teal-700">✏️ Abrir Editor Visual</span> acima para editar a carta em 3 colunas.
-                    </p>
-                    <button
-                      onClick={() => setIsEditingVisual(true)}
-                      className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white text-xs font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
-                    >
-                      ✏️ Abrir Editor Visual
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <h4 className="text-base font-bold text-gray-800">Nenhum modelo selecionado</h4>
-                    <p className="text-xs text-gray-500 max-w-md mx-auto">
-                      Selecione um modelo existente no seletor acima ou clique em <span className="font-semibold text-teal-700">+ Novo Modelo</span> para criar um do zero.
-                    </p>
-                  </>
-                )}
+                <h4 className="text-base font-bold text-gray-800">Nenhum modelo selecionado</h4>
+                <p className="text-xs text-gray-500 max-w-md mx-auto">
+                  Selecione um modelo no seletor acima ou clique em <span className="font-semibold text-teal-700">+ Novo Modelo</span> para criar um novo documento personalizado.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleNewTemplate}
+                  className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white text-xs font-bold rounded-xl hover:bg-teal-700 transition shadow-sm"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Novo Modelo</span>
+                </button>
               </div>
             )}
           </Section>
