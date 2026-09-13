@@ -18,6 +18,7 @@ export interface CriarLancamentoDTO {
   conta_id?: string | null;
   categoria_id?: string | null;
   member_id?: string | null;
+  codigo_registro?: string | null;
 }
 
 export class TesourariaService {
@@ -25,6 +26,15 @@ export class TesourariaService {
 
   constructor(supabase: any) {
     this.repository = new TesourariaRepository(supabase);
+  }
+
+  async obterProximoCodigo(ministryId: string, dataLancamento?: string): Promise<string> {
+    if (!ministryId || !ministryId.trim()) {
+      throw new Error('O ministry_id é obrigatório.');
+    }
+    const ano = dataLancamento ? parseInt(dataLancamento.split('-')[0], 10) : new Date().getFullYear();
+    const anoValido = !isNaN(ano) && ano > 2000 ? ano : new Date().getFullYear();
+    return this.repository.obterPreviaCodigoRegistro(ministryId, anoValido);
   }
 
   async criarLancamento(
@@ -53,9 +63,15 @@ export class TesourariaService {
       throw new Error('O valor deve ser um número positivo maior que zero.');
     }
 
-    // ── Montar payload para inserção ───────────────────────────────────────
+    const ano = parseInt(dto.data_lancamento.split('-')[0], 10) || new Date().getFullYear();
+    const isManual = Boolean(
+      dto.codigo_registro &&
+      dto.codigo_registro.trim().length > 0 &&
+      !/^REG-\d{4}-\d+$/i.test(dto.codigo_registro.trim())
+    );
 
-    const payload: LancamentoInsert = {
+    // Helper para montar payload
+    const montarPayload = (codigo: string | null): LancamentoInsert => ({
       ministry_id: ministryId,
       data_lancamento: dto.data_lancamento,
       tipo_movimento: dto.tipo_movimento,
@@ -69,9 +85,40 @@ export class TesourariaService {
       conta_id: dto.conta_id ?? null,
       categoria_id: dto.categoria_id ?? null,
       member_id: dto.member_id ?? null,
-    };
+      codigo_registro: codigo,
+    });
 
-    return this.repository.criarLancamento(payload);
+    // ── Caso 1: Código Manual Customizado (ex: OFERTA-2026-001, NF-4587/2026) ──
+    if (isManual) {
+      const codigoManual = dto.codigo_registro!.trim();
+      const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoManual);
+      if (jaExiste) {
+        throw new Error('Já existe um lançamento registrado com este Código/ID.');
+      }
+      return this.repository.criarLancamento(montarPayload(codigoManual));
+    }
+
+    // ── Caso 2: Código Automático (REG-YYYY-XXXXXX) ou omitido ───────────────
+    // Se o operador não informou código ou enviou um padrão automático (que pode ter sofrido concorrência)
+    // Aloca atômica e definitivamente no banco com lock
+    const maxTentativas = 5;
+    for (let tentativa = 1; tentativa <= maxTentativas; tentativa++) {
+      try {
+        const codigoAlocado = await this.repository.alocarProximoCodigoRegistro(ministryId, ano);
+        return await this.repository.criarLancamento(montarPayload(codigoAlocado));
+      } catch (err: any) {
+        const isCollision = err?.message?.includes('Já existe um lançamento registrado com este Código/ID') ||
+                            err?.message?.includes('23505') ||
+                            err?.message?.includes('idx_tesouraria_lancamentos_codigo_registro');
+        if (isCollision && tentativa < maxTentativas) {
+          // Em caso de colisão concorrente rara, tenta novamente para obter o próximo número da sequência
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    throw new Error('Não foi possível gerar um código de registro único para o lançamento.');
   }
 
   async atualizarLancamento(
@@ -112,6 +159,19 @@ export class TesourariaService {
     if (dto.conta_id !== undefined) payload.conta_id = dto.conta_id;
     if (dto.categoria_id !== undefined) payload.categoria_id = dto.categoria_id;
     if (dto.member_id !== undefined) payload.member_id = dto.member_id;
+
+    if (dto.codigo_registro !== undefined) {
+      if (dto.codigo_registro && dto.codigo_registro.trim().length > 0) {
+        const codigoTrim = dto.codigo_registro.trim();
+        const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoTrim, id);
+        if (jaExiste) {
+          throw new Error('Já existe um lançamento registrado com este Código/ID.');
+        }
+        payload.codigo_registro = codigoTrim;
+      } else {
+        payload.codigo_registro = null;
+      }
+    }
 
     return this.repository.atualizarLancamento(id, ministryId, payload);
   }

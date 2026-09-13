@@ -371,7 +371,6 @@ export default function CartasPage() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
-  const [copiedJson, setCopiedJson] = useState(false);
 
   // Verificação de alterações não salvas no modelo ativo
   const currentSnapshot = useMemo(() => {
@@ -1873,28 +1872,6 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                           </button>
                         )
                       )}
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const jsonStructure = {
-                            template_key: selectedTemplate.template_key || draftKey,
-                            title: selectedTemplate.title || draftTitle,
-                            tipo: selectedTemplate.tipo || draftTipo || 'custom',
-                            scope: selectedTemplate.scope || 'tenant',
-                            content_json: serializeCanvasContent(canvasContent),
-                          };
-                          const formattedJson = JSON.stringify(jsonStructure, null, 2);
-                          navigator.clipboard.writeText(formattedJson);
-                          setCopiedJson(true);
-                          setTimeout(() => setCopiedJson(false), 2500);
-                        }}
-                        className="text-xs px-3 py-2 rounded-xl font-medium transition flex items-center gap-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
-                        title="Copiar JSON do modelo para área de transferência"
-                      >
-                        <Copy className="h-3.5 w-3.5 text-gray-500" />
-                        <span>{copiedJson ? 'Copiado!' : 'Copiar JSON'}</span>
-                      </button>
                     </div>
                   )}
                 </div>

@@ -28,6 +28,7 @@ export interface Lancamento {
   conta_id?: string | null;
   categoria_id?: string | null;
   member_id?: string | null;
+  codigo_registro?: string | null;
   origem_modulo?: string | null;
   forma_pagamento?: string | null;
   origem_id?: string | null;
@@ -35,7 +36,18 @@ export interface Lancamento {
   departamento_nome?: string;
 }
 export interface FinConta { id: string; nome: string; is_padrao?: boolean }
-export interface FinCategoria { id: string; nome: string; icone?: string; tipo_movimento?: string }
+export interface FinCategoria {
+  id: string;
+  nome: string;
+  icone?: string | null;
+  tipo_movimento?: string;
+  codigo?: string | null;
+  cor?: string | null;
+  categoria_pai_id?: string | null;
+  ministry_id?: string | null;
+  is_sistema?: boolean;
+  is_ativa?: boolean;
+}
 export interface Fechamento {
   id: string;
   mes_referencia: string;
@@ -145,6 +157,7 @@ export interface FormLanc {
   departamento_id: string;
   conta_id: string;
   categoria_id: string;
+  codigo_registro: string;
   is_dizimo: boolean;
   dizimista_id?: string;
   dizimista_nome?: string;
@@ -207,6 +220,7 @@ const emptyForm = (): FormLanc => ({
   departamento_id: '',
   conta_id: '',
   categoria_id: '',
+  codigo_registro: '',
   is_dizimo: false,
   dizimista_id: '',
   dizimista_nome: '',
@@ -850,6 +864,27 @@ export function useTesouraria() {
   }, [lancsFiltrados]);
 
   // Handlers CRUD Lançamento
+  const handleNovoLancamento = useCallback(async () => {
+    const baseForm = emptyForm();
+    setShowForm(true);
+    setEditId(null);
+    setForm(baseForm);
+    resetDizForm();
+
+    // Busca código sequencial gerado para o ano atual
+    try {
+      const res = await authenticatedFetch(`/api/v1/tesouraria/lancamentos?action=proximo_codigo&data=${baseForm.data_lancamento}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.codigo) {
+          setForm((p) => ({ ...p, codigo_registro: json.codigo }));
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao buscar próximo código de registro:', err);
+    }
+  }, [resetDizForm]);
+
   const handleEdit = useCallback((l: Lancamento) => {
     setEditId(l.id);
     setForm({
@@ -866,6 +901,7 @@ export function useTesouraria() {
       departamento_id: l.departamento_id || '',
       conta_id: l.conta_id || '',
       categoria_id: l.categoria_id || '',
+      codigo_registro: l.codigo_registro || '',
       is_dizimo: l.tipo_recebimento === 'dizimo',
     });
     setShowForm(true);
@@ -909,6 +945,7 @@ export function useTesouraria() {
         departamento_id: form.departamento_id || null,
         conta_id: form.conta_id || null,
         categoria_id: form.categoria_id || null,
+        codigo_registro: form.codigo_registro?.trim() || null,
       };
 
       const url = editId ? `/api/v1/tesouraria/lancamentos?id=${editId}` : '/api/v1/tesouraria/lancamentos';
@@ -1053,6 +1090,20 @@ export function useTesouraria() {
   }, [showModal]);
 
   // Handlers Categorias
+  const handleEditCat = useCallback((cat: FinCategoria) => {
+    setFormCat({
+      nome: cat.nome || '',
+      tipo_movimento: (cat.tipo_movimento as 'entrada' | 'saida' | 'ambos') || 'ambos',
+      codigo: cat.codigo || '',
+      cor: cat.cor || '#6b7280',
+      icone: cat.icone || '🏷️',
+      categoria_pai_id: cat.categoria_pai_id || '',
+      is_ativa: cat.is_ativa ?? true,
+    });
+    setCatEditId(cat.id);
+    setShowCatModal(true);
+  }, []);
+
   const handleSaveCat = useCallback(async () => {
     if (!formCat.nome.trim()) {
       showModal('Campo obrigatório', 'Informe o nome da categoria.', 'error');
@@ -1062,10 +1113,17 @@ export function useTesouraria() {
       setSavingCat(true);
       const url = catEditId ? `/api/v1/tesouraria/categorias?id=${catEditId}` : '/api/v1/tesouraria/categorias';
       const method = catEditId ? 'PUT' : 'POST';
+      const payload = {
+        ...formCat,
+        categoria_pai_id: formCat.categoria_pai_id?.trim() ? formCat.categoria_pai_id.trim() : null,
+        codigo: formCat.codigo?.trim() || null,
+        cor: formCat.cor?.trim() || null,
+        icone: formCat.icone?.trim() || null,
+      };
       const res = await authenticatedFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formCat),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const json = await res.json();
@@ -1129,8 +1187,9 @@ export function useTesouraria() {
 
     const emItem = dados[0];
     if (emItem.data_lancamento !== undefined) {
-      headers = ['Data', 'Tipo Movimento', 'Tipo Recebimento / Categoria', 'Valor', 'Congregação', 'Departamento', 'Referência', 'Observações'];
+      headers = ['Código / ID', 'Data', 'Tipo Movimento', 'Tipo Recebimento / Categoria', 'Valor', 'Congregação', 'Departamento', 'Referência', 'Observações'];
       rows = dados.map((l: Lancamento) => [
+        l.codigo_registro || '',
         l.data_lancamento,
         l.tipo_movimento === 'entrada' ? 'Entrada' : 'Saída',
         l.tipo_recebimento || '',
@@ -1274,6 +1333,7 @@ export function useTesouraria() {
     setConfirmDelCat,
     filtroCatTipo,
     setFiltroCatTipo,
+    handleEditCat,
     handleSaveCat,
     handleDeleteCat,
     emptyFormCat,
@@ -1287,6 +1347,7 @@ export function useTesouraria() {
     saving,
     confirmDel,
     setConfirmDel,
+    handleNovoLancamento,
     handleEdit,
     handleSave,
     handleDelete,

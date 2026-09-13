@@ -72,6 +72,7 @@ export default function MembrosPage() {
     setNotification,
 
     // Estado: formulário
+    salvandoMembro,
     dadosPessoais,
     setDadosPessoais,
     enderecoData,
@@ -445,6 +446,7 @@ export default function MembrosPage() {
                 handleFotoUpload={handleFotoUpload}
                 handleGirarFoto={handleGirarFoto}
                 salvarMembro={salvarMembro}
+                salvandoMembro={salvandoMembro}
                 fecharFormulario={fecharFormulario}
                 dizimosHistorico={dizimosHistorico}
                 loadingDizimosHistorico={loadingDizimosHistorico}

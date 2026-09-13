@@ -323,6 +323,7 @@ export function useMembros() {
   }>({ isOpen: false, title: '', message: '', type: 'success' });
 
   // ── Estado: formulário ───────────────────────────────────────────────────────
+  const [salvandoMembro, setSalvandoMembro] = useState(false);
   const [dadosPessoais, setDadosPessoais] = useState<DadosPessoaisState>(DADOS_PESSOAIS_INICIAL);
   const [enderecoData, setEnderecoData] = useState(ENDERECO_INICIAL);
   const [dadosMinisteriais, setDadosMinisteriais] = useState(DADOS_MINISTERIAIS_INICIAL);
@@ -742,6 +743,7 @@ export function useMembros() {
   // ─── CRUD ─────────────────────────────────────────────────────────────────────
 
   const salvarMembro = async () => {
+    if (salvandoMembro) return;
     console.log('💾 Iniciando salvamento do membro...');
 
     if (cpfDuplicado) {
@@ -776,6 +778,7 @@ export function useMembros() {
     }
 
     try {
+      setSalvandoMembro(true);
       const baseForCustom: Partial<Membro> = {
         uniqueId: membroEditando?.uniqueId || gerarUniqueId(),
         matricula: dadosPessoais.matricula,
@@ -904,6 +907,7 @@ export function useMembros() {
         setUltimoCadastro(createdUi);
         setNotification({ isOpen: true, title: 'Sucesso', message: 'Novo membro cadastrado com sucesso!', type: 'success' });
       }
+      resetarFormulario();
     } catch (e) {
       console.error('Erro ao salvar membro (API):', e);
       setNotification({
@@ -913,9 +917,9 @@ export function useMembros() {
         type: 'error',
       });
       return;
+    } finally {
+      setSalvandoMembro(false);
     }
-
-    resetarFormulario();
   };
 
   const deletarMembro = async () => {
@@ -1341,6 +1345,7 @@ export function useMembros() {
     setNotification,
 
     // Estado: formulário
+    salvandoMembro,
     dadosPessoais,
     setDadosPessoais,
     enderecoData,

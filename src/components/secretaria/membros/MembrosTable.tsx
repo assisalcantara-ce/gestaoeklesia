@@ -73,6 +73,15 @@ export default function MembrosTable({
     return (membro?.tipoCadastro || '').toUpperCase().trim();
   };
 
+  const temFotoValida = (membro: any): boolean => {
+    return Boolean(membro?.fotoUrl && typeof membro.fotoUrl === 'string' && membro.fotoUrl.trim().length > 0);
+  };
+
+  const membrosComFotoNaPagina = membrosPaginados.filter(temFotoValida);
+  const todosComFotoSelecionados =
+    membrosComFotoNaPagina.length > 0 &&
+    membrosComFotoNaPagina.every((m) => membrosSelecionados.has(m.id));
+
   return (
     <>
       {/* CARDS MOBILE — visíveis apenas em telas < md */}
@@ -152,19 +161,23 @@ export default function MembrosTable({
                 <th className="border-2 border-gray-300 px-4 py-3 text-center font-semibold text-gray-700 w-12">
                   <input
                     type="checkbox"
-                    checked={membrosSelecionados.size === membrosPaginados.length && membrosPaginados.length > 0}
+                    checked={todosComFotoSelecionados}
+                    disabled={membrosComFotoNaPagina.length === 0}
                     onChange={(e) => {
+                      const novoSet = new Set(membrosSelecionados);
                       if (e.target.checked) {
-                        const novoSet = new Set(membrosSelecionados);
-                        membrosPaginados.forEach((m) => novoSet.add(m.id));
-                        setMembrosSelecionados(novoSet);
+                        membrosComFotoNaPagina.forEach((m) => novoSet.add(m.id));
                       } else {
-                        const novoSet = new Set(membrosSelecionados);
-                        membrosPaginados.forEach((m) => novoSet.delete(m.id));
-                        setMembrosSelecionados(novoSet);
+                        membrosComFotoNaPagina.forEach((m) => novoSet.delete(m.id));
                       }
+                      setMembrosSelecionados(novoSet);
                     }}
-                    className="w-4 h-4 cursor-pointer"
+                    className="w-4 h-4 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
+                    title={
+                      membrosComFotoNaPagina.length === 0
+                        ? 'Nenhum membro com foto nesta página'
+                        : 'Selecionar todos os membros com foto'
+                    }
                   />
                 </th>
                 <th className="border-2 border-gray-300 px-4 py-3 text-left font-semibold text-gray-700 w-20">
@@ -205,34 +218,43 @@ export default function MembrosTable({
               </tr>
             </thead>
             <tbody>
-              {membrosPaginados.map((membro) => (
-                <tr key={membro.id} className="hover:bg-gray-50">
-                  <td className="border border-gray-300 px-4 py-3 text-center">
-                    <input
-                      type="checkbox"
-                      checked={membrosSelecionados.has(membro.id)}
-                      onChange={(e) => {
-                        const novoSet = new Set(membrosSelecionados);
-                        if (e.target.checked) {
-                          novoSet.add(membro.id);
-                        } else {
-                          novoSet.delete(membro.id);
-                        }
-                        setMembrosSelecionados(novoSet);
-                      }}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </td>
-                  <td className="border border-gray-300 px-4 py-3 font-semibold text-gray-700">{membro.matricula}</td>
-                  <td className="border border-gray-300 px-4 py-3 text-center">
-                    <div className="w-10 h-12 bg-gray-100 rounded overflow-hidden flex items-center justify-center mx-auto border border-gray-200">
-                      {membro.fotoUrl ? (
-                        <img src={membro.fotoUrl} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-xl text-gray-400">👤</span>
-                      )}
-                    </div>
-                  </td>
+              {membrosPaginados.map((membro) => {
+                const possuiFoto = temFotoValida(membro);
+                return (
+                  <tr key={membro.id} className="hover:bg-gray-50">
+                    <td className="border border-gray-300 px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={possuiFoto && membrosSelecionados.has(membro.id)}
+                        disabled={!possuiFoto}
+                        onChange={(e) => {
+                          if (!possuiFoto) return;
+                          const novoSet = new Set(membrosSelecionados);
+                          if (e.target.checked) {
+                            novoSet.add(membro.id);
+                          } else {
+                            novoSet.delete(membro.id);
+                          }
+                          setMembrosSelecionados(novoSet);
+                        }}
+                        className={`w-4 h-4 ${
+                          possuiFoto
+                            ? 'cursor-pointer'
+                            : 'cursor-not-allowed opacity-30 accent-gray-400'
+                        }`}
+                        title={possuiFoto ? 'Selecionar membro' : 'Membro sem foto (seleção desabilitada)'}
+                      />
+                    </td>
+                    <td className="border border-gray-300 px-4 py-3 font-semibold text-gray-700">{membro.matricula}</td>
+                    <td className="border border-gray-300 px-4 py-3 text-center">
+                      <div className="w-10 h-12 bg-gray-100 rounded overflow-hidden flex items-center justify-center mx-auto border border-gray-200">
+                        {membro.fotoUrl ? (
+                          <img src={membro.fotoUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-xl text-gray-400">👤</span>
+                        )}
+                      </div>
+                    </td>
                   <td className="border border-gray-300 px-4 py-3 text-gray-700">{membro.nome}</td>
                   <td className="border border-gray-300 px-4 py-3 text-gray-600">{membro.cpf}</td>
                   <td className="border border-gray-300 px-4 py-3 text-gray-600">{getCargoExibicao(membro)}</td>
@@ -324,7 +346,8 @@ export default function MembrosTable({
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

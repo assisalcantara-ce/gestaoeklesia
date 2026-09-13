@@ -18,6 +18,7 @@ export interface LancamentoInsert {
   conta_id?: string | null;
   categoria_id?: string | null;
   member_id?: string | null;
+  codigo_registro?: string | null;
 }
 
 export interface LancamentoRow extends LancamentoInsert {
@@ -33,6 +34,100 @@ export class TesourariaRepository {
     this.supabase = supabase;
   }
 
+  /**
+   * Obtém apenas a sugestão/prévia de código para exibição visual no frontend (NÃO consome a sequência)
+   */
+  async obterPreviaCodigoRegistro(ministryId: string, ano: number): Promise<string> {
+    try {
+      const { data: rpcCode, error: rpcErr } = await this.supabase.rpc('obter_previa_codigo_lancamento', {
+        p_ministry_id: ministryId,
+        p_ano: ano,
+      });
+      if (!rpcErr && rpcCode && typeof rpcCode === 'string') {
+        return rpcCode;
+      }
+    } catch {
+      // Fallback
+    }
+
+    return this.calcularPreviaFallback(ministryId, ano);
+  }
+
+  /**
+   * Aloca atômica e definitivamente o próximo código de registro com lock no PostgreSQL
+   */
+  async alocarProximoCodigoRegistro(ministryId: string, ano: number): Promise<string> {
+    try {
+      const { data: rpcCode, error: rpcErr } = await this.supabase.rpc('alocar_proximo_codigo_lancamento', {
+        p_ministry_id: ministryId,
+        p_ano: ano,
+      });
+      if (!rpcErr && rpcCode && typeof rpcCode === 'string') {
+        return rpcCode;
+      }
+    } catch {
+      // Fallback para query direta
+    }
+
+    return this.calcularPreviaFallback(ministryId, ano);
+  }
+
+  /**
+   * @deprecated mantido para retrocompatibilidade; chama obterPreviaCodigoRegistro
+   */
+  async obterProximoCodigoRegistro(ministryId: string, ano: number): Promise<string> {
+    return this.obterPreviaCodigoRegistro(ministryId, ano);
+  }
+
+  private async calcularPreviaFallback(ministryId: string, ano: number): Promise<string> {
+    const prefix = `REG-${ano}-`;
+    const { data, error } = await this.supabase
+      .from('tesouraria_lancamentos')
+      .select('codigo_registro')
+      .eq('ministry_id', ministryId)
+      .like('codigo_registro', `${prefix}%`)
+      .order('codigo_registro', { ascending: false })
+      .limit(100);
+
+    let maxSeq = 0;
+    if (!error && Array.isArray(data)) {
+      const regex = new RegExp(`^REG-${ano}-(\\d+)$`, 'i');
+      for (const item of data) {
+        if (item.codigo_registro) {
+          const match = item.codigo_registro.trim().match(regex);
+          if (match && match[1]) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > maxSeq) {
+              maxSeq = num;
+            }
+          }
+        }
+      }
+    }
+
+    const proximoNum = maxSeq + 1;
+    return `${prefix}${String(proximoNum).padStart(6, '0')}`;
+  }
+
+  async verificarCodigoExiste(ministryId: string, codigo: string, excludeId?: string): Promise<boolean> {
+    if (!codigo || !codigo.trim()) return false;
+    let query = this.supabase
+      .from('tesouraria_lancamentos')
+      .select('id')
+      .eq('ministry_id', ministryId)
+      .ilike('codigo_registro', codigo.trim());
+
+    if (excludeId) {
+      query = query.neq('id', excludeId);
+    }
+
+    const { data, error } = await query.limit(1);
+    if (error) {
+      return false;
+    }
+    return Array.isArray(data) && data.length > 0;
+  }
+
   async criarLancamento(payload: LancamentoInsert): Promise<LancamentoRow> {
     const { data, error } = await this.supabase
       .from('tesouraria_lancamentos')
@@ -41,6 +136,9 @@ export class TesourariaRepository {
       .single();
 
     if (error) {
+      if (error.code === '23505' || error.message?.includes('idx_tesouraria_lancamentos_codigo_registro')) {
+        throw new Error('Já existe um lançamento registrado com este Código/ID.');
+      }
       throw new Error(`Erro ao cadastrar lançamento: ${error.message}`);
     }
 
@@ -60,6 +158,9 @@ export class TesourariaRepository {
       .single();
 
     if (error) {
+      if (error.code === '23505' || error.message?.includes('idx_tesouraria_lancamentos_codigo_registro')) {
+        throw new Error('Já existe um lançamento registrado com este Código/ID.');
+      }
       throw new Error(`Erro ao atualizar lançamento: ${error.message}`);
     }
 

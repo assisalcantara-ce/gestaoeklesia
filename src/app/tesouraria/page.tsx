@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import PageLayout from '@/components/PageLayout';
 import NotificationModal from '@/components/NotificationModal';
-import { Plus, X, TrendingUp, Building2, Tag, Users, Lock, List, Printer, QrCode, UserPlus, FileText } from 'lucide-react';
+import { Plus, X, TrendingUp, Building2, Tag, Users, Lock, List, Printer, QrCode, UserPlus, FileText, Pencil, Trash2 } from 'lucide-react';
 import TesourariaTable from '@/components/tesouraria/TesourariaTable';
 import TesourariaToolbar from '@/components/tesouraria/TesourariaToolbar';
 import FechamentoCaixaModal from '@/components/tesouraria/modals/FechamentoCaixaModal';
@@ -181,11 +181,7 @@ export default function TesourariaPage() {
               TIPOS={t.TIPOS}
               TIPOS_SAIDA={t.TIPOS_SAIDA}
               MonthPicker={MonthPicker}
-              onNovoClick={() => {
-                t.setForm(t.emptyForm());
-                t.setEditId(null);
-                t.setShowForm(true);
-              }}
+              onNovoClick={t.handleNovoLancamento}
               lancamentosMesCount={t.lancamentosMes.length}
               onExportarCSV={() => t.exportarCSV(t.lancsFiltrados, `lancamentos-${t.filtroMes}`)}
               lancsFiltradosCount={t.lancsFiltrados.length}
@@ -199,9 +195,16 @@ export default function TesourariaPage() {
             {t.showForm && (
               <div className="bg-white rounded-2xl border-2 border-[#123b63] p-5 shadow-lg space-y-4">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-base font-bold text-[#123b63]">
-                    {t.editId ? 'Editar Lançamento' : 'Novo Lançamento'}
-                  </h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-base font-bold text-[#123b63]">
+                      {t.editId ? 'Editar Lançamento' : 'Novo Lançamento'}
+                    </h3>
+                    {t.form.codigo_registro && (
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                        {t.form.codigo_registro}
+                      </span>
+                    )}
+                  </div>
                   <button
                     onClick={() => {
                       t.setShowForm(false);
@@ -231,7 +234,7 @@ export default function TesourariaPage() {
                         t.form.tipo_movimento === mv
                           ? mv === 'entrada'
                             ? 'bg-green-600 text-white border-green-600'
-                            : 'bg-red-500 text-white border-red-500'
+                          : 'bg-red-500 text-white border-red-500'
                           : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                       }`}
                     >
@@ -241,6 +244,23 @@ export default function TesourariaPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Código / ID do Registro */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-xs font-semibold text-gray-600">
+                        Código / ID do Registro
+                      </label>
+                      <span className="text-[10px] text-gray-400">Automático / Editável</span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Ex: REG-2026-000001"
+                      value={t.form.codigo_registro}
+                      onChange={(e) => t.setForm((p) => ({ ...p, codigo_registro: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase focus:border-[#123b63] focus:ring-1 focus:ring-[#123b63]"
+                    />
+                  </div>
+
                   {/* Caixa / Congregação */}
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1">Caixa</label>
@@ -1115,32 +1135,71 @@ export default function TesourariaPage() {
                   Nenhuma categoria personalizada cadastrada.
                 </div>
               ) : (
-                t.finCategorias.map((cat) => (
-                  <div key={cat.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-base">
-                        {cat.icone || <Tag className="h-4 w-4 text-gray-500" />}
+                t.finCategorias.map((cat) => {
+                  const isTenantCat = !cat.is_sistema && (cat.ministry_id === t.ministryId || (!!cat.ministry_id && !cat.is_sistema));
+                  return (
+                    <div key={cat.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center justify-between hover:border-slate-300 transition">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-base">
+                          {cat.icone || <Tag className="h-4 w-4 text-gray-500" />}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-gray-800 text-sm">{cat.nome}</h4>
+                            {cat.codigo && (
+                              <span className="text-[10px] font-mono text-gray-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                {cat.codigo}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                              cat.tipo_movimento === 'entrada'
+                                ? 'bg-green-100 text-green-800'
+                                : cat.tipo_movimento === 'saida'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {cat.tipo_movimento}
+                            </span>
+                            {cat.is_sistema ? (
+                              <span className="text-[10px] text-gray-400 font-medium bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                                Sistema
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-indigo-600 font-medium bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                Personalizada
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-800 text-sm">{cat.nome}</h4>
-                        <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
-                          cat.tipo_movimento === 'entrada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {cat.tipo_movimento}
-                        </span>
-                      </div>
-                    </div>
 
-                    {t.scope.canDelete && (
-                      <button
-                        onClick={() => t.setConfirmDelCat(cat.id)}
-                        className="text-xs text-red-600 font-semibold hover:underline"
-                      >
-                        Excluir
-                      </button>
-                    )}
-                  </div>
-                ))
+                      {isTenantCat && (
+                        <div className="flex items-center gap-1">
+                          {t.scope.canWrite && (
+                            <button
+                              onClick={() => t.handleEditCat(cat)}
+                              title="Editar Categoria"
+                              className="p-1.5 text-gray-500 hover:text-[#123b63] hover:bg-slate-100 rounded-lg transition"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          )}
+                          {t.scope.canDelete && (
+                            <button
+                              onClick={() => t.setConfirmDelCat(cat.id)}
+                              title="Excluir Categoria"
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
 
@@ -1186,18 +1245,27 @@ export default function TesourariaPage() {
               catEditId={t.catEditId}
               savingCat={t.savingCat}
               handleSaveCat={t.handleSaveCat}
-              categoriasFull={t.categoriasFull}
+              categoriasFull={t.finCategorias}
             />
 
-            <ConfirmDeleteModal
-              isOpen={!!t.confirmDelCat}
-              onClose={() => t.setConfirmDelCat(null)}
-              onConfirm={() => t.handleDeleteCat(t.confirmDelCat!)}
-              title="Excluir Categoria"
-              description="Esta ação não pode ser desfeita."
-              warningText="Lançamentos vinculados perderão a referência de categoria."
-              confirmText="Excluir"
-            />
+            {(() => {
+              const catParaExcluir = t.finCategorias.find((c) => c.id === t.confirmDelCat);
+              return (
+                <ConfirmDeleteModal
+                  isOpen={!!t.confirmDelCat}
+                  onClose={() => t.setConfirmDelCat(null)}
+                  onConfirm={() => t.handleDeleteCat(t.confirmDelCat!)}
+                  title="Excluir Categoria"
+                  description={
+                    catParaExcluir
+                      ? `Tem certeza que deseja excluir a categoria "${catParaExcluir.nome}"?`
+                      : 'Esta ação não pode ser desfeita.'
+                  }
+                  warningText="Categorias com lançamentos ou subcategorias ativas não poderão ser excluídas para manter a integridade."
+                  confirmText="Excluir Categoria"
+                />
+              );
+            })()}
           </div>
         )}
 
@@ -1395,7 +1463,7 @@ export default function TesourariaPage() {
             <table className="w-full border-collapse text-xs text-left">
               <thead>
                 <tr className="border-b border-gray-300 bg-gray-50">
-                  <th className="py-2.5 px-2 font-bold text-gray-600">Data</th>
+                  <th className="py-2.5 px-2 font-bold text-gray-600">ID / Data</th>
                   <th className="py-2.5 px-2 font-bold text-gray-600">Caixa</th>
                   <th className="py-2.5 px-2 font-bold text-gray-600">Departamento</th>
                   <th className="py-2.5 px-2 font-bold text-gray-600">Tipo</th>
@@ -1413,7 +1481,14 @@ export default function TesourariaPage() {
                 ) : (
                   t.lancsRelatorioFiltrados.map((l) => (
                     <tr key={l.id} className="border-b border-gray-100">
-                      <td className="py-2 px-2">{t.fmtDate(l.data_lancamento)}</td>
+                      <td className="py-2 px-2">
+                        {l.codigo_registro && (
+                          <div className="font-mono text-[10px] font-bold text-[#123b63]">
+                            {l.codigo_registro}
+                          </div>
+                        )}
+                        <div className="text-gray-500">{t.fmtDate(l.data_lancamento)}</div>
+                      </td>
                       <td className="py-2 px-2 uppercase font-medium">{t.congNome(l.congregacao_id)}</td>
                       <td className="py-2 px-2">{l.departamento_nome || 'Caixa Geral'}</td>
                       <td className="py-2 px-2 font-medium capitalize">

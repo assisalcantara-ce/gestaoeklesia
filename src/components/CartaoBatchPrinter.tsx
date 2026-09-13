@@ -46,6 +46,7 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [orgNomenclaturas, setOrgNomenclaturas] = useState<any>(null);
+  const [gerandoPDF, setGerandoPDF] = useState(false);
 
   useEffect(() => {
     loadOrgNomenclaturasFromSupabaseOrMigrate(supabase, { syncLocalStorage: false })
@@ -92,9 +93,11 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
   };
 
   const gerarPDFLote = async () => {
-    if (!containerRef.current || membros.length === 0) return;
+    if (gerandoPDF || !containerRef.current || membros.length === 0) return;
 
-    const { templates } = await loadTemplatesForCurrentUser(supabase, { allowLocalMigration: true });
+    try {
+      setGerandoPDF(true);
+      const { templates } = await loadTemplatesForCurrentUser(supabase, { allowLocalMigration: true });
 
     let configIgreja: any = {};
     try {
@@ -337,15 +340,42 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
     pdf.save(nomeArquivo);
 
     if (onComplete) onComplete();
+    } catch (err) {
+      console.error('Erro ao gerar PDF em lote:', err);
+    } finally {
+      setGerandoPDF(false);
+    }
   };
 
   return (
     <div ref={containerRef}>
       <button
         onClick={gerarPDFLote}
-        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
+        disabled={gerandoPDF}
+        className={`px-4 py-2 bg-blue-600 text-white rounded-lg transition font-semibold flex items-center justify-center gap-2 ${
+          gerandoPDF ? 'opacity-70 cursor-not-allowed bg-blue-500' : 'hover:bg-blue-700'
+        }`}
       >
-        🖨️ Gerar PDF em Lote ({membros.length})
+        {gerandoPDF ? (
+          <>
+            <svg
+              className="animate-spin h-4 w-4 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <span>Gerando PDF...</span>
+          </>
+        ) : (
+          <span>🖨️ Gerar PDF em Lote ({membros.length})</span>
+        )}
       </button>
 
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>

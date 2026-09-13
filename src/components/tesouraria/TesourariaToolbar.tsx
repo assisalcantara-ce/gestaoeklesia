@@ -23,7 +23,7 @@ export interface TesourariaToolbarProps {
   };
   congregacoes: Array<{ id: string; nome: string }>;
   departamentos: Array<{ id: string; nome: string; sigla?: string }>;
-  finCategorias?: Array<{ id: string; nome: string; icone?: string; tipo_movimento?: string }>;
+  finCategorias?: Array<{ id: string; nome: string; icone?: string | null; tipo_movimento?: string }>;
   TIPOS: Array<{ value: string; label: string }>;
   TIPOS_SAIDA: Array<{ value: string; label: string }>;
   MonthPicker: React.ComponentType<{ value: string; onChange: (v: string) => void; className?: string }>;

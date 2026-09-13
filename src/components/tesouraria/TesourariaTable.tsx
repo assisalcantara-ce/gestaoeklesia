@@ -107,6 +107,11 @@ export default function TesourariaTable({
                             : tipoLabel(l.tipo_recebimento)}
                         </span>
                         <div className="flex items-center gap-1.5 flex-wrap">
+                          {l.codigo_registro && (
+                            <span className="font-mono text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.2 rounded" title="Código / ID do Registro">
+                              ID: {l.codigo_registro}
+                            </span>
+                          )}
                           <span
                             className={`text-xs font-semibold ${
                               l.tipo_movimento === 'saida' ? 'text-red-500' : 'text-green-600'
@@ -230,6 +235,15 @@ export default function TesourariaTable({
                   {fmtBRL(Number(selectedLanc.valor))}
                 </span>
               </div>
+
+              {selectedLanc.codigo_registro && (
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 col-span-2 flex items-center justify-between">
+                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Código / ID de Registro</span>
+                  <span className="font-mono font-bold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded">
+                    {selectedLanc.codigo_registro}
+                  </span>
+                </div>
+              )}
 
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
                 <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Data do Lançamento</span>
