@@ -868,14 +868,30 @@ export class SecretaryReportsService {
 
     let registrosQuery = this.supabase
       .from('cartas_registros')
-      .select('status, categoria, members(congregacao_id)')
+      .select('status, categoria, template_title, template_key, members(congregacao_id)')
       .eq('ministry_id', ministryId);
 
     if (congregacaoId) {
       registrosQuery = registrosQuery.eq('members.congregacao_id', congregacaoId);
     }
 
-    const { data: registrosData, error: registrosError } = await registrosQuery;
+    let { data: registrosData, error: registrosError } = await registrosQuery;
+
+    // Fallback resiliente: se a coluna 'categoria' ainda não estiver na migration aplicada do banco
+    if (registrosError && registrosError.message?.includes('categoria')) {
+      let fallbackQuery = this.supabase
+        .from('cartas_registros')
+        .select('status, template_title, template_key, members(congregacao_id)')
+        .eq('ministry_id', ministryId);
+
+      if (congregacaoId) {
+        fallbackQuery = fallbackQuery.eq('members.congregacao_id', congregacaoId);
+      }
+
+      const fallbackRes = await fallbackQuery;
+      registrosData = fallbackRes.data as any;
+      registrosError = fallbackRes.error;
+    }
 
     if (registrosError) {
       throw new Error(`Erro ao buscar registros de cartas emitidas: ${registrosError.message}`);
@@ -893,7 +909,11 @@ export class SecretaryReportsService {
 
     for (const r of registrosList) {
       const s = (r.status || '').toLowerCase();
-      const cat = (r.categoria === 'declaracao' ? 'declaracao' : 'carta') as 'carta' | 'declaracao';
+      // Se não houver campo categoria na coluna, deduz por declaração ou padrão carta
+      const isDeclaracao = r.categoria === 'declaracao' ||
+        (r.template_title || '').toLowerCase().includes('declara') ||
+        (r.template_key || '').toLowerCase().includes('declaracao');
+      const cat = (isDeclaracao ? 'declaracao' : 'carta') as 'carta' | 'declaracao';
       porCategoria[cat] = (porCategoria[cat] || 0) + 1;
 
       if (s === 'emitida' || !s) {

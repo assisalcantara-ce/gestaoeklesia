@@ -67,23 +67,52 @@ export async function GET(request: NextRequest) {
         query = query.eq('status', status);
       }
 
-      const { data, count, error } = await query
+      let { data, count, error } = await query
         .order('issued_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
+      // Fallback se a coluna 'categoria' não existir na tabela
+      if (error && error.message?.includes('categoria')) {
+        let fallbackQuery = admin
+          .from('cartas_registros')
+          .select('id, template_title, template_key, status, issued_by, issued_at, created_at, member_id, members(name, congregacoes(nome))', { count: 'exact' })
+          .eq('ministry_id', ministryId);
+
+        if (effectiveCongregacaoId) {
+          fallbackQuery = fallbackQuery.eq('members.congregacao_id', effectiveCongregacaoId);
+        }
+        if (status && status !== 'todos') {
+          fallbackQuery = fallbackQuery.eq('status', status);
+        }
+
+        const fallbackRes = await fallbackQuery
+          .order('issued_at', { ascending: false })
+          .range(offset, offset + limit - 1);
+
+        data = fallbackRes.data as any;
+        count = fallbackRes.count;
+        error = fallbackRes.error;
+      }
+
       if (error) throw error;
 
-      const items = (data || []).map((r: any) => ({
-        id: r.id,
-        template_title: r.template_title || (r.categoria === 'declaracao' ? 'Declaração Oficial' : 'Carta Ministerial'),
-        template_key: r.template_key,
-        categoria: r.categoria === 'declaracao' ? 'declaracao' : 'carta',
-        status: r.status || 'emitida',
-        issued_by: r.issued_by || null,
-        issued_at: r.issued_at || r.created_at,
-        membro_nome: r.members?.name || 'Não identificado',
-        congregacao_nome: r.members?.congregacoes?.nome || null,
-      }));
+      const items = (data || []).map((r: any) => {
+        const isDeclaracao = r.categoria === 'declaracao' ||
+          (r.template_title || '').toLowerCase().includes('declara') ||
+          (r.template_key || '').toLowerCase().includes('declaracao');
+
+        return {
+          id: r.id,
+          template_title: r.template_title || (isDeclaracao ? 'Declaração Oficial' : 'Carta Ministerial'),
+          template_key: r.template_key,
+          categoria: isDeclaracao ? 'declaracao' : 'carta',
+          status: r.status || 'emitida',
+          issued_by: r.issued_by || null,
+          issued_at: r.issued_at || r.created_at,
+          membro_nome: r.members?.name || 'Não identificado',
+          congregacao_nome: r.members?.congregacoes?.nome || null,
+        };
+      });
 
       const total = count || 0;
       return NextResponse.json({
