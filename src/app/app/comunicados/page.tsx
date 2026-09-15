@@ -50,22 +50,22 @@ const CATEGORIA_CONFIG: Record<
 > = {
   urgente: {
     label: 'Urgente',
-    badgeColor: 'bg-rose-50 text-rose-700 border-rose-200',
+    badgeColor: 'bg-rose-950/40 text-rose-400 border-rose-500/20',
     icon: AlertTriangle,
   },
   evento: {
     label: 'Evento',
-    badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
+    badgeColor: 'bg-blue-950/40 text-blue-400 border-blue-500/20',
     icon: Calendar,
   },
   departamento: {
     label: 'Departamento',
-    badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
+    badgeColor: 'bg-purple-950/40 text-purple-400 border-purple-500/20',
     icon: Layers,
   },
   geral: {
     label: 'Comunicado',
-    badgeColor: 'bg-slate-50 text-slate-700 border-slate-200',
+    badgeColor: 'bg-slate-800/80 text-slate-300 border-slate-700/60',
     icon: Megaphone,
   },
 };
@@ -183,20 +183,20 @@ export default function MobileComunicadosPage() {
     <MobileShell>
       <MobileHeader title="Comunicados & Avisos" showBack={false} />
 
-      <main className="flex-1 pb-24 px-4 pt-4 space-y-4">
+      <main className="flex-1 pb-28 px-4 pt-4 space-y-4 text-slate-100 max-w-lg mx-auto w-full">
         {/* Banner de Boas-vindas / Informativo */}
-        <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-4 rounded-2xl shadow-sm relative overflow-hidden">
-          <div className="relative z-10 space-y-1">
-            <div className="flex items-center gap-1.5 text-xs text-blue-200 font-semibold uppercase tracking-wider">
-              <Megaphone className="w-3.5 h-3.5 text-blue-300" />
+        <div className="bg-gradient-to-br from-[#172033] to-[#111827] border border-blue-500/20 text-white p-5 rounded-2xl shadow-lg relative overflow-hidden">
+          <div className="relative z-10 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-[11px] text-blue-400 font-bold uppercase tracking-wider">
+              <Megaphone className="w-3.5 h-3.5 text-blue-400" />
               <span>Mural Oficial</span>
             </div>
-            <h1 className="text-lg font-bold text-white">Comunicados da Igreja</h1>
-            <p className="text-xs text-blue-100/90 leading-relaxed">
-              Fique por dentro das últimas notícias, informes pastorais e eventos da nossa congregação.
+            <h1 className="text-base font-bold text-white">Comunicados da Igreja</h1>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Fique por dentro das últimas notícias, informes pastorais e avisos oficiais da congregação.
             </p>
           </div>
-          <div className="absolute -right-4 -bottom-6 opacity-10 text-white pointer-events-none">
+          <div className="absolute -right-4 -bottom-6 opacity-5 text-blue-400 pointer-events-none">
             <Megaphone className="w-28 h-28" />
           </div>
         </div>
@@ -209,8 +209,8 @@ export default function MobileComunicadosPage() {
               onClick={() => setCategoriaAtiva(f.id)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition ${
                 categoriaAtiva === f.id
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                  : 'bg-[#172033] border border-slate-700/50 text-slate-300 hover:text-white hover:border-slate-600'
               }`}
             >
               {f.label}
@@ -220,14 +220,14 @@ export default function MobileComunicadosPage() {
 
         {/* Mensagem de Erro com Botão de Tentar Novamente */}
         {errorMsg && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-700 space-y-2">
+          <div className="p-4 bg-rose-950/20 border border-rose-500/30 rounded-2xl text-xs text-rose-300 space-y-2">
             <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
               <span className="font-semibold">{errorMsg}</span>
             </div>
             <button
               onClick={() => fetchComunicados(1, categoriaAtiva, false)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition shadow-md shadow-blue-900/30"
             >
               <RefreshCw className="w-3 h-3" />
               <span>Tentar novamente</span>
@@ -241,14 +241,14 @@ export default function MobileComunicadosPage() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm animate-pulse space-y-3"
+                className="bg-[#111827] p-4 rounded-2xl border border-slate-800 shadow-md animate-pulse space-y-3"
               >
                 <div className="flex items-center justify-between">
-                  <div className="w-20 h-5 bg-gray-200 rounded-md" />
-                  <div className="w-16 h-4 bg-gray-200 rounded-md" />
+                  <div className="w-20 h-5 bg-slate-800 rounded-md" />
+                  <div className="w-16 h-4 bg-slate-800 rounded-md" />
                 </div>
-                <div className="w-3/4 h-5 bg-gray-200 rounded-md" />
-                <div className="w-full h-12 bg-gray-200 rounded-md" />
+                <div className="w-3/4 h-5 bg-slate-800 rounded-md" />
+                <div className="w-full h-12 bg-slate-800 rounded-md" />
               </div>
             ))}
           </div>
@@ -256,11 +256,11 @@ export default function MobileComunicadosPage() {
 
         {/* Lista Vazia (Empty State) */}
         {!loading && !errorMsg && comunicados.length === 0 && (
-          <div className="py-16 px-4 text-center bg-white border border-gray-100 rounded-2xl shadow-sm space-y-3">
-            <Megaphone className="w-12 h-12 text-gray-300 mx-auto" />
+          <div className="py-16 px-4 text-center bg-[#111827] border border-slate-800 rounded-2xl shadow-lg space-y-3">
+            <Megaphone className="w-12 h-12 text-slate-600 mx-auto" />
             <div className="space-y-1">
-              <p className="text-sm font-bold text-gray-700">Nenhum comunicado disponível</p>
-              <p className="text-xs text-gray-400 max-w-xs mx-auto">
+              <p className="text-sm font-bold text-slate-200">Nenhum comunicado disponível</p>
+              <p className="text-xs text-slate-400 max-w-xs mx-auto">
                 No momento não há avisos ou notícias publicados nesta categoria.
               </p>
             </div>
@@ -280,15 +280,15 @@ export default function MobileComunicadosPage() {
                 <article
                   key={com.id}
                   onClick={() => router.push(`/app/comunicados/${com.id}`)}
-                  className={`bg-white rounded-2xl border shadow-sm overflow-hidden active:scale-[0.99] transition cursor-pointer ${
+                  className={`bg-[#111827] rounded-2xl border shadow-md overflow-hidden active:scale-[0.99] transition cursor-pointer ${
                     isUrgente
-                      ? 'border-rose-300 ring-1 ring-rose-200 bg-rose-50/20'
-                      : 'border-gray-200 hover:border-blue-200'
+                      ? 'border-rose-500/40 bg-rose-950/15'
+                      : 'border-slate-800 hover:border-slate-700'
                   }`}
                 >
                   {/* Banner / Imagem Opcional */}
                   {hasImg && (
-                    <div className="relative w-full h-40 bg-gray-100 overflow-hidden border-b border-gray-100">
+                    <div className="relative w-full h-44 bg-slate-900 overflow-hidden border-b border-slate-800">
                       <img
                         src={com.imagem_url!}
                         alt={com.titulo}
@@ -310,15 +310,15 @@ export default function MobileComunicadosPage() {
                         </span>
 
                         {com.departamento && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-700">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#172033] border border-slate-700/60 text-purple-300">
                             <Tag className="w-2.5 h-2.5" />
                             <span>{com.departamento.sigla || com.departamento.nome}</span>
                           </span>
                         )}
                       </div>
 
-                      <span className="text-[11px] text-gray-400 font-medium flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-gray-300" />
+                      <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-slate-500" />
                         <span>{fmtDate(com.publicado_em)}</span>
                       </span>
                     </div>
@@ -326,29 +326,29 @@ export default function MobileComunicadosPage() {
                     {/* Título */}
                     <h2
                       className={`text-sm font-bold leading-snug line-clamp-2 ${
-                        isUrgente ? 'text-rose-900' : 'text-gray-900'
+                        isUrgente ? 'text-rose-200' : 'text-slate-100'
                       }`}
                     >
                       {com.titulo}
                     </h2>
 
                     {/* Resumo do Conteúdo */}
-                    <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed">
+                    <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">
                       {com.conteudo}
                     </p>
 
                     {/* Rodapé do Card */}
-                    <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-xs">
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
                       {com.congregacao_nome ? (
-                        <span className="text-gray-400 text-[11px] flex items-center gap-1 truncate max-w-[200px]">
-                          <Building2 className="w-3 h-3 shrink-0" />
+                        <span className="text-slate-400 text-[11px] flex items-center gap-1 truncate max-w-[200px]">
+                          <Building2 className="w-3 h-3 shrink-0 text-slate-500" />
                           <span className="truncate">{com.congregacao_nome}</span>
                         </span>
                       ) : (
-                        <span className="text-gray-400 text-[11px]">Toda a Igreja</span>
+                        <span className="text-slate-400 text-[11px]">Toda a Igreja</span>
                       )}
 
-                      <span className="font-bold text-blue-600 flex items-center gap-0.5 text-xs">
+                      <span className="font-bold text-blue-400 flex items-center gap-0.5 text-xs">
                         <span>Ler mais</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </span>
@@ -364,11 +364,11 @@ export default function MobileComunicadosPage() {
                 <button
                   onClick={handleLoadMore}
                   disabled={loadingMore}
-                  className="w-full py-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition shadow-sm flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[#111827] border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-bold rounded-xl transition shadow-md flex items-center justify-center gap-2"
                 >
                   {loadingMore ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
                       <span>Carregando mais comunicados...</span>
                     </>
                   ) : (
