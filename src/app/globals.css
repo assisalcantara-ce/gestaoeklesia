@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@theme {
+  --color-dark-blue: #0f172a;
+}
+
 @layer base {
   * {
     margin: 0;
