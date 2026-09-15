@@ -148,4 +148,30 @@ describe('PROMPT 31 — Auditoria e Correção Forense do Login do Portal do Mem
       'Input CPF deve possuir max-w-full e manter consistência visual com data'
     );
   });
+
+  // L — normalização determinística de data e resolução de candidatos multi-tenant
+  it('L — endpoint /api/v1/mobile/auth/link-member suporta normalização civil de data e resolve candidatos elegíveis', () => {
+    const routeContent = fs.readFileSync(path.resolve('src/app/api/v1/mobile/auth/link-member/route.ts'), 'utf8');
+    assert.ok(
+      routeContent.includes('DATE_BR_RE') && routeContent.includes('DATE_ISO_RE'),
+      'Deve suportar formatos AAAA-MM-DD e DD/MM/AAAA de forma determinística'
+    );
+    assert.ok(
+      routeContent.includes('unlinkedMember = candidates.find((c) => !c.auth_user_id)'),
+      'Deve priorizar o membro não vinculado entre múltiplos candidatos multi-tenant'
+    );
+  });
+
+  // M — tratamento seguro de códigos de erro no frontend
+  it('M — frontend /app/vincular mapeia os códigos de erro oficiais da API sem fallback indevido', () => {
+    const vincularContent = fs.readFileSync(path.resolve('src/app/app/vincular/page.tsx'), 'utf8');
+    assert.ok(
+      vincularContent.includes('data.code || data.error'),
+      'Deve ler data.code ou data.error para exibição precisa de mensagem'
+    );
+    assert.ok(
+      vincularContent.includes('MEMBER_NOT_FOUND') && vincularContent.includes('ALREADY_LINKED_OTHER'),
+      'Deve tratar explicitamente casos de membro não encontrado e já vinculado a outra conta'
+    );
+  });
 });

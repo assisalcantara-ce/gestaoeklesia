@@ -62,7 +62,8 @@ export default function VincularPage() {
         await refresh();
         // O provider vai redirecionar automaticamente para /app/inicio
       } else {
-        switch (data.error) {
+        const code = data.code || data.error;
+        switch (code) {
           case 'MEMBER_NOT_FOUND':
             setError(
               'Não encontramos um cadastro com esses dados. Verifique o CPF e a data de nascimento.',
@@ -73,11 +74,21 @@ export default function VincularPage() {
             break;
           case 'ALREADY_LINKED_OTHER':
             setError(
-              'Este cadastro já está vinculado a outra conta. Entre em contato com o suporte.',
+              'Este cadastro já está vinculado a outra conta. Entre em contato com o suporte ou secretaria da sua igreja.',
             );
             break;
+          case 'INVALID_CPF':
+            setError('CPF inválido. Verifique os dígitos informados.');
+            break;
+          case 'INVALID_DATE':
+            setError('Data de nascimento inválida. Verifique o formato.');
+            break;
           default:
-            setError(data.message || 'Não foi possível vincular. Tente novamente.');
+            setError(
+              typeof data.error === 'string' && data.error
+                ? data.error
+                : data.message || 'Não foi possível vincular. Tente novamente.',
+            );
         }
       }
     } catch {
