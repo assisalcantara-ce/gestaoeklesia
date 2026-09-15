@@ -57,9 +57,9 @@ function formatDate(dateStr: string | null): string {
 
 function InfoRow({ label, value }: { label: string; value: string | null }) {
   return (
-    <div className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-      <span className="text-xs text-gray-400 font-medium">{label}</span>
-      <span className="text-xs text-gray-700 font-semibold text-right max-w-[60%]">
+    <div className="flex justify-between items-center py-2 border-b border-slate-800 last:border-0">
+      <span className="text-xs text-slate-400 font-medium">{label}</span>
+      <span className="text-xs text-slate-200 font-semibold text-right max-w-[60%]">
         {value || '—'}
       </span>
     </div>
@@ -107,22 +107,22 @@ export default function CarteirinhaPage() {
 
   if (memberLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 size={32} className="text-dark-blue animate-spin" />
+      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
+        <Loader2 size={32} className="text-blue-500 animate-spin" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 pb-24">
+      <div className="min-h-screen bg-[#0f172a] text-slate-100 pb-24">
         <MobileHeader title="Carteirinha" />
         <div className="pt-24 px-6 flex flex-col items-center gap-4">
           <AlertCircle size={48} className="text-red-400" />
-          <p className="text-gray-600 text-sm text-center">{error}</p>
+          <p className="text-slate-400 text-sm text-center">{error}</p>
           <button
             onClick={fetchCarteirinha}
-            className="flex items-center gap-2 bg-dark-blue text-white px-6 py-2.5 rounded-xl text-sm font-medium"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold shadow-md active:scale-95 transition"
           >
             <RefreshCw size={14} />
             Tentar novamente
@@ -143,31 +143,31 @@ export default function CarteirinhaPage() {
   const StatusIcon = statusCfg.icon;
 
   return (
-    <div className="min-h-screen bg-gray-100 pb-24">
+    <div className="min-h-screen bg-[#0f172a] text-slate-100 pb-24">
       <MobileHeader title="Carteirinha Digital" />
 
       <div className="pt-20 px-4">
-        {/* Card principal */}
-        <div className="bg-dark-blue rounded-3xl overflow-hidden shadow-2xl">
+        {/* Card principal da Carteirinha */}
+        <div className="bg-[#111827] rounded-3xl overflow-hidden shadow-2xl border border-slate-800">
           {/* Header do card */}
-          <div className="px-6 pt-6 pb-4 flex items-center gap-4">
+          <div className="px-6 pt-6 pb-4 flex items-center gap-4 bg-gradient-to-b from-[#1e293b]/60 to-transparent">
             {data.ministerio_logo ? (
               <Image
                 src={data.ministerio_logo}
                 alt={data.ministerio ?? 'Ministério'}
                 width={44}
                 height={44}
-                className="w-11 h-11 rounded-xl object-cover border-2 border-white/20"
+                className="w-11 h-11 rounded-xl object-cover border-2 border-blue-500/30"
               />
             ) : (
-              <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center border-2 border-white/20">
-                <span className="text-white font-bold text-lg">
+              <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                <span className="text-blue-400 font-bold text-lg">
                   {(data.ministerio ?? 'M').charAt(0)}
                 </span>
               </div>
             )}
             <div>
-              <p className="text-white/60 text-xs font-medium">CARTEIRINHA DIGITAL</p>
+              <p className="text-blue-400 text-xs font-semibold tracking-wider uppercase">CARTEIRINHA DIGITAL</p>
               <p className="text-white text-sm font-bold leading-tight">
                 {data.ministerio ?? 'Ministério'}
               </p>
@@ -175,7 +175,7 @@ export default function CarteirinhaPage() {
           </div>
 
           {/* Divisor */}
-          <div className="h-px bg-white/10 mx-6" />
+          <div className="h-px bg-slate-800 mx-6" />
 
           {/* Corpo do card */}
           <div className="px-6 py-5 flex gap-5">
@@ -187,11 +187,11 @@ export default function CarteirinhaPage() {
                   alt={data.nome}
                   width={72}
                   height={72}
-                  className="w-[72px] h-[72px] rounded-2xl object-cover border-2 border-white/20"
+                  className="w-[72px] h-[72px] rounded-2xl object-cover border-2 border-blue-500/30 shadow-md"
                 />
               ) : (
-                <div className="w-[72px] h-[72px] rounded-2xl bg-white/10 flex items-center justify-center border-2 border-white/20">
-                  <User size={28} className="text-white/50" />
+                <div className="w-[72px] h-[72px] rounded-2xl bg-slate-800 flex items-center justify-center border border-slate-700">
+                  <User size={28} className="text-slate-500" />
                 </div>
               )}
             </div>
@@ -202,10 +202,10 @@ export default function CarteirinhaPage() {
                 {data.nome}
               </p>
               {data.cargo_ministerial && (
-                <p className="text-white/60 text-xs mt-0.5 truncate">{data.cargo_ministerial}</p>
+                <p className="text-slate-400 text-xs mt-0.5 truncate">{data.cargo_ministerial}</p>
               )}
               {data.congregacao && (
-                <p className="text-white/50 text-xs mt-0.5 truncate">{data.congregacao}</p>
+                <p className="text-slate-400 text-xs mt-0.5 truncate">🏛 {data.congregacao}</p>
               )}
               <div className="mt-2">
                 <span
@@ -219,7 +219,7 @@ export default function CarteirinhaPage() {
           </div>
 
           {/* Detalhes */}
-          <div className="mx-6 mb-5 bg-white/5 rounded-2xl px-4 py-1">
+          <div className="mx-6 mb-5 bg-[#172033] rounded-2xl px-4 py-1 border border-slate-800">
             <InfoRow label="Matrícula" value={data.matricula} />
             <InfoRow label="Tipo" value={data.tipo_cadastro} />
             <InfoRow label="Batismo" value={formatDate(data.data_batismo_aguas)} />
@@ -227,16 +227,16 @@ export default function CarteirinhaPage() {
           </div>
 
           {/* Rodapé com QR */}
-          <div className="bg-white/10 px-6 py-5 flex flex-col items-center gap-3">
+          <div className="bg-[#0f172a] px-6 py-5 flex flex-col items-center gap-3 border-t border-slate-800">
             <div className="bg-white p-3 rounded-2xl shadow-lg">
               <QRCodeSVG value={data.qr_payload} size={128} />
             </div>
             {data.unique_id && (
-              <p className="text-white/50 text-[10px] font-mono tracking-wider">
+              <p className="text-slate-400 text-[10px] font-mono tracking-wider">
                 {data.unique_id}
               </p>
             )}
-            <p className="text-white/30 text-[10px]">
+            <p className="text-slate-500 text-[10px]">
               Atualizado em {new Intl.DateTimeFormat('pt-BR').format(new Date())}
             </p>
           </div>
@@ -245,9 +245,9 @@ export default function CarteirinhaPage() {
         {/* Botão atualizar */}
         <button
           onClick={fetchCarteirinha}
-          className="mt-4 w-full flex items-center justify-center gap-2 bg-white rounded-xl py-3 text-sm font-medium text-gray-600 border border-gray-200 shadow-sm active:scale-[0.98] transition"
+          className="mt-4 w-full flex items-center justify-center gap-2 bg-[#111827] rounded-xl py-3 text-sm font-semibold text-slate-200 border border-slate-800 shadow-xs hover:border-slate-700 hover:bg-[#172033] active:scale-[0.98] transition"
         >
-          <RefreshCw size={14} />
+          <RefreshCw size={14} className="text-blue-400" />
           Atualizar carteirinha
         </button>
       </div>
