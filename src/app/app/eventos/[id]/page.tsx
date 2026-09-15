@@ -2,11 +2,13 @@
 
 /**
  * /app/eventos/[id] — Detalhes do Evento e Fluxo de Inscrição Mobile
+ * Design System Dark + Blue Institucional
  */
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useMobileMember } from '@/providers/MobileMemberProvider';
+import MobileShell from '@/components/mobile/MobileShell';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import IngressoModal from '@/components/mobile/IngressoModal';
 import { createClient } from '@/lib/supabase-client';
@@ -219,10 +221,10 @@ export default function EventoDetalhesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center p-6 text-slate-100">
         <div className="text-center space-y-3">
-          <Loader2 size={36} className="text-dark-blue animate-spin mx-auto" />
-          <p className="text-xs text-gray-500 font-medium">Carregando evento...</p>
+          <Loader2 size={36} className="text-blue-500 animate-spin mx-auto" />
+          <p className="text-xs text-slate-400 font-medium">Carregando evento...</p>
         </div>
       </div>
     );
@@ -230,20 +232,22 @@ export default function EventoDetalhesPage() {
 
   if (error || !evento) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6 flex flex-col justify-between">
-        <MobileHeader title="Evento" />
-        <div className="my-auto text-center bg-white rounded-3xl p-8 border border-gray-100 shadow-sm max-w-sm mx-auto">
-          <AlertCircle size={44} className="text-red-500 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-gray-900 mb-1">Evento indisponível</h3>
-          <p className="text-xs text-gray-500 mb-6">{error || 'Evento não encontrado.'}</p>
-          <button
-            onClick={() => router.push('/app/eventos')}
-            className="w-full py-3 bg-dark-blue text-white text-xs font-bold rounded-xl shadow hover:bg-dark-blue/90 transition-all"
-          >
-            Voltar para Eventos
-          </button>
+      <MobileShell>
+        <div className="min-h-screen bg-[#0F172A] p-6 flex flex-col justify-between text-slate-100">
+          <MobileHeader title="Evento" />
+          <div className="my-auto text-center bg-[#111827] rounded-3xl p-8 border border-slate-800/80 shadow-md max-w-sm mx-auto">
+            <AlertCircle size={44} className="text-rose-500 mx-auto mb-3" />
+            <h3 className="text-base font-bold text-slate-100 mb-1">Evento indisponível</h3>
+            <p className="text-xs text-slate-400 mb-6 leading-relaxed">{error || 'Evento não encontrado.'}</p>
+            <button
+              onClick={() => router.push('/app/eventos')}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95"
+            >
+              Voltar para Eventos
+            </button>
+          </div>
         </div>
-      </div>
+      </MobileShell>
     );
   }
 
@@ -253,325 +257,328 @@ export default function EventoDetalhesPage() {
   const tipoLabel = TIPO_LABELS[evento.tipo] || 'Evento';
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      {/* Header com botão Voltar */}
-      <div className="bg-white border-b border-gray-100 px-4 py-3 sticky top-0 z-20 flex items-center gap-3 shadow-xs">
-        <button
-          onClick={() => router.push('/app/eventos')}
-          className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 active:scale-95 flex items-center justify-center text-gray-700 transition-colors"
-          aria-label="Voltar"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <span className="text-sm font-bold text-gray-800 truncate">Detalhes do Evento</span>
-      </div>
-
-      <div className="max-w-md mx-auto px-4 py-5 space-y-5">
-        {/* Banner Card */}
-        <div className="bg-dark-blue text-white rounded-3xl p-6 shadow-md relative overflow-hidden">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <span className="text-[11px] font-bold text-white/90 bg-white/15 px-3 py-1 rounded-full uppercase tracking-wider">
-              {tipoLabel}
-            </span>
-
-            <span
-              className={`text-xs font-extrabold px-3 py-1 rounded-full ${
-                evento.valor_inscricao === 0
-                  ? 'bg-emerald-400 text-emerald-950'
-                  : 'bg-amber-400 text-amber-950'
-              }`}
-            >
-              {formatCurrency(evento.valor_inscricao)}
-            </span>
-          </div>
-
-          <h1 className="text-xl font-extrabold leading-snug tracking-tight">
-            {evento.titulo}
-          </h1>
-
-          {evento.descricao && (
-            <p className="text-xs text-white/80 mt-2.5 leading-relaxed">
-              {evento.descricao}
-            </p>
-          )}
-
-          {/* Vagas */}
-          <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs text-white/70">
-            {evento.lotado ? (
-              <span className="text-amber-300 font-bold flex items-center gap-1">
-                <Users size={13} />
-                Vagas Principais Esgotadas
-              </span>
-            ) : evento.vagas_restantes != null ? (
-              <span>Vagas restantes: <strong>{evento.vagas_restantes}</strong></span>
-            ) : (
-              <span>Vagas ilimitadas</span>
-            )}
-
-            {evento.inclui_hospedagem && (
-              <span className="flex items-center gap-1 text-blue-200">
-                <Bed size={13} />
-                Hospedagem disponível
-              </span>
-            )}
-          </div>
+    <MobileShell>
+      <div className="min-h-screen bg-[#0F172A] text-slate-100 pb-28">
+        {/* Header com botão Voltar */}
+        <div className="bg-[#0F172A]/95 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 sticky top-0 z-20 flex items-center gap-3">
+          <button
+            onClick={() => router.push('/app/eventos')}
+            className="w-9 h-9 rounded-full bg-[#172033] border border-slate-700/60 hover:bg-slate-700 active:scale-95 flex items-center justify-center text-slate-300 transition-colors"
+            aria-label="Voltar"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <span className="text-sm font-bold text-slate-100 truncate">Detalhes do Evento</span>
         </div>
 
-        {/* FEEDBACK DE INSCRIÇÃO CONCLUÍDA RECENTEMENTE */}
-        {inscricaoSucesso && (
-          <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-200 shadow-xs space-y-2 animate-in fade-in">
-            <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
-              <CheckCircle2 size={18} className="text-emerald-600" />
-              <span>Inscrição realizada com sucesso!</span>
-            </div>
-            <p className="text-xs text-emerald-700 leading-relaxed">
-              {inscricaoSucesso.status === 'lista_espera'
-                ? 'Sua inscrição foi registrada na lista de espera. Você será notificado assim que uma vaga for liberada.'
-                : 'Sua vaga está garantida. Acesse seu ingresso para o dia do evento.'}
-            </p>
-          </div>
-        )}
-
-        {/* STATUS DA MINHA INSCRIÇÃO EXISTENTE */}
-        {isJaInscrito && minhaIns && (
-          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                Sua Inscrição
+        <div className="max-w-md mx-auto px-4 py-5 space-y-5">
+          {/* Banner Card */}
+          <div className="bg-[#111827] border border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <span className="text-[11px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-full uppercase tracking-wider">
+                {tipoLabel}
               </span>
 
-              {minhaIns.status === 'confirmado' && (
-                <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
-                  <CheckCircle2 size={13} />
-                  Confirmada
-                </span>
-              )}
-
-              {minhaIns.status === 'aguardando_pagamento' && (
-                <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full animate-pulse">
-                  <Clock size={13} />
-                  Aguardando PIX
-                </span>
-              )}
-
-              {minhaIns.status === 'lista_espera' && (
-                <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">
-                  Lista de Espera
-                </span>
-              )}
+              <span
+                className={`text-xs font-black px-3 py-1 rounded-full border ${
+                  evento.valor_inscricao === 0
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                    : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                }`}
+              >
+                {formatCurrency(evento.valor_inscricao)}
+              </span>
             </div>
 
-            {minhaIns.com_hospedagem && (
-              <p className="text-xs text-blue-700 bg-blue-50/60 p-2.5 rounded-xl flex items-center gap-2">
-                <Bed size={14} className="shrink-0" />
-                <span>Hospedagem solicitada nesta inscrição.</span>
+            <h1 className="text-xl font-black text-slate-100 leading-snug tracking-tight">
+              {evento.titulo}
+            </h1>
+
+            {evento.descricao && (
+              <p className="text-xs text-slate-400 mt-2.5 leading-relaxed">
+                {evento.descricao}
               </p>
             )}
 
-            {/* Ações para inscrição existente */}
-            <div className="pt-2">
-              {minhaIns.status === 'confirmado' && (
-                <button
-                  onClick={() => setIsIngressoOpen(true)}
-                  className="w-full py-3 px-4 rounded-xl bg-dark-blue text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm hover:bg-dark-blue/90 active:scale-[0.98] transition-all"
-                >
-                  <Ticket size={16} />
-                  Ver Ingresso Digital / QR Code
-                </button>
+            {/* Vagas */}
+            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+              {evento.lotado ? (
+                <span className="text-amber-400 font-bold flex items-center gap-1">
+                  <Users size={13} />
+                  Vagas Principais Esgotadas
+                </span>
+              ) : evento.vagas_restantes != null ? (
+                <span>Vagas restantes: <strong className="text-slate-200">{evento.vagas_restantes}</strong></span>
+              ) : (
+                <span>Vagas ilimitadas</span>
               )}
 
-              {minhaIns.status === 'aguardando_pagamento' && minhaIns.pagamento?.id && (
-                <button
-                  onClick={() => router.push(`/app/eventos/${evento.id}/pix?pagamentoId=${minhaIns.pagamento?.id}`)}
-                  className="w-full py-3 px-4 rounded-xl bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm hover:bg-emerald-700 active:scale-[0.98] transition-all"
-                >
-                  <DollarSign size={16} />
-                  Concluir Pagamento PIX (R$ {Number(minhaIns.pagamento.valor).toFixed(2)})
-                </button>
+              {evento.inclui_hospedagem && (
+                <span className="flex items-center gap-1 text-sky-400">
+                  <Bed size={13} />
+                  Hospedagem disponível
+                </span>
               )}
             </div>
           </div>
-        )}
 
-        {/* Data e Local */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs space-y-4">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-            Informações do Evento
-          </h3>
-
-          <div className="space-y-3 text-xs text-gray-700">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-dark-blue/10 flex items-center justify-center text-dark-blue shrink-0 mt-0.5">
-                <Calendar size={16} />
+          {/* FEEDBACK DE INSCRIÇÃO CONCLUÍDA RECENTEMENTE */}
+          {inscricaoSucesso && (
+            <div className="bg-emerald-950/30 rounded-2xl p-5 border border-emerald-800/50 shadow-md space-y-2 animate-in fade-in">
+              <div className="flex items-center gap-2 text-emerald-300 font-bold text-sm">
+                <CheckCircle2 size={18} className="text-emerald-400" />
+                <span>Inscrição realizada com sucesso!</span>
               </div>
-              <div>
-                <p className="font-bold text-gray-900">Data e Horário</p>
-                <p className="text-gray-600 capitalize">{formatEventFullDate(evento.data_inicio)}</p>
-                {evento.data_fim && (
-                  <p className="text-gray-500 text-[11px] mt-0.5">
-                    Até {formatEventFullDate(evento.data_fim)}
-                  </p>
+              <p className="text-xs text-emerald-200/80 leading-relaxed">
+                {inscricaoSucesso.status === 'lista_espera'
+                  ? 'Sua inscrição foi registrada na lista de espera. Você será notificado assim que uma vaga for liberada.'
+                  : 'Sua vaga está garantida. Acesse seu ingresso para o dia do evento.'}
+              </p>
+            </div>
+          )}
+
+          {/* STATUS DA MINHA INSCRIÇÃO EXISTENTE */}
+          {isJaInscrito && minhaIns && (
+            <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800/80 shadow-md space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Sua Inscrição
+                </span>
+
+                {minhaIns.status === 'confirmado' && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                    <CheckCircle2 size={13} />
+                    Confirmada
+                  </span>
+                )}
+
+                {minhaIns.status === 'aguardando_pagamento' && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full animate-pulse">
+                    <Clock size={13} />
+                    Aguardando PIX
+                  </span>
+                )}
+
+                {minhaIns.status === 'lista_espera' && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full">
+                    Lista de Espera
+                  </span>
+                )}
+              </div>
+
+              {minhaIns.com_hospedagem && (
+                <p className="text-xs text-sky-300 bg-sky-500/10 border border-sky-500/20 p-2.5 rounded-xl flex items-center gap-2">
+                  <Bed size={14} className="shrink-0 text-sky-400" />
+                  <span>Hospedagem solicitada nesta inscrição.</span>
+                </p>
+              )}
+
+              {/* Ações para inscrição existente */}
+              <div className="pt-2">
+                {minhaIns.status === 'confirmado' && (
+                  <button
+                    onClick={() => setIsIngressoOpen(true)}
+                    className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-blue-900/30 active:scale-[0.98] transition-all"
+                  >
+                    <Ticket size={16} />
+                    Ver Ingresso Digital / QR Code
+                  </button>
+                )}
+
+                {minhaIns.status === 'aguardando_pagamento' && minhaIns.pagamento?.id && (
+                  <button
+                    onClick={() => router.push(`/app/eventos/${evento.id}/pix?pagamentoId=${minhaIns.pagamento?.id}`)}
+                    className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-900/30 active:scale-[0.98] transition-all"
+                  >
+                    <DollarSign size={16} />
+                    Concluir Pagamento PIX (R$ {Number(minhaIns.pagamento.valor).toFixed(2)})
+                  </button>
                 )}
               </div>
             </div>
+          )}
 
-            {evento.local_nome && (
-              <div className="flex items-start gap-3 pt-2 border-t border-gray-50">
-                <div className="w-8 h-8 rounded-lg bg-dark-blue/10 flex items-center justify-center text-dark-blue shrink-0 mt-0.5">
-                  <MapPin size={16} />
+          {/* Data e Local */}
+          <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800/80 shadow-md space-y-4">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Informações do Evento
+            </h3>
+
+            <div className="space-y-3 text-xs text-slate-300">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0 mt-0.5">
+                  <Calendar size={16} />
                 </div>
                 <div>
-                  <p className="font-bold text-gray-900">{evento.local_nome}</p>
-                  {evento.local_endereco && (
-                    <p className="text-gray-500 mt-0.5">{evento.local_endereco}</p>
+                  <p className="font-bold text-slate-100">Data e Horário</p>
+                  <p className="text-slate-300 capitalize">{formatEventFullDate(evento.data_inicio)}</p>
+                  {evento.data_fim && (
+                    <p className="text-slate-400 text-[11px] mt-0.5">
+                      Até {formatEventFullDate(evento.data_fim)}
+                    </p>
                   )}
                 </div>
               </div>
-            )}
+
+              {evento.local_nome && (
+                <div className="flex items-start gap-3 pt-2.5 border-t border-slate-800/60">
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0 mt-0.5">
+                    <MapPin size={16} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-100">{evento.local_nome}</p>
+                    {evento.local_endereco && (
+                      <p className="text-slate-400 mt-0.5">{evento.local_endereco}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Programação (se existente) */}
+          {evento.programacao && (
+            <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800/80 shadow-md space-y-2">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <FileText size={14} className="text-blue-400" />
+                Programação
+              </h3>
+              <p className="text-xs text-slate-300 whitespace-pre-line leading-relaxed">
+                {evento.programacao}
+              </p>
+            </div>
+          )}
+
+          {/* Hospedagem (se o evento incluir) */}
+          {evento.inclui_hospedagem && (
+            <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800/80 shadow-md space-y-3">
+              <div className="flex items-center gap-2 text-blue-400 font-bold text-xs">
+                <Bed size={16} />
+                <span>Hospedagem no Local</span>
+              </div>
+
+              {evento.descricao_hospedagem && (
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  {evento.descricao_hospedagem}
+                </p>
+              )}
+
+              {!isJaInscrito && (
+                <label className="flex items-center gap-3 p-3 bg-[#172033] rounded-xl cursor-pointer hover:bg-slate-700/60 transition-colors border border-slate-700/60">
+                  <input
+                    type="checkbox"
+                    checked={querHospedagem}
+                    onChange={(e) => setQuerHospedagem(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded bg-slate-900 border-slate-600 focus:ring-blue-500"
+                  />
+                  <span className="text-xs font-semibold text-slate-200">
+                    Desejo solicitar vaga de hospedagem
+                  </span>
+                </label>
+              )}
+            </div>
+          )}
+
+          {/* FORMULÁRIO DE INSCRIÇÃO (Se o membro ainda não está inscrito) */}
+          {!isJaInscrito && (
+            <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800/80 shadow-md space-y-4">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Realizar Inscrição
+              </h3>
+
+              {/* Aviso sobre dados */}
+              <div className="bg-[#172033] p-3 rounded-xl flex items-start gap-2.5 text-xs text-slate-300 border border-slate-700/50">
+                <Info size={15} className="text-blue-400 shrink-0 mt-0.5" />
+                <p>
+                  Inscrição vinculada ao seu cadastro: <strong className="text-slate-100">{member?.name}</strong>.
+                </p>
+              </div>
+
+              {/* Observações Opcionais */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Observações ou necessidades especiais (opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={observacoes}
+                  onChange={(e) => setObservacoes(e.target.value)}
+                  placeholder="Ex: restrições alimentares, grupo musical, etc."
+                  className="w-full px-3.5 py-2.5 text-xs bg-[#172033] border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  maxLength={300}
+                />
+              </div>
+
+              {/* Alerta de erro de submissão */}
+              {submitError && (
+                <div className="p-3 bg-rose-950/40 text-rose-300 rounded-xl text-xs flex items-center gap-2 border border-rose-800/50">
+                  <AlertCircle size={15} className="shrink-0 text-rose-400" />
+                  <span>{submitError}</span>
+                </div>
+              )}
+
+              {/* Botão de Ação Principal */}
+              <button
+                onClick={handleInscrever}
+                disabled={isSubmitting}
+                className={`w-full py-3.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] ${
+                  isSubmitting
+                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                    : evento.lotado
+                    ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-900/30'
+                    : isPago
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/30'
+                }`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Processando inscrição...</span>
+                  </>
+                ) : evento.lotado ? (
+                  <>
+                    <Users size={16} />
+                    <span>Entrar na Lista de Espera</span>
+                  </>
+                ) : isPago ? (
+                  <>
+                    <DollarSign size={16} />
+                    <span>Inscrever e Gerar PIX ({formatCurrency(evento.valor_inscricao)})</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={16} />
+                    <span>Confirmar Inscrição Gratuita</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Programação (se existente) */}
-        {evento.programacao && (
-          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs space-y-2">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-              <FileText size={14} className="text-dark-blue" />
-              Programação
-            </h3>
-            <p className="text-xs text-gray-700 whitespace-pre-line leading-relaxed">
-              {evento.programacao}
-            </p>
-          </div>
-        )}
-
-        {/* Hospedagem (se o evento incluir) */}
-        {evento.inclui_hospedagem && (
-          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs space-y-3">
-            <div className="flex items-center gap-2 text-dark-blue font-bold text-xs">
-              <Bed size={16} />
-              <span>Hospedagem no Local</span>
-            </div>
-
-            {evento.descricao_hospedagem && (
-              <p className="text-xs text-gray-600 leading-relaxed">
-                {evento.descricao_hospedagem}
-              </p>
-            )}
-
-            {!isJaInscrito && (
-              <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200/60">
-                <input
-                  type="checkbox"
-                  checked={querHospedagem}
-                  onChange={(e) => setQuerHospedagem(e.target.checked)}
-                  className="w-4 h-4 text-dark-blue rounded border-gray-300 focus:ring-dark-blue"
-                />
-                <span className="text-xs font-semibold text-gray-800">
-                  Desejo solicitar vaga de hospedagem
-                </span>
-              </label>
-            )}
-          </div>
-        )}
-
-        {/* FORMULÁRIO DE INSCRIÇÃO (Se o membro ainda não está inscrito) */}
-        {!isJaInscrito && (
-          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs space-y-4">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Realizar Inscrição
-            </h3>
-
-            {/* Aviso sobre dados */}
-            <div className="bg-gray-50 p-3 rounded-xl flex items-start gap-2.5 text-xs text-gray-600">
-              <Info size={15} className="text-dark-blue shrink-0 mt-0.5" />
-              <p>
-                Inscrição vinculada ao seu cadastro: <strong>{member?.name}</strong>.
-              </p>
-            </div>
-
-            {/* Observações Opcionais */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Observações ou necessidades especiais (opcional)
-              </label>
-              <textarea
-                rows={2}
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Ex: restrições alimentares, grupo musical, etc."
-                className="w-full px-3 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-dark-blue/20 focus:border-dark-blue transition-all"
-                maxLength={300}
-              />
-            </div>
-
-            {/* Alerta de erro de submissão */}
-            {submitError && (
-              <div className="p-3 bg-red-50 text-red-700 rounded-xl text-xs flex items-center gap-2 border border-red-100">
-                <AlertCircle size={15} className="shrink-0" />
-                <span>{submitError}</span>
-              </div>
-            )}
-
-            {/* Botão de Ação Principal */}
-            <button
-              onClick={handleInscrever}
-              disabled={isSubmitting}
-              className={`w-full py-3.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] ${
-                isSubmitting
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : evento.lotado
-                  ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                  : isPago
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                  : 'bg-dark-blue hover:bg-dark-blue/90 text-white'
-              }`}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>Processando inscrição...</span>
-                </>
-              ) : evento.lotado ? (
-                <>
-                  <Users size={16} />
-                  <span>Entrar na Lista de Espera</span>
-                </>
-              ) : isPago ? (
-                <>
-                  <DollarSign size={16} />
-                  <span>Inscrever e Gerar PIX ({formatCurrency(evento.valor_inscricao)})</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles size={16} />
-                  <span>Confirmar Inscrição Gratuita</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
+        {/* Modal de Ingresso */}
+        <IngressoModal
+          isOpen={isIngressoOpen}
+          onClose={() => setIsIngressoOpen(false)}
+          data={
+            minhaIns
+              ? {
+                  inscricaoId: minhaIns.id,
+                  eventoTitulo: evento.titulo,
+                  dataInicio: evento.data_inicio,
+                  localNome: evento.local_nome,
+                  localEndereco: evento.local_endereco,
+                  membroNome: member?.name || 'Membro',
+                  comHospedagem: minhaIns.com_hospedagem,
+                  statusHospedagem: minhaIns.status_hospedagem,
+                  presente: false,
+                }
+              : null
+          }
+        />
       </div>
-
-      {/* Modal de Ingresso */}
-      <IngressoModal
-        isOpen={isIngressoOpen}
-        onClose={() => setIsIngressoOpen(false)}
-        data={
-          minhaIns
-            ? {
-                inscricaoId: minhaIns.id,
-                eventoTitulo: evento.titulo,
-                dataInicio: evento.data_inicio,
-                localNome: evento.local_nome,
-                localEndereco: evento.local_endereco,
-                membroNome: member?.name || 'Membro',
-                comHospedagem: minhaIns.com_hospedagem,
-                statusHospedagem: minhaIns.status_hospedagem,
-                presente: false,
-              }
-            : null
-        }
-      />
-    </div>
+    </MobileShell>
   );
 }
+
