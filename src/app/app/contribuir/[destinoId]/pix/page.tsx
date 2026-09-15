@@ -10,6 +10,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter, useParams } from 'next/navigation';
 import { useMobileMember } from '@/providers/MobileMemberProvider';
+import MobileShell from '@/components/mobile/MobileShell';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import { createClient } from '@/lib/supabase-client';
 import { QRCodeSVG } from 'qrcode.react';
@@ -155,132 +156,132 @@ export default function ContribuirPixPage() {
   if (memberLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 size={32} className="text-dark-blue animate-spin" />
+        <Loader2 size={32} className="text-blue-500 animate-spin" />
       </div>
     );
   }
 
   if (error || !charge) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
+      <MobileShell>
         <MobileHeader title="Pagamento PIX" showBack backHref={`/app/contribuir/${destinoId}`} />
-        <div className="pt-24 px-6 flex flex-col items-center gap-4 text-center">
-          <AlertCircle size={44} className="text-red-400" />
-          <p className="text-gray-700 text-sm">{error || 'Cobrança não encontrada.'}</p>
+        <main className="pt-24 px-6 flex flex-col items-center gap-4 text-center flex-1 text-slate-100">
+          <AlertCircle size={44} className="text-rose-400" />
+          <p className="text-slate-300 text-sm">{error || 'Cobrança não encontrada.'}</p>
           <button
             onClick={() => router.push('/app/contribuir')}
-            className="bg-dark-blue text-white text-xs font-semibold px-5 py-2.5 rounded-xl"
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md transition"
           >
             Voltar para Contribuir
           </button>
-        </div>
-      </div>
+        </main>
+      </MobileShell>
     );
   }
 
   // ─── ESTADO: SUCESSO (PAGO) ────────────────────────────────────────────────
   if (charge.status === 'pago') {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col pb-10">
+      <MobileShell>
         <MobileHeader title="Contribuição Confirmada" />
 
-        <div className="pt-20 px-5 flex-1 flex flex-col items-center justify-center text-center">
-          <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4 shadow-md animate-bounce">
+        <main className="pt-16 pb-12 px-4 flex-1 flex flex-col items-center justify-center text-center text-slate-100 max-w-lg mx-auto w-full">
+          <div className="w-20 h-20 bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center mb-4 shadow-lg animate-bounce">
             <CheckCircle2 size={44} />
           </div>
 
-          <h2 className="text-xl font-bold text-gray-800">Contribuição Confirmada!</h2>
-          <p className="text-xs text-gray-500 mt-1 max-w-xs">
+          <h2 className="text-xl font-bold text-slate-100">Contribuição Confirmada!</h2>
+          <p className="text-xs text-slate-400 mt-1 max-w-xs">
             Seu pagamento foi liquidado com sucesso e registrado na Tesouraria da sua igreja.
           </p>
 
           {/* Card Resumo */}
-          <div className="w-full max-w-sm bg-white rounded-2xl p-5 border border-gray-100 shadow-sm mt-6 text-left space-y-3">
-            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
-              <span className="text-xs text-gray-400">Valor recebido</span>
-              <span className="text-base font-extrabold text-green-700">
+          <div className="w-full max-w-sm bg-[#111827] rounded-2xl p-5 border border-slate-800 shadow-lg mt-6 text-left space-y-3">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+              <span className="text-xs text-slate-400">Valor recebido</span>
+              <span className="text-base font-extrabold text-emerald-400">
                 {formatCurrency(charge.valor_pago || charge.valor_solicitado)}
               </span>
             </div>
-            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
-              <span className="text-xs text-gray-400">Status</span>
-              <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+              <span className="text-xs text-slate-400">Status</span>
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-500/20 px-2 py-0.5 rounded-full">
                 <CheckCircle2 size={12} /> Confirmado
               </span>
             </div>
             {charge.paid_at && (
               <div className="flex justify-between items-center text-xs">
-                <span className="text-gray-400">Data / Hora</span>
-                <span className="text-gray-700 font-medium">
+                <span className="text-slate-400">Data / Hora</span>
+                <span className="text-slate-200 font-medium">
                   {new Date(charge.paid_at).toLocaleString('pt-BR')}
                 </span>
               </div>
             )}
           </div>
 
-          <div className="w-full max-w-sm space-y-2 mt-8">
+          <div className="w-full max-w-sm space-y-2.5 mt-8">
             <button
               onClick={() => router.push('/app/contribuir')}
-              className="w-full bg-dark-blue text-white py-3.5 rounded-xl font-bold text-sm shadow-md hover:bg-dark-blue/90 active:scale-[0.98] transition"
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-900/30 active:scale-[0.98] transition"
             >
               Ver Minhas Contribuições
             </button>
             <button
               onClick={() => router.push('/app/inicio')}
-              className="w-full bg-white text-gray-600 py-3 rounded-xl font-semibold text-xs border border-gray-200 hover:bg-gray-50 transition"
+              className="w-full bg-[#172033] hover:bg-slate-800 text-slate-300 py-3 rounded-xl font-semibold text-xs border border-slate-700/60 transition"
             >
               Voltar ao Início
             </button>
           </div>
-        </div>
-      </div>
+        </main>
+      </MobileShell>
     );
   }
 
   // ─── ESTADO: EXPIRADO OU CANCELADO ─────────────────────────────────────────
   if (charge.status === 'expirado' || charge.status === 'cancelado') {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col pb-10">
+      <MobileShell>
         <MobileHeader title="Cobrança Expirada" showBack backHref={`/app/contribuir/${destinoId}`} />
-        <div className="pt-24 px-6 flex flex-col items-center gap-4 text-center">
-          <XCircle size={48} className="text-red-400" />
-          <h2 className="text-lg font-bold text-gray-800">Esta cobrança PIX expirou</h2>
-          <p className="text-xs text-gray-500 max-w-xs">
+        <main className="pt-24 px-6 flex flex-col items-center gap-4 text-center flex-1 text-slate-100 max-w-lg mx-auto w-full">
+          <XCircle size={48} className="text-rose-400" />
+          <h2 className="text-lg font-bold text-slate-100">Esta cobrança PIX expirou</h2>
+          <p className="text-xs text-slate-400 max-w-xs">
             O tempo limite para pagamento via QR Code foi encerrado. Você pode gerar um novo código PIX a qualquer momento.
           </p>
           <button
             onClick={() => router.push(`/app/contribuir/${destinoId}`)}
-            className="mt-4 bg-dark-blue text-white text-xs font-semibold px-6 py-3 rounded-xl shadow"
+            className="mt-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-6 py-3 rounded-xl shadow-md transition"
           >
             Gerar novo PIX
           </button>
-        </div>
-      </div>
+        </main>
+      </MobileShell>
     );
   }
 
   // ─── ESTADO: PENDENTE (QR CODE + COPIA E COLA) ─────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col pb-10">
+    <MobileShell>
       <MobileHeader title="Pagar com PIX" showBack backHref={`/app/contribuir/${destinoId}`} />
 
-      <div className="pt-20 px-5 space-y-4 flex-1">
+      <main className="pb-12 px-4 pt-4 space-y-4 flex-1 text-slate-100 max-w-lg mx-auto w-full">
         {/* Card Valor */}
-        <div className="bg-dark-blue rounded-2xl p-5 text-white shadow-md flex justify-between items-center">
+        <div className="bg-gradient-to-br from-[#172033] to-[#111827] border border-blue-500/20 rounded-2xl p-5 text-white shadow-lg flex justify-between items-center">
           <div>
-            <span className="text-xs text-white/70 block">Valor a transferir</span>
-            <span className="text-2xl font-black">{formatCurrency(charge.valor_solicitado)}</span>
+            <span className="text-xs text-slate-400 block font-medium">Valor a transferir</span>
+            <span className="text-2xl font-black text-blue-400">{formatCurrency(charge.valor_solicitado)}</span>
           </div>
-          <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-full text-xs font-semibold">
-            <Clock size={14} className="animate-pulse text-yellow-300" />
-            <span className="text-white/90">Aguardando...</span>
+          <div className="flex items-center gap-1.5 bg-amber-950/40 border border-amber-500/30 text-amber-400 px-3 py-1.5 rounded-full text-xs font-bold">
+            <Clock size={14} className="animate-pulse" />
+            <span>Aguardando...</span>
           </div>
         </div>
 
         {/* QR Code */}
         {charge.pix_payload ? (
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex flex-col items-center gap-4">
-            <div className="bg-white p-3 rounded-2xl shadow-inner border border-gray-100">
+          <div className="bg-[#111827] rounded-2xl p-6 border border-slate-800 shadow-lg flex flex-col items-center gap-4">
+            <div className="bg-white p-3 rounded-2xl shadow-inner border border-slate-200">
               <QRCodeSVG
                 value={charge.pix_payload}
                 size={200}
@@ -288,34 +289,34 @@ export default function ContribuirPixPage() {
                 aria-label="QR Code PIX para pagamento"
               />
             </div>
-            <p className="text-xs text-gray-500 text-center max-w-xs">
-              Abra o app do seu banco, escolha <strong>Pagar com PIX</strong> e aponte a câmera ou use o código abaixo.
+            <p className="text-xs text-slate-300 text-center max-w-xs leading-relaxed">
+              Abra o app do seu banco, escolha <strong className="text-slate-100">Pagar com PIX</strong> e aponte a câmera ou use o código Copia e Cola abaixo.
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl p-6 text-center border border-gray-100 shadow-sm">
-            <AlertCircle size={32} className="text-yellow-500 mx-auto mb-2" />
-            <p className="text-xs text-gray-600">QR Code indisponível no momento.</p>
+          <div className="bg-[#111827] rounded-2xl p-6 text-center border border-slate-800 shadow-md">
+            <AlertCircle size={32} className="text-amber-400 mx-auto mb-2" />
+            <p className="text-xs text-slate-300">QR Code indisponível no momento.</p>
           </div>
         )}
 
         {/* PIX Copia e Cola */}
         {charge.pix_payload && (
-          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-3">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+          <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800 shadow-lg space-y-3">
+            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
               Código PIX Copia e Cola
             </span>
 
-            <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 break-all text-[11px] font-mono text-gray-600 max-h-20 overflow-y-auto select-all">
+            <div className="bg-[#172033] p-3 rounded-xl border border-slate-700/60 break-all text-[11px] font-mono text-slate-300 max-h-20 overflow-y-auto select-all">
               {charge.pix_payload}
             </div>
 
             <button
               onClick={handleCopyPix}
-              className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-sm ${
+              className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md ${
                 copied
-                  ? 'bg-green-600 text-white'
-                  : 'bg-dark-blue text-white hover:bg-dark-blue/90 active:scale-[0.98]'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/30 active:scale-[0.98]'
               }`}
             >
               {copied ? (
@@ -334,14 +335,14 @@ export default function ContribuirPixPage() {
         )}
 
         {/* Status de Polling */}
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-center gap-3">
-          <Loader2 size={20} className="text-dark-blue animate-spin shrink-0" />
-          <div className="text-xs text-dark-blue">
-            <p className="font-bold">Identificando pagamento em tempo real...</p>
-            <p className="text-[11px] opacity-80">Assim que você transferir, a tela confirmará automaticamente.</p>
+        <div className="bg-blue-950/20 border border-blue-500/20 rounded-2xl p-4 flex items-center gap-3">
+          <Loader2 size={20} className="text-blue-400 animate-spin shrink-0" />
+          <div className="text-xs text-slate-300">
+            <p className="font-bold text-slate-100">Identificando pagamento em tempo real...</p>
+            <p className="text-[11px] text-slate-400">Assim que você transferir, a tela confirmará automaticamente.</p>
           </div>
         </div>
-      </div>
-    </div>
+      </main>
+    </MobileShell>
   );
 }

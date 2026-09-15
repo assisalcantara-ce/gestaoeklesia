@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useMobileMember } from '@/providers/MobileMemberProvider';
+import MobileShell from '@/components/mobile/MobileShell';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 import { createClient } from '@/lib/supabase-client';
@@ -164,30 +165,33 @@ export default function ContribuirPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, memberLoading, member?.id]);
 
-  if (memberLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 size={32} className="text-dark-blue animate-spin" />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      <MobileHeader title="Contribuir" />
+    <MobileShell>
+      <MobileHeader title="Contribuir" showBack={false} />
 
-      {/* Tabs */}
-      <div className="pt-16 bg-dark-blue px-6 pb-4">
-        <p className="text-white/70 text-xs mt-2 mb-3">
-          Participe da obra do Senhor com alegria e transparência.
-        </p>
-        <div className="flex bg-white/10 p-1 rounded-xl">
+      <main className="flex-1 pb-28 px-4 pt-4 space-y-4 text-slate-100 max-w-lg mx-auto w-full">
+        {/* Banner de Boas-vindas / Informativo */}
+        <div className="bg-gradient-to-br from-[#172033] to-[#111827] border border-blue-500/20 text-white p-5 rounded-2xl shadow-lg relative overflow-hidden">
+          <div className="relative z-10 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-[11px] text-blue-400 font-bold uppercase tracking-wider">
+              <Heart className="w-3.5 h-3.5 text-blue-400" />
+              <span>Generosidade & Adoração</span>
+            </div>
+            <h1 className="text-base font-bold text-white">Contribuição Ministerial</h1>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Participe da obra do Senhor com alegria, segurança e total transparência.
+            </p>
+          </div>
+        </div>
+
+        {/* Abas */}
+        <div className="flex bg-[#172033] p-1 rounded-xl border border-slate-800/80">
           <button
             onClick={() => setActiveTab('destinos')}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
               activeTab === 'destinos'
-                ? 'bg-white text-dark-blue shadow-sm'
-                : 'text-white/70 hover:text-white'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Destinos
@@ -196,145 +200,153 @@ export default function ContribuirPage() {
             onClick={() => setActiveTab('extrato')}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
               activeTab === 'extrato'
-                ? 'bg-white text-dark-blue shadow-sm'
-                : 'text-white/70 hover:text-white'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <History size={14} />
             Minhas Contribuições
           </button>
         </div>
-      </div>
 
-      {/* Conteúdo Aba Destinos */}
-      {activeTab === 'destinos' && (
-        <div className="px-5 mt-5 space-y-3">
-          {loadingDestinos ? (
-            <div className="py-16 flex flex-col items-center justify-center gap-3">
-              <Loader2 size={28} className="text-dark-blue animate-spin" />
-              <p className="text-xs text-gray-500">Carregando opções...</p>
-            </div>
-          ) : errorDestinos ? (
-            <div className="bg-white rounded-2xl p-6 text-center border border-gray-100 shadow-sm">
-              <AlertCircle size={36} className="text-red-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600 mb-4">{errorDestinos}</p>
-              <button
-                onClick={fetchDestinos}
-                className="inline-flex items-center gap-2 bg-dark-blue text-white text-xs font-medium px-4 py-2 rounded-xl"
-              >
-                <RefreshCw size={12} /> Tentar novamente
-              </button>
-            </div>
-          ) : destinos.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm">
-              <DollarSign size={40} className="text-gray-300 mx-auto mb-2" />
-              <h3 className="text-sm font-bold text-gray-700">Nenhum destino ativo</h3>
-              <p className="text-xs text-gray-500 mt-1">
-                Sua igreja ainda não disponibilizou chaves de arrecadação digital.
-              </p>
-            </div>
-          ) : (
-            destinos.map((dest) => {
-              const IconComp = TIPO_ICONS[dest.tipo_recebimento] || DollarSign;
-              return (
+        {/* Loading Member */}
+        {memberLoading && (
+          <div className="py-16 flex flex-col items-center justify-center gap-3">
+            <Loader2 size={28} className="text-blue-500 animate-spin" />
+            <p className="text-xs text-slate-400">Carregando informações...</p>
+          </div>
+        )}
+
+        {/* Conteúdo Aba Destinos */}
+        {!memberLoading && activeTab === 'destinos' && (
+          <div className="space-y-3">
+            {loadingDestinos ? (
+              <div className="py-16 flex flex-col items-center justify-center gap-3">
+                <Loader2 size={28} className="text-blue-500 animate-spin" />
+                <p className="text-xs text-slate-400">Carregando opções...</p>
+              </div>
+            ) : errorDestinos ? (
+              <div className="bg-[#111827] rounded-2xl p-6 text-center border border-slate-800 shadow-md">
+                <AlertCircle size={36} className="text-rose-400 mx-auto mb-2" />
+                <p className="text-sm text-slate-300 mb-4">{errorDestinos}</p>
                 <button
-                  key={dest.id}
-                  onClick={() => router.push(`/app/contribuir/${dest.id}`)}
-                  className="w-full bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md active:scale-[0.98] transition-all flex items-center gap-4 text-left group"
+                  onClick={fetchDestinos}
+                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-dark-blue/10 flex items-center justify-center shrink-0 text-dark-blue group-hover:bg-dark-blue group-hover:text-white transition-colors">
-                    <IconComp size={24} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-gray-800 truncate">{dest.label}</h3>
-                      {dest.valor_fixo != null && dest.valor_fixo > 0 && (
-                        <span className="text-[10px] font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full shrink-0">
-                          {formatCurrency(dest.valor_fixo)}
-                        </span>
-                      )}
-                    </div>
-                    {dest.descricao && (
-                      <p className="text-xs text-gray-500 truncate mt-0.5">{dest.descricao}</p>
-                    )}
-                    <span className="inline-block text-[10px] text-gray-400 mt-1 font-medium">
-                      {TIPO_LABELS[dest.tipo_recebimento] || dest.tipo_recebimento}
-                    </span>
-                  </div>
-                  <ChevronRight size={18} className="text-gray-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                  <RefreshCw size={12} /> Tentar novamente
                 </button>
-              );
-            })
-          )}
-        </div>
-      )}
-
-      {/* Conteúdo Aba Extrato */}
-      {activeTab === 'extrato' && (
-        <div className="px-5 mt-5 space-y-3">
-          {loadingExtrato ? (
-            <div className="py-16 flex flex-col items-center justify-center gap-3">
-              <Loader2 size={28} className="text-dark-blue animate-spin" />
-              <p className="text-xs text-gray-500">Buscando histórico...</p>
-            </div>
-          ) : errorExtrato ? (
-            <div className="bg-white rounded-2xl p-6 text-center border border-gray-100 shadow-sm">
-              <AlertCircle size={36} className="text-red-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600 mb-4">{errorExtrato}</p>
-              <button
-                onClick={fetchExtrato}
-                className="inline-flex items-center gap-2 bg-dark-blue text-white text-xs font-medium px-4 py-2 rounded-xl"
-              >
-                <RefreshCw size={12} /> Tentar novamente
-              </button>
-            </div>
-          ) : extrato.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm">
-              <History size={40} className="text-gray-300 mx-auto mb-2" />
-              <h3 className="text-sm font-bold text-gray-700">Nenhuma contribuição identificada</h3>
-              <p className="text-xs text-gray-500 mt-1">
-                Suas contribuições confirmadas via PIX ou secretaria aparecerão listadas aqui.
-              </p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-100">
-              {extrato.map((lanc) => {
-                const IconComp = TIPO_ICONS[lanc.tipo_recebimento] || DollarSign;
+              </div>
+            ) : destinos.length === 0 ? (
+              <div className="bg-[#111827] rounded-2xl p-8 text-center border border-slate-800 shadow-md space-y-2">
+                <DollarSign size={40} className="text-slate-600 mx-auto mb-1" />
+                <h3 className="text-sm font-bold text-slate-200">Nenhum destino ativo</h3>
+                <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                  Sua igreja ainda não disponibilizou chaves de arrecadação digital no momento.
+                </p>
+              </div>
+            ) : (
+              destinos.map((dest) => {
+                const IconComp = TIPO_ICONS[dest.tipo_recebimento] || DollarSign;
                 return (
-                  <div key={lanc.id} className="p-4 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center shrink-0">
-                        <IconComp size={18} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-gray-800 truncate">
-                          {TIPO_LABELS[lanc.tipo_recebimento] || lanc.tipo_recebimento}
-                        </p>
-                        <p className="text-[11px] text-gray-400">
-                          {formatDate(lanc.data_lancamento)} • {lanc.forma_pagamento.toUpperCase()}
-                        </p>
-                        {lanc.descricao && (
-                          <p className="text-[10px] text-gray-500 truncate">{lanc.descricao}</p>
+                  <button
+                    key={dest.id}
+                    onClick={() => router.push(`/app/contribuir/${dest.id}`)}
+                    className="w-full bg-[#111827] rounded-2xl p-4 border border-slate-800 shadow-md hover:border-slate-700 active:scale-[0.99] transition-all flex items-center gap-3.5 text-left group"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-blue-600/15 border border-blue-500/20 flex items-center justify-center shrink-0 text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                      <IconComp size={22} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-slate-100 truncate">{dest.label}</h3>
+                        {dest.valor_fixo != null && dest.valor_fixo > 0 && (
+                          <span className="text-[10px] font-bold bg-emerald-950/40 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
+                            {formatCurrency(dest.valor_fixo)}
+                          </span>
                         )}
                       </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs font-bold text-green-700">
-                        + {formatCurrency(lanc.valor)}
-                      </p>
-                      <span className="inline-flex items-center gap-0.5 text-[9px] text-green-600 font-medium">
-                        <CheckCircle2 size={10} /> Confirmado
+                      {dest.descricao && (
+                        <p className="text-xs text-slate-400 truncate mt-0.5">{dest.descricao}</p>
+                      )}
+                      <span className="inline-block text-[10px] text-slate-500 mt-1 font-semibold uppercase tracking-wider">
+                        {TIPO_LABELS[dest.tipo_recebimento] || dest.tipo_recebimento}
                       </span>
                     </div>
-                  </div>
+                    <ChevronRight size={18} className="text-slate-500 shrink-0 group-hover:translate-x-0.5 group-hover:text-slate-300 transition-all" />
+                  </button>
                 );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+              })
+            )}
+          </div>
+        )}
+
+        {/* Conteúdo Aba Extrato */}
+        {!memberLoading && activeTab === 'extrato' && (
+          <div className="space-y-3">
+            {loadingExtrato ? (
+              <div className="py-16 flex flex-col items-center justify-center gap-3">
+                <Loader2 size={28} className="text-blue-500 animate-spin" />
+                <p className="text-xs text-slate-400">Buscando histórico...</p>
+              </div>
+            ) : errorExtrato ? (
+              <div className="bg-[#111827] rounded-2xl p-6 text-center border border-slate-800 shadow-md">
+                <AlertCircle size={36} className="text-rose-400 mx-auto mb-2" />
+                <p className="text-sm text-slate-300 mb-4">{errorExtrato}</p>
+                <button
+                  onClick={fetchExtrato}
+                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition"
+                >
+                  <RefreshCw size={12} /> Tentar novamente
+                </button>
+              </div>
+            ) : extrato.length === 0 ? (
+              <div className="bg-[#111827] rounded-2xl p-8 text-center border border-slate-800 shadow-md space-y-2">
+                <History size={40} className="text-slate-600 mx-auto mb-1" />
+                <h3 className="text-sm font-bold text-slate-200">Nenhuma contribuição identificada</h3>
+                <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                  Suas contribuições confirmadas via PIX ou secretaria aparecerão listadas aqui.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-[#111827] rounded-2xl border border-slate-800 shadow-md overflow-hidden divide-y divide-slate-800/80">
+                {extrato.map((lanc) => {
+                  const IconComp = TIPO_ICONS[lanc.tipo_recebimento] || DollarSign;
+                  return (
+                    <div key={lanc.id} className="p-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                          <IconComp size={18} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-100 truncate">
+                            {TIPO_LABELS[lanc.tipo_recebimento] || lanc.tipo_recebimento}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {formatDate(lanc.data_lancamento)} • {lanc.forma_pagamento.toUpperCase()}
+                          </p>
+                          {lanc.descricao && (
+                            <p className="text-[10px] text-slate-400 truncate mt-0.5">{lanc.descricao}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-bold text-emerald-400">
+                          + {formatCurrency(lanc.valor)}
+                        </p>
+                        <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-400/90 font-medium">
+                          <CheckCircle2 size={10} /> Confirmado
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
 
       <MobileBottomNav />
-    </div>
+    </MobileShell>
   );
 }
