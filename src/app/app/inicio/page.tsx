@@ -1,12 +1,12 @@
 'use client';
 
 /**
- * /app/inicio — Página inicial do portal do membro
+ * /app/inicio — Página inicial mobile-first do aplicativo do membro
+ * Refinada rigorosamente conforme mockup aprovado (Dark + Blue Institucional).
  */
 
 import { useState, useEffect, useMemo } from 'react';
 import { useMobileMember } from '@/providers/MobileMemberProvider';
-import MobileHeader from '@/components/mobile/MobileHeader';
 import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 import { createClient } from '@/lib/supabase-client';
 import { useRouter } from 'next/navigation';
@@ -15,74 +15,116 @@ import {
   CreditCard,
   DollarSign,
   Calendar,
-  CheckCircle2,
-  Clock,
-  XCircle,
   Loader2,
   BookOpen,
-  Flame,
   ChevronRight,
-  MapPin,
   Sparkles,
   HeartHandshake,
   FileText,
   Megaphone,
   Cake,
   Tv,
+  Bell,
+  Play,
+  X,
+  Compass,
 } from 'lucide-react';
 import Image from 'next/image';
 
-const STATUS_CONFIG: Record<
-  string,
-  { label: string; color: string; icon: React.ElementType }
-> = {
-  active: { label: 'Ativo', color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
-  inactive: { label: 'Inativo', color: 'bg-gray-100 text-gray-600', icon: XCircle },
-  pending: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
-  visitante: { label: 'Visitante', color: 'bg-blue-100 text-blue-700', icon: User },
-};
-
-const SHORTCUTS = [
-  { href: '/app/midia', label: 'Central de Mídia', icon: Tv, enabled: true },
-  { href: '/app/comunicados', label: 'Comunicados', icon: Megaphone, enabled: true },
-  { href: '/app/aniversariantes', label: 'Aniversariantes', icon: Cake, enabled: true },
-  { href: '/app/programacao', label: 'Programação', icon: Calendar, enabled: true },
-  { href: '/app/cuidado-pastoral', label: 'Cuidado Pastoral', icon: HeartHandshake, enabled: true },
-  { href: '/app/documentos', label: 'Meus Documentos', icon: FileText, enabled: true },
-  { href: '/app/ebd', label: 'Minha EBD', icon: BookOpen, enabled: true },
-  { href: '/app/carteirinha', label: 'Carteirinha', icon: CreditCard, enabled: true },
-  { href: '/app/contribuir', label: 'Contribuir', icon: DollarSign, enabled: true },
-  { href: '/app/eventos', label: 'Eventos', icon: Sparkles, enabled: true },
-  { href: '/app/perfil', label: 'Meu Perfil', icon: User, enabled: true },
+const PRIMARY_SHORTCUTS = [
+  {
+    href: '/app/contribuir',
+    label: 'Contribuir',
+    icon: DollarSign,
+    iconColor: 'text-blue-400',
+    iconBg: 'bg-blue-500/15 border-blue-500/25',
+  },
+  {
+    href: '/app/eventos',
+    label: 'Eventos',
+    icon: Sparkles,
+    iconColor: 'text-emerald-400',
+    iconBg: 'bg-emerald-500/15 border-emerald-500/25',
+  },
+  {
+    href: '/app/carteirinha',
+    label: 'Carteirinha',
+    icon: CreditCard,
+    iconColor: 'text-indigo-400',
+    iconBg: 'bg-indigo-500/15 border-indigo-500/25',
+  },
+  {
+    href: '/app/ebd',
+    label: 'Minha EBD',
+    icon: BookOpen,
+    iconColor: 'text-cyan-400',
+    iconBg: 'bg-cyan-500/15 border-cyan-500/25',
+  },
+  {
+    href: '/app/documentos',
+    label: 'Documentos',
+    icon: FileText,
+    iconColor: 'text-amber-400',
+    iconBg: 'bg-amber-500/15 border-amber-500/25',
+  },
+  {
+    href: '/app/programacao',
+    label: 'Programação',
+    icon: Calendar,
+    iconColor: 'text-violet-400',
+    iconBg: 'bg-violet-500/15 border-violet-500/25',
+  },
 ];
 
-function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? {
-    label: status,
-    color: 'bg-gray-100 text-gray-600',
+const ALL_SHORTCUTS = [
+  ...PRIMARY_SHORTCUTS,
+  {
+    href: '/app/midia',
+    label: 'Central de Mídia',
+    icon: Tv,
+    iconColor: 'text-rose-400',
+    iconBg: 'bg-rose-500/15 border-rose-500/25',
+  },
+  {
+    href: '/app/comunicados',
+    label: 'Comunicados',
+    icon: Megaphone,
+    iconColor: 'text-sky-400',
+    iconBg: 'bg-sky-500/15 border-sky-500/25',
+  },
+  {
+    href: '/app/cuidado-pastoral',
+    label: 'Cuidado Pastoral',
+    icon: HeartHandshake,
+    iconColor: 'text-pink-400',
+    iconBg: 'bg-pink-500/15 border-pink-500/25',
+  },
+  {
+    href: '/app/aniversariantes',
+    label: 'Aniversariantes',
+    icon: Cake,
+    iconColor: 'text-amber-400',
+    iconBg: 'bg-amber-500/15 border-amber-500/25',
+  },
+  {
+    href: '/app/perfil',
+    label: 'Meu Perfil',
     icon: User,
-  };
-  const Icon = cfg.icon;
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.color}`}
-    >
-      <Icon size={12} />
-      {cfg.label}
-    </span>
-  );
-}
+    iconColor: 'text-slate-300',
+    iconBg: 'bg-slate-700/30 border-slate-600/30',
+  },
+];
 
 function formatHoraData(dateStr: string) {
   const d = new Date(dateStr);
-  const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
   const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const diaSemana = diasSemana[d.getDay()];
   const dia = d.getDate();
   const mes = meses[d.getMonth()];
   const hora = String(d.getHours()).padStart(2, '0');
   const minuto = String(d.getMinutes()).padStart(2, '0');
-  return `${diaSemana}, ${dia} ${mes} às ${hora}:${minuto}`;
+  return `${diaSemana}, ${dia} de ${mes} às ${hora}:${minuto}`;
 }
 
 export default function InicioPage() {
@@ -93,6 +135,7 @@ export default function InicioPage() {
   const [proximoCulto, setProximoCulto] = useState<any | null>(null);
   const [aniversariantesHoje, setAniversariantesHoje] = useState<any[]>([]);
   const [aoVivoDestaque, setAoVivoDestaque] = useState<any | null>(null);
+  const [showAllShortcuts, setShowAllShortcuts] = useState(false);
 
   useEffect(() => {
     async function loadDashboardData() {
@@ -174,229 +217,310 @@ export default function InicioPage() {
   const firstName = member.name?.split(' ')[0] ?? 'Membro';
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 pb-28">
-      <MobileHeader
-        title="Início"
-        rightSlot={
-          <div className="flex items-center gap-2">
-            <Image
-              src="/brand/logo-white.png"
-              alt="Gestão Eklésia"
-              width={80}
-              height={22}
-              className="h-5 w-auto object-contain opacity-90"
-              priority
-            />
-          </div>
-        }
-      />
-
-      {/* Hero */}
-      <div className="bg-gradient-to-b from-[#111827] to-[#0f172a] pt-20 pb-6 px-5 border-b border-slate-800/50">
-        <div className="flex items-center gap-4">
-          {member.foto_url ? (
-            <Image
-              src={member.foto_url}
-              alt={member.name}
-              width={56}
-              height={56}
-              className="w-14 h-14 rounded-2xl object-cover border-2 border-blue-500/30 shadow-md"
-            />
-          ) : (
-            <div className="w-14 h-14 rounded-2xl bg-slate-800 flex items-center justify-center border border-slate-700 shadow-md">
-              <User size={24} className="text-blue-400" />
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="text-slate-400 text-xs font-medium">Bem-vindo(a),</p>
-            <p className="text-white text-lg font-bold leading-tight truncate">{firstName}</p>
-            <div className="mt-1.5 flex items-center gap-2">
-              <StatusBadge status={member.status} />
-              {member.congregacao_nome && (
-                <span className="text-slate-400 text-xs truncate">
-                  • {member.congregacao_nome}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Card Destaque: Culto Ao Vivo (desaparece quando offline) */}
-      {aoVivoDestaque && (
-        <div className="px-5 mt-4">
+    <div className="min-h-screen bg-[#0f172a] text-slate-100 pb-28 select-none">
+      {/* 1. Header Compacto e Pessoal */}
+      <header className="pt-5 pb-3 px-5 flex items-center justify-between">
+        <div className="flex items-center gap-3.5">
+          {/* Avatar com indicador de status ativo */}
           <div
-            onClick={() => router.push('/app/midia')}
-            className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 rounded-2xl p-4 shadow-lg text-white cursor-pointer active:scale-[0.98] transition-all relative overflow-hidden border border-red-500/40"
+            onClick={() => router.push('/app/perfil')}
+            className="relative cursor-pointer group"
           >
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white text-red-600 shadow-sm animate-pulse">
-                <span className="w-2 h-2 rounded-full bg-red-600" />
-                AO VIVO AGORA
-              </span>
-              <span className="text-[11px] font-semibold text-red-100 flex items-center gap-1">
-                Assistir <ChevronRight size={14} />
-              </span>
-            </div>
-
-            <h3 className="text-sm font-bold text-white line-clamp-1">
-              {aoVivoDestaque.titulo || 'Culto Ao Vivo na Igreja'}
-            </h3>
-
-            {aoVivoDestaque.descricao && (
-              <p className="text-xs text-red-100 line-clamp-1 mt-0.5 opacity-90">
-                {aoVivoDestaque.descricao}
-              </p>
+            {member.foto_url ? (
+              <Image
+                src={member.foto_url}
+                alt={member.name}
+                width={48}
+                height={48}
+                className="w-12 h-12 rounded-full object-cover border-2 border-slate-700/80 group-hover:border-blue-500 transition-colors shadow-sm"
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-[#172033] border border-slate-700/80 flex items-center justify-center text-blue-400 group-hover:border-blue-500 transition-colors shadow-sm">
+                <User size={22} />
+              </div>
             )}
+            <span
+              className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-[#0f172a] ${
+                member.status === 'active' ? 'bg-emerald-500' : 'bg-amber-500'
+              }`}
+              title={member.status === 'active' ? 'Membro Ativo' : 'Membro'}
+            />
+          </div>
+
+          {/* Saudação */}
+          <div>
+            <p className="text-[11px] font-medium text-slate-400 leading-tight">Olá,</p>
+            <h1 className="text-base font-black text-white leading-tight truncate max-w-[180px] sm:max-w-[220px]">
+              {firstName}
+            </h1>
+            <p className="text-[11px] text-slate-400 leading-tight mt-0.5">
+              Que bom ter você aqui!
+            </p>
           </div>
         </div>
-      )}
 
-      {/* Card Destaque: Próximo Culto */}
+        {/* Botões de Ação Topo (Notificações / Mural) */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.push('/app/comunicados')}
+            className="w-10 h-10 rounded-full bg-[#172033] border border-slate-700/60 flex items-center justify-center text-slate-300 hover:text-white hover:border-slate-600 transition-all active:scale-95 relative"
+            title="Comunicados e Notificações"
+          >
+            <Bell size={18} />
+            <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-blue-500" />
+          </button>
+        </div>
+      </header>
+
+      {/* 2. Hero Principal (Ao Vivo se houver, ou Destaque da Semana) */}
+      <section className="px-5 mt-3">
+        {aoVivoDestaque ? (
+          /* Card AO VIVO */
+          <div className="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-xl">
+            {/* Background com gradiente escuro e brilho */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/90 to-blue-950/40 z-0" />
+            <div className="absolute top-0 right-0 w-48 h-48 bg-rose-600/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="relative z-10 p-5 pt-6 flex flex-col justify-between min-h-[190px]">
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-md shadow-rose-900/40 animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-white" />
+                  AO VIVO AGORA
+                </span>
+                <span className="text-[11px] font-medium text-slate-400">
+                  {aoVivoDestaque.plataforma || 'Transmissão Oficial'}
+                </span>
+              </div>
+
+              <div className="my-3">
+                <h2 className="text-xl font-black text-white leading-snug drop-shadow-sm">
+                  {aoVivoDestaque.titulo || 'Culto de Celebração'}
+                </h2>
+                <p className="text-xs text-slate-300 mt-1 line-clamp-2 leading-relaxed">
+                  {aoVivoDestaque.descricao || 'Participe conosco agora ao vivo e seja edificado pela palavra de Deus.'}
+                </p>
+              </div>
+
+              <button
+                onClick={() => router.push('/app/midia')}
+                className="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-bold text-sm py-3 px-4 rounded-2xl flex items-center justify-between shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <Play size={16} className="fill-white" />
+                  Assistir agora
+                </span>
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Card Destaque Institucional / Palavra da Semana */
+          <div className="relative overflow-hidden rounded-3xl bg-[#111827] border border-slate-800 shadow-xl">
+            {/* Background com gradiente e ambientação */}
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-950/40 via-slate-900/90 to-[#111827] z-0" />
+            <div className="absolute -top-10 -right-10 w-44 h-44 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="relative z-10 p-5 pt-6 flex flex-col justify-between min-h-[190px]">
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                  <Compass size={13} className="text-blue-400" />
+                  {member.congregacao_nome || 'Gestão Eklésia'}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-400">
+                  Igreja Conectada
+                </span>
+              </div>
+
+              <div className="my-3">
+                <h2 className="text-lg sm:text-xl font-black text-white leading-snug">
+                  {proximoCulto ? proximoCulto.titulo : 'Culto de Celebração'}
+                </h2>
+                <p className="text-xs text-slate-300 mt-1 line-clamp-2 leading-relaxed">
+                  {proximoCulto
+                    ? formatHoraData(proximoCulto.data_inicio)
+                    : 'Acompanhe as mensagens, participe dos cultos e fique por dentro da vida da igreja.'}
+                </p>
+              </div>
+
+              <button
+                onClick={() => router.push(proximoCulto ? `/app/programacao/${proximoCulto.id}` : '/app/midia')}
+                className="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-bold text-sm py-3 px-4 rounded-2xl flex items-center justify-between shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <Play size={16} className="fill-white" />
+                  {proximoCulto ? 'Ver detalhes do culto' : 'Explorar Palavra e Mídia'}
+                </span>
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Indicadores sutis de carrossel (dots) */}
+        <div className="flex items-center justify-center gap-1.5 mt-3">
+          <span className="w-5 h-1.5 rounded-full bg-blue-500" />
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />
+        </div>
+      </section>
+
+      {/* 3. Próximo Culto (Horizontal Card conforme Mockup) */}
       {proximoCulto && (
-        <div className="px-5 mt-4">
+        <section className="px-5 mt-4">
           <div
             onClick={() => router.push(`/app/programacao/${proximoCulto.id}`)}
-            className="bg-[#111827] rounded-2xl p-4 shadow-md border border-slate-800 hover:border-slate-700 transition-all cursor-pointer active:scale-[0.98]"
+            className="bg-[#111827] rounded-2xl p-4 border border-slate-800 shadow-sm flex items-center justify-between gap-3 hover:border-slate-700 active:scale-[0.99] transition-all cursor-pointer"
           >
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-950/80 text-blue-400 border border-blue-800/50">
-                <Flame size={12} className="text-blue-400 fill-blue-400" />
-                Próximo Culto
-              </span>
-              <span className="text-[11px] font-semibold text-blue-400">
-                {formatHoraData(proximoCulto.data_inicio)}
-              </span>
-            </div>
-
-            <h3 className="text-sm font-bold text-slate-100 truncate">
-              {proximoCulto.titulo}
-            </h3>
-
-            <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-slate-800 text-xs text-slate-400">
-              <span className="truncate flex items-center gap-1.5">
-                <MapPin size={13} className="text-slate-500 shrink-0" />
-                {proximoCulto.congregacoes?.nome || proximoCulto.local || 'Na Igreja'}
-              </span>
-              <ChevronRight size={14} className="text-slate-500 shrink-0" />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Widget: Aniversariantes */}
-      <div className="px-5 mt-3">
-        <div
-          onClick={() => router.push('/app/aniversariantes')}
-          className={`rounded-2xl p-4 shadow-sm border transition-all cursor-pointer active:scale-[0.98] ${
-            aniversariantesHoje.length > 0
-              ? 'bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-slate-900 border-amber-500/30 hover:border-amber-500/50'
-              : 'bg-[#111827] border-slate-800 hover:border-slate-700'
-          }`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                  aniversariantesHoje.length > 0
-                    ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
-                    : 'bg-slate-800 text-amber-400 border border-slate-700'
-                }`}
-              >
-                <Cake size={20} />
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                <Calendar size={22} />
               </div>
               <div className="min-w-0">
-                <h3 className="text-xs font-bold text-slate-100 truncate">
-                  {aniversariantesHoje.length > 0
-                    ? `🎂 ${aniversariantesHoje.length} ${
-                        aniversariantesHoje.length === 1
-                          ? 'aniversariante hoje!'
-                          : 'aniversariantes hoje!'
-                      }`
-                    : 'Aniversariantes'}
+                <p className="text-[11px] font-bold text-blue-400 uppercase tracking-wider">
+                  Próximo Culto
+                </p>
+                <h3 className="text-sm font-bold text-white truncate">
+                  {proximoCulto.titulo}
                 </h3>
-                <p className="text-[11px] text-slate-400 truncate">
-                  {aniversariantesHoje.length > 0
-                    ? aniversariantesHoje
-                        .map((a: any) => a.nome.split(' ')[0])
-                        .slice(0, 3)
-                        .join(', ') + (aniversariantesHoje.length > 3 ? ' e mais...' : '')
-                    : 'Celebre a vida dos irmãos em Cristo'}
+                <p className="text-xs text-slate-400 truncate mt-0.5 flex items-center gap-1">
+                  <span>{formatHoraData(proximoCulto.data_inicio)}</span>
+                  <span>•</span>
+                  <span className="truncate">{proximoCulto.congregacoes?.nome || proximoCulto.local || 'Templo Sede'}</span>
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-1 text-xs font-semibold text-amber-400 shrink-0">
-              <span className="hidden sm:inline">Ver todos</span>
-              <ChevronRight size={14} />
+            <div className="text-slate-500 shrink-0 pl-1">
+              <ChevronRight size={18} />
             </div>
           </div>
-        </div>
-      </div>
+        </section>
+      )}
 
-      {/* Atalhos Rápidos */}
-      <div className="px-5 mt-6">
-        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3.5 flex items-center gap-1.5">
-          <Sparkles size={13} className="text-blue-400" />
-          Menu Rápido
-        </h2>
-        <div className="grid grid-cols-2 gap-2.5">
-          {SHORTCUTS.map(({ href, label, icon: Icon, enabled }) =>
-            enabled ? (
+      {/* 4. Widget de Aniversariantes do Dia (se houver) */}
+      {aniversariantesHoje.length > 0 && (
+        <section className="px-5 mt-3">
+          <div
+            onClick={() => router.push('/app/aniversariantes')}
+            className="bg-gradient-to-r from-amber-950/30 via-[#172033] to-[#111827] rounded-2xl p-3.5 border border-amber-500/30 shadow-sm flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 font-bold">
+                <Cake size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-amber-300 truncate">
+                  🎂 {aniversariantesHoje.length} {aniversariantesHoje.length === 1 ? 'aniversariante hoje!' : 'aniversariantes hoje!'}
+                </p>
+                <p className="text-[11px] text-slate-400 truncate">
+                  {aniversariantesHoje
+                    .map((a: any) => a.nome.split(' ')[0])
+                    .slice(0, 3)
+                    .join(', ') + (aniversariantesHoje.length > 3 ? ' e mais...' : '')}
+                </p>
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-amber-400 shrink-0 flex items-center">
+              Parabenizar <ChevronRight size={14} />
+            </span>
+          </div>
+        </section>
+      )}
+
+      {/* 5. Acesso Rápido (Grade com 6 atalhos + Link "Ver todos") */}
+      <section className="px-5 mt-6">
+        <div className="flex items-center justify-between mb-3.5">
+          <h2 className="text-sm font-bold text-white tracking-tight">
+            Acesso Rápido
+          </h2>
+          <button
+            onClick={() => setShowAllShortcuts(true)}
+            className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-0.5 cursor-pointer"
+          >
+            Ver todos
+            <ChevronRight size={14} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2.5">
+          {PRIMARY_SHORTCUTS.map((item) => {
+            const Icon = item.icon;
+            return (
               <button
-                key={label}
-                onClick={() => router.push(href)}
-                className="bg-[#111827] rounded-2xl p-4 flex flex-col items-start gap-3 shadow-xs border border-slate-800 active:scale-[0.97] transition-all hover:border-slate-700 hover:bg-[#172033]"
+                key={item.href}
+                onClick={() => router.push(item.href)}
+                className="bg-[#111827] rounded-2xl p-3.5 flex flex-col items-center justify-center gap-2 border border-slate-800/80 shadow-xs hover:border-slate-700 hover:bg-[#172033] active:scale-[0.96] transition-all cursor-pointer"
               >
-                <div className="w-10 h-10 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center">
-                  <Icon size={20} className="text-blue-400" />
+                <div
+                  className={`w-11 h-11 rounded-2xl flex items-center justify-center border ${item.iconBg}`}
+                >
+                  <Icon size={20} className={item.iconColor} />
                 </div>
-                <span className="text-xs font-semibold text-slate-200">{label}</span>
-              </button>
-            ) : (
-              <div
-                key={label}
-                className="bg-[#111827] rounded-2xl p-4 flex flex-col items-start gap-3 shadow-xs border border-slate-800 opacity-40 cursor-not-allowed"
-              >
-                <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center">
-                  <Icon size={20} className="text-slate-500" />
-                </div>
-                <div>
-                  <span className="text-xs font-semibold text-slate-400">{label}</span>
-                  <span className="block text-[10px] text-slate-500 mt-0.5">Em breve</span>
-                </div>
-              </div>
-            ),
-          )}
-        </div>
-      </div>
-
-      {/* Ministério */}
-      {member.ministerio_nome && (
-        <div className="px-5 mt-6">
-          <div className="bg-[#111827] rounded-2xl p-4 border border-slate-800 shadow-sm flex items-center gap-3.5">
-            {member.ministerio_logo ? (
-              <Image
-                src={member.ministerio_logo}
-                alt={member.ministerio_nome}
-                width={40}
-                height={40}
-                className="w-10 h-10 rounded-xl object-cover border border-slate-700"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                <span className="text-blue-400 font-bold text-sm">
-                  {member.ministerio_nome.charAt(0)}
+                <span className="text-xs font-semibold text-slate-200 text-center truncate max-w-full">
+                  {item.label}
                 </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 6. Modal / Sheet "Todos os Atalhos" */}
+      {showAllShortcuts && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-end sm:items-center sm:justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="w-full sm:max-w-md bg-[#111827] border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-200">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                  <Sparkles size={16} />
+                </div>
+                <h3 className="text-base font-bold text-white">Todos os Atalhos</h3>
               </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] text-slate-400 font-medium">Igreja / Ministério</p>
-              <p className="text-sm font-bold text-slate-200 truncate">{member.ministerio_nome}</p>
+              <button
+                onClick={() => setShowAllShortcuts(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+              {ALL_SHORTCUTS.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.href}
+                    onClick={() => {
+                      setShowAllShortcuts(false);
+                      router.push(item.href);
+                    }}
+                    className="bg-[#172033] rounded-2xl p-3 flex flex-col items-center justify-center gap-2 border border-slate-700/60 hover:border-slate-600 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center border ${item.iconBg}`}
+                    >
+                      <Icon size={18} className={item.iconColor} />
+                    </div>
+                    <span className="text-[11px] font-semibold text-slate-200 text-center truncate max-w-full">
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-slate-800 text-center">
+              <button
+                onClick={() => setShowAllShortcuts(false)}
+                className="w-full py-2.5 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 rounded-xl transition-colors"
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* 7. Bottom Navigation Homologada com 5 abas */}
       <MobileBottomNav />
     </div>
   );

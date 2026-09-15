@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, User, CreditCard, DollarSign, CalendarDays } from 'lucide-react';
+import { Home, User, DollarSign, CalendarDays, Tv } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/app/inicio', label: 'Início', icon: Home },
   { href: '/app/eventos', label: 'Eventos', icon: CalendarDays },
   { href: '/app/contribuir', label: 'Contribuir', icon: DollarSign },
-  { href: '/app/carteirinha', label: 'Carteirinha', icon: CreditCard },
+  { href: '/app/midia', label: 'Mídia', icon: Tv },
   { href: '/app/perfil', label: 'Perfil', icon: User },
 ] as const;
 

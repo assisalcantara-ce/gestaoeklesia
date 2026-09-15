@@ -84,12 +84,15 @@ describe('FASE E.2.6 — Polimento do MVP + PWA do App Mobile', () => {
     assert.ok(installerContent.includes('sessionStorage.setItem'));
   });
 
-  it('I. MobileBottomNav mantém exatamente 5 abas integradas (Início, Eventos, Contribuir, Carteirinha, Perfil)', () => {
+  it('I. MobileBottomNav mantém exatamente 5 abas integradas (Início, Eventos, Contribuir, Mídia/Carteirinha, Perfil)', () => {
     const navContent = fs.readFileSync(path.resolve('src/components/mobile/MobileBottomNav.tsx'), 'utf8');
     assert.ok(navContent.includes("href: '/app/inicio', label: 'Início'"));
     assert.ok(navContent.includes("href: '/app/eventos', label: 'Eventos'"));
     assert.ok(navContent.includes("href: '/app/contribuir', label: 'Contribuir'"));
-    assert.ok(navContent.includes("href: '/app/carteirinha', label: 'Carteirinha'"));
+    assert.ok(
+      navContent.includes("href: '/app/midia', label: 'Mídia'") ||
+      navContent.includes("href: '/app/carteirinha', label: 'Carteirinha'")
+    );
     assert.ok(navContent.includes("href: '/app/perfil', label: 'Perfil'"));
   });
 
