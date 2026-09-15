@@ -39,22 +39,22 @@ const STATUS_CONFIG: Record<
 > = {
   recebido: {
     label: 'Recebido',
-    color: 'bg-blue-50 text-blue-700 border-blue-200',
+    color: 'bg-blue-950/40 text-blue-400 border-blue-500/20',
     icon: Clock,
   },
   em_oracao: {
     label: 'Em Oração',
-    color: 'bg-amber-50 text-amber-700 border-amber-200',
+    color: 'bg-amber-950/40 text-amber-400 border-amber-500/20',
     icon: Sparkles,
   },
   em_atendimento: {
     label: 'Em Atendimento',
-    color: 'bg-purple-50 text-purple-700 border-purple-200',
+    color: 'bg-purple-950/40 text-purple-400 border-purple-500/20',
     icon: HeartHandshake,
   },
   concluido: {
     label: 'Concluído',
-    color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    color: 'bg-emerald-950/40 text-emerald-400 border-emerald-500/20',
     icon: CheckCircle2,
   },
 };
@@ -187,27 +187,27 @@ export default function CuidadoPastoralPage() {
     <MobileShell>
       <MobileHeader title="Cuidado Pastoral" />
 
-      <main className="flex-1 px-4 py-5 max-w-lg mx-auto w-full pb-24 space-y-4">
+      <main className="flex-1 px-4 py-5 max-w-lg mx-auto w-full pb-28 space-y-4 text-slate-100">
         {/* Banner acolhedor */}
-        <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950 rounded-2xl p-5 text-white shadow-md">
+        <div className="bg-gradient-to-br from-[#172033] to-[#111827] border border-blue-500/20 rounded-2xl p-5 text-white shadow-lg">
           <div className="flex items-center gap-2 mb-2">
-            <div className="p-2 rounded-xl bg-white/10 text-amber-300">
+            <div className="p-2 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400">
               <HeartHandshake size={20} />
             </div>
             <div>
-              <h1 className="text-base font-bold tracking-tight">Cuidado Pastoral</h1>
+              <h1 className="text-base font-bold tracking-tight text-white">Cuidado Pastoral</h1>
               <p className="text-xs text-slate-300">Espaço de oração, acolhimento e suporte espiritual</p>
             </div>
           </div>
 
-          <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-2 text-[11px] text-slate-300">
-            <Lock size={12} className="text-amber-400 shrink-0" />
+          <div className="mt-3 pt-3 border-t border-slate-700/60 flex items-center gap-2 text-[11px] text-slate-300">
+            <Lock size={12} className="text-blue-400 shrink-0" />
             <span>Seus pedidos são tratados com sigilo e dedicação pastoral.</span>
           </div>
         </div>
 
         {/* Abas */}
-        <div className="flex bg-slate-200/70 p-1 rounded-xl">
+        <div className="flex bg-[#172033] p-1 rounded-xl border border-slate-800/80">
           <button
             onClick={() => {
               setActiveTab('novo');
@@ -215,8 +215,8 @@ export default function CuidadoPastoralPage() {
             }}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
               activeTab === 'novo'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Novo Pedido
@@ -225,8 +225,8 @@ export default function CuidadoPastoralPage() {
             onClick={() => setActiveTab('historico')}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
               activeTab === 'historico'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Minhas Solicitações
@@ -235,10 +235,10 @@ export default function CuidadoPastoralPage() {
 
         {/* Error Alert */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-2.5">
-            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+          <div className="bg-rose-950/20 border border-rose-500/30 rounded-xl p-4 flex items-start gap-2.5">
+            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-xs font-semibold text-red-900">{error}</p>
+              <p className="text-xs font-semibold text-rose-300">{error}</p>
             </div>
           </div>
         )}
@@ -247,34 +247,34 @@ export default function CuidadoPastoralPage() {
         {activeTab === 'novo' && (
           <div className="space-y-4">
             {sucesso ? (
-              <div className="bg-white rounded-2xl border border-emerald-200 p-6 text-center shadow-sm space-y-3">
-                <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+              <div className="bg-[#111827] rounded-2xl border border-emerald-500/30 p-6 text-center shadow-lg space-y-3">
+                <div className="w-14 h-14 bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center mx-auto">
                   <CheckCircle2 size={28} />
                 </div>
-                <h2 className="text-base font-bold text-slate-900">Pedido Enviado com Sucesso!</h2>
-                <p className="text-xs text-slate-600 leading-relaxed max-w-xs mx-auto">
+                <h2 className="text-base font-bold text-slate-100">Pedido Enviado com Sucesso!</h2>
+                <p className="text-xs text-slate-300 leading-relaxed max-w-xs mx-auto">
                   Sua solicitação foi encaminhada para a liderança pastoral da sua igreja. Estamos orando por você!
                 </p>
                 <div className="pt-2 flex flex-col gap-2">
                   <button
                     onClick={() => setSucesso(false)}
-                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition"
+                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-blue-900/30"
                   >
                     Fazer Outro Pedido
                   </button>
                   <button
                     onClick={() => setActiveTab('historico')}
-                    className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
+                    className="w-full py-2 bg-[#172033] hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700/60 transition"
                   >
                     Ver Minhas Solicitações
                   </button>
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+              <form onSubmit={handleSubmit} className="bg-[#111827] rounded-2xl border border-slate-800 p-5 shadow-lg space-y-4">
                 {/* Tipo de Cuidado */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
                     Tipo de Cuidado
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -290,8 +290,8 @@ export default function CuidadoPastoralPage() {
                         onClick={() => setTipo(item.id as any)}
                         className={`py-2 px-3 rounded-xl text-xs font-semibold border transition text-center ${
                           tipo === item.id
-                            ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold'
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                            ? 'bg-blue-600/20 border-blue-500 text-blue-300 font-bold'
+                            : 'bg-[#172033] border-slate-700/50 text-slate-400 hover:text-slate-200'
                         }`}
                       >
                         {item.label}
@@ -302,8 +302,8 @@ export default function CuidadoPastoralPage() {
 
                 {/* Assunto */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Assunto / Motivo <span className="text-red-500">*</span>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Assunto / Motivo <span className="text-rose-400">*</span>
                   </label>
                   <input
                     type="text"
@@ -311,14 +311,14 @@ export default function CuidadoPastoralPage() {
                     value={assunto}
                     onChange={(e) => setAssunto(e.target.value)}
                     placeholder="Ex: Saúde da família, Direção espiritual..."
-                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-[#172033] border border-slate-700/60 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
                 {/* Descrição do Pedido */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Descrição do Pedido <span className="text-red-500">*</span>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Descrição do Pedido <span className="text-rose-400">*</span>
                   </label>
                   <textarea
                     required
@@ -326,39 +326,39 @@ export default function CuidadoPastoralPage() {
                     value={descricao}
                     onChange={(e) => setDescricao(e.target.value)}
                     placeholder="Compartilhe com a liderança como podemos interceder ou ajudá-lo..."
-                    className="w-full border border-slate-200 rounded-xl p-3.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none leading-relaxed"
+                    className="w-full bg-[#172033] border border-slate-700/60 rounded-xl p-3.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none leading-relaxed"
                   />
                 </div>
 
                 {/* Data Preferencial (Opcional) */}
                 {tipo !== 'oracao' && (
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
                       Data Preferencial (Opcional)
                     </label>
                     <input
                       type="date"
                       value={dataPreferencial}
                       onChange={(e) => setDataPreferencial(e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-[#172033] border border-slate-700/60 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
                 )}
 
                 {/* Sigilo */}
-                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex items-center justify-between">
+                <div className="bg-[#172033] border border-slate-700/50 rounded-xl p-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck size={16} className="text-blue-600 shrink-0" />
+                    <ShieldCheck size={16} className="text-blue-400 shrink-0" />
                     <div>
-                      <p className="text-xs font-bold text-slate-800">Sigilo Pastoral Estrito</p>
-                      <p className="text-[10px] text-slate-500">Apenas os pastores diretos terão acesso</p>
+                      <p className="text-xs font-bold text-slate-200">Sigilo Pastoral Estrito</p>
+                      <p className="text-[10px] text-slate-400">Apenas os pastores diretos terão acesso</p>
                     </div>
                   </div>
                   <input
                     type="checkbox"
                     checked={sigiloso}
                     onChange={(e) => setSigiloso(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                    className="w-4 h-4 accent-blue-600 rounded bg-[#111827] border-slate-700 focus:ring-blue-500"
                   />
                 </div>
 
@@ -366,7 +366,7 @@ export default function CuidadoPastoralPage() {
                 <button
                   type="submit"
                   disabled={submitting || !assunto.trim() || !descricao.trim()}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center justify-center gap-2 active:scale-[0.98]"
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-900/30 transition flex items-center justify-center gap-2 active:scale-[0.98]"
                 >
                   <Send size={14} />
                   {submitting ? 'Enviando com segurança...' : 'Enviar Pedido de Oração'}
@@ -381,16 +381,16 @@ export default function CuidadoPastoralPage() {
           <div className="space-y-3">
             {loading && (
               <div className="space-y-3 animate-pulse">
-                <div className="h-20 bg-slate-200 rounded-xl w-full" />
-                <div className="h-20 bg-slate-200 rounded-xl w-full" />
+                <div className="h-20 bg-[#111827] rounded-xl border border-slate-800 w-full" />
+                <div className="h-20 bg-[#111827] rounded-xl border border-slate-800 w-full" />
               </div>
             )}
 
             {!loading && pedidos.length === 0 && (
-              <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
-                <HeartHandshake size={36} className="text-slate-400 mx-auto mb-3" />
-                <h3 className="font-bold text-slate-800 text-sm mb-1">Nenhuma solicitação enviada</h3>
-                <p className="text-xs text-slate-500 max-w-xs mx-auto">
+              <div className="bg-[#111827] rounded-2xl border border-slate-800 p-8 text-center shadow-lg">
+                <HeartHandshake size={36} className="text-slate-500 mx-auto mb-3" />
+                <h3 className="font-bold text-slate-200 text-sm mb-1">Nenhuma solicitação enviada</h3>
+                <p className="text-xs text-slate-400 max-w-xs mx-auto">
                   Você ainda não registrou nenhum pedido de oração ou atendimento pastoral.
                 </p>
               </div>
@@ -404,10 +404,10 @@ export default function CuidadoPastoralPage() {
                 return (
                   <div
                     key={p.id}
-                    className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-2"
+                    className="bg-[#111827] rounded-xl border border-slate-800 p-4 shadow-md space-y-2"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#172033] border border-slate-700/60 text-blue-300">
                         {TIPO_LABELS[p.tipo] || p.tipo}
                       </span>
                       <span
@@ -418,18 +418,18 @@ export default function CuidadoPastoralPage() {
                       </span>
                     </div>
 
-                    <h4 className="text-xs font-bold text-slate-900 leading-snug">{p.assunto}</h4>
-                    <p className="text-[11px] text-slate-600 leading-relaxed whitespace-pre-line">
+                    <h4 className="text-xs font-bold text-slate-100 leading-snug">{p.assunto}</h4>
+                    <p className="text-[11px] text-slate-300 leading-relaxed whitespace-pre-line">
                       {p.descricao}
                     </p>
 
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
                       <span className="flex items-center gap-1">
                         <Calendar size={11} />
                         Enviado em {formatDateBR(p.created_at)}
                       </span>
                       {p.atendido_em && (
-                        <span className="text-emerald-600 font-semibold">
+                        <span className="text-emerald-400 font-semibold">
                           Atendido em {formatDateBR(p.atendido_em)}
                         </span>
                       )}
