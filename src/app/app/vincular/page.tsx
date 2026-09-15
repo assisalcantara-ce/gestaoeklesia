@@ -88,39 +88,43 @@ export default function VincularPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col">
       <MobileHeader title="Vincular Cadastro" />
 
       <div className="flex-1 flex flex-col px-6 pt-24 pb-10">
         {/* Ícone + Instrução */}
         <div className="flex flex-col items-center mb-8 gap-3">
-          <div className="w-14 h-14 bg-dark-blue/10 rounded-2xl flex items-center justify-center">
-            <Link2 size={28} className="text-dark-blue" />
+          <div className="w-16 h-16 bg-[#172033] border border-blue-500/30 rounded-2xl flex items-center justify-center shadow-inner shadow-blue-500/10">
+            <Link2 size={30} className="text-blue-400" />
           </div>
           <div className="text-center">
-            <h1 className="text-xl font-bold text-gray-800">Vinculação de Cadastro</h1>
-            <p className="text-gray-500 text-sm mt-1 max-w-xs">
+            <h1 className="text-xl font-bold text-slate-100">Vinculação de Cadastro</h1>
+            <p className="text-slate-400 text-sm mt-1 max-w-xs">
               Informe seus dados para conectar sua conta ao cadastro de membro da sua igreja.
             </p>
           </div>
         </div>
 
         {/* Card formulário */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="bg-[#111827] rounded-2xl shadow-xl border border-slate-800 p-6 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-blue-400 to-indigo-600" />
+
           {success ? (
-            <div className="flex flex-col items-center gap-4 py-4">
-              <CheckCircle2 size={48} className="text-green-500" />
-              <p className="text-gray-700 font-medium text-center">
-                Cadastro vinculado com sucesso!
-              </p>
-              <p className="text-gray-400 text-sm text-center">
-                Redirecionando para o início...
-              </p>
+            <div className="flex flex-col items-center gap-4 py-6 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+              <CheckCircle2 size={48} className="text-emerald-400" />
+              <div className="text-center space-y-1">
+                <p className="text-slate-100 font-semibold">
+                  Cadastro vinculado com sucesso!
+                </p>
+                <p className="text-slate-400 text-xs">
+                  Redirecionando para o início do aplicativo...
+                </p>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
                   CPF
                 </label>
                 <input
@@ -130,27 +134,27 @@ export default function VincularPage() {
                   onChange={(e) => setCpf(formatCpf(e.target.value))}
                   placeholder="000.000.000-00"
                   maxLength={14}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-dark-blue/30 focus:border-dark-blue transition"
+                  className="w-full px-4 py-3 bg-[#172033] border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
                   Data de nascimento
                 </label>
                 <input
                   type="date"
                   value={dataNascimento}
                   onChange={(e) => setDataNascimento(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-dark-blue/30 focus:border-dark-blue transition"
+                  className="w-full px-4 py-3 bg-[#172033] border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition [color-scheme:dark]"
                   required
                 />
               </div>
 
               {error && (
-                <div className="flex items-start gap-2 bg-red-50 text-red-700 text-xs px-3 py-2.5 rounded-xl">
-                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2.5 bg-red-500/10 border border-red-500/30 text-red-300 text-xs px-3.5 py-3 rounded-xl">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-400" />
                   <span>{error}</span>
                 </div>
               )}
@@ -158,15 +162,18 @@ export default function VincularPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-dark-blue text-white py-3 rounded-xl font-medium text-sm flex items-center justify-center gap-2 hover:bg-dark-blue/90 active:scale-[0.98] transition disabled:opacity-60"
+                className="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {loading ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Verificando...
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Confirmando vinculação...</span>
                   </>
                 ) : (
-                  'Vincular meu cadastro'
+                  <>
+                    <Link2 size={18} />
+                    <span>Confirmar vinculação</span>
+                  </>
                 )}
               </button>
             </form>
@@ -174,9 +181,9 @@ export default function VincularPage() {
         </div>
 
         {user && (
-          <p className="text-center text-gray-400 text-xs mt-6">
-            Conectado como: <span className="text-gray-600">{user.email}</span>
-          </p>
+          <div className="mt-6 bg-[#111827]/60 border border-slate-800/80 rounded-xl px-4 py-2.5 text-center text-xs text-slate-400">
+            Conectado como: <span className="text-slate-200 font-medium">{user.email}</span>
+          </div>
         )}
       </div>
     </div>
