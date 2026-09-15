@@ -7,6 +7,7 @@ import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { resolveEbdScope } from '@/lib/cartoes-templates-sync';
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
+import NotificationModal from '@/components/NotificationModal';
 import { CheckCircle2, XCircle, Plus, Trash2, Save, UserPlus, Calendar, AlertCircle, Clock } from 'lucide-react';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -123,6 +124,17 @@ export default function EbdChamadaPage() {
 
   const [saving, setSaving] = useState(false);
   const [msg,    setMsg]    = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
+  const [modalNotify, setModalNotify] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'success',
+  });
 
   // ── Carregar base ────────────────────────────────────────────────────────
 
@@ -331,7 +343,17 @@ export default function EbdChamadaPage() {
         total_presentes: totalPresentes,
         total_visitantes: totalVisitantes,
       }).select('id').single();
-      if (error) { flash('erro', error.message); setSaving(false); return; }
+      if (error) {
+        flash('erro', error.message);
+        setModalNotify({
+          isOpen: true,
+          title: 'Erro ao Salvar Chamada',
+          message: error.message || 'Não foi possível salvar os dados da aula. Verifique a conexão.',
+          type: 'error',
+        });
+        setSaving(false);
+        return;
+      }
       aulaId = novaAula.id;
       const novaAulaObj: EbdAula = {
         id: novaAula.id, turma_id: selTurma, data_aula: selData,
@@ -353,7 +375,18 @@ export default function EbdChamadaPage() {
         total_presentes: totalPresentes,
         total_visitantes: totalVisitantes,
       };
-      await supabase.from('ebd_aulas').update(updated).eq('id', aulaId);
+      const { error: updErr } = await supabase.from('ebd_aulas').update(updated).eq('id', aulaId);
+      if (updErr) {
+        flash('erro', updErr.message);
+        setModalNotify({
+          isOpen: true,
+          title: 'Erro ao Atualizar Aula',
+          message: updErr.message || 'Não foi possível atualizar os dados da aula.',
+          type: 'error',
+        });
+        setSaving(false);
+        return;
+      }
       setAulasMap(prev => {
         const m = new Map(prev);
         const existing = m.get(selData);
@@ -373,9 +406,29 @@ export default function EbdChamadaPage() {
       const { error: freqErr } = await supabase
         .from('ebd_frequencias')
         .upsert(freqPayload, { onConflict: 'aula_id,aluno_id' });
-      if (freqErr) { flash('erro', freqErr.message); setSaving(false); return; }
+      if (freqErr) {
+        flash('erro', freqErr.message);
+        setModalNotify({
+          isOpen: true,
+          title: 'Erro ao Salvar Frequência',
+          message: freqErr.message || 'Não foi possível registrar a presença dos alunos.',
+          type: 'error',
+        });
+        setSaving(false);
+        return;
+      }
     }
 
+    const totalAlunos = freqs.length;
+    const totalAusentes = totalAlunos - totalPresentes;
+    const percPresenca = totalAlunos > 0 ? Math.round((totalPresentes / totalAlunos) * 100) : 0;
+
+    setModalNotify({
+      isOpen: true,
+      title: 'Chamada Salva com Sucesso!',
+      message: `A chamada dominical foi registrada com sucesso.\n\n• ${totalPresentes} aluno(s) presente(s)\n• ${totalAusentes} ausente(s)\n• ${totalVisitantes} visitante(s)\n• ${percPresenca}% de presença na turma`,
+      type: 'success',
+    });
     flash('ok', `Chamada salva! ${totalPresentes} presente(s), ${totalVisitantes} visitante(s).`);
     setSaving(false);
   };
@@ -806,6 +859,15 @@ export default function EbdChamadaPage() {
           <p className="text-sm font-medium text-gray-400">Configure um trimestre e selecione uma turma para começar</p>
         </div>
       )}
+
+      {/* Modal Estilizado de Notificação */}
+      <NotificationModal
+        isOpen={modalNotify.isOpen}
+        title={modalNotify.title}
+        message={modalNotify.message}
+        type={modalNotify.type}
+        onClose={() => setModalNotify(prev => ({ ...prev, isOpen: false }))}
+      />
     </PageLayout>
   );
 }
