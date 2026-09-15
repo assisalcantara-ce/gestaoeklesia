@@ -13,7 +13,7 @@ import { useState, useRef } from 'react';
 import { useMobileMember } from '@/providers/MobileMemberProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { createClient } from '@/lib/supabase-client';
-import { formatCpf } from '@/lib/mascaras';
+import { formatCpf, formatData } from '@/lib/mascaras';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import { Loader2, Link2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
@@ -155,10 +155,13 @@ export default function VincularPage() {
                   Data de nascimento
                 </label>
                 <input
-                  type="date"
+                  type="text"
+                  inputMode="numeric"
                   value={dataNascimento}
-                  onChange={(e) => setDataNascimento(e.target.value)}
-                  className="block w-full max-w-full min-w-0 min-h-[46px] px-4 py-3 bg-[#172033] border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition [color-scheme:dark] box-border"
+                  onChange={(e) => setDataNascimento(formatData(e.target.value))}
+                  placeholder="DD/MM/AAAA"
+                  maxLength={10}
+                  className="block w-full max-w-full min-w-0 min-h-[46px] px-4 py-3 bg-[#172033] border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition box-border"
                   required
                 />
               </div>

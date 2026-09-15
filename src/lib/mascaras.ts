@@ -46,6 +46,14 @@ export const formatCpfOrCnpj = (value: string) => {
   return formatCnpj(digits);
 };
 
+export const formatData = (value: string) => {
+  const digits = onlyDigits(value).slice(0, 8);
+  if (!digits) return '';
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
 export const formatPhone = (value: string) => {
   const digits = onlyDigits(value).slice(0, 11);
   if (!digits) return '';

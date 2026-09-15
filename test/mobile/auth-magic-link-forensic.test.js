@@ -136,16 +136,20 @@ describe('PROMPT 31 — Auditoria e Correção Forense do Login do Portal do Mem
     );
   });
 
-  // K — responsividade e contenção de overflow no formulário de vinculação
-  it('K — campos CPF e Data de Nascimento em /app/vincular possuem contenção de overflow e min-w-0', () => {
+  // K — responsividade e digitação direta com máscara nos campos de vinculação
+  it('K — campos CPF e Data de Nascimento em /app/vincular utilizam digitação direta com máscara e contenção de overflow', () => {
     const vincularContent = fs.readFileSync(path.resolve('src/app/app/vincular/page.tsx'), 'utf8');
     assert.ok(
-      vincularContent.includes('type="date"') && vincularContent.includes('max-w-full') && vincularContent.includes('min-w-0'),
-      'Input type date deve possuir max-w-full e min-w-0 para evitar overflow horizontal em viewports estreitos'
+      vincularContent.includes('formatData') && vincularContent.includes('placeholder="DD/MM/AAAA"'),
+      'Data de Nascimento deve utilizar máscara digitada DD/MM/AAAA'
     );
     assert.ok(
-      vincularContent.includes('type="text"') && vincularContent.includes('max-w-full'),
-      'Input CPF deve possuir max-w-full e manter consistência visual com data'
+      vincularContent.includes('formatCpf') && vincularContent.includes('placeholder="000.000.000-00"'),
+      'CPF deve utilizar máscara 000.000.000-00'
+    );
+    assert.ok(
+      vincularContent.includes('max-w-full') && vincularContent.includes('min-w-0'),
+      'Ambos os inputs devem possuir contenção estrita de overflow'
     );
   });
 
