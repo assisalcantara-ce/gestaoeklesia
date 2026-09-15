@@ -72,17 +72,17 @@ const STATUS_SOLICITACAO: Record<
 > = {
   pendente: {
     label: 'Aguardando Secretaria',
-    color: 'bg-amber-50 text-amber-700 border-amber-200',
+    color: 'bg-amber-950/40 text-amber-400 border-amber-500/20',
     icon: Clock,
   },
   autorizado: {
     label: 'Autorizado / Pronto',
-    color: 'bg-green-50 text-green-700 border-green-200',
+    color: 'bg-emerald-950/40 text-emerald-400 border-emerald-500/20',
     icon: CheckCircle2,
   },
   rejeitado: {
     label: 'Não Aprovado',
-    color: 'bg-red-50 text-red-700 border-red-200',
+    color: 'bg-rose-950/40 text-rose-400 border-rose-500/20',
     icon: XCircle,
   },
 };
@@ -249,32 +249,32 @@ export default function MobileDocumentosPage() {
     <MobileShell>
       <MobileHeader title="Central de Documentos" showBack={false} />
 
-      <main className="flex-1 pb-24 px-4 pt-4 space-y-4">
+      <main className="flex-1 pb-28 px-4 pt-4 space-y-4 text-slate-100 max-w-lg mx-auto w-full">
         {/* Banner Informativo */}
-        <div className="bg-gradient-to-r from-teal-700 to-emerald-800 text-white p-4 rounded-2xl shadow-sm relative overflow-hidden">
-          <div className="relative z-10 space-y-1">
-            <div className="flex items-center gap-1.5 text-xs text-teal-200 font-semibold tracking-wide uppercase">
-              <FileCheck className="w-4 h-4 text-emerald-300" />
+        <div className="bg-gradient-to-br from-[#172033] to-[#111827] border border-blue-500/20 text-white p-5 rounded-2xl shadow-lg relative overflow-hidden">
+          <div className="relative z-10 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-[11px] text-blue-400 font-bold tracking-wider uppercase">
+              <FileCheck className="w-4 h-4 text-blue-400" />
               <span>Documentos Oficiais</span>
             </div>
-            <h1 className="text-lg font-bold text-white">Meus Documentos</h1>
-            <p className="text-xs text-teal-100/90 leading-relaxed">
+            <h1 className="text-base font-bold text-white">Meus Documentos</h1>
+            <p className="text-xs text-slate-300 leading-relaxed">
               Consulte cartas ministeriais e declarações emitidas pela Secretaria ou solicite novos documentos.
             </p>
           </div>
-          <div className="absolute right-[-10px] bottom-[-20px] opacity-10 text-white">
+          <div className="absolute right-[-10px] bottom-[-20px] opacity-5 text-blue-400">
             <FileText className="w-32 h-32" />
           </div>
         </div>
 
         {/* Abas de Navegação */}
-        <div className="grid grid-cols-3 gap-1 bg-gray-100/80 p-1 rounded-xl border border-gray-200">
+        <div className="grid grid-cols-3 gap-1 bg-[#172033] p-1 rounded-xl border border-slate-800/80">
           <button
             onClick={() => setActiveTab('disponiveis')}
             className={`py-2 px-1 text-xs font-bold rounded-lg transition text-center flex items-center justify-center gap-1 ${
               activeTab === 'disponiveis'
-                ? 'bg-white text-teal-800 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <FileCheck className="w-3.5 h-3.5" />
@@ -284,8 +284,8 @@ export default function MobileDocumentosPage() {
             onClick={() => setActiveTab('solicitacoes')}
             className={`py-2 px-1 text-xs font-bold rounded-lg transition text-center flex items-center justify-center gap-1 ${
               activeTab === 'solicitacoes'
-                ? 'bg-white text-teal-800 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
@@ -295,19 +295,19 @@ export default function MobileDocumentosPage() {
             onClick={() => setActiveTab('novo')}
             className={`py-2 px-1 text-xs font-bold rounded-lg transition text-center flex items-center justify-center gap-1 ${
               activeTab === 'novo'
-                ? 'bg-white text-teal-800 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <PlusCircle className="w-3.5 h-3.5 text-teal-600" />
+            <PlusCircle className="w-3.5 h-3.5" />
             <span>Solicitar</span>
           </button>
         </div>
 
         {/* Mensagem de Erro Geral */}
         {errorMsg && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+          <div className="p-3 bg-rose-950/20 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
             <span>{errorMsg}</span>
           </div>
         )}
@@ -315,8 +315,8 @@ export default function MobileDocumentosPage() {
         {/* Loading Global */}
         {loading && (
           <div className="py-16 text-center space-y-3">
-            <Loader2 className="w-8 h-8 animate-spin text-teal-600 mx-auto" />
-            <p className="text-xs text-gray-500 font-medium">Carregando documentos...</p>
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto" />
+            <p className="text-xs text-slate-400 font-medium">Carregando documentos...</p>
           </div>
         )}
 
@@ -324,19 +324,19 @@ export default function MobileDocumentosPage() {
         {!loading && activeTab === 'disponiveis' && (
           <div className="space-y-3">
             {documentos.length === 0 ? (
-              <div className="py-16 px-4 text-center bg-white border border-gray-100 rounded-2xl shadow-sm space-y-3">
-                <FileText className="w-12 h-12 text-gray-300 mx-auto" />
+              <div className="py-16 px-4 text-center bg-[#111827] border border-slate-800 rounded-2xl shadow-lg space-y-3">
+                <FileText className="w-12 h-12 text-slate-600 mx-auto" />
                 <div className="space-y-1">
-                  <p className="text-sm font-bold text-gray-700">Nenhum documento disponível</p>
-                  <p className="text-xs text-gray-400 max-w-xs mx-auto">
+                  <p className="text-sm font-bold text-slate-200">Nenhum documento disponível</p>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">
                     Quando a Secretaria emitir cartas ou declarações para você, elas aparecerão aqui prontas para visualização e impressão.
                   </p>
                 </div>
                 <button
                   onClick={() => setActiveTab('novo')}
-                  className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold rounded-xl transition"
+                  className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 text-xs font-bold rounded-xl transition"
                 >
-                  <PlusCircle className="w-4 h-4 text-teal-600" />
+                  <PlusCircle className="w-4 h-4 text-blue-400" />
                   <span>Solicitar Documento</span>
                 </button>
               </div>
@@ -344,35 +344,35 @@ export default function MobileDocumentosPage() {
               documentos.map((doc) => (
                 <div
                   key={doc.id}
-                  className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm space-y-3 hover:border-teal-200 transition"
+                  className="bg-[#111827] p-4 rounded-2xl border border-slate-800 shadow-md space-y-3 hover:border-slate-700 transition"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-1">
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
                           doc.tipo === 'declaracao'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-blue-50 text-blue-700 border border-blue-200'
+                            ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-blue-950/40 text-blue-300 border border-blue-500/30'
                         }`}
                       >
                         {doc.tipo === 'declaracao' ? '📄 Declaração' : '📜 Carta Ministerial'}
                       </span>
-                      <h2 className="text-sm font-bold text-gray-900 leading-snug">
+                      <h2 className="text-sm font-bold text-slate-100 leading-snug">
                         {doc.titulo}
                       </h2>
                     </div>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
-                      <CheckCircle2 className="w-3 h-3 text-green-600" />
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-950/40 text-emerald-400 border border-emerald-500/20">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                       <span>Liberado</span>
                     </span>
                   </div>
 
-                  <div className="text-xs text-gray-500 pt-1 border-t border-gray-100 flex items-center justify-between">
+                  <div className="text-xs text-slate-400 pt-2 border-t border-slate-800 flex items-center justify-between">
                     <span>Emitido em: {fmtDate(doc.data_emissao)}</span>
                     <button
                       onClick={() => handleOpenDoc(doc.id, doc.titulo)}
                       disabled={viewLoading}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition shadow-sm"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition shadow-md shadow-blue-900/30"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>Visualizar / PDF</span>
@@ -388,17 +388,17 @@ export default function MobileDocumentosPage() {
         {!loading && activeTab === 'solicitacoes' && (
           <div className="space-y-3">
             {solicitacoes.length === 0 ? (
-              <div className="py-16 px-4 text-center bg-white border border-gray-100 rounded-2xl shadow-sm space-y-3">
-                <Clock className="w-12 h-12 text-gray-300 mx-auto" />
+              <div className="py-16 px-4 text-center bg-[#111827] border border-slate-800 rounded-2xl shadow-lg space-y-3">
+                <Clock className="w-12 h-12 text-slate-600 mx-auto" />
                 <div className="space-y-1">
-                  <p className="text-sm font-bold text-gray-700">Nenhum pedido em andamento</p>
-                  <p className="text-xs text-gray-400 max-w-xs mx-auto">
+                  <p className="text-sm font-bold text-slate-200">Nenhum pedido em andamento</p>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">
                     Você ainda não fez nenhum pedido de documento oficial.
                   </p>
                 </div>
                 <button
                   onClick={() => setActiveTab('novo')}
-                  className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white text-xs font-bold rounded-xl transition shadow-sm"
+                  className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-blue-900/30"
                 >
                   <PlusCircle className="w-4 h-4" />
                   <span>Fazer Novo Pedido</span>
@@ -413,12 +413,12 @@ export default function MobileDocumentosPage() {
                 return (
                   <div
                     key={sol.id}
-                    className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm space-y-2.5"
+                    className="bg-[#111827] p-4 rounded-2xl border border-slate-800 shadow-md space-y-2.5"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="space-y-0.5">
-                        <h2 className="text-sm font-bold text-gray-900">{info.label}</h2>
-                        <p className="text-[11px] text-gray-400">
+                        <h2 className="text-sm font-bold text-slate-100">{info.label}</h2>
+                        <p className="text-[11px] text-slate-400">
                           Solicitado em {fmtDate(sol.created_at)}
                         </p>
                       </div>
@@ -431,26 +431,26 @@ export default function MobileDocumentosPage() {
                     </div>
 
                     {sol.destino && (
-                      <p className="text-xs text-gray-600">
-                        <strong>Destino informado:</strong> {sol.destino}
+                      <p className="text-xs text-slate-300">
+                        <strong className="text-slate-100">Destino informado:</strong> {sol.destino}
                       </p>
                     )}
 
                     {sol.observacoes && (
-                      <p className="text-xs text-gray-500 italic bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+                      <p className="text-xs text-slate-300 italic bg-[#172033] p-2.5 rounded-xl border border-slate-700/50">
                         "{sol.observacoes}"
                       </p>
                     )}
 
                     {sol.status === 'rejeitado' && sol.motivo_rejeicao && (
-                      <div className="text-xs text-red-700 bg-red-50 border border-red-200 p-2.5 rounded-xl">
-                        <strong>Motivo informado pela secretaria:</strong> {sol.motivo_rejeicao}
+                      <div className="text-xs text-rose-300 bg-rose-950/30 border border-rose-500/30 p-2.5 rounded-xl">
+                        <strong className="text-rose-200">Motivo informado pela secretaria:</strong> {sol.motivo_rejeicao}
                       </div>
                     )}
 
                     {sol.status === 'autorizado' && (
-                      <div className="text-xs text-green-700 bg-green-50 border border-green-200 p-2.5 rounded-xl flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                      <div className="text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-500/30 p-2.5 rounded-xl flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                         <span>Autorizado em {fmtDate(sol.data_autorizacao)}. O documento está disponível na aba "Disponíveis".</span>
                       </div>
                     )}
@@ -463,22 +463,22 @@ export default function MobileDocumentosPage() {
 
         {/* Conteúdo Aba: NOVO PEDIDO */}
         {!loading && activeTab === 'novo' && (
-          <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-            <div className="border-b border-gray-100 pb-3">
-              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-teal-600" />
+          <div className="bg-[#111827] p-5 rounded-2xl border border-slate-800 shadow-lg space-y-4">
+            <div className="border-b border-slate-800 pb-3">
+              <h2 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-blue-400" />
                 <span>Solicitar Documento Oficial</span>
               </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-slate-400 mt-0.5">
                 Seus dados cadastrais (nome, cargo e congregação) são vinculados automaticamente com segurança.
               </p>
             </div>
 
             {formSuccess ? (
               <div className="py-8 text-center space-y-2">
-                <CheckCircle2 className="w-10 h-10 text-green-600 mx-auto animate-bounce" />
-                <h3 className="text-sm font-bold text-gray-800">Solicitação Enviada!</h3>
-                <p className="text-xs text-gray-500">
+                <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto animate-bounce" />
+                <h3 className="text-sm font-bold text-slate-100">Solicitação Enviada!</h3>
+                <p className="text-xs text-slate-400">
                   A Secretaria Geral foi notificada e avaliará o seu pedido.
                 </p>
               </div>
@@ -486,7 +486,7 @@ export default function MobileDocumentosPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Tipo de Documento */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-700 block uppercase tracking-wider">
+                  <label className="text-xs font-bold text-slate-300 block uppercase tracking-wider">
                     Selecione o Documento Desejado *
                   </label>
                   <div className="space-y-2">
@@ -495,8 +495,8 @@ export default function MobileDocumentosPage() {
                         key={key}
                         className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
                           formTipo === key
-                            ? 'bg-teal-50/70 border-teal-500 ring-1 ring-teal-500'
-                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                            ? 'bg-blue-600/15 border-blue-500 ring-1 ring-blue-500'
+                            : 'bg-[#172033] border-slate-700/50 hover:border-slate-600'
                         }`}
                       >
                         <input
@@ -505,11 +505,11 @@ export default function MobileDocumentosPage() {
                           value={key}
                           checked={formTipo === key}
                           onChange={() => setFormTipo(key as any)}
-                          className="mt-0.5 text-teal-600 focus:ring-teal-500"
+                          className="mt-0.5 accent-blue-600 focus:ring-blue-500"
                         />
                         <div className="space-y-0.5">
-                          <p className="text-xs font-bold text-gray-800">{val.label}</p>
-                          <p className="text-[11px] text-gray-500">{val.desc}</p>
+                          <p className="text-xs font-bold text-slate-100">{val.label}</p>
+                          <p className="text-[11px] text-slate-400">{val.desc}</p>
                         </div>
                       </label>
                     ))}
@@ -518,7 +518,7 @@ export default function MobileDocumentosPage() {
 
                 {/* Destino (Opcional ou Relevante) */}
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-700 block uppercase tracking-wider">
+                  <label className="text-xs font-bold text-slate-300 block uppercase tracking-wider">
                     Igreja / Cidade de Destino (Opcional)
                   </label>
                   <input
@@ -526,13 +526,13 @@ export default function MobileDocumentosPage() {
                     value={formDestino}
                     onChange={(e) => setFormDestino(e.target.value)}
                     placeholder="Ex: Igreja Evangélica Betel — São Paulo/SP"
-                    className="w-full text-xs p-3 rounded-xl border border-gray-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                    className="w-full text-xs p-3 rounded-xl bg-[#172033] border border-slate-700/60 text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </div>
 
                 {/* Observações */}
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-700 block uppercase tracking-wider">
+                  <label className="text-xs font-bold text-slate-300 block uppercase tracking-wider">
                     Observações / Motivo (Opcional)
                   </label>
                   <textarea
@@ -540,14 +540,14 @@ export default function MobileDocumentosPage() {
                     value={formObservacoes}
                     onChange={(e) => setFormObservacoes(e.target.value)}
                     placeholder="Detalhes adicionais para a Secretaria Geral..."
-                    className="w-full text-xs p-3 rounded-xl border border-gray-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none resize-none"
+                    className="w-full text-xs p-3 rounded-xl bg-[#172033] border border-slate-700/60 text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {submitting ? (
                     <>
@@ -568,35 +568,35 @@ export default function MobileDocumentosPage() {
 
         {/* Modal Visualizador de Documento Oficial (HTML / PDF) */}
         {viewDoc && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in duration-200">
+            <div className="bg-[#111827] w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-800">
               {/* Header do Modal */}
-              <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/80">
+              <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-[#172033]">
                 <div className="space-y-0.5">
-                  <h3 className="text-sm font-bold text-gray-900">{viewDoc.titulo}</h3>
-                  <p className="text-[11px] text-gray-500">Documento Oficial Autêntico</p>
+                  <h3 className="text-sm font-bold text-slate-100">{viewDoc.titulo}</h3>
+                  <p className="text-[11px] text-slate-400">Documento Oficial Autêntico</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handlePrint(viewDoc.rendered_html, viewDoc.titulo)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition shadow-sm"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition shadow-md shadow-blue-900/30"
                   >
                     <Printer className="w-3.5 h-3.5" />
                     <span>Imprimir / Salvar PDF</span>
                   </button>
                   <button
                     onClick={() => setViewDoc(null)}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
-              {/* Corpo do Documento Renderizado em A4 */}
-              <div className="flex-1 overflow-y-auto p-4 bg-gray-100/60 flex justify-center">
+              {/* Corpo do Documento Renderizado em A4 (Preservando folha branca para autenticidade do documento impresso) */}
+              <div className="flex-1 overflow-y-auto p-4 bg-slate-950 flex justify-center">
                 <div
-                  className="bg-white shadow-md p-6 max-w-full rounded-lg text-gray-800"
+                  className="bg-white shadow-md p-6 max-w-full rounded-lg text-gray-900"
                   dangerouslySetInnerHTML={{ __html: viewDoc.rendered_html }}
                 />
               </div>
