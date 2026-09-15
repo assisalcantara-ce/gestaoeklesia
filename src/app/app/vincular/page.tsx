@@ -88,10 +88,10 @@ export default function VincularPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white">
       <MobileHeader title="Vincular Cadastro" />
 
-      <div className="flex-1 flex flex-col px-6 pt-24 pb-10">
+      <div className="flex-1 flex flex-col px-4 sm:px-6 pt-20 pb-10 w-full max-w-md mx-auto min-w-0">
         {/* Ícone + Instrução */}
         <div className="flex flex-col items-center mb-8 gap-3">
           <div className="w-16 h-16 bg-[#172033] border border-blue-500/30 rounded-2xl flex items-center justify-center shadow-inner shadow-blue-500/10">
@@ -106,7 +106,7 @@ export default function VincularPage() {
         </div>
 
         {/* Card formulário */}
-        <div className="bg-[#111827] rounded-2xl shadow-xl border border-slate-800 p-6 relative overflow-hidden">
+        <div className="bg-[#111827] rounded-2xl shadow-xl border border-slate-800 p-5 sm:p-6 relative overflow-hidden w-full min-w-0 box-border">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-blue-400 to-indigo-600" />
 
           {success ? (
@@ -122,8 +122,8 @@ export default function VincularPage() {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
+            <form onSubmit={handleSubmit} className="space-y-5 w-full min-w-0">
+              <div className="w-full min-w-0">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
                   CPF
                 </label>
@@ -134,12 +134,12 @@ export default function VincularPage() {
                   onChange={(e) => setCpf(formatCpf(e.target.value))}
                   placeholder="000.000.000-00"
                   maxLength={14}
-                  className="w-full px-4 py-3 bg-[#172033] border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition"
+                  className="block w-full max-w-full min-w-0 min-h-[46px] px-4 py-3 bg-[#172033] border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition box-border"
                   required
                 />
               </div>
 
-              <div>
+              <div className="w-full min-w-0">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
                   Data de nascimento
                 </label>
@@ -147,7 +147,7 @@ export default function VincularPage() {
                   type="date"
                   value={dataNascimento}
                   onChange={(e) => setDataNascimento(e.target.value)}
-                  className="w-full px-4 py-3 bg-[#172033] border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition [color-scheme:dark]"
+                  className="block w-full max-w-full min-w-0 min-h-[46px] px-4 py-3 bg-[#172033] border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition [color-scheme:dark] box-border"
                   required
                 />
               </div>
@@ -162,7 +162,7 @@ export default function VincularPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full min-h-[46px] bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {loading ? (
                   <>
@@ -181,7 +181,7 @@ export default function VincularPage() {
         </div>
 
         {user && (
-          <div className="mt-6 bg-[#111827]/60 border border-slate-800/80 rounded-xl px-4 py-2.5 text-center text-xs text-slate-400">
+          <div className="mt-6 bg-[#111827]/60 border border-slate-800/80 rounded-xl px-4 py-2.5 text-center text-xs text-slate-400 truncate max-w-full">
             Conectado como: <span className="text-slate-200 font-medium">{user.email}</span>
           </div>
         )}
