@@ -17,7 +17,7 @@ export default function MobileBottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50">
-      <div className="max-w-md mx-auto bg-white border-t border-gray-200 shadow-lg">
+      <div className="max-w-md mx-auto bg-[#111827]/95 backdrop-blur-md border-t border-slate-800/80 shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
         <div className="flex items-center justify-around h-16 px-1">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href || pathname.startsWith(`${href}/`);
@@ -25,16 +25,19 @@ export default function MobileBottomNav() {
               <Link
                 key={href}
                 href={href}
-                className={`flex flex-col items-center gap-0.5 py-2 px-2.5 rounded-xl transition-colors min-w-[56px] ${
+                className={`flex flex-col items-center gap-1 py-1.5 px-2 rounded-xl transition-all min-w-[56px] relative ${
                   isActive
-                    ? 'text-dark-blue'
-                    : 'text-gray-400 hover:text-gray-600 active:text-gray-700'
+                    ? 'text-blue-500 font-bold'
+                    : 'text-slate-400 hover:text-slate-200 active:text-slate-100'
                 }`}
               >
-                <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
+                {isActive && (
+                  <span className="absolute top-0 w-8 h-0.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                )}
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.75} className={isActive ? 'text-blue-500' : 'text-slate-400'} />
                 <span
-                  className={`text-[10px] font-medium ${
-                    isActive ? 'text-dark-blue font-bold' : 'text-gray-400'
+                  className={`text-[10px] tracking-tight ${
+                    isActive ? 'text-blue-400 font-semibold' : 'text-slate-400 font-medium'
                   }`}
                 >
                   {label}
