@@ -162,17 +162,17 @@ export default function MobileAlbumDetailPage({
     <MobileShell>
       <MobileHeader title="Galeria de Fotos" />
 
-      <main className="min-h-screen bg-slate-50 pb-28">
+      <main className="min-h-screen bg-[#0f172a] text-slate-100 pb-28">
         {/* Topo / Voltar */}
-        <div className="bg-dark-blue pt-20 pb-5 px-5 text-white">
+        <div className="bg-[#0f172a] pt-20 pb-5 px-5 text-white border-b border-slate-800/80">
           <div className="flex items-center justify-between gap-3">
             <Link
               href="/app/midia"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/80 hover:text-white bg-white/10 px-3 py-1.5 rounded-xl transition"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-200 hover:text-white bg-[#172033] border border-slate-700/80 px-3 py-1.5 rounded-xl transition"
             >
               <ArrowLeft size={14} /> Voltar para Central
             </Link>
-            <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
               Álbum Oficial
             </span>
           </div>
@@ -181,14 +181,14 @@ export default function MobileAlbumDetailPage({
         {/* Feedback de Erro */}
         {errorMsg && (
           <div className="p-5">
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-xs flex items-center justify-between gap-3">
+            <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-300 text-xs flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
-                <AlertCircle size={18} className="shrink-0 text-rose-600" />
+                <AlertCircle size={18} className="shrink-0 text-rose-400" />
                 <span className="truncate">{errorMsg}</span>
               </div>
               <button
                 onClick={loadAlbum}
-                className="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-600 text-white font-semibold rounded-xl text-[11px] shrink-0"
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-xl text-[11px] shrink-0 transition cursor-pointer"
               >
                 <RefreshCw size={11} /> Tentar de novo
               </button>
@@ -199,18 +199,18 @@ export default function MobileAlbumDetailPage({
         {/* Loading Skeleton */}
         {loading ? (
           <div className="p-5 space-y-4">
-            <div className="h-44 bg-slate-200 rounded-2xl animate-pulse" />
+            <div className="h-44 bg-slate-800 rounded-2xl animate-pulse" />
             <div className="grid grid-cols-2 gap-3">
-              <div className="aspect-square bg-slate-200 rounded-xl animate-pulse" />
-              <div className="aspect-square bg-slate-200 rounded-xl animate-pulse" />
-              <div className="aspect-square bg-slate-200 rounded-xl animate-pulse" />
-              <div className="aspect-square bg-slate-200 rounded-xl animate-pulse" />
+              <div className="aspect-square bg-slate-800 rounded-xl animate-pulse" />
+              <div className="aspect-square bg-slate-800 rounded-xl animate-pulse" />
+              <div className="aspect-square bg-slate-800 rounded-xl animate-pulse" />
+              <div className="aspect-square bg-slate-800 rounded-xl animate-pulse" />
             </div>
           </div>
         ) : album ? (
           <div className="p-5 space-y-5">
             {/* Metadados e Capa do Álbum */}
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="bg-[#111827] rounded-2xl border border-slate-800 overflow-hidden shadow-sm">
               {album.capa_url && (
                 <div className="aspect-video w-full relative bg-slate-950 overflow-hidden">
                   <img
@@ -218,7 +218,7 @@ export default function MobileAlbumDetailPage({
                     alt={album.titulo}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                   <div className="absolute bottom-3 left-3 right-3 text-white">
                     <span className="px-2 py-0.5 rounded bg-blue-600 text-[10px] font-bold uppercase tracking-wider mb-1 inline-block">
                       {album.escopo === 'congregacao' ? 'Congregação' : 'Geral'}
@@ -232,31 +232,31 @@ export default function MobileAlbumDetailPage({
 
               <div className="p-4 space-y-2">
                 {!album.capa_url && (
-                  <h1 className="text-lg font-black text-slate-900 leading-tight">
+                  <h1 className="text-lg font-black text-slate-100 leading-tight">
                     {album.titulo}
                   </h1>
                 )}
 
                 {album.descricao && (
-                  <p className="text-xs text-slate-600 leading-relaxed">
+                  <p className="text-xs text-slate-300 leading-relaxed">
                     {album.descricao}
                   </p>
                 )}
 
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 pt-2 border-t border-slate-100">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 pt-2 border-t border-slate-800">
                   {album.data_evento && (
                     <span className="flex items-center gap-1 font-medium">
-                      <Calendar size={12} className="text-slate-400" />
+                      <Calendar size={12} className="text-slate-500" />
                       {new Date(album.data_evento).toLocaleDateString('pt-BR')}
                     </span>
                   )}
                   {album.congregacao_nome && (
                     <span className="flex items-center gap-1 font-medium">
-                      <Building2 size={12} className="text-slate-400" />
+                      <Building2 size={12} className="text-slate-500" />
                       {album.congregacao_nome}
                     </span>
                   )}
-                  <span className="flex items-center gap-1 font-bold text-blue-600 ml-auto">
+                  <span className="flex items-center gap-1 font-bold text-blue-400 ml-auto">
                     <ImageIcon size={12} />
                     {album.fotos.length} foto{album.fotos.length === 1 ? '' : 's'}
                   </span>
@@ -266,9 +266,9 @@ export default function MobileAlbumDetailPage({
 
             {/* Grid de Fotos */}
             {album.fotos.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-2">
-                <ImageIcon size={32} className="mx-auto text-slate-400" />
-                <p className="text-xs text-slate-500">Nenhuma foto adicionada a este álbum.</p>
+              <div className="bg-[#111827] border border-slate-800 rounded-2xl p-8 text-center space-y-2">
+                <ImageIcon size={32} className="mx-auto text-slate-500" />
+                <p className="text-xs text-slate-400">Nenhuma foto adicionada a este álbum.</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -276,7 +276,7 @@ export default function MobileAlbumDetailPage({
                   <div
                     key={foto.id}
                     onClick={() => setLightboxIndex(idx)}
-                    className="aspect-square bg-slate-900 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition cursor-pointer active:scale-[0.98] relative group"
+                    className="aspect-square bg-[#172033] border border-slate-800/80 rounded-2xl overflow-hidden shadow-xs hover:border-blue-500/50 transition cursor-pointer active:scale-[0.98] relative group"
                   >
                     <img
                       src={foto.foto_url}
@@ -312,7 +312,7 @@ export default function MobileAlbumDetailPage({
               </span>
               <button
                 onClick={() => setLightboxIndex(null)}
-                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
+                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition cursor-pointer"
                 title="Fechar"
               >
                 <X size={18} />
@@ -330,14 +330,14 @@ export default function MobileAlbumDetailPage({
               {/* Botões Laterais */}
               <button
                 onClick={prevPhoto}
-                className="absolute left-3 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/80 transition"
+                className="absolute left-3 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/80 transition cursor-pointer"
                 title="Foto anterior"
               >
                 <ChevronLeft size={22} />
               </button>
               <button
                 onClick={nextPhoto}
-                className="absolute right-3 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/80 transition"
+                className="absolute right-3 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/80 transition cursor-pointer"
                 title="Próxima foto"
               >
                 <ChevronRight size={22} />

@@ -263,26 +263,26 @@ export default function MobileMidiaPage() {
     <MobileShell>
       <MobileHeader title="Central de Mídia" />
 
-      <main className="min-h-screen bg-slate-50 pb-28">
+      <main className="min-h-screen bg-[#0f172a] text-slate-100 pb-28">
         {/* Header Hero */}
-        <div className="bg-dark-blue pt-20 pb-6 px-5 text-white">
+        <div className="bg-[#0f172a] pt-20 pb-6 px-5 text-white border-b border-slate-800/80">
           <div className="flex items-center gap-2 mb-1">
-            <span className="p-1 rounded-lg bg-white/10 text-white">
+            <span className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30">
               <Tv size={16} />
             </span>
-            <span className="text-xs font-semibold text-white/70 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">
               Comunicação & Conteúdo
             </span>
           </div>
-          <h1 className="text-xl font-bold text-white tracking-tight">
+          <h1 className="text-xl font-bold text-slate-100 tracking-tight">
             Central de Mídia
           </h1>
-          <p className="text-xs text-white/60 mt-0.5">
+          <p className="text-xs text-slate-400 mt-0.5">
             Cultos ao vivo, web rádio, sermões e fotos oficiais
           </p>
 
           {/* Navegação por Segmentos/Pills */}
-          <div className="flex items-center gap-1.5 mt-5 overflow-x-auto no-scrollbar pb-1 -mx-5 px-5">
+          <div className="flex items-center gap-2 mt-5 overflow-x-auto no-scrollbar pb-1 -mx-5 px-5">
             {[
               { id: 'tudo', label: 'Tudo', icon: Sparkles },
               { id: 'aovivo', label: 'Ao Vivo', icon: Tv },
@@ -297,13 +297,13 @@ export default function MobileMidiaPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as TabOption)}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all active:scale-95 ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer ${
                     isActive
-                      ? 'bg-white text-dark-blue shadow-sm'
-                      : 'bg-white/10 text-white/80 hover:bg-white/15'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40 border border-blue-500'
+                      : 'bg-[#172033] text-slate-300 hover:bg-[#1f2c45] border border-slate-700/60'
                   }`}
                 >
-                  <Icon size={13} className={isActive ? 'text-dark-blue' : 'text-white/70'} />
+                  <Icon size={13} className={isActive ? 'text-white' : 'text-slate-400'} />
                   {tab.label}
                 </button>
               );
@@ -314,14 +314,14 @@ export default function MobileMidiaPage() {
         {/* Feedback de Erro Geral */}
         {errorMsg && (
           <div className="p-5">
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-xs flex items-center justify-between gap-3">
+            <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-300 text-xs flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
-                <AlertCircle size={18} className="shrink-0 text-rose-600" />
+                <AlertCircle size={18} className="shrink-0 text-rose-400" />
                 <span className="truncate">{errorMsg}</span>
               </div>
               <button
                 onClick={loadFeed}
-                className="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-600 text-white font-semibold rounded-xl text-[11px] shrink-0"
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-xl text-[11px] shrink-0 transition cursor-pointer"
               >
                 <RefreshCw size={11} /> Tentar de novo
               </button>
@@ -332,11 +332,11 @@ export default function MobileMidiaPage() {
         {/* Loading Skeleton */}
         {loading ? (
           <div className="p-5 space-y-4">
-            <div className="h-36 bg-slate-200 rounded-2xl animate-pulse" />
-            <div className="h-28 bg-slate-200 rounded-2xl animate-pulse" />
+            <div className="h-36 bg-slate-800 rounded-2xl animate-pulse" />
+            <div className="h-28 bg-slate-800 rounded-2xl animate-pulse" />
             <div className="grid grid-cols-2 gap-3">
-              <div className="aspect-video bg-slate-200 rounded-xl animate-pulse" />
-              <div className="aspect-video bg-slate-200 rounded-xl animate-pulse" />
+              <div className="aspect-video bg-slate-800 rounded-xl animate-pulse" />
+              <div className="aspect-video bg-slate-800 rounded-xl animate-pulse" />
             </div>
           </div>
         ) : (
@@ -345,7 +345,7 @@ export default function MobileMidiaPage() {
             {(activeTab === 'tudo' || activeTab === 'aovivo') && (
               <section className="space-y-3">
                 {feedData?.aovivo?.is_aovivo ? (
-                  <div className="bg-gradient-to-br from-red-600 to-rose-700 rounded-2xl p-4 text-white shadow-md overflow-hidden relative border border-red-500">
+                  <div className="bg-gradient-to-br from-red-600 to-rose-700 rounded-2xl p-4 text-white shadow-lg overflow-hidden relative border border-red-500">
                     <div className="flex items-center justify-between mb-3">
                       <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 text-white text-[11px] font-black tracking-wider uppercase backdrop-blur-sm">
                         <span className="w-2 h-2 rounded-full bg-white animate-ping" />
@@ -394,13 +394,13 @@ export default function MobileMidiaPage() {
                     )}
                   </div>
                 ) : activeTab === 'aovivo' ? (
-                  <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-3">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-8 text-center space-y-3 shadow-sm">
+                    <div className="w-14 h-14 rounded-2xl bg-[#172033] border border-slate-700/60 text-slate-400 flex items-center justify-center mx-auto">
                       <Tv size={28} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-slate-800">Nenhuma transmissão ao vivo</h3>
-                      <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                      <h3 className="text-sm font-bold text-slate-100">Nenhuma transmissão ao vivo</h3>
+                      <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
                         Fique atento aos horários dos cultos ou acesse o canal oficial para rever mensagens anteriores.
                       </p>
                     </div>
@@ -409,7 +409,7 @@ export default function MobileMidiaPage() {
                         href={feedData.aovivo.canal_youtube_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800 transition"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md transition"
                       >
                         Canal da Igreja no YouTube <ExternalLink size={12} />
                       </a>
@@ -423,13 +423,13 @@ export default function MobileMidiaPage() {
             {(activeTab === 'tudo' || activeTab === 'radio') && (
               <section className="space-y-3">
                 {feedData?.radio?.disponivel ? (
-                  <div className="bg-gradient-to-br from-emerald-700 to-teal-900 text-white rounded-2xl p-4 shadow-md overflow-hidden relative border border-emerald-600/50">
+                  <div className="bg-gradient-to-br from-emerald-900/80 via-teal-950 to-slate-900 text-white rounded-2xl p-4 shadow-lg overflow-hidden relative border border-emerald-500/30">
                     <div className="flex items-center justify-between mb-3">
-                      <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-200 uppercase tracking-wider">
+                      <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-300 uppercase tracking-wider">
                         <Radio size={14} className={isRadioPlaying ? 'animate-bounce text-emerald-300' : ''} />
                         Web Rádio Oficial
                       </div>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-100 text-[10px] font-bold border border-emerald-400/30">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-200 text-[10px] font-bold border border-emerald-500/30">
                         {isRadioPlaying ? 'Transmitindo' : 'No Ar'}
                       </span>
                     </div>
@@ -452,23 +452,23 @@ export default function MobileMidiaPage() {
                       <button
                         onClick={toggleRadio}
                         disabled={isRadioBuffering}
-                        className="w-13 h-13 rounded-full bg-white text-emerald-800 flex items-center justify-center shadow-lg transition-transform active:scale-95 shrink-0"
+                        className="w-13 h-13 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center shadow-lg transition-transform active:scale-95 shrink-0 cursor-pointer"
                         title={isRadioPlaying ? 'Pausar rádio' : 'Tocar rádio'}
                       >
                         {isRadioBuffering ? (
-                          <div className="w-5 h-5 border-2 border-emerald-800 border-t-transparent rounded-full animate-spin" />
+                          <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                         ) : isRadioPlaying ? (
-                          <Square size={20} className="fill-current text-emerald-800" />
+                          <Square size={20} className="fill-current text-slate-950" />
                         ) : (
-                          <Play size={22} className="fill-current text-emerald-800 ml-0.5" />
+                          <Play size={22} className="fill-current text-slate-950 ml-0.5" />
                         )}
                       </button>
                     </div>
 
                     {/* Controle de Volume e Erros */}
                     {isRadioPlaying && (
-                      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-white/15">
-                        <button onClick={toggleMute} className="text-emerald-200 hover:text-white">
+                      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-white/10">
+                        <button onClick={toggleMute} className="text-emerald-300 hover:text-white cursor-pointer">
                           {isRadioMuted || radioVolume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
                         </button>
                         <input
@@ -478,25 +478,25 @@ export default function MobileMidiaPage() {
                           step="0.05"
                           value={isRadioMuted ? 0 : radioVolume}
                           onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                          className="w-full h-1.5 bg-emerald-950/60 rounded-lg appearance-none cursor-pointer accent-white"
+                          className="w-full h-1.5 bg-emerald-950 rounded-lg appearance-none cursor-pointer accent-emerald-400"
                         />
                       </div>
                     )}
 
                     {radioError && (
-                      <p className="text-[11px] text-rose-200 bg-rose-950/50 p-2 rounded-xl mt-3">
+                      <p className="text-[11px] text-rose-300 bg-rose-950/60 p-2 rounded-xl mt-3 border border-rose-500/30">
                         {radioError}
                       </p>
                     )}
                   </div>
                 ) : activeTab === 'radio' ? (
-                  <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-3">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-8 text-center space-y-3 shadow-sm">
+                    <div className="w-14 h-14 rounded-2xl bg-[#172033] border border-slate-700/60 text-slate-400 flex items-center justify-center mx-auto">
                       <Radio size={28} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-slate-800">Web Rádio Indisponível</h3>
-                      <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                      <h3 className="text-sm font-bold text-slate-100">Web Rádio Indisponível</h3>
+                      <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
                         A transmissão da Web Rádio não está ativada no momento para este ministério.
                       </p>
                     </div>
@@ -510,15 +510,15 @@ export default function MobileMidiaPage() {
               <section className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <Video size={16} className="text-dark-blue" />
-                    <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                    <Video size={16} className="text-blue-400" />
+                    <h2 className="text-xs font-bold text-blue-400 uppercase tracking-wider">
                       Vídeos & Sermões
                     </h2>
                   </div>
                   {activeTab === 'tudo' && (
                     <button
                       onClick={() => setActiveTab('videos')}
-                      className="text-xs font-semibold text-blue-600 flex items-center gap-0.5"
+                      className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-0.5 cursor-pointer"
                     >
                       Ver todos <ChevronRight size={13} />
                     </button>
@@ -527,15 +527,15 @@ export default function MobileMidiaPage() {
 
                 {/* Filtro e Busca na aba de vídeos */}
                 {activeTab === 'videos' && (
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     <div className="relative">
-                      <Search size={14} className="text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <Search size={14} className="text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
                         value={videoSearch}
                         onChange={(e) => setVideoSearch(e.target.value)}
                         placeholder="Buscar sermão ou pregador..."
-                        className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900"
+                        className="w-full pl-9 pr-4 py-2.5 bg-[#172033] border border-slate-700/80 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 text-slate-100 placeholder-slate-500 transition"
                       />
                     </div>
                     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
@@ -543,10 +543,10 @@ export default function MobileMidiaPage() {
                         <button
                           key={cat}
                           onClick={() => setSelectedVideoCategory(cat)}
-                          className={`px-3 py-1 rounded-xl text-[11px] font-bold shrink-0 transition-all ${
+                          className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold shrink-0 transition-all cursor-pointer ${
                             selectedVideoCategory === cat
-                              ? 'bg-dark-blue text-white shadow-xs'
-                              : 'bg-white text-slate-600 border border-slate-200'
+                              ? 'bg-blue-600 text-white shadow-xs border border-blue-500'
+                              : 'bg-[#172033] text-slate-300 hover:bg-[#1f2c45] border border-slate-700/60'
                           }`}
                         >
                           {cat === 'todos' ? 'Todos' : CATEGORIA_LABELS[cat as CategoriaVideo] || cat}
@@ -559,12 +559,12 @@ export default function MobileMidiaPage() {
                 {/* Lista / Grid de Vídeos */}
                 {loadingVideos ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="aspect-video bg-slate-200 rounded-2xl animate-pulse" />
-                    <div className="aspect-video bg-slate-200 rounded-2xl animate-pulse" />
+                    <div className="aspect-video bg-slate-800 rounded-2xl animate-pulse" />
+                    <div className="aspect-video bg-slate-800 rounded-2xl animate-pulse" />
                   </div>
                 ) : (activeTab === 'videos' ? videosList : feedData?.videos || []).length === 0 ? (
-                  <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center">
-                    <p className="text-xs text-slate-500">Nenhum vídeo disponível no momento.</p>
+                  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 text-center">
+                    <p className="text-xs text-slate-400">Nenhum vídeo disponível no momento.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -572,9 +572,9 @@ export default function MobileMidiaPage() {
                       <div
                         key={video.id}
                         onClick={() => setActiveVideoModal(video)}
-                        className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition cursor-pointer active:scale-[0.99] group"
+                        className="bg-[#111827] rounded-2xl border border-slate-800 overflow-hidden shadow-sm hover:border-slate-700 transition cursor-pointer active:scale-[0.99] group"
                       >
-                        <div className="aspect-video relative bg-slate-900">
+                        <div className="aspect-video relative bg-slate-950">
                           {video.thumbnail_url ? (
                             <img
                               src={video.thumbnail_url}
@@ -588,17 +588,17 @@ export default function MobileMidiaPage() {
                           )}
 
                           {/* Play overlay button */}
-                          <div className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-md">
+                          <div className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-blue-600/90 text-white flex items-center justify-center shadow-lg group-hover:bg-blue-500 transition">
                             <Play size={16} className="fill-current ml-0.5" />
                           </div>
 
                           {/* Badges */}
                           <div className="absolute top-2 left-2 flex items-center gap-1">
-                            <span className="px-2 py-0.5 rounded-md bg-slate-900/80 backdrop-blur-sm text-[10px] font-bold text-white">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-sm text-[10px] font-bold text-white border border-white/10">
                               {CATEGORIA_LABELS[video.categoria as CategoriaVideo] || video.categoria}
                             </span>
                             {video.destaque && (
-                              <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[10px] font-bold flex items-center gap-0.5">
+                              <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 text-[10px] font-bold flex items-center gap-0.5">
                                 <Star size={10} className="fill-current" />
                               </span>
                             )}
@@ -612,12 +612,12 @@ export default function MobileMidiaPage() {
                         </div>
 
                         <div className="p-3">
-                          <h3 className="text-xs font-bold text-slate-900 line-clamp-1 group-hover:text-blue-600 transition">
+                          <h3 className="text-xs font-bold text-slate-100 line-clamp-1 group-hover:text-blue-400 transition">
                             {video.titulo}
                           </h3>
                           {video.autor_pregador && (
-                            <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                              <User size={11} /> {video.autor_pregador}
+                            <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-1">
+                              <User size={11} className="text-slate-500" /> {video.autor_pregador}
                             </p>
                           )}
                         </div>
@@ -633,15 +633,15 @@ export default function MobileMidiaPage() {
               <section className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <ImageIcon size={16} className="text-dark-blue" />
-                    <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                    <ImageIcon size={16} className="text-blue-400" />
+                    <h2 className="text-xs font-bold text-blue-400 uppercase tracking-wider">
                       Álbuns & Fotos
                     </h2>
                   </div>
                   {activeTab === 'tudo' && (
                     <button
                       onClick={() => setActiveTab('fotos')}
-                      className="text-xs font-semibold text-blue-600 flex items-center gap-0.5"
+                      className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-0.5 cursor-pointer"
                     >
                       Ver todos <ChevronRight size={13} />
                     </button>
@@ -650,12 +650,12 @@ export default function MobileMidiaPage() {
 
                 {loadingAlbuns ? (
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="aspect-square bg-slate-200 rounded-2xl animate-pulse" />
-                    <div className="aspect-square bg-slate-200 rounded-2xl animate-pulse" />
+                    <div className="aspect-square bg-slate-800 rounded-2xl animate-pulse" />
+                    <div className="aspect-square bg-slate-800 rounded-2xl animate-pulse" />
                   </div>
                 ) : (activeTab === 'fotos' ? albunsList : feedData?.albuns || []).length === 0 ? (
-                  <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center">
-                    <p className="text-xs text-slate-500">Nenhum álbum de fotos disponível.</p>
+                  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 text-center">
+                    <p className="text-xs text-slate-400">Nenhum álbum de fotos disponível.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
@@ -663,9 +663,9 @@ export default function MobileMidiaPage() {
                       <Link
                         key={album.id}
                         href={`/app/midia/albuns/${album.id}`}
-                        className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition cursor-pointer active:scale-[0.98] group flex flex-col justify-between"
+                        className="bg-[#111827] rounded-2xl border border-slate-800 overflow-hidden shadow-sm hover:border-slate-700 transition cursor-pointer active:scale-[0.98] group flex flex-col justify-between"
                       >
-                        <div className="aspect-square relative bg-slate-900 overflow-hidden">
+                        <div className="aspect-square relative bg-slate-950 overflow-hidden">
                           {album.capa_url ? (
                             <img
                               src={album.capa_url}
@@ -673,24 +673,24 @@ export default function MobileMidiaPage() {
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
                           ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-500">
+                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-600">
                               <ImageIcon size={32} />
                             </div>
                           )}
 
-                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-black/75 backdrop-blur-sm text-[10px] font-bold text-white flex items-center gap-1">
+                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-black/80 backdrop-blur-sm text-[10px] font-bold text-white flex items-center gap-1 border border-white/10">
                             <ImageIcon size={10} />
                             {album.total_fotos || 0}
                           </div>
                         </div>
 
                         <div className="p-3">
-                          <h3 className="text-xs font-bold text-slate-900 line-clamp-1 group-hover:text-blue-600 transition">
+                          <h3 className="text-xs font-bold text-slate-100 line-clamp-1 group-hover:text-blue-400 transition">
                             {album.titulo}
                           </h3>
                           {album.data_evento && (
-                            <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-1">
-                              <Calendar size={10} />
+                            <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-1">
+                              <Calendar size={10} className="text-slate-500" />
                               {new Date(album.data_evento).toLocaleDateString('pt-BR')}
                             </p>
                           )}
@@ -707,15 +707,15 @@ export default function MobileMidiaPage() {
               <section className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <Megaphone size={16} className="text-dark-blue" />
-                    <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                    <Megaphone size={16} className="text-blue-400" />
+                    <h2 className="text-xs font-bold text-blue-400 uppercase tracking-wider">
                       Notícias & Avisos
                     </h2>
                   </div>
                   {activeTab === 'tudo' && (
                     <Link
                       href="/app/comunicados"
-                      className="text-xs font-semibold text-blue-600 flex items-center gap-0.5"
+                      className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-0.5"
                     >
                       Ver mural <ChevronRight size={13} />
                     </Link>
@@ -723,8 +723,8 @@ export default function MobileMidiaPage() {
                 </div>
 
                 {(feedData?.noticias || []).length === 0 ? (
-                  <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center">
-                    <p className="text-xs text-slate-500">Nenhum comunicado recente.</p>
+                  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 text-center">
+                    <p className="text-xs text-slate-400">Nenhum comunicado recente.</p>
                   </div>
                 ) : (
                   <div className="space-y-2.5">
@@ -732,11 +732,11 @@ export default function MobileMidiaPage() {
                       <Link
                         key={noticia.id}
                         href={`/app/comunicados/${noticia.id}`}
-                        className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs hover:shadow-md transition flex items-center justify-between gap-3 active:scale-[0.99] group"
+                        className="bg-[#111827] rounded-2xl p-3.5 border border-slate-800 shadow-sm hover:border-slate-700 transition flex items-center justify-between gap-3 active:scale-[0.99] group"
                       >
                         <div className="space-y-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-bold uppercase">
+                            <span className="px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase">
                               {noticia.categoria || 'Geral'}
                             </span>
                             {noticia.publicado_em && (
@@ -745,11 +745,11 @@ export default function MobileMidiaPage() {
                               </span>
                             )}
                           </div>
-                          <h3 className="text-xs font-bold text-slate-900 truncate group-hover:text-blue-600 transition">
+                          <h3 className="text-xs font-bold text-slate-100 truncate group-hover:text-blue-400 transition">
                             {noticia.titulo}
                           </h3>
                         </div>
-                        <ChevronRight size={16} className="text-slate-400 shrink-0" />
+                        <ChevronRight size={16} className="text-slate-500 group-hover:text-slate-300 shrink-0" />
                       </Link>
                     ))}
                   </div>
@@ -762,14 +762,14 @@ export default function MobileMidiaPage() {
         {/* Modal Player de Vídeo Sanitizado */}
         {activeVideoModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
-              <div className="px-4 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-                <h3 className="text-xs font-bold text-white truncate max-w-xs">
+            <div className="bg-[#111827] border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+              <div className="px-4 py-3 bg-[#0f172a] border-b border-slate-800 flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-100 truncate max-w-xs">
                   {activeVideoModal.titulo}
                 </h3>
                 <button
                   onClick={() => setActiveVideoModal(null)}
-                  className="p-1 text-slate-400 hover:text-white rounded-lg transition"
+                  className="p-1 text-slate-400 hover:text-white rounded-lg transition cursor-pointer"
                 >
                   <X size={18} />
                 </button>
@@ -800,7 +800,7 @@ export default function MobileMidiaPage() {
               </div>
 
               {activeVideoModal.descricao && (
-                <div className="p-4 bg-slate-900/90 text-xs text-slate-300 border-t border-slate-800/80">
+                <div className="p-4 bg-[#111827] text-xs text-slate-300 border-t border-slate-800/80">
                   <p className="line-clamp-3">{activeVideoModal.descricao}</p>
                 </div>
               )}
@@ -813,3 +813,4 @@ export default function MobileMidiaPage() {
     </MobileShell>
   );
 }
+
