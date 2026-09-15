@@ -28,7 +28,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { createClient } from '@/lib/supabase-client';
 
 // Rotas acessíveis sem member vinculado
-const PUBLIC_MOBILE_PATHS = ['/app/login', '/app/vincular'];
+const PUBLIC_MOBILE_PATHS = ['/app/login', '/app/vincular', '/app/auth/callback', '/app'];
 
 export interface MemberData {
   id: string;

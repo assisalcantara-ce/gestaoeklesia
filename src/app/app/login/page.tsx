@@ -28,7 +28,18 @@ export default function MobileLoginPage() {
   const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState('');
 
-  // Se já autenticado, deixa o provider redirecionar
+  // Capturar mensagens de erro vindas de redirecionamentos do callback
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get('error');
+      if (err) {
+        setError(err);
+      }
+    }
+  }, []);
+
+  // Se já autenticado, deixa o provider/root redirecionar
   useEffect(() => {
     if (!authLoading && user) {
       router.replace('/app');
@@ -47,20 +58,26 @@ export default function MobileLoginPage() {
 
     setLoading(true);
     try {
+      const origin = typeof window !== 'undefined' && window.location.origin
+        ? window.location.origin
+        : (process.env.NEXT_PUBLIC_APP_URL || 'https://www.gestaoeklesia.com.br');
+
       const { error: otpError } = await sbRef.current.auth.signInWithOtp({
         email: trimmedEmail,
         options: {
-          emailRedirectTo: `${window.location.origin}/app`,
+          emailRedirectTo: `${origin}/app/auth/callback`,
           shouldCreateUser: true,
         },
       });
 
       if (otpError) {
+        console.error('[MOBILE_LOGIN] Erro signInWithOtp:', otpError);
         setError('Não foi possível enviar o link. Verifique o e-mail e tente novamente.');
       } else {
         setEmailSent(true);
       }
-    } catch {
+    } catch (err) {
+      console.error('[MOBILE_LOGIN] Erro ao conectar:', err);
       setError('Erro ao conectar. Tente novamente.');
     } finally {
       setLoading(false);

@@ -2,27 +2,41 @@
 
 /**
  * /app — root redirect
- * O MobileMemberProvider cuida do redirecionamento correto conforme o estado auth.
- * Esta página é intermediária e só exibe loading enquanto o guard processa.
+ * Redireciona o usuário para o estado correto do App:
+ * - Não autenticado: /app/login
+ * - Autenticado + Vinculado: /app/inicio
+ * - Autenticado + Não Vinculado: /app/vincular
  */
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/providers/AuthProvider';
 import { useMobileMember } from '@/providers/MobileMemberProvider';
+import { Loader2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
 export default function AppRootPage() {
-  const { isLoading } = useMobileMember();
+  const { user, isLoading: authLoading } = useAuth();
+  const { isLinked, isLoading: memberLoading } = useMobileMember();
+  const router = useRouter();
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-dark-blue">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-          <p className="text-white/70 text-sm">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (authLoading || memberLoading) return;
 
-  return null;
+    if (!user) {
+      router.replace('/app/login');
+    } else if (isLinked) {
+      router.replace('/app/inicio');
+    } else {
+      router.replace('/app/vincular');
+    }
+  }, [user, isLinked, authLoading, memberLoading, router]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#0f172a]">
+      <Loader2 size={36} className="text-blue-500 animate-spin" />
+    </div>
+  );
 }
+

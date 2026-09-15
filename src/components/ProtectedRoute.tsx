@@ -25,7 +25,7 @@ const PUBLIC_PREFIXES = [
 
 function isPublicPath(pathname: string): boolean {
   if (pathname === '/') return true
-  if (pathname === '/app') return true // Apenas a rota raiz '/app' é pública e redirecionada pelo fluxo mobile
+  if (pathname === '/app' || pathname.startsWith('/app/')) return true // Rotas mobile são gerenciadas exclusivamente pelo MobileMemberProvider
   return PUBLIC_PREFIXES.some(prefix => 
     prefix !== '/' && (pathname === prefix || pathname.startsWith(prefix + '/'))
   )
