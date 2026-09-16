@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Check, Printer, X, Grid, FileText, Smartphone } from 'lucide-react';
+import { Copy, Check, Printer, X, Grid, FileText } from 'lucide-react';
 
 interface DestinoQrModalProps {
   isOpen: boolean;
@@ -208,68 +208,99 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
 
       {/* ── ELEMENTOS EXCLUSIVOS DE IMPRESSÃO A4 (ISOLADOS E FORMATADOS) ── */}
 
-      {/* MODELO 1 POR FOLHA */}
+      {/* MODELO 1 POR FOLHA (CARTAZ A4 COMPLETO) */}
       {printLayout === '1' && (
         <div className="pix-print-container-single">
-          <div className="w-[188mm] h-[272mm] border-[4px] border-[#053361] rounded-[28px] p-6 flex flex-col items-center justify-between bg-white box-border text-center shadow-none">
-            {/* Header */}
-            <div className="w-full bg-[#053361] rounded-[18px] py-4 px-6 text-center text-white">
-              <h2 className="text-3xl font-black tracking-widest uppercase text-white m-0 leading-none">
-                CONTRIBUA VIA PIX
-              </h2>
-              <div className="w-20 h-1 bg-emerald-400 mx-auto mt-2 rounded-full" />
-            </div>
-
-            {/* Identificação / Destino */}
-            <div className="space-y-1">
-              <p className="text-lg font-bold text-slate-800 uppercase tracking-wide">
-                {destino.label} {destino.congregacoes?.nome ? `• ${destino.congregacoes.nome}` : ''}
-              </p>
-              <p className="text-sm font-semibold text-slate-500">
-                Aponte a câmera do seu celular para o QR Code
-              </p>
-            </div>
-
-            {/* QR Code */}
-            <div className="p-6 bg-white border-[3px] border-[#053361] rounded-[28px] shadow-sm flex flex-col items-center justify-center">
-              <QRCodeSVG
-                value={qrCodeValue}
-                size={260}
-                level="H"
-                includeMargin={false}
-              />
-            </div>
-
-            {/* Valor Sugerido (opcional) */}
-            {destino.valor_fixo && (
-              <div className="text-base font-extrabold text-[#053361] bg-slate-100 px-5 py-2 rounded-xl border border-slate-300">
-                Valor Sugerido: {fmtBRL(Number(destino.valor_fixo))}
+          <div className="w-[190mm] h-[275mm] border-[4px] border-[#0c2f54] rounded-[26px] p-6 flex flex-col items-center justify-between bg-white box-border text-center shadow-none overflow-hidden">
+            
+            {/* Header Principal */}
+            <div className="w-full space-y-2">
+              <div className="w-full bg-[#0c2f54] rounded-[16px] py-3.5 px-6 text-center text-white shadow-sm">
+                <h2 className="text-2xl sm:text-3xl font-black tracking-widest uppercase text-white m-0 leading-tight">
+                  CONTRIBUIÇÃO VIA PIX
+                </h2>
+                <div className="w-24 h-1 bg-amber-400 mx-auto mt-2 rounded-full" />
               </div>
-            )}
 
-            {/* Barra de Instrução */}
-            <div className="w-full bg-slate-100 border border-slate-300 rounded-[20px] py-3.5 px-6 flex items-center justify-center gap-4 text-[#053361]">
-              <div className="w-10 h-10 rounded-xl bg-[#053361] text-white flex items-center justify-center shrink-0">
-                <Smartphone className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-left">
-                <div className="text-base font-black tracking-wider uppercase leading-snug">LEIA O QR CODE</div>
-                <div className="text-xs font-bold text-slate-600 tracking-wide">ESCOLHA O VALOR • CONFIRME NO BANCO</div>
+              {/* Destino & Congregação */}
+              <div className="pt-2 space-y-1">
+                <h1 className="text-3xl sm:text-4xl font-black text-[#0c2f54] uppercase tracking-wide leading-none">
+                  {destino.label}
+                </h1>
+                {destino.congregacoes?.nome && (
+                  <p className="text-base font-bold text-slate-600 uppercase tracking-widest">
+                    Congregação {destino.congregacoes.nome}
+                  </p>
+                )}
+                <p className="text-xs font-semibold text-slate-500">
+                  Aponte a câmera do seu celular ou utilize o aplicativo do seu banco
+                </p>
               </div>
             </div>
 
-            {/* Rodapé Inspiracional */}
-            <div className="w-full text-center space-y-1 pt-2 border-t border-slate-200">
-              <p className="text-sm font-bold text-slate-700">
-                Sua generosidade transforma vidas!
+            {/* QR Code em Destaque */}
+            <div className="flex flex-col items-center justify-center my-1">
+              <div className="p-5 bg-white border-[3.5px] border-[#0c2f54] rounded-[28px] shadow-sm flex flex-col items-center justify-center">
+                <QRCodeSVG
+                  value={qrCodeValue}
+                  size={270}
+                  level="H"
+                  includeMargin={false}
+                />
+              </div>
+
+              {/* Valor Sugerido (se houver) */}
+              {destino.valor_fixo ? (
+                <div className="mt-3 text-lg font-black text-[#0c2f54] bg-amber-50 border-2 border-amber-300 px-6 py-1.5 rounded-xl shadow-sm">
+                  Valor Sugerido: {fmtBRL(Number(destino.valor_fixo))}
+                </div>
+              ) : (
+                <div className="mt-2 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                  QR Code Oficial • Transferência Direta e Segura
+                </div>
+              )}
+            </div>
+
+            {/* Guia Passo a Passo (Ocupa o espaço intermediário com harmonia) */}
+            <div className="w-full grid grid-cols-3 gap-3 px-2">
+              <div className="bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-center flex flex-col items-center justify-center">
+                <div className="w-6 h-6 rounded-full bg-[#0c2f54] text-white text-xs font-black flex items-center justify-center mb-1">
+                  1
+                </div>
+                <p className="text-xs font-extrabold text-[#0c2f54] uppercase">Abra o App</p>
+                <p className="text-[10px] text-slate-600 leading-tight">Acesse seu banco no celular</p>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-center flex flex-col items-center justify-center">
+                <div className="w-6 h-6 rounded-full bg-[#0c2f54] text-white text-xs font-black flex items-center justify-center mb-1">
+                  2
+                </div>
+                <p className="text-xs font-extrabold text-[#0c2f54] uppercase">Selecione PIX</p>
+                <p className="text-[10px] text-slate-600 leading-tight">Escolha pagar com QR Code</p>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-center flex flex-col items-center justify-center">
+                <div className="w-6 h-6 rounded-full bg-[#0c2f54] text-white text-xs font-black flex items-center justify-center mb-1">
+                  3
+                </div>
+                <p className="text-xs font-extrabold text-[#0c2f54] uppercase">Confirme</p>
+                <p className="text-[10px] text-slate-600 leading-tight">Defina o valor e finalize</p>
+              </div>
+            </div>
+
+            {/* Versículo Bíblico em Destaque Especial */}
+            <div className="w-full border-t-2 border-slate-200 pt-3 pb-1 px-4 space-y-1 bg-gradient-to-b from-transparent to-slate-50/50 rounded-b-2xl">
+              <p className="text-sm sm:text-base font-semibold italic text-slate-800 leading-snug">
+                &ldquo;Cada um dê conforme determinou em seu coração, não com tristeza ou por obrigação, pois Deus ama quem dá com alegria.&rdquo;
               </p>
-              <p className="text-xs font-extrabold text-[#053361] uppercase tracking-wider">
-                DEUS AMA QUEM DÁ COM ALEGRIA.
+              <p className="text-xs font-black text-[#0c2f54] tracking-widest uppercase">
+                — 2 Coríntios 9:7 —
               </p>
-              <p className="text-[11px] font-semibold text-slate-500">
-                2 CORÍNTIOS 9:7
+              <p className="text-[11px] font-bold text-slate-500">
+                Sua fidelidade e generosidade abençoam e multiplicam a obra de Deus!
               </p>
             </div>
+
           </div>
         </div>
       )}
@@ -280,40 +311,49 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
           {Array.from({ length: 8 }).map((_, idx) => (
             <div
               key={idx}
-              className="w-[94mm] h-[66mm] border-[2px] border-[#053361] rounded-[14px] p-2 flex flex-col items-center justify-between bg-white box-border text-center overflow-hidden"
+              className="w-[94mm] h-[66mm] border-[2px] border-[#0c2f54] rounded-[14px] p-2 flex flex-col items-center justify-between bg-white box-border text-center overflow-hidden"
             >
               {/* Header Mini */}
-              <div className="w-full bg-[#053361] rounded-[7px] py-1 px-2 text-center text-white">
+              <div className="w-full bg-[#0c2f54] rounded-[6px] py-1 px-1 text-center text-white">
                 <h3 className="text-[11px] font-black tracking-wider uppercase text-white m-0 leading-tight">
-                  CONTRIBUA VIA PIX
+                  CONTRIBUIÇÃO VIA PIX
                 </h3>
               </div>
 
-              {/* Subtítulo */}
-              <p className="text-[7.5px] font-bold text-slate-700 leading-tight truncate max-w-full px-1">
-                {destino.label} {destino.congregacoes?.nome ? `(${destino.congregacoes.nome})` : ''}
-              </p>
+              {/* Título do Destino */}
+              <div className="space-y-0.5 leading-none">
+                <p className="text-[9px] font-black text-[#0c2f54] uppercase leading-tight truncate max-w-[86mm]">
+                  {destino.label}
+                </p>
+                {destino.congregacoes?.nome && (
+                  <p className="text-[7.5px] font-semibold text-slate-600 truncate max-w-[86mm]">
+                    {destino.congregacoes.nome}
+                  </p>
+                )}
+              </div>
 
               {/* QR Code Mini */}
-              <div className="p-1 bg-white border border-[#053361] rounded-[8px] flex items-center justify-center">
+              <div className="p-1 bg-white border border-[#0c2f54] rounded-[8px] flex items-center justify-center">
                 <QRCodeSVG
                   value={qrCodeValue}
-                  size={95}
+                  size={92}
                   level="H"
                   includeMargin={false}
                 />
               </div>
 
-              {/* Barra de Instrução Mini */}
-              <div className="w-full bg-slate-100 rounded-[6px] py-0.5 px-2 flex items-center justify-center gap-1.5 text-[#053361] border border-slate-200">
-                <span className="text-[7px] font-black tracking-wider uppercase leading-none">LEIA O QR CODE</span>
-                <span className="text-[6.5px] font-bold text-slate-600 leading-none">• CONFIRME NO BANCO</span>
+              {/* Instrução Rápida */}
+              <div className="w-full bg-slate-100 rounded-[5px] py-0.5 px-1 flex items-center justify-center gap-1 text-[#0c2f54] border border-slate-200">
+                <span className="text-[7px] font-black uppercase">1. Abra o App</span>
+                <span className="text-[7px] font-bold text-slate-500">• 2. Leia o QR</span>
+                <span className="text-[7px] font-bold text-slate-500">• 3. Confirme</span>
               </div>
 
-              {/* Rodapé Mini */}
-              <div className="w-full text-center leading-none">
-                <span className="text-[6.5px] font-extrabold text-[#053361]">DEUS AMA QUEM DÁ COM ALEGRIA </span>
-                <span className="text-[6px] font-semibold text-slate-500">(2Co 9:7)</span>
+              {/* Versículo Mini */}
+              <div className="w-full text-center leading-tight">
+                <p className="text-[6.5px] font-bold italic text-slate-700">
+                  &ldquo;Deus ama quem dá com alegria.&rdquo; <span className="font-black text-[#0c2f54]">(2 Co 9:7)</span>
+                </p>
               </div>
             </div>
           ))}
@@ -350,7 +390,7 @@ export default function DestinoQrModal({ isOpen, onClose, destino, fmtBRL }: Des
             top: 0 !important;
             width: 210mm !important;
             height: 297mm !important;
-            padding: 10mm 11mm !important;
+            padding: 10mm 10mm !important;
             box-sizing: border-box !important;
             background: #ffffff !important;
             z-index: 999999 !important;
