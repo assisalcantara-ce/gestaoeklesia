@@ -21,6 +21,7 @@ export interface TesourariaTableProps {
   setConfirmDel?: (id: string) => void;
   finContas?: FinConta[];
   finCategorias?: FinCategoria[];
+  mostrarCategoria?: boolean;
 }
 
 export default function TesourariaTable({
@@ -36,6 +37,7 @@ export default function TesourariaTable({
   setConfirmDel,
   finContas = [],
   finCategorias = [],
+  mostrarCategoria = false,
 }: TesourariaTableProps) {
   const [selectedLanc, setSelectedLanc] = useState<any | null>(null);
   const [chargeDetails, setChargeDetails] = useState<any | null>(null);
@@ -80,7 +82,9 @@ export default function TesourariaTable({
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Data</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Caixa</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Departamento</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
+                  {mostrarCategoria ? 'Categoria Financeira' : 'Departamento'}
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Tipo</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Descrição / Ref.</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Valor</th>
@@ -98,7 +102,24 @@ export default function TesourariaTable({
                   >
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(l.data_lancamento)}</td>
                     <td className="px-4 py-3 text-gray-700">{l.congregacao_nome}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{l.departamento_nome}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">
+                      {mostrarCategoria ? (
+                        (() => {
+                          const cat = finCategorias.find((c) => c.id === l.categoria_id);
+                          if (cat) {
+                            return (
+                              <span className="inline-flex items-center gap-1 font-medium text-slate-700">
+                                {cat.icone && <span>{cat.icone}</span>}
+                                <span>{cat.nome}</span>
+                              </span>
+                            );
+                          }
+                          return l.categoria_nome || '—';
+                        })()
+                      ) : (
+                        l.departamento_nome || '—'
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
                         <span

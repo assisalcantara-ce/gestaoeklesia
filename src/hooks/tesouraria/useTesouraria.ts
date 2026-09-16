@@ -34,6 +34,7 @@ export interface Lancamento {
   origem_id?: string | null;
   congregacao_nome?: string;
   departamento_nome?: string;
+  categoria_nome?: string;
 }
 export interface FinConta {
   id: string;

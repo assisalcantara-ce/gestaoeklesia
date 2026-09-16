@@ -809,6 +809,7 @@ export default function TesourariaPage() {
                   setConfirmDel={t.setConfirmDel}
                   finContas={t.finContas}
                   finCategorias={t.finCategorias}
+                  mostrarCategoria={true}
                 />
               </div>
             </div>
@@ -1558,7 +1559,7 @@ export default function TesourariaPage() {
                 <tr className="border-b border-gray-300 bg-gray-50">
                   <th className="py-2.5 px-2 font-bold text-gray-600">ID / Data</th>
                   <th className="py-2.5 px-2 font-bold text-gray-600">Caixa</th>
-                  <th className="py-2.5 px-2 font-bold text-gray-600">Departamento</th>
+                  <th className="py-2.5 px-2 font-bold text-gray-600">Categoria Financeira</th>
                   <th className="py-2.5 px-2 font-bold text-gray-600">Tipo</th>
                   <th className="py-2.5 px-2 font-bold text-gray-600">Descrição / Ref.</th>
                   <th className="py-2.5 px-2 font-bold text-gray-600 text-right">Valor</th>
@@ -1583,7 +1584,15 @@ export default function TesourariaPage() {
                         <div className="text-gray-500">{t.fmtDate(l.data_lancamento)}</div>
                       </td>
                       <td className="py-2 px-2 uppercase font-medium">{t.congNome(l.congregacao_id)}</td>
-                      <td className="py-2 px-2">{l.departamento_nome || 'Caixa Geral'}</td>
+                      <td className="py-2 px-2 text-gray-700">
+                        {(() => {
+                          const cat = t.finCategorias.find((c) => c.id === l.categoria_id);
+                          if (cat) {
+                            return `${cat.icone ? `${cat.icone} ` : ''}${cat.nome}`;
+                          }
+                          return l.categoria_nome || '—';
+                        })()}
+                      </td>
                       <td className="py-2 px-2 font-medium capitalize">
                         {t.tipoLabel(l.tipo_recebimento || l.tipo_movimento)}
                       </td>
