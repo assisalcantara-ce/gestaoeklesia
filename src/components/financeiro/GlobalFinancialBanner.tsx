@@ -42,7 +42,14 @@ export default function GlobalFinancialBanner() {
   const shouldSkipRoute = useMemo(() => {
     if (!pathname) return false;
     if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/technical')) return true;
-    if (pathname === '/trial-expirado' || pathname === '/login' || pathname === '/pre-cadastro') return true;
+    if (
+      pathname === '/trial-expirado' ||
+      pathname === '/login' ||
+      pathname === '/pre-cadastro' ||
+      pathname.startsWith('/membro') ||
+      pathname.startsWith('/app') ||
+      pathname.startsWith('/formularios')
+    ) return true;
     return false;
   }, [pathname]);
 

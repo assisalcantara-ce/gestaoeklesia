@@ -10,10 +10,14 @@ const EXEMPT_PREFIXES = [
   '/login',
   '/admin',
   '/redefinir-senha',
+  '/validar-senha',
   '/pre-cadastro',
   '/registrar',
   '/trial-expirado',
   '/auth',
+  '/membro',
+  '/formularios',
+  '/app',
 ];
 
 export default function GlobalJuridicoGuard() {

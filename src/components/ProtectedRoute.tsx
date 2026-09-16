@@ -14,10 +14,12 @@ const PUBLIC_PREFIXES = [
   '/pre-cadastro',
   '/email-confirmation',
   '/validar-senha',
+  '/redefinir-senha',
   '/acesso-negado',
   '/auth',
   '/admin',
   '/formularios',
+  '/membro',
   // Apenas as rotas mobile públicas explícitas estão liberadas do ProtectedRoute global
   '/app/login',
   '/app/vincular',

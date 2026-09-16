@@ -16,10 +16,13 @@ const BYPASS_PATHS = [
   '/pre-cadastro',
   '/email-confirmation',
   '/validar-senha',
+  '/redefinir-senha',
   '/acesso-negado',
   '/auth',
   '/admin',
   '/formularios',
+  '/membro',
+  '/app',
 ]
 
 /** Intervalo de polling para re-verificar o status do trial (5 minutos). */
