@@ -1389,35 +1389,36 @@ export default function TesourariaPage() {
         fmtBRL={t.fmtBRL}
       />
 
-      {/* Bloco Exclusivo de Impressão (Oculto em visualização normal e exibido no @media print) */}
-      <div className="print-only hidden p-8 bg-white text-black space-y-6">
-        {/* Timbre da Igreja */}
-        <div className="flex items-center gap-5 border-b pb-4 border-gray-300">
-          {t.ministerio?.logo ? (
-            <img
-              src={t.ministerio.logo}
-              alt="Logo da Igreja"
-              className="max-h-20 max-w-[120px] object-contain"
-            />
-          ) : (
-            <div className="w-[100px] h-[100px] bg-gray-100 flex items-center justify-center text-xs text-gray-400 border border-gray-200">
-              Sem Logo
-            </div>
-          )}
-          <div className="space-y-1">
-            <h1 className="text-lg font-bold uppercase text-gray-800">
-              {t.ministerio?.nome || 'Gestão Eklesia — Igreja Registrada'}
-            </h1>
-            <p className="text-xs text-gray-500 font-medium">
-              {t.ministerio?.endereco && `Endereço: ${t.ministerio.endereco}`}
-            </p>
-            <div className="flex gap-4 text-xs text-gray-500 font-medium">
-              {t.ministerio?.cnpj && <span>CNPJ: {t.ministerio.cnpj}</span>}
-              {t.ministerio?.telefone && <span>Telefone: {t.ministerio.telefone}</span>}
-              {t.ministerio?.email && <span>E-mail: {t.ministerio.email}</span>}
+      {/* Bloco Exclusivo de Impressão de Relatórios (Exibido no @media print APENAS nas abas de relatórios/dizimistas) */}
+      {(t.aba === 'relatorios' || t.aba === 'dizimistas') && (
+        <div className="print-only hidden p-8 bg-white text-black space-y-6">
+          {/* Timbre da Igreja */}
+          <div className="flex items-center gap-5 border-b pb-4 border-gray-300">
+            {t.ministerio?.logo ? (
+              <img
+                src={t.ministerio.logo}
+                alt="Logo da Igreja"
+                className="max-h-20 max-w-[120px] object-contain"
+              />
+            ) : (
+              <div className="w-[100px] h-[100px] bg-gray-100 flex items-center justify-center text-xs text-gray-400 border border-gray-200">
+                Sem Logo
+              </div>
+            )}
+            <div className="space-y-1">
+              <h1 className="text-lg font-bold uppercase text-gray-800">
+                {t.ministerio?.nome || 'Gestão Eklesia — Igreja Registrada'}
+              </h1>
+              <p className="text-xs text-gray-500 font-medium">
+                {t.ministerio?.endereco && `Endereço: ${t.ministerio.endereco}`}
+              </p>
+              <div className="flex gap-4 text-xs text-gray-500 font-medium">
+                {t.ministerio?.cnpj && <span>CNPJ: {t.ministerio.cnpj}</span>}
+                {t.ministerio?.telefone && <span>Telefone: {t.ministerio.telefone}</span>}
+                {t.ministerio?.email && <span>E-mail: {t.ministerio.email}</span>}
+              </div>
             </div>
           </div>
-        </div>
 
         {t.aba === 'dizimistas' ? (
           /* ─── MODELO IMPRESSÃO: RELATÓRIO DE DIZIMISTAS ─── */
@@ -1598,6 +1599,7 @@ export default function TesourariaPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Modal para Adicionar Dizimista */}
       <AdicionarDizimistaModal
