@@ -35,7 +35,20 @@ export interface Lancamento {
   congregacao_nome?: string;
   departamento_nome?: string;
 }
-export interface FinConta { id: string; nome: string; is_padrao?: boolean }
+export interface FinConta {
+  id: string;
+  nome: string;
+  tipo?: string;
+  banco?: string | null;
+  agencia?: string | null;
+  conta?: string | null;
+  chave_pix?: string | null;
+  saldo_inicial?: number;
+  is_padrao?: boolean;
+  is_ativa?: boolean;
+  congregacao_id?: string | null;
+  departamento_id?: string | null;
+}
 export interface FinCategoria {
   id: string;
   nome: string;
@@ -1044,6 +1057,24 @@ export function useTesouraria() {
   }, [fechaCongId, fechaSaldoInicial, fechaDataInicio, fechaDataFim, fechaObs, lancamentos, showModal, statusMes]);
 
   // Handlers Contas
+  const handleEditConta = useCallback((conta: any) => {
+    setFormConta({
+      nome: conta.nome || '',
+      tipo: conta.tipo || 'conta_corrente',
+      banco: conta.banco || '',
+      agencia: conta.agencia || '',
+      conta: conta.conta || '',
+      chave_pix: conta.chave_pix || '',
+      saldo_inicial: String(conta.saldo_inicial ?? 0),
+      is_padrao: !!conta.is_padrao,
+      is_ativa: conta.is_ativa ?? true,
+      congregacao_id: conta.congregacao_id || '',
+      departamento_id: conta.departamento_id || '',
+    });
+    setContaEditId(conta.id);
+    setShowContaModal(true);
+  }, []);
+
   const handleSaveConta = useCallback(async () => {
     if (!formConta.nome.trim()) {
       showModal('Campo obrigatório', 'Informe o nome da conta.', 'error');
@@ -1063,6 +1094,16 @@ export function useTesouraria() {
         showModal('Erro', json.error ?? 'Falha ao salvar conta.', 'error');
         return;
       }
+      // Recarrega a lista de contas atualizada do Supabase
+      const { data: updatedContas } = await supabase
+        .from('fin_contas')
+        .select('*')
+        .eq('is_ativa', true)
+        .order('nome');
+      if (updatedContas) {
+        setFinContas(updatedContas);
+      }
+
       showModal('Sucesso!', contaEditId ? 'Conta atualizada.' : 'Conta criada.');
       setShowContaModal(false);
       setContaEditId(null);
@@ -1072,7 +1113,7 @@ export function useTesouraria() {
     } finally {
       setSavingConta(false);
     }
-  }, [formConta, contaEditId, showModal]);
+  }, [formConta, contaEditId, showModal, supabase]);
 
   const handleDeleteConta = useCallback(async (id: string) => {
     try {
@@ -1082,12 +1123,23 @@ export function useTesouraria() {
         showModal('Erro', json.error ?? 'Falha ao excluir conta.', 'error');
         return;
       }
+
+      // Recarrega a lista de contas atualizada do Supabase
+      const { data: updatedContas } = await supabase
+        .from('fin_contas')
+        .select('*')
+        .eq('is_ativa', true)
+        .order('nome');
+      if (updatedContas) {
+        setFinContas(updatedContas);
+      }
+
       showModal('Excluída!', 'Conta removida.');
       setConfirmDelConta(null);
     } catch (err: any) {
       showModal('Erro', err.message, 'error');
     }
-  }, [showModal]);
+  }, [showModal, supabase]);
 
   // Handlers Categorias
   const handleEditCat = useCallback((cat: FinCategoria) => {
@@ -1315,6 +1367,7 @@ export function useTesouraria() {
     savingConta,
     confirmDelConta,
     setConfirmDelConta,
+    handleEditConta,
     handleSaveConta,
     handleDeleteConta,
     emptyFormConta,

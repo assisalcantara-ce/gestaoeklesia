@@ -1053,15 +1053,22 @@ export default function TesourariaPage() {
                           {c.is_padrao && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-semibold">Padrão</span>}
                         </h3>
                       </div>
+                      <div className="text-xs text-gray-500 space-y-0.5">
+                        {c.banco && <p><span className="font-medium text-gray-700">Banco:</span> {c.banco}</p>}
+                        {(c.agencia || c.conta) && (
+                          <p>
+                            {c.agencia && <><span className="font-medium text-gray-700">Ag:</span> {c.agencia} </>}
+                            {c.conta && <><span className="font-medium text-gray-700">CC:</span> {c.conta}</>}
+                          </p>
+                        )}
+                        {c.chave_pix && <p><span className="font-medium text-gray-700">PIX:</span> {c.chave_pix}</p>}
+                      </div>
                     </div>
 
                     {t.scope.canWrite && (
                       <div className="pt-3 mt-3 border-t border-gray-100 flex justify-end gap-2">
                         <button
-                          onClick={() => {
-                            t.setContaEditId(c.id);
-                            t.setShowContaModal(true);
-                          }}
+                          onClick={() => t.handleEditConta(c)}
                           className="text-xs text-[#123b63] font-semibold hover:underline"
                         >
                           Editar

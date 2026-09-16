@@ -178,4 +178,17 @@ describe('PROMPT 31 — Auditoria e Correção Forense do Login do Portal do Mem
       'Deve tratar explicitamente casos de membro não encontrado e já vinculado a outra conta'
     );
   });
+
+  // N — compatibilidade de templates Supabase para 1º acesso (Confirm signup) e logins posteriores (Magic Link)
+  it('N — template institucional atende tanto o 1º acesso quanto novos Magic Links pós-logout com ConfirmationURL', () => {
+    const templateContent = fs.readFileSync(path.resolve('docs/email-templates/supabase-magic-link-template.html'), 'utf8');
+    assert.ok(
+      templateContent.includes('href="{{ .ConfirmationURL }}"'),
+      'O botão CTA deve conter exatamente href="{{ .ConfirmationURL }}"'
+    );
+    assert.ok(
+      templateContent.includes('ACESSAR MEU PORTAL'),
+      'O botão de acesso deve estar presente para ambos os templates'
+    );
+  });
 });
