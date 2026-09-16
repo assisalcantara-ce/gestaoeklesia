@@ -328,7 +328,51 @@ export function useTesouraria() {
   });
 
   const [loadingData, setLoadingData] = useState(true);
-  const [aba, setAba] = useState<Aba>('dashboard');
+  const [aba, setAbaState] = useState<Aba>('dashboard');
+
+  // Limpeza isolada de estados de modais/ações ao mudar de aba
+  const setAba = useCallback((novaAba: Aba) => {
+    // 1. Limpar formulário e edição de lançamentos
+    setShowForm(false);
+    setEditId(null);
+    setForm(emptyForm());
+    setConfirmDel(null);
+    setConfirmDuplicidadeCodigo(null);
+
+    // 2. Limpar modais de fechamento de caixa
+    setShowFechaModal(false);
+    setFechaObs('');
+    setFechaSaldoInicial('');
+    setFechaDataInicio('');
+    setFechaDataFim('');
+    setFechaCongId(null);
+
+    // 3. Limpar modal de dizimistas
+    setShowAddDizimistaModal(false);
+
+    // 4. Limpar modais de contas
+    setShowContaModal(false);
+    setContaEditId(null);
+    setFormConta(emptyFormConta());
+    setConfirmDelConta(null);
+
+    // 5. Limpar modais de categorias
+    setShowCatModal(false);
+    setCatEditId(null);
+    setFormCat(emptyFormCat());
+    setConfirmDelCat(null);
+
+    // 6. Limpar modais de arrecadação digital / PIX
+    setShowDestinoModal(false);
+    setDestinoEditId(null);
+    setFormDestino(emptyFormDestino());
+    setShowQrModal(false);
+    setQrDestino(null);
+    setConfirmDelDestino(null);
+
+    // 7. Atualizar a aba
+    setAbaState(novaAba);
+  }, []);
 
   // Fechamentos
   const [fechamentos, setFechamentos] = useState<Fechamento[]>([]);
@@ -991,12 +1035,13 @@ export function useTesouraria() {
       resetDizForm();
       setConfirmDuplicidadeCodigo(null);
       loadLancamentosMes(filtroMes);
+      loadLancamentosRelatorio(relMes);
     } catch (err: any) {
       showModal('Erro', err.message, 'error');
     } finally {
       setSaving(false);
     }
-  }, [form, editId, showModal, resetDizForm, loadLancamentosMes, filtroMes]);
+  }, [form, editId, showModal, resetDizForm, loadLancamentosMes, loadLancamentosRelatorio, filtroMes, relMes]);
 
   const handleConfirmarSalvarDuplicado = useCallback(async () => {
     await handleSave({ forcarDuplicidade: true });
@@ -1018,10 +1063,11 @@ export function useTesouraria() {
       showModal('Excluído!', 'Lançamento removido com sucesso.');
       setConfirmDel(null);
       loadLancamentosMes(filtroMes);
+      loadLancamentosRelatorio(relMes);
     } catch (err: any) {
       showModal('Erro', err.message, 'error');
     }
-  }, [showModal, loadLancamentosMes, filtroMes]);
+  }, [showModal, loadLancamentosMes, loadLancamentosRelatorio, filtroMes, relMes]);
 
   // Status mensal para fechamento
   const statusMes = useMemo(() => {

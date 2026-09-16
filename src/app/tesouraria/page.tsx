@@ -655,6 +655,8 @@ export default function TesourariaPage() {
               scope={t.scope}
               handleEdit={t.handleEdit}
               setConfirmDel={t.setConfirmDel}
+              finContas={t.finContas}
+              finCategorias={t.finCategorias}
             />
 
             {/* Confirm delete lançamento */}
@@ -805,9 +807,21 @@ export default function TesourariaPage() {
                   scope={t.scope}
                   handleEdit={t.handleEdit}
                   setConfirmDel={t.setConfirmDel}
+                  finContas={t.finContas}
+                  finCategorias={t.finCategorias}
                 />
               </div>
             </div>
+
+            {/* Confirm delete lançamento na aba Relatórios */}
+            <ConfirmDeleteModal
+              isOpen={Boolean(t.confirmDel)}
+              onClose={() => t.setConfirmDel(null)}
+              onConfirm={() => t.handleDelete(t.confirmDel!)}
+              title="⚠️ Excluir Lançamento Financeiro"
+              description="Esta é uma ação sensível. O lançamento será removido do saldo do período e os dados anteriores serão salvos permanentemente no histórico de auditoria do sistema."
+              confirmText="Sim, Excluir Lançamento"
+            />
           </div>
         )}
 
