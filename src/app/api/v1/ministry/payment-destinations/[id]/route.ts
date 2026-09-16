@@ -3,10 +3,54 @@ import { resolveTenantAuth } from '@/lib/tenant-auth';
 import { isArrecadacaoDigitalAllowedForTenant } from '@/lib/plan-permissions';
 import { decryptCredentials } from '@/lib/ministry-credentials';
 import { deleteAsaasStaticPixQrCode } from '@/lib/asaas-eventos';
+import { temAcesso, temAcessoEscrita } from '@/lib/access-control';
 
 export const dynamic = 'force-dynamic';
 
 type Ctx = { params: Promise<{ id: string }> };
+
+function checkHasDestinosReadAccess(ctx: { isOwner: boolean; nivel?: string | null; roles?: string[]; permissions?: string[] }) {
+  if (ctx.isOwner) return true;
+  const nivel = ctx.nivel as any;
+  if (temAcesso(nivel, 'tesouraria') || temAcesso(nivel, 'financeiro')) return true;
+  const perms = [...(ctx.roles ?? []), ...(ctx.permissions ?? [])].map((p) => p.toUpperCase());
+  return perms.some((p) =>
+    [
+      'ADMINISTRADOR',
+      'ADMIN',
+      'TESOUREIRO_GERAL',
+      'FINANCEIRO',
+      'TESOURARIA_LOCAL',
+      'FINANCEIRO_LOCAL',
+      'ADMIN_LOCAL',
+    ].includes(p)
+  );
+}
+
+function checkHasDestinosWriteAccess(ctx: { isOwner: boolean; nivel?: string | null; roles?: string[]; permissions?: string[] }) {
+  if (ctx.isOwner) return true;
+  const nivel = ctx.nivel as any;
+  if (temAcessoEscrita(nivel, 'tesouraria') || temAcessoEscrita(nivel, 'financeiro')) return true;
+  const perms = [...(ctx.roles ?? []), ...(ctx.permissions ?? [])].map((p) => p.toUpperCase());
+  return perms.some((p) =>
+    [
+      'ADMINISTRADOR',
+      'ADMIN',
+      'TESOUREIRO_GERAL',
+      'FINANCEIRO',
+      'TESOURARIA_LOCAL',
+      'FINANCEIRO_LOCAL',
+      'ADMIN_LOCAL',
+    ].includes(p)
+  );
+}
+
+function checkHasDestinosDeleteAccess(ctx: { isOwner: boolean; nivel?: string | null; roles?: string[]; permissions?: string[] }) {
+  if (ctx.isOwner) return true;
+  if (['administrador', 'tesoureiro_geral', 'financeiro'].includes(ctx.nivel ?? '')) return true;
+  const perms = [...(ctx.roles ?? []), ...(ctx.permissions ?? [])].map((p) => p.toUpperCase());
+  return perms.some((p) => ['ADMINISTRADOR', 'ADMIN', 'TESOUREIRO_GERAL', 'FINANCEIRO'].includes(p));
+}
 
 // Função auxiliar para remover QR Code estático do ASAAS antes de desativar
 async function removeAsaasStaticQrCodeIfPresent(
@@ -81,6 +125,10 @@ export async function GET(request: NextRequest, context: Ctx) {
     );
   }
 
+  if (!checkHasDestinosReadAccess(ctx)) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 });
+  }
+
   const { data, error } = await ctx.admin
     .from('fin_payment_destinations')
     .select('*, congregacoes(nome)')
@@ -112,12 +160,7 @@ export async function PUT(request: NextRequest, context: Ctx) {
     );
   }
 
-  const canEdit =
-    ctx.isOwner ||
-    ctx.nivel === 'administrador' ||
-    ctx.nivel === 'financeiro';
-
-  if (!canEdit) {
+  if (!checkHasDestinosWriteAccess(ctx)) {
     return NextResponse.json({ error: 'Sem permissão para editar destinos.' }, { status: 403 });
   }
 
@@ -198,10 +241,9 @@ export async function DELETE(request: NextRequest, context: Ctx) {
     );
   }
 
-  const canDelete = ctx.isOwner || ctx.nivel === 'administrador';
-  if (!canDelete) {
+  if (!checkHasDestinosDeleteAccess(ctx)) {
     return NextResponse.json(
-      { error: 'Somente ADMINISTRADOR pode excluir destinos.' },
+      { error: 'Apenas Administrador ou Tesoureiro Geral podem excluir destinos.' },
       { status: 403 }
     );
   }

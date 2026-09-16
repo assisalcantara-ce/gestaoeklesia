@@ -14,11 +14,53 @@ import { resolveTenantAuth } from '@/lib/tenant-auth';
 import { isArrecadacaoDigitalAllowedForTenant } from '@/lib/plan-permissions';
 import { decryptCredentials } from '@/lib/ministry-credentials';
 import { getAsaasActivePixAddressKey, createAsaasStaticPixQrCode } from '@/lib/asaas-eventos';
+import { temAcesso, temAcessoEscrita } from '@/lib/access-control';
 
 export const dynamic = 'force-dynamic';
 
 const TIPOS_VALIDOS = ['dizimo', 'oferta', 'missoes', 'doacao', 'campanha_local', 'evento_local'] as const;
-const NIVEIS_PERMITIDOS = ['administrador', 'financeiro', 'financeiro_local'] as const;
+
+function checkHasDestinosReadAccess(ctx: { isOwner: boolean; nivel?: string | null; roles?: string[]; permissions?: string[] }) {
+  if (ctx.isOwner) return true;
+  const nivel = ctx.nivel as any;
+  if (temAcesso(nivel, 'tesouraria') || temAcesso(nivel, 'financeiro')) return true;
+  const perms = [...(ctx.roles ?? []), ...(ctx.permissions ?? [])].map((p) => p.toUpperCase());
+  return perms.some((p) =>
+    [
+      'ADMINISTRADOR',
+      'ADMIN',
+      'TESOUREIRO_GERAL',
+      'FINANCEIRO',
+      'TESOURARIA_LOCAL',
+      'FINANCEIRO_LOCAL',
+      'ADMIN_LOCAL',
+    ].includes(p)
+  );
+}
+
+function checkHasDestinosWriteAccess(ctx: { isOwner: boolean; nivel?: string | null; roles?: string[]; permissions?: string[] }) {
+  if (ctx.isOwner) return true;
+  const nivel = ctx.nivel as any;
+  if (temAcessoEscrita(nivel, 'tesouraria') || temAcessoEscrita(nivel, 'financeiro')) return true;
+  const perms = [...(ctx.roles ?? []), ...(ctx.permissions ?? [])].map((p) => p.toUpperCase());
+  return perms.some((p) =>
+    [
+      'ADMINISTRADOR',
+      'ADMIN',
+      'TESOUREIRO_GERAL',
+      'FINANCEIRO',
+      'TESOURARIA_LOCAL',
+      'FINANCEIRO_LOCAL',
+      'ADMIN_LOCAL',
+    ].includes(p)
+  );
+}
+
+function isLocalUser(ctx: { nivel?: string | null; congregacaoId?: string | null }) {
+  const localNiveis = ['tesouraria_local', 'financeiro_local', 'secretaria_local', 'admin_local'];
+  const globalNiveis = ['administrador', 'secretario_geral', 'tesoureiro_geral', 'financeiro'];
+  return localNiveis.includes(ctx.nivel ?? '') || (Boolean(ctx.congregacaoId) && !globalNiveis.includes(ctx.nivel ?? ''));
+}
 
 // ─── GET — lista destinos ─────────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
@@ -35,11 +77,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const hasAccess =
-    ctx.isOwner ||
-    (NIVEIS_PERMITIDOS as readonly string[]).includes(ctx.nivel ?? '');
-
-  if (!hasAccess) {
+  if (!checkHasDestinosReadAccess(ctx)) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 });
   }
 
@@ -79,8 +117,8 @@ export async function GET(request: NextRequest) {
     query = query.eq('congregacao_id', congParam);
   }
 
-  // FINANCEIRO_LOCAL: só vê a própria congregação
-  if (ctx.nivel === 'financeiro_local' && ctx.congregacaoId) {
+  // FINANCEIRO_LOCAL / Usuário Local: só vê a própria congregação
+  if (isLocalUser(ctx) && ctx.congregacaoId) {
     query = query.eq('congregacao_id', ctx.congregacaoId);
   }
 
@@ -149,11 +187,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const canCreate =
-    ctx.isOwner ||
-    (NIVEIS_PERMITIDOS as readonly string[]).includes(ctx.nivel ?? '');
-
-  if (!canCreate) {
+  if (!checkHasDestinosWriteAccess(ctx)) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 });
   }
 
@@ -189,15 +223,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // FINANCEIRO_LOCAL: só pode criar para sua própria congregação
-  const congId =
-    ctx.nivel === 'financeiro_local'
-      ? ctx.congregacaoId
-      : ((congregacao_id as string | undefined) ?? null);
+  // Usuário local: só pode criar para sua própria congregação
+  const isLocal = isLocalUser(ctx);
+  const congId = isLocal
+    ? ctx.congregacaoId
+    : ((congregacao_id as string | undefined) ?? null);
 
-  if (ctx.nivel === 'financeiro_local' && congregacao_id && congregacao_id !== ctx.congregacaoId) {
+  if (isLocal && congregacao_id && congregacao_id !== ctx.congregacaoId) {
     return NextResponse.json(
-      { error: 'FINANCEIRO_LOCAL só pode criar destinos para sua própria congregação.' },
+      { error: 'Usuários locais só podem criar destinos para sua própria congregação.' },
       { status: 403 }
     );
   }
