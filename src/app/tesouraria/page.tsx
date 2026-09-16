@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import PageLayout from '@/components/PageLayout';
 import NotificationModal from '@/components/NotificationModal';
-import { Plus, X, TrendingUp, Building2, Tag, Users, Lock, List, Printer, QrCode, UserPlus, FileText, Pencil, Trash2 } from 'lucide-react';
+import { Plus, X, TrendingUp, Building2, Tag, Users, Lock, List, Printer, QrCode, UserPlus, FileText, Pencil, Trash2, Wallet, Landmark, CreditCard, Sparkles, Check } from 'lucide-react';
 import TesourariaTable from '@/components/tesouraria/TesourariaTable';
 import TesourariaToolbar from '@/components/tesouraria/TesourariaToolbar';
 import FechamentoCaixaModal from '@/components/tesouraria/modals/FechamentoCaixaModal';
@@ -1043,46 +1043,107 @@ export default function TesourariaPage() {
                   Nenhuma conta cadastrada. Clique no botão acima para adicionar.
                 </div>
               ) : (
-                t.finContas.map((c) => (
-                  <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm flex flex-col justify-between">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-start">
-                        <h3 className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
-                          <Building2 className="h-4 w-4 text-[#123b63]" />
-                          {c.nome}
-                          {c.is_padrao && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-semibold">Padrão</span>}
-                        </h3>
-                      </div>
-                      <div className="text-xs text-gray-500 space-y-0.5">
-                        {c.banco && <p><span className="font-medium text-gray-700">Banco:</span> {c.banco}</p>}
-                        {(c.agencia || c.conta) && (
-                          <p>
-                            {c.agencia && <><span className="font-medium text-gray-700">Ag:</span> {c.agencia} </>}
-                            {c.conta && <><span className="font-medium text-gray-700">CC:</span> {c.conta}</>}
-                          </p>
-                        )}
-                        {c.chave_pix && <p><span className="font-medium text-gray-700">PIX:</span> {c.chave_pix}</p>}
-                      </div>
-                    </div>
+                t.finContas.map((c) => {
+                  const isCaixa = c.tipo === 'caixa_fisico' || c.tipo === 'caixa' || !c.banco;
+                  return (
+                    <div
+                      key={c.id}
+                      className="bg-white rounded-2xl border border-gray-200/90 p-5 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between group relative overflow-hidden"
+                    >
+                      {/* Linha de acento no topo do card */}
+                      <div className={`absolute top-0 left-0 right-0 h-1 ${c.is_padrao ? 'bg-gradient-to-r from-[#123b63] to-blue-500' : 'bg-transparent group-hover:bg-slate-200'} transition-all`} />
 
-                    {t.scope.canWrite && (
-                      <div className="pt-3 mt-3 border-t border-gray-100 flex justify-end gap-2">
-                        <button
-                          onClick={() => t.handleEditConta(c)}
-                          className="text-xs text-[#123b63] font-semibold hover:underline"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => t.setConfirmDelConta(c.id)}
-                          className="text-xs text-red-600 font-semibold hover:underline"
-                        >
-                          Excluir
-                        </button>
+                      <div>
+                        {/* Header do Card com Ícone estilizado e Badges */}
+                        <div className="flex items-start justify-between gap-3 mb-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+                              c.is_padrao 
+                                ? 'bg-[#123b63] text-white' 
+                                : isCaixa 
+                                ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' 
+                                : 'bg-blue-50 text-[#123b63] border border-blue-100'
+                            }`}>
+                              {isCaixa ? <Wallet className="h-5 w-5" /> : <Landmark className="h-5 w-5" />}
+                            </div>
+                            <div>
+                              <h3 className="font-bold text-gray-900 text-sm leading-snug">
+                                {c.nome}
+                              </h3>
+                              <p className="text-[11px] text-gray-600 font-medium capitalize mt-0.5">
+                                {c.tipo?.replace('_', ' ') || 'Conta'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-end gap-1">
+                            {c.is_padrao && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-blue-50 text-[#123b63] border border-blue-200/70 px-2 py-0.5 rounded-full shadow-xs">
+                                <Sparkles className="h-2.5 w-2.5 text-amber-500 fill-amber-500" /> Padrão
+                              </span>
+                            )}
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                              c.is_ativa !== false ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {c.is_ativa !== false ? 'Ativa' : 'Inativa'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Dados Detalhados da Conta */}
+                        <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 space-y-1.5 text-xs">
+                          {c.banco && (
+                            <div className="flex items-center justify-between text-gray-600">
+                              <span className="text-gray-600 font-medium">Banco / Instituição:</span>
+                              <span className="font-semibold text-gray-800">{c.banco}</span>
+                            </div>
+                          )}
+                          {(c.agencia || c.conta) && (
+                            <div className="flex items-center justify-between text-gray-600">
+                              <span className="text-gray-600 font-medium">Agência / Conta:</span>
+                              <span className="font-semibold font-mono text-gray-800">
+                                {c.agencia ? `Ag. ${c.agencia}` : ''} {c.conta ? `• CC ${c.conta}` : ''}
+                              </span>
+                            </div>
+                          )}
+                          {c.chave_pix && (
+                            <div className="flex items-center justify-between text-gray-600 pt-0.5 border-t border-slate-200/50">
+                              <span className="text-gray-600 font-medium">Chave PIX:</span>
+                              <span className="font-semibold font-mono text-[#123b63] truncate max-w-[170px]" title={c.chave_pix}>
+                                {c.chave_pix}
+                              </span>
+                            </div>
+                          )}
+                          {!c.banco && !c.agencia && !c.conta && !c.chave_pix && (
+                            <div className="text-gray-600 italic text-[11px] py-1 text-center">
+                              Caixa físico / controle interno
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                ))
+
+                      {/* Ações de Edição e Exclusão */}
+                      {t.scope.canWrite && (
+                        <div className="pt-3 mt-3 border-t border-gray-100 flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => t.handleEditConta(c)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#123b63] hover:bg-blue-50/80 transition active:scale-95"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            <span>Editar</span>
+                          </button>
+                          <button
+                            onClick={() => t.setConfirmDelConta(c.id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 transition active:scale-95"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Excluir</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
 
