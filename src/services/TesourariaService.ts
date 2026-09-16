@@ -19,6 +19,7 @@ export interface CriarLancamentoDTO {
   categoria_id?: string | null;
   member_id?: string | null;
   codigo_registro?: string | null;
+  permitir_duplicidade?: boolean;
 }
 
 export class TesourariaService {
@@ -35,6 +36,11 @@ export class TesourariaService {
     const ano = dataLancamento ? parseInt(dataLancamento.split('-')[0], 10) : new Date().getFullYear();
     const anoValido = !isNaN(ano) && ano > 2000 ? ano : new Date().getFullYear();
     return this.repository.obterPreviaCodigoRegistro(ministryId, anoValido);
+  }
+
+  async verificarCodigoExiste(ministryId: string, codigo: string, excludeId?: string): Promise<boolean> {
+    if (!ministryId || !codigo) return false;
+    return this.repository.verificarCodigoExiste(ministryId, codigo, excludeId);
   }
 
   async criarLancamento(
@@ -64,10 +70,10 @@ export class TesourariaService {
     }
 
     const ano = parseInt(dto.data_lancamento.split('-')[0], 10) || new Date().getFullYear();
+    const temCodigoInformado = Boolean(dto.codigo_registro && dto.codigo_registro.trim().length > 0);
     const isManual = Boolean(
-      dto.codigo_registro &&
-      dto.codigo_registro.trim().length > 0 &&
-      !/^REG-\d{4}-\d+$/i.test(dto.codigo_registro.trim())
+      temCodigoInformado &&
+      !/^REG-\d{4}-\d+$/i.test(dto.codigo_registro!.trim())
     );
 
     // Helper para montar payload
@@ -88,7 +94,13 @@ export class TesourariaService {
       codigo_registro: codigo,
     });
 
-    // ── Caso 1: Código Manual Customizado (ex: OFERTA-2026-001, NF-4587/2026) ──
+    // ── Caso 1: Usuário confirmou/permitiu salvar com código duplicado ──────────
+    if (dto.permitir_duplicidade && temCodigoInformado) {
+      const codigoForcado = dto.codigo_registro!.trim();
+      return this.repository.criarLancamento(montarPayload(codigoForcado));
+    }
+
+    // ── Caso 2: Código Manual Customizado (ex: OFERTA-2026-001, NF-4587/2026) ──
     if (isManual) {
       const codigoManual = dto.codigo_registro!.trim();
       const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoManual);
@@ -98,7 +110,16 @@ export class TesourariaService {
       return this.repository.criarLancamento(montarPayload(codigoManual));
     }
 
-    // ── Caso 2: Código Automático (REG-YYYY-XXXXXX) ou omitido ───────────────
+    // ── Caso 3: Código informado pelo usuário no formato REG-YYYY-XXXXXX que já existe ──
+    if (temCodigoInformado) {
+      const codigoInformado = dto.codigo_registro!.trim();
+      const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoInformado);
+      if (jaExiste) {
+        throw new Error('Já existe um lançamento registrado com este Código/ID.');
+      }
+    }
+
+    // ── Caso 4: Código Automático (REG-YYYY-XXXXXX) ou omitido ───────────────
     // Se o operador não informou código ou enviou um padrão automático (que pode ter sofrido concorrência)
     // Aloca atômica e definitivamente no banco com lock
     const maxTentativas = 5;
@@ -163,9 +184,11 @@ export class TesourariaService {
     if (dto.codigo_registro !== undefined) {
       if (dto.codigo_registro && dto.codigo_registro.trim().length > 0) {
         const codigoTrim = dto.codigo_registro.trim();
-        const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoTrim, id);
-        if (jaExiste) {
-          throw new Error('Já existe um lançamento registrado com este Código/ID.');
+        if (!dto.permitir_duplicidade) {
+          const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoTrim, id);
+          if (jaExiste) {
+            throw new Error('Já existe um lançamento registrado com este Código/ID.');
+          }
         }
         payload.codigo_registro = codigoTrim;
       } else {

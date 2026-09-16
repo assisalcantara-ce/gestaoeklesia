@@ -396,6 +396,7 @@ export function useTesouraria() {
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
+  const [confirmDuplicidadeCodigo, setConfirmDuplicidadeCodigo] = useState<{ open: boolean; codigo: string } | null>(null);
 
   const [modal, setModal] = useState<{ open: boolean; title: string; message: string; type: 'success' | 'error' | 'info' }>({
     open: false, title: '', message: '', type: 'success',
@@ -920,7 +921,7 @@ export function useTesouraria() {
     setShowForm(true);
   }, []);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (options?: { forcarDuplicidade?: boolean }) => {
     if (!form.data_lancamento || !form.valor) {
       showModal('Campos obrigatórios', 'Preencha valor e data.', 'error');
       return;
@@ -959,6 +960,7 @@ export function useTesouraria() {
         conta_id: form.conta_id || null,
         categoria_id: form.categoria_id || null,
         codigo_registro: form.codigo_registro?.trim() || null,
+        permitir_duplicidade: options?.forcarDuplicidade ? true : undefined,
       };
 
       const url = editId ? `/api/v1/tesouraria/lancamentos?id=${editId}` : '/api/v1/tesouraria/lancamentos';
@@ -971,6 +973,13 @@ export function useTesouraria() {
 
       if (!res.ok) {
         const errJson = await res.json();
+        if (res.status === 409 || errJson.error === 'DUPLICATE_CODIGO_REGISTRO' || errJson.requires_confirmation) {
+          setConfirmDuplicidadeCodigo({
+            open: true,
+            codigo: form.codigo_registro?.trim() || '',
+          });
+          return;
+        }
         showModal('Erro', errJson.error ?? 'Falha ao salvar lançamento.', 'error');
         return;
       }
@@ -980,6 +989,7 @@ export function useTesouraria() {
       setEditId(null);
       setForm(emptyForm());
       resetDizForm();
+      setConfirmDuplicidadeCodigo(null);
       loadLancamentosMes(filtroMes);
     } catch (err: any) {
       showModal('Erro', err.message, 'error');
@@ -987,6 +997,15 @@ export function useTesouraria() {
       setSaving(false);
     }
   }, [form, editId, showModal, resetDizForm, loadLancamentosMes, filtroMes]);
+
+  const handleConfirmarSalvarDuplicado = useCallback(async () => {
+    await handleSave({ forcarDuplicidade: true });
+    setConfirmDuplicidadeCodigo(null);
+  }, [handleSave]);
+
+  const handleCancelarDuplicado = useCallback(() => {
+    setConfirmDuplicidadeCodigo(null);
+  }, []);
 
   const handleDelete = useCallback(async (id: string) => {
     try {
@@ -1400,6 +1419,10 @@ export function useTesouraria() {
     saving,
     confirmDel,
     setConfirmDel,
+    confirmDuplicidadeCodigo,
+    setConfirmDuplicidadeCodigo,
+    handleConfirmarSalvarDuplicado,
+    handleCancelarDuplicado,
     handleNovoLancamento,
     handleEdit,
     handleSave,

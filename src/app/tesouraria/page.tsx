@@ -11,6 +11,7 @@ import FechamentoCaixaModal from '@/components/tesouraria/modals/FechamentoCaixa
 import ContaBancariaModal from '@/components/tesouraria/modals/ContaBancariaModal';
 import CategoriaFinanceiraModal from '@/components/tesouraria/modals/CategoriaFinanceiraModal';
 import ConfirmDeleteModal from '@/components/tesouraria/modals/ConfirmDeleteModal';
+import ConfirmDuplicidadeCodigoModal from '@/components/tesouraria/modals/ConfirmDuplicidadeCodigoModal';
 import AdicionarDizimistaModal from '@/components/tesouraria/modals/AdicionarDizimistaModal';
 import TesourariaCharts from '@/components/tesouraria/TesourariaCharts';
 import FechamentoCaixaTable from '@/components/tesouraria/FechamentoCaixaTable';
@@ -621,7 +622,7 @@ export default function TesourariaPage() {
 
                 <div className="flex gap-3 pt-2">
                   <button
-                    onClick={t.handleSave}
+                    onClick={() => t.handleSave()}
                     disabled={t.saving}
                     className="px-6 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition disabled:opacity-50"
                   >
@@ -664,6 +665,15 @@ export default function TesourariaPage() {
               title="⚠️ Excluir Lançamento Financeiro"
               description="Esta é uma ação sensível. O lançamento será removido do saldo do período e os dados anteriores serão salvos permanentemente no histórico de auditoria do sistema."
               confirmText="Sim, Excluir Lançamento"
+            />
+
+            {/* Modal de Aviso de Código de Registro Duplicado */}
+            <ConfirmDuplicidadeCodigoModal
+              isOpen={Boolean(t.confirmDuplicidadeCodigo?.open)}
+              codigo={t.confirmDuplicidadeCodigo?.codigo || t.form.codigo_registro || ''}
+              saving={t.saving}
+              onClose={t.handleCancelarDuplicado}
+              onConfirm={t.handleConfirmarSalvarDuplicado}
             />
           </div>
         )}

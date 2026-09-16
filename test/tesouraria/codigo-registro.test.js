@@ -71,15 +71,6 @@ class MockTesourariaRepository {
   }
 
   async criarLancamento(payload) {
-    if (payload.codigo_registro && payload.codigo_registro.trim()) {
-      const existe = await this.verificarCodigoExiste(payload.ministry_id, payload.codigo_registro);
-      if (existe) {
-        const err = new Error('duplicate key value violates unique constraint "idx_tesouraria_lancamentos_codigo_registro"');
-        err.code = '23505';
-        throw err;
-      }
-    }
-
     const row = {
       id: 'lanc-' + Math.random().toString(36).substring(2, 9),
       ...payload,
@@ -111,15 +102,19 @@ class MockTesourariaService {
     return this.repository.obterPreviaCodigoRegistro(ministryId, ano);
   }
 
+  async verificarCodigoExiste(ministryId, codigo, excludeId) {
+    return this.repository.verificarCodigoExiste(ministryId, codigo, excludeId);
+  }
+
   async criarLancamento(ministryId, dto) {
     if (!ministryId) throw new Error('O ministry_id é obrigatório.');
     if (!dto.data_lancamento) throw new Error('data_lancamento é obrigatória.');
     if (!dto.valor || dto.valor <= 0) throw new Error('O valor deve ser positivo.');
 
     const ano = parseInt(dto.data_lancamento.split('-')[0], 10) || new Date().getFullYear();
+    const temCodigoInformado = Boolean(dto.codigo_registro && dto.codigo_registro.trim().length > 0);
     const isManual = Boolean(
-      dto.codigo_registro &&
-      dto.codigo_registro.trim().length > 0 &&
+      temCodigoInformado &&
       !/^REG-\d{4}-\d+$/i.test(dto.codigo_registro.trim())
     );
 
@@ -129,6 +124,10 @@ class MockTesourariaService {
       codigo_registro: codigo,
     });
 
+    if (dto.permitir_duplicidade && temCodigoInformado) {
+      return this.repository.criarLancamento(montarPayload(dto.codigo_registro.trim()));
+    }
+
     if (isManual) {
       const codigoManual = dto.codigo_registro.trim();
       const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoManual);
@@ -136,6 +135,14 @@ class MockTesourariaService {
         throw new Error('Já existe um lançamento registrado com este Código/ID.');
       }
       return this.repository.criarLancamento(montarPayload(codigoManual));
+    }
+
+    if (temCodigoInformado) {
+      const codigoInformado = dto.codigo_registro.trim();
+      const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoInformado);
+      if (jaExiste) {
+        throw new Error('Já existe um lançamento registrado com este Código/ID.');
+      }
     }
 
     // Código automático
@@ -163,9 +170,11 @@ class MockTesourariaService {
     if (dto.codigo_registro !== undefined) {
       if (dto.codigo_registro && dto.codigo_registro.trim().length > 0) {
         const codigoTrim = dto.codigo_registro.trim();
-        const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoTrim, id);
-        if (jaExiste) {
-          throw new Error('Já existe um lançamento registrado com este Código/ID.');
+        if (!dto.permitir_duplicidade) {
+          const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoTrim, id);
+          if (jaExiste) {
+            throw new Error('Já existe um lançamento registrado com este Código/ID.');
+          }
         }
       }
     }
@@ -370,6 +379,36 @@ describe('Módulo Tesouraria - Código / ID de Registro e Concorrência Atômica
         message: 'Já existe um lançamento registrado com este Código/ID.',
       }
     );
+  });
+
+  it('13. Deve permitir criar lançamento com código duplicado quando permitir_duplicidade for true', async () => {
+    const lancDuplicado = await service.criarLancamento(tenantA, {
+      data_lancamento: '2026-04-02',
+      tipo_movimento: 'entrada',
+      tipo_recebimento: 'oferta',
+      valor: 150.0,
+      codigo_registro: 'OFERTA-2026-001',
+      permitir_duplicidade: true,
+    });
+
+    assert.equal(lancDuplicado.codigo_registro, 'OFERTA-2026-001');
+    assert.equal(lancDuplicado.valor, 150.0);
+  });
+
+  it('14. Deve permitir atualizar lançamento com código duplicado quando permitir_duplicidade for true', async () => {
+    const lanc = await service.criarLancamento(tenantA, {
+      data_lancamento: '2026-04-03',
+      tipo_movimento: 'saida',
+      tipo_recebimento: 'limpeza',
+      valor: 80.0,
+    });
+
+    const atualizado = await service.atualizarLancamento(lanc.id, tenantA, {
+      codigo_registro: 'OFERTA-2026-001',
+      permitir_duplicidade: true,
+    });
+
+    assert.equal(atualizado.codigo_registro, 'OFERTA-2026-001');
   });
 });
 

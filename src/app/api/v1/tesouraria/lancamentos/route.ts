@@ -1,4 +1,4 @@
-﻿/**
+/**
  * API ROUTE: Cadastro de Lançamentos Financeiros da Tesouraria
  * GET /api/v1/tesouraria/lancamentos?action=proximo_codigo&data=YYYY-MM-DD
  * POST /api/v1/tesouraria/lancamentos
@@ -44,6 +44,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ codigo: proximoCodigo });
     } catch (err: any) {
       return NextResponse.json({ error: err?.message || 'Erro ao gerar código' }, { status: 500 });
+    }
+  }
+
+  if (action === 'verificar_codigo') {
+    try {
+      const codigo = searchParams.get('codigo') || '';
+      const excludeId = searchParams.get('exclude_id') || undefined;
+      const service = new TesourariaService(admin);
+      const exists = await service.verificarCodigoExiste(ministryId, codigo, excludeId);
+      return NextResponse.json({ exists, codigo });
+    } catch (err: any) {
+      return NextResponse.json({ error: err?.message || 'Erro ao verificar código' }, { status: 500 });
     }
   }
 
@@ -94,19 +106,20 @@ export async function POST(request: NextRequest) {
     const service = new TesourariaService(admin);
 
     const lancamento = await service.criarLancamento(ministryId, {
-      data_lancamento:  String(data_lancamento),
-      tipo_movimento:   tipo_movimento as 'entrada' | 'saida',
-      tipo_recebimento: String(tipo_recebimento),
-      valor:            Number(valor),
-      referencia:       body.referencia    ?? null,
-      observacoes:      body.observacoes   ?? null,
-      descricao:        body.descricao     ?? null,
-      congregacao_id:   body.congregacao_id   ?? null,
-      departamento_id:  body.departamento_id  ?? null,
-      conta_id:         body.conta_id         ?? null,
-      categoria_id:     body.categoria_id     ?? null,
-      member_id:        body.member_id         ?? null,
-      codigo_registro:  body.codigo_registro   ?? null,
+      data_lancamento:      String(data_lancamento),
+      tipo_movimento:       tipo_movimento as 'entrada' | 'saida',
+      tipo_recebimento:     String(tipo_recebimento),
+      valor:                Number(valor),
+      referencia:           body.referencia    ?? null,
+      observacoes:          body.observacoes   ?? null,
+      descricao:            body.descricao     ?? null,
+      congregacao_id:       body.congregacao_id   ?? null,
+      departamento_id:      body.departamento_id  ?? null,
+      conta_id:             body.conta_id         ?? null,
+      categoria_id:         body.categoria_id     ?? null,
+      member_id:            body.member_id         ?? null,
+      codigo_registro:      body.codigo_registro   ?? null,
+      permitir_duplicidade: Boolean(body.permitir_duplicidade),
     });
 
     return NextResponse.json(
@@ -115,6 +128,21 @@ export async function POST(request: NextRequest) {
     );
   } catch (err: any) {
     console.error('[POST /api/v1/tesouraria/lancamentos]', err);
+    const isDuplicate = err?.message?.includes('Já existe um lançamento registrado com este Código/ID') ||
+                        err?.code === '23505' ||
+                        err?.message?.includes('idx_tesouraria_lancamentos_codigo_registro');
+    if (isDuplicate) {
+      return NextResponse.json(
+        {
+          error: 'DUPLICATE_CODIGO_REGISTRO',
+          message: 'Já existe um lançamento registrado com este Código / ID nesta igreja/congregação.',
+          codigo: body.codigo_registro,
+          requires_confirmation: true,
+        },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
       { error: err?.message || 'Erro interno ao cadastrar lançamento.' },
       { status: 400 }
@@ -159,24 +187,40 @@ export async function PUT(request: NextRequest) {
     const service = new TesourariaService(admin);
 
     const lancamento = await service.atualizarLancamento(id, ministryId, {
-      data_lancamento:  body.data_lancamento  ? String(body.data_lancamento) : undefined,
-      tipo_movimento:   body.tipo_movimento   ? (body.tipo_movimento as 'entrada' | 'saida') : undefined,
-      tipo_recebimento: body.tipo_recebimento ? String(body.tipo_recebimento) : undefined,
-      valor:            body.valor !== undefined ? Number(body.valor) : undefined,
-      referencia:       body.referencia,
-      observacoes:      body.observacoes,
-      descricao:        body.descricao,
-      congregacao_id:   body.congregacao_id,
-      departamento_id:  body.departamento_id,
-      conta_id:         body.conta_id,
-      categoria_id:     body.categoria_id,
-      member_id:        body.member_id,
-      codigo_registro:  body.codigo_registro !== undefined ? body.codigo_registro : undefined,
+      data_lancamento:      body.data_lancamento  ? String(body.data_lancamento) : undefined,
+      tipo_movimento:       body.tipo_movimento   ? (body.tipo_movimento as 'entrada' | 'saida') : undefined,
+      tipo_recebimento:     body.tipo_recebimento ? String(body.tipo_recebimento) : undefined,
+      valor:                body.valor !== undefined ? Number(body.valor) : undefined,
+      referencia:           body.referencia,
+      observacoes:          body.observacoes,
+      descricao:            body.descricao,
+      congregacao_id:       body.congregacao_id,
+      departamento_id:      body.departamento_id,
+      conta_id:             body.conta_id,
+      categoria_id:         body.categoria_id,
+      member_id:            body.member_id,
+      codigo_registro:      body.codigo_registro !== undefined ? body.codigo_registro : undefined,
+      permitir_duplicidade: Boolean(body.permitir_duplicidade),
     });
 
     return NextResponse.json({ success: true, data: lancamento });
   } catch (err: any) {
     console.error('[PUT /api/v1/tesouraria/lancamentos]', err);
+    const isDuplicate = err?.message?.includes('Já existe um lançamento registrado com este Código/ID') ||
+                        err?.code === '23505' ||
+                        err?.message?.includes('idx_tesouraria_lancamentos_codigo_registro');
+    if (isDuplicate) {
+      return NextResponse.json(
+        {
+          error: 'DUPLICATE_CODIGO_REGISTRO',
+          message: 'Já existe um lançamento registrado com este Código / ID nesta igreja/congregação.',
+          codigo: body.codigo_registro,
+          requires_confirmation: true,
+        },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
       { error: err?.message || 'Erro interno ao atualizar lançamento.' },
       { status: 400 }
