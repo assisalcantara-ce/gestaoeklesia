@@ -14,11 +14,81 @@ import {
   Clock,
   XCircle,
   AlertCircle,
+  Printer,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/api-client';
 import ConfirmDeleteModal from '@/components/tesouraria/modals/ConfirmDeleteModal';
 
 interface Congregacao { id: string; nome: string }
+
+// Componente customizado para seleção de Mês e Ano de referência
+function MonthPicker({
+  value,
+  onChange,
+  className = '',
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+}) {
+  const [anoStr, mesStr] = value.split('-');
+  const ano = parseInt(anoStr || String(new Date().getFullYear()), 10);
+  const mes = parseInt(mesStr || String(new Date().getMonth() + 1), 10);
+
+  const meses = [
+    { value: 1, label: 'Janeiro' },
+    { value: 2, label: 'Fevereiro' },
+    { value: 3, label: 'Março' },
+    { value: 4, label: 'Abril' },
+    { value: 5, label: 'Maio' },
+    { value: 6, label: 'Junho' },
+    { value: 7, label: 'Julho' },
+    { value: 8, label: 'Agosto' },
+    { value: 9, label: 'Setembro' },
+    { value: 10, label: 'Outubro' },
+    { value: 11, label: 'Novembro' },
+    { value: 12, label: 'Dezembro' },
+  ];
+
+  const anoAtual = new Date().getFullYear();
+  const anos = Array.from({ length: 8 }, (_, i) => anoAtual - 5 + i);
+
+  const handleMesChange = (novoMes: number) => {
+    onChange(`${anoStr}-${String(novoMes).padStart(2, '0')}`);
+  };
+
+  const handleAnoChange = (novoAno: number) => {
+    onChange(`${novoAno}-${String(mes).padStart(2, '0')}`);
+  };
+
+  return (
+    <div className={`flex gap-1.5 ${className}`}>
+      <select
+        value={mes}
+        onChange={(e) => handleMesChange(Number(e.target.value))}
+        className="flex-1 min-w-[105px] border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-[#123b63] bg-white font-medium text-slate-700"
+      >
+        {meses.map((m) => (
+          <option key={m.value} value={m.value}>
+            {m.label}
+          </option>
+        ))}
+      </select>
+      <select
+        value={ano}
+        onChange={(e) => handleAnoChange(Number(e.target.value))}
+        className="w-[72px] border border-gray-200 rounded-lg px-1.5 py-1.5 text-xs focus:outline-none focus:border-[#123b63] bg-white font-medium text-slate-700"
+      >
+        {anos.map((y) => (
+          <option key={y} value={y}>
+            {y}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 export interface PaymentDestino {
   id: string;
@@ -64,6 +134,9 @@ interface ArrecadacaoDigitalContentProps {
   onOpenNovoDestino: () => void;
   onOpenQrModal: (destino: PaymentDestino) => void;
   destinosUpdatedKey: number;
+  nomenclaturas?: { divisao1?: string };
+  isFinanceiroLocal?: boolean;
+  exportarCSV?: (dados: any[], filename: string) => void;
 }
 
 export default function ArrecadacaoDigitalContent({
@@ -74,6 +147,9 @@ export default function ArrecadacaoDigitalContent({
   onOpenNovoDestino,
   onOpenQrModal,
   destinosUpdatedKey,
+  nomenclaturas,
+  isFinanceiroLocal,
+  exportarCSV,
 }: ArrecadacaoDigitalContentProps) {
   const [subAba, setSubAba] = useState<'destinos' | 'extrato'>('destinos');
   const [destinos, setDestinos] = useState<PaymentDestino[]>([]);
@@ -89,14 +165,21 @@ export default function ArrecadacaoDigitalContent({
     active: false,
   });
 
-  // Filtros de busca e status
+  // Filtros de busca e status para Destinos
   const [statusFiltro, setStatusFiltro] = useState<'ativo' | 'inativo'>('ativo');
   const [buscaTexto, setBuscaTexto] = useState('');
-  const [buscaExtrato, setBuscaExtrato] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('');
   const [congFiltro, setCongFiltro] = useState('');
 
-  // Estado de Paginação Backend
+  // Filtros da barra de Extrato de Ofertas PIX
+  const now = new Date();
+  const defaultMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const [extratoMes, setExtratoMes] = useState<string>(defaultMes);
+  const [extratoCong, setExtratoCong] = useState<string>('');
+  const [extratoTipoMovimento, setExtratoTipoMovimento] = useState<'ambos' | 'entradas' | 'saidas'>('entradas');
+  const [buscaExtrato, setBuscaExtrato] = useState('');
+
+  // Estado de Paginação Backend para Destinos
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [totalCount, setTotalCount] = useState(0);
@@ -172,8 +255,13 @@ export default function ArrecadacaoDigitalContent({
   const loadCobrancas = useCallback(async () => {
     try {
       setLoadingCobrancas(true);
-      const res = await authenticatedFetch('/api/v1/ministry/payment-charges?pageSize=100');
-      if (!res.ok) throw new Error('Erro ao carregar extrato de doações.');
+      const params = new URLSearchParams();
+      params.set('pageSize', '100');
+      if (extratoMes) params.set('mes', extratoMes);
+      if (extratoCong) params.set('congregacao_id', extratoCong);
+
+      const res = await authenticatedFetch(`/api/v1/ministry/payment-charges?${params.toString()}`);
+      if (!res.ok) throw new Error('Erro ao carregar extrato de ofertas.');
       const json = await res.json();
 
       const validCobrancas = (json.data ?? []).filter((c: any) => {
@@ -189,12 +277,12 @@ export default function ArrecadacaoDigitalContent({
         });
       }
     } catch (err) {
-      console.error('Erro ao carregar extrato de doações PIX:', err);
+      console.error('Erro ao carregar extrato de ofertas PIX:', err);
       setCobrancas([]);
     } finally {
       setLoadingCobrancas(false);
     }
-  }, []);
+  }, [extratoMes, extratoCong]);
 
   useEffect(() => {
     loadDestinos();
@@ -297,8 +385,14 @@ export default function ArrecadacaoDigitalContent({
     }).length
   );
 
-  // Filtragem de Extrato
+  // Filtragem de Extrato (busca textual e tipo de movimento)
   const cobrancasFiltradas = cobrancas.filter((c) => {
+    // Filtro por tipo de movimento
+    if (extratoTipoMovimento === 'saidas') {
+      // Arrecadação PIX trata de entradas de ofertas
+      return false;
+    }
+
     if (!buscaExtrato) return true;
     const term = buscaExtrato.toLowerCase();
     const pagador = (c.payer_name ?? '').toLowerCase();
@@ -315,11 +409,51 @@ export default function ArrecadacaoDigitalContent({
     );
   });
 
+  // Exportar Extrato para CSV
+  const handleExportarExtratoCSV = () => {
+    if (exportarCSV) {
+      const csvData = cobrancasFiltradas.map((c) => ({
+        'Data / Hora': fmtDate(c.created_at),
+        'Destino PIX': c.fin_payment_destinations?.label ?? 'Destino Indefinido',
+        'Congregação': c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas',
+        'Pagador / Doador': c.payer_name || 'Anônimo / Não identificado',
+        'Documento': c.payer_document || '—',
+        'Valor (R$)': Number(c.valor_pago ?? c.valor_solicitado ?? 0).toFixed(2),
+        'Status': (STATUS_BADGES[c.status]?.label ?? c.status).toUpperCase(),
+        'Conciliado Caixa': c.tesouraria_lancamento_id ? 'SIM' : 'NÃO',
+        'ID Transação Gateway': c.gateway_charge_id || '—',
+      }));
+      exportarCSV(csvData, `extrato_ofertas_pix_${extratoMes}`);
+    } else {
+      // Fallback CSV download nativo
+      if (cobrancasFiltradas.length === 0) return;
+      const headers = ['Data', 'Destino', 'Congregação', 'Pagador', 'Documento', 'Valor', 'Status', 'Conciliado'];
+      const rows = cobrancasFiltradas.map((c) => [
+        fmtDate(c.created_at),
+        `"${(c.fin_payment_destinations?.label ?? '').replace(/"/g, '""')}"`,
+        `"${(c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas').replace(/"/g, '""')}"`,
+        `"${(c.payer_name || 'Anônimo').replace(/"/g, '""')}"`,
+        c.payer_document || '',
+        Number(c.valor_pago ?? c.valor_solicitado ?? 0).toFixed(2),
+        STATUS_BADGES[c.status]?.label ?? c.status,
+        c.tesouraria_lancamento_id ? 'Sim' : 'Não',
+      ]);
+      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `extrato_ofertas_pix_${extratoMes}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   const TIPO_LABELS: Record<string, string> = {
     dizimo: 'Dízimo',
     oferta: 'Oferta',
     missoes: 'Missões',
-    doacao: 'Doação',
+    doacao: 'Oferta / Doação',
     campanha_local: 'Campanha',
     evento_local: 'Evento',
   };
@@ -354,7 +488,7 @@ export default function ArrecadacaoDigitalContent({
             )}
           </div>
           <p className="text-xs text-slate-500 max-w-xl">
-            Gerencie destinos de doação, gere QR Codes automáticos para púlpitos ou eventos e acompanhe as conciliações via PIX em tempo real.
+            Gerencie destinos de ofertas, gere QR Codes automáticos para púlpitos ou eventos e acompanhe as conciliações via PIX em tempo real.
           </p>
         </div>
 
@@ -395,7 +529,7 @@ export default function ArrecadacaoDigitalContent({
             <CreditCard className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Doações Pagas</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Ofertas Pagas</p>
             <h3 className="text-xl font-extrabold text-slate-800 mt-0.5">{transacoesPagasCount} transação(ões)</h3>
           </div>
         </div>
@@ -421,7 +555,7 @@ export default function ArrecadacaoDigitalContent({
               : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
-          Extrato de Doações PIX
+          Extrato de Ofertas PIX
         </button>
       </div>
 
@@ -478,7 +612,7 @@ export default function ArrecadacaoDigitalContent({
                 <option value="dizimo">Dízimo</option>
                 <option value="oferta">Oferta</option>
                 <option value="missoes">Missões</option>
-                <option value="doacao">Doação</option>
+                <option value="doacao">Oferta / Doação</option>
                 <option value="campanha_local">Campanha</option>
                 <option value="evento_local">Evento</option>
               </select>
@@ -498,123 +632,84 @@ export default function ArrecadacaoDigitalContent({
             </div>
           </div>
 
-          {/* Tabela Operacional de Destinos */}
+          {/* Tabela de Destinos */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             {loadingDestinos ? (
-              <div className="p-12 text-center text-xs text-slate-400">
-                Carregando destinos de arrecadação...
-              </div>
+              <div className="p-12 text-center text-xs text-slate-400">Carregando destinos PIX...</div>
             ) : destinos.length === 0 ? (
-              <div className="p-12 text-center space-y-3">
-                <QrCode className="h-12 w-12 text-slate-300 mx-auto" />
-                <p className="text-sm font-bold text-slate-700">
-                  {buscaTexto
-                    ? 'Nenhum destino encontrado para a busca informada'
-                    : statusFiltro === 'ativo'
-                    ? 'Nenhum destino ativo cadastrado'
-                    : 'Nenhum destino inativo encontrado'}
+              <div className="p-12 text-center text-xs text-slate-400 space-y-2">
+                <QrCode className="h-10 w-10 mx-auto text-slate-300 stroke-[1.5]" />
+                <p className="font-bold text-slate-600 text-sm">Nenhum destino de arrecadação encontrado</p>
+                <p className="text-slate-400">
+                  {statusFiltro === 'ativo'
+                    ? 'Clique no botão "Novo Destino PIX" acima para criar seu primeiro ponto de recebimento.'
+                    : 'Não há destinos inativos cadastrados no momento.'}
                 </p>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  {buscaTexto
-                    ? 'Tente utilizar termos diferentes ou limpar o campo de pesquisa.'
-                    : 'Crie links e QR Codes dinâmicos para dízimos, ofertas e eventos.'}
-                </p>
-                {statusFiltro === 'ativo' && !buscaTexto && (
-                  <button
-                    onClick={onOpenNovoDestino}
-                    className="mt-2 px-4 py-2 bg-[#123b63] text-white text-xs font-bold rounded-xl"
-                  >
-                    + Criar Primeiro Destino
-                  </button>
-                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
-                      <th className="py-3.5 px-4">Destino / Finalidade</th>
-                      <th className="py-3.5 px-4">Congregação</th>
-                      <th className="py-3.5 px-4">Tipo</th>
-                      <th className="py-3.5 px-4 text-right">Total Arrecadado</th>
-                      <th className="py-3.5 px-4 text-center">QR Pix</th>
-                      <th className="py-3.5 px-4 text-center">Status</th>
-                      <th className="py-3.5 px-4 text-center">Ações</th>
+                      <th className="py-3 px-4">Destino / Finalidade</th>
+                      <th className="py-3 px-4">Tipo</th>
+                      <th className="py-3 px-4">Congregação</th>
+                      <th className="py-3 px-4 text-right">Valor Padrão</th>
+                      <th className="py-3 px-4 text-right">Total Recebido</th>
+                      <th className="py-3 px-4 text-center">Status</th>
+                      <th className="py-3 px-4 text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {destinos.map((d) => {
-                      const hasStaticPix = Boolean(d.pix_payload);
+                      const hasStaticPix = Boolean(d.pix_qr_code_id || d.pix_payload);
 
                       return (
-                        <tr
-                          key={d.id}
-                          className={`hover:bg-slate-50/80 transition ${
-                            !d.is_ativo ? 'bg-slate-50/50 text-slate-500' : ''
-                          }`}
-                        >
-                          {/* Nome/Label do Destino */}
-                          <td className="py-3.5 px-4">
-                            <p className="font-extrabold text-slate-800 text-xs">{d.label}</p>
+                        <tr key={d.id} className="hover:bg-slate-50/80 transition">
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-800">{d.label}</div>
                             {d.descricao && (
-                              <p className="text-[11px] text-slate-400 line-clamp-1 max-w-xs">{d.descricao}</p>
+                              <p className="text-[11px] text-slate-400 truncate max-w-xs">{d.descricao}</p>
                             )}
                           </td>
-
-                          {/* Congregação */}
-                          <td className="py-3.5 px-4 text-slate-700 font-medium">
-                            📍 {d.congregacoes?.nome ?? 'Sede / Todas as Congregações'}
-                          </td>
-
-                          {/* Tipo de Recebimento */}
-                          <td className="py-3.5 px-4">
-                            <span className="inline-block px-2.5 py-0.5 bg-[#123b63]/10 text-[#123b63] text-[10px] font-bold rounded-full uppercase tracking-wider">
+                          <td className="py-3 px-4">
+                            <span className="inline-block px-2 py-0.5 rounded-full font-semibold text-[10px] bg-slate-100 text-slate-700">
                               {TIPO_LABELS[d.tipo_recebimento] ?? d.tipo_recebimento}
                             </span>
                           </td>
-
-                          {/* Total Arrecadado */}
-                          <td className="py-3.5 px-4 text-right font-extrabold text-slate-800">
+                          <td className="py-3 px-4 text-slate-600">
+                            {d.congregacoes?.nome ?? 'Sede / Todas'}
+                          </td>
+                          <td className="py-3 px-4 text-right font-semibold text-slate-700">
+                            {d.valor_fixo && d.valor_fixo > 0 ? fmtBRL(d.valor_fixo) : 'Livre (Aberto)'}
+                          </td>
+                          <td className="py-3 px-4 text-right font-extrabold text-emerald-600">
                             {fmtBRL(d.total_arrecadado ?? 0)}
                           </td>
-
-                          {/* QR Pix Indicator */}
-                          <td className="py-3.5 px-4 text-center">
-                            {hasStaticPix ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md">
-                                <QrCode className="h-3 w-3" /> Pix Estático
+                          <td className="py-3 px-4 text-center">
+                            {d.is_ativo ? (
+                              <span className="inline-flex items-center gap-1 font-bold text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <CheckCircle2 className="h-3 w-3" /> Ativo
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md">
-                                Web Link
+                              <span className="inline-flex items-center gap-1 font-bold text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                <XCircle className="h-3 w-3" /> Inativo
                               </span>
                             )}
                           </td>
-
-                          {/* Status */}
-                          <td className="py-3.5 px-4 text-center">
-                            <span
-                              className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                                d.is_ativo
-                                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                                  : 'bg-slate-200 text-slate-600 border border-slate-300'
-                              }`}
-                            >
-                              {d.is_ativo ? 'Ativo' : 'Inativo'}
-                            </span>
-                          </td>
-
-                          {/* Ações Operacionais */}
-                          <td className="py-3.5 px-4 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Botão Ver QR Code */}
                               <button
                                 onClick={() => onOpenQrModal(d)}
-                                className="px-2.5 py-1.5 bg-[#123b63] hover:bg-[#1a4f85] text-white text-[11px] font-bold rounded-lg flex items-center gap-1 transition"
-                                title="Visualizar/Imprimir QR Code PIX"
+                                className="px-2.5 py-1.5 bg-[#123b63] hover:bg-[#1a4f85] text-white rounded-lg transition text-[11px] font-bold flex items-center gap-1 shadow-sm"
+                                title="Visualizar QR Code PIX"
                               >
-                                <QrCode className="h-3.5 w-3.5 text-white" /> Ver QR Code PIX
+                                <QrCode className="h-3.5 w-3.5" />
+                                <span>QR Code</span>
                               </button>
 
+                              {/* Ação Alternar Status (Ativar / Desativar / Excluir) */}
                               {d.is_ativo ? (
                                 <button
                                   disabled={deactivatingId === d.id || deletingId === d.id}
@@ -688,28 +783,110 @@ export default function ArrecadacaoDigitalContent({
         </div>
       )}
 
-      {/* ── 4. VISÃO EXTRATO DE DOAÇÕES PIX ── */}
+      {/* ── 4. VISÃO EXTRATO DE OFERTAS PIX ── */}
       {subAba === 'extrato' && (
         <div className="space-y-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+          {/* Barra de Filtros com Estilo Idêntico ao Módulo Tesouraria / Relatórios */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex flex-wrap items-center gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Mês de Referência</label>
+                <MonthPicker
+                  value={extratoMes}
+                  onChange={setExtratoMes}
+                  className="h-[36px]"
+                />
+              </div>
+
+              {congregacoes.length > 0 && !isFinanceiroLocal && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    {nomenclaturas?.divisao1 || 'CONGREGAÇÃO'}
+                  </label>
+                  <select
+                    value={extratoCong}
+                    onChange={(e) => setExtratoCong(e.target.value)}
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#123b63] h-[36px] bg-white font-medium text-slate-700"
+                  >
+                    <option value="">Todas as unidades</option>
+                    {congregacoes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo de Movimento</label>
+                <select
+                  value={extratoTipoMovimento}
+                  onChange={(e) => setExtratoTipoMovimento(e.target.value as any)}
+                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#123b63] h-[36px] bg-white font-medium text-slate-700"
+                >
+                  <option value="entradas">Apenas Entradas</option>
+                  <option value="ambos">Entradas e Saídas</option>
+                  <option value="saidas">Apenas Saídas</option>
+                </select>
+              </div>
+
+              <div className="self-end">
+                <button
+                  onClick={() => {
+                    setExtratoCong('');
+                    setExtratoTipoMovimento('entradas');
+                    setExtratoMes(defaultMes);
+                    setBuscaExtrato('');
+                  }}
+                  disabled={extratoCong === '' && extratoTipoMovimento === 'entradas' && extratoMes === defaultMes && buscaExtrato === ''}
+                  className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs font-semibold transition h-[36px] ${
+                    extratoCong === '' && extratoTipoMovimento === 'entradas' && extratoMes === defaultMes && buscaExtrato === ''
+                      ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                      : 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300'
+                  }`}
+                >
+                  Limpar Filtros
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              <button
+                onClick={handleExportarExtratoCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs hover:bg-gray-50 font-medium transition h-[36px]"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-slate-600" /> Exportar CSV
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#123b63] text-white rounded-lg text-xs hover:bg-[#0f2a45] font-medium transition h-[36px]"
+              >
+                <Printer className="h-3.5 w-3.5" /> Imprimir
+              </button>
+            </div>
+          </div>
+
+          {/* Busca rápida textual */}
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
             <Search className="h-4 w-4 text-slate-400 shrink-0" />
             <input
               type="text"
               value={buscaExtrato}
               onChange={(e) => setBuscaExtrato(e.target.value)}
-              placeholder="Buscar doação por nome do pagador ou nome do destino..."
-              className="w-full text-xs outline-none bg-transparent"
+              placeholder="Filtrar por nome do pagador, destino ou documento..."
+              className="w-full text-xs outline-none bg-transparent text-slate-800 placeholder-slate-400 font-medium"
             />
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             {loadingCobrancas ? (
-              <div className="p-12 text-center text-xs text-slate-400">Carregando extrato PIX...</div>
+              <div className="p-12 text-center text-xs text-slate-400">Carregando extrato de ofertas PIX...</div>
             ) : cobrancasFiltradas.length === 0 ? (
               <div className="p-12 text-center text-xs text-slate-400 space-y-1">
-                <p className="font-bold text-slate-600 text-sm">Nenhuma doação registrada no extrato</p>
+                <p className="font-bold text-slate-600 text-sm">Nenhuma oferta registrada no extrato</p>
                 <p className="text-slate-400">
-                  As doações recebidas via PIX através dos QR Codes do ministério serão exibidas aqui.
+                  As ofertas recebidas via PIX através dos QR Codes do ministério serão exibidas aqui.
                 </p>
               </div>
             ) : (

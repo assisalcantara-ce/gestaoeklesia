@@ -1378,6 +1378,9 @@ export default function TesourariaPage() {
               t.setShowQrModal(true);
             }}
             destinosUpdatedKey={t.destinosUpdatedKey ?? 0}
+            nomenclaturas={t.nomenclaturas}
+            isFinanceiroLocal={t.scope.isFinanceiroLocal}
+            exportarCSV={t.exportarCSV}
           />
         )}
 

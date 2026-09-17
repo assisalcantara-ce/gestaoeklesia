@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
   const statusParam = urlObj.searchParams.get('status') || '';
   const destinationParam = urlObj.searchParams.get('destination_id') || '';
   const congParam = urlObj.searchParams.get('congregacao_id') || '';
+  const mesParam = urlObj.searchParams.get('mes') || ''; // Formato YYYY-MM
 
   try {
     let query = ctx.admin
@@ -92,6 +93,16 @@ export async function GET(request: NextRequest) {
         { count: 'exact' }
       )
       .eq('ministry_id', ctx.ministryId);
+
+    // Filtro por Mês de Referência (YYYY-MM)
+    if (mesParam && /^\d{4}-\d{2}$/.test(mesParam)) {
+      const [anoStr, mesStr] = mesParam.split('-');
+      const ano = parseInt(anoStr, 10);
+      const mes = parseInt(mesStr, 10);
+      const startIso = new Date(ano, mes - 1, 1).toISOString();
+      const endIso = new Date(ano, mes, 0, 23, 59, 59, 999).toISOString();
+      query = query.gte('created_at', startIso).lte('created_at', endIso);
+    }
 
     // Filtros
     if (statusParam) {
