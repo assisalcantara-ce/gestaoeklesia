@@ -1141,18 +1141,6 @@ export default function ArrecadacaoDigitalContent({
               </tr>
             </tfoot>
           </table>
-
-          {/* Assinatura Responsável */}
-          <div className="pt-12 flex justify-around text-center text-xs">
-            <div className="space-y-1">
-              <div className="w-48 border-b border-gray-400 mx-auto"></div>
-              <p className="font-semibold text-gray-700">Assinatura do Tesoureiro</p>
-            </div>
-            <div className="space-y-1">
-              <div className="w-48 border-b border-gray-400 mx-auto"></div>
-              <p className="font-semibold text-gray-700">Assinatura do Pastor / Dirigente</p>
-            </div>
-          </div>
         </div>
       )}
     </div>

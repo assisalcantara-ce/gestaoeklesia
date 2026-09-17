@@ -37,7 +37,7 @@ export default function TesourariaTable({
   setConfirmDel,
   finContas = [],
   finCategorias = [],
-  mostrarCategoria = false,
+  mostrarCategoria = true,
 }: TesourariaTableProps) {
   const [selectedLanc, setSelectedLanc] = useState<any | null>(null);
   const [chargeDetails, setChargeDetails] = useState<any | null>(null);
