@@ -229,6 +229,7 @@ export default function TesourariaPage() {
                           tipo_movimento: mv,
                           tipo_recebimento: mv === 'entrada' ? 'oferta' : '',
                           categoria_saida: '',
+                          categoria_id: '',
                         }))
                       }
                       className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${
@@ -341,18 +342,36 @@ export default function TesourariaPage() {
                     </div>
                   ) : (
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria da despesa</label>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">
+                        Categoria da despesa <span className="text-red-500">*</span>
+                      </label>
                       <select
-                        value={t.form.categoria_saida}
-                        onChange={(e) => t.setForm((p) => ({ ...p, categoria_saida: e.target.value }))}
+                        value={t.form.categoria_id || t.form.categoria_saida}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const found = t.finCategorias.find((c) => c.id === val);
+                          t.setForm((p) => ({
+                            ...p,
+                            categoria_id: found ? found.id : '',
+                            categoria_saida: found ? (found.codigo || found.nome) : val,
+                          }));
+                        }}
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                       >
-                        <option value="">Selecione</option>
-                        {t.TIPOS_SAIDA.map((ts) => (
-                          <option key={ts.value} value={ts.value}>
-                            {ts.label}
-                          </option>
-                        ))}
+                        <option value="">Selecione a categoria</option>
+                        {t.finCategorias
+                          .filter((c) => c.tipo_movimento === 'saida' || c.tipo_movimento === 'ambos')
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.icone ? `${c.icone} ` : ''}{c.nome} {c.codigo ? `(${c.codigo})` : ''}
+                            </option>
+                          ))}
+                        {t.finCategorias.filter((c) => c.tipo_movimento === 'saida' || c.tipo_movimento === 'ambos').length === 0 &&
+                          t.TIPOS_SAIDA.map((ts) => (
+                            <option key={ts.value} value={ts.value}>
+                              {ts.label}
+                            </option>
+                          ))}
                       </select>
                     </div>
                   )}
@@ -556,41 +575,43 @@ export default function TesourariaPage() {
                     </select>
                   </div>
 
-                  {/* Categoria financeira */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria financeira</label>
-                    {t.finCategorias.length === 0 ? (
-                      <div className="w-full border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-400 flex items-center justify-between gap-2">
-                        <span>Sem categorias disponíveis.</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            t.setShowForm(false);
-                            t.setAba('categorias');
-                          }}
-                          className="text-[#123b63] font-semibold hover:underline whitespace-nowrap"
+                  {/* Categoria financeira (apenas para Entrada) */}
+                  {t.form.tipo_movimento === 'entrada' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria financeira (opcional)</label>
+                      {t.finCategorias.filter((c) => c.tipo_movimento === 'entrada' || c.tipo_movimento === 'ambos').length === 0 ? (
+                        <div className="w-full border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-400 flex items-center justify-between gap-2">
+                          <span>Sem categorias disponíveis.</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              t.setShowForm(false);
+                              t.setAba('categorias');
+                            }}
+                            className="text-[#123b63] font-semibold hover:underline whitespace-nowrap"
+                          >
+                            Configurar
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          value={t.form.categoria_id}
+                          onChange={(e) => t.setForm((p) => ({ ...p, categoria_id: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                         >
-                          Configurar
-                        </button>
-                      </div>
-                    ) : (
-                      <select
-                        value={t.form.categoria_id}
-                        onChange={(e) => t.setForm((p) => ({ ...p, categoria_id: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      >
-                        <option value="">Sem categoria</option>
-                        {t.finCategorias
-                          .filter((c) => c.tipo_movimento === t.form.tipo_movimento || c.tipo_movimento === 'ambos')
-                          .map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.icone ? `${c.icone} ` : ''}
-                              {c.nome}
-                            </option>
-                          ))}
-                      </select>
-                    )}
-                  </div>
+                          <option value="">Sem categoria (Geral)</option>
+                          {t.finCategorias
+                            .filter((c) => c.tipo_movimento === 'entrada' || c.tipo_movimento === 'ambos')
+                            .map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.icone ? `${c.icone} ` : ''}
+                                {c.nome} {c.codigo ? `(${c.codigo})` : ''}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
 
                   {/* Referência */}
                   <div>
@@ -1202,38 +1223,78 @@ export default function TesourariaPage() {
         {/* ─── ABA: CATEGORIAS ─── */}
         {t.aba === 'categorias' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200">
               <div>
                 <h2 className="text-base font-bold text-[#123b63]">Categorias Financeiras</h2>
-                <p className="text-sm text-gray-500">Categorias de plano de contas para entradas e saídas</p>
+                <p className="text-sm text-gray-500">Gerencie as categorias de receitas e despesas da tesouraria</p>
               </div>
-              {t.scope.canDelete && (
-                <button
-                  onClick={() => {
-                    t.setFormCat(t.emptyFormCat());
-                    t.setCatEditId(null);
-                    t.setShowCatModal(true);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition"
-                >
-                  <Plus className="h-4 w-4" /> Nova Categoria
-                </button>
-              )}
+
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                {/* Filtro por Tipo */}
+                <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-xs font-medium">
+                  {[
+                    { id: '', label: 'Todas' },
+                    { id: 'entrada', label: 'Entradas' },
+                    { id: 'saida', label: 'Saídas' },
+                    { id: 'ambos', label: 'Ambos' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => t.setFiltroCatTipo(tab.id as any)}
+                      className={`px-3 py-1.5 rounded-md transition ${
+                        t.filtroCatTipo === tab.id
+                          ? 'bg-white text-[#123b63] font-bold shadow-xs'
+                          : 'text-gray-500 hover:text-gray-800'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {t.scope.canDelete && (
+                  <button
+                    onClick={() => {
+                      t.setFormCat(t.emptyFormCat());
+                      t.setCatEditId(null);
+                      t.setShowCatModal(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition"
+                  >
+                    <Plus className="h-4 w-4" /> Nova Categoria
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Listagem de Categorias de Plano de Contas */}
+            {/* Listagem de Categorias */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {t.finCategorias.length === 0 ? (
-                <div className="col-span-full bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-400 text-sm">
-                  Nenhuma categoria personalizada cadastrada.
-                </div>
-              ) : (
-                t.finCategorias.map((cat) => {
+              {(() => {
+                const catsFiltradas = t.finCategorias.filter((cat) => {
+                  if (!t.filtroCatTipo) return true;
+                  return cat.tipo_movimento === t.filtroCatTipo || cat.tipo_movimento === 'ambos';
+                });
+
+                if (catsFiltradas.length === 0) {
+                  return (
+                    <div className="col-span-full bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-400 text-sm">
+                      Nenhuma categoria encontrada para este filtro.
+                    </div>
+                  );
+                }
+
+                return catsFiltradas.map((cat) => {
                   const isTenantCat = !cat.is_sistema && (cat.ministry_id === t.ministryId || (!!cat.ministry_id && !cat.is_sistema));
                   return (
-                    <div key={cat.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center justify-between hover:border-slate-300 transition">
+                    <div
+                      key={cat.id}
+                      className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center justify-between hover:border-slate-300 transition"
+                    >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-base">
+                        <div
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-base"
+                          style={{ backgroundColor: `${cat.cor || '#6b7280'}18` }}
+                        >
                           {cat.icone || <Tag className="h-4 w-4 text-gray-500" />}
                         </div>
                         <div>
@@ -1246,13 +1307,15 @@ export default function TesourariaPage() {
                             )}
                           </div>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
-                              cat.tipo_movimento === 'entrada'
-                                ? 'bg-green-100 text-green-800'
-                                : cat.tipo_movimento === 'saida'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-blue-100 text-blue-800'
-                            }`}>
+                            <span
+                              className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                                cat.tipo_movimento === 'entrada'
+                                  ? 'bg-green-100 text-green-800'
+                                  : cat.tipo_movimento === 'saida'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-blue-100 text-blue-800'
+                              }`}
+                            >
                               {cat.tipo_movimento}
                             </span>
                             {cat.is_sistema ? (
@@ -1292,38 +1355,8 @@ export default function TesourariaPage() {
                       )}
                     </div>
                   );
-                })
-              )}
-            </div>
-
-            {/* Cabeçalho Categorias de Despesas Padrão */}
-            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 mt-6">
-              <div>
-                <h3 className="text-base font-bold text-[#123b63]">Categorias de Despesa (Saídas Padrão)</h3>
-                <p className="text-sm text-gray-500">Tipos de despesas pré-configurados no sistema para lançamentos de saída</p>
-              </div>
-            </div>
-
-            {/* Listagem de Categorias de Despesa */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {t.TIPOS_SAIDA.map((ts) => (
-                <div key={ts.value} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold text-xs">
-                      ↓
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-800 text-sm">{ts.label}</h4>
-                      <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800">
-                        Saída
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-[11px] text-gray-400 font-medium bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
-                    Sistema
-                  </span>
-                </div>
-              ))}
+                });
+              })()}
             </div>
 
             <CategoriaFinanceiraModal

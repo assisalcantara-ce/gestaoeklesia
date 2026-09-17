@@ -946,6 +946,19 @@ export function useTesouraria() {
 
   const handleEdit = useCallback((l: Lancamento) => {
     setEditId(l.id);
+    let catId = l.categoria_id || '';
+    if (!catId && l.tipo_recebimento && finCategorias.length > 0) {
+      const match = finCategorias.find(
+        (c) =>
+          c.id === l.tipo_recebimento ||
+          c.nome.toLowerCase() === l.tipo_recebimento?.toLowerCase() ||
+          c.codigo === l.tipo_recebimento
+      );
+      if (match) {
+        catId = match.id;
+      }
+    }
+
     setForm({
       data_lancamento: l.data_lancamento,
       tipo_movimento: l.tipo_movimento,
@@ -959,12 +972,12 @@ export function useTesouraria() {
       congregacao_id: l.congregacao_id || '',
       departamento_id: l.departamento_id || '',
       conta_id: l.conta_id || '',
-      categoria_id: l.categoria_id || '',
+      categoria_id: catId,
       codigo_registro: l.codigo_registro || '',
       is_dizimo: l.tipo_recebimento === 'dizimo',
     });
     setShowForm(true);
-  }, []);
+  }, [finCategorias]);
 
   const handleSave = useCallback(async (options?: { forcarDuplicidade?: boolean }) => {
     if (!form.data_lancamento || !form.valor) {
@@ -992,10 +1005,22 @@ export function useTesouraria() {
         }
       }
 
+      let tipoRecebimentoFinal: string = form.tipo_recebimento;
+      let categoriaIdFinal = form.categoria_id || null;
+
+      if (form.tipo_movimento === 'saida') {
+        if (form.categoria_id) {
+          const cat = finCategorias.find((c) => c.id === form.categoria_id);
+          tipoRecebimentoFinal = cat ? (cat.codigo || cat.nome) : (form.categoria_saida || 'outros_saida');
+        } else {
+          tipoRecebimentoFinal = form.categoria_saida || 'outros_saida';
+        }
+      }
+
       const payload = {
         data_lancamento: form.data_lancamento,
         tipo_movimento: form.tipo_movimento,
-        tipo_recebimento: form.tipo_movimento === 'entrada' ? form.tipo_recebimento : form.categoria_saida,
+        tipo_recebimento: tipoRecebimentoFinal,
         valor: valNum,
         referencia: form.referencia || (form.dizimista_nome ? `Dízimo: ${form.dizimista_nome}` : null),
         observacoes: obsFinal || null,
@@ -1003,7 +1028,7 @@ export function useTesouraria() {
         congregacao_id: form.congregacao_id || null,
         departamento_id: form.departamento_id || null,
         conta_id: form.conta_id || null,
-        categoria_id: form.categoria_id || null,
+        categoria_id: categoriaIdFinal,
         codigo_registro: form.codigo_registro?.trim() || null,
         permitir_duplicidade: options?.forcarDuplicidade ? true : undefined,
       };
