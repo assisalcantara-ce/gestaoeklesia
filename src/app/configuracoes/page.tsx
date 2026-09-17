@@ -26,6 +26,16 @@ export default function ConfiguracoesPage() {
     type: 'success' | 'error' | 'warning' | 'info';
   }>({ isOpen: false, title: '', message: '', type: 'success' });
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam && ['perfil', 'nomenclaturas', 'identidade', 'gateways', 'plano'].includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
+
   if (ctx.loading) return <div className="p-8">Carregando...</div>;
   if (bloqueado) return null;
 

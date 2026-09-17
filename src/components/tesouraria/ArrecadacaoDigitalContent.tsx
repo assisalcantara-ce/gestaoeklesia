@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import {
   QrCode,
   Plus,
@@ -9,16 +10,18 @@ import {
   TrendingUp,
   CreditCard,
   Search,
-  Filter,
   CheckCircle2,
   Clock,
   XCircle,
   AlertCircle,
   Printer,
   FileSpreadsheet,
+  Settings,
+  Sparkles,
 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/api-client';
 import ConfirmDeleteModal from '@/components/tesouraria/modals/ConfirmDeleteModal';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 
 interface Congregacao { id: string; nome: string }
 
@@ -162,6 +165,7 @@ export default function ArrecadacaoDigitalContent({
   ministerio,
   congNome,
 }: ArrecadacaoDigitalContentProps) {
+  const planFeatures = usePlanFeatures();
   const [subAba, setSubAba] = useState<'destinos' | 'extrato'>('destinos');
   const [destinos, setDestinos] = useState<PaymentDestino[]>([]);
   const [cobrancas, setCobrancas] = useState<FinCobrancaCharge[]>([]);
@@ -171,9 +175,10 @@ export default function ArrecadacaoDigitalContent({
   });
   const [loadingDestinos, setLoadingDestinos] = useState(true);
   const [loadingCobrancas, setLoadingCobrancas] = useState(false);
-  const [asaasStatus, setAsaasStatus] = useState<{ configured: boolean; active: boolean }>({
+  const [asaasStatus, setAsaasStatus] = useState<{ configured: boolean; active: boolean; loading: boolean }>({
     configured: false,
     active: false,
+    loading: true,
   });
 
   // Filtros de busca e status para Destinos
@@ -216,21 +221,50 @@ export default function ArrecadacaoDigitalContent({
     setPage(1);
   };
 
-  // 1. Carregar status do gateway ASAAS
+  // 1. Carregar status do gateway ASAAS / EFI
   useEffect(() => {
     authenticatedFetch('/api/v1/ministry/gateway')
       .then((res) => res.json())
       .then((json) => {
-        const gw = (json.data ?? []).find((g: any) => g.gateway === 'asaas');
-        if (gw) {
-          setAsaasStatus({
-            configured: gw.status === 'configured' || gw.status === 'connected',
-            active: gw.is_active === true,
-          });
-        }
+        const gw = (json.data ?? []).find(
+          (g: any) =>
+            (g.status === 'configured' || g.status === 'connected') &&
+            g.is_active === true &&
+            (g.has_credentials || !!g.encrypted_credentials)
+        );
+        setAsaasStatus({
+          configured: !!gw,
+          active: gw ? gw.is_active === true : false,
+          loading: false,
+        });
       })
-      .catch(() => {});
+      .catch(() => {
+        setAsaasStatus({ configured: false, active: false, loading: false });
+      });
   }, []);
+
+  const isPlanoPermitido = planFeatures.loading || planFeatures.has_arrecadacao_digital || planFeatures.hasFeature('digital_collection');
+  const isGatewayAtivo = asaasStatus.configured && asaasStatus.active;
+
+  const handleCriarDestinoClick = () => {
+    if (!isPlanoPermitido) {
+      showModal(
+        'Plano Não Compatível',
+        'A arrecadação digital e criação de destinos PIX é um recurso disponível nos planos Intermediário e Profissional. Acesse Configurações > Plano para fazer upgrade.',
+        'info'
+      );
+      return;
+    }
+    if (!isGatewayAtivo) {
+      showModal(
+        'Conta Digital Necessária',
+        'Para criar destinos PIX e emitir QR Codes, você precisa integrar sua conta digital no módulo Configurações > Gateways de Pagamento (disponível nos planos Intermediário e Profissional).',
+        'info'
+      );
+      return;
+    }
+    onOpenNovoDestino();
+  };
 
   // 2. Carregar Destinos via GET /api/v1/ministry/payment-destinations (Paginado no servidor)
   const loadDestinos = useCallback(async () => {
@@ -488,13 +522,17 @@ export default function ArrecadacaoDigitalContent({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h2 className="text-xl font-extrabold text-slate-800">Arrecadação Digital PIX</h2>
-            {asaasStatus.configured && asaasStatus.active ? (
+            {!isPlanoPermitido ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200 px-2.5 py-0.5 rounded-full">
+                <Sparkles className="h-3.5 w-3.5" /> Planos Intermediário e Profissional
+              </span>
+            ) : isGatewayAtivo ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                <ShieldCheck className="h-3.5 w-3.5" /> ASAAS Conectado
+                <ShieldCheck className="h-3.5 w-3.5" /> Gateway Conectado
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full">
-                Gateway em Configuração
+                <AlertCircle className="h-3.5 w-3.5" /> Conta Digital Não Configurada
               </span>
             )}
           </div>
@@ -504,14 +542,76 @@ export default function ArrecadacaoDigitalContent({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={onOpenNovoDestino}
-            className="px-4 py-2.5 bg-[#123b63] hover:bg-[#1a4f85] text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-md hover:shadow-lg transition"
-          >
-            <Plus className="h-4 w-4" /> Novo Destino PIX
-          </button>
+          {!isPlanoPermitido ? (
+            <Link
+              href="/configuracoes?tab=plano"
+              className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-md hover:shadow-lg transition"
+            >
+              <Sparkles className="h-4 w-4" /> Fazer Upgrade de Plano
+            </Link>
+          ) : isGatewayAtivo ? (
+            <button
+              onClick={handleCriarDestinoClick}
+              className="px-4 py-2.5 bg-[#123b63] hover:bg-[#1a4f85] text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-md hover:shadow-lg transition"
+            >
+              <Plus className="h-4 w-4" /> Novo Destino PIX
+            </button>
+          ) : (
+            <Link
+              href="/configuracoes?tab=gateways"
+              className="px-4 py-2.5 bg-[#123b63] hover:bg-[#1a4f85] text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-md hover:shadow-lg transition"
+            >
+              <Settings className="h-4 w-4" /> Configurar Gateway de Pagamento
+            </Link>
+          )}
         </div>
       </div>
+
+      {/* Aviso de Plano Não Compatível */}
+      {!isPlanoPermitido && (
+        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 bg-purple-100 text-purple-700 rounded-xl">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div>
+              <h4 className="font-bold text-slate-800 text-sm">Recurso Disponível nos Planos Intermediário e Profissional</h4>
+              <p className="text-xs text-slate-600 mt-0.5 max-w-2xl">
+                A criação de destinos PIX, emissão de QR Codes dinâmicos de ofertas e conciliação bancária automática estão disponíveis a partir do plano <strong>Intermediário</strong>. Faça o upgrade para desbloquear esta funcionalidade.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/configuracoes?tab=plano"
+            className="px-4 py-2 bg-[#123b63] hover:bg-[#1a4f85] text-white text-xs font-bold rounded-xl whitespace-nowrap transition shadow-xs flex items-center gap-1.5"
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Conhecer Planos
+          </Link>
+        </div>
+      )}
+
+      {/* Aviso de Gateway Não Configurado (para planos permitidos) */}
+      {isPlanoPermitido && !isGatewayAtivo && !asaasStatus.loading && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 bg-amber-100 text-amber-700 rounded-xl">
+              <AlertCircle className="h-6 w-6" />
+            </div>
+            <div>
+              <h4 className="font-bold text-amber-900 text-sm">Conta Digital Não Configurada</h4>
+              <p className="text-xs text-amber-800 mt-0.5 max-w-2xl">
+                Para criar destinos de arrecadação PIX e emitir QR Codes de ofertas, é necessário integrar sua conta digital no módulo <strong>Configurações &gt; Gateways de Pagamento</strong> (disponível nos planos Intermediário e Profissional).
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/configuracoes?tab=gateways"
+            className="px-4 py-2 bg-[#123b63] hover:bg-[#1a4f85] text-white text-xs font-bold rounded-xl whitespace-nowrap transition shadow-xs flex items-center gap-1.5"
+          >
+            <Settings className="h-3.5 w-3.5" /> Configurar Gateway de Pagamento
+          </Link>
+        </div>
+      )}
 
       {/* Cards de Métricas Reais */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -570,50 +670,42 @@ export default function ArrecadacaoDigitalContent({
         </button>
       </div>
 
-      {/* ── 3. VISÃO TABELA DE DESTINOS COM PAGINAÇÃO ── */}
+      {/* ── 3. CONTEÚDO DA SUB-ABA ── */}
       {subAba === 'destinos' && (
         <div className="space-y-4">
-          {/* Barra de Busca e Filtros de Destinos */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between text-xs">
-            {/* Abas/Toggle de Status: Ativos x Inativos */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
+          {/* Barra de Filtros de Destinos */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+            <div className="flex bg-slate-100 p-1 rounded-xl w-full md:w-auto">
               <button
                 onClick={() => handleStatusFiltroChange('ativo')}
-                className={`px-4 py-1.5 rounded-lg font-bold transition text-xs ${
-                  statusFiltro === 'ativo'
-                    ? 'bg-white text-emerald-700 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
+                className={`flex-1 md:flex-none px-4 py-1.5 rounded-lg text-xs font-bold transition ${
+                  statusFiltro === 'ativo' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
                 Ativos
               </button>
               <button
                 onClick={() => handleStatusFiltroChange('inativo')}
-                className={`px-4 py-1.5 rounded-lg font-bold transition text-xs ${
-                  statusFiltro === 'inativo'
-                    ? 'bg-white text-slate-700 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
+                className={`flex-1 md:flex-none px-4 py-1.5 rounded-lg text-xs font-bold transition ${
+                  statusFiltro === 'inativo' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
                 Inativos
               </button>
             </div>
 
-            {/* Input de Busca Textual */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex-1 max-w-md">
-              <Search className="h-4 w-4 text-slate-400 shrink-0" />
-              <input
-                type="text"
-                value={buscaTexto}
-                onChange={(e) => handleBuscaChange(e.target.value)}
-                placeholder="Buscar destino por nome ou congregação..."
-                className="w-full text-xs outline-none bg-transparent text-slate-800 placeholder-slate-400 font-medium"
-              />
-            </div>
+            <div className="flex flex-1 items-center gap-3 w-full md:w-auto">
+              <div className="relative flex-1">
+                <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar destino por nome ou congregação..."
+                  value={buscaTexto}
+                  onChange={(e) => handleBuscaChange(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-[#123b63]"
+                />
+              </div>
 
-            {/* Selects de Filtros Adicionais */}
-            <div className="flex items-center gap-2 shrink-0">
-              <Filter className="h-4 w-4 text-slate-400 hidden sm:block" />
               <select
                 value={tipoFiltro}
                 onChange={(e) => handleTipoFiltroChange(e.target.value)}
@@ -648,14 +740,54 @@ export default function ArrecadacaoDigitalContent({
             {loadingDestinos ? (
               <div className="p-12 text-center text-xs text-slate-400">Carregando destinos PIX...</div>
             ) : destinos.length === 0 ? (
-              <div className="p-12 text-center text-xs text-slate-400 space-y-2">
-                <QrCode className="h-10 w-10 mx-auto text-slate-300 stroke-[1.5]" />
-                <p className="font-bold text-slate-600 text-sm">Nenhum destino de arrecadação encontrado</p>
-                <p className="text-slate-400">
-                  {statusFiltro === 'ativo'
-                    ? 'Clique no botão "Novo Destino PIX" acima para criar seu primeiro ponto de recebimento.'
-                    : 'Não há destinos inativos cadastrados no momento.'}
-                </p>
+              <div className="p-12 text-center text-xs text-slate-400 space-y-3">
+                {!isPlanoPermitido ? (
+                  <>
+                    <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mx-auto border border-purple-100">
+                      <Sparkles className="h-6 w-6" />
+                    </div>
+                    <p className="font-bold text-slate-700 text-sm">Recurso Premium — Arrecadação Digital</p>
+                    <p className="text-slate-500 max-w-md mx-auto">
+                      A criação de destinos PIX e QR Codes está disponível nos planos <strong>Intermediário</strong> e <strong>Profissional</strong>.
+                    </p>
+                    <div className="pt-2">
+                      <Link
+                        href="/configuracoes?tab=plano"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#123b63] text-white text-xs font-bold rounded-xl hover:bg-[#1a4f85] transition shadow-xs"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" /> Fazer Upgrade de Plano
+                      </Link>
+                    </div>
+                  </>
+                ) : !isGatewayAtivo ? (
+                  <>
+                    <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto border border-amber-100">
+                      <Settings className="h-6 w-6" />
+                    </div>
+                    <p className="font-bold text-slate-700 text-sm">Integração de Conta Digital Pendente</p>
+                    <p className="text-slate-500 max-w-md mx-auto">
+                      Para criar pontos de recebimento PIX e gerar QR Codes para púlpitos ou eventos, integre sua conta digital no menu <strong>Configurações &gt; Gateways de Pagamento</strong> (disponível nos planos Intermediário e Profissional).
+                    </p>
+                    <div className="pt-2">
+                      <Link
+                        href="/configuracoes?tab=gateways"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#123b63] text-white text-xs font-bold rounded-xl hover:bg-[#1a4f85] transition shadow-xs"
+                      >
+                        <Settings className="h-3.5 w-3.5" /> Ir para Configurações de Gateway
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <QrCode className="h-10 w-10 mx-auto text-slate-300 stroke-[1.5]" />
+                    <p className="font-bold text-slate-600 text-sm">Nenhum destino de arrecadação encontrado</p>
+                    <p className="text-slate-400">
+                      {statusFiltro === 'ativo'
+                        ? 'Clique no botão "Novo Destino PIX" acima para criar seu primeiro ponto de recebimento.'
+                        : 'Não há destinos inativos cadastrados no momento.'}
+                    </p>
+                  </>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
