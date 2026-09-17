@@ -78,6 +78,10 @@ export default function ArrecadacaoDigitalContent({
   const [subAba, setSubAba] = useState<'destinos' | 'extrato'>('destinos');
   const [destinos, setDestinos] = useState<PaymentDestino[]>([]);
   const [cobrancas, setCobrancas] = useState<FinCobrancaCharge[]>([]);
+  const [summary, setSummary] = useState<{ totalArrecadado: number; transacoesPagas: number }>({
+    totalArrecadado: 0,
+    transacoesPagas: 0,
+  });
   const [loadingDestinos, setLoadingDestinos] = useState(true);
   const [loadingCobrancas, setLoadingCobrancas] = useState(false);
   const [asaasStatus, setAsaasStatus] = useState<{ configured: boolean; active: boolean }>({
@@ -97,6 +101,26 @@ export default function ArrecadacaoDigitalContent({
   const pageSize = 20;
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+
+  const handleStatusFiltroChange = (novoStatus: 'ativo' | 'inativo') => {
+    setStatusFiltro(novoStatus);
+    setPage(1);
+  };
+
+  const handleBuscaChange = (val: string) => {
+    setBuscaTexto(val);
+    setPage(1);
+  };
+
+  const handleTipoFiltroChange = (val: string) => {
+    setTipoFiltro(val);
+    setPage(1);
+  };
+
+  const handleCongFiltroChange = (val: string) => {
+    setCongFiltro(val);
+    setPage(1);
+  };
 
   // 1. Carregar status do gateway ASAAS
   useEffect(() => {
@@ -144,56 +168,28 @@ export default function ArrecadacaoDigitalContent({
     }
   }, [page, pageSize, statusFiltro, buscaTexto, tipoFiltro, congFiltro, showModal]);
 
-  useEffect(() => {
-    loadDestinos();
-  }, [loadDestinos, destinosUpdatedKey]);
-
-  // Resetar para página 1 ao alterar filtros
-  const handleStatusFiltroChange = (newStatus: 'ativo' | 'inativo') => {
-    setStatusFiltro(newStatus);
-    setPage(1);
-  };
-
-  const handleBuscaChange = (val: string) => {
-    setBuscaTexto(val);
-    setPage(1);
-  };
-
-  const handleTipoFiltroChange = (val: string) => {
-    setTipoFiltro(val);
-    setPage(1);
-  };
-
-  const handleCongFiltroChange = (val: string) => {
-    setCongFiltro(val);
-    setPage(1);
-  };
-
-  // 3. Carregar Cobranças / Extrato PIX via Supabase Client ou API do Supabase
+  // 3. Carregar Cobranças / Extrato PIX via API autenticada segura
   const loadCobrancas = useCallback(async () => {
     try {
       setLoadingCobrancas(true);
-      const { createClient } = await import('@/lib/supabase-client');
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('fin_payment_charges')
-        .select(`
-          id, destination_id, gateway_charge_id, valor_solicitado, valor_pago,
-          payer_name, payer_document, status, paid_at, created_at, tesouraria_lancamento_id,
-          fin_payment_destinations (
-            label, congregacoes (nome)
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const res = await authenticatedFetch('/api/v1/ministry/payment-charges?pageSize=100');
+      if (!res.ok) throw new Error('Erro ao carregar extrato de doações.');
+      const json = await res.json();
 
-      if (error) throw error;
-      const validCobrancas = ((data as any) ?? []).filter((c: any) => {
+      const validCobrancas = (json.data ?? []).filter((c: any) => {
         const st = String(c.status || '').toLowerCase().trim();
         return st !== 'canceled' && st !== 'cancelado' && st !== 'cancelled' && st !== 'cancelada';
       });
+
       setCobrancas(validCobrancas);
-    } catch {
+      if (json.summary) {
+        setSummary({
+          totalArrecadado: Number(json.summary.totalArrecadado ?? 0),
+          transacoesPagas: Number(json.summary.transacoesPagas ?? 0),
+        });
+      }
+    } catch (err) {
+      console.error('Erro ao carregar extrato de doações PIX:', err);
       setCobrancas([]);
     } finally {
       setLoadingCobrancas(false);
@@ -201,10 +197,12 @@ export default function ArrecadacaoDigitalContent({
   }, []);
 
   useEffect(() => {
-    if (subAba === 'extrato') {
-      loadCobrancas();
-    }
-  }, [subAba, loadCobrancas]);
+    loadDestinos();
+  }, [loadDestinos, destinosUpdatedKey]);
+
+  useEffect(() => {
+    loadCobrancas();
+  }, [loadCobrancas, destinosUpdatedKey, subAba]);
 
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -286,12 +284,18 @@ export default function ArrecadacaoDigitalContent({
 
 
   // Métricas Computadas
-  const totalArrecadadoGlobal = destinos.reduce((acc, d) => acc + (d.total_arrecadado ?? 0), 0);
+  const totalArrecadadoCalculado = Math.max(
+    summary.totalArrecadado,
+    destinos.reduce((acc, d) => acc + (d.total_arrecadado ?? 0), 0)
+  );
   const destinosAtivosCount = destinos.filter((d) => d.is_ativo).length;
-  const transacoesPagasCount = cobrancas.filter((c) => {
-    const st = String(c.status || '').toLowerCase().trim();
-    return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
-  }).length;
+  const transacoesPagasCount = Math.max(
+    summary.transacoesPagas,
+    cobrancas.filter((c) => {
+      const st = String(c.status || '').toLowerCase().trim();
+      return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
+    }).length
+  );
 
   // Filtragem de Extrato
   const cobrancasFiltradas = cobrancas.filter((c) => {
@@ -299,7 +303,16 @@ export default function ArrecadacaoDigitalContent({
     const term = buscaExtrato.toLowerCase();
     const pagador = (c.payer_name ?? '').toLowerCase();
     const dest = (c.fin_payment_destinations?.label ?? '').toLowerCase();
-    return pagador.includes(term) || dest.includes(term);
+    const doc = (c.payer_document ?? '').toLowerCase();
+    const gwId = (c.gateway_charge_id ?? '').toLowerCase();
+    const cong = (c.fin_payment_destinations?.congregacoes?.nome ?? '').toLowerCase();
+    return (
+      pagador.includes(term) ||
+      dest.includes(term) ||
+      doc.includes(term) ||
+      gwId.includes(term) ||
+      cong.includes(term)
+    );
   });
 
   const TIPO_LABELS: Record<string, string> = {
@@ -363,7 +376,7 @@ export default function ArrecadacaoDigitalContent({
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Arrecadado PIX</p>
-            <h3 className="text-xl font-extrabold text-slate-800 mt-0.5">{fmtBRL(totalArrecadadoGlobal)}</h3>
+            <h3 className="text-xl font-extrabold text-slate-800 mt-0.5">{fmtBRL(totalArrecadadoCalculado)}</h3>
           </div>
         </div>
 
