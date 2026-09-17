@@ -276,7 +276,7 @@ const TIPOS_SAIDA = [
   { value: 'internet', label: 'Internet / Telefone' },
   { value: 'manutencao', label: 'Manutenção / Reformas' },
   { value: 'equipamentos', label: 'Equipamentos / Som' },
-  { value: 'preletor', label: 'Honorários / Preletor' },
+  { value: 'preletor', label: 'Honorários' },
   { value: 'social', label: 'Ação Social / Cestas' },
   { value: 'missoes', label: 'Missões / Oferta Missionária' },
   { value: 'eventos', label: 'Eventos / Congressos' },
