@@ -1455,6 +1455,19 @@ export default function TesourariaPage() {
       {/* Bloco Exclusivo de Impressão de Relatórios (Exibido no @media print APENAS nas abas de relatórios/dizimistas) */}
       {(t.aba === 'relatorios' || t.aba === 'dizimistas') && (
         <div className="print-only hidden p-8 bg-white text-black space-y-6">
+          {t.aba === 'relatorios' && (
+            <style
+              dangerouslySetInnerHTML={{
+                __html: `
+                  @page {
+                    size: A4 landscape !important;
+                    margin: 10mm 12mm !important;
+                  }
+                `,
+              }}
+            />
+          )}
+
           {/* Timbre da Igreja */}
           <div className="flex items-center gap-5 border-b pb-4 border-gray-300">
             {t.ministerio?.logo ? (
@@ -1591,29 +1604,29 @@ export default function TesourariaPage() {
               </p>
             </div>
 
-            {/* Tabela do Relatório Formato A4 */}
+            {/* Tabela do Relatório Formato A4 Landscape */}
             <table className="w-full border-collapse text-xs text-left">
               <thead>
                 <tr className="border-b border-gray-300 bg-gray-50">
-                  <th className="py-2.5 px-2 font-bold text-gray-600">ID / Data</th>
-                  <th className="py-2.5 px-2 font-bold text-gray-600">Caixa</th>
-                  <th className="py-2.5 px-2 font-bold text-gray-600">Categoria Financeira</th>
-                  <th className="py-2.5 px-2 font-bold text-gray-600">Tipo</th>
-                  <th className="py-2.5 px-2 font-bold text-gray-600">Descrição / Ref.</th>
-                  <th className="py-2.5 px-2 font-bold text-gray-600 text-right">Valor</th>
+                  <th className="py-2.5 px-3 font-bold text-gray-600 whitespace-nowrap">ID / Data</th>
+                  <th className="py-2.5 px-3 font-bold text-gray-600">Caixa</th>
+                  <th className="py-2.5 px-3 font-bold text-gray-600">Categoria Financeira</th>
+                  <th className="py-2.5 px-3 font-bold text-gray-600">Tipo</th>
+                  <th className="py-2.5 px-3 font-bold text-gray-600">Descrição / Ref.</th>
+                  <th className="py-2.5 px-3 font-bold text-gray-600 text-right whitespace-nowrap">Valor</th>
                 </tr>
               </thead>
               <tbody>
                 {t.lancsRelatorioFiltrados.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-4 text-center text-gray-400">
+                    <td colSpan={6} className="py-6 text-center text-gray-400">
                       Nenhum lançamento encontrado no período selecionado.
                     </td>
                   </tr>
                 ) : (
                   t.lancsRelatorioFiltrados.map((l) => (
                     <tr key={l.id} className="border-b border-gray-100">
-                      <td className="py-2 px-2">
+                      <td className="py-2 px-3 whitespace-nowrap">
                         {l.codigo_registro && (
                           <div className="font-mono text-[10px] font-bold text-[#123b63]">
                             {l.codigo_registro}
@@ -1621,8 +1634,8 @@ export default function TesourariaPage() {
                         )}
                         <div className="text-gray-500">{t.fmtDate(l.data_lancamento)}</div>
                       </td>
-                      <td className="py-2 px-2 uppercase font-medium">{t.congNome(l.congregacao_id)}</td>
-                      <td className="py-2 px-2 text-gray-700">
+                      <td className="py-2 px-3 uppercase font-medium">{t.congNome(l.congregacao_id)}</td>
+                      <td className="py-2 px-3 text-gray-700">
                         {(() => {
                           const cat = t.finCategorias.find((c) => c.id === l.categoria_id);
                           if (cat) {
@@ -1631,12 +1644,12 @@ export default function TesourariaPage() {
                           return l.categoria_nome || '—';
                         })()}
                       </td>
-                      <td className="py-2 px-2 font-medium capitalize">
+                      <td className="py-2 px-3 font-medium capitalize">
                         {t.tipoLabel(l.tipo_recebimento || l.tipo_movimento)}
                       </td>
-                      <td className="py-2 px-2 text-gray-500">{l.referencia || l.observacoes || '—'}</td>
+                      <td className="py-2 px-3 text-gray-500">{l.referencia || l.observacoes || '—'}</td>
                       <td
-                        className={`py-2 px-2 text-right font-bold ${
+                        className={`py-2 px-3 text-right font-bold whitespace-nowrap ${
                           l.tipo_movimento === 'entrada' ? 'text-green-600' : 'text-red-500'
                         }`}
                       >
@@ -1648,8 +1661,8 @@ export default function TesourariaPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-gray-300 font-bold bg-gray-50">
-                  <td colSpan={5} className="py-2.5 px-2 text-right text-gray-700">Totalizadores:</td>
-                  <td className="py-2.5 px-2 text-right text-[#123b63]">
+                  <td colSpan={5} className="py-2.5 px-3 text-right text-gray-700">Totalizadores:</td>
+                  <td className="py-2.5 px-3 text-right text-[#123b63] whitespace-nowrap">
                     {t.fmtBRL(t.entradasRelatorio - t.saidasRelatorio)}
                   </td>
                 </tr>
