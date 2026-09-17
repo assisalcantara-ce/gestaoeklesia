@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Pencil, Trash2, QrCode, Eye } from 'lucide-react';
 import type { FinConta, FinCategoria } from '@/hooks/tesouraria/useTesouraria';
 import LancamentoDetalhesModal from '@/components/tesouraria/modals/LancamentoDetalhesModal';
@@ -41,6 +41,45 @@ export default function TesourariaTable({
 }: TesourariaTableProps) {
   const [selectedLanc, setSelectedLanc] = useState<any | null>(null);
   const [chargeDetails, setChargeDetails] = useState<any | null>(null);
+  const [sortColumn, setSortColumn] = useState<'' | 'categoria' | 'tipo' | 'valor'>('');
+
+  const getCategoriaNome = (l: any) => {
+    if (mostrarCategoria) {
+      const cat = finCategorias.find((c) => c.id === l.categoria_id);
+      if (cat?.nome) return cat.nome;
+      if (l.categoria_nome) return l.categoria_nome;
+    }
+    return l.departamento_nome || '';
+  };
+
+  const getTipoNome = (l: any) => {
+    if (l.tipo_movimento === 'saida') {
+      return TIPOS_SAIDA.find((t) => t.value === l.tipo_recebimento)?.label || l.tipo_recebimento || '';
+    }
+    return tipoLabel(l.tipo_recebimento) || '';
+  };
+
+  const sortedLancs = useMemo(() => {
+    if (!sortColumn) return lancsFiltrados;
+    return [...lancsFiltrados].sort((a, b) => {
+      if (sortColumn === 'categoria') {
+        const catA = getCategoriaNome(a);
+        const catB = getCategoriaNome(b);
+        return catA.localeCompare(catB, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (sortColumn === 'tipo') {
+        const tipoA = getTipoNome(a);
+        const tipoB = getTipoNome(b);
+        return tipoA.localeCompare(tipoB, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (sortColumn === 'valor') {
+        const valA = Number(a.valor) || 0;
+        const valB = Number(b.valor) || 0;
+        return valA - valB;
+      }
+      return 0;
+    });
+  }, [lancsFiltrados, sortColumn, finCategorias, mostrarCategoria, TIPOS_SAIDA, tipoLabel]);
 
   // Abrir modal de detalhes e buscar enriquecimento em fin_payment_charges se necessário
   const handleOpenDetails = async (lanc: any) => {
@@ -73,7 +112,7 @@ export default function TesourariaTable({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
-      {lancsFiltrados.length === 0 ? (
+      {sortedLancs.length === 0 ? (
         <p className="text-center text-gray-400 py-12 text-sm">Nenhum lançamento no período.</p>
       ) : (
         <div className="overflow-x-auto">
@@ -83,16 +122,70 @@ export default function TesourariaTable({
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Data</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Caixa</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
-                  {mostrarCategoria ? 'Categoria Financeira' : 'Departamento'}
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer select-none group">
+                    <input
+                      type="checkbox"
+                      checked={sortColumn === 'categoria'}
+                      onChange={() => setSortColumn(sortColumn === 'categoria' ? '' : 'categoria')}
+                      className="w-3.5 h-3.5 text-[#123b63] rounded border-gray-300 focus:ring-[#123b63] cursor-pointer"
+                      title="Classificar de A a Z (crescente)"
+                    />
+                    <span className={`group-hover:text-[#123b63] transition ${sortColumn === 'categoria' ? 'text-[#123b63] font-bold' : ''}`}>
+                      {mostrarCategoria ? 'Categoria Financeira' : 'Departamento'}
+                    </span>
+                    {sortColumn === 'categoria' && (
+                      <span className="text-[10px] font-bold text-[#123b63] bg-blue-50 border border-blue-200 px-1 rounded">
+                        A-Z
+                      </span>
+                    )}
+                  </label>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Tipo</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer select-none group">
+                    <input
+                      type="checkbox"
+                      checked={sortColumn === 'tipo'}
+                      onChange={() => setSortColumn(sortColumn === 'tipo' ? '' : 'tipo')}
+                      className="w-3.5 h-3.5 text-[#123b63] rounded border-gray-300 focus:ring-[#123b63] cursor-pointer"
+                      title="Classificar de A a Z (crescente)"
+                    />
+                    <span className={`group-hover:text-[#123b63] transition ${sortColumn === 'tipo' ? 'text-[#123b63] font-bold' : ''}`}>
+                      Tipo
+                    </span>
+                    {sortColumn === 'tipo' && (
+                      <span className="text-[10px] font-bold text-[#123b63] bg-blue-50 border border-blue-200 px-1 rounded">
+                        A-Z
+                      </span>
+                    )}
+                  </label>
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Descrição / Ref.</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Valor</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">
+                  <div className="flex justify-end">
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none group">
+                      <input
+                        type="checkbox"
+                        checked={sortColumn === 'valor'}
+                        onChange={() => setSortColumn(sortColumn === 'valor' ? '' : 'valor')}
+                        className="w-3.5 h-3.5 text-[#123b63] rounded border-gray-300 focus:ring-[#123b63] cursor-pointer"
+                        title="Classificar por Valor crescente (menor para maior)"
+                      />
+                      <span className={`group-hover:text-[#123b63] transition ${sortColumn === 'valor' ? 'text-[#123b63] font-bold' : ''}`}>
+                        Valor
+                      </span>
+                      {sortColumn === 'valor' && (
+                        <span className="text-[10px] font-bold text-[#123b63] bg-blue-50 border border-blue-200 px-1 rounded">
+                          0-9
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                </th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {lancsFiltrados.map((l) => {
+              {sortedLancs.map((l) => {
                 const isDigitalPix = l.origem_modulo === 'gateway' || l.forma_pagamento === 'pix';
 
                 return (
