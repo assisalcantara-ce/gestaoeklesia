@@ -137,6 +137,15 @@ interface ArrecadacaoDigitalContentProps {
   nomenclaturas?: { divisao1?: string };
   isFinanceiroLocal?: boolean;
   exportarCSV?: (dados: any[], filename: string) => void;
+  ministerio?: {
+    nome?: string;
+    logo?: string | null;
+    endereco?: string | null;
+    cnpj?: string | null;
+    telefone?: string | null;
+    email?: string | null;
+  } | null;
+  congNome?: (id?: string | null) => string;
 }
 
 export default function ArrecadacaoDigitalContent({
@@ -150,6 +159,8 @@ export default function ArrecadacaoDigitalContent({
   nomenclaturas,
   isFinanceiroLocal,
   exportarCSV,
+  ministerio,
+  congNome,
 }: ArrecadacaoDigitalContentProps) {
   const [subAba, setSubAba] = useState<'destinos' | 'extrato'>('destinos');
   const [destinos, setDestinos] = useState<PaymentDestino[]>([]);
@@ -985,6 +996,165 @@ export default function ArrecadacaoDigitalContent({
         warningText="Apenas destinos sem histórico financeiro contábil associado poderão ser excluídos fisicamente."
         confirmText="Sim, Excluir Definitivamente"
       />
+
+      {/* ── BLOCO EXCLUSIVO DE IMPRESSÃO: EXTRATO DE OFERTAS PIX ── */}
+      {subAba === 'extrato' && (
+        <div className="print-only hidden p-8 bg-white text-black space-y-6">
+          {/* Timbre da Igreja */}
+          <div className="flex items-center gap-5 border-b pb-4 border-gray-300">
+            {ministerio?.logo ? (
+              <img
+                src={ministerio.logo}
+                alt="Logo da Igreja"
+                className="max-h-20 max-w-[120px] object-contain"
+              />
+            ) : (
+              <div className="w-[100px] h-[100px] bg-gray-100 flex items-center justify-center text-xs text-gray-400 border border-gray-200">
+                Sem Logo
+              </div>
+            )}
+            <div className="space-y-1">
+              <h1 className="text-lg font-bold uppercase text-gray-800">
+                {ministerio?.nome || 'Gestão Eklesia — Igreja Registrada'}
+              </h1>
+              <p className="text-xs text-gray-500 font-medium">
+                {ministerio?.endereco && `Endereço: ${ministerio.endereco}`}
+              </p>
+              <div className="flex gap-4 text-xs text-gray-500 font-medium">
+                {ministerio?.cnpj && <span>CNPJ: {ministerio.cnpj}</span>}
+                {ministerio?.telefone && <span>Telefone: {ministerio.telefone}</span>}
+                {ministerio?.email && <span>E-mail: {ministerio.email}</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* Título e Filtros Aplicados */}
+          <div className="space-y-1">
+            <h2 className="text-base font-bold uppercase tracking-wider text-gray-700">
+              Relatório / Extrato de Ofertas e Arrecadação PIX
+            </h2>
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-600 font-medium">
+              <p>
+                Mês de Referência: <span className="font-bold text-gray-800">{extratoMes}</span>
+              </p>
+              <p>
+                Congregação:{' '}
+                <span className="font-bold text-gray-800">
+                  {extratoCong
+                    ? congregacoes.find((c) => c.id === extratoCong)?.nome ||
+                      (congNome ? congNome(extratoCong) : 'Congregação Selecionada')
+                    : 'Todas as Congregações / Unidades'}
+                </span>
+              </p>
+              <p>
+                Tipo de Movimento:{' '}
+                <span className="font-bold text-gray-800">
+                  {extratoTipoMovimento === 'entradas'
+                    ? 'Apenas Entradas'
+                    : extratoTipoMovimento === 'saidas'
+                    ? 'Apenas Saídas'
+                    : 'Entradas e Saídas'}
+                </span>
+              </p>
+              {buscaExtrato && (
+                <p>
+                  Busca Textual: <span className="font-bold text-gray-800">"{buscaExtrato}"</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Tabela de Extrato de Ofertas Formato Impressão A4 */}
+          <table className="w-full border-collapse text-xs text-left">
+            <thead>
+              <tr className="border-b border-gray-300 bg-gray-50">
+                <th className="py-2.5 px-2 font-bold text-gray-600">Data</th>
+                <th className="py-2.5 px-2 font-bold text-gray-600">Destino PIX</th>
+                <th className="py-2.5 px-2 font-bold text-gray-600">Congregação</th>
+                <th className="py-2.5 px-2 font-bold text-gray-600">Pagador / Doador</th>
+                <th className="py-2.5 px-2 font-bold text-gray-600 text-center">Status</th>
+                <th className="py-2.5 px-2 font-bold text-gray-600 text-center">Conciliado</th>
+                <th className="py-2.5 px-2 font-bold text-gray-600 text-right">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cobrancasFiltradas.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-4 text-center text-gray-400">
+                    Nenhuma oferta PIX registrada no período/filtros selecionados.
+                  </td>
+                </tr>
+              ) : (
+                cobrancasFiltradas.map((c) => {
+                  const badge = STATUS_BADGES[c.status] ?? STATUS_BADGES.pendente;
+                  const valor = c.valor_pago ?? c.valor_solicitado ?? 0;
+                  return (
+                    <tr key={c.id} className="border-b border-gray-100">
+                      <td className="py-2 px-2 text-gray-700">{fmtDate(c.created_at)}</td>
+                      <td className="py-2 px-2 font-semibold text-gray-800">
+                        {c.fin_payment_destinations?.label ?? 'Destino Indefinido'}
+                      </td>
+                      <td className="py-2 px-2 text-gray-600">
+                        {c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas'}
+                      </td>
+                      <td className="py-2 px-2 text-gray-700">
+                        {c.payer_name || 'Anônimo / Não identificado'}
+                      </td>
+                      <td className="py-2 px-2 text-center font-bold text-gray-700 uppercase text-[10px]">
+                        {badge.label}
+                      </td>
+                      <td className="py-2 px-2 text-center text-[10px]">
+                        {c.tesouraria_lancamento_id ? 'Sim' : 'Não'}
+                      </td>
+                      <td className="py-2 px-2 text-right font-bold text-emerald-700">
+                        {fmtBRL(valor)}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-gray-300 font-bold bg-gray-50 text-xs">
+                <td colSpan={4} className="py-2.5 px-2 text-gray-700">
+                  Total de Transações Exibidas: {cobrancasFiltradas.length} | Pagas:{' '}
+                  {
+                    cobrancasFiltradas.filter((c) => {
+                      const st = String(c.status || '').toLowerCase();
+                      return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
+                    }).length
+                  }
+                </td>
+                <td colSpan={2} className="py-2.5 px-2 text-right text-gray-700">
+                  Total Arrecadado:
+                </td>
+                <td className="py-2.5 px-2 text-right text-emerald-800 font-extrabold text-sm">
+                  {fmtBRL(
+                    cobrancasFiltradas
+                      .filter((c) => {
+                        const st = String(c.status || '').toLowerCase();
+                        return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
+                      })
+                      .reduce((acc, curr) => acc + (curr.valor_pago ?? curr.valor_solicitado ?? 0), 0)
+                  )}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+
+          {/* Assinatura Responsável */}
+          <div className="pt-12 flex justify-around text-center text-xs">
+            <div className="space-y-1">
+              <div className="w-48 border-b border-gray-400 mx-auto"></div>
+              <p className="font-semibold text-gray-700">Assinatura do Tesoureiro</p>
+            </div>
+            <div className="space-y-1">
+              <div className="w-48 border-b border-gray-400 mx-auto"></div>
+              <p className="font-semibold text-gray-700">Assinatura do Pastor / Dirigente</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

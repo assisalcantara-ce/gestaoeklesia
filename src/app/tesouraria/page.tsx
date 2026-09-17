@@ -1381,6 +1381,8 @@ export default function TesourariaPage() {
             nomenclaturas={t.nomenclaturas}
             isFinanceiroLocal={t.scope.isFinanceiroLocal}
             exportarCSV={t.exportarCSV}
+            ministerio={t.ministerio}
+            congNome={t.congNome}
           />
         )}
 
