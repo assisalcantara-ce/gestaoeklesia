@@ -98,7 +98,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (cargoParam && cargoParam.toUpperCase() !== 'TODOS') {
-      query = query.ilike('cargo_ministerial', `%${cargoParam}%`)
+      const cargoUpper = cargoParam.toUpperCase().trim()
+      if (cargoUpper === 'MEMBRO') {
+        query = query.or('tipo_cadastro.eq.membro,role.eq.membro,cargo_ministerial.ilike.%MEMBRO%')
+      } else if (cargoUpper === 'CONGREGADO') {
+        query = query.or('tipo_cadastro.eq.congregado,role.eq.congregado,cargo_ministerial.ilike.%CONGREGADO%')
+      } else {
+        query = query.ilike('cargo_ministerial', `%${cargoParam}%`)
+      }
     }
 
     if (searchParam) {

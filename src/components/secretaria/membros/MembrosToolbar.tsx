@@ -76,6 +76,8 @@ export default function MembrosToolbar({
               className="w-full px-4 py-2 border-2 border-teal-300 rounded-lg bg-teal-50 focus:outline-none focus:border-teal-500"
             >
               <option value="TODOS">TODOS</option>
+              <option value="MEMBRO">MEMBRO</option>
+              <option value="CONGREGADO">CONGREGADO</option>
               {cargosMinisteriais.filter(c => c.ativo).map(c => (
                 <option key={c.id} value={c.nome}>{c.nome.toUpperCase()}</option>
               ))}
