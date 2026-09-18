@@ -19,17 +19,6 @@ export interface MembrosToolbarProps {
   maxMembros: number;
   abrirNovoCadastro: () => void;
   abrirCadastroPublico?: () => void;
-  ultimoCadastro: any;
-  gerarProximaMatricula: () => string;
-  setDadosPessoais: (data: any) => void;
-  setEnderecoData: (data: any) => void;
-  setDadosMinisteriais: (data: any) => void;
-  setCargoSelecionado: (cargo: string) => void;
-  setDadosCargos: (cargos: any) => void;
-  setIsEditando: (isEdit: boolean) => void;
-  setShowForm: (show: boolean) => void;
-  setActiveTab: (tab: string) => void;
-  resolveCargoValue: (value?: string) => string;
   gerarPDFListagem: () => void;
   membrosSelecionadosCount: number;
   setImprimindoLote: (lote: boolean) => void;
@@ -53,17 +42,6 @@ export default function MembrosToolbar({
   maxMembros,
   abrirNovoCadastro,
   abrirCadastroPublico,
-  ultimoCadastro,
-  gerarProximaMatricula,
-  setDadosPessoais,
-  setEnderecoData,
-  setDadosMinisteriais,
-  setCargoSelecionado,
-  setDadosCargos,
-  setIsEditando,
-  setShowForm,
-  setActiveTab,
-  resolveCargoValue,
   gerarPDFListagem,
   membrosSelecionadosCount,
   setImprimindoLote,
@@ -195,84 +173,6 @@ export default function MembrosToolbar({
                   </button>
                 </>
               )}
-              <button
-                onClick={() => {
-                  if (ultimoCadastro) {
-                    const novaMatricula = gerarProximaMatricula();
-                    setDadosPessoais({
-                      matricula: novaMatricula,
-                      cpf: '',
-                      tipoCadastro: 'ministro',
-                      nome: '',
-                      dataNascimento: ultimoCadastro.dataNascimento || '',
-                      sexo: ultimoCadastro.sexo || 'MASCULINO',
-                      tipoSanguineo: ultimoCadastro.tipoSanguineo || '',
-                      escolaridade: ultimoCadastro.escolaridade || '',
-                      estadoCivil: ultimoCadastro.estadoCivil || '',
-                      nomeConjuge: '',
-                      cpfConjuge: '',
-                      dataNascimentoConjuge: '',
-                      nomePai: ultimoCadastro.nomePai || '',
-                      nomeMae: ultimoCadastro.nomeMae || '',
-                      rg: '',
-                      orgaoEmissor: ultimoCadastro.orgaoEmissor || '',
-                      nacionalidade: ultimoCadastro.nacionalidade || 'BRASILEIRA',
-                      naturalidade: ultimoCadastro.naturalidade || '',
-                      uf: ultimoCadastro.uf || '',
-                      supervisao: ultimoCadastro.supervisao || '',
-                      campo: ultimoCadastro.campo || '',
-                      congregacao: ultimoCadastro.congregacao || '',
-                      email: '',
-                      celular: '',
-                      whatsapp: '',
-                      profissao: ultimoCadastro.profissao || '',
-                      tituloEleitoral: ultimoCadastro.tituloEleitoral || '',
-                      zonaEleitoral: ultimoCadastro.zonaEleitoral || '',
-                      secaoEleitoral: ultimoCadastro.secaoEleitoral || '',
-                      observacoes: ultimoCadastro.observacoes || ''
-                    });
-                    setEnderecoData({
-                      cep: ultimoCadastro.cep || '',
-                      logradouro: ultimoCadastro.logradouro || '',
-                      numero: ultimoCadastro.numero || '',
-                      bairro: ultimoCadastro.bairro || '',
-                      complemento: ultimoCadastro.complemento || '',
-                      cidade: ultimoCadastro.cidade || '',
-                      latitude: ultimoCadastro.latitude || '',
-                      longitude: ultimoCadastro.longitude || ''
-                    });
-                    setDadosMinisteriais({
-                      temFuncaoIgreja: ultimoCadastro.temFuncaoIgreja || false,
-                      qualFuncao: ultimoCadastro.qualFuncao || '',
-                      setorDepartamento: ultimoCadastro.setorDepartamento || '',
-                      dataBatismoAguas: ultimoCadastro.dataBatismoAguas || '',
-                      dataBatismoEspiritoSanto: ultimoCadastro.dataBatismoEspiritoSanto || '',
-                      cursoTeologico: ultimoCadastro.cursoTeologico || '',
-                      instituicaoTeologica: ultimoCadastro.instituicaoTeologica || '',
-                      pastorAuxiliar: ultimoCadastro.pastorAuxiliar || false,
-                      procedencia: ultimoCadastro.procedencia || '',
-                      procedenciaLocal: ultimoCadastro.procedenciaLocal || '',
-                      dataConsagracao: ultimoCadastro.dataConsagracao || '',
-                      dataEmissao: ultimoCadastro.dataEmissao || '',
-                      dataValidadeCredencial: ultimoCadastro.dataValidadeCredencial || '',
-                      observacoesMinisteriais: ultimoCadastro.observacoesMinisteriais || ''
-                    });
-                    setCargoSelecionado(resolveCargoValue(ultimoCadastro.cargoMinisterial));
-                    setDadosCargos(ultimoCadastro.dadosCargos || {});
-                    setIsEditando(false);
-                    setShowForm(true);
-                    setActiveTab('dados');
-                  }
-                }}
-                disabled={!ultimoCadastro}
-                className={`px-4 py-2 rounded-lg transition font-semibold text-sm w-full sm:w-auto ${
-                  ultimoCadastro
-                    ? 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                📋 Cadastrar Semelhante
-              </button>
               <button
                 onClick={gerarPDFListagem}
                 className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition font-semibold text-sm w-full sm:w-auto"

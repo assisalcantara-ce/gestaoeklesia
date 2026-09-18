@@ -30,11 +30,15 @@ interface CandidatoSugestao {
   data_nascimento?: string | null;
   sexo?: string | null;
   celular?: string | null;
+  congregacao_id?: string | null;
+  congregacao_nome?: string | null;
 }
 
 interface BatismoRegistro {
   id: string;
   ministry_id: string;
+  congregacao_id?: string | null;
+  congregacao?: { id: string; nome: string } | null;
   candidato_id?: string | null;
   candidato_nome: string;
   candidato_data_nascimento?: string | null;
@@ -83,6 +87,7 @@ const formatIsoDate = (value?: string | null) => {
 };
 
 const EMPTY_FORM = {
+  congregacao_id: '',
   candidato_id: '' as string,
   candidato_nome: '',
   candidato_data_nascimento: '',
@@ -102,6 +107,7 @@ export default function BatismoAguasPage() {
   const [activeTab, setActiveTab] = useState('cadastro');
   const [ministryId, setMinistryId] = useState<string | null>(null);
   const [registros, setRegistros] = useState<BatismoRegistro[]>([]);
+  const [congregacoes, setCongregacoes] = useState<Array<{ id: string; nome: string }>>([]);
   const [certTemplates, setCertTemplates] = useState<CertificadoTemplate[]>([]);
   const [configIgreja, setConfigIgreja] = useState<ConfiguracaoIgreja>({
     nome: 'Igreja/Ministerio',
@@ -164,9 +170,9 @@ export default function BatismoAguasPage() {
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
+    if (!formData.congregacao_id) errors.congregacao_id = 'Selecione a congregação do ato.';
     if (!formData.candidato_nome.trim()) errors.candidato_nome = 'Informe o nome do candidato.';
     if (!formData.data_batismo) errors.data_batismo = 'Informe a data do batismo.';
-    if (!formData.local_batismo.trim()) errors.local_batismo = 'Informe o local do batismo.';
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -175,7 +181,7 @@ export default function BatismoAguasPage() {
     if (!mid) return;
     const { data, error } = await supabase
       .from('batismo_aguas_registros')
-      .select('*')
+      .select('*, congregacao:congregacoes(id, nome)')
       .eq('ministry_id', mid)
       .order('created_at', { ascending: false });
 
@@ -184,6 +190,18 @@ export default function BatismoAguasPage() {
       return;
     }
     setRegistros((data || []) as BatismoRegistro[]);
+  };
+
+  const loadCongregacoes = async (mid?: string | null) => {
+    if (!mid) return;
+    const { data } = await supabase
+      .from('congregacoes')
+      .select('id, nome')
+      .eq('ministry_id', mid)
+      .eq('is_active', true)
+      .order('nome', { ascending: true });
+
+    setCongregacoes((data || []) as Array<{ id: string; nome: string }>);
   };
 
   useEffect(() => {
@@ -196,7 +214,7 @@ export default function BatismoAguasPage() {
       setConfigIgreja(config);
       const certRes = await loadCertificadosTemplatesForCurrentUser(supabase);
       setCertTemplates(certRes.templates as CertificadoTemplate[]);
-      await loadRegistros(mid);
+      await Promise.all([loadRegistros(mid), loadCongregacoes(mid)]);
       setLoadingData(false);
     };
     run();
@@ -223,7 +241,7 @@ export default function BatismoAguasPage() {
       setSearchLoading(true);
       const { data } = await supabase
         .from('members')
-        .select('id, name, data_nascimento, sexo, celular')
+        .select('id, name, data_nascimento, sexo, celular, congregacao_id, congregacao')
         .eq('ministry_id', ministryId)
         .eq('tipo_cadastro', 'congregado')
         .ilike('name', `%${termo}%`)
@@ -235,6 +253,8 @@ export default function BatismoAguasPage() {
         data_nascimento: m.data_nascimento,
         sexo: m.sexo,
         celular: m.celular,
+        congregacao_id: m.congregacao_id,
+        congregacao_nome: m.congregacao,
       }));
       setSugestoes(mapped);
       setShowSugestoes(mapped.length > 0);
@@ -252,6 +272,15 @@ export default function BatismoAguasPage() {
 
   const handleSelecionarCandidato = (c: CandidatoSugestao) => {
     setSearchInput(c.nome);
+    // Pré-selecionar congregação caso o candidato possua vínculo e ainda não tenha sido alterada
+    let sugCongId = c.congregacao_id || '';
+    if (!sugCongId && c.congregacao_nome && congregacoes.length > 0) {
+      const match = congregacoes.find(
+        (cg) => cg.nome.trim().toLowerCase() === c.congregacao_nome?.trim().toLowerCase()
+      );
+      if (match) sugCongId = match.id;
+    }
+
     setFormData((prev) => ({
       ...prev,
       candidato_id: c.id,
@@ -259,6 +288,7 @@ export default function BatismoAguasPage() {
       candidato_data_nascimento: formatIsoDate(c.data_nascimento),
       candidato_sexo: c.sexo || 'MASCULINO',
       candidato_telefone: c.celular || '',
+      congregacao_id: sugCongId || prev.congregacao_id,
     }));
     setSugestoes([]);
     setShowSugestoes(false);
@@ -273,12 +303,13 @@ export default function BatismoAguasPage() {
 
     const payload: any = {
       ministry_id: ministryId,
+      congregacao_id: formData.congregacao_id || null,
       candidato_nome: formData.candidato_nome.trim(),
       candidato_data_nascimento: formData.candidato_data_nascimento || null,
       candidato_sexo: formData.candidato_sexo,
       candidato_telefone: formData.candidato_telefone.trim() || null,
       data_batismo: formData.data_batismo || null,
-      local_batismo: formData.local_batismo.trim(),
+      local_batismo: formData.local_batismo.trim() || null,
       pastor_nome: formData.pastor_nome.trim() || null,
       status: formData.status,
       observacoes: formData.observacoes.trim() || null,
@@ -292,7 +323,7 @@ export default function BatismoAguasPage() {
         .from('batismo_aguas_registros')
         .update(payload)
         .eq('id', editingId)
-        .select('*')
+        .select('*, congregacao:congregacoes(id, nome)')
         .single();
 
       if (error) {
@@ -313,7 +344,7 @@ export default function BatismoAguasPage() {
     const { data, error } = await supabase
       .from('batismo_aguas_registros')
       .insert({ ...payload, created_at: new Date().toISOString() })
-      .select('*')
+      .select('*, congregacao:congregacoes(id, nome)')
       .single();
 
     if (error) {
@@ -336,6 +367,7 @@ export default function BatismoAguasPage() {
     const nome = registro.candidato_nome || '';
     setSearchInput(nome);
     setFormData({
+      congregacao_id: registro.congregacao_id || '',
       candidato_id: registro.candidato_id || '',
       candidato_nome: nome,
       candidato_data_nascimento: formatIsoDate(registro.candidato_data_nascimento),
@@ -370,6 +402,7 @@ export default function BatismoAguasPage() {
     candidato_data_nascimento: formatDate(registro.candidato_data_nascimento),
     candidato_sexo: registro.candidato_sexo || '',
     data_batismo: formatDate(registro.data_batismo),
+    congregacao: (registro as any).congregacao?.nome || '',
     local_batismo: registro.local_batismo || '',
     pastor_nome: registro.pastor_nome || '',
     data_emissao: new Date().toLocaleDateString('pt-BR'),
@@ -593,6 +626,22 @@ export default function BatismoAguasPage() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <label className="text-xs font-semibold text-gray-600">Congregação do Ato *</label>
+                          <select
+                            value={formData.congregacao_id}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, congregacao_id: e.target.value }))}
+                            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
+                          >
+                            <option value="">Selecione a congregação...</option>
+                            {congregacoes.map((c) => (
+                              <option key={c.id} value={c.id}>{c.nome}</option>
+                            ))}
+                          </select>
+                          {fieldErrors.congregacao_id && (
+                            <p className="text-xs text-red-600 mt-1">{fieldErrors.congregacao_id}</p>
+                          )}
+                        </div>
                         <div>
                           <label className="text-xs font-semibold text-gray-600">Data de nascimento</label>
                           <input
@@ -647,15 +696,13 @@ export default function BatismoAguasPage() {
                           )}
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-gray-600">Local do batismo</label>
+                          <label className="text-xs font-semibold text-gray-600">Local do batismo (complemento)</label>
                           <input
                             value={formData.local_batismo}
                             onChange={(e) => setFormData((prev) => ({ ...prev, local_batismo: e.target.value }))}
+                            placeholder="Ex: Tanque Batismal, Chácara Betel..."
                             className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                           />
-                          {fieldErrors.local_batismo && (
-                            <p className="text-xs text-red-600 mt-1">{fieldErrors.local_batismo}</p>
-                          )}
                         </div>
                         <div className="md:col-span-2">
                           <label className="text-xs font-semibold text-gray-600">Pastor/Ministro que batizou</label>
@@ -747,8 +794,14 @@ export default function BatismoAguasPage() {
                                 )}
                               </td>
                               <td className="py-3 pr-4">
-                                <div className="text-xs text-gray-600">{formatDate(r.data_batismo) || '-'}</div>
-                                <div className="text-xs text-gray-500">{r.local_batismo || '-'}</div>
+                                <div className="font-semibold text-gray-800 text-xs flex items-center gap-1">
+                                  <span>🏛️</span>
+                                  <span>{r.congregacao?.nome || 'Não informada'}</span>
+                                </div>
+                                <div className="text-xs text-gray-600 mt-0.5">{formatDate(r.data_batismo) || '-'}</div>
+                                {r.local_batismo && (
+                                  <div className="text-xs text-gray-400 mt-0.5">{r.local_batismo}</div>
+                                )}
                               </td>
                               <td className="py-3 pr-4">
                                 <div className="text-xs text-gray-600">{r.pastor_nome || '-'}</div>

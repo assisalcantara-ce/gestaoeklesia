@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
   const tipoAto = searchParams.get('tipoAto') || 'batismos'; // 'batismos' | 'apresentacoes' | 'casamentos' | 'consagracoes'
   const year = searchParams.get('year');
   const status = searchParams.get('status');
+  const congregacaoId = searchParams.get('congregacaoId') || searchParams.get('congregacao_id');
   const page = parseInt(searchParams.get('page') || '1', 10);
   const limit = parseInt(searchParams.get('limit') || '25', 10);
   const offset = (page - 1) * limit;
@@ -34,9 +35,12 @@ export async function GET(request: NextRequest) {
     if (tipoAto === 'batismos') {
       let query = admin
         .from('batismo_aguas_registros')
-        .select('id, candidato_nome, data_batismo, local_batismo, pastor_nome, status, certificado_emitido_em, created_at', { count: 'exact' })
+        .select('id, candidato_nome, data_batismo, local_batismo, pastor_nome, status, congregacao_id, congregacao:congregacoes(id, nome), certificado_emitido_em, created_at', { count: 'exact' })
         .eq('ministry_id', ministryId);
 
+      if (congregacaoId && congregacaoId !== 'todos') {
+        query = query.eq('congregacao_id', congregacaoId);
+      }
       if (year && year !== 'todos') {
         query = query.gte('data_batismo', `${year}-01-01`).lte('data_batismo', `${year}-12-31`);
       }
@@ -63,9 +67,12 @@ export async function GET(request: NextRequest) {
     if (tipoAto === 'apresentacoes') {
       let query = admin
         .from('apresentacao_criancas_registros')
-        .select('id, crianca_nome, crianca_data_nascimento, pai_nome, mae_nome, responsavel_nome, responsavel_telefone, data_apresentacao, local_apresentacao, status, certificado_emitido_em, created_at', { count: 'exact' })
+        .select('id, crianca_nome, crianca_data_nascimento, pai_nome, mae_nome, responsavel_nome, responsavel_telefone, data_apresentacao, local_apresentacao, status, congregacao_id, congregacao:congregacoes(id, nome), certificado_emitido_em, created_at', { count: 'exact' })
         .eq('ministry_id', ministryId);
 
+      if (congregacaoId && congregacaoId !== 'todos') {
+        query = query.eq('congregacao_id', congregacaoId);
+      }
       if (year && year !== 'todos') {
         query = query.gte('data_apresentacao', `${year}-01-01`).lte('data_apresentacao', `${year}-12-31`);
       }
@@ -92,9 +99,12 @@ export async function GET(request: NextRequest) {
     if (tipoAto === 'casamentos') {
       let query = admin
         .from('casamento_registros')
-        .select('id, conjuge1_nome, conjuge2_nome, data_casamento, local_casamento, pastor_nome, tipo_casamento, status, certificado_emitido_em, created_at', { count: 'exact' })
+        .select('id, conjuge1_nome, conjuge2_nome, data_casamento, local_casamento, pastor_nome, tipo_casamento, status, congregacao_id, congregacao:congregacoes(id, nome), certificado_emitido_em, created_at', { count: 'exact' })
         .eq('ministry_id', ministryId);
 
+      if (congregacaoId && congregacaoId !== 'todos') {
+        query = query.eq('congregacao_id', congregacaoId);
+      }
       if (year && year !== 'todos') {
         query = query.gte('data_casamento', `${year}-01-01`).lte('data_casamento', `${year}-12-31`);
       }

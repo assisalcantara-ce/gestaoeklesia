@@ -29,6 +29,7 @@ const CERTIFICADO_PLACEHOLDERS_POR_CATEGORIA: Record<CertificadoCategoria, Array
     { campo: 'responsavel_nome', placeholder: '{responsavel_nome}', label: 'Responsavel' },
     { campo: 'responsavel_telefone', placeholder: '{responsavel_telefone}', label: 'Telefone do Responsavel' },
     { campo: 'data_apresentacao', placeholder: '{data_apresentacao}', label: 'Data da Apresentacao' },
+    { campo: 'congregacao', placeholder: '{congregacao}', label: 'Congregacao do Ato' },
     { campo: 'local_apresentacao', placeholder: '{local_apresentacao}', label: 'Local da Apresentacao' },
     { campo: 'data_emissao', placeholder: '{data_emissao}', label: 'Data de Emissao' },
     { campo: 'nome_igreja', placeholder: '{nome_igreja}', label: 'Nome da Igreja' }
@@ -38,6 +39,7 @@ const CERTIFICADO_PLACEHOLDERS_POR_CATEGORIA: Record<CertificadoCategoria, Array
     { campo: 'candidato_data_nascimento', placeholder: '{candidato_data_nascimento}', label: 'Data de Nascimento' },
     { campo: 'candidato_sexo', placeholder: '{candidato_sexo}', label: 'Sexo' },
     { campo: 'data_batismo', placeholder: '{data_batismo}', label: 'Data do Batismo' },
+    { campo: 'congregacao', placeholder: '{congregacao}', label: 'Congregacao do Ato' },
     { campo: 'local_batismo', placeholder: '{local_batismo}', label: 'Local do Batismo' },
     { campo: 'pastor_nome', placeholder: '{pastor_nome}', label: 'Nome do Pastor' },
     { campo: 'data_emissao', placeholder: '{data_emissao}', label: 'Data de Emissao' },
@@ -49,6 +51,7 @@ const CERTIFICADO_PLACEHOLDERS_POR_CATEGORIA: Record<CertificadoCategoria, Array
     { campo: 'conjuge1_data_nascimento', placeholder: '{conjuge1_data_nascimento}', label: 'Data de Nascimento (Cônjuge 1)' },
     { campo: 'conjuge2_data_nascimento', placeholder: '{conjuge2_data_nascimento}', label: 'Data de Nascimento (Cônjuge 2)' },
     { campo: 'data_casamento', placeholder: '{data_casamento}', label: 'Data do Casamento' },
+    { campo: 'congregacao', placeholder: '{congregacao}', label: 'Congregacao do Ato' },
     { campo: 'local_casamento', placeholder: '{local_casamento}', label: 'Local do Casamento' },
     { campo: 'tipo_casamento', placeholder: '{tipo_casamento}', label: 'Tipo de Casamento' },
     { campo: 'pastor_nome', placeholder: '{pastor_nome}', label: 'Pastor Celebrante' },

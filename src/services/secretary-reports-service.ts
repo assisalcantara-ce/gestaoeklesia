@@ -957,12 +957,18 @@ export class SecretaryReportsService {
     const year = params.year || new Date().getFullYear();
     const yearPrefix = String(year);
 
-    const { data: batismosData, error: batismosError } = await this.supabase
+    let batQuery = this.supabase
       .from('batismo_aguas_registros')
       .select('status, data_batismo')
       .eq('ministry_id', ministryId)
       .gte('data_batismo', `${yearPrefix}-01-01`)
       .lte('data_batismo', `${yearPrefix}-12-31`);
+
+    if (params.congregacaoId) {
+      batQuery = batQuery.eq('congregacao_id', params.congregacaoId);
+    }
+
+    const { data: batismosData, error: batismosError } = await batQuery;
 
     if (batismosError) throw new Error(`Erro ao buscar batismos: ${batismosError.message}`);
 
@@ -976,12 +982,18 @@ export class SecretaryReportsService {
       else if (s === 'cancelado') batCancelados++;
     }
 
-    const { data: criancasData, error: criancasError } = await this.supabase
+    let criQuery = this.supabase
       .from('apresentacao_criancas_registros')
       .select('status, data_apresentacao')
       .eq('ministry_id', ministryId)
       .gte('data_apresentacao', `${yearPrefix}-01-01`)
       .lte('data_apresentacao', `${yearPrefix}-12-31`);
+
+    if (params.congregacaoId) {
+      criQuery = criQuery.eq('congregacao_id', params.congregacaoId);
+    }
+
+    const { data: criancasData, error: criancasError } = await criQuery;
 
     if (criancasError) throw new Error(`Erro ao buscar apresentações: ${criancasError.message}`);
 
@@ -995,12 +1007,18 @@ export class SecretaryReportsService {
       else if (s === 'cancelado') criCanceladas++;
     }
 
-    const { data: casamentosData, error: casamentosError } = await this.supabase
+    let casQuery = this.supabase
       .from('casamento_registros')
       .select('status, data_casamento')
       .eq('ministry_id', ministryId)
       .gte('data_casamento', `${yearPrefix}-01-01`)
       .lte('data_casamento', `${yearPrefix}-12-31`);
+
+    if (params.congregacaoId) {
+      casQuery = casQuery.eq('congregacao_id', params.congregacaoId);
+    }
+
+    const { data: casamentosData, error: casamentosError } = await casQuery;
 
     if (casamentosError) throw new Error(`Erro ao buscar casamentos: ${casamentosError.message}`);
 

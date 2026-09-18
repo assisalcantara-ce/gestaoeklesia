@@ -324,8 +324,8 @@ export default function BaptismsAndActsReportTab({
               <thead>
                 <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-500 uppercase tracking-wider font-semibold print:bg-gray-100 print:text-black">
                   <th className="py-3 px-4">Candidato</th>
+                  <th className="py-3 px-4">Congregação / Local</th>
                   <th className="py-3 px-4">Data do Batismo</th>
-                  <th className="py-3 px-4">Local</th>
                   <th className="py-3 px-4">Pastor Oficiante</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Certificado</th>
@@ -335,10 +335,13 @@ export default function BaptismsAndActsReportTab({
                 {items.map((b) => (
                   <tr key={b.id} className="hover:bg-gray-50/80 transition-colors print:break-inside-avoid">
                     <td className="py-3 px-4 font-semibold text-gray-900">{b.candidato_nome}</td>
+                    <td className="py-3 px-4 text-gray-600">
+                      <div>{b.congregacao?.nome || 'Não informada'}</div>
+                      {b.local_batismo && <div className="text-[11px] text-gray-400">{b.local_batismo}</div>}
+                    </td>
                     <td className="py-3 px-4 whitespace-nowrap text-gray-600">
                       {b.data_batismo ? new Date(b.data_batismo + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}
                     </td>
-                    <td className="py-3 px-4 text-gray-600">{b.local_batismo || '—'}</td>
                     <td className="py-3 px-4 text-gray-600">{b.pastor_nome || '—'}</td>
                     <td className="py-3 px-4 whitespace-nowrap">
                       <span
@@ -367,9 +370,9 @@ export default function BaptismsAndActsReportTab({
               <thead>
                 <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-500 uppercase tracking-wider font-semibold print:bg-gray-100 print:text-black">
                   <th className="py-3 px-4">Criança</th>
+                  <th className="py-3 px-4">Congregação / Local</th>
                   <th className="py-3 px-4">Data Apresentação</th>
                   <th className="py-3 px-4">Filiação (Pais)</th>
-                  <th className="py-3 px-4">Local</th>
                   <th className="py-3 px-4">Status</th>
                 </tr>
               </thead>
@@ -377,13 +380,16 @@ export default function BaptismsAndActsReportTab({
                 {items.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50/80 transition-colors print:break-inside-avoid">
                     <td className="py-3 px-4 font-semibold text-gray-900">{c.crianca_nome}</td>
+                    <td className="py-3 px-4 text-gray-600">
+                      <div>{c.congregacao?.nome || 'Não informada'}</div>
+                      {c.local_apresentacao && <div className="text-[11px] text-gray-400">{c.local_apresentacao}</div>}
+                    </td>
                     <td className="py-3 px-4 whitespace-nowrap text-gray-600">
                       {c.data_apresentacao ? new Date(c.data_apresentacao + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}
                     </td>
                     <td className="py-3 px-4 text-gray-600">
                       {c.pai_nome && c.mae_nome ? `${c.pai_nome} e ${c.mae_nome}` : c.pai_nome || c.mae_nome || c.responsavel_nome || '—'}
                     </td>
-                    <td className="py-3 px-4 text-gray-600">{c.local_apresentacao || '—'}</td>
                     <td className="py-3 px-4 whitespace-nowrap">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-pink-100 text-pink-800">
                         {c.status === 'apresentado' ? 'Apresentado' : c.status}
@@ -400,6 +406,7 @@ export default function BaptismsAndActsReportTab({
               <thead>
                 <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-500 uppercase tracking-wider font-semibold print:bg-gray-100 print:text-black">
                   <th className="py-3 px-4">Noivos / Cônjuges</th>
+                  <th className="py-3 px-4">Congregação / Local</th>
                   <th className="py-3 px-4">Data do Casamento</th>
                   <th className="py-3 px-4">Tipo</th>
                   <th className="py-3 px-4">Pastor</th>
@@ -411,6 +418,10 @@ export default function BaptismsAndActsReportTab({
                   <tr key={cs.id} className="hover:bg-gray-50/80 transition-colors print:break-inside-avoid">
                     <td className="py-3 px-4 font-semibold text-gray-900">
                       {cs.conjuge1_nome} & {cs.conjuge2_nome}
+                    </td>
+                    <td className="py-3 px-4 text-gray-600">
+                      <div>{cs.congregacao?.nome || 'Não informada'}</div>
+                      {cs.local_casamento && <div className="text-[11px] text-gray-400">{cs.local_casamento}</div>}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap text-gray-600">
                       {cs.data_casamento ? new Date(cs.data_casamento + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}

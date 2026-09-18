@@ -28,6 +28,8 @@ type CertificadoTemplate = {
 interface ApresentacaoRegistro {
   id: string;
   ministry_id: string;
+  congregacao_id?: string | null;
+  congregacao?: { id: string; nome: string } | null;
   crianca_nome: string;
   crianca_data_nascimento?: string | null;
   crianca_sexo?: string | null;
@@ -84,6 +86,7 @@ export default function ApresentacaoCriancasPage() {
   const [activeTab, setActiveTab] = useState('cadastro');
   const [ministryId, setMinistryId] = useState<string | null>(null);
   const [registros, setRegistros] = useState<ApresentacaoRegistro[]>([]);
+  const [congregacoes, setCongregacoes] = useState<Array<{ id: string; nome: string }>>([]);
   const [certTemplates, setCertTemplates] = useState<CertificadoTemplate[]>([]);
   const [configIgreja, setConfigIgreja] = useState<ConfiguracaoIgreja>({
     nome: 'Igreja/Ministerio',
@@ -99,6 +102,7 @@ export default function ApresentacaoCriancasPage() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
+    congregacao_id: '',
     crianca_nome: '',
     crianca_data_nascimento: '',
     crianca_sexo: 'MASCULINO',
@@ -142,6 +146,7 @@ export default function ApresentacaoCriancasPage() {
 
   const resetForm = () => {
     setFormData({
+      congregacao_id: '',
       crianca_nome: '',
       crianca_data_nascimento: '',
       crianca_sexo: 'MASCULINO',
@@ -160,6 +165,7 @@ export default function ApresentacaoCriancasPage() {
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
+    if (!formData.congregacao_id) errors.congregacao_id = 'Selecione a congregação do ato.';
     if (!formData.crianca_nome.trim()) errors.crianca_nome = 'Informe o nome da crianca.';
     if (!formData.crianca_data_nascimento) errors.crianca_data_nascimento = 'Informe a data de nascimento.';
     if (!formData.pai_nome.trim()) errors.pai_nome = 'Informe o nome do pai.';
@@ -167,7 +173,6 @@ export default function ApresentacaoCriancasPage() {
     if (!formData.responsavel_nome.trim()) errors.responsavel_nome = 'Informe o responsavel.';
     if (!formData.responsavel_telefone.trim()) errors.responsavel_telefone = 'Informe o telefone do responsavel.';
     if (!formData.data_apresentacao) errors.data_apresentacao = 'Informe a data da apresentacao.';
-    if (!formData.local_apresentacao.trim()) errors.local_apresentacao = 'Informe o local da apresentacao.';
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -176,7 +181,7 @@ export default function ApresentacaoCriancasPage() {
     if (!mid) return;
     const { data, error } = await supabase
       .from('apresentacao_criancas_registros')
-      .select('*')
+      .select('*, congregacao:congregacoes(id, nome)')
       .eq('ministry_id', mid)
       .order('created_at', { ascending: false });
 
@@ -186,6 +191,18 @@ export default function ApresentacaoCriancasPage() {
     }
 
     setRegistros((data || []) as ApresentacaoRegistro[]);
+  };
+
+  const loadCongregacoes = async (mid?: string | null) => {
+    if (!mid) return;
+    const { data } = await supabase
+      .from('congregacoes')
+      .select('id, nome')
+      .eq('ministry_id', mid)
+      .eq('is_active', true)
+      .order('nome', { ascending: true });
+
+    setCongregacoes((data || []) as Array<{ id: string; nome: string }>);
   };
 
   useEffect(() => {
@@ -198,7 +215,7 @@ export default function ApresentacaoCriancasPage() {
       setConfigIgreja(config);
       const certRes = await loadCertificadosTemplatesForCurrentUser(supabase);
       setCertTemplates(certRes.templates as CertificadoTemplate[]);
-      await loadRegistros(mid);
+      await Promise.all([loadRegistros(mid), loadCongregacoes(mid)]);
       setLoadingData(false);
     };
     run();
@@ -213,6 +230,7 @@ export default function ApresentacaoCriancasPage() {
 
     const payload = {
       ministry_id: ministryId,
+      congregacao_id: formData.congregacao_id || null,
       crianca_nome: formData.crianca_nome.trim(),
       crianca_data_nascimento: formData.crianca_data_nascimento,
       crianca_sexo: formData.crianca_sexo,
@@ -221,9 +239,9 @@ export default function ApresentacaoCriancasPage() {
       responsavel_nome: formData.responsavel_nome.trim(),
       responsavel_telefone: formData.responsavel_telefone.trim(),
       data_apresentacao: formData.data_apresentacao,
-      local_apresentacao: formData.local_apresentacao.trim(),
+      local_apresentacao: formData.local_apresentacao.trim() || null,
       status: formData.status,
-      observacoes: formData.observacoes.trim(),
+      observacoes: formData.observacoes.trim() || null,
       updated_at: new Date().toISOString(),
     };
 
@@ -232,7 +250,7 @@ export default function ApresentacaoCriancasPage() {
         .from('apresentacao_criancas_registros')
         .update(payload)
         .eq('id', editingId)
-        .select('*')
+        .select('*, congregacao:congregacoes(id, nome)')
         .single();
 
       if (error) {
@@ -254,7 +272,7 @@ export default function ApresentacaoCriancasPage() {
     const { data, error } = await supabase
       .from('apresentacao_criancas_registros')
       .insert({ ...payload, created_at: new Date().toISOString() })
-      .select('*')
+      .select('*, congregacao:congregacoes(id, nome)')
       .single();
 
     if (error) {
@@ -275,6 +293,7 @@ export default function ApresentacaoCriancasPage() {
   const handleEdit = (registro: ApresentacaoRegistro) => {
     setEditingId(registro.id);
     setFormData({
+      congregacao_id: registro.congregacao_id || '',
       crianca_nome: registro.crianca_nome || '',
       crianca_data_nascimento: formatIsoDate(registro.crianca_data_nascimento),
       crianca_sexo: registro.crianca_sexo || 'MASCULINO',
@@ -319,6 +338,7 @@ export default function ApresentacaoCriancasPage() {
     responsavel_nome: registro.responsavel_nome || '',
     responsavel_telefone: registro.responsavel_telefone || '',
     data_apresentacao: formatDate(registro.data_apresentacao),
+    congregacao: (registro as any).congregacao?.nome || '',
     local_apresentacao: registro.local_apresentacao || '',
     data_emissao: new Date().toLocaleDateString('pt-BR'),
     nome_igreja: configIgreja.nome || '',
@@ -557,6 +577,22 @@ export default function ApresentacaoCriancasPage() {
                   <div className="lg:col-span-8 space-y-4">
                     <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <label className="text-xs font-semibold text-gray-600">Congregação do Ato *</label>
+                          <select
+                            value={formData.congregacao_id}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, congregacao_id: e.target.value }))}
+                            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
+                          >
+                            <option value="">Selecione a congregação...</option>
+                            {congregacoes.map((c) => (
+                              <option key={c.id} value={c.id}>{c.nome}</option>
+                            ))}
+                          </select>
+                          {fieldErrors.congregacao_id && (
+                            <p className="text-xs text-red-600 mt-1">{fieldErrors.congregacao_id}</p>
+                          )}
+                        </div>
                         <div>
                           <label className="text-xs font-semibold text-gray-600">Nome da crianca</label>
                           <input
@@ -604,15 +640,13 @@ export default function ApresentacaoCriancasPage() {
                           )}
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-gray-600">Local da apresentacao</label>
+                          <label className="text-xs font-semibold text-gray-600">Local da apresentação (complemento)</label>
                           <input
                             value={formData.local_apresentacao}
                             onChange={(e) => setFormData((prev) => ({ ...prev, local_apresentacao: e.target.value }))}
+                            placeholder="Ex: Templo Central, Sala dos Bebês..."
                             className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                           />
-                          {fieldErrors.local_apresentacao && (
-                            <p className="text-xs text-red-600 mt-1">{fieldErrors.local_apresentacao}</p>
-                          )}
                         </div>
                         <div>
                           <label className="text-xs font-semibold text-gray-600">Status</label>
@@ -776,6 +810,7 @@ export default function ApresentacaoCriancasPage() {
                               </span>
                             </div>
                             <div className="text-xs text-gray-600 space-y-0.5">
+                              <p><span className="text-gray-400">Congregação:</span> <span className="font-semibold text-slate-700">{r.congregacao?.nome || 'Não informada'}</span></p>
                               {r.pai_nome && <p><span className="text-gray-400">Pai:</span> {r.pai_nome}</p>}
                               {r.mae_nome && <p><span className="text-gray-400">Mãe:</span> {r.mae_nome}</p>}
                               {r.responsavel_nome && <p><span className="text-gray-400">Resp.:</span> {r.responsavel_nome} {r.responsavel_telefone && `· ${r.responsavel_telefone}`}</p>}
@@ -854,9 +889,13 @@ export default function ApresentacaoCriancasPage() {
                                   <div className="text-xs text-gray-400 mt-0.5">{r.responsavel_telefone}</div>
                                 )}
                               </td>
-                              {/* Data/Local */}
+                              {/* Data/Local/Congregação */}
                               <td className="py-3 px-4">
-                                <div className="text-sm font-medium text-gray-700">{formatDate(r.data_apresentacao) || '—'}</div>
+                                <div className="font-semibold text-gray-800 text-xs flex items-center gap-1">
+                                  <span>🏛️</span>
+                                  <span>{r.congregacao?.nome || 'Não informada'}</span>
+                                </div>
+                                <div className="text-xs text-gray-600 mt-0.5">{formatDate(r.data_apresentacao) || '—'}</div>
                                 {r.local_apresentacao && (
                                   <div className="text-xs text-gray-400 mt-0.5">{r.local_apresentacao}</div>
                                 )}

@@ -29,11 +29,15 @@ interface PessoaSugestao {
   data_nascimento?: string | null;
   sexo?: string | null;
   celular?: string | null;
+  congregacao_id?: string | null;
+  congregacao_nome?: string | null;
 }
 
 interface CasamentoRegistro {
   id: string;
   ministry_id: string;
+  congregacao_id?: string | null;
+  congregacao?: { id: string; nome: string } | null;
   conjuge1_id?: string | null;
   conjuge1_nome: string;
   conjuge1_data_nascimento?: string | null;
@@ -118,7 +122,7 @@ function AutocompleteField({
               onMouseDown={() => onSelect(c)}>
               <span className="text-sm font-medium text-gray-800">{c.nome}</span>
               <span className="text-xs text-gray-400">
-                {[c.sexo, c.data_nascimento ? formatDate(c.data_nascimento) : null].filter(Boolean).join(' \u00b7 ')}
+                {[c.sexo, c.data_nascimento ? formatDate(c.data_nascimento) : null, c.congregacao_nome].filter(Boolean).join(' · ')}
               </span>
             </button>
           ))}
@@ -145,6 +149,7 @@ const formatIsoDate = (value?: string | null) => {
 };
 
 const EMPTY_FORM = {
+  congregacao_id: '',
   conjuge1_id: '',
   conjuge1_nome: '',
   conjuge1_data_nascimento: '',
@@ -171,6 +176,7 @@ export default function CasamentoPage() {
   const [activeTab, setActiveTab]       = useState('cadastro');
   const [ministryId, setMinistryId]     = useState<string | null>(null);
   const [registros, setRegistros]       = useState<CasamentoRegistro[]>([]);
+  const [congregacoes, setCongregacoes] = useState<{ id: string; nome: string }[]>([]);
   const [certTemplates, setCertTemplates] = useState<CertificadoTemplate[]>([]);
   const [configIgreja, setConfigIgreja] = useState<ConfiguracaoIgreja>({
     nome: 'Igreja/Ministerio', endereco: '', cnpj: '', telefone: '',
@@ -229,19 +235,29 @@ export default function CasamentoPage() {
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
+    if (!formData.congregacao_id)       errors.congregacao_id = 'Selecione a congregação do ato.';
     if (!formData.conjuge1_nome.trim()) errors.conjuge1_nome = 'Informe o nome do cônjuge 1.';
     if (!formData.conjuge2_nome.trim()) errors.conjuge2_nome = 'Informe o nome do cônjuge 2.';
     if (!formData.data_casamento)       errors.data_casamento = 'Informe a data do casamento.';
-    if (!formData.local_casamento.trim()) errors.local_casamento = 'Informe o local do casamento.';
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
+  };
+
+  const loadCongregacoes = async (mid: string) => {
+    const { data } = await supabase
+      .from('congregacoes')
+      .select('id, nome')
+      .eq('ministry_id', mid)
+      .eq('ativo', true)
+      .order('nome');
+    setCongregacoes(data || []);
   };
 
   const loadRegistros = async (mid?: string | null) => {
     if (!mid) return;
     const { data, error } = await supabase
       .from('casamento_registros')
-      .select('*')
+      .select('*, congregacao:congregacoes(id, nome)')
       .eq('ministry_id', mid)
       .order('created_at', { ascending: false });
     if (error) { showNotification('error', 'Erro', error.message, undefined); return; }
@@ -258,6 +274,9 @@ export default function CasamentoPage() {
       setConfigIgreja(config);
       const certRes = await loadCertificadosTemplatesForCurrentUser(supabase);
       setCertTemplates(certRes.templates as CertificadoTemplate[]);
+      if (mid) {
+        await loadCongregacoes(mid);
+      }
       await loadRegistros(mid);
       setLoadingData(false);
     })();
@@ -280,13 +299,18 @@ export default function CasamentoPage() {
       setLoad(true);
       const { data } = await supabase
         .from('members')
-        .select('id, name, data_nascimento, sexo, celular')
+        .select('id, name, data_nascimento, sexo, celular, congregacao_id, congregacao:congregacoes(id, nome)')
         .eq('ministry_id', ministryId)
         .ilike('name', `%${termo}%`)
         .limit(10);
       const mapped: PessoaSugestao[] = (data || []).map((m: any) => ({
-        id: m.id, nome: m.name || '',
-        data_nascimento: m.data_nascimento, sexo: m.sexo, celular: m.celular,
+        id: m.id,
+        nome: m.name || '',
+        data_nascimento: m.data_nascimento,
+        sexo: m.sexo,
+        celular: m.celular,
+        congregacao_id: m.congregacao_id,
+        congregacao_nome: m.congregacao?.nome || null,
       }));
       setSugestoes(mapped);
       setShow(mapped.length > 0);
@@ -312,23 +336,31 @@ export default function CasamentoPage() {
   const selecionarConjuge1 = (c: PessoaSugestao) => {
     setSearch1(c.nome);
     setFormData(p => ({
-      ...p, conjuge1_id: c.id, conjuge1_nome: c.nome,
+      ...p,
+      conjuge1_id: c.id,
+      conjuge1_nome: c.nome,
       conjuge1_data_nascimento: formatIsoDate(c.data_nascimento),
       conjuge1_sexo: c.sexo || 'MASCULINO',
       conjuge1_telefone: c.celular || '',
+      congregacao_id: !p.congregacao_id && c.congregacao_id ? c.congregacao_id : p.congregacao_id,
     }));
-    setSugestoes1([]); setShowSug1(false);
+    setSugestoes1([]);
+    setShowSug1(false);
   };
 
   const selecionarConjuge2 = (c: PessoaSugestao) => {
     setSearch2(c.nome);
     setFormData(p => ({
-      ...p, conjuge2_id: c.id, conjuge2_nome: c.nome,
+      ...p,
+      conjuge2_id: c.id,
+      conjuge2_nome: c.nome,
       conjuge2_data_nascimento: formatIsoDate(c.data_nascimento),
       conjuge2_sexo: c.sexo || 'FEMININO',
       conjuge2_telefone: c.celular || '',
+      congregacao_id: !p.congregacao_id && c.congregacao_id ? c.congregacao_id : p.congregacao_id,
     }));
-    setSugestoes2([]); setShowSug2(false);
+    setSugestoes2([]);
+    setShowSug2(false);
   };
 
   const handleSubmit = async () => {
@@ -337,6 +369,7 @@ export default function CasamentoPage() {
 
     const payload: any = {
       ministry_id: ministryId,
+      congregacao_id: formData.congregacao_id || null,
       conjuge1_nome: formData.conjuge1_nome.trim(),
       conjuge1_data_nascimento: formData.conjuge1_data_nascimento || null,
       conjuge1_sexo: formData.conjuge1_sexo,
@@ -346,7 +379,7 @@ export default function CasamentoPage() {
       conjuge2_sexo: formData.conjuge2_sexo,
       conjuge2_telefone: formData.conjuge2_telefone.trim() || null,
       data_casamento: formData.data_casamento || null,
-      local_casamento: formData.local_casamento.trim(),
+      local_casamento: formData.local_casamento.trim() || null,
       pastor_nome: formData.pastor_nome.trim() || null,
       tipo_casamento: formData.tipo_casamento,
       status: formData.status,
@@ -358,21 +391,29 @@ export default function CasamentoPage() {
 
     if (editingId) {
       const { data, error } = await supabase
-        .from('casamento_registros').update(payload).eq('id', editingId).select('*').single();
+        .from('casamento_registros')
+        .update(payload)
+        .eq('id', editingId)
+        .select('*, congregacao:congregacoes(id, nome)')
+        .single();
       if (error) { showNotification('error', 'Erro', error.message, undefined); return; }
       setRegistros(prev => prev.map(r => r.id === editingId ? (data as CasamentoRegistro) : r));
       showNotification('success', 'Sucesso', 'Registro atualizado com sucesso.', 3000);
-      resetForm(); setActiveTab('registros'); return;
+      resetForm();
+      setActiveTab('registros');
+      return;
     }
 
     const { data, error } = await supabase
       .from('casamento_registros')
       .insert({ ...payload, created_at: new Date().toISOString() })
-      .select('*').single();
+      .select('*, congregacao:congregacoes(id, nome)')
+      .single();
     if (error) { showNotification('error', 'Erro', error.message, undefined); return; }
     setRegistros(prev => [data as CasamentoRegistro, ...prev]);
     showNotification('success', 'Sucesso', 'Registro criado com sucesso.', 3000);
-    resetForm(); setActiveTab('registros');
+    resetForm();
+    setActiveTab('registros');
   };
 
   const handleEdit = (r: CasamentoRegistro) => {
@@ -380,6 +421,7 @@ export default function CasamentoPage() {
     setSearch1(r.conjuge1_nome || '');
     setSearch2(r.conjuge2_nome || '');
     setFormData({
+      congregacao_id: r.congregacao_id || '',
       conjuge1_id: r.conjuge1_id || '',
       conjuge1_nome: r.conjuge1_nome || '',
       conjuge1_data_nascimento: formatIsoDate(r.conjuge1_data_nascimento),
@@ -414,6 +456,7 @@ export default function CasamentoPage() {
     conjuge1_data_nascimento: formatDate(r.conjuge1_data_nascimento),
     conjuge2_data_nascimento: formatDate(r.conjuge2_data_nascimento),
     data_casamento: formatDate(r.data_casamento),
+    congregacao: (r as any).congregacao?.nome || '',
     local_casamento: r.local_casamento || '',
     pastor_nome: r.pastor_nome || '',
     tipo_casamento: TIPO_OPTIONS.find(t => t.value === r.tipo_casamento)?.label || r.tipo_casamento || '',
@@ -652,7 +695,25 @@ export default function CasamentoPage() {
                         <h4 className="text-sm font-bold text-[#123b63] border-b border-gray-100 pb-1">📋 Dados do Casamento</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <label className="text-xs font-semibold text-gray-600">Data do casamento</label>
+                            <label className="text-xs font-semibold text-gray-600">
+                              Congregação do Ato <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={formData.congregacao_id}
+                              onChange={e => setFormData(p => ({ ...p, congregacao_id: e.target.value }))}
+                              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
+                            >
+                              <option value="">Selecione a congregação...</option>
+                              {congregacoes.map(c => (
+                                <option key={c.id} value={c.id}>{c.nome}</option>
+                              ))}
+                            </select>
+                            {fieldErrors.congregacao_id && <p className="text-xs text-red-600 mt-1">{fieldErrors.congregacao_id}</p>}
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-gray-600">
+                              Data do casamento <span className="text-red-500">*</span>
+                            </label>
                             <input type="date" value={formData.data_casamento}
                               onChange={e => setFormData(p => ({ ...p, data_casamento: e.target.value }))}
                               className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
@@ -667,11 +728,11 @@ export default function CasamentoPage() {
                             </select>
                           </div>
                           <div>
-                            <label className="text-xs font-semibold text-gray-600">Local do casamento</label>
+                            <label className="text-xs font-semibold text-gray-600">Local do casamento (complemento)</label>
                             <input value={formData.local_casamento}
                               onChange={e => setFormData(p => ({ ...p, local_casamento: e.target.value }))}
+                              placeholder="Ex: Templo Central, Salão Nobre..."
                               className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-                            {fieldErrors.local_casamento && <p className="text-xs text-red-600 mt-1">{fieldErrors.local_casamento}</p>}
                           </div>
                           <div>
                             <label className="text-xs font-semibold text-gray-600">Status</label>
@@ -681,7 +742,7 @@ export default function CasamentoPage() {
                               {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                             </select>
                           </div>
-                          <div className="md:col-span-2">
+                          <div>
                             <label className="text-xs font-semibold text-gray-600">Pastor/Ministro celebrante</label>
                             <input value={formData.pastor_nome}
                               onChange={e => setFormData(p => ({ ...p, pastor_nome: e.target.value }))}
@@ -745,7 +806,8 @@ export default function CasamentoPage() {
                         <thead>
                           <tr className="text-left text-xs uppercase text-gray-400 border-b">
                             <th className="py-2 pr-4">Cônjuges</th>
-                            <th className="py-2 pr-4">Data / Local</th>
+                            <th className="py-2 pr-4">Congregação / Local</th>
+                            <th className="py-2 pr-4">Data</th>
                             <th className="py-2 pr-4">Tipo</th>
                             <th className="py-2 pr-4">Pastor</th>
                             <th className="py-2 pr-4">Status</th>
@@ -760,8 +822,11 @@ export default function CasamentoPage() {
                                 <div className="text-xs text-gray-500">& {r.conjuge2_nome}</div>
                               </td>
                               <td className="py-3 pr-4">
+                                <div className="text-xs font-medium text-gray-800">{r.congregacao?.nome || 'Não informada'}</div>
+                                {r.local_casamento && <div className="text-[11px] text-gray-500">{r.local_casamento}</div>}
+                              </td>
+                              <td className="py-3 pr-4">
                                 <div className="text-xs text-gray-600">{formatDate(r.data_casamento) || '-'}</div>
-                                <div className="text-xs text-gray-500">{r.local_casamento || '-'}</div>
                               </td>
                               <td className="py-3 pr-4">
                                 <div className="text-xs text-gray-600">

@@ -66,7 +66,6 @@ export default function MembrosPage() {
     setMembroImprimindo,
     membroImprimindoCartao,
     setMembroImprimindoCartao,
-    ultimoCadastro,
 
     // Estado: notificação
     notification,
@@ -117,8 +116,6 @@ export default function MembrosPage() {
 
     // Helpers expostos
     maskCpf,
-    gerarProximaMatricula,
-    resolveCargoValue,
     hasActiveTemplate,
     getMensagemSemTemplate,
     ensureTemplatesSnapshot,
@@ -367,17 +364,6 @@ export default function MembrosPage() {
                 maxMembros={maxMembros}
                 abrirNovoCadastro={abrirNovoCadastro}
                 abrirCadastroPublico={() => setShowPublicQrModal(true)}
-                ultimoCadastro={ultimoCadastro}
-                gerarProximaMatricula={gerarProximaMatricula}
-                setDadosPessoais={setDadosPessoais}
-                setEnderecoData={setEnderecoData}
-                setDadosMinisteriais={setDadosMinisteriais}
-                setCargoSelecionado={setCargoSelecionado}
-                setDadosCargos={setDadosCargos}
-                setIsEditando={() => {}}
-                setShowForm={setShowForm}
-                setActiveTab={setActiveTab as any}
-                resolveCargoValue={resolveCargoValue}
                 gerarPDFListagem={gerarPDFListagem}
                 membrosSelecionadosCount={membrosSelecionados.size}
                 setImprimindoLote={setImprimindoLote}
