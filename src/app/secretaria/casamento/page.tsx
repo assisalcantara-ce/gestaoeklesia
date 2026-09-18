@@ -235,7 +235,6 @@ export default function CasamentoPage() {
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (!formData.congregacao_id)       errors.congregacao_id = 'Selecione a congregação do ato.';
     if (!formData.conjuge1_nome.trim()) errors.conjuge1_nome = 'Informe o nome do cônjuge 1.';
     if (!formData.conjuge2_nome.trim()) errors.conjuge2_nome = 'Informe o nome do cônjuge 2.';
     if (!formData.data_casamento)       errors.data_casamento = 'Informe a data do casamento.';
@@ -243,14 +242,19 @@ export default function CasamentoPage() {
     return Object.keys(errors).length === 0;
   };
 
-  const loadCongregacoes = async (mid: string) => {
-    const { data } = await supabase
+  const loadCongregacoes = async (mid?: string | null) => {
+    if (!mid) return;
+    const { data, error } = await supabase
       .from('congregacoes')
       .select('id, nome')
       .eq('ministry_id', mid)
-      .eq('ativo', true)
-      .order('nome');
-    setCongregacoes(data || []);
+      .eq('is_active', true)
+      .order('nome', { ascending: true });
+    if (error) {
+      console.error('Erro ao carregar congregações:', error);
+      return;
+    }
+    setCongregacoes((data || []) as Array<{ id: string; nome: string }>);
   };
 
   const loadRegistros = async (mid?: string | null) => {
@@ -274,10 +278,7 @@ export default function CasamentoPage() {
       setConfigIgreja(config);
       const certRes = await loadCertificadosTemplatesForCurrentUser(supabase);
       setCertTemplates(certRes.templates as CertificadoTemplate[]);
-      if (mid) {
-        await loadCongregacoes(mid);
-      }
-      await loadRegistros(mid);
+      await Promise.all([loadRegistros(mid), loadCongregacoes(mid)]);
       setLoadingData(false);
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -333,6 +334,7 @@ export default function CasamentoPage() {
     deb2.current = setTimeout(() => buscarPessoas(value, setSugestoes2, setShowSug2, setLoading2), 300);
   };
 
+  // Pré-seleção obrigatória exclusivamente pelo Cônjuge 01
   const selecionarConjuge1 = (c: PessoaSugestao) => {
     setSearch1(c.nome);
     setFormData(p => ({
@@ -342,12 +344,13 @@ export default function CasamentoPage() {
       conjuge1_data_nascimento: formatIsoDate(c.data_nascimento),
       conjuge1_sexo: c.sexo || 'MASCULINO',
       conjuge1_telefone: c.celular || '',
-      congregacao_id: !p.congregacao_id && c.congregacao_id ? c.congregacao_id : p.congregacao_id,
+      congregacao_id: c.congregacao_id || '', // Pré-seleciona a congregação do Cônjuge 01 ou "Sem registro"
     }));
     setSugestoes1([]);
     setShowSug1(false);
   };
 
+  // Selecionar Cônjuge 02 NUNCA sobrescreve a congregação já definida/escolhida
   const selecionarConjuge2 = (c: PessoaSugestao) => {
     setSearch2(c.nome);
     setFormData(p => ({
@@ -357,7 +360,6 @@ export default function CasamentoPage() {
       conjuge2_data_nascimento: formatIsoDate(c.data_nascimento),
       conjuge2_sexo: c.sexo || 'FEMININO',
       conjuge2_telefone: c.celular || '',
-      congregacao_id: !p.congregacao_id && c.congregacao_id ? c.congregacao_id : p.congregacao_id,
     }));
     setSugestoes2([]);
     setShowSug2(false);
@@ -366,6 +368,15 @@ export default function CasamentoPage() {
   const handleSubmit = async () => {
     if (!ministryId) { showNotification('warning', 'Aviso', 'Ministério não encontrado.', 3000); return; }
     if (!validateForm()) return;
+
+    // Validação de segurança: congregacao_id opcional deve pertencer ao tenant atual
+    if (formData.congregacao_id) {
+      const existsInTenant = congregacoes.some(c => c.id === formData.congregacao_id);
+      if (!existsInTenant) {
+        showNotification('error', 'Erro de validação', 'A congregação selecionada não pertence a esta instituição.', 4000);
+        return;
+      }
+    }
 
     const payload: any = {
       ministry_id: ministryId,
@@ -394,6 +405,7 @@ export default function CasamentoPage() {
         .from('casamento_registros')
         .update(payload)
         .eq('id', editingId)
+        .eq('ministry_id', ministryId)
         .select('*, congregacao:congregacoes(id, nome)')
         .single();
       if (error) { showNotification('error', 'Erro', error.message, undefined); return; }
@@ -444,7 +456,7 @@ export default function CasamentoPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Deseja realmente excluir este registro?')) return;
-    const { error } = await supabase.from('casamento_registros').delete().eq('id', id);
+    const { error } = await supabase.from('casamento_registros').delete().eq('id', id).eq('ministry_id', ministryId);
     if (error) { showNotification('error', 'Erro', error.message, undefined); return; }
     setRegistros(prev => prev.filter(r => r.id !== id));
     showNotification('success', 'Sucesso', 'Registro excluído.', 3000);
@@ -527,7 +539,8 @@ export default function CasamentoPage() {
     const { error } = await supabase
       .from('casamento_registros')
       .update({ certificado_template_key: template.id, certificado_emitido_em: nowIso, updated_at: nowIso })
-      .eq('id', registro.id);
+      .eq('id', registro.id)
+      .eq('ministry_id', ministryId);
     if (!error) {
       setRegistros(prev => prev.map(r =>
         r.id === registro.id ? { ...r, certificado_template_key: template.id, certificado_emitido_em: nowIso } : r
@@ -696,19 +709,18 @@ export default function CasamentoPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label className="text-xs font-semibold text-gray-600">
-                              Congregação do Ato <span className="text-red-500">*</span>
+                              Congregação do Ato <span className="text-xs font-normal text-gray-400">(opcional)</span>
                             </label>
                             <select
                               value={formData.congregacao_id}
                               onChange={e => setFormData(p => ({ ...p, congregacao_id: e.target.value }))}
                               className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
                             >
-                              <option value="">Selecione a congregação...</option>
+                              <option value="">Sem registro</option>
                               {congregacoes.map(c => (
                                 <option key={c.id} value={c.id}>{c.nome}</option>
                               ))}
                             </select>
-                            {fieldErrors.congregacao_id && <p className="text-xs text-red-600 mt-1">{fieldErrors.congregacao_id}</p>}
                           </div>
                           <div>
                             <label className="text-xs font-semibold text-gray-600">
@@ -822,7 +834,7 @@ export default function CasamentoPage() {
                                 <div className="text-xs text-gray-500">& {r.conjuge2_nome}</div>
                               </td>
                               <td className="py-3 pr-4">
-                                <div className="text-xs font-medium text-gray-800">{r.congregacao?.nome || 'Não informada'}</div>
+                                <div className="text-xs font-medium text-gray-800">{r.congregacao?.nome || 'Sem registro'}</div>
                                 {r.local_casamento && <div className="text-[11px] text-gray-500">{r.local_casamento}</div>}
                               </td>
                               <td className="py-3 pr-4">
