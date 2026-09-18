@@ -135,10 +135,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── 5. Gerar Magic Link no Supabase Auth (Server-side) ────────────────
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.gestaoeklesia.com.br';
-    const redirectTo = `${appUrl}/app/auth/callback`;
+    // ── 5. Determinar a URL base da aplicação dinamicamente ────────────────
+    const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
+    const proto = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+    const dynamicOrigin = host ? `${proto}://${host}` : (process.env.NEXT_PUBLIC_APP_URL || 'https://www.gestaoeklesia.com.br');
 
+    const redirectTo = `${dynamicOrigin}/app/auth/callback`;
+
+    // Gerar Magic Link no Supabase Auth (Server-side)
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: 'magiclink',
       email: memberEmail,
@@ -155,13 +159,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // O link direto gerado pelo Supabase
+    // O link direto gerado para o callback da aplicação
     let loginUrl = linkData.properties.action_link;
 
-    // Se tivermos o hashed_token retornado, podemos direcionar diretamente para o nosso /app/auth/callback
-    // garantindo validação direta via verifyOtp no callback sem depender do PKCE do browser
     if (linkData.properties.hashed_token) {
-      loginUrl = `${appUrl}/app/auth/callback?token_hash=${encodeURIComponent(linkData.properties.hashed_token)}&type=magiclink`;
+      loginUrl = `${dynamicOrigin}/app/auth/callback?token_hash=${encodeURIComponent(linkData.properties.hashed_token)}&type=magiclink`;
     }
 
     // ── 6. Enviar e-mail via Resend ────────────────────────────────────────
