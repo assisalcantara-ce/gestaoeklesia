@@ -6,6 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient as createSsrClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { createServerClient, createServerClientFromRequest } from '@/lib/supabase-server';
 
 export interface MobileMemberContext {
@@ -15,29 +17,61 @@ export interface MobileMemberContext {
 }
 
 /**
- * Resolve o membro autenticado a partir do header Authorization Bearer.
+ * Resolve o membro autenticado a partir do header Authorization Bearer ou Cookies de Sessão HTTP.
  *
- * 1. Verifica o JWT via Supabase Auth → obtém userId
+ * 1. Verifica o JWT via Supabase Auth (Bearer Token ou Cookies SSR) → obtém userId
  * 2. Busca o registro em `members` WHERE auth_user_id = userId
  *
- * @throws Error('UNAUTHORIZED')      — token inválido ou ausente
+ * @throws Error('UNAUTHORIZED')      — token/sessão inválida ou ausente
  * @throws Error('MEMBER_NOT_LINKED') — userId não vinculado a nenhum member
  */
 export async function resolveMobileMember(
   request: NextRequest,
 ): Promise<MobileMemberContext> {
-  // 1. Verificar JWT via anon key + Bearer token
-  const rlsClient = createServerClientFromRequest(request);
-  const {
-    data: { user },
-    error: authError,
-  } = await rlsClient.auth.getUser();
+  let authenticatedUser = null;
 
-  if (authError || !user) {
+  // 1. Tentar via Authorization Bearer token
+  const authHeader = request.headers.get('Authorization') || request.headers.get('authorization');
+  if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+    const rlsClient = createServerClientFromRequest(request);
+    const { data: { user } } = await rlsClient.auth.getUser();
+    if (user) {
+      authenticatedUser = user;
+    }
+  }
+
+  // 2. Se não obtiver por Bearer token, tentar via cookies de sessão SSR
+  if (!authenticatedUser) {
+    try {
+      const cookieStore = await cookies();
+      const ssrClient = createSsrClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+        {
+          cookies: {
+            getAll() {
+              return cookieStore.getAll();
+            },
+            setAll() {},
+          },
+        }
+      );
+      const { data: { user } } = await ssrClient.auth.getUser();
+      if (user) {
+        authenticatedUser = user;
+      }
+    } catch (cookieErr) {
+      console.error('[resolveMobileMember] Erro ao consultar cookies SSR:', cookieErr);
+    }
+  }
+
+  if (!authenticatedUser) {
     throw new Error('UNAUTHORIZED');
   }
 
-  // 2. Buscar member vinculado (service_role para ignorar RLS durante o lookup)
+  const user = authenticatedUser;
+
+  // 3. Buscar member vinculado (service_role para ignorar RLS durante o lookup)
   const admin = createServerClient();
   const { data: member, error: memberError } = await admin
     .from('members')

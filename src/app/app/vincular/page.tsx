@@ -5,7 +5,7 @@
  *
  * Fluxo:
  * 1. Usuário informa CPF + data de nascimento
- * 2. POST /api/v1/mobile/auth/link-member com Bearer token
+ * 2. POST /api/v1/mobile/auth/link-member (Bearer token + Cookies de sessão SSR)
  * 3. Sucesso → refresh() no context → provider redireciona para /app/inicio
  */
 
@@ -32,23 +32,24 @@ export default function VincularPage() {
     e.preventDefault();
     setError('');
 
+    // Obter access_token se disponível na sessão do cliente
     const {
       data: { session },
     } = await sbRef.current.auth.getSession();
     const token = session?.access_token;
-    if (!token) {
-      setError('Sessão expirada. Faça login novamente.');
-      return;
-    }
 
     setLoading(true);
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch('/api/v1/mobile/auth/link-member', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({
           cpf: cpf.replace(/\D/g, ''),
           data_nascimento: dataNascimento,
@@ -64,6 +65,9 @@ export default function VincularPage() {
       } else {
         const code = data.code || data.error;
         switch (code) {
+          case 'UNAUTHORIZED':
+            setError('Sessão expirada. Por favor, solicite um novo link de acesso.');
+            break;
           case 'MEMBER_NOT_FOUND':
             setError(
               'Não encontramos um cadastro com esses dados. Verifique o CPF e a data de nascimento.',
@@ -145,7 +149,7 @@ export default function VincularPage() {
                   onChange={(e) => setCpf(formatCpf(e.target.value))}
                   placeholder="000.000.000-00"
                   maxLength={14}
-                  className="block w-full max-w-full min-w-0 min-h-[46px] px-4 py-3 bg-[#172033] border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition box-border"
+                  className="block w-full max-w-full min-w-0 min-h-[46px] px-4 py-3 bg-[#172033] border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition box-border font-mono tracking-wide"
                   required
                 />
               </div>
@@ -161,7 +165,7 @@ export default function VincularPage() {
                   onChange={(e) => setDataNascimento(formatData(e.target.value))}
                   placeholder="DD/MM/AAAA"
                   maxLength={10}
-                  className="block w-full max-w-full min-w-0 min-h-[46px] px-4 py-3 bg-[#172033] border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition box-border"
+                  className="block w-full max-w-full min-w-0 min-h-[46px] px-4 py-3 bg-[#172033] border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition box-border font-mono tracking-wide"
                   required
                 />
               </div>

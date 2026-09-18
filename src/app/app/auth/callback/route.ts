@@ -12,9 +12,10 @@ export const dynamic = 'force-dynamic';
  * 1. `token_hash` + `type`: Magic Link gerado server-side via Supabase Admin (imune a erros de PKCE)
  * 2. `code`: Fluxo tradicional de troca PKCE via exchangeCodeForSession
  *
- * Após estabelecer a sessão em cookies HTTP seguros (@supabase/ssr):
- * - Se o usuário já tiver vínculo oficial em `members.auth_user_id` → redireciona para `/app/inicio`
- * - Se não tiver vínculo → redireciona para `/app/vincular`
+ * Persistência Confiável de Sessão:
+ * - Grava os cookies de autenticação (sb-access-token / sb-refresh-token / etc.)
+ *   diretamente nos cabeçalhos Set-Cookie do objeto NextResponse.redirect retornado.
+ * - Redireciona para /app/inicio (se já vinculado) ou /app/vincular (se não vinculado).
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -41,6 +42,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const cookieStore = await cookies();
+    const cookiesToSetBuffer: Array<{ name: string; value: string; options: any }> = [];
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
@@ -51,9 +54,10 @@ export async function GET(request: NextRequest) {
           },
           setAll(cookiesToSet) {
             try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
+              cookiesToSet.forEach(({ name, value, options }) => {
+                cookieStore.set(name, value, options);
+                cookiesToSetBuffer.push({ name, value, options });
+              });
             } catch {}
           },
         },
@@ -115,13 +119,24 @@ export async function GET(request: NextRequest) {
       console.error('[MOBILE_AUTH_CALLBACK] Erro ao consultar vínculo de membro:', memberError);
     }
 
-    if (member && !memberError) {
-      console.log('[MOBILE_AUTH_CALLBACK] Membro vinculado identificado:', member.id, '→ Redirecionando para /app/inicio');
-      return NextResponse.redirect(new URL('/app/inicio', request.url));
-    } else {
-      console.log('[MOBILE_AUTH_CALLBACK] Usuário autenticado sem vínculo → Redirecionando para /app/vincular');
-      return NextResponse.redirect(new URL('/app/vincular', request.url));
-    }
+    const redirectUrl = member && !memberError
+      ? new URL('/app/inicio', request.url)
+      : new URL('/app/vincular', request.url);
+
+    const response = NextResponse.redirect(redirectUrl);
+
+    // Garantir que todos os cookies da sessão sejam aplicados na resposta HTTP de redirecionamento
+    cookiesToSetBuffer.forEach(({ name, value, options }) => {
+      response.cookies.set(name, value, {
+        ...options,
+        path: options?.path || '/',
+        sameSite: options?.sameSite || 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      });
+    });
+
+    console.log('[MOBILE_AUTH_CALLBACK] Redirecionando com cookies de sessão para:', redirectUrl.pathname);
+    return response;
   } catch (err: any) {
     console.error('[MOBILE_AUTH_CALLBACK] Erro inesperado no callback mobile:', err);
     return NextResponse.redirect(
