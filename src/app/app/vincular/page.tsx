@@ -50,6 +50,7 @@ export default function VincularPage() {
       const res = await fetch('/api/v1/mobile/auth/link-member', {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify({
           cpf: cpf.replace(/\D/g, ''),
           data_nascimento: dataNascimento,
@@ -66,11 +67,11 @@ export default function VincularPage() {
         const code = data.code || data.error;
         switch (code) {
           case 'UNAUTHORIZED':
-            setError('Sessão expirada. Por favor, solicite um novo link de acesso.');
+            setError('Sessão expirada ou não encontrada. Por favor, solicite um novo link de acesso.');
             break;
           case 'MEMBER_NOT_FOUND':
             setError(
-              'Não encontramos um cadastro com esses dados. Verifique o CPF e a data de nascimento.',
+              'Não encontramos um cadastro ativo com esse CPF e data de nascimento. Verifique os dados informados.',
             );
             break;
           case 'ALREADY_LINKED':
@@ -78,20 +79,20 @@ export default function VincularPage() {
             break;
           case 'ALREADY_LINKED_OTHER':
             setError(
-              'Este cadastro já está vinculado a outra conta. Entre em contato com o suporte ou secretaria da sua igreja.',
+              'Este cadastro de membro já está vinculado a outra conta. Entre em contato com a secretaria da sua igreja.',
             );
             break;
           case 'INVALID_CPF':
-            setError('CPF inválido. Verifique os dígitos informados.');
+            setError('CPF inválido. Verifique os 11 dígitos informados.');
             break;
           case 'INVALID_DATE':
-            setError('Data de nascimento inválida. Verifique o formato.');
+            setError('Data de nascimento inválida. Use o formato DD/MM/AAAA.');
             break;
           default:
             setError(
               typeof data.error === 'string' && data.error
                 ? data.error
-                : data.message || 'Não foi possível vincular. Tente novamente.',
+                : data.message || 'Não foi possível vincular seu cadastro. Tente novamente.',
             );
         }
       }
