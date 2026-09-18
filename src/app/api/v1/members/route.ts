@@ -121,9 +121,13 @@ export async function GET(request: NextRequest) {
       query = query.order('name', { ascending: false }).order('id', { ascending: true })
     } else if (sortParam === 'created_desc') {
       query = query.order('created_at', { ascending: false }).order('id', { ascending: true })
-    } else {
-      // Default: created_at ASC determinístico
+    } else if (sortParam === 'created_asc') {
       query = query.order('created_at', { ascending: true }).order('id', { ascending: true })
+    } else if (sortParam === 'matricula_desc') {
+      query = query.order('matricula', { ascending: false, nullsFirst: false }).order('id', { ascending: true })
+    } else {
+      // Default: matrícula menor para o maior (matricula ASC) determinístico
+      query = query.order('matricula', { ascending: true, nullsFirst: false }).order('id', { ascending: true })
     }
 
     // Aplicar paginação server-side
@@ -277,7 +281,10 @@ export async function POST(request: NextRequest) {
           data_emissao: normalizedBody.data_emissao || null,
           data_validade_credencial: normalizedBody.data_validade_credencial || null,
           // Aba Dados
-          matricula: normalizedBody.matricula || null,
+          matricula:
+            normalizedBody.matricula && /^\d+$/.test(String(normalizedBody.matricula).trim())
+              ? String(normalizedBody.matricula).trim().padStart(3, '0')
+              : (normalizedBody.matricula || null),
           unique_id: normalizedBody.unique_id || null,
           tipo_cadastro: normalizedBody.tipo_cadastro || 'ministro',
           data_nascimento: normalizedBody.data_nascimento || null,

@@ -9,7 +9,10 @@ function buildMemberPayload(normalizedBody: Record<string, any>) {
     email: typeof normalizedBody.email === 'string' ? normalizedBody.email.toLowerCase() : normalizedBody.email ?? null,
     phone: normalizedBody.phone ?? null,
     cpf: normalizedBody.cpf ?? null,
-    matricula: normalizedBody.matricula ?? null,
+    matricula:
+      normalizedBody.matricula && /^\d+$/.test(String(normalizedBody.matricula).trim())
+        ? String(normalizedBody.matricula).trim().padStart(3, '0')
+        : (normalizedBody.matricula ?? null),
     unique_id: normalizedBody.unique_id ?? null,
     tipo_cadastro: normalizedBody.tipo_cadastro ?? null,
     data_nascimento: normalizedBody.data_nascimento ?? null,

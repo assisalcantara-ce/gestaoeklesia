@@ -497,7 +497,7 @@ export function useMembros() {
         search: searchTerm.trim() || undefined,
         status: statusFilter === 'TODOS' ? undefined : statusFilter,
         cargo: cargoFilter === 'TODOS' ? undefined : cargoFilter,
-        sort: sortOrdemAlfabetica ? 'name_asc' : 'created_asc',
+        sort: sortOrdemAlfabetica ? 'name_asc' : 'matricula_asc',
       });
 
       if (res && res.data) {
