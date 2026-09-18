@@ -55,11 +55,14 @@ export async function GET(request: NextRequest) {
 
     // Extrair query params
     const searchParams = request.nextUrl.searchParams
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
-    const status = searchParams.get('status')
-    const search = searchParams.get('search')
-    const tipoCadastro = searchParams.get('tipoCadastro')
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
+    const limit = Math.max(1, Math.min(1000, parseInt(searchParams.get('limit') || '20', 10) || 20))
+    const statusParam = searchParams.get('status')?.trim()
+    const searchParam = searchParams.get('search')?.trim()
+    const tipoCadastro = searchParams.get('tipoCadastro')?.trim()
+    const cargoParam = searchParams.get('cargo')?.trim()
+    const congregacaoParam = searchParams.get('congregacao_id')?.trim() || searchParams.get('congregacaoId')?.trim()
+    const sortParam = searchParams.get('sort')?.trim()
 
     const offset = (page - 1) * limit
 
@@ -79,27 +82,52 @@ export async function GET(request: NextRequest) {
         // Supervisão sem congregações → retorna vazio
         query = query.eq('id', '00000000-0000-0000-0000-000000000000')
       }
+    } else if (congregacaoParam && congregacaoParam !== 'TODAS') {
+      query = query.eq('congregacao_id', congregacaoParam)
     }
 
     // Aplicar filtros
-    if (status) {
-      query = query.eq('status', status)
+    if (statusParam && statusParam.toUpperCase() !== 'TODOS') {
+      const normalizedStatus =
+        statusParam.toLowerCase() === 'ativo' || statusParam.toLowerCase() === 'active'
+          ? 'active'
+          : statusParam.toLowerCase() === 'inativo' || statusParam.toLowerCase() === 'inactive'
+            ? 'inactive'
+            : statusParam.toLowerCase()
+      query = query.eq('status', normalizedStatus)
     }
 
-    if (search) {
-      query = query.ilike('name', `%${search}%`)
+    if (cargoParam && cargoParam.toUpperCase() !== 'TODOS') {
+      query = query.ilike('cargo_ministerial', `%${cargoParam}%`)
     }
 
-    if (tipoCadastro) {
+    if (searchParam) {
+      // Sanitizar caracteres especiais de regex/postgrest para busca segura
+      const sanitized = searchParam.replace(/[,()]/g, '')
+      if (sanitized) {
+        query = query.or(`name.ilike.%${sanitized}%,cpf.ilike.%${sanitized}%,matricula.ilike.%${sanitized}%`)
+      }
+    }
+
+    if (tipoCadastro && tipoCadastro.toUpperCase() !== 'TODOS') {
       const tipo = String(tipoCadastro).toLowerCase()
-      query = query.eq('role', tipo)
+      query = query.or(`role.eq.${tipo},tipo_cadastro.eq.${tipo}`)
     }
 
-    // Aplicar paginação
-    query = query.range(offset, offset + limit - 1)
+    // Ordenação determinística com desempate por id
+    if (sortParam === 'name_asc' || sortParam === 'name' || sortParam === 'nome_asc') {
+      query = query.order('name', { ascending: true }).order('id', { ascending: true })
+    } else if (sortParam === 'name_desc' || sortParam === 'nome_desc') {
+      query = query.order('name', { ascending: false }).order('id', { ascending: true })
+    } else if (sortParam === 'created_desc') {
+      query = query.order('created_at', { ascending: false }).order('id', { ascending: true })
+    } else {
+      // Default: created_at ASC determinístico
+      query = query.order('created_at', { ascending: true }).order('id', { ascending: true })
+    }
 
-    // Ordenar por data de criação (ordenação numérica de matrícula feita no cliente)
-    query = query.order('created_at', { ascending: true })
+    // Aplicar paginação server-side
+    query = query.range(offset, offset + limit - 1)
 
     const { data, error, count } = await query
 

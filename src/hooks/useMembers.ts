@@ -31,7 +31,18 @@ export function useMembers() {
 
   // Listar membros
   const fetchMembers = useCallback(
-    async (page = 1, limit = 20, filters?: { status?: string; search?: string; tipoCadastro?: string }) => {
+    async (
+      page = 1,
+      limit = 20,
+      filters?: {
+        status?: string
+        search?: string
+        tipoCadastro?: string
+        cargo?: string
+        congregacaoId?: string
+        sort?: string
+      }
+    ) => {
       try {
         setLoading(true)
         setError(null)
@@ -42,6 +53,9 @@ export function useMembers() {
           ...(filters?.status && { status: filters.status }),
           ...(filters?.search && { search: filters.search }),
           ...(filters?.tipoCadastro && { tipoCadastro: filters.tipoCadastro }),
+          ...(filters?.cargo && { cargo: filters.cargo }),
+          ...(filters?.congregacaoId && { congregacao_id: filters.congregacaoId }),
+          ...(filters?.sort && { sort: filters.sort }),
         })
 
         const accessToken = await getAccessTokenOrThrow()

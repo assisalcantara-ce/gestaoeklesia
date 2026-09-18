@@ -46,8 +46,9 @@ export default function MembrosPage() {
     setSortOrdemAlfabetica,
     currentPage,
     setCurrentPage,
-    membrosFiltrados,
     membrosPaginados,
+    membrosFiltradosCount,
+    totalMembrosCount,
     totalPages,
     startIndex,
     endIndex,
@@ -359,8 +360,8 @@ export default function MembrosPage() {
                 setCurrentPage={setCurrentPage}
                 setSortOrdemAlfabetica={setSortOrdemAlfabetica}
                 cargosMinisteriais={cargosMinisteriais as any}
-                membrosFiltradosCount={membrosFiltrados.length}
-                totalMembrosCount={membros.length}
+                membrosFiltradosCount={membrosFiltradosCount}
+                totalMembrosCount={totalMembrosCount}
                 isSupervisor={isSupervisor}
                 limiteMembrosAtingido={limiteMembrosAtingido}
                 maxMembros={maxMembros}
@@ -385,7 +386,7 @@ export default function MembrosPage() {
 
               <MembrosTable
                 membrosPaginados={membrosPaginados}
-                membrosFiltradosCount={membrosFiltrados.length}
+                membrosFiltradosCount={membrosFiltradosCount}
                 membrosSelecionados={membrosSelecionados}
                 setMembrosSelecionados={setMembrosSelecionados}
                 sortOrdemAlfabetica={sortOrdemAlfabetica}

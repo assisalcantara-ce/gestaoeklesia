@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMembers } from '@/hooks/useMembers';
 import { useUserContext } from '@/hooks/useUserContext';
@@ -266,10 +266,14 @@ export function useMembros() {
   const isSupervisor = userCtx.nivel === 'supervisor';
   const isAuxiliar = userCtx.nivel === 'auxiliar_secretaria';
 
-  const { members: membersApi, fetchMembers, createMember, updateMember, deleteMember, error: membersError } = useMembers();
+  const { fetchMembers, createMember, updateMember, deleteMember, error: membersError } = useMembers();
 
   // ── Estado: membros ──────────────────────────────────────────────────────────
   const [membros, setMembros] = useState<Membro[]>([]);
+  const [membrosOverview, setMembrosOverview] = useState<Membro[]>([]);
+  const [totalFiltrados, setTotalFiltrados] = useState<number>(0);
+  const [totalMembrosCount, setTotalMembrosCount] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
   const [maxMembros, setMaxMembros] = useState<number>(0);
 
   // ── Estado: UI / navegação ───────────────────────────────────────────────────
@@ -390,41 +394,14 @@ export function useMembros() {
 
   // ─── Derivados ───────────────────────────────────────────────────────────────
 
-  const limiteMembrosAtingido = maxMembros > 0 && membros.length >= maxMembros;
+  const limiteMembrosAtingido = maxMembros > 0 && totalMembrosCount >= maxMembros;
 
-  const supervisoesOptions = supervisoes;
-  const camposOptions = campos;
-  const congregacoesOptions = congregacoes;
+  // ─── Paginação e Índices ──────────────────────────────────────────────────────
 
-  console.log('supervisoesOptions', supervisoesOptions);
-  console.log('camposOptions', camposOptions);
-  console.log('congregacoesOptions', congregacoesOptions);
-
-
-
-  // ─── Filtros e paginação ──────────────────────────────────────────────────────
-
-  const membrosFiltrados = membros
-    .filter((m) => {
-      const matchSearch =
-        m.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.cpf.includes(searchTerm) ||
-        m.matricula.includes(searchTerm);
-      const matchStatus = statusFilter === 'TODOS' || m.status.toUpperCase() === statusFilter;
-      const matchCargo =
-        cargoFilter === 'TODOS' ||
-        (m.cargoMinisterial || '').toUpperCase() === cargoFilter.toUpperCase();
-      return matchSearch && matchStatus && matchCargo;
-    })
-    .sort((a, b) => {
-      if (!sortOrdemAlfabetica) return 0;
-      return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
-    });
-
-  const totalPages = Math.ceil(membrosFiltrados.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const membrosPaginados = membrosFiltrados.slice(startIndex, endIndex);
+  const endIndex = Math.min(startIndex + membros.length, totalFiltrados);
+  const membrosPaginados = membros;
+  const membrosFiltrados = { length: totalFiltrados } as unknown as Membro[];
 
   // ─── Helpers de transformação de dados ───────────────────────────────────────
 
@@ -511,26 +488,64 @@ export function useMembros() {
     return customFields;
   };
 
-  // ─── Efeitos ─────────────────────────────────────────────────────────────────
+  // ─── Efeitos e Carregamento Server-Side ───────────────────────────────────────
 
-  // Carregar membros ao montar
-  useEffect(() => {
-    fetchMembers(1, 500).catch((e) => {
+  // Carregar dados da página atual com filtros via API
+  const carregarMembrosPagina = useCallback(async () => {
+    try {
+      const res = await fetchMembers(currentPage, itemsPerPage, {
+        search: searchTerm.trim() || undefined,
+        status: statusFilter === 'TODOS' ? undefined : statusFilter,
+        cargo: cargoFilter === 'TODOS' ? undefined : cargoFilter,
+        sort: sortOrdemAlfabetica ? 'name_asc' : 'created_asc',
+      });
+
+      if (res && res.data) {
+        const list = res.data.map(memberToMembro);
+        setMembros(list);
+        const total = typeof res.pagination?.total === 'number' ? res.pagination.total : list.length;
+        setTotalFiltrados(total);
+        setTotalPages(res.pagination?.total_pages ?? Math.max(1, Math.ceil(total / itemsPerPage)));
+      }
+    } catch (e) {
       if (e instanceof Error && e.message === 'Usuário sem ministério associado') return;
       if (e instanceof Error && e.message === 'Não autenticado') return;
       console.error('Erro ao carregar membros (API):', e);
-    });
-  }, [fetchMembers]);
+    }
+  }, [fetchMembers, currentPage, itemsPerPage, searchTerm, statusFilter, cargoFilter, sortOrdemAlfabetica]);
 
-  // Sincronizar membrosApi -> membros
+  // Debounce para recarregar a lista quando filtros/busca/página mudam
   useEffect(() => {
-    setMembros(
-      membersApi
-        .map(memberToMembro)
-        .sort((a, b) => (parseInt(a.matricula) || 0) - (parseInt(b.matricula) || 0))
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [membersApi]);
+    const timer = setTimeout(() => {
+      carregarMembrosPagina();
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [carregarMembrosPagina]);
+
+  // Carregar dados agregados do tenant para Overview, Aniversariantes e Contagem Total
+  const carregarOverviewEContagem = useCallback(async () => {
+    const ministryId = userCtx.ministryId;
+    if (!ministryId) return;
+
+    try {
+      const { data, count, error } = await supabase
+        .from('members')
+        .select('id, name, status, role, tipo_cadastro, cargo_ministerial, data_nascimento, created_at, congregacao_id, matricula, custom_fields', { count: 'exact' })
+        .eq('ministry_id', ministryId);
+
+      if (!error && data) {
+        const overviewList = data.map(memberToMembro);
+        setMembrosOverview(overviewList);
+        setTotalMembrosCount(count ?? data.length);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar dados de overview:', err);
+    }
+  }, [userCtx.ministryId, supabase]);
+
+  useEffect(() => {
+    carregarOverviewEContagem();
+  }, [carregarOverviewEContagem]);
 
   // Carregar configuração da igreja
   useEffect(() => {
@@ -610,7 +625,8 @@ export function useMembros() {
   // ─── Helpers de formulário ────────────────────────────────────────────────────
 
   const gerarProximaMatricula = () => {
-    const ultimaMatricula = Math.max(...membros.map((m) => parseInt(m.matricula) || 0), 0);
+    const base = membrosOverview.length > 0 ? membrosOverview : membros;
+    const ultimaMatricula = Math.max(...base.map((m) => parseInt(m.matricula) || 0), 0);
     return String(ultimaMatricula + 1).padStart(3, '0');
   };
 
@@ -898,11 +914,13 @@ export function useMembros() {
 
       if (membroEditando) {
         await updateMember(membroEditando.id, payloadBase);
-        await fetchMembers(1, 500);
+        await carregarMembrosPagina();
+        void carregarOverviewEContagem();
         setNotification({ isOpen: true, title: 'Sucesso', message: 'Membro atualizado com sucesso!', type: 'success' });
       } else {
         const created = await createMember(payloadBase);
-        await fetchMembers(1, 500);
+        await carregarMembrosPagina();
+        void carregarOverviewEContagem();
         const createdUi = memberToMembro(created as unknown as any);
         setUltimoCadastro(createdUi);
         setNotification({ isOpen: true, title: 'Sucesso', message: 'Novo membro cadastrado com sucesso!', type: 'success' });
@@ -926,7 +944,8 @@ export function useMembros() {
     if (!membroDeletando) return;
     try {
       await deleteMember(membroDeletando.id);
-      await fetchMembers(1, 500);
+      await carregarMembrosPagina();
+      void carregarOverviewEContagem();
       setNotification({
         isOpen: true,
         title: 'Sucesso',
@@ -963,7 +982,7 @@ export function useMembros() {
 
   // ─── PDF Listagem ─────────────────────────────────────────────────────────────
 
-  const gerarPDFListagem = () => {
+  const gerarPDFListagem = async () => {
     const { jsPDF } = require('jspdf');
     const autoTable = require('jspdf-autotable').default;
 
@@ -1004,13 +1023,28 @@ export function useMembros() {
     doc.setFont('helvetica', 'bold');
     doc.text('Listagem de Membros', pageWidth / 2, yPos, { align: 'center' });
 
+    let listaParaImprimir = membros;
+    try {
+      const res = await fetchMembers(1, 1000, {
+        search: searchTerm.trim() || undefined,
+        status: statusFilter === 'TODOS' ? undefined : statusFilter,
+        cargo: cargoFilter === 'TODOS' ? undefined : cargoFilter,
+        sort: sortOrdemAlfabetica ? 'name_asc' : 'created_asc',
+      });
+      if (res?.data && res.data.length > 0) {
+        listaParaImprimir = res.data.map(memberToMembro);
+      }
+    } catch (e) {
+      console.warn('Usando membros carregados para o PDF:', e);
+    }
+
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     yPos += 7;
-    doc.text(`Total de registros: ${membrosFiltrados.length}`, 14, yPos);
+    doc.text(`Total de registros: ${totalFiltrados || listaParaImprimir.length}`, 14, yPos);
     doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth - 14, yPos, { align: 'right' });
 
-    const tableData = membrosFiltrados.map((membro) => {
+    const tableData = listaParaImprimir.map((membro) => {
       const tipo = (membro?.tipoCadastro || '').toLowerCase().trim();
       const cargoExibicao = tipo === 'ministro'
         ? ((membro?.cargoMinisterial || '').trim() || 'MINISTRO')
@@ -1291,7 +1325,7 @@ export function useMembros() {
 
   return {
     // Estado: membros e configuração
-    membros,
+    membros: membrosOverview.length > 0 ? membrosOverview : membros,
     membersError,
     maxMembros,
     limiteMembrosAtingido,
@@ -1320,6 +1354,8 @@ export function useMembros() {
     setCurrentPage,
     membrosFiltrados,
     membrosPaginados,
+    membrosFiltradosCount: totalFiltrados,
+    totalMembrosCount: totalMembrosCount || totalFiltrados,
     totalPages,
     startIndex,
     endIndex,
