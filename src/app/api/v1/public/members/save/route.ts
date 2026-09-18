@@ -265,6 +265,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Determinar classificação do cadastro
+  const rawTipo = typeof body.tipo_cadastro === 'string' ? body.tipo_cadastro.toLowerCase().trim() : 'membro';
+  const tipoCadastro = rawTipo === 'ministro' ? 'ministro' : 'membro';
+  const role = tipoCadastro;
+  const cargoMinisterial = tipoCadastro === 'ministro' && typeof body.cargo_ministerial === 'string' && body.cargo_ministerial.trim()
+    ? body.cargo_ministerial.toUpperCase().trim()
+    : null;
+
   const insertPayload: Record<string, any> = {
     ministry_id: ministryId,
     congregacao_id: congregacao_id.trim(),
@@ -297,7 +305,9 @@ export async function POST(request: NextRequest) {
     naturalidade: cleanVal(normalizedBody.naturalidade),
     uf_naturalidade: cleanVal(normalizedBody.uf_naturalidade),
     foto_url: cleanVal(normalizedBody.foto_url),
-    tipo_cadastro: 'membro',
+    tipo_cadastro: tipoCadastro,
+    role: role,
+    ...(cargoMinisterial ? { cargo_ministerial: cargoMinisterial } : {}),
     status: 'active',
     member_since: new Date().toISOString().split('T')[0],
   };

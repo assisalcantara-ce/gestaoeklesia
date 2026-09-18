@@ -42,6 +42,8 @@ interface CongregacaoOption {
 }
 
 interface MemberFormData {
+  tipo_cadastro: string;
+  cargo_ministerial: string;
   name: string;
   nome_pai: string;
   nome_mae: string;
@@ -73,6 +75,8 @@ interface MemberFormData {
 }
 
 const EMPTY_FORM: MemberFormData = {
+  tipo_cadastro: 'membro',
+  cargo_ministerial: '',
   name: '',
   nome_pai: '',
   nome_mae: '',
@@ -479,6 +483,8 @@ export default function PublicMemberPage({ params }: PageProps) {
         institution,
         congregacao_id: selectedCongregacaoId,
         cpf: cpf.replace(/\D/g, ''),
+        tipo_cadastro: formData.tipo_cadastro || 'membro',
+        cargo_ministerial: formData.tipo_cadastro === 'ministro' ? (formData.cargo_ministerial || null) : null,
         name: formData.name.trim(),
         nome_pai: formData.nome_pai.trim(),
         nome_mae: formData.nome_mae.trim(),
@@ -819,6 +825,64 @@ export default function PublicMemberPage({ params }: PageProps) {
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-[#123b63]">
                   <User className="h-4 w-4" />
                   <h3 className="text-sm font-bold uppercase tracking-wider">1. Dados Pessoais</h3>
+                </div>
+
+                {/* Seletor de Tipo de Cadastro: MEMBRO ou OBREIRO */}
+                <div className="bg-slate-50/90 p-4 rounded-xl border border-slate-200 space-y-3">
+                  <label className="block text-xs font-bold text-slate-800">
+                    Qual é o tipo de cadastro? <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, tipo_cadastro: 'membro', cargo_ministerial: '' }))}
+                      className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition text-center cursor-pointer ${
+                        formData.tipo_cadastro === 'membro'
+                          ? 'border-[#123b63] bg-blue-50/80 text-[#123b63] shadow-sm ring-1 ring-[#123b63]/20'
+                          : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      <User className="h-5 w-5 mb-1" />
+                      <span className="text-xs font-bold uppercase tracking-wide">MEMBRO</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, tipo_cadastro: 'ministro' }))}
+                      className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition text-center cursor-pointer ${
+                        formData.tipo_cadastro === 'ministro'
+                          ? 'border-[#123b63] bg-blue-50/80 text-[#123b63] shadow-sm ring-1 ring-[#123b63]/20'
+                          : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      <Church className="h-5 w-5 mb-1" />
+                      <span className="text-xs font-bold uppercase tracking-wide">OBREIRO</span>
+                    </button>
+                  </div>
+
+                  {/* Cargo Ministerial condicional para OBREIRO */}
+                  {formData.tipo_cadastro === 'ministro' && (
+                    <div className="pt-2 animate-in fade-in space-y-1.5 border-t border-slate-200/80">
+                      <label className="block text-xs font-bold text-slate-700">
+                        Cargo / Função Ministerial
+                      </label>
+                      <select
+                        value={formData.cargo_ministerial}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, cargo_ministerial: e.target.value }))}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none bg-white font-medium"
+                      >
+                        <option value="">Selecione seu cargo (Obreiro em Geral)</option>
+                        <option value="AUXILIAR">AUXILIAR</option>
+                        <option value="DIÁCONO">DIÁCONO</option>
+                        <option value="DIACONISA">DIACONISA</option>
+                        <option value="PRESBÍTERO">PRESBÍTERO</option>
+                        <option value="MISSIONÁRIO">MISSIONÁRIO</option>
+                        <option value="MISSIONÁRIA">MISSIONÁRIA</option>
+                        <option value="EVANGELISTA">EVANGELISTA</option>
+                        <option value="PASTOR">PASTOR</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 {/* Upload e Preview de Foto 3x4 */}
