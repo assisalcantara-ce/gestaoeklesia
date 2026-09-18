@@ -84,18 +84,22 @@ export function MobileMemberProvider({ children }: { children: React.ReactNode }
 
   // Busca os dados do membro autenticado via API
   const doFetch = useCallback(async (): Promise<void> => {
-    const {
-      data: { session },
-    } = await sbRef.current.auth.getSession();
-    const token = session?.access_token;
-    if (!token) {
-      setMember(null);
-      setIsLinked(false);
-      return;
+    let token: string | undefined;
+    try {
+      const {
+        data: { session },
+      } = await sbRef.current.auth.getSession();
+      token = session?.access_token;
+    } catch {}
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     const res = await fetch('/api/v1/mobile/member/me', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers,
+      credentials: 'include',
       cache: 'no-store',
     });
 

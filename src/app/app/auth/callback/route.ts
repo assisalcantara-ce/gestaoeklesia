@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
 
     // 3. Verifica vínculo com a tabela members usando service_role (autoridade do servidor)
     const admin = createAdminClient();
-    const { data: member, error: memberError } = await admin
+    let { data: member, error: memberError } = await admin
       .from('members')
       .select('id, status, ministry_id')
       .eq('auth_user_id', authUser.id)
@@ -119,7 +119,35 @@ export async function GET(request: NextRequest) {
       console.error('[MOBILE_AUTH_CALLBACK] Erro ao consultar vínculo de membro:', memberError);
     }
 
-    const redirectUrl = member && !memberError
+    // Se ainda não estiver vinculado por auth_user_id, vincular automaticamente pelo e-mail autenticado
+    if (!member && authUser.email) {
+      const cleanEmail = authUser.email.trim();
+      const { data: memberByEmail } = await admin
+        .from('members')
+        .select('id, status, ministry_id, auth_user_id')
+        .ilike('email', cleanEmail)
+        .eq('status', 'active')
+        .is('auth_user_id', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (memberByEmail) {
+        console.log('[MOBILE_AUTH_CALLBACK] ✅ Auto-vinculando membro por e-mail:', memberByEmail.id);
+        const { error: linkErr } = await admin
+          .from('members')
+          .update({ auth_user_id: authUser.id, updated_at: new Date().toISOString() })
+          .eq('id', memberByEmail.id);
+
+        if (!linkErr) {
+          member = memberByEmail;
+        } else {
+          console.error('[MOBILE_AUTH_CALLBACK] Erro ao auto-vincular membro:', linkErr);
+        }
+      }
+    }
+
+    const redirectUrl = member
       ? new URL('/app/inicio', request.url)
       : new URL('/app/vincular', request.url);
 

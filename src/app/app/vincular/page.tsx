@@ -10,6 +10,7 @@
  */
 
 import { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useMobileMember } from '@/providers/MobileMemberProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { createClient } from '@/lib/supabase-client';
@@ -18,6 +19,7 @@ import MobileHeader from '@/components/mobile/MobileHeader';
 import { Loader2, Link2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function VincularPage() {
+  const router = useRouter();
   const { refresh } = useMobileMember();
   const { user } = useAuth();
   const sbRef = useRef(createClient());
@@ -62,7 +64,9 @@ export default function VincularPage() {
       if (res.ok) {
         setSuccess(true);
         await refresh();
-        // O provider vai redirecionar automaticamente para /app/inicio
+        setTimeout(() => {
+          router.replace('/app/inicio');
+        }, 1000);
       } else {
         const code = data.code || data.error;
         switch (code) {
