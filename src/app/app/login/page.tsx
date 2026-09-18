@@ -1,31 +1,34 @@
 'use client';
 
 /**
- * /app/login — Login do membro via magic link (OTP)
+ * /app/login — Login do membro via CPF + Data de Nascimento
  *
- * Fluxo:
- * 1. Usuário informa e-mail
- * 2. Supabase envia magic link
- * 3. Usuário clica no link → retorna para /app → MobileMemberProvider redireciona
- *
- * Se o usuário já tiver sessão, o MobileMemberProvider redireciona automaticamente.
+ * Novo Fluxo Simplificado:
+ * 1. Usuário informa CPF + Data de nascimento
+ * 2. POST /api/v1/mobile/auth/request-access (Server-side)
+ * 3. Servidor localiza o membro ativo, gera Magic Link seguro e dispara via Resend
+ * 4. Resposta genérica protege contra enumeração de CPFs
+ * 5. Se não possuir e-mail cadastrado, orienta a procurar a Secretaria
+ * 6. Usuário clica no link do e-mail → /app/auth/callback → /app/inicio ou /app/vincular
  */
 
-import { useState, useRef, useEffect } from 'react';
-import { createClient } from '@/lib/supabase-client';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
 import { useRouter } from 'next/navigation';
-import { Mail, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
+import { formatCpf, formatData } from '@/lib/mascaras';
+import { Loader2, CheckCircle2, ArrowRight, ShieldCheck, AlertCircle, Info } from 'lucide-react';
 import Image from 'next/image';
 
 export default function MobileLoginPage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const sbRef = useRef(createClient());
 
-  const [email, setEmail] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [dataNascimento, setDataNascimento] = useState('');
   const [loading, setLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [warningMessage, setWarningMessage] = useState('');
   const [error, setError] = useState('');
 
   // Capturar mensagens de erro vindas de redirecionamentos do callback
@@ -39,7 +42,7 @@ export default function MobileLoginPage() {
     }
   }, []);
 
-  // Se já autenticado, deixa o provider/root redirecionar
+  // Se já autenticado, deixa o MobileMemberProvider redirecionar
   useEffect(() => {
     if (!authLoading && user) {
       router.replace('/app');
@@ -49,36 +52,48 @@ export default function MobileLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setWarningMessage('');
+    setSuccessMessage('');
 
-    const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail || !trimmedEmail.includes('@')) {
-      setError('Informe um e-mail válido.');
+    const cleanCpf = cpf.replace(/\D/g, '');
+    if (cleanCpf.length !== 11) {
+      setError('Informe um CPF válido com 11 dígitos.');
+      return;
+    }
+
+    if (!dataNascimento || dataNascimento.length < 10) {
+      setError('Informe uma data de nascimento válida (DD/MM/AAAA).');
       return;
     }
 
     setLoading(true);
     try {
-      const origin = typeof window !== 'undefined' && window.location.origin
-        ? window.location.origin
-        : (process.env.NEXT_PUBLIC_APP_URL || 'https://www.gestaoeklesia.com.br');
-
-      const { error: otpError } = await sbRef.current.auth.signInWithOtp({
-        email: trimmedEmail,
-        options: {
-          emailRedirectTo: `${origin}/app/auth/callback`,
-          shouldCreateUser: true,
+      const res = await fetch('/api/v1/mobile/auth/request-access', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          cpf: cleanCpf,
+          data_nascimento: dataNascimento,
+        }),
       });
 
-      if (otpError) {
-        console.error('[MOBILE_LOGIN] Erro signInWithOtp:', otpError);
-        setError('Não foi possível enviar o link. Verifique o e-mail e tente novamente.');
-      } else {
-        setEmailSent(true);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Não foi possível solicitar o acesso. Tente novamente.');
+        return;
       }
-    } catch (err) {
-      console.error('[MOBILE_LOGIN] Erro ao conectar:', err);
-      setError('Erro ao conectar. Tente novamente.');
+
+      if (data.code === 'NO_EMAIL') {
+        setWarningMessage(data.message || 'Seu cadastro não possui e-mail cadastrado. Por favor, procure a Secretaria da sua igreja.');
+      } else {
+        setSuccessMessage(data.message || 'Se os dados estiverem corretos e houver um e-mail cadastrado, enviaremos um link de acesso.');
+        setSubmitted(true);
+      }
+    } catch {
+      setError('Erro de conexão. Verifique sua internet e tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -117,86 +132,118 @@ export default function MobileLoginPage() {
         <div className="w-full bg-[#111827] rounded-3xl border border-slate-800/80 shadow-2xl p-6 sm:p-7 relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600" />
 
-          {emailSent ? (
+          {submitted ? (
             <div className="flex flex-col items-center gap-4 py-2">
               <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
                 <CheckCircle2 size={32} />
               </div>
-              <div className="text-center">
-                <h2 className="text-lg font-bold text-white">Link enviado!</h2>
-                <p className="text-slate-300 text-xs leading-relaxed mt-2">
-                  Enviamos um link de acesso seguro para o e-mail:
-                  <br />
-                  <strong className="text-blue-400 font-semibold">{email}</strong>
+              <div className="text-center space-y-2">
+                <h2 className="text-lg font-bold text-white">Solicitação enviada!</h2>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  {successMessage}
                 </p>
-                <p className="text-slate-400 text-[11px] mt-3">
-                  Abra seu aplicativo de e-mail e clique no link para entrar automaticamente.
-                </p>
+                <div className="p-3.5 rounded-xl bg-[#172033] border border-slate-800 text-left text-xs text-slate-400 space-y-1 mt-3">
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-300">
+                    <ShieldCheck className="h-4 w-4 text-blue-400 shrink-0" />
+                    <span>Próximo passo:</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-normal">
+                    Abra seu aplicativo de e-mail e toque no botão <strong>“Entrar no Aplicativo”</strong> para acessar sua conta instantaneamente.
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => {
-                  setEmailSent(false);
-                  setEmail('');
+                  setSubmitted(false);
+                  setCpf('');
+                  setDataNascimento('');
+                  setSuccessMessage('');
+                  setError('');
+                  setWarningMessage('');
                 }}
-                className="mt-2 text-xs font-semibold text-blue-400 hover:text-blue-300 underline underline-offset-4 active:scale-95 transition"
+                className="mt-2 text-xs font-semibold text-blue-400 hover:text-blue-300 underline underline-offset-4 active:scale-95 transition cursor-pointer"
               >
-                Usar outro e-mail
+                Tentar novamente com outros dados
               </button>
             </div>
           ) : (
             <>
               <div className="mb-6">
-                <h2 className="text-base font-bold text-white">Entrar com e-mail</h2>
+                <h2 className="text-base font-bold text-white">Acesse seu aplicativo</h2>
                 <p className="text-slate-400 text-xs mt-1">
-                  Digite seu e-mail cadastrado para receber um link de acesso instantâneo sem precisar de senha.
+                  Informe seu CPF e data de nascimento para localizarmos seu cadastro e enviar seu link de acesso seguro.
                 </p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label
-                    htmlFor="email"
-                    className="block text-xs font-semibold text-slate-300 mb-1.5"
+                    htmlFor="cpf"
+                    className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5"
                   >
-                    E-mail do Membro
+                    CPF
                   </label>
-                  <div className="relative">
-                    <Mail
-                      size={16}
-                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                    />
-                    <input
-                      id="email"
-                      type="email"
-                      autoComplete="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="seu.email@exemplo.com"
-                      className="w-full pl-10 pr-4 py-3 bg-[#172033] border border-slate-800 rounded-xl text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
-                      required
-                    />
-                  </div>
+                  <input
+                    id="cpf"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="username"
+                    value={cpf}
+                    onChange={(e) => setCpf(formatCpf(e.target.value))}
+                    placeholder="000.000.000-00"
+                    maxLength={14}
+                    className="w-full px-4 py-3 bg-[#172033] border border-slate-800 rounded-xl text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition font-mono tracking-wide"
+                    required
+                  />
                 </div>
 
+                <div>
+                  <label
+                    htmlFor="dataNascimento"
+                    className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5"
+                  >
+                    Data de nascimento
+                  </label>
+                  <input
+                    id="dataNascimento"
+                    type="text"
+                    inputMode="numeric"
+                    value={dataNascimento}
+                    onChange={(e) => setDataNascimento(formatData(e.target.value))}
+                    placeholder="DD/MM/AAAA"
+                    maxLength={10}
+                    className="w-full px-4 py-3 bg-[#172033] border border-slate-800 rounded-xl text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition font-mono tracking-wide"
+                    required
+                  />
+                </div>
+
+                {warningMessage && (
+                  <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs p-3.5 rounded-xl">
+                    <Info size={16} className="shrink-0 mt-0.5 text-amber-400" />
+                    <span>{warningMessage}</span>
+                  </div>
+                )}
+
                 {error && (
-                  <p className="text-rose-400 text-xs bg-rose-950/40 border border-rose-900/50 px-3.5 py-2.5 rounded-xl">
-                    {error}
-                  </p>
+                  <div className="flex items-start gap-2.5 bg-rose-950/40 border border-rose-900/50 text-rose-300 text-xs p-3.5 rounded-xl">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-400" />
+                    <span>{error}</span>
+                  </div>
                 )}
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full min-h-[46px] bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-[0.98] transition disabled:opacity-50"
+                  className="w-full min-h-[46px] bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-[0.98] transition disabled:opacity-50 cursor-pointer"
                 >
                   {loading ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      <span>Enviando link seguro...</span>
+                      <span>Verificando cadastro...</span>
                     </>
                   ) : (
                     <>
-                      <span>Receber link de acesso</span>
+                      <span>Continuar</span>
                       <ArrowRight size={15} />
                     </>
                   )}

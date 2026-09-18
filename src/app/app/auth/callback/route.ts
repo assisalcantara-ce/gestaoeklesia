@@ -8,28 +8,31 @@ export const dynamic = 'force-dynamic';
 /**
  * /app/auth/callback — Callback oficial de autenticação do Portal do Membro
  *
- * Fluxo:
- * 1. Recebe 'code' do Supabase Auth (PKCE)
- * 2. Troca o código por uma sessão Supabase e grava os cookies HTTP seguros via @supabase/ssr
- * 3. Consulta se o usuário autenticado (auth.uid()) já possui vínculo na tabela 'members' (members.auth_user_id)
- * 4. Redirecionamento:
- *    - Usuário autenticado + Membro vinculado     → /app/inicio
- *    - Usuário autenticado + Membro NÃO vinculado → /app/vincular
- *    - Erro na troca de código / código inválido  → /app/login?error=...
+ * Suporta:
+ * 1. `token_hash` + `type`: Magic Link gerado server-side via Supabase Admin (imune a erros de PKCE)
+ * 2. `code`: Fluxo tradicional de troca PKCE via exchangeCodeForSession
+ *
+ * Após estabelecer a sessão em cookies HTTP seguros (@supabase/ssr):
+ * - Se o usuário já tiver vínculo oficial em `members.auth_user_id` → redireciona para `/app/inicio`
+ * - Se não tiver vínculo → redireciona para `/app/vincular`
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
+  const tokenHash = searchParams.get('token_hash');
+  const type = searchParams.get('type');
   const code = searchParams.get('code');
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
   console.log('[MOBILE_AUTH_CALLBACK] Recebido callback mobile:', {
+    hasTokenHash: !!tokenHash,
     hasCode: !!code,
+    type,
     error,
     errorDescription,
   });
 
-  if (error || !code) {
+  if (error || (!tokenHash && !code)) {
     const msg = errorDescription || error || 'Link de acesso inválido ou expirado. Por favor, solicite um novo link.';
     return NextResponse.redirect(
       new URL(`/app/login?error=${encodeURIComponent(msg)}`, request.url)
@@ -57,27 +60,55 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // 1. Troca o código PKCE por sessão Supabase (grava cookies)
-    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    let authUser = null;
 
-    if (exchangeError || !data?.user) {
-      console.error('[MOBILE_AUTH_CALLBACK] Falha na troca de código por sessão:', exchangeError);
+    // 1. Se recebemos token_hash (Magic Link gerado server-side)
+    if (tokenHash) {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: (type as any) || 'magiclink',
+      });
+
+      if (verifyError || !data?.user) {
+        console.error('[MOBILE_AUTH_CALLBACK] Falha na verificação de OTP/Magic Link:', verifyError);
+        return NextResponse.redirect(
+          new URL(
+            `/app/login?error=${encodeURIComponent(verifyError?.message || 'Link de acesso expirado ou inválido. Solicite um novo link.')}`,
+            request.url
+          )
+        );
+      }
+      authUser = data.user;
+    } else if (code) {
+      // 2. Se recebemos code (PKCE do Supabase Auth)
+      const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+      if (exchangeError || !data?.user) {
+        console.error('[MOBILE_AUTH_CALLBACK] Falha na troca de código por sessão:', exchangeError);
+        return NextResponse.redirect(
+          new URL(
+            `/app/login?error=${encodeURIComponent(exchangeError?.message || 'Não foi possível validar seu acesso. Solicite um novo link.')}`,
+            request.url
+          )
+        );
+      }
+      authUser = data.user;
+    }
+
+    if (!authUser) {
       return NextResponse.redirect(
-        new URL(
-          `/app/login?error=${encodeURIComponent(exchangeError?.message || 'Não foi possível validar seu acesso. Solicite um novo link.')}`,
-          request.url
-        )
+        new URL('/app/login?error=Não+foi+possível+identificar+o+usuário+autenticado.', request.url)
       );
     }
 
-    console.log('[MOBILE_AUTH_CALLBACK] ✅ Sessão Supabase estabelecida para:', data.user.email);
+    console.log('[MOBILE_AUTH_CALLBACK] ✅ Sessão Supabase estabelecida para:', authUser.email);
 
-    // 2. Verifica vínculo com a tabela members usando service_role (autoridade do servidor)
+    // 3. Verifica vínculo com a tabela members usando service_role (autoridade do servidor)
     const admin = createAdminClient();
     const { data: member, error: memberError } = await admin
       .from('members')
-      .select('id, status')
-      .eq('auth_user_id', data.user.id)
+      .select('id, status, ministry_id')
+      .eq('auth_user_id', authUser.id)
       .maybeSingle();
 
     if (memberError) {
