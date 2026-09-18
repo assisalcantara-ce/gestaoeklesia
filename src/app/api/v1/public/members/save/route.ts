@@ -50,11 +50,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { institution, cpf } = body;
+  const { institution, congregacao_id, cpf } = body;
 
   if (!institution || typeof institution !== 'string' || !institution.trim()) {
     return NextResponse.json(
       { error: 'Identificador da instituição é obrigatório.' },
+      { status: 400 }
+    );
+  }
+
+  if (!congregacao_id || typeof congregacao_id !== 'string' || !congregacao_id.trim()) {
+    return NextResponse.json(
+      { error: 'A seleção da congregação é obrigatória.' },
       { status: 400 }
     );
   }
@@ -95,7 +102,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!ministry.is_active) {
+  if (ministry.is_active === false) {
     return NextResponse.json(
       { error: 'Cadastro público suspenso para esta instituição.' },
       { status: 403 }
@@ -104,17 +111,71 @@ export async function POST(request: NextRequest) {
 
   const ministryId = ministry.id;
 
-  // ── 4. Normalizar os textos da requisição (preservando emails, datas e foto_url) ──────
+  // ── 4. Validar se a congregação pertence estritamente ao tenant no servidor ──
+  const { data: validCong } = await admin
+    .from('congregacoes')
+    .select('id')
+    .eq('id', congregacao_id.trim())
+    .eq('ministry_id', ministryId)
+    .maybeSingle();
+
+  if (!validCong) {
+    const { data: validSup } = await admin
+      .from('supervisoes')
+      .select('id')
+      .eq('id', congregacao_id.trim())
+      .eq('ministry_id', ministryId)
+      .maybeSingle();
+
+    if (!validSup) {
+      return NextResponse.json(
+        { error: 'Congregação inválida para esta instituição.' },
+        { status: 400 }
+      );
+    }
+  }
+
+  // ── 5. Normalizar os textos da requisição (preservando emails, datas e foto_url) ──────
   const normalizedBody = normalizePayloadToUppercase(body, {
     preserveKeys: [
       'email',
       'data_nascimento',
       'data_nascimento_conjuge',
+      'data_batismo_aguas',
       'foto_url',
     ],
   }) as Record<string, any>;
 
-  // ── 5. Buscar se o membro já existe no ministério ──────────────────────────
+  // ── 6. Validação dos Campos Obrigatórios ──────────────────────────────────
+  if (!normalizedBody.name || typeof normalizedBody.name !== 'string' || !normalizedBody.name.trim()) {
+    return NextResponse.json(
+      { error: 'Nome completo é obrigatório.' },
+      { status: 400 }
+    );
+  }
+
+  if (!normalizedBody.nome_pai || typeof normalizedBody.nome_pai !== 'string' || !normalizedBody.nome_pai.trim()) {
+    return NextResponse.json(
+      { error: 'Nome do Pai é obrigatório.' },
+      { status: 400 }
+    );
+  }
+
+  if (!normalizedBody.nome_mae || typeof normalizedBody.nome_mae !== 'string' || !normalizedBody.nome_mae.trim()) {
+    return NextResponse.json(
+      { error: 'Nome da Mãe é obrigatório.' },
+      { status: 400 }
+    );
+  }
+
+  if (!normalizedBody.data_batismo_aguas || typeof normalizedBody.data_batismo_aguas !== 'string' || !normalizedBody.data_batismo_aguas.trim()) {
+    return NextResponse.json(
+      { error: 'Data de Batismo é obrigatória.' },
+      { status: 400 }
+    );
+  }
+
+  // ── 7. Buscar se o membro já existe no ministério ──────────────────────────
   const formattedCpf = `${cleanCpf.slice(0, 3)}.${cleanCpf.slice(3, 6)}.${cleanCpf.slice(6, 9)}-${cleanCpf.slice(9)}`;
 
   const { data: existingMember } = await admin
@@ -131,10 +192,14 @@ export async function POST(request: NextRequest) {
     return val;
   };
 
-  // ── 6. LÓGICA DE UPDATE (Membro já existente) ──────────────────────────────
+  // ── 8. LÓGICA DE UPDATE (Membro já existente) ──────────────────────────────
   if (existingMember) {
-    // Para membro existente, montar o payload contendo EXCLUSIVAMENTE os campos públicos permitidos
     const updatePayload: Record<string, any> = {
+      congregacao_id: congregacao_id.trim(),
+      nome_pai: normalizedBody.nome_pai.trim(),
+      nome_mae: normalizedBody.nome_mae.trim(),
+      rg: cleanVal(normalizedBody.rg),
+      data_batismo_aguas: cleanVal(normalizedBody.data_batismo_aguas),
       email: typeof normalizedBody.email === 'string' && normalizedBody.email.trim() ? normalizedBody.email.toLowerCase().trim() : null,
       phone: cleanVal(normalizedBody.phone),
       celular: cleanVal(normalizedBody.celular),
@@ -157,7 +222,7 @@ export async function POST(request: NextRequest) {
       nacionalidade: cleanVal(normalizedBody.nacionalidade),
       naturalidade: cleanVal(normalizedBody.naturalidade),
       uf_naturalidade: cleanVal(normalizedBody.uf_naturalidade),
-      foto_url: cleanVal(normalizedBody.foto_url),
+      ...(normalizedBody.foto_url ? { foto_url: cleanVal(normalizedBody.foto_url) } : {}),
       updated_at: new Date().toISOString(),
     };
 
@@ -182,8 +247,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // ── 7. LÓGICA DE INSERT (Novo membro) ──────────────────────────────────────
-  // Verificar limite do plano da instituição antes de cadastrar novo membro
+  // ── 9. LÓGICA DE INSERT (Novo membro) ──────────────────────────────────────
   const planData = (ministry as any)?.subscription_plans;
   const maxMembers: number = planData?.max_members ?? 0;
 
@@ -201,18 +265,15 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Nome é obrigatório para novo cadastro
-  if (!normalizedBody.name || typeof normalizedBody.name !== 'string' || !normalizedBody.name.trim()) {
-    return NextResponse.json(
-      { error: 'Nome completo é obrigatório para novos cadastros.' },
-      { status: 400 }
-    );
-  }
-
   const insertPayload: Record<string, any> = {
     ministry_id: ministryId,
+    congregacao_id: congregacao_id.trim(),
     name: normalizedBody.name.trim(),
     cpf: cleanCpf,
+    nome_pai: normalizedBody.nome_pai.trim(),
+    nome_mae: normalizedBody.nome_mae.trim(),
+    rg: cleanVal(normalizedBody.rg),
+    data_batismo_aguas: cleanVal(normalizedBody.data_batismo_aguas),
     email: typeof normalizedBody.email === 'string' && normalizedBody.email.trim() ? normalizedBody.email.toLowerCase().trim() : null,
     phone: cleanVal(normalizedBody.phone),
     celular: cleanVal(normalizedBody.celular),
@@ -247,7 +308,6 @@ export async function POST(request: NextRequest) {
 
   if (insertErr) {
     console.error('[POST /api/v1/public/members/save] Insert error:', insertErr);
-    // Tratar erro de duplicidade de unicidade (se porventura 2 submits forem concorrentes)
     if (insertErr.code === '23505' || insertErr.message.includes('unique')) {
       return NextResponse.json(
         { error: 'Este CPF já foi cadastrado nesta instituição.' },

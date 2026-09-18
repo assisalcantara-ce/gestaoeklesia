@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useState, useEffect, use } from 'react';
 import {
   UserCheck,
   UserPlus,
@@ -10,9 +10,7 @@ import {
   Loader2,
   Building2,
   ArrowLeft,
-  Lock,
   Phone,
-  Mail,
   MapPin,
   Heart,
   Briefcase,
@@ -27,6 +25,9 @@ import {
   Check,
   Crop,
   X,
+  Church,
+  ShieldCheck,
+  FileText,
 } from 'lucide-react';
 
 interface PageProps {
@@ -35,8 +36,17 @@ interface PageProps {
   }>;
 }
 
+interface CongregacaoOption {
+  id: string;
+  nome: string;
+}
+
 interface MemberFormData {
   name: string;
+  nome_pai: string;
+  nome_mae: string;
+  rg: string;
+  data_batismo_aguas: string;
   email: string;
   phone: string;
   celular: string;
@@ -64,6 +74,10 @@ interface MemberFormData {
 
 const EMPTY_FORM: MemberFormData = {
   name: '',
+  nome_pai: '',
+  nome_mae: '',
+  rg: '',
+  data_batismo_aguas: '',
   email: '',
   phone: '',
   celular: '',
@@ -114,15 +128,21 @@ function formatCep(val: string) {
 export default function PublicMemberPage({ params }: PageProps) {
   const { institution } = use(params);
 
-  // Estados principais da página
-  const [cpf, setCpf] = useState('');
-  const [stage, setStage] = useState<'search' | 'form' | 'success'>('search');
-  const [isExisting, setIsExisting] = useState(false);
+  // Estados institucionais (carregados via /info)
+  const [loadingInfo, setLoadingInfo] = useState(true);
   const [institutionName, setInstitutionName] = useState<string>('');
-  
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [congregacoes, setCongregacoes] = useState<CongregacaoOption[]>([]);
+
+  // Fluxo em 4 etapas: welcome -> congregacao -> cpf -> form -> success
+  const [stage, setStage] = useState<'welcome' | 'congregacao' | 'cpf' | 'form' | 'success'>('welcome');
+  const [selectedCongregacaoId, setSelectedCongregacaoId] = useState<string>('');
+  const [cpf, setCpf] = useState('');
+  const [isExisting, setIsExisting] = useState(false);
+
   // Form State
   const [formData, setFormData] = useState<MemberFormData>(EMPTY_FORM);
-  
+
   // Feedback States
   const [checking, setChecking] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -139,6 +159,38 @@ export default function PublicMemberPage({ params }: PageProps) {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  // Carregar dados institucionais e congregações da instituição
+  useEffect(() => {
+    let active = true;
+    async function fetchInfo() {
+      try {
+        setLoadingInfo(true);
+        const res = await fetch(`/api/v1/public/members/info?institution=${encodeURIComponent(institution)}`);
+        const data = await res.json();
+        if (!active) return;
+        if (res.ok) {
+          setInstitutionName(data.institution_name || '');
+          setLogoUrl(data.logo_url || null);
+          const congs = Array.isArray(data.congregacoes) ? data.congregacoes : [];
+          setCongregacoes(congs);
+          if (congs.length === 1) {
+            setSelectedCongregacaoId(congs[0].id);
+          }
+        } else {
+          setErrorMessage(data.error || 'Instituição não encontrada.');
+        }
+      } catch {
+        if (active) setErrorMessage('Erro ao carregar dados da instituição.');
+      } finally {
+        if (active) setLoadingInfo(false);
+      }
+    }
+    fetchInfo();
+    return () => {
+      active = false;
+    };
+  }, [institution]);
 
   // Selecionar arquivo de foto para iniciar o ajuste/corte
   const handleSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -166,11 +218,10 @@ export default function PublicMemberPage({ params }: PageProps) {
       }
     };
     reader.readAsDataURL(file);
-    // Reset do input file para permitir selecionar o mesmo arquivo novamente
     e.target.value = '';
   };
 
-  // Funções de interação de Pan/Arrastar na foto
+  // Funções de Pan / Arrastar
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -189,7 +240,6 @@ export default function PublicMemberPage({ params }: PageProps) {
     setIsDragging(false);
   };
 
-  // Suporte a Touch para Smartphones (Mobile-first)
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
       const touch = e.touches[0];
@@ -213,7 +263,7 @@ export default function PublicMemberPage({ params }: PageProps) {
     setZoom((prev) => Math.min(Math.max(prev + delta, 1), 3.5));
   };
 
-  // Gerar o Canvas final enquadrado (300x400 px padrão 3x4) e subir para o storage
+  // Crop & Upload
   const handleConfirmCropAndUpload = async () => {
     if (!fotoOriginal) return;
 
@@ -225,7 +275,6 @@ export default function PublicMemberPage({ params }: PageProps) {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Resolução padrão do avatar/credencial (300x400 px)
       const targetWidth = 360;
       const targetHeight = 480;
       canvas.width = targetWidth;
@@ -239,32 +288,21 @@ export default function PublicMemberPage({ params }: PageProps) {
         img.src = fotoOriginal;
       });
 
-      // Fundo neutro
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, targetWidth, targetHeight);
 
       ctx.save();
-      // Mover origem para o centro do canvas (180, 240)
       ctx.translate(targetWidth / 2, targetHeight / 2);
       ctx.rotate((rotation * Math.PI) / 180);
 
-      // Proporção de escala cover da imagem para caber no Canvas de 360x480 (3:4):
       const canvasCoverScale = Math.max(targetWidth / img.width, targetHeight / img.height);
-
-      // Largura e altura desenhadas com zoom
       const drawWidth = img.width * canvasCoverScale * zoom;
       const drawHeight = img.height * canvasCoverScale * zoom;
 
-      // Na preview, a div tem 224px de largura e o canvas tem 360px.
-      // O fator de escala dos controles em relação ao canvas é (360 / 224)
       const scaleFactor = targetWidth / 224;
-
-      // No CSS transform, quando a imagem está rotacionada ou ampliada (scale(zoom)),
-      // o translateX e translateY aplicados em pixels do preview são multiplicados pelo fator de tela e pelo zoom da imagem.
       const offsetX = position.x * scaleFactor;
       const offsetY = position.y * scaleFactor;
 
-      // Desenhar centralizado com o deslocamento exato
       ctx.drawImage(
         img,
         -drawWidth / 2 + offsetX,
@@ -274,7 +312,6 @@ export default function PublicMemberPage({ params }: PageProps) {
       );
       ctx.restore();
 
-      // Converter o canvas processado para Blob PNG/JPEG
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92)
       );
@@ -284,7 +321,6 @@ export default function PublicMemberPage({ params }: PageProps) {
         return;
       }
 
-      // Enviar Blob via FormData para a API pública
       const formDataUpload = new FormData();
       formDataUpload.append('file', blob, 'foto-membro.jpg');
       formDataUpload.append('institution', institution);
@@ -316,7 +352,7 @@ export default function PublicMemberPage({ params }: PageProps) {
     }
   };
 
-  // Mascarar CPF no input
+  // Mascarar CPF
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCpf(formatCpf(e.target.value));
     setErrorMessage(null);
@@ -341,18 +377,34 @@ export default function PublicMemberPage({ params }: PageProps) {
         }));
       }
     } catch {
-      // Ignora falha de busca de CEP e permite preenchimento manual
+      // Permite preenchimento manual
     } finally {
       setSearchingCep(false);
     }
   };
 
-  // Passo 1: Verificar CPF na API pública
+  // Etapa 2 -> Etapa 3
+  const handleProceedCongregacao = () => {
+    if (!selectedCongregacaoId) {
+      setErrorMessage('Selecione a congregação à qual você pertence.');
+      return;
+    }
+    setErrorMessage(null);
+    setStage('cpf');
+  };
+
+  // Etapa 3: Verificar CPF via /check
   const handleCheckCpf = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCpf = cpf.replace(/\D/g, '');
     if (cleanCpf.length !== 11) {
       setErrorMessage('Informe um CPF válido com 11 dígitos.');
+      return;
+    }
+
+    if (!selectedCongregacaoId) {
+      setErrorMessage('Selecione a sua congregação antes de prosseguir.');
+      setStage('congregacao');
       return;
     }
 
@@ -365,6 +417,7 @@ export default function PublicMemberPage({ params }: PageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           institution,
+          congregacao_id: selectedCongregacaoId,
           cpf: cleanCpf,
         }),
       });
@@ -380,39 +433,7 @@ export default function PublicMemberPage({ params }: PageProps) {
         setInstitutionName(json.institution_name);
       }
 
-      if (json.exists && json.data) {
-        setIsExisting(true);
-        setFormData({
-          name: json.data.name || '',
-          email: json.data.email || '',
-          phone: json.data.phone ? formatPhone(json.data.phone) : '',
-          celular: json.data.celular ? formatPhone(json.data.celular) : '',
-          whatsapp: json.data.whatsapp ? formatPhone(json.data.whatsapp) : '',
-          data_nascimento: json.data.data_nascimento || '',
-          sexo: json.data.sexo || '',
-          estado_civil: json.data.estado_civil || '',
-          nome_conjuge: json.data.nome_conjuge || '',
-          cpf_conjuge: json.data.cpf_conjuge ? formatCpf(json.data.cpf_conjuge) : '',
-          data_nascimento_conjuge: json.data.data_nascimento_conjuge || '',
-          profissao: json.data.profissao || '',
-          cep: json.data.cep ? formatCep(json.data.cep) : '',
-          logradouro: json.data.logradouro || '',
-          numero: json.data.numero || '',
-          bairro: json.data.bairro || '',
-          complemento: json.data.complemento || '',
-          cidade: json.data.cidade || '',
-          estado: json.data.estado || '',
-          escolaridade: json.data.escolaridade || '',
-          nacionalidade: json.data.nacionalidade || '',
-          naturalidade: json.data.naturalidade || '',
-          uf_naturalidade: json.data.uf_naturalidade || '',
-          foto_url: json.data.foto_url || '',
-        });
-      } else {
-        setIsExisting(false);
-        setFormData(EMPTY_FORM);
-      }
-
+      setIsExisting(!!json.exists);
       setStage('form');
     } catch (err: any) {
       setErrorMessage(err?.message || 'Erro de conexão ao servidor.');
@@ -421,12 +442,32 @@ export default function PublicMemberPage({ params }: PageProps) {
     }
   };
 
-  // Passo 2: Salvar ou Atualizar Dados na API pública
+  // Etapa 4: Salvar ou Atualizar Dados na API pública
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!isExisting && !formData.name.trim()) {
-      setErrorMessage('Nome completo é obrigatório para novos cadastros.');
+
+    if (!formData.name.trim()) {
+      setErrorMessage('Nome completo é obrigatório.');
+      return;
+    }
+
+    if (!formData.nome_pai.trim()) {
+      setErrorMessage('Nome do Pai é obrigatório.');
+      return;
+    }
+
+    if (!formData.nome_mae.trim()) {
+      setErrorMessage('Nome da Mãe é obrigatório.');
+      return;
+    }
+
+    if (!formData.data_batismo_aguas) {
+      setErrorMessage('Data de Batismo é obrigatória.');
+      return;
+    }
+
+    if (!selectedCongregacaoId) {
+      setErrorMessage('Selecione a congregação.');
       return;
     }
 
@@ -436,8 +477,13 @@ export default function PublicMemberPage({ params }: PageProps) {
 
       const payload = {
         institution,
+        congregacao_id: selectedCongregacaoId,
         cpf: cpf.replace(/\D/g, ''),
         name: formData.name.trim(),
+        nome_pai: formData.nome_pai.trim(),
+        nome_mae: formData.nome_mae.trim(),
+        rg: formData.rg.trim(),
+        data_batismo_aguas: formData.data_batismo_aguas,
         email: formData.email.trim(),
         phone: formData.phone.replace(/\D/g, ''),
         celular: formData.celular.replace(/\D/g, ''),
@@ -494,17 +540,29 @@ export default function PublicMemberPage({ params }: PageProps) {
     setFormData(EMPTY_FORM);
     setErrorMessage(null);
     setSuccessMessage('');
-    setStage('search');
+    setStage('welcome');
   };
+
+  const selectedCongregacaoNome = congregacoes.find((c) => c.id === selectedCongregacaoId)?.nome || '';
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-between py-6 px-4 sm:px-6 font-sans">
       <div className="max-w-md w-full mx-auto space-y-6">
         
-        {/* Cabeçalho da Marca Gestão Eklésia / Instituição */}
+        {/* Cabeçalho Institucional com Logo Dinâmica do Tenant */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-[#123b63] text-white shadow-lg shadow-[#123b63]/20 mb-1">
-            <Building2 className="h-7 w-7" />
+          <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-white border border-slate-200 shadow-md p-1.5 mb-1 mx-auto overflow-hidden">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={institutionName || 'Logo'}
+                className="h-full w-full object-contain rounded-xl"
+              />
+            ) : (
+              <div className="h-full w-full rounded-xl bg-[#123b63] text-white flex items-center justify-center">
+                <Building2 className="h-7 w-7 text-white" />
+              </div>
+            )}
           </div>
           <h1 className="text-xl font-bold text-slate-800 tracking-tight">
             {institutionName || 'Gestão Eklésia'}
@@ -522,13 +580,139 @@ export default function PublicMemberPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* TELA 1: CONSULTA DE CPF */}
-        {stage === 'search' && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-6 space-y-5">
+        {/* ETAPA 1: BOAS-VINDAS */}
+        {stage === 'welcome' && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-6 sm:p-8 space-y-6 text-center animate-in fade-in">
+            <div className="space-y-3">
+              <div className="inline-flex p-3 rounded-full bg-blue-50 text-[#123b63] border border-blue-100">
+                <Church className="h-8 w-8" />
+              </div>
+              <h2 className="text-xl font-extrabold text-slate-800">
+                Bem-vindo ao seu Cadastro
+              </h2>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Este formulário é utilizado pela secretaria da <strong className="text-slate-800">{institutionName || 'igreja'}</strong> para atualização ou inclusão dos seus dados na base oficial de membros.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-left space-y-2 text-xs text-slate-600">
+              <div className="flex items-center gap-2 font-semibold text-slate-700">
+                <ShieldCheck className="h-4 w-4 text-teal-600" />
+                <span>Cadastro Seguro e Confidencial</span>
+              </div>
+              <p>
+                Suas informações serão armazenadas de forma segura e utilizadas estritamente para o registro eclesiástico oficial.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              disabled={loadingInfo}
+              onClick={() => {
+                setErrorMessage(null);
+                setStage('congregacao');
+              }}
+              className="w-full py-3.5 px-4 bg-[#123b63] hover:bg-[#0d2a47] text-white font-bold rounded-xl shadow-lg shadow-[#123b63]/25 active:scale-[0.99] transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+            >
+              {loadingInfo ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Carregando informações...
+                </>
+              ) : (
+                <>
+                  Começar Cadastro
+                  <Sparkles className="h-4 w-4" />
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* ETAPA 2: CONGREGAÇÃO */}
+        {stage === 'congregacao' && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-6 space-y-5 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMessage(null);
+                  setStage('welcome');
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar
+              </button>
+              <span className="text-xs font-semibold text-slate-400">Passo 1 de 3</span>
+            </div>
+
             <div className="space-y-1 text-center">
-              <h2 className="text-lg font-bold text-slate-800">Identificação do Membro</h2>
+              <h2 className="text-lg font-bold text-slate-800">
+                Qual congregação você pertence?
+              </h2>
               <p className="text-xs text-slate-500">
-                Informe o seu CPF para iniciar ou atualizar o seu cadastro na igreja.
+                Selecione a sua congregação pertencente a {institutionName || 'esta igreja'}.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  Congregação *
+                </label>
+                <select
+                  value={selectedCongregacaoId}
+                  onChange={(e) => {
+                    setSelectedCongregacaoId(e.target.value);
+                    setErrorMessage(null);
+                  }}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 text-slate-800 text-sm font-medium outline-none transition bg-white"
+                >
+                  <option value="">-- Selecione sua congregação --</option>
+                  {congregacoes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                disabled={!selectedCongregacaoId}
+                onClick={handleProceedCongregacao}
+                className="w-full py-3.5 px-4 bg-[#123b63] hover:bg-[#0d2a47] text-white font-bold rounded-xl shadow-lg shadow-[#123b63]/25 active:scale-[0.99] transition flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Continuar
+                <Sparkles className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ETAPA 3: CPF */}
+        {stage === 'cpf' && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-6 space-y-5 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMessage(null);
+                  setStage('congregacao');
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar
+              </button>
+              <span className="text-xs font-semibold text-slate-400">Passo 2 de 3</span>
+            </div>
+
+            <div className="space-y-1 text-center">
+              <h2 className="text-lg font-bold text-slate-800">Identificação por CPF</h2>
+              <p className="text-xs text-slate-500">
+                Informe o seu CPF para identificarmos seu cadastro na congregação <strong className="text-slate-700">{selectedCongregacaoNome}</strong>.
               </p>
             </div>
 
@@ -560,11 +744,11 @@ export default function PublicMemberPage({ params }: PageProps) {
                 {checking ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    Consultando CPF...
+                    Consultando...
                   </>
                 ) : (
                   <>
-                    Continuar
+                    Avançar para o Formulário
                     <Sparkles className="h-4 w-4" />
                   </>
                 )}
@@ -579,10 +763,26 @@ export default function PublicMemberPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* TELA 2: FORMULÁRIO DE CADASTRO OU ATUALIZAÇÃO */}
+        {/* ETAPA 4: FORMULÁRIO DE CADASTRO OU ATUALIZAÇÃO */}
         {stage === 'form' && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-5 space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-5 space-y-6 animate-in fade-in">
             
+            {/* Header de navegação e resumo */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMessage(null);
+                  setStage('cpf');
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Alterar CPF / Congregação
+              </button>
+              <span className="text-xs font-semibold text-slate-400">Passo 3 de 3</span>
+            </div>
+
             {/* Banner de status do CPF */}
             <div className={`p-3.5 rounded-xl border flex items-center justify-between text-xs font-semibold ${
               isExisting 
@@ -596,71 +796,56 @@ export default function PublicMemberPage({ params }: PageProps) {
                   <UserPlus className="h-4 w-4 text-blue-600 shrink-0" />
                 )}
                 <span>
-                  {isExisting ? 'Cadastro localizado!' : 'Novo cadastro'}
+                  {isExisting
+                    ? 'Cadastro localizado. Preencha seus dados para atualizar sua ficha.'
+                    : 'Vamos iniciar seu cadastro.'}
                 </span>
               </div>
-              <span className="font-mono text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
-                CPF: {cpf}
-              </span>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-5">
+            <div className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
+              <div>
+                <span className="font-semibold text-slate-700">Congregação:</span> {selectedCongregacaoNome}
+              </div>
+              <div className="font-mono font-medium text-slate-700">
+                {cpf}
+              </div>
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-6">
               
-              {/* BLOCO 1: DADOS PESSOAIS */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-xs font-bold text-[#123b63] border-b pb-1.5 uppercase tracking-wider">
-                  <UserCheck className="h-4 w-4" />
-                  <span>Dados Pessoais & Foto</span>
+              {/* ── 1. DADOS PESSOAIS & FOTO ── */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-[#123b63]">
+                  <User className="h-4 w-4" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider">1. Dados Pessoais</h3>
                 </div>
 
-                {/* UPLOAD / EXIBIÇÃO DA FOTO DE PERFIL */}
-                <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                  <div className="relative group shrink-0">
-                    <div className="w-24 h-32 rounded-2xl overflow-hidden bg-slate-200 border-2 border-[#123b63]/30 shadow-md flex items-center justify-center relative">
-                      {formData.foto_url ? (
-                        <img
-                          src={formData.foto_url}
-                          alt="Foto de perfil do membro"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <User className="w-12 h-12 text-slate-400" />
-                      )}
-                      
-                      {uploadingPhoto && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white">
-                          <Loader2 className="w-6 h-6 animate-spin" />
-                        </div>
-                      )}
-                    </div>
-
-                    <label className="absolute -bottom-2 -right-2 p-2 bg-[#123b63] hover:bg-[#0d2a47] text-white rounded-xl shadow-lg cursor-pointer transition active:scale-95">
-                      <Camera className="w-4 h-4" />
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        onChange={handleSelectFile}
-                        disabled={uploadingPhoto}
-                        className="hidden"
-                      />
-                    </label>
+                {/* Upload e Preview de Foto 3x4 */}
+                <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200">
+                  <div className="relative w-24 h-32 bg-slate-200 rounded-lg overflow-hidden border-2 border-slate-300 flex items-center justify-center shrink-0 shadow-inner">
+                    {formData.foto_url ? (
+                      <img src={formData.foto_url} alt="Foto Membro" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center text-slate-400">
+                        <Camera className="h-7 w-7 mb-1" />
+                        <span className="text-[10px] font-semibold">Foto 3x4</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="text-center sm:text-left space-y-1">
-                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      Foto de Perfil
-                    </h4>
-                    <p className="text-xs text-slate-500 max-w-xs">
-                      Selecione a foto do celular e ajuste o enquadramento perfeito (JPG, PNG ou WEBP até 10MB).
+                  <div className="flex-1 text-center sm:text-left space-y-2">
+                    <p className="text-xs font-semibold text-slate-700">Foto de Perfil (Opcional)</p>
+                    <p className="text-[11px] text-slate-500">
+                      Tire uma foto ou escolha uma imagem para sua ficha e carteirinha de membro.
                     </p>
-                    <label className="inline-flex items-center gap-1.5 text-xs font-bold text-[#123b63] hover:underline cursor-pointer pt-1">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>{formData.foto_url ? 'Alterar foto de perfil' : 'Enviar e ajustar foto'}</span>
+                    <label className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold cursor-pointer transition shadow-sm">
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>{formData.foto_url ? 'Alterar Foto' : 'Selecionar Foto'}</span>
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
                         onChange={handleSelectFile}
-                        disabled={uploadingPhoto}
                         className="hidden"
                       />
                     </label>
@@ -668,336 +853,451 @@ export default function PublicMemberPage({ params }: PageProps) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    Nome Completo {isExisting ? '(Protegido)' : '*'}
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nome Completo *
                   </label>
-                  {isExisting ? (
-                    <div className="relative">
-                      <input
-                        type="text"
-                        disabled
-                        value={formData.name}
-                        className="w-full pl-9 pr-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-semibold text-sm cursor-not-allowed"
-                      />
-                      <Lock className="h-4 w-4 text-slate-400 absolute left-3 top-3" />
-                    </div>
-                  ) : (
-                    <input
-                      type="text"
-                      required
-                      placeholder="Seu nome completo"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 text-sm outline-none font-medium"
-                    />
-                  )}
+                  <input
+                    type="text"
+                    required
+                    placeholder="Seu nome completo"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Data de Nascimento</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Data de Nascimento
+                    </label>
                     <input
                       type="date"
                       value={formData.data_nascimento}
                       onChange={(e) => setFormData({ ...formData, data_nascimento: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:border-[#123b63] text-sm outline-none"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Sexo</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Sexo
+                    </label>
                     <select
                       value={formData.sexo}
                       onChange={(e) => setFormData({ ...formData, sexo: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:border-[#123b63] text-sm bg-white outline-none"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none bg-white"
                     >
-                      <option value="">Selecione...</option>
-                      <option value="MASCULINO">Masculino</option>
-                      <option value="FEMININO">Feminino</option>
+                      <option value="">Selecione</option>
+                      <option value="MASCULINO">MASCULINO</option>
+                      <option value="FEMININO">FEMININO</option>
                     </select>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Nacionalidade</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: BRASILEIRA"
-                      value={formData.nacionalidade}
-                      onChange={(e) => setFormData({ ...formData, nacionalidade: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Naturalidade / UF</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <input
-                        type="text"
-                        placeholder="Cidade"
-                        value={formData.naturalidade}
-                        onChange={(e) => setFormData({ ...formData, naturalidade: e.target.value })}
-                        className="col-span-2 w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none min-w-0"
-                      />
-                      <input
-                        type="text"
-                        maxLength={2}
-                        placeholder="UF"
-                        value={formData.uf_naturalidade}
-                        onChange={(e) => setFormData({ ...formData, uf_naturalidade: e.target.value.toUpperCase() })}
-                        className="col-span-1 w-full px-2 py-2.5 border border-slate-300 rounded-xl text-sm uppercase text-center outline-none min-w-0"
-                      />
-                    </div>
-                  </div>
-                </div>
               </div>
 
-              {/* BLOCO 2: CONTATO */}
-              <div className="space-y-3 pt-2 border-t">
-                <div className="flex items-center gap-2 text-xs font-bold text-[#123b63] border-b pb-1.5 uppercase tracking-wider">
-                  <Phone className="h-4 w-4" />
-                  <span>Contato</span>
+              {/* ── 2. FILIAÇÃO E DADOS ECLESIÁSTICOS ── */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-[#123b63]">
+                  <FileText className="h-4 w-4" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider">2. Filiação e Dados Eclesiásticos</h3>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">E-mail</label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      placeholder="seuemail@exemplo.com"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none"
-                    />
-                    <Mail className="h-4 w-4 text-slate-400 absolute left-3 top-3" />
-                  </div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nome do Pai *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Nome completo do pai"
+                    value={formData.nome_pai}
+                    onChange={(e) => setFormData({ ...formData, nome_pai: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nome da Mãe *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Nome completo da mãe"
+                    value={formData.nome_mae}
+                    onChange={(e) => setFormData({ ...formData, nome_mae: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Celular / WhatsApp</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      RG (Opcional)
+                    </label>
                     <input
                       type="text"
-                      placeholder="(00) 90000-0000"
-                      value={formData.whatsapp}
-                      onChange={(e) => setFormData({ ...formData, whatsapp: formatPhone(e.target.value) })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none"
+                      placeholder="Número do RG"
+                      value={formData.rg}
+                      onChange={(e) => setFormData({ ...formData, rg: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase"
                     />
                   </div>
+
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Telefone Fixo / Recado</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Data de Batismo nas Águas *
+                    </label>
                     <input
-                      type="text"
-                      placeholder="(00) 0000-0000"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none"
+                      type="date"
+                      required
+                      value={formData.data_batismo_aguas}
+                      onChange={(e) => setFormData({ ...formData, data_batismo_aguas: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* BLOCO 3: ENDEREÇO */}
-              <div className="space-y-3 pt-2 border-t">
-                <div className="flex items-center justify-between border-b pb-1.5">
-                  <div className="flex items-center gap-2 text-xs font-bold text-[#123b63] uppercase tracking-wider">
-                    <MapPin className="h-4 w-4" />
-                    <span>Endereço Residencial</span>
+              {/* ── 3. CONTATOS ── */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-[#123b63]">
+                  <Phone className="h-4 w-4" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider">3. Contato</h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      WhatsApp / Celular
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="(00) 00000-0000"
+                      value={formData.whatsapp || formData.celular}
+                      onChange={(e) => {
+                        const formatted = formatPhone(e.target.value);
+                        setFormData({ ...formData, whatsapp: formatted, celular: formatted });
+                      }}
+                      maxLength={15}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none"
+                    />
                   </div>
-                  {searchingCep && (
-                    <span className="text-[11px] text-blue-600 font-semibold flex items-center gap-1">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Buscando CEP...
-                    </span>
-                  )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Telefone Fixo
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="(00) 0000-0000"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })}
+                      maxLength={15}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    E-mail
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="seuemail@exemplo.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* ── 4. ENDEREÇO RESIDENCIAL ── */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-[#123b63]">
+                  <MapPin className="h-4 w-4" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider">4. Endereço Residencial</h3>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="col-span-1 sm:col-span-1">
-                    <label className="block text-xs font-bold text-slate-600 mb-1">CEP</label>
-                    <div className="flex gap-1.5">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      CEP
+                    </label>
+                    <div className="relative">
                       <input
                         type="text"
+                        inputMode="numeric"
                         placeholder="00000-000"
                         value={formData.cep}
                         onChange={(e) => setFormData({ ...formData, cep: formatCep(e.target.value) })}
                         onBlur={handleCepBlur}
                         maxLength={9}
-                        className="flex-1 min-w-0 px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none focus:border-[#123b63]"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none"
                       />
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (document.activeElement instanceof HTMLElement) {
-                            document.activeElement.blur();
-                          }
-                          handleCepBlur();
-                        }}
-                        disabled={searchingCep || formData.cep.replace(/\D/g, '').length !== 8}
-                        title="Buscar CEP"
-                        className="px-3 py-2.5 bg-[#123b63] hover:bg-[#0d2a47] text-white font-bold rounded-xl shadow-sm transition active:scale-95 flex items-center justify-center shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {searchingCep ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Search className="h-4 w-4" />
-                        )}
-                      </button>
+                      {searchingCep && (
+                        <Loader2 className="h-4 w-4 animate-spin text-slate-400 absolute right-3 top-3" />
+                      )}
                     </div>
                   </div>
-                  <div className="col-span-1 sm:col-span-2">
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Logradouro / Rua</label>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Logradouro (Rua / Av.)
+                    </label>
                     <input
                       type="text"
-                      placeholder="Rua, Avenida, Praça..."
+                      placeholder="Ex: Rua das Flores"
                       value={formData.logradouro}
                       onChange={(e) => setFormData({ ...formData, logradouro: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-1">
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Número</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Número
+                    </label>
                     <input
                       type="text"
-                      placeholder="123"
+                      placeholder="Ex: 123"
                       value={formData.numero}
                       onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase"
                     />
                   </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Bairro</label>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Bairro
+                    </label>
                     <input
                       type="text"
-                      placeholder="Bairro"
+                      placeholder="Ex: Centro"
                       value={formData.bairro}
                       onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase"
+                    />
+                  </div>
+
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Complemento
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Apto, Bloco..."
+                      value={formData.complemento}
+                      onChange={(e) => setFormData({ ...formData, complemento: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2">
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Cidade</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Cidade
+                    </label>
                     <input
                       type="text"
                       placeholder="Cidade"
                       value={formData.cidade}
                       onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase"
                     />
                   </div>
-                  <div className="col-span-1">
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Estado (UF)</label>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      UF
+                    </label>
                     <input
                       type="text"
                       maxLength={2}
                       placeholder="UF"
                       value={formData.estado}
                       onChange={(e) => setFormData({ ...formData, estado: e.target.value.toUpperCase() })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm uppercase text-center outline-none"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase text-center font-bold"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* ── 5. FAMÍLIA & ESTADO CIVIL ── */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-[#123b63]">
+                  <Heart className="h-4 w-4" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider">5. Família & Estado Civil</h3>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Complemento</label>
-                  <input
-                    type="text"
-                    placeholder="Apto, Bloco, Casa B..."
-                    value={formData.complemento}
-                    onChange={(e) => setFormData({ ...formData, complemento: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none"
-                  />
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Estado Civil
+                  </label>
+                  <select
+                    value={formData.estado_civil}
+                    onChange={(e) => setFormData({ ...formData, estado_civil: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none bg-white"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="SOLTEIRO(A)">SOLTEIRO(A)</option>
+                    <option value="CASADO(A)">CASADO(A)</option>
+                    <option value="DIVORCIADO(A)">DIVORCIADO(A)</option>
+                    <option value="VIUVO(A)">VIÚVO(A)</option>
+                    <option value="UNIAO_ESTAVEL">UNIÃO ESTÁVEL</option>
+                  </select>
                 </div>
-              </div>
 
-              {/* BLOCO 4: FAMÍLIA E ESTADO CIVIL */}
-              <div className="space-y-3 pt-2 border-t">
-                <div className="flex items-center gap-2 text-xs font-bold text-[#123b63] border-b pb-1.5 uppercase tracking-wider">
-                  <Heart className="h-4 w-4" />
-                  <span>Família & Estado Civil</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Estado Civil</label>
-                    <select
-                      value={formData.estado_civil}
-                      onChange={(e) => setFormData({ ...formData, estado_civil: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white outline-none"
-                    >
-                      <option value="">Selecione...</option>
-                      <option value="SOLTEIRO">Solteiro(a)</option>
-                      <option value="CASADO">Casado(a)</option>
-                      <option value="DIVORCIADO">Divorciado(a)</option>
-                      <option value="VIUVO">Viúvo(a)</option>
-                      <option value="UNIAO_ESTAVEL">União Estável</option>
-                      <option value="OUTROS">Outros</option>
-                    </select>
-                  </div>
-
-                  {formData.estado_civil === 'CASADO' || formData.estado_civil === 'UNIAO_ESTAVEL' ? (
+                {formData.estado_civil === 'CASADO(A)' && (
+                  <div className="space-y-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Nome do Cônjuge</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Nome do Cônjuge
+                      </label>
                       <input
                         type="text"
-                        placeholder="Nome do esposo(a)"
+                        placeholder="Nome completo do cônjuge"
                         value={formData.nome_conjuge}
                         onChange={(e) => setFormData({ ...formData, nome_conjuge: e.target.value })}
-                        className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase"
                       />
                     </div>
-                  ) : null}
-                </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          CPF do Cônjuge
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="000.000.000-00"
+                          value={formData.cpf_conjuge}
+                          onChange={(e) => setFormData({ ...formData, cpf_conjuge: formatCpf(e.target.value) })}
+                          maxLength={14}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Nascimento do Cônjuge
+                        </label>
+                        <input
+                          type="date"
+                          value={formData.data_nascimento_conjuge}
+                          onChange={(e) => setFormData({ ...formData, data_nascimento_conjuge: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* BLOCO 5: PROFISSÃO E ESCOLARIDADE */}
-              <div className="space-y-3 pt-2 border-t">
-                <div className="flex items-center gap-2 text-xs font-bold text-[#123b63] border-b pb-1.5 uppercase tracking-wider">
+              {/* ── 6. PROFISSÃO & ESCOLARIDADE ── */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-[#123b63]">
                   <Briefcase className="h-4 w-4" />
-                  <span>Profissão & Escolaridade</span>
+                  <h3 className="text-sm font-bold uppercase tracking-wider">6. Profissão & Escolaridade</h3>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Profissão / Ocupação</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Profissão
+                    </label>
                     <input
                       type="text"
-                      placeholder="Sua profissão"
+                      placeholder="Ex: Professor, Comerciante..."
                       value={formData.profissao}
                       onChange={(e) => setFormData({ ...formData, profissao: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm outline-none"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase"
                     />
                   </div>
+
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Escolaridade</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Escolaridade
+                    </label>
                     <select
                       value={formData.escolaridade}
                       onChange={(e) => setFormData({ ...formData, escolaridade: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white outline-none"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none bg-white"
                     >
-                      <option value="">Selecione...</option>
-                      <option value="FUNDAMENTAL">Ensino Fundamental</option>
-                      <option value="MEDIO">Ensino Médio</option>
-                      <option value="SUPERIOR">Ensino Superior</option>
-                      <option value="POS_GRADUACAO">Pós-Graduação / Especialização</option>
-                      <option value="MESTRADO_DOUTORADO">Mestrado / Doutorado</option>
+                      <option value="">Selecione</option>
+                      <option value="ENSINO_FUNDAMENTAL">ENSINO FUNDAMENTAL</option>
+                      <option value="ENSINO_MEDIO">ENSINO MÉDIO</option>
+                      <option value="ENSINO_SUPERIOR">ENSINO SUPERIOR</option>
+                      <option value="POS_GRADUACAO">PÓS-GRADUAÇÃO</option>
                     </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Nacionalidade
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: BRASILEIRA"
+                      value={formData.nacionalidade}
+                      onChange={(e) => setFormData({ ...formData, nacionalidade: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Naturalidade
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Cidade onde nasceu"
+                      value={formData.naturalidade}
+                      onChange={(e) => setFormData({ ...formData, naturalidade: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      UF Naturalidade
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={2}
+                      placeholder="UF"
+                      value={formData.uf_naturalidade}
+                      onChange={(e) => setFormData({ ...formData, uf_naturalidade: e.target.value.toUpperCase() })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none uppercase text-center font-bold"
+                    />
                   </div>
                 </div>
               </div>
 
-              {/* BOTÕES DE AÇÃO */}
-              <div className="pt-4 space-y-2">
+              {/* Botões de Ação */}
+              <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStage('cpf')}
+                  className="w-full sm:w-1/3 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition text-sm text-center"
+                >
+                  Voltar
+                </button>
+
                 <button
                   type="submit"
                   disabled={saving}
-                  className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/25 active:scale-[0.99] transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                  className="w-full sm:w-2/3 py-3.5 px-4 bg-[#123b63] hover:bg-[#0d2a47] text-white font-bold rounded-xl shadow-lg shadow-[#123b63]/25 active:scale-[0.99] transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                 >
                   {saving ? (
                     <>
@@ -1006,270 +1306,179 @@ export default function PublicMemberPage({ params }: PageProps) {
                     </>
                   ) : (
                     <>
-                      <CheckCircle2 className="h-5 w-5" />
-                      {isExisting ? 'Atualizar cadastro' : 'Finalizar cadastro'}
+                      {isExisting ? 'Atualizar Meu Cadastro' : 'Finalizar Cadastro'}
+                      <CheckCircle2 className="h-4 w-4" />
                     </>
                   )}
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStage('search')}
-                  disabled={saving}
-                  className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-xs transition flex items-center justify-center gap-1.5"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Voltar e consultar outro CPF
-                </button>
               </div>
-
             </form>
           </div>
         )}
 
-        {/* TELA 3: SUCESSO CONFIRMAÇÃO */}
+        {/* TELA DE SUCESSO */}
         {stage === 'success' && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8 text-center space-y-5 animate-in zoom-in-95">
-            <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-emerald-100 text-emerald-600 shadow-inner">
-              <CheckCircle2 className="h-10 w-10" />
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-6 sm:p-8 text-center space-y-6 animate-in zoom-in-95">
+            <div className="h-16 w-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle2 className="h-9 w-9" />
             </div>
 
             <div className="space-y-2">
-              <h2 className="text-xl font-bold text-slate-800">
-                {successMessage}
+              <h2 className="text-xl font-extrabold text-slate-800">
+                {successMessage || 'Dados Salvos com Sucesso!'}
               </h2>
-              <p className="text-sm text-slate-500 max-w-xs mx-auto">
-                Suas informações foram registradas com segurança no sistema da igreja.
+              <p className="text-sm text-slate-600">
+                Agradecemos por atualizar suas informações junto à secretaria da <strong>{institutionName}</strong>.
               </p>
             </div>
 
-            <div className="pt-4 border-t">
-              <button
-                type="button"
-                onClick={handleReset}
-                className="w-full py-3 px-4 bg-[#123b63] hover:bg-[#0d2a47] text-white font-bold rounded-xl text-sm shadow-md transition"
-              >
-                Concluir
-              </button>
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1 text-left">
+              <p>
+                <strong>Congregação:</strong> {selectedCongregacaoNome}
+              </p>
+              <p>
+                <strong>Membro:</strong> {formData.name}
+              </p>
+              <p>
+                <strong>CPF:</strong> {cpf}
+              </p>
             </div>
+
+            <button
+              type="button"
+              onClick={handleReset}
+              className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition text-sm"
+            >
+              Novo Preenchimento
+            </button>
           </div>
         )}
 
-        {/* Rodapé institucional */}
-        <div className="text-center space-y-1">
-          <p className="text-[11px] font-medium text-slate-400">
-            © Gestão Eklésia — Plataforma de Gestão Eclesiástica
-          </p>
-        </div>
-
       </div>
 
-      {/* ── MODAL INTERATIVO DE CORTE E ENQUADRAMENTO DA FOTO (MOBILE & DESKTOP) ── */}
-      {showCropModal && fotoOriginal && (
+      {/* MODAL DE ENQUADRAMENTO E CORTE DA FOTO (3x4) */}
+      {showCropModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full overflow-hidden flex flex-col">
-            
-            {/* Header do Modal de Corte */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-[#123b63]/10 text-[#123b63]">
-                  <Crop className="w-4 h-4" />
-                </div>
-                <h3 className="text-sm font-extrabold text-slate-800">Enquadrar Foto de Perfil</h3>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 space-y-4 text-center">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+                <Crop className="h-4 w-4 text-[#123b63]" />
+                <span>Ajustar Foto 3x4</span>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setShowCropModal(false);
-                  setFotoOriginal(null);
-                }}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+                onClick={() => setShowCropModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
               >
-                <X className="w-4 h-4" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* ÁREA DE CROP INTERATIVA COM CANVAS / TOUCH / MOUSE */}
-            <div className="p-5 space-y-4 text-center bg-slate-100/60">
-              <p className="text-xs text-slate-500 font-medium">
-                Arraste a imagem para centralizar o rosto no enquadramento
-              </p>
+            {/* Viewport de Crop (Proporção 3:4) */}
+            <div
+              className="relative w-56 h-72 mx-auto bg-slate-900 rounded-xl overflow-hidden border-2 border-[#123b63] shadow-lg select-none cursor-grab active:cursor-grabbing touch-none"
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleMouseUp}
+              onWheel={handleWheel}
+            >
+              {fotoOriginal && (
+                <img
+                  src={fotoOriginal}
+                  alt="Ajuste de Foto"
+                  style={{
+                    transform: `translate(${position.x}px, ${position.y}px) rotate(${rotation}deg) scale(${zoom})`,
+                    transformOrigin: 'center center',
+                  }}
+                  className="w-full h-full object-cover pointer-events-none transition-transform duration-75"
+                />
+              )}
+              {/* Overlay de Máscara de Enquadramento */}
+              <div className="absolute inset-0 border border-white/40 pointer-events-none grid grid-cols-3 grid-rows-3">
+                <div className="border-r border-b border-white/20"></div>
+                <div className="border-r border-b border-white/20"></div>
+                <div className="border-b border-white/20"></div>
+                <div className="border-r border-b border-white/20"></div>
+                <div className="border-r border-b border-white/20"></div>
+                <div className="border-b border-white/20"></div>
+                <div className="border-r border-white/20"></div>
+                <div className="border-r border-white/20"></div>
+                <div></div>
+              </div>
+            </div>
 
-              {/* Viewport do Crop (3:4 ratio) */}
-              <div className="flex justify-center">
-                <div
-                  className="relative w-56 h-72 rounded-2xl overflow-hidden bg-slate-900 border-4 border-[#123b63] shadow-2xl cursor-grab active:cursor-grabbing select-none touch-none"
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
-                  onTouchStart={handleTouchStart}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleMouseUp}
-                  onWheel={handleWheel}
+            {/* Controles de Zoom e Rotação */}
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => Math.max(z - 0.2, 1))}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                  title="Diminuir Zoom"
                 >
-                  <div className="w-full h-full absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <img
-                      src={fotoOriginal}
-                      alt="Ajuste de enquadramento da foto"
-                      className="w-full h-full object-cover pointer-events-none"
-                      style={{
-                        transform: `translate(${position.x}px, ${position.y}px) rotate(${rotation}deg) scale(${zoom})`,
-                        transformOrigin: 'center',
-                        transition: isDragging ? 'none' : 'transform 0.05s ease-out',
-                      }}
-                    />
-                  </div>
-
-                  {/* Guia de enquadramento facial tipo oval/3x4 */}
-                  <div className="absolute inset-0 border-2 border-white/40 rounded-xl pointer-events-none flex items-center justify-center">
-                    <div className="w-40 h-52 border border-dashed border-white/60 rounded-full opacity-60"></div>
-                  </div>
-                </div>
+                  <ZoomOut className="h-4 w-4" />
+                </button>
+                <span className="text-xs font-semibold text-slate-600 w-12 text-center">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => Math.min(z + 0.2, 3))}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                  title="Aumentar Zoom"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </button>
+                <div className="w-px h-6 bg-slate-200 mx-1"></div>
+                <button
+                  type="button"
+                  onClick={() => setRotation((r) => (r - 90) % 360)}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                  title="Girar Esquerda"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRotation((r) => (r + 90) % 360)}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                  title="Girar Direita"
+                >
+                  <RotateCw className="h-4 w-4" />
+                </button>
               </div>
 
-              {/* CONTROLES DE ZOOM E ROTAÇÃO */}
-              <div className="space-y-3 bg-white p-3.5 rounded-xl border border-slate-200 text-left">
-                {/* Controle de Zoom */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                      <ZoomIn className="w-3.5 h-3.5 text-[#123b63]" />
-                      <span>Zoom: {zoom.toFixed(1)}x</span>
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setZoom((z) => Math.max(z - 0.15, 0.6))}
-                      className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
-                    >
-                      <ZoomOut className="w-4 h-4" />
-                    </button>
-                    <input
-                      type="range"
-                      min="0.6"
-                      max="3.5"
-                      step="0.05"
-                      value={zoom}
-                      onChange={(e) => setZoom(parseFloat(e.target.value))}
-                      className="flex-1 accent-[#123b63] h-1.5 bg-slate-200 rounded-lg cursor-pointer"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setZoom((z) => Math.min(z + 0.15, 3.5))}
-                      className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
-                    >
-                      <ZoomIn className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Controle de Posição / Ajuste Fino */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                  <span className="text-xs font-bold text-slate-700">Ajustar posição:</span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setPosition((p) => ({ ...p, y: p.y - 30 }))}
-                      title="Mover para cima"
-                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPosition((p) => ({ ...p, y: p.y + 30 }))}
-                      title="Mover para baixo (descer foto)"
-                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
-                    >
-                      ▼
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPosition((p) => ({ ...p, x: p.x - 30 }))}
-                      title="Mover para esquerda"
-                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
-                    >
-                      ◀
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPosition((p) => ({ ...p, x: p.x + 30 }))}
-                      title="Mover para direita"
-                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
-                    >
-                      ▶
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPosition({ x: 0, y: 0 })}
-                      title="Centralizar foto"
-                      className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded ml-1"
-                    >
-                      Reset
-                    </button>
-                  </div>
-                </div>
-
-                {/* Controle de Rotação */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                  <span className="text-xs font-bold text-slate-700">Girar foto:</span>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setRotation((r) => (r - 90) % 360)}
-                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1 transition"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" /> 90° Esq
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRotation((r) => (r + 90) % 360)}
-                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1 transition"
-                    >
-                      <RotateCw className="w-3.5 h-3.5" /> 90° Dir
-                    </button>
-                  </div>
-                </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCropModal(false)}
+                  className="flex-1 py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={uploadingPhoto}
+                  onClick={handleConfirmCropAndUpload}
+                  className="flex-1 py-2.5 px-3 bg-[#123b63] hover:bg-[#0d2a47] text-white font-bold rounded-xl text-xs shadow-md active:scale-95 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {uploadingPhoto ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      Confirmar Foto
+                    </>
+                  )}
+                </button>
               </div>
-
             </div>
-
-            {/* Rodapé com Ação de Confirmar Enquadramento */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCropModal(false);
-                  setFotoOriginal(null);
-                }}
-                disabled={uploadingPhoto}
-                className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition"
-              >
-                Cancelar
-              </button>
-
-              <button
-                type="button"
-                onClick={handleConfirmCropAndUpload}
-                disabled={uploadingPhoto}
-                className="flex-1 py-2.5 bg-[#123b63] hover:bg-[#0d2a47] text-white font-bold rounded-xl text-xs shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50"
-              >
-                {uploadingPhoto ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    Confirmar Foto
-                  </>
-                )}
-              </button>
-            </div>
-
           </div>
         </div>
       )}

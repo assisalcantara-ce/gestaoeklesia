@@ -46,11 +46,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { institution, cpf } = body;
+  const { institution, congregacao_id, cpf } = body;
 
   if (!institution || typeof institution !== 'string' || !institution.trim()) {
     return NextResponse.json(
       { error: 'Identificador da instituição não informado.' },
+      { status: 400 }
+    );
+  }
+
+  if (!congregacao_id || typeof congregacao_id !== 'string' || !congregacao_id.trim()) {
+    return NextResponse.json(
+      { error: 'Congregação é obrigatória para verificação.' },
       { status: 400 }
     );
   }
@@ -92,7 +99,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!ministry.is_active) {
+  if (ministry.is_active === false) {
     return NextResponse.json(
       { error: 'Cadastro indisponível para esta instituição.' },
       { status: 403 }
@@ -101,39 +108,37 @@ export async function POST(request: NextRequest) {
 
   const ministryId = ministry.id;
 
-  // ── 4. Buscar membro existente dentro do ministry_id pelo CPF ──────────────
-  // Tentar encontrar tanto com o CPF limpo quanto com a máscara padrão se armazenada formatada
+  // ── 4. Validar se a congregação pertence estritamente ao tenant ────────────
+  const { data: validCong } = await admin
+    .from('congregacoes')
+    .select('id')
+    .eq('id', congregacao_id.trim())
+    .eq('ministry_id', ministryId)
+    .maybeSingle();
+
+  if (!validCong) {
+    // Fallback: verificar se é uma supervisão cadastrada como unidade
+    const { data: validSup } = await admin
+      .from('supervisoes')
+      .select('id')
+      .eq('id', congregacao_id.trim())
+      .eq('ministry_id', ministryId)
+      .maybeSingle();
+
+    if (!validSup) {
+      return NextResponse.json(
+        { error: 'Congregação inválida para esta instituição.' },
+        { status: 400 }
+      );
+    }
+  }
+
+  // ── 5. Buscar se membro existe dentro do ministry_id pelo CPF ──────────────
   const formattedCpf = `${cleanCpf.slice(0, 3)}.${cleanCpf.slice(3, 6)}.${cleanCpf.slice(6, 9)}-${cleanCpf.slice(9)}`;
 
   const { data: member, error: memErr } = await admin
     .from('members')
-    .select(`
-      id,
-      name,
-      email,
-      phone,
-      celular,
-      whatsapp,
-      data_nascimento,
-      sexo,
-      estado_civil,
-      nome_conjuge,
-      cpf_conjuge,
-      data_nascimento_conjuge,
-      profissao,
-      cep,
-      logradouro,
-      numero,
-      bairro,
-      complemento,
-      cidade,
-      estado,
-      escolaridade,
-      nacionalidade,
-      naturalidade,
-      uf_naturalidade,
-      foto_url
-    `)
+    .select('id')
     .eq('ministry_id', ministryId)
     .or(`cpf.eq.${cleanCpf},cpf.eq.${formattedCpf}`)
     .maybeSingle();
@@ -146,43 +151,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!member) {
-    return NextResponse.json({
-      exists: false,
-      institution_name: ministry.name,
-    });
-  }
-
-  // ── 5. Retornar apenas dados públicos autorizados para atualização ─────────
+  // ── 6. Retorno estrito de segurança (sem expor quaisquer dados cadastrais) ──
   return NextResponse.json({
-    exists: true,
+    exists: !!member,
     institution_name: ministry.name,
-    data: {
-      id: member.id,
-      name: member.name,
-      email: member.email ?? '',
-      phone: member.phone ?? '',
-      celular: member.celular ?? '',
-      whatsapp: member.whatsapp ?? '',
-      data_nascimento: member.data_nascimento ?? '',
-      sexo: member.sexo ?? '',
-      estado_civil: member.estado_civil ?? '',
-      nome_conjuge: member.nome_conjuge ?? '',
-      cpf_conjuge: member.cpf_conjuge ?? '',
-      data_nascimento_conjuge: member.data_nascimento_conjuge ?? '',
-      profissao: member.profissao ?? '',
-      cep: member.cep ?? '',
-      logradouro: member.logradouro ?? '',
-      numero: member.numero ?? '',
-      bairro: member.bairro ?? '',
-      complemento: member.complemento ?? '',
-      cidade: member.cidade ?? '',
-      estado: member.estado ?? '',
-      escolaridade: member.escolaridade ?? '',
-      nacionalidade: member.nacionalidade ?? '',
-      naturalidade: member.naturalidade ?? '',
-      uf_naturalidade: member.uf_naturalidade ?? '',
-      foto_url: member.foto_url ?? '',
-    },
   });
 }

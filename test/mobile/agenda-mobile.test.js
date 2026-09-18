@@ -181,8 +181,7 @@ describe('FASE E.4 — Programação, Cultos e Agenda no App Mobile Gestão Ekl�
       { id: congB, ministry_id: ministryB, nome: 'Sede Beta', endereco: 'Av. Central, 500', cidade: 'Recife', uf: 'PE' },
     ];
 
-    const hoje = new Date();
-    hoje.setHours(23, 0, 0, 0);
+    const hoje = new Date(Date.now() + 2 * 3600 * 1000);
     const amanha = new Date(); amanha.setDate(amanha.getDate() + 1);
     const daquiQuatroDias = new Date(); daquiQuatroDias.setDate(daquiQuatroDias.getDate() + 4);
     const daquiDezDias = new Date(); daquiDezDias.setDate(daquiDezDias.getDate() + 10);
