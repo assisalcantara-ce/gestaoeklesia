@@ -1,22 +1,21 @@
 'use client';
 
 /**
- * /app/login — Login do membro via CPF + Data de Nascimento
+ * /app/login — Acesso Direto do Membro via CPF + Data de Nascimento
  *
- * Novo Fluxo Simplificado:
- * 1. Usuário informa CPF + Data de nascimento
- * 2. POST /api/v1/mobile/auth/request-access (Server-side)
- * 3. Servidor localiza o membro ativo, gera Magic Link seguro e dispara via Resend
- * 4. Resposta genérica protege contra enumeração de CPFs
- * 5. Se não possuir e-mail cadastrado, orienta a procurar a Secretaria
- * 6. Usuário clica no link do e-mail → /app/auth/callback → /app/inicio ou /app/vincular
+ * Fluxo Direto:
+ * 1. O membro informa CPF + Data de nascimento.
+ * 2. POST /api/v1/mobile/auth/login (Autenticação server-side imediata).
+ * 3. Validação segura do cadastro oficial, geração de sessão Supabase Auth e gravação de cookies SSR.
+ * 4. Redirecionamento instantâneo para /app/inicio.
  */
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase-client';
 import { formatCpf, formatData } from '@/lib/mascaras';
-import { Loader2, CheckCircle2, ArrowRight, ShieldCheck, AlertCircle, Info } from 'lucide-react';
+import { Loader2, AlertCircle, LogIn } from 'lucide-react';
 import Image from 'next/image';
 
 export default function MobileLoginPage() {
@@ -26,12 +25,9 @@ export default function MobileLoginPage() {
   const [cpf, setCpf] = useState('');
   const [dataNascimento, setDataNascimento] = useState('');
   const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [warningMessage, setWarningMessage] = useState('');
   const [error, setError] = useState('');
 
-  // Capturar mensagens de erro vindas de redirecionamentos do callback
+  // Capturar mensagens de erro vindas de redirecionamentos de outras rotas
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -42,18 +38,16 @@ export default function MobileLoginPage() {
     }
   }, []);
 
-  // Se já autenticado, deixa o MobileMemberProvider redirecionar
+  // Se já autenticado, redireciona para a tela inicial
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace('/app');
+      router.replace('/app/inicio');
     }
   }, [user, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setWarningMessage('');
-    setSuccessMessage('');
 
     const cleanCpf = cpf.replace(/\D/g, '');
     if (cleanCpf.length !== 11) {
@@ -62,17 +56,18 @@ export default function MobileLoginPage() {
     }
 
     if (!dataNascimento || dataNascimento.length < 10) {
-      setError('Informe uma data de nascimento válida (DD/MM/AAAA).');
+      setError('Informe sua data de nascimento completa no formato DD/MM/AAAA.');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/mobile/auth/request-access', {
+      const res = await fetch('/api/v1/mobile/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           cpf: cleanCpf,
           data_nascimento: dataNascimento,
@@ -82,16 +77,25 @@ export default function MobileLoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || 'Não foi possível solicitar o acesso. Tente novamente.');
+        setError(
+          data.error ||
+            'Não encontramos um cadastro ativo com os dados informados. Verifique o CPF e a data de nascimento.'
+        );
         return;
       }
 
-      if (data.code === 'NO_EMAIL') {
-        setWarningMessage(data.message || 'Seu cadastro não possui e-mail cadastrado. Por favor, procure a Secretaria da sua igreja.');
-      } else {
-        setSuccessMessage(data.message || 'Se os dados estiverem corretos e houver um e-mail cadastrado, enviaremos um link de acesso.');
-        setSubmitted(true);
+      // Sincronizar sessão no cliente Supabase se retornada
+      if (data.session) {
+        try {
+          const supabase = createClient();
+          await supabase.auth.setSession(data.session);
+        } catch (sessionErr) {
+          console.error('[MOBILE_LOGIN] Erro ao sincronizar sessão cliente:', sessionErr);
+        }
       }
+
+      // Redireciona diretamente para o início do aplicativo
+      router.replace('/app/inicio');
     } catch {
       setError('Erro de conexão. Verifique sua internet e tente novamente.');
     } finally {
@@ -132,125 +136,80 @@ export default function MobileLoginPage() {
         <div className="w-full bg-[#111827] rounded-3xl border border-slate-800/80 shadow-2xl p-6 sm:p-7 relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600" />
 
-          {submitted ? (
-            <div className="flex flex-col items-center gap-4 py-2">
-              <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                <CheckCircle2 size={32} />
-              </div>
-              <div className="text-center space-y-2">
-                <h2 className="text-lg font-bold text-white">Solicitação enviada!</h2>
-                <p className="text-slate-300 text-xs leading-relaxed">
-                  {successMessage}
-                </p>
-                <div className="p-3.5 rounded-xl bg-[#172033] border border-slate-800 text-left text-xs text-slate-400 space-y-1 mt-3">
-                  <div className="flex items-center gap-1.5 font-semibold text-slate-300">
-                    <ShieldCheck className="h-4 w-4 text-blue-400 shrink-0" />
-                    <span>Próximo passo:</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-normal">
-                    Abra seu aplicativo de e-mail e toque no botão <strong>“Entrar no Aplicativo”</strong> para acessar sua conta instantaneamente.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setSubmitted(false);
-                  setCpf('');
-                  setDataNascimento('');
-                  setSuccessMessage('');
-                  setError('');
-                  setWarningMessage('');
-                }}
-                className="mt-2 text-xs font-semibold text-blue-400 hover:text-blue-300 underline underline-offset-4 active:scale-95 transition cursor-pointer"
+          <div className="mb-6">
+            <h2 className="text-base font-bold text-white">Acesse sua conta</h2>
+            <p className="text-slate-400 text-xs mt-1">
+              Informe seu CPF e data de nascimento cadastrados na sua igreja.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label
+                htmlFor="cpf"
+                className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5"
               >
-                Tentar novamente com outros dados
-              </button>
+                CPF
+              </label>
+              <input
+                id="cpf"
+                type="text"
+                inputMode="numeric"
+                autoComplete="username"
+                value={cpf}
+                onChange={(e) => setCpf(formatCpf(e.target.value))}
+                placeholder="000.000.000-00"
+                maxLength={14}
+                className="w-full px-4 py-3 bg-[#172033] border border-slate-800 rounded-xl text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition font-mono tracking-wide"
+                required
+              />
             </div>
-          ) : (
-            <>
-              <div className="mb-6">
-                <h2 className="text-base font-bold text-white">Acesse seu aplicativo</h2>
-                <p className="text-slate-400 text-xs mt-1">
-                  Informe seu CPF e data de nascimento para localizarmos seu cadastro e enviar seu link de acesso seguro.
-                </p>
+
+            <div>
+              <label
+                htmlFor="dataNascimento"
+                className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5"
+              >
+                Data de nascimento
+              </label>
+              <input
+                id="dataNascimento"
+                type="text"
+                inputMode="numeric"
+                value={dataNascimento}
+                onChange={(e) => setDataNascimento(formatData(e.target.value))}
+                placeholder="DD/MM/AAAA"
+                maxLength={10}
+                className="w-full px-4 py-3 bg-[#172033] border border-slate-800 rounded-xl text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition font-mono tracking-wide"
+                required
+              />
+            </div>
+
+            {error && (
+              <div className="flex items-start gap-2.5 bg-rose-950/40 border border-rose-900/50 text-rose-300 text-xs p-3.5 rounded-xl">
+                <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-400" />
+                <span>{error}</span>
               </div>
+            )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="cpf"
-                    className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5"
-                  >
-                    CPF
-                  </label>
-                  <input
-                    id="cpf"
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="username"
-                    value={cpf}
-                    onChange={(e) => setCpf(formatCpf(e.target.value))}
-                    placeholder="000.000.000-00"
-                    maxLength={14}
-                    className="w-full px-4 py-3 bg-[#172033] border border-slate-800 rounded-xl text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition font-mono tracking-wide"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="dataNascimento"
-                    className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5"
-                  >
-                    Data de nascimento
-                  </label>
-                  <input
-                    id="dataNascimento"
-                    type="text"
-                    inputMode="numeric"
-                    value={dataNascimento}
-                    onChange={(e) => setDataNascimento(formatData(e.target.value))}
-                    placeholder="DD/MM/AAAA"
-                    maxLength={10}
-                    className="w-full px-4 py-3 bg-[#172033] border border-slate-800 rounded-xl text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition font-mono tracking-wide"
-                    required
-                  />
-                </div>
-
-                {warningMessage && (
-                  <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs p-3.5 rounded-xl">
-                    <Info size={16} className="shrink-0 mt-0.5 text-amber-400" />
-                    <span>{warningMessage}</span>
-                  </div>
-                )}
-
-                {error && (
-                  <div className="flex items-start gap-2.5 bg-rose-950/40 border border-rose-900/50 text-rose-300 text-xs p-3.5 rounded-xl">
-                    <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-400" />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full min-h-[46px] bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-[0.98] transition disabled:opacity-50 cursor-pointer"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Verificando cadastro...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Continuar</span>
-                      <ArrowRight size={15} />
-                    </>
-                  )}
-                </button>
-              </form>
-            </>
-          )}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full min-h-[46px] bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-[0.98] transition disabled:opacity-50 cursor-pointer"
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Acessando...</span>
+                </>
+              ) : (
+                <>
+                  <LogIn size={15} />
+                  <span>Entrar</span>
+                </>
+              )}
+            </button>
+          </form>
         </div>
       </div>
 
