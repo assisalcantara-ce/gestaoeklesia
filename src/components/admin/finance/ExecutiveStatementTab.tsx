@@ -362,7 +362,13 @@ export default function ExecutiveStatementTab({
         </div>
       ) : data ? (
         /* ÁREA PRINCIPAL DO DOCUMENTO (FORMATADO COM ALTA QUALIDADE PARA TELA E IMPRESSÃO A4) */
-        <div className="w-full space-y-8 print:space-y-5 print:w-full print:max-w-none print:m-0 print:p-0">
+        <div className="w-full space-y-8 print:space-y-5 print:w-full print:max-w-none print:p-6">
+          <style jsx global>{`
+            @page {
+              size: A4 portrait;
+              margin: 12mm 10mm;
+            }
+          `}</style>
           
           {/* ========================================================================= */}
           {/* CABEÇALHO INSTITUCIONAL PROFISSIONAL (Exclusivo para Impressão e PDF) */}

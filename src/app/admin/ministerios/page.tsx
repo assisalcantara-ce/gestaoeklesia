@@ -44,7 +44,7 @@ export default function MinisteriosPage() {
   
   // Clientes 2.1: Estados dos Filtros da Toolbar Executiva
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('ativo')
   const [planFilter, setPlanFilter] = useState('all')
   const [trialFilter, setTrialFilter] = useState('all')
 

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 import Link from 'next/link'
 import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState'
@@ -44,6 +45,22 @@ export default function MinisteriosTable({
   onTechnicalAccess,
 }: MinisteriosTableProps) {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
+  const [dropdownCoords, setDropdownCoords] = useState<{ top: number; left: number } | null>(null)
+
+  // Fechar dropdown ao rolar a página ou redimensionar a janela
+  useEffect(() => {
+    if (!openDropdownId) return
+    const handleClose = () => {
+      setOpenDropdownId(null)
+      setDropdownCoords(null)
+    }
+    window.addEventListener('scroll', handleClose, true)
+    window.addEventListener('resize', handleClose)
+    return () => {
+      window.removeEventListener('scroll', handleClose, true)
+      window.removeEventListener('resize', handleClose)
+    }
+  }, [openDropdownId])
 
   if (loading) {
     return <div className="text-center text-gray-400 py-12">Carregando...</div>
@@ -72,12 +89,29 @@ export default function MinisteriosTable({
 
   const totalPages = Math.ceil(totalItems / itemsPerPage)
 
-  const toggleDropdown = (id: string) => {
+  const toggleDropdown = (id: string, e: React.MouseEvent<HTMLButtonElement>) => {
     if (openDropdownId === id) {
       setOpenDropdownId(null)
-    } else {
-      setOpenDropdownId(id)
+      setDropdownCoords(null)
+      return
     }
+
+    const btnRect = e.currentTarget.getBoundingClientRect()
+    const menuWidth = 192 // w-48 = 12rem = 192px
+    const menuHeight = onTechnicalAccess ? 220 : 180 // altura aproximada do menu com ou sem acesso técnico
+    const spaceBelow = window.innerHeight - btnRect.bottom
+    const spaceAbove = btnRect.top
+
+    // Se o espaço abaixo for insuficiente e acima tiver mais espaço, abrir para cima
+    const openUpwards = spaceBelow < menuHeight && spaceAbove > spaceBelow
+
+    const top = openUpwards
+      ? Math.max(8, btnRect.top - menuHeight - 6)
+      : Math.min(window.innerHeight - menuHeight - 8, btnRect.bottom + 6)
+    const left = Math.max(8, btnRect.right - menuWidth)
+
+    setDropdownCoords({ top, left })
+    setOpenDropdownId(id)
   }
 
   return (
@@ -143,21 +177,37 @@ export default function MinisteriosTable({
 
                     <div className="relative">
                       <button
-                        onClick={() => toggleDropdown(ministerio.id)}
+                        onClick={(e) => toggleDropdown(ministerio.id, e)}
                         className="px-2 py-1.5 bg-[#032C28] hover:bg-[#0B453B] text-[#A7C4BC] hover:text-white rounded-xl border border-[#0E4D43] transition text-xs font-bold cursor-pointer"
+                        title="Opções"
                       >
                         ⚙️
                       </button>
 
-                      {isDropdownOpen && (
+                      {isDropdownOpen && typeof document !== 'undefined' && dropdownCoords && createPortal(
                         <>
                           {/* Overlay invisivel para fechar o dropdown */}
-                          <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownId(null)} />
-                          <div className="absolute right-0 mt-2 w-48 bg-[#02201d] border border-[#0E4D43] rounded-xl shadow-xl py-1.5 z-20 text-left">
+                          <div
+                            style={{ position: 'fixed', inset: 0, zIndex: 99998 }}
+                            onClick={() => {
+                              setOpenDropdownId(null)
+                              setDropdownCoords(null)
+                            }}
+                          />
+                          <div
+                            style={{
+                              position: 'fixed',
+                              top: `${dropdownCoords.top}px`,
+                              left: `${dropdownCoords.left}px`,
+                              zIndex: 99999,
+                            }}
+                            className="w-48 bg-[#02201d] border border-[#0E4D43] rounded-xl shadow-2xl py-1.5 text-left animate-in fade-in zoom-in-95 duration-100"
+                          >
                             <button
                               onClick={() => {
                                 onEdit(ministerio)
                                 setOpenDropdownId(null)
+                                setDropdownCoords(null)
                               }}
                               className="w-full px-4 py-2 text-xs font-medium text-[#A7C4BC] hover:bg-[#073B34] hover:text-white transition text-left cursor-pointer"
                             >
@@ -167,36 +217,40 @@ export default function MinisteriosTable({
                               onClick={() => {
                                 onBilling(ministerio)
                                 setOpenDropdownId(null)
+                                setDropdownCoords(null)
                               }}
                               className="w-full px-4 py-2 text-xs font-medium text-[#A7C4BC] hover:bg-[#073B34] hover:text-white transition text-left cursor-pointer"
                             >
                               💰 Gerar Cobrança
                             </button>
-                             {onTechnicalAccess && (
+                            {onTechnicalAccess && (
                               <button
                                 onClick={() => {
                                   onTechnicalAccess(ministerio)
                                   setOpenDropdownId(null)
+                                  setDropdownCoords(null)
                                 }}
                                 className="w-full px-4 py-2 text-xs font-semibold text-[#10B981] hover:bg-[#059669]/20 hover:text-white transition text-left flex items-center gap-2 border-t border-[#0E4D43] mt-1 pt-2 cursor-pointer"
                               >
                                 <span>🛠️</span>
                                 <span>Acesso Técnico Nativo</span>
                               </button>
-                             )}
+                            )}
                             <button
                               onClick={() => {
                                 onActivate(ministerio)
                                 setOpenDropdownId(null)
+                                setDropdownCoords(null)
                               }}
                               className="w-full px-4 py-2 text-xs font-medium text-[#A7C4BC] hover:bg-[#073B34] hover:text-white transition text-left cursor-pointer"
                             >
                               ⚡ Ativar / Renovar
                             </button>
-                             <button
+                            <button
                               onClick={() => {
                                 onPrintLabel(ministerio)
                                 setOpenDropdownId(null)
+                                setDropdownCoords(null)
                               }}
                               className="w-full px-4 py-2 text-xs font-medium text-[#A7C4BC] hover:bg-[#073B34] hover:text-white transition text-left cursor-pointer"
                             >
@@ -207,13 +261,15 @@ export default function MinisteriosTable({
                               onClick={() => {
                                 onDelete(ministerio)
                                 setOpenDropdownId(null)
+                                setDropdownCoords(null)
                               }}
                               className="w-full px-4 py-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 transition text-left cursor-pointer"
                             >
                               🚨 Excluir Conta
                             </button>
                           </div>
-                        </>
+                        </>,
+                        document.body
                       )}
                     </div>
                   </div>

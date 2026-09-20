@@ -404,7 +404,25 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'ID do ministério é obrigatório' }, { status: 400 })
     }
 
-    // 1. Remover eventuais fechamentos de caixa prévios para não disparar trigger fn_bloquear_periodo_fechado
+    // 1. Remover dependências que possuem foreign keys sem ON DELETE CASCADE
+    // a) Sessões de impersonation do admin
+    await supabase
+      .from('admin_impersonation_sessions')
+      .delete()
+      .eq('tenant_id', id)
+
+    // b) Sessões de acesso técnico e credenciais
+    await supabase
+      .from('technical_access_grants')
+      .delete()
+      .eq('ministry_id', id)
+
+    await supabase
+      .from('technical_access_secrets')
+      .delete()
+      .eq('ministry_id', id)
+
+    // c) Remover eventuais fechamentos de caixa prévios para não disparar trigger fn_bloquear_periodo_fechado
     await supabase
       .from('tesouraria_fechamentos')
       .delete()
