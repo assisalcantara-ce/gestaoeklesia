@@ -216,26 +216,26 @@ export default function ComercialDashboardPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className="flex h-screen bg-[#032C28]">
       <AdminSidebar />
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto bg-[#032C28]">
         {/* Top Header */}
-        <div className="sticky top-0 bg-gray-950 border-b border-gray-800 px-6 py-4 z-10 flex justify-between items-center">
+        <div className="sticky top-0 bg-[#02201d]/90 backdrop-blur-md border-b border-[#0E4D43]/70 px-6 py-4 z-10 flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-              <Briefcase className="text-blue-500" />
+            <h2 className="text-2xl font-bold text-[#F8FAFC] flex items-center gap-2">
+              <Briefcase className="text-[#10B981]" />
               CRM: Dashboard Comercial
             </h2>
-            <p className="text-gray-400 text-sm mt-1">
+            <p className="text-[#A7C4BC] text-xs mt-1">
               Visão geral das negociações, taxas de conversão e receita prevista.
             </p>
           </div>
           <button
             onClick={fetchOportunidades}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold transition cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 bg-[#073B34] hover:bg-[#0B453B] border border-[#0E4D43] text-[#F8FAFC] rounded-xl text-xs font-semibold transition cursor-pointer"
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={15} />
             Atualizar
           </button>
         </div>
@@ -251,16 +251,16 @@ export default function ComercialDashboardPage() {
           <CrmActivities />
           
           {/* MENU COMERCIAL */}
-          <nav aria-label="Menu comercial" className="flex flex-wrap gap-2 border-b border-gray-800 pb-4">
+          <nav aria-label="Menu comercial" className="flex flex-wrap gap-2 border-b border-[#0E4D43] pb-4">
             <button
               aria-current="page"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold transition"
+              className="px-4 py-2 bg-[#059669] text-white rounded-xl text-xs font-semibold transition shadow-sm"
             >
               Dashboard
             </button>
             <button
               onClick={() => router.push('/admin/comercial/oportunidades')}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg text-sm font-semibold transition cursor-pointer"
+              className="px-4 py-2 bg-[#073B34] hover:bg-[#0B453B] border border-[#0E4D43] text-[#A7C4BC] hover:text-white rounded-xl text-xs font-semibold transition cursor-pointer"
             >
               Oportunidades
             </button>

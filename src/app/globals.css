@@ -12,6 +12,20 @@
   --color-app-text-muted: #94a3b8;
   --color-app-border: #1e293b;
   --color-app-border-subtle: #334155;
+
+  /* Admin Backoffice Emerald Theme Tokens */
+  --color-admin-bg: #032C28;
+  --color-admin-surface: #073B34;
+  --color-admin-surface-elevated: #0B453B;
+  --color-admin-surface-card: #083832;
+  --color-admin-border: #0E4D43;
+  --color-admin-border-subtle: #13584D;
+  --color-admin-primary: #059669;
+  --color-admin-primary-hover: #047857;
+  --color-admin-accent: #10B981;
+  --color-admin-text: #F8FAFC;
+  --color-admin-text-secondary: #A7C4BC;
+  --color-admin-text-muted: #6E9B91;
 }
 
 @layer base {

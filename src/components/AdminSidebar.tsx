@@ -93,27 +93,29 @@ export default function AdminSidebar() {
   ]
 
   return (
-    <div className="flex h-screen bg-gray-900 print:hidden">
+    <div className="flex h-screen bg-[#032C28] print:hidden">
       {/* Sidebar */}
       <aside
-        className={`bg-gray-950 text-white transition-all duration-300 ${
+        className={`bg-[#02201d] text-white transition-all duration-300 ${
           isOpen ? 'w-64' : 'w-20'
-        } border-r border-gray-800 flex flex-col`}
+        } border-r border-[#0E4D43]/60 flex flex-col`}
       >
-        <div className="flex items-center justify-center p-4 border-b border-gray-800">
-          <Image
-            src={BRAND.logoHorizontal}
-            alt="Gestão Eklésia"
-            width={150}
-            height={42}
-            priority
-            sizes="150px"
-            className="h-[42px] w-auto object-contain"
-          />
+        <div className="flex items-center justify-center p-4 border-b border-[#0E4D43]/60 bg-[#032C28]/60">
+          <div className="bg-white/95 px-3 py-1.5 rounded-xl shadow-sm">
+            <Image
+              src={BRAND.logoHorizontal}
+              alt="Gestão Eklésia"
+              width={140}
+              height={38}
+              priority
+              sizes="140px"
+              className="h-[36px] w-auto object-contain"
+            />
+          </div>
         </div>
 
         {/* Menu Items */}
-        <nav className="p-4 space-y-2 flex-1">
+        <nav className="p-4 space-y-1.5 flex-1 overflow-y-auto">
           {menuItems.map((item: any) => {
             const Icon = item.icon
             const isActive = pathname === item.href
@@ -129,20 +131,20 @@ export default function AdminSidebar() {
                         isSubmenuOpen ? null : item.label
                       )
                     }
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
                       isSubmenuOpen
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-300 hover:bg-gray-800'
+                        ? 'bg-[#059669] text-white shadow-sm shadow-emerald-900/30'
+                        : 'text-[#A7C4BC] hover:text-white hover:bg-[#073B34]'
                     }`}
                   >
-                    <Icon size={20} />
+                    <Icon size={19} className={isSubmenuOpen ? 'text-white' : 'text-[#10B981]'} />
                     {isOpen && (
                       <>
                         <span className="text-sm flex-1 text-left">
                           {item.label}
                         </span>
                         <ChevronDown
-                          size={16}
+                          size={15}
                           className={`transition-transform ${
                             isSubmenuOpen ? 'rotate-180' : ''
                           }`}
@@ -153,26 +155,26 @@ export default function AdminSidebar() {
                 ) : (
                   <Link
                     href={item.href}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition ${
                       isActive
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-300 hover:bg-gray-800'
+                        ? 'bg-[#059669] text-white shadow-sm shadow-emerald-900/40 border border-emerald-400/20'
+                        : 'text-[#A7C4BC] hover:text-white hover:bg-[#073B34]'
                     }`}
                     title={!isOpen ? item.label : ''}
                   >
                     <div className="relative">
-                      <Icon size={20} />
+                      <Icon size={19} className={isActive ? 'text-white' : 'text-[#10B981]'} />
                       {!isOpen && item.badge > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
+                        <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white">
                           {item.badge}
                         </span>
                       )}
                     </div>
                     {isOpen && (
-                      <span className="text-sm flex-1 flex items-center justify-between">
+                      <span className="flex-1 flex items-center justify-between">
                         {item.label}
                         {item.badge > 0 && (
-                          <span className="px-2 py-0.5 rounded-full bg-red-500 text-[10px] font-bold text-white">
+                          <span className="px-2 py-0.5 rounded-full bg-rose-500 text-[10px] font-bold text-white">
                             {item.badge}
                           </span>
                         )}
@@ -183,7 +185,7 @@ export default function AdminSidebar() {
 
                 {/* Submenu */}
                 {hasSubmenu && isSubmenuOpen && isOpen && (
-                  <div className="ml-4 space-y-1 mt-1">
+                  <div className="ml-4 space-y-1 mt-1 pl-2 border-l border-[#0E4D43]">
                     {item.submenu.map((subitem: any) => {
                       const SubIcon = subitem.icon
                       const isSubActive = pathname === subitem.href
@@ -192,13 +194,13 @@ export default function AdminSidebar() {
                         <Link
                           key={subitem.href}
                           href={subitem.href}
-                          className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition ${
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition ${
                             isSubActive
-                              ? 'bg-blue-500 text-white'
-                              : 'text-gray-400 hover:bg-gray-800'
+                              ? 'bg-[#059669] text-white font-semibold'
+                              : 'text-[#A7C4BC] hover:text-white hover:bg-[#073B34]'
                           }`}
                         >
-                          <SubIcon size={16} />
+                          <SubIcon size={15} className={isSubActive ? 'text-white' : 'text-[#10B981]'} />
                           <span>{subitem.label}</span>
                         </Link>
                       )
@@ -211,20 +213,20 @@ export default function AdminSidebar() {
         </nav>
 
         {/* Logout Button */}
-        <div className="px-4 py-4 border-t border-gray-800">
+        <div className="px-4 py-4 border-t border-[#0E4D43]/60 bg-[#02201d]">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white transition text-sm"
+            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition text-xs font-semibold cursor-pointer"
             title="Sair"
           >
-            <LogOut size={20} />
-            {isOpen && <span>Sair</span>}
+            <LogOut size={17} />
+            {isOpen && <span>Sair do Backoffice</span>}
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto bg-gray-900" />
+      <main className="flex-1 overflow-auto bg-[#032C28]" />
     </div>
   )
 }

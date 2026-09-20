@@ -85,10 +85,10 @@ export default function AdminDashboardPage() {
   // Mostrar tela de carregamento enquanto verifica autenticação
   if (isLoading) {
     return (
-      <div className="flex h-screen bg-gray-900">
+      <div className="flex h-screen bg-[#032C28]">
         <AdminSidebar />
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-white text-lg">Verificando autenticação...</div>
+          <div className="text-[#F8FAFC] text-lg font-medium">Verificando autenticação...</div>
         </div>
       </div>
     )
@@ -102,10 +102,10 @@ export default function AdminDashboardPage() {
   // Mostrar tela de carregamento enquanto busca dados
   if (loading) {
     return (
-      <div className="flex h-screen bg-gray-900">
+      <div className="flex h-screen bg-[#032C28]">
         <AdminSidebar />
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-white text-lg">Carregando métricas...</div>
+          <div className="text-[#F8FAFC] text-lg font-medium">Carregando métricas...</div>
         </div>
       </div>
     )
@@ -125,39 +125,39 @@ export default function AdminDashboardPage() {
     value: string | number
     trend?: string
   }) => (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition">
+    <div className="bg-[#073B34] rounded-2xl p-6 border border-[#0E4D43] shadow-sm hover:border-[#10B981]/50 transition duration-200 group">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-gray-400 text-sm font-medium">{title}</p>
-          <p className="text-white text-3xl font-bold mt-2">{value}</p>
-          {trend && <p className="text-green-400 text-sm mt-2">{trend}</p>}
+          <p className="text-[#A7C4BC] text-xs font-semibold uppercase tracking-wider">{title}</p>
+          <p className="text-[#F8FAFC] text-3xl font-extrabold mt-2 tracking-tight">{value}</p>
+          {trend && <p className="text-[#10B981] text-xs font-semibold mt-2">{trend}</p>}
         </div>
-        <div className="bg-blue-600 p-3 rounded-lg">
-          <Icon size={24} className="text-white" />
+        <div className="bg-[#0B453B] border border-[#10B981]/30 p-3.5 rounded-xl text-[#10B981] group-hover:bg-[#059669] group-hover:text-white transition duration-200 shadow-sm">
+          <Icon size={24} />
         </div>
       </div>
     </div>
   )
 
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className="flex h-screen bg-[#032C28]">
       <AdminSidebar />
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto bg-[#032C28]">
         {/* Top Header */}
-        <div className="sticky top-0 bg-gray-950 border-b border-gray-800 px-6 py-4 z-10">
-          <h2 className="text-2xl font-bold text-white">PAINEL ADMINISTRATIVO: Visão Geral</h2>
-          <p className="text-gray-400 text-sm mt-1">
-            Bem-vindo de volta, {adminUser?.email}
+        <div className="sticky top-0 bg-[#02201d]/90 backdrop-blur-md border-b border-[#0E4D43]/70 px-6 py-4 z-10">
+          <h2 className="text-2xl font-bold text-[#F8FAFC]">PAINEL ADMINISTRATIVO: Visão Geral</h2>
+          <p className="text-[#A7C4BC] text-xs mt-1">
+            Operador autenticado: <span className="text-white font-medium">{adminUser?.email}</span>
           </p>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 max-w-7xl">
           {error && (
-            <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg flex items-center gap-2">
-              <AlertCircle size={20} />
+            <div className="bg-rose-950/80 border border-rose-800/80 text-rose-200 px-4 py-3 rounded-xl flex items-center gap-2 text-sm">
+              <AlertCircle size={20} className="text-rose-400 shrink-0" />
               {error}
             </div>
           )}
@@ -189,53 +189,55 @@ export default function AdminDashboardPage() {
           {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Tickets Chart */}
-            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-              <h3 className="text-white font-bold text-lg mb-4">Chamados Mensal</h3>
+            <div className="bg-[#073B34] rounded-2xl p-6 border border-[#0E4D43] shadow-sm">
+              <h3 className="text-[#F8FAFC] font-bold text-lg mb-4">Chamados Mensal</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={ticketsData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis stroke="#9ca3af" dataKey="month" />
-                  <YAxis stroke="#9ca3af" allowDecimals={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#0E4D43" />
+                  <XAxis stroke="#A7C4BC" dataKey="month" tick={{ fill: '#A7C4BC', fontSize: 12 }} />
+                  <YAxis stroke="#A7C4BC" allowDecimals={false} tick={{ fill: '#A7C4BC', fontSize: 12 }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#1f2937',
-                      border: '1px solid #4b5563',
-                      borderRadius: '0.5rem',
+                      backgroundColor: '#073B34',
+                      border: '1px solid #0E4D43',
+                      borderRadius: '0.75rem',
+                      color: '#F8FAFC',
                     }}
                   />
-                  <Legend />
+                  <Legend wrapperStyle={{ color: '#A7C4BC' }} />
                   <Line
                     type="monotone"
                     dataKey="value"
                     name="Chamados"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    dot={{ fill: '#3b82f6', r: 5 }}
+                    stroke="#10B981"
+                    strokeWidth={2.5}
+                    dot={{ fill: '#10B981', r: 4 }}
+                    activeDot={{ r: 6, fill: '#34D399' }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
 
             {/* Painel de Alertas Executivos */}
-            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-              <h3 className="text-white font-bold text-lg mb-4 flex items-center justify-between">
+            <div className="bg-[#073B34] rounded-2xl p-6 border border-[#0E4D43] shadow-sm">
+              <h3 className="text-[#F8FAFC] font-bold text-lg mb-4 flex items-center justify-between">
                 <span>🚨 Alertas Executivos</span>
-                <span className="text-xs font-semibold text-gray-400">Monitoramento em Tempo Real</span>
+                <span className="text-xs font-semibold text-[#A7C4BC]">Monitoramento em Tempo Real</span>
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* 1. ⚠️ Trials Expirados */}
                 <Link
                   href="/admin/ministerios"
-                  className="bg-gray-900 hover:bg-gray-850 rounded-lg p-4 border border-rose-900/40 hover:border-rose-600/60 transition block group"
+                  className="bg-[#032C28] hover:bg-[#0B453B] rounded-xl p-4 border border-rose-900/40 hover:border-rose-500/60 transition block group"
                 >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-rose-400 text-xs font-extrabold uppercase tracking-wider">⚠️ Trials Expirados</p>
-                      <p className="text-white text-3xl font-black mt-1">{execStats?.trials ? 0 : (execStats?.suspensos || 0)}</p>
-                      <p className="text-[11px] text-gray-400 mt-1 group-hover:text-rose-300 transition">Ver clientes expirados →</p>
+                      <p className="text-[#F8FAFC] text-3xl font-black mt-1">{execStats?.trials ? 0 : (execStats?.suspensos || 0)}</p>
+                      <p className="text-[11px] text-[#A7C4BC] mt-1 group-hover:text-rose-300 transition">Ver clientes expirados →</p>
                     </div>
-                    <div className="p-3 bg-rose-950/80 text-rose-400 rounded-lg border border-rose-800/50 group-hover:scale-105 transition">
+                    <div className="p-3 bg-rose-950/80 text-rose-400 rounded-xl border border-rose-800/50 group-hover:scale-105 transition">
                       <AlertCircle className="w-5 h-5" />
                     </div>
                   </div>
@@ -244,15 +246,15 @@ export default function AdminDashboardPage() {
                 {/* 2. 💳 Cobranças Pendentes */}
                 <Link
                   href="/admin/pagamentos"
-                  className="bg-gray-900 hover:bg-gray-850 rounded-lg p-4 border border-amber-900/40 hover:border-amber-600/60 transition block group"
+                  className="bg-[#032C28] hover:bg-[#0B453B] rounded-xl p-4 border border-amber-900/40 hover:border-amber-500/60 transition block group"
                 >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-amber-400 text-xs font-extrabold uppercase tracking-wider">💳 Cobranças Pendentes</p>
-                      <p className="text-white text-3xl font-black mt-1">{execStats?.pendentes || 0}</p>
-                      <p className="text-[11px] text-gray-400 mt-1 group-hover:text-amber-300 transition">Ver faturas abertas →</p>
+                      <p className="text-[#F8FAFC] text-3xl font-black mt-1">{execStats?.pendentes || 0}</p>
+                      <p className="text-[11px] text-[#A7C4BC] mt-1 group-hover:text-amber-300 transition">Ver faturas abertas →</p>
                     </div>
-                    <div className="p-3 bg-amber-950/80 text-amber-400 rounded-lg border border-amber-800/50 group-hover:scale-105 transition">
+                    <div className="p-3 bg-amber-950/80 text-amber-400 rounded-xl border border-amber-800/50 group-hover:scale-105 transition">
                       <CreditCard className="w-5 h-5" />
                     </div>
                   </div>
@@ -261,15 +263,15 @@ export default function AdminDashboardPage() {
                 {/* 3. 📥 Leads Aguardando Conversão */}
                 <Link
                   href="/admin/ministerios"
-                  className="bg-gray-900 hover:bg-gray-850 rounded-lg p-4 border border-blue-900/40 hover:border-blue-600/60 transition block group"
+                  className="bg-[#032C28] hover:bg-[#0B453B] rounded-xl p-4 border border-emerald-800/50 hover:border-[#10B981]/60 transition block group"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-blue-400 text-xs font-extrabold uppercase tracking-wider">📥 Leads Pendentes</p>
-                      <p className="text-white text-3xl font-black mt-1">{execStats?.leads || 0}</p>
-                      <p className="text-[11px] text-gray-400 mt-1 group-hover:text-blue-300 transition">Ver central de leads →</p>
+                      <p className="text-[#10B981] text-xs font-extrabold uppercase tracking-wider">📥 Leads Pendentes</p>
+                      <p className="text-[#F8FAFC] text-3xl font-black mt-1">{execStats?.leads || 0}</p>
+                      <p className="text-[11px] text-[#A7C4BC] mt-1 group-hover:text-emerald-300 transition">Ver central de leads →</p>
                     </div>
-                    <div className="p-3 bg-blue-950/80 text-blue-400 rounded-lg border border-blue-800/50 group-hover:scale-105 transition">
+                    <div className="p-3 bg-[#0B453B] text-[#10B981] rounded-xl border border-[#10B981]/40 group-hover:scale-105 transition">
                       <Inbox className="w-5 h-5" />
                     </div>
                   </div>
@@ -278,15 +280,15 @@ export default function AdminDashboardPage() {
                 {/* 4. 🚨 Clientes Suspensos */}
                 <Link
                   href="/admin/ministerios"
-                  className="bg-gray-900 hover:bg-gray-850 rounded-lg p-4 border border-red-900/40 hover:border-red-600/60 transition block group"
+                  className="bg-[#032C28] hover:bg-[#0B453B] rounded-xl p-4 border border-rose-900/40 hover:border-rose-500/60 transition block group"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-red-400 text-xs font-extrabold uppercase tracking-wider">🚨 Clientes Suspensos</p>
-                      <p className="text-white text-3xl font-black mt-1">{execStats?.suspensos || 0}</p>
-                      <p className="text-[11px] text-gray-400 mt-1 group-hover:text-red-300 transition">Ver clientes suspensos →</p>
+                      <p className="text-rose-400 text-xs font-extrabold uppercase tracking-wider">🚨 Clientes Suspensos</p>
+                      <p className="text-[#F8FAFC] text-3xl font-black mt-1">{execStats?.suspensos || 0}</p>
+                      <p className="text-[11px] text-[#A7C4BC] mt-1 group-hover:text-rose-300 transition">Ver clientes suspensos →</p>
                     </div>
-                    <div className="p-3 bg-red-950/80 text-red-400 rounded-lg border border-red-800/50 group-hover:scale-105 transition">
+                    <div className="p-3 bg-rose-950/80 text-rose-400 rounded-xl border border-rose-800/50 group-hover:scale-105 transition">
                       <Lock className="w-5 h-5" />
                     </div>
                   </div>
@@ -296,23 +298,24 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Deployments Chart */}
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <h3 className="text-white font-bold text-lg mb-4">Implantações vs Cancelamentos</h3>
+          <div className="bg-[#073B34] rounded-2xl p-6 border border-[#0E4D43] shadow-sm">
+            <h3 className="text-[#F8FAFC] font-bold text-lg mb-4">Implantações vs Cancelamentos</h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={deploymentsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis stroke="#9ca3af" dataKey="month" />
-                <YAxis stroke="#9ca3af" allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#0E4D43" />
+                <XAxis stroke="#A7C4BC" dataKey="month" tick={{ fill: '#A7C4BC', fontSize: 12 }} />
+                <YAxis stroke="#A7C4BC" allowDecimals={false} tick={{ fill: '#A7C4BC', fontSize: 12 }} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#1f2937',
-                    border: '1px solid #4b5563',
-                    borderRadius: '0.5rem',
+                    backgroundColor: '#073B34',
+                    border: '1px solid #0E4D43',
+                    borderRadius: '0.75rem',
+                    color: '#F8FAFC',
                   }}
                 />
-                <Legend />
-                <Bar dataKey="implantacoes" name="Implantações" fill="#10b981" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="cancelamentos" name="Cancelamentos" fill="#ef4444" radius={[8, 8, 0, 0]} />
+                <Legend wrapperStyle={{ color: '#A7C4BC' }} />
+                <Bar dataKey="implantacoes" name="Implantações" fill="#10B981" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="cancelamentos" name="Cancelamentos" fill="#EF4444" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

@@ -569,14 +569,14 @@ export default function SuportePage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className="flex h-screen bg-[#032C28]">
       <AdminSidebar />
 
       <main className="flex-1 overflow-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-gray-950 border-b border-gray-800 px-6 py-4 z-10">
-          <h2 className="text-2xl font-bold text-white">Suporte Técnico</h2>
-          <p className="text-gray-400 text-sm mt-1">Gerenciamento de tickets e atendimentos</p>
+        <div className="sticky top-0 bg-[#02201d]/90 backdrop-blur border-b border-[#0E4D43] px-6 py-4 z-10">
+          <h2 className="text-2xl font-bold text-[#F8FAFC]">Suporte Técnico</h2>
+          <p className="text-[#A7C4BC] text-sm mt-1">Gerenciamento de tickets e atendimentos</p>
         </div>
 
         <div className="p-6 space-y-6">

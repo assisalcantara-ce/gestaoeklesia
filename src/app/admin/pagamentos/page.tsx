@@ -644,11 +644,11 @@ export default function PagamentosPage() {
   // Cláusulas de Retorno Antecipado (apenas APÓS a execução incondicional de TODOS os Hooks)
   if (isLoading) {
     return (
-      <div className="flex h-screen bg-gray-900">
+      <div className="flex h-screen bg-[#032C28]">
         <AdminSidebar />
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-white text-lg flex items-center gap-2">
-            <RefreshCw className="animate-spin text-blue-500" />
+          <div className="text-[#F8FAFC] text-lg flex items-center gap-2 font-medium">
+            <RefreshCw className="animate-spin text-[#10B981]" />
             Verificando autenticação...
           </div>
         </div>
@@ -661,33 +661,33 @@ export default function PagamentosPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden">
+    <div className="flex h-screen bg-[#032C28] text-[#F8FAFC] overflow-hidden">
       <AdminSidebar />
 
-      <main className="flex-1 flex flex-col overflow-y-auto">
-        <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur px-8 py-6 sticky top-0 z-10 flex items-center justify-between">
+      <main className="flex-1 flex flex-col overflow-y-auto bg-[#032C28]">
+        <header className="border-b border-[#0E4D43]/70 bg-[#02201d]/90 backdrop-blur px-8 py-6 sticky top-0 z-10 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-              <Coins className="text-blue-500 h-7 w-7" />
+            <h1 className="text-2xl font-bold tracking-tight text-[#F8FAFC] flex items-center gap-2">
+              <Coins className="text-[#10B981] h-7 w-7" />
               Gestão Financeira da Plataforma
             </h1>
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="text-xs text-[#A7C4BC] mt-1">
               Gerencie a receita, faturas e lançamentos financeiros de todos os clientes.
             </p>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/admin/pagamentos/relatorios')}
-              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 hover:border-gray-600 px-4 py-2.5 rounded-lg text-sm font-semibold transition"
+              className="flex items-center gap-2 bg-[#073B34] hover:bg-[#0B453B] text-[#F8FAFC] border border-[#0E4D43] px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer"
             >
-              <BarChart3 className="h-4 w-4 text-blue-400" />
+              <BarChart3 className="h-4 w-4 text-[#10B981]" />
               📊 Relatórios
             </button>
 
             {hasMinistriesAccess && (
               <button
                 onClick={handleOpenAvulsaModal}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition"
+                className="flex items-center gap-2 bg-[#059669] hover:bg-[#047857] text-white px-4 py-2 rounded-xl text-xs font-semibold transition shadow-sm shadow-emerald-900/40 cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
                 Lançar Fatura Avulsa
@@ -696,10 +696,10 @@ export default function PagamentosPage() {
             <button
               onClick={fetchInvoices}
               disabled={loading}
-              className="p-2.5 text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition disabled:opacity-50"
+              className="p-2.5 text-[#A7C4BC] hover:text-white bg-[#073B34] hover:bg-[#0B453B] border border-[#0E4D43] rounded-xl transition disabled:opacity-50 cursor-pointer"
               title="Atualizar lista"
             >
-              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </header>

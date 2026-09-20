@@ -212,25 +212,25 @@ export default function PlanosPage() {
   const orderedPlanos = [...visiblePlanos].sort((a, b) => a.price_monthly - b.price_monthly)
 
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className="flex h-screen bg-[#032C28]">
       <AdminSidebar />
 
       <main className="flex-1 overflow-auto">
-        <div className="sticky top-0 bg-gray-950 border-b border-gray-800 px-6 py-4 z-10">
-          <h2 className="text-2xl font-bold text-white">PAINEL ADMINISTRATIVO: PLANOS</h2>
-          <p className="text-gray-400 text-sm mt-1">Gestão de planos e limites</p>
+        <div className="sticky top-0 bg-[#02201d]/90 backdrop-blur border-b border-[#0E4D43] px-6 py-4 z-10">
+          <h2 className="text-2xl font-bold text-[#F8FAFC]">PAINEL ADMINISTRATIVO: PLANOS</h2>
+          <p className="text-[#A7C4BC] text-sm mt-1">Gestão de planos e limites</p>
         </div>
 
         <div className="p-6 space-y-6">
           <div className="max-w-7xl mx-auto">
             {error && (
-              <div className="bg-red-900 border border-red-700 text-red-200 p-4 rounded mb-6">
+              <div className="bg-red-950/80 border border-red-800 text-red-200 p-4 rounded mb-6">
                 {error}
               </div>
             )}
 
             {success && (
-              <div className="bg-green-900 border border-green-700 text-green-200 p-4 rounded mb-6">
+              <div className="bg-emerald-950/80 border border-emerald-800 text-emerald-200 p-4 rounded mb-6">
                 {success}
               </div>
             )}
@@ -242,14 +242,14 @@ export default function PlanosPage() {
                     resetForm()
                     setShowForm(!showForm)
                   }}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="px-6 py-2 bg-[#059669] hover:bg-[#047857] text-white font-medium rounded-lg transition"
                 >
                   {showForm ? 'Cancelar' : '+ Novo Plano'}
                 </button>
 
                 <button
                   onClick={() => setShowInactive((prev) => !prev)}
-                  className="px-4 py-2 bg-gray-700 text-gray-100 rounded-lg hover:bg-gray-600 text-sm"
+                  className="px-4 py-2 bg-[#073B34] border border-[#0E4D43] text-[#A7C4BC] hover:text-[#F8FAFC] rounded-lg transition text-sm"
                 >
                   {showInactive ? 'Ocultar Inativos' : 'Mostrar Inativos'}
                 </button>
@@ -257,13 +257,13 @@ export default function PlanosPage() {
             </div>
 
             {showForm && (
-              <div ref={formRef} className="bg-gray-800 border border-gray-700 rounded-lg shadow p-6 mb-6 text-gray-100">
-                <h2 className="text-xl font-bold mb-4">
+              <div ref={formRef} className="bg-[#073B34] border border-[#0E4D43] rounded-lg shadow p-6 mb-6 text-[#F8FAFC]">
+                <h2 className="text-xl font-bold mb-4 text-[#F8FAFC]">
                   {selectedPlan ? 'Editar Plano' : 'Novo Plano'}
                 </h2>
                 <form
                   onSubmit={handleSubmit}
-                  className="grid grid-cols-1 md:grid-cols-3 gap-4 [&_input]:bg-gray-900 [&_input]:border-gray-700 [&_input]:text-gray-100 [&_input]:placeholder:text-gray-500 [&_textarea]:bg-gray-900 [&_textarea]:border-gray-700 [&_textarea]:text-gray-100 [&_textarea]:placeholder:text-gray-500"
+                  className="grid grid-cols-1 md:grid-cols-3 gap-4 [&_input]:bg-[#032C28] [&_input]:border-[#0E4D43] [&_input]:text-[#F8FAFC] [&_input]:placeholder:text-[#A7C4BC]/60 [&_textarea]:bg-[#032C28] [&_textarea]:border-[#0E4D43] [&_textarea]:text-[#F8FAFC] [&_textarea]:placeholder:text-[#A7C4BC]/60"
                 >
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Nome do Plano</label>
@@ -391,59 +391,59 @@ export default function PlanosPage() {
                 orderedPlanos.map((plan) => (
                   <div
                     key={plan.id}
-                    className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden hover:border-gray-700 transition"
+                    className="bg-[#073B34] border border-[#0E4D43] rounded-lg overflow-hidden hover:border-[#10B981]/50 transition shadow-sm"
                   >
-                    <div className="bg-gradient-to-r from-blue-900 to-blue-700 text-white p-6">
-                      <h3 className="text-2xl font-bold">{plan.name}</h3>
-                      <p className="text-blue-100 mt-2">{plan.description || 'Sem descrição cadastrada.'}</p>
+                    <div className="bg-gradient-to-r from-[#02201d] to-[#0B453B] text-white p-6 border-b border-[#0E4D43]">
+                      <h3 className="text-2xl font-bold text-[#F8FAFC]">{plan.name}</h3>
+                      <p className="text-[#A7C4BC] mt-2">{plan.description || 'Sem descrição cadastrada.'}</p>
                       {!plan.is_active && (
-                        <span className="inline-block mt-3 px-2 py-1 text-xs rounded bg-gray-900/40 border border-white/30">
+                        <span className="inline-block mt-3 px-2 py-1 text-xs rounded bg-red-950/60 border border-red-800/60 text-red-300">
                           Inativo
                         </span>
                       )}
                     </div>
 
-                    <div className="p-6 border-b border-gray-800">
-                      <div className="text-3xl font-bold text-white">
+                    <div className="p-6 border-b border-[#0E4D43]">
+                      <div className="text-3xl font-bold text-[#F8FAFC]">
                         R$ {plan.price_monthly.toFixed(2)}
-                        <span className="text-base text-gray-300">/mês</span>
+                        <span className="text-base text-[#A7C4BC]">/mês</span>
                       </div>
                       {plan.is_price_on_request && (
-                        <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded bg-blue-950/80 text-blue-400 border border-blue-800/60 text-[11px] font-semibold">
+                        <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-950/80 text-[#10B981] border border-[#10B981]/30 text-[11px] font-semibold">
                           🏷️ LP: "Consulte-nos"
                         </div>
                       )}
                     </div>
 
-                    <div className="p-6 border-b border-gray-800">
-                      <ul className="space-y-3 text-gray-200">
+                    <div className="p-6 border-b border-[#0E4D43]">
+                      <ul className="space-y-3 text-[#A7C4BC]">
                         <li className="flex items-center text-sm">
-                          <span className="font-semibold text-gray-100 mr-2">👥</span>
+                          <span className="font-semibold text-[#F8FAFC] mr-2">👥</span>
                           {plan.max_members > 0 ? `Até ${plan.max_members} Membros` : 'Membros ilimitados'}
                         </li>
                         <li className="flex items-center text-sm">
-                          <span className="font-semibold text-gray-100 mr-2">🏛️</span>
+                          <span className="font-semibold text-[#F8FAFC] mr-2">🏛️</span>
                           Até {(plan as any).max_ministerios || 0} Igrejas Inclusas
                         </li>
                       </ul>
                     </div>
 
                     {Array.isArray((plan as any).modulos) && (plan as any).modulos.length > 0 && (
-                      <div className="border-b border-gray-800">
+                      <div className="border-b border-[#0E4D43]">
                         <button
                           onClick={() => setExpandedModulos(prev => ({ ...prev, [plan.id]: !prev[plan.id] }))}
-                          className="w-full flex items-center justify-between px-6 py-3 text-left hover:bg-gray-800/50 transition"
+                          className="w-full flex items-center justify-between px-6 py-3 text-left hover:bg-[#0B453B]/50 transition"
                         >
-                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          <span className="text-xs font-semibold text-[#A7C4BC] uppercase tracking-wide">
                             Módulos inclusos ({(plan as any).modulos.length})
                           </span>
-                          <span className="text-gray-500 text-xs transition-transform duration-200" style={{ display: 'inline-block', transform: expandedModulos[plan.id] ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                          <span className="text-[#A7C4BC] text-xs transition-transform duration-200" style={{ display: 'inline-block', transform: expandedModulos[plan.id] ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                         </button>
                         {expandedModulos[plan.id] && (
                           <ul className="px-6 pb-4 space-y-1">
                             {(plan as any).modulos.map((m: string) => (
-                              <li key={m} className="flex items-center gap-2 text-sm text-gray-300">
-                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                              <li key={m} className="flex items-center gap-2 text-sm text-[#F8FAFC]">
+                                <span className="h-1.5 w-1.5 rounded-full bg-[#10B981] flex-shrink-0" />
                                 {m}
                               </li>
                             ))}
@@ -458,7 +458,7 @@ export default function PlanosPage() {
                           e.stopPropagation();
                           handleEdit(plan);
                         }}
-                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                        className="flex-1 px-4 py-2 bg-[#059669] hover:bg-[#047857] text-white rounded text-sm font-medium transition"
                       >
                         Editar
                       </button>

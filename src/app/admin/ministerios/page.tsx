@@ -400,10 +400,10 @@ export default function MinisteriosPage() {
   }, [filteredMinisterios, currentPage, itemsPerPage])
 
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className="flex h-screen bg-[#032C28]">
       <AdminSidebar />
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto bg-[#032C28]">
         <MinisteriosHeader
           titulo="PAINEL ADMINISTRATIVO: MINISTÉRIOS"
           descricao="Gerencie todos os ministérios/clientes"
@@ -412,14 +412,14 @@ export default function MinisteriosPage() {
         <div className="p-6 space-y-6">
           <div className="max-w-7xl mx-auto">
             {error && (
-              <div ref={errorRef} className="bg-red-900 border border-red-700 text-red-200 p-4 rounded mb-6 flex items-start gap-3">
+              <div ref={errorRef} className="bg-rose-950/80 border border-rose-800 text-rose-200 p-4 rounded-xl mb-6 flex items-start gap-3 text-sm">
                 <span className="text-xl leading-none mt-0.5">&#9888;</span>
                 <span>{error}</span>
               </div>
             )}
 
             {success && (
-              <div className="bg-green-900 border border-green-700 text-green-200 p-4 rounded mb-6">
+              <div className="bg-[#073B34] border border-[#10B981] text-emerald-200 p-4 rounded-xl mb-6 text-sm font-medium">
                 {success}
               </div>
             )}
@@ -468,24 +468,24 @@ export default function MinisteriosPage() {
             </div>
 
             {/* Abas */}
-            <div className="mb-6 border-b border-gray-800">
+            <div className="mb-6 border-b border-[#0E4D43]">
               <div className="flex gap-4">
                 <button
                   onClick={() => setActiveTab('ativos')}
-                  className={`px-4 py-3 font-medium text-sm transition ${
+                  className={`px-4 py-3 font-medium text-sm transition cursor-pointer ${
                     activeTab === 'ativos'
-                      ? 'text-blue-400 border-b-2 border-blue-400'
-                      : 'text-gray-400 hover:text-gray-200'
+                      ? 'text-[#10B981] border-b-2 border-[#10B981] font-semibold'
+                      : 'text-[#A7C4BC] hover:text-white'
                   }`}
                 >
                   📋 Ministérios Ativos
                 </button>
                 <button
                   onClick={() => setActiveTab('leads')}
-                  className={`px-4 py-3 font-medium text-sm transition ${
+                  className={`px-4 py-3 font-medium text-sm transition cursor-pointer ${
                     activeTab === 'leads'
-                      ? 'text-blue-400 border-b-2 border-blue-400'
-                      : 'text-gray-400 hover:text-gray-200'
+                      ? 'text-[#10B981] border-b-2 border-[#10B981] font-semibold'
+                      : 'text-[#A7C4BC] hover:text-white'
                   }`}
                 >
                   📥 Leads
@@ -497,24 +497,24 @@ export default function MinisteriosPage() {
         {activeTab === 'ativos' && (
           <>
             {/* Nova Toolbar Executiva */}
-            <div className="mb-6 bg-gray-800/40 border border-gray-700/50 rounded-xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="mb-6 bg-[#073B34] border border-[#0E4D43] rounded-2xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-sm">
               {/* Lado Esquerdo: Filtros e Pesquisa */}
               <div className="flex flex-wrap items-center gap-3 flex-1 max-w-4xl">
                 <div className="relative flex-1 min-w-[240px]">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">🔍</span>
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-[#A7C4BC] pointer-events-none">🔍</span>
                   <input
                     type="text"
                     placeholder="Pesquisar por nome, responsável, e-mail, cidade, telefone..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 hover:border-gray-600 focus:border-blue-500 rounded-lg text-sm text-gray-100 placeholder-gray-400 focus:outline-none transition"
+                    className="w-full pl-9 pr-4 py-2 bg-[#032C28] border border-[#0E4D43] hover:border-[#10B981]/50 focus:border-[#10B981] rounded-xl text-sm text-[#F8FAFC] placeholder-[#A7C4BC]/60 focus:outline-none transition"
                   />
                 </div>
 
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className="px-3 py-2 bg-[#032C28] border border-[#0E4D43] rounded-xl text-sm text-[#F8FAFC] focus:outline-none focus:border-[#10B981] cursor-pointer"
                 >
                   <option value="all">Status: Todos</option>
                   <option value="ativo">Ativo</option>
@@ -527,7 +527,7 @@ export default function MinisteriosPage() {
                 <select
                   value={planFilter}
                   onChange={(e) => setPlanFilter(e.target.value)}
-                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className="px-3 py-2 bg-[#032C28] border border-[#0E4D43] rounded-xl text-sm text-[#F8FAFC] focus:outline-none focus:border-[#10B981] cursor-pointer"
                 >
                   <option value="all">Plano: Todos os Planos</option>
                   {planos.map((p) => (
@@ -540,7 +540,7 @@ export default function MinisteriosPage() {
                 <select
                   value={trialFilter}
                   onChange={(e) => setTrialFilter(e.target.value)}
-                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className="px-3 py-2 bg-[#032C28] border border-[#0E4D43] rounded-xl text-sm text-[#F8FAFC] focus:outline-none focus:border-[#10B981] cursor-pointer"
                 >
                   <option value="all">Trial: Todos</option>
                   <option value="em_trial">Em Trial</option>
@@ -558,7 +558,7 @@ export default function MinisteriosPage() {
                       setPlanFilter('all')
                       setTrialFilter('all')
                     }}
-                    className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+                    className="px-3 py-2 bg-[#032C28] hover:bg-[#0B453B] border border-[#0E4D43] text-[#A7C4BC] hover:text-white rounded-xl text-sm font-medium transition flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer"
                     title="Limpar todos os filtros"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
@@ -578,7 +578,7 @@ export default function MinisteriosPage() {
                     setImportFile(null)
                     setImportMinistryId('')
                   }}
-                  className="px-4 py-2 bg-gray-750 hover:bg-gray-700 border border-gray-600/55 text-white text-sm font-semibold rounded-lg transition"
+                  className="px-4 py-2 bg-[#032C28] hover:bg-[#0B453B] border border-[#0E4D43] text-[#F8FAFC] text-sm font-semibold rounded-xl transition cursor-pointer"
                 >
                   📥 Importar CSV
                 </button>
@@ -587,7 +587,7 @@ export default function MinisteriosPage() {
                   onClick={() => {
                     router.push('/admin/ministerios/novo')
                   }}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition"
+                  className="px-4 py-2 bg-[#059669] hover:bg-[#047857] text-white text-sm font-semibold rounded-xl transition shadow-sm shadow-emerald-900/40 cursor-pointer"
                 >
                   + Novo Ministério
                 </button>

@@ -81,35 +81,35 @@ export default function MinisteriosTable({
   }
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg shadow overflow-visible">
+    <div className="bg-[#073B34] border border-[#0E4D43] rounded-2xl shadow-sm overflow-visible">
       <table className="w-full text-left border-collapse">
-        <thead className="bg-gray-900 border-b border-gray-750">
+        <thead className="bg-[#02201d] border-b border-[#0E4D43]">
           <tr>
-            <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Ministério / Contato</th>
-            <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Assinatura e Licença</th>
-            <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Última Atividade</th>
-            <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Ações</th>
+            <th className="px-6 py-4 text-xs font-bold text-[#A7C4BC] uppercase tracking-wider">Ministério / Contato</th>
+            <th className="px-6 py-4 text-xs font-bold text-[#A7C4BC] uppercase tracking-wider">Assinatura e Licença</th>
+            <th className="px-6 py-4 text-xs font-bold text-[#A7C4BC] uppercase tracking-wider">Última Atividade</th>
+            <th className="px-6 py-4 text-xs font-bold text-[#A7C4BC] uppercase tracking-wider text-right">Ações</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-750">
+        <tbody className="divide-y divide-[#0E4D43]/60">
           {ministerios.map((ministerio) => {
             const statusDetail = getDetailedStatus(ministerio)
             const isDropdownOpen = openDropdownId === ministerio.id
 
             return (
-              <tr key={ministerio.id} className="hover:bg-gray-700/30 transition duration-150">
+              <tr key={ministerio.id} className="hover:bg-[#0B453B]/50 transition duration-150">
                 {/* Coluna Ministério e Contato agrupados */}
                 <td className="px-6 py-4">
                   <div className="flex flex-col space-y-1">
                     <Link
                       href={`/admin/ministerios/${ministerio.id}`}
-                      className="text-sm font-semibold text-white hover:text-blue-400 transition"
+                      className="text-sm font-semibold text-[#F8FAFC] hover:text-[#10B981] transition"
                     >
                       {ministerio.name}
                     </Link>
-                    <span className="text-xs text-gray-400">{ministerio.email_admin}</span>
+                    <span className="text-xs text-[#A7C4BC]">{ministerio.email_admin}</span>
                     {ministerio.phone && (
-                      <span className="text-[11px] text-gray-500">{formatPhoneDisplay(ministerio.phone)}</span>
+                      <span className="text-[11px] text-[#6E9B91]">{formatPhoneDisplay(ministerio.phone)}</span>
                     )}
                   </div>
                 </td>
@@ -120,14 +120,14 @@ export default function MinisteriosTable({
                     <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${statusDetail.class}`}>
                       {statusDetail.label}
                     </span>
-                    <span className="text-[11px] text-gray-400">
-                      Plano: <span className="text-gray-200 uppercase font-semibold">{ministerio.plan || 'Starter'}</span>
+                    <span className="text-[11px] text-[#A7C4BC]">
+                      Plano: <span className="text-[#F8FAFC] uppercase font-semibold">{ministerio.plan || 'Starter'}</span>
                     </span>
                   </div>
                 </td>
 
                 {/* Coluna Ultima Atividade */}
-                <td className="px-6 py-4 text-sm text-gray-400">
+                <td className="px-6 py-4 text-sm text-[#A7C4BC]">
                   Não informado
                 </td>
 
@@ -136,7 +136,7 @@ export default function MinisteriosTable({
                   <div className="relative inline-flex items-center gap-2">
                     <Link
                       href={`/admin/ministerios/${ministerio.id}`}
-                      className="px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600 border border-blue-500/20 hover:border-blue-500 text-blue-300 hover:text-white rounded-lg text-xs font-semibold transition"
+                      className="px-3 py-1.5 bg-[#059669]/15 hover:bg-[#059669] border border-[#10B981]/30 hover:border-[#10B981] text-[#10B981] hover:text-white rounded-xl text-xs font-semibold transition cursor-pointer"
                     >
                       Abrir Cockpit
                     </Link>
@@ -144,7 +144,7 @@ export default function MinisteriosTable({
                     <div className="relative">
                       <button
                         onClick={() => toggleDropdown(ministerio.id)}
-                        className="px-2 py-1.5 bg-gray-700 hover:bg-gray-650 text-gray-300 hover:text-white rounded-lg border border-gray-600 transition text-xs font-bold"
+                        className="px-2 py-1.5 bg-[#032C28] hover:bg-[#0B453B] text-[#A7C4BC] hover:text-white rounded-xl border border-[#0E4D43] transition text-xs font-bold cursor-pointer"
                       >
                         ⚙️
                       </button>
@@ -153,13 +153,13 @@ export default function MinisteriosTable({
                         <>
                           {/* Overlay invisivel para fechar o dropdown */}
                           <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownId(null)} />
-                          <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-750 rounded-lg shadow-xl py-1.5 z-20 text-left">
+                          <div className="absolute right-0 mt-2 w-48 bg-[#02201d] border border-[#0E4D43] rounded-xl shadow-xl py-1.5 z-20 text-left">
                             <button
                               onClick={() => {
                                 onEdit(ministerio)
                                 setOpenDropdownId(null)
                               }}
-                              className="w-full px-4 py-2 text-xs font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition text-left"
+                              className="w-full px-4 py-2 text-xs font-medium text-[#A7C4BC] hover:bg-[#073B34] hover:text-white transition text-left cursor-pointer"
                             >
                               📝 Editar Cadastro
                             </button>
@@ -168,7 +168,7 @@ export default function MinisteriosTable({
                                 onBilling(ministerio)
                                 setOpenDropdownId(null)
                               }}
-                              className="w-full px-4 py-2 text-xs font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition text-left"
+                              className="w-full px-4 py-2 text-xs font-medium text-[#A7C4BC] hover:bg-[#073B34] hover:text-white transition text-left cursor-pointer"
                             >
                               💰 Gerar Cobrança
                             </button>
@@ -178,7 +178,7 @@ export default function MinisteriosTable({
                                   onTechnicalAccess(ministerio)
                                   setOpenDropdownId(null)
                                 }}
-                                className="w-full px-4 py-2 text-xs font-semibold text-blue-400 hover:bg-blue-600/20 hover:text-blue-200 transition text-left flex items-center gap-2 border-t border-gray-800 mt-1 pt-2"
+                                className="w-full px-4 py-2 text-xs font-semibold text-[#10B981] hover:bg-[#059669]/20 hover:text-white transition text-left flex items-center gap-2 border-t border-[#0E4D43] mt-1 pt-2 cursor-pointer"
                               >
                                 <span>🛠️</span>
                                 <span>Acesso Técnico Nativo</span>
@@ -189,7 +189,7 @@ export default function MinisteriosTable({
                                 onActivate(ministerio)
                                 setOpenDropdownId(null)
                               }}
-                              className="w-full px-4 py-2 text-xs font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition text-left"
+                              className="w-full px-4 py-2 text-xs font-medium text-[#A7C4BC] hover:bg-[#073B34] hover:text-white transition text-left cursor-pointer"
                             >
                               ⚡ Ativar / Renovar
                             </button>
@@ -198,17 +198,17 @@ export default function MinisteriosTable({
                                 onPrintLabel(ministerio)
                                 setOpenDropdownId(null)
                               }}
-                              className="w-full px-4 py-2 text-xs font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition text-left"
+                              className="w-full px-4 py-2 text-xs font-medium text-[#A7C4BC] hover:bg-[#073B34] hover:text-white transition text-left cursor-pointer"
                             >
                               🏷️ Imprimir Etiqueta
                             </button>
-                            <hr className="border-gray-800 my-1" />
+                            <hr className="border-[#0E4D43] my-1" />
                             <button
                               onClick={() => {
                                 onDelete(ministerio)
                                 setOpenDropdownId(null)
                               }}
-                              className="w-full px-4 py-2 text-xs font-medium text-red-400 hover:bg-red-950/20 transition text-left"
+                              className="w-full px-4 py-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 transition text-left cursor-pointer"
                             >
                               🚨 Excluir Conta
                             </button>
@@ -225,8 +225,8 @@ export default function MinisteriosTable({
       </table>
 
       {/* Paginação */}
-      <div className="px-6 py-4 bg-gray-900/50 border-t border-gray-750 flex items-center justify-between gap-4 flex-wrap">
-        <span className="text-xs text-gray-400">
+      <div className="px-6 py-4 bg-[#02201d]/60 border-t border-[#0E4D43] flex items-center justify-between gap-4 flex-wrap">
+        <span className="text-xs text-[#A7C4BC]">
           Mostrando {totalItems > 0 ? Math.min(totalItems, (currentPage - 1) * itemsPerPage + 1) : 0} a {Math.min(totalItems, currentPage * itemsPerPage)} de {totalItems} ministérios
         </span>
         {totalPages > 1 && (
@@ -234,7 +234,7 @@ export default function MinisteriosTable({
             <button
               onClick={() => onPageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-bold rounded-lg border border-gray-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 py-1 bg-[#032C28] hover:bg-[#0B453B] text-[#A7C4BC] hover:text-white text-xs font-bold rounded-lg border border-[#0E4D43] transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               Anterior
             </button>
@@ -245,10 +245,10 @@ export default function MinisteriosTable({
                 <button
                   key={p}
                   onClick={() => onPageChange(p)}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
                     isCurrent
-                      ? 'bg-blue-600 text-white border border-blue-500'
-                      : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 hover:text-white'
+                      ? 'bg-[#059669] text-white border border-[#10B981]'
+                      : 'bg-[#032C28] text-[#A7C4BC] border border-[#0E4D43] hover:bg-[#0B453B] hover:text-white'
                   }`}
                 >
                   {p}
@@ -258,7 +258,7 @@ export default function MinisteriosTable({
             <button
               onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
-              className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-bold rounded-lg border border-gray-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 py-1 bg-[#032C28] hover:bg-[#0B453B] text-[#A7C4BC] hover:text-white text-xs font-bold rounded-lg border border-[#0E4D43] transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               Próximo
             </button>
