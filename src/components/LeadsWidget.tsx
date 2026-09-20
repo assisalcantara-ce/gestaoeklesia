@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Eye, X, CheckCircle, Trash2, XCircle, MoreVertical } from 'lucide-react'
 import { authenticatedFetch } from '@/lib/api-client'
 
@@ -38,9 +39,56 @@ export default function LeadsWidget() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [confirmDeleteSignup, setConfirmDeleteSignup] = useState<PreRegistration | null>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
+  const [dropdownCoords, setDropdownCoords] = useState<{ top: number; left: number } | null>(null)
 
-  const toggleDropdown = (id: string) => {
-    setOpenDropdownId(openDropdownId === id ? null : id)
+  // Fechar dropdown ao pressionar Escape, rolar ou redimensionar janela
+  useEffect(() => {
+    if (!openDropdownId) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpenDropdownId(null)
+        setDropdownCoords(null)
+      }
+    }
+
+    const handleScrollOrResize = () => {
+      setOpenDropdownId(null)
+      setDropdownCoords(null)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('scroll', handleScrollOrResize, true)
+    window.addEventListener('resize', handleScrollOrResize)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('scroll', handleScrollOrResize, true)
+      window.removeEventListener('resize', handleScrollOrResize)
+    }
+  }, [openDropdownId])
+
+  const toggleDropdown = (id: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    if (openDropdownId === id) {
+      setOpenDropdownId(null)
+      setDropdownCoords(null)
+      return
+    }
+
+    const btnRect = e.currentTarget.getBoundingClientRect()
+    const menuWidth = 180
+    const menuHeight = activeTab === 'trial' ? 140 : 100
+    const spaceBelow = window.innerHeight - btnRect.bottom
+    const spaceAbove = btnRect.top
+
+    const openUpwards = spaceBelow < menuHeight && spaceAbove > spaceBelow
+
+    const top = openUpwards
+      ? Math.max(8, btnRect.top - menuHeight - 6)
+      : Math.min(window.innerHeight - menuHeight - 8, btnRect.bottom + 6)
+    const left = Math.max(8, btnRect.right - menuWidth)
+
+    setDropdownCoords({ top, left })
+    setOpenDropdownId(id)
   }
 
   const isExpired = (s: PreRegistration) => new Date(s.trial_expires_at) < new Date()
@@ -250,24 +298,39 @@ export default function LeadsWidget() {
                       {/* Menu de Ações (⋮) */}
                       <div className="relative">
                         <button
-                          onClick={() => toggleDropdown(signup.id)}
-                          className="p-1.5 bg-gray-750 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg border border-gray-650 transition text-xs font-bold"
+                          onClick={(e) => toggleDropdown(signup.id, e)}
+                          className="p-1.5 bg-[#032C28] hover:bg-[#0B453B] text-[#A7C4BC] hover:text-white rounded-lg border border-[#0E4D43] transition text-xs font-bold cursor-pointer"
                           title="Mais Ações"
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
 
-                        {openDropdownId === signup.id && (
+                        {openDropdownId === signup.id && typeof document !== 'undefined' && dropdownCoords && createPortal(
                           <>
-                            <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownId(null)} />
-                            <div className="absolute right-0 mt-2 w-44 bg-gray-900 border border-gray-750 rounded-lg shadow-xl py-1.5 z-20 text-left">
+                            <div
+                              style={{ position: 'fixed', inset: 0, zIndex: 99998 }}
+                              onClick={() => {
+                                setOpenDropdownId(null)
+                                setDropdownCoords(null)
+                              }}
+                            />
+                            <div
+                              style={{
+                                position: 'fixed',
+                                top: `${dropdownCoords.top}px`,
+                                left: `${dropdownCoords.left}px`,
+                                zIndex: 99999,
+                              }}
+                              className="w-44 bg-[#02201d] border border-[#0E4D43] rounded-xl shadow-2xl py-1.5 z-20 text-left animate-in fade-in zoom-in-95 duration-100"
+                            >
                               <button
                                 onClick={() => {
                                   setSelectedSignup(signup)
                                   setShowDetailModal(true)
                                   setOpenDropdownId(null)
+                                  setDropdownCoords(null)
                                 }}
-                                className="w-full px-4 py-2 text-xs font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition text-left flex items-center gap-2"
+                                className="w-full px-4 py-2 text-xs font-medium text-[#A7C4BC] hover:bg-[#073B34] hover:text-white transition text-left flex items-center gap-2 cursor-pointer"
                               >
                                 <Eye className="w-3.5 h-3.5 text-blue-400" />
                                 Ver Detalhes
@@ -278,29 +341,32 @@ export default function LeadsWidget() {
                                   onClick={() => {
                                     handleCancelarTrial(signup.id)
                                     setOpenDropdownId(null)
+                                    setDropdownCoords(null)
                                   }}
                                   disabled={!!actionLoading}
-                                  className="w-full px-4 py-2 text-xs font-medium text-yellow-400 hover:bg-gray-800 transition text-left flex items-center gap-2"
+                                  className="w-full px-4 py-2 text-xs font-medium text-yellow-400 hover:bg-[#073B34] transition text-left flex items-center gap-2 cursor-pointer"
                                 >
                                   <XCircle className="w-3.5 h-3.5" />
                                   Cancelar Teste
                                 </button>
                               )}
 
-                              <hr className="border-gray-800 my-1" />
+                              <hr className="border-[#0E4D43] my-1" />
 
                               <button
                                 onClick={() => {
                                   setConfirmDeleteSignup(signup)
                                   setOpenDropdownId(null)
+                                  setDropdownCoords(null)
                                 }}
-                                className="w-full px-4 py-2 text-xs font-medium text-red-400 hover:bg-red-950/20 transition text-left flex items-center gap-2"
+                                className="w-full px-4 py-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 transition text-left flex items-center gap-2 cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 Excluir Lead
                               </button>
                             </div>
-                          </>
+                          </>,
+                          document.body
                         )}
                       </div>
                     </div>

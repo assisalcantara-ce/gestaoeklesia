@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import type { Ministry as SupabaseMinistry } from '@/types/supabase'
 import Link from 'next/link'
 import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState'
-import { Inbox } from 'lucide-react'
+import { Inbox, MoreVertical } from 'lucide-react'
 
 interface MinisteriosTableProps {
   loading: boolean
@@ -47,16 +47,27 @@ export default function MinisteriosTable({
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
   const [dropdownCoords, setDropdownCoords] = useState<{ top: number; left: number } | null>(null)
 
-  // Fechar dropdown ao rolar a página ou redimensionar a janela
+  // Fechar dropdown ao rolar a página, redimensionar a janela ou pressionar Escape
   useEffect(() => {
     if (!openDropdownId) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpenDropdownId(null)
+        setDropdownCoords(null)
+      }
+    }
+
     const handleClose = () => {
       setOpenDropdownId(null)
       setDropdownCoords(null)
     }
+
+    window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('scroll', handleClose, true)
     window.addEventListener('resize', handleClose)
     return () => {
+      window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('scroll', handleClose, true)
       window.removeEventListener('resize', handleClose)
     }
@@ -178,10 +189,11 @@ export default function MinisteriosTable({
                     <div className="relative">
                       <button
                         onClick={(e) => toggleDropdown(ministerio.id, e)}
-                        className="px-2 py-1.5 bg-[#032C28] hover:bg-[#0B453B] text-[#A7C4BC] hover:text-white rounded-xl border border-[#0E4D43] transition text-xs font-bold cursor-pointer"
-                        title="Opções"
+                        className="p-1.5 bg-[#032C28] hover:bg-[#0B453B] text-[#A7C4BC] hover:text-white rounded-xl border border-[#0E4D43] transition text-xs font-bold cursor-pointer"
+                        title="Mais opções"
+                        aria-label="Mais opções"
                       >
-                        ⚙️
+                        <MoreVertical className="w-4 h-4" />
                       </button>
 
                       {isDropdownOpen && typeof document !== 'undefined' && dropdownCoords && createPortal(
