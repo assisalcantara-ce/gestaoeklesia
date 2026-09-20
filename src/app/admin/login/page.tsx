@@ -140,17 +140,16 @@ export default function AdminLoginPage() {
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-[#041d1a] text-white relative overflow-x-hidden selection:bg-emerald-500 selection:text-white">
-      {/* Padrão de fundo Pontilhado (Dot Matrix) com Gradientes Radiais Verdes */}
+      {/* Imagem de Fundo Oficial do Admin (br_admin.png) */}
       <div 
-        className="pointer-events-none absolute inset-0 opacity-[0.22]"
+        className="pointer-events-none absolute inset-0 bg-cover bg-center z-0"
         style={{
-          backgroundImage: `radial-gradient(rgba(16, 185, 129, 0.45) 1px, transparent 1px)`,
-          backgroundSize: '24px 24px',
+          backgroundImage: `url('/img/br_admin.png')`,
         }}
       />
-      <div className="pointer-events-none absolute -top-40 -left-40 w-[600px] h-[600px] bg-emerald-600/15 rounded-full blur-[140px]" />
-      <div className="pointer-events-none absolute top-1/3 -right-20 w-[550px] h-[550px] bg-teal-500/10 rounded-full blur-[160px]" />
-      <div className="pointer-events-none absolute -bottom-32 left-1/3 w-[500px] h-[500px] bg-emerald-900/30 rounded-full blur-[130px]" />
+
+      {/* Camada sutil para realçar contraste dos textos e cards */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-emerald-950/40 via-transparent to-emerald-950/20 z-0" />
 
       {/* Barra de Navegação Superior */}
       <header className="relative z-10 w-full max-w-7xl mx-auto px-6 sm:px-10 pt-7 pb-4 flex items-center justify-between">
