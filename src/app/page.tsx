@@ -1080,8 +1080,8 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-8 shadow-md">
-              <form onSubmit={handleContactSubmit} className="space-y-4">
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-8 shadow-md h-full flex flex-col justify-between">
+              <form onSubmit={handleContactSubmit} className="space-y-4 flex-1 flex flex-col justify-between">
                 {error && (
                   <div className="bg-red-50 border border-red-200 text-sm text-red-700 p-3.5 rounded-xl">
                     {error}
@@ -1133,27 +1133,29 @@ export default function LandingPage() {
                     />
                   </div>
                 </div>
-                <div>
+                <div className="flex-1 flex flex-col">
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Mensagem (opcional)</label>
                   <textarea
                     name="mensagem"
                     value={contactData.mensagem}
                     onChange={handleContactChange}
-                    rows={3}
+                    rows={4}
                     placeholder="Conte-nos sobre a estrutura da sua igreja ou suas dúvidas..."
-                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition resize-none"
+                    className="w-full flex-1 min-h-[110px] px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition resize-none"
                   />
                 </div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition shadow-md shadow-blue-600/20 cursor-pointer disabled:opacity-50 text-sm"
-                >
-                  {loading ? 'Enviando...' : 'Quero falar com um consultor'}
-                </button>
-                <p className="text-[11px] text-slate-500 text-center">
-                  Ao enviar, você concorda com nossa política de privacidade. Seus dados estão seguros.
-                </p>
+                <div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition shadow-md shadow-blue-600/20 cursor-pointer disabled:opacity-50 text-sm"
+                  >
+                    {loading ? 'Enviando...' : 'Quero falar com um consultor'}
+                  </button>
+                  <p className="text-[11px] text-slate-500 text-center mt-3">
+                    Ao enviar, você concorda com nossa política de privacidade. Seus dados estão seguros.
+                  </p>
+                </div>
               </form>
             </div>
           </div>
