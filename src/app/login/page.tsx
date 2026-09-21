@@ -195,7 +195,7 @@ export default function LoginPage() {
       {/* Cabeçalho com Logo */}
       <header className="relative z-10 w-full max-w-7xl mx-auto px-6 sm:px-10 pt-7 pb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="bg-white/95 px-3 py-1.5 rounded-xl shadow-md flex items-center justify-center backdrop-blur-md">
+          <div className="flex items-center justify-center">
             <Image
               src={BRAND.logoHorizontal}
               alt={BRAND.name}
@@ -207,12 +207,12 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <Link
-          href="/"
+        <a
+          href="https://www.gestaoeklesia.com.br/"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs sm:text-sm font-medium text-blue-50 border border-white/15 backdrop-blur-md transition duration-200 hover:border-blue-300/40 cursor-pointer shadow-sm"
         >
           <span>← Voltar ao site</span>
-        </Link>
+        </a>
       </header>
 
       {/* Conteúdo Principal Split-Screen */}
