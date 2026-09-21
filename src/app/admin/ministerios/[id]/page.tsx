@@ -17,7 +17,7 @@ import { friendlyError, formatPhoneDisplay } from '@/lib/admin/ministerios/helpe
 import { getDetailedStatus } from '@/lib/admin/ministerios/status'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
 import CockpitJuridicoTab from '@/components/admin/ministerios/CockpitJuridicoTab'
-import { ShieldCheck, Award, Clock, CreditCard, Users, Church, LogIn, Key, Eye, Wrench, FileText, AlertTriangle, AlertCircle, XCircle, Scale } from 'lucide-react'
+import { ShieldCheck, Award, CreditCard, Users, Church, LogIn, Key, Eye, Wrench, FileText, AlertTriangle, AlertCircle, XCircle, Scale } from 'lucide-react'
 
 interface CockpitPageProps {
   params: Promise<{ id: string }>
@@ -244,7 +244,7 @@ export default function CockpitPage({ params }: CockpitPageProps) {
             </div>
 
             {/* Painel Executivo (Executive Summary) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <ExecutiveMetricCard
                 title="Assinatura"
                 value={statusDetail.label}
@@ -259,26 +259,6 @@ export default function CockpitPage({ params }: CockpitPageProps) {
                 subtitle="Licenciamento"
                 icon={Award}
                 color="indigo"
-              />
-
-              <ExecutiveMetricCard
-                title="Trial / Dias"
-                value={
-                  statusDetail.type === 'TRIAL_ATIVO'
-                    ? statusDetail.label.replace('Teste — restam ', '').replace(' dias', '')
-                    : 'Licenciado'
-                }
-                subtitle="Período de Testes"
-                icon={Clock}
-                color="blue"
-              />
-
-              <ExecutiveMetricCard
-                title="Última Cobrança"
-                value={faturas.length > 0 ? `R$ ${faturas[0].value}` : 'R$ 0'}
-                subtitle={faturas.length > 0 ? String(faturas[0].status).toUpperCase() : 'Nenhuma'}
-                icon={CreditCard}
-                color="slate"
               />
 
               <ExecutiveMetricCard
@@ -421,14 +401,24 @@ export default function CockpitPage({ params }: CockpitPageProps) {
                 });
               }
 
-              // Alerta 4: Cobrança vencida ou pendente
-              const cobrancasAbertas = faturas.filter((fat: any) => fat.status !== 'RECEIVED' && fat.status !== 'CONFIRMED');
-              if (cobrancasAbertas.length > 0) {
+              // Alerta 4: Cobrança vencida no Asaas (exclusivamente faturas vencidas)
+              const todayStr = new Date().toISOString().slice(0, 10);
+              const faturasVencidas = faturas.filter((fat: any) => {
+                const statusUpper = String(fat.status || '').toUpperCase();
+                if (statusUpper === 'OVERDUE') return true;
+                if ((statusUpper === 'PENDING' || statusUpper === 'AGUARDANDO') && fat.due_date) {
+                  const dueDateStr = String(fat.due_date).slice(0, 10);
+                  return dueDateStr < todayStr;
+                }
+                return false;
+              });
+
+              if (faturasVencidas.length > 0) {
                 alerts.push({
                   icon: AlertCircle,
-                  title: 'Faturas Pendentes no Asaas',
-                  description: `Existem ${cobrancasAbertas.length} cobrança(s) pendente(s) ou vencida(s) no sistema. Verifique a aba Financeiro Asaas.`,
-                  severity: 'warning',
+                  title: 'Faturas vencidas no Asaas',
+                  description: `Existem ${faturasVencidas.length} fatura(s) vencida(s) no Asaas para este ministério. Cobranças pendentes não vencidas não constam neste alerta.`,
+                  severity: 'danger',
                 });
               }
 
@@ -560,7 +550,7 @@ export default function CockpitPage({ params }: CockpitPageProps) {
                             <tr key={fat.id} className="text-gray-300">
                               <td className="py-2 font-mono text-xs">{fat.id}</td>
                               <td className="py-2">{fat.due_date ? new Date(fat.due_date).toLocaleDateString('pt-BR') : '-'}</td>
-                              <td className="py-2">R$ {fat.value}</td>
+                              <td className="py-2">R$ {fat.amount ?? fat.value ?? 0}</td>
                               <td className="py-2 uppercase text-xs">{fat.status || 'pendente'}</td>
                             </tr>
                           ))}

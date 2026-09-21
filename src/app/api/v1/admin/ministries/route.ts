@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit
     let query = supabaseAdmin
       .from('ministries')
-      .select('*, platform_billing_invoices(id)', { count: 'exact' })
+      .select('*, platform_billing_invoices(id, status, amount, due_date)', { count: 'exact' })
 
     if (search) {
       query = query.ilike('name', `%${search}%`)
