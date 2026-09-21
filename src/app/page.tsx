@@ -810,12 +810,12 @@ export default function LandingPage() {
       </section>
 
       {/* Seção Fluxo de Trabalho - Fundo Branco Estruturado com Painel Visual Integrado */}
-      <section id="fluxo" className="bg-white border-b border-slate-200/80 py-20">
+      <section id="fluxo" className="bg-white border-b border-slate-200/80 py-20 lg:py-24">
         <div className="max-w-7xl mx-auto px-5 sm:px-8">
-          <div className="grid gap-12 lg:grid-cols-12 items-center">
+          <div className="grid gap-10 lg:gap-8 xl:gap-12 lg:grid-cols-12 items-center">
             
             {/* Coluna Esquerda: Conteúdo explicativo e as 3 etapas da jornada */}
-            <div className="lg:col-span-5 space-y-6">
+            <div className="lg:col-span-4 xl:col-span-4 space-y-6">
               <div>
                 <div className="inline-flex items-center gap-2.5 mb-3">
                   <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-blue-600">
@@ -831,34 +831,34 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="space-y-5 pt-2">
+              <div className="space-y-4 pt-1">
                 {journey.map((item) => (
                   <div key={item.step} className="flex gap-4 items-start group">
-                    <div className="h-11 w-11 shrink-0 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-600/20">
+                    <div className="h-10 w-10 sm:h-11 sm:w-11 shrink-0 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-600/20">
                       {item.step}
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-slate-900">{item.title}</h3>
-                      <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">{item.text}</p>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900">{item.title}</h3>
+                      <p className="text-xs sm:text-sm text-slate-600 mt-0.5 leading-relaxed">{item.text}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Coluna Direita: Painel Visual Integrado com Mockup dos Celulares e Destaques do App */}
-            <div className="lg:col-span-7">
-              <div className="relative rounded-3xl bg-gradient-to-br from-blue-50/70 via-indigo-50/40 to-blue-100/50 border border-blue-200/80 p-6 sm:p-8 lg:p-10 shadow-xl overflow-hidden">
-                <div className="grid gap-8 lg:grid-cols-12 items-center">
+            {/* Coluna Direita: Painel Visual Amplo com Mockup dos Celulares em Destaque */}
+            <div className="lg:col-span-8 xl:col-span-8">
+              <div className="relative rounded-3xl bg-gradient-to-br from-blue-50/70 via-indigo-50/30 to-blue-100/40 border border-blue-200/80 p-5 sm:p-7 lg:p-8 xl:p-10 shadow-xl overflow-hidden">
+                <div className="grid gap-8 lg:gap-6 xl:gap-8 lg:grid-cols-12 items-center">
                   
-                  {/* Imagem dos Celulares com App Eklésia */}
-                  <div className="lg:col-span-6 flex justify-center items-center">
-                    <div className="relative w-full max-w-[300px] sm:max-w-[340px] lg:max-w-none transition-transform duration-500 hover:scale-[1.02]">
+                  {/* Imagem dos Celulares com App Eklésia em Grande Destaque */}
+                  <div className="lg:col-span-6 xl:col-span-6 flex justify-center items-center">
+                    <div className="relative w-full max-w-[340px] sm:max-w-[420px] lg:max-w-[480px] xl:max-w-[520px] transition-transform duration-500 hover:scale-[1.02]">
                       <Image
                         src="/images/app.png"
                         alt="Aplicativo de Membros Gestão Eklésia"
-                        width={600}
-                        height={600}
+                        width={900}
+                        height={900}
                         className="w-full h-auto object-contain drop-shadow-2xl"
                         priority={false}
                       />
@@ -866,7 +866,7 @@ export default function LandingPage() {
                   </div>
 
                   {/* Detalhes do Aplicativo de Membros */}
-                  <div className="lg:col-span-6 space-y-4">
+                  <div className="lg:col-span-6 xl:col-span-6 space-y-4">
                     <div>
                       <div className="inline-flex items-center gap-2 mb-2">
                         <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600">
@@ -877,13 +877,13 @@ export default function LandingPage() {
                       <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-snug">
                         Sua igreja <span className="text-blue-600">na palma da mão</span>
                       </h3>
-                      <p className="text-slate-600 text-xs sm:text-sm mt-1.5 leading-relaxed">
+                      <p className="text-slate-600 text-xs sm:text-sm mt-1 leading-relaxed">
                         Comunicação, participação e comunidade em um só lugar.
                       </p>
                     </div>
 
                     {/* Lista de Recursos do App */}
-                    <div className="space-y-2.5 pt-1">
+                    <div className="space-y-2 pt-0.5">
                       {[
                         {
                           icon: Users,
@@ -910,12 +910,12 @@ export default function LandingPage() {
                         return (
                           <div
                             key={feature.title}
-                            className="bg-white/90 hover:bg-white border border-blue-100/90 rounded-2xl p-3 sm:p-3.5 flex items-center gap-3.5 shadow-xs transition-all duration-200"
+                            className="bg-white/95 hover:bg-white border border-blue-100/90 hover:border-blue-200 rounded-2xl p-3 sm:p-3.5 flex items-center gap-3.5 shadow-xs hover:shadow-sm transition-all duration-200"
                           >
                             <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
                               <IconComp className="w-4 h-4" />
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <p className="text-xs sm:text-sm font-bold text-slate-900">{feature.title}</p>
                               <p className="text-[11px] sm:text-xs text-slate-500 leading-tight mt-0.5">{feature.desc}</p>
                             </div>
@@ -929,11 +929,11 @@ export default function LandingPage() {
                       <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-600/30">
                         <Smartphone className="w-5 h-5" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-700">
                           IGREJA MAIS CONECTADA
                         </p>
-                        <p className="text-xs sm:text-sm font-bold text-slate-900">
+                        <p className="text-xs sm:text-sm font-bold text-slate-900 truncate sm:whitespace-normal">
                           Comunhão em qualquer lugar.
                         </p>
                       </div>
