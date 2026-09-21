@@ -631,7 +631,7 @@ export default function LandingPage() {
               {/* Imagem Ilustrativa com Card Institucional Sobreposto */}
               <div className="relative rounded-3xl overflow-hidden border border-slate-200 shadow-xl group">
                 <Image
-                  src="/img/login-bg.png"
+                  src="/img/image01.png"
                   alt="Gestão de igrejas e tecnologia a serviço da missão"
                   width={640}
                   height={380}
