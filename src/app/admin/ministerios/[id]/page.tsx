@@ -17,7 +17,7 @@ import { friendlyError, formatPhoneDisplay } from '@/lib/admin/ministerios/helpe
 import { getDetailedStatus } from '@/lib/admin/ministerios/status'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
 import CockpitJuridicoTab from '@/components/admin/ministerios/CockpitJuridicoTab'
-import { ShieldCheck, Award, CreditCard, Users, Church, LogIn, Key, Eye, Wrench, FileText, AlertTriangle, AlertCircle, XCircle, Scale } from 'lucide-react'
+import { ShieldCheck, Award, CreditCard, Users, Church, Key, Eye, Wrench, FileText, AlertTriangle, AlertCircle, XCircle, Scale } from 'lucide-react'
 
 interface CockpitPageProps {
   params: Promise<{ id: string }>
@@ -244,7 +244,7 @@ export default function CockpitPage({ params }: CockpitPageProps) {
             </div>
 
             {/* Painel Executivo (Executive Summary) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <ExecutiveMetricCard
                 title="Assinatura"
                 value={statusDetail.label}
@@ -274,14 +274,6 @@ export default function CockpitPage({ params }: CockpitPageProps) {
                 value={ministry.quantity_temples || 'Ilimitado'}
                 subtitle="Templos permitidos"
                 icon={Church}
-                color="slate"
-              />
-
-              <ExecutiveMetricCard
-                title="Último Acesso"
-                value="Não informado"
-                subtitle="Logs de login"
-                icon={LogIn}
                 color="slate"
               />
             </div>
