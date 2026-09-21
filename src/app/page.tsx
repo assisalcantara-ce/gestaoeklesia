@@ -7,7 +7,7 @@ import NotificationModal from '@/components/NotificationModal';
 import { formatPhone } from '@/lib/mascaras';
 import { createClient } from '@/lib/supabase-client';
 import { formatarPreco } from '@/config/plans';
-import { Users, CircleDollarSign, Calendar, BarChart3, ArrowRight, Play, CheckCircle2, ShieldCheck, Target, ChevronDown, Sparkles, UserPlus, Coins, FileText, TrendingUp, BookOpen } from 'lucide-react';
+import { Users, CircleDollarSign, Calendar, BarChart3, ArrowRight, Play, CheckCircle2, ShieldCheck, Target, ChevronDown, Sparkles, UserPlus, Coins, FileText, TrendingUp, BookOpen, Smartphone, Heart } from 'lucide-react';
 
 const pillars = [
   {
@@ -809,27 +809,32 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Seção Fluxo de Trabalho - Fundo Branco Estruturado */}
+      {/* Seção Fluxo de Trabalho - Fundo Branco Estruturado com Painel Visual Integrado */}
       <section id="fluxo" className="bg-white border-b border-slate-200/80 py-20">
         <div className="max-w-7xl mx-auto px-5 sm:px-8">
-          <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] items-center">
-            <div>
-              <div className="inline-flex items-center gap-2.5 mb-3">
-                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-blue-700">
-                  FLUXO DE TRABALHO
-                </span>
-                <span className="h-0.5 w-8 bg-blue-600 rounded-full" />
+          <div className="grid gap-12 lg:grid-cols-12 items-center">
+            
+            {/* Coluna Esquerda: Conteúdo explicativo e as 3 etapas da jornada */}
+            <div className="lg:col-span-5 space-y-6">
+              <div>
+                <div className="inline-flex items-center gap-2.5 mb-3">
+                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-blue-600">
+                    FLUXO DE TRABALHO
+                  </span>
+                  <span className="h-0.5 w-8 bg-blue-600 rounded-full" />
+                </div>
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
+                  Uma jornada simples, clara e previsível
+                </h2>
+                <p className="text-slate-600 mt-4 text-sm sm:text-base leading-relaxed">
+                  Do cadastro inicial aos relatórios finais. Tudo conectado e com visibilidade para líderes e equipes.
+                </p>
               </div>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
-                Uma jornada simples, clara e previsível
-              </h2>
-              <p className="text-slate-600 mt-4 text-sm sm:text-base leading-relaxed">
-                Do cadastro inicial aos relatórios finais. Tudo conectado e com visibilidade para líderes e equipes.
-              </p>
-              <div className="mt-8 space-y-6">
+
+              <div className="space-y-5 pt-2">
                 {journey.map((item) => (
-                  <div key={item.step} className="flex gap-4 items-start">
-                    <div className="h-10 w-10 shrink-0 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-600/20">
+                  <div key={item.step} className="flex gap-4 items-start group">
+                    <div className="h-11 w-11 shrink-0 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-600/20">
                       {item.step}
                     </div>
                     <div>
@@ -841,27 +846,105 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="bg-slate-50/90 border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-md">
-              <h3 className="text-lg font-bold text-slate-900 tracking-wide">Resumo operacional</h3>
-              <p className="text-xs sm:text-sm text-slate-600 mt-1.5">O que sua equipe acompanha em um único painel integrado.</p>
-              <div className="mt-6 space-y-3">
-                {['Secretaria ativa e organizada', 'Financeiro consolidado com auditoria', 'Indicadores de crescimento em tempo real'].map((item) => (
-                  <div key={item} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-                    <span className="text-sm font-medium text-slate-800">{item}</span>
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700">
-                      CONECTADO
-                    </span>
+            {/* Coluna Direita: Painel Visual Integrado com Mockup dos Celulares e Destaques do App */}
+            <div className="lg:col-span-7">
+              <div className="relative rounded-3xl bg-gradient-to-br from-blue-50/70 via-indigo-50/40 to-blue-100/50 border border-blue-200/80 p-6 sm:p-8 lg:p-10 shadow-xl overflow-hidden">
+                <div className="grid gap-8 lg:grid-cols-12 items-center">
+                  
+                  {/* Imagem dos Celulares com App Eklésia */}
+                  <div className="lg:col-span-6 flex justify-center items-center">
+                    <div className="relative w-full max-w-[300px] sm:max-w-[340px] lg:max-w-none transition-transform duration-500 hover:scale-[1.02]">
+                      <Image
+                        src="/images/app.png"
+                        alt="Aplicativo de Membros Gestão Eklésia"
+                        width={600}
+                        height={600}
+                        className="w-full h-auto object-contain drop-shadow-2xl"
+                        priority={false}
+                      />
+                    </div>
                   </div>
-                ))}
-              </div>
-              <div className="mt-6 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50/40 p-4 flex items-center gap-3.5">
-                <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0" />
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-blue-700 font-bold">Acompanhamento contínuo</p>
-                  <p className="text-sm font-semibold text-slate-900 mt-0.5">Equipe alinhada, dados seguros e sem retrabalho</p>
+
+                  {/* Detalhes do Aplicativo de Membros */}
+                  <div className="lg:col-span-6 space-y-4">
+                    <div>
+                      <div className="inline-flex items-center gap-2 mb-2">
+                        <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600">
+                          APLICATIVO DE MEMBROS
+                        </span>
+                        <span className="h-0.5 w-6 bg-blue-600 rounded-full" />
+                      </div>
+                      <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-snug">
+                        Sua igreja <span className="text-blue-600">na palma da mão</span>
+                      </h3>
+                      <p className="text-slate-600 text-xs sm:text-sm mt-1.5 leading-relaxed">
+                        Comunicação, participação e comunidade em um só lugar.
+                      </p>
+                    </div>
+
+                    {/* Lista de Recursos do App */}
+                    <div className="space-y-2.5 pt-1">
+                      {[
+                        {
+                          icon: Users,
+                          title: 'Acesso ao perfil',
+                          desc: 'Dados atualizados e informações da igreja.'
+                        },
+                        {
+                          icon: Calendar,
+                          title: 'Eventos e programações',
+                          desc: 'Acompanhe e participe das atividades.'
+                        },
+                        {
+                          icon: Heart,
+                          title: 'Contribuições',
+                          desc: 'Dízimos e ofertas de forma prática e segura.'
+                        },
+                        {
+                          icon: BookOpen,
+                          title: 'Conteúdos e edificação',
+                          desc: 'Mensagens, estudos e materiais exclusivos.'
+                        }
+                      ].map((feature) => {
+                        const IconComp = feature.icon;
+                        return (
+                          <div
+                            key={feature.title}
+                            className="bg-white/90 hover:bg-white border border-blue-100/90 rounded-2xl p-3 sm:p-3.5 flex items-center gap-3.5 shadow-xs transition-all duration-200"
+                          >
+                            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                              <IconComp className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <p className="text-xs sm:text-sm font-bold text-slate-900">{feature.title}</p>
+                              <p className="text-[11px] sm:text-xs text-slate-500 leading-tight mt-0.5">{feature.desc}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Card Inferior de Destaque */}
+                    <div className="bg-blue-100/80 border border-blue-300/80 rounded-2xl p-3 sm:p-3.5 flex items-center gap-3.5 shadow-xs">
+                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-600/30">
+                        <Smartphone className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-700">
+                          IGREJA MAIS CONECTADA
+                        </p>
+                        <p className="text-xs sm:text-sm font-bold text-slate-900">
+                          Comunhão em qualquer lugar.
+                        </p>
+                      </div>
+                    </div>
+
+                  </div>
+
                 </div>
               </div>
             </div>
+
           </div>
         </div>
       </section>
