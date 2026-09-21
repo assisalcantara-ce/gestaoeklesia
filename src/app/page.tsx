@@ -7,6 +7,7 @@ import NotificationModal from '@/components/NotificationModal';
 import { formatPhone } from '@/lib/mascaras';
 import { createClient } from '@/lib/supabase-client';
 import { formatarPreco } from '@/config/plans';
+import { Users, CircleDollarSign, Calendar, BarChart3, ArrowRight, Play, CheckCircle2, ShieldCheck, Target } from 'lucide-react';
 
 const pillars = [
   {
@@ -475,120 +476,202 @@ export default function LandingPage() {
         </div>
       )}
 
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      {/* Cabeçalho Horizontal no Topo */}
+      <header className="sticky top-0 z-40 bg-[#021815]/90 backdrop-blur-md border-b border-emerald-900/40">
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Image
               src={BRAND.logoHorizontal}
               alt="Gestão Eklésia"
-              width={180}
-              height={52}
+              width={160}
+              height={44}
               priority
-              sizes="180px"
-              className="h-[52px] w-auto object-contain"
+              sizes="160px"
+              className="h-9 sm:h-10 w-auto object-contain brightness-110 drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
             />
           </div>
-          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
-            <a href="#visao" className="hover:text-slate-900 transition">Visão</a>
-            <a href="#dores" className="hover:text-slate-900 transition">Dores</a>
-            <a href="#modulos" className="hover:text-slate-900 transition">Módulos</a>
-            <a href="#fluxo" className="hover:text-slate-900 transition">Fluxo</a>
-            <a href="#telas" className="hover:text-slate-900 transition">Telas</a>
-            <a href="#planos" className="hover:text-slate-900 transition">Planos</a>
-            <a href="#faq" className="hover:text-slate-900 transition">FAQ</a>
-            <a href="#contato" className="hover:text-slate-900 transition">Contato</a>
+          
+          <nav className="hidden lg:flex items-center gap-7 text-sm font-medium text-emerald-100/70">
+            <a href="#visao" className="text-emerald-400 font-semibold border-b-2 border-emerald-400 pb-0.5 transition">Início</a>
+            <a href="#modulos" className="hover:text-emerald-300 transition">Funcionalidades</a>
+            <a href="#planos" className="hover:text-emerald-300 transition">Planos</a>
+            <a href="#telas" className="hover:text-emerald-300 transition">Demonstração</a>
+            <a href="#contato" className="hover:text-emerald-300 transition">Contato</a>
           </nav>
-          <a
-            href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.gestaoeklesia.com.br'}/login`}
-            className="px-4 py-2 bg-emerald-700 text-white rounded-lg font-semibold hover:bg-emerald-800 transition"
-          >
-            Acesso ao Sistema
-          </a>
+
+          <div className="flex items-center gap-3">
+            <a
+              href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.gestaoeklesia.com.br'}/login`}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/50 hover:border-emerald-400 text-xs sm:text-sm font-medium transition shadow-lg shadow-emerald-950/50 group"
+            >
+              <span>Entrar no Sistema</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </a>
+          </div>
         </div>
       </header>
 
+      {/* Hero Section Reformulada */}
       <section
         id="visao"
-        className="relative overflow-hidden"
-        style={{
-          backgroundImage: "url('/img/bgslider.png')",
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        }}
+        className="relative overflow-hidden bg-[#021815] text-white border-b border-emerald-950"
       >
-        <div className="relative max-w-6xl mx-auto px-6 py-20 grid gap-12 lg:grid-cols-[1.05fr_0.95fr] items-center">
-          <div className="space-y-6 reveal" style={{ animationDelay: '0.05s' }}>
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-50 text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">
-              Para ministérios
-            </span>
-            <h1 className="landing-title text-4xl md:text-6xl">
-              Tenha controle total da sua igreja em um único painel
+        {/* Imagem de Fundo Oficial do Projeto */}
+        <div 
+          className="pointer-events-none absolute inset-0 bg-cover bg-right md:bg-center z-0 opacity-45 lg:opacity-60"
+          style={{
+            backgroundImage: "url('/img/br_admin.png')",
+          }}
+        />
+
+        {/* Gradientes e Iluminação Verde-Petróleo / Esmeralda */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#021815] via-[#021815]/95 lg:via-[#021815]/80 to-transparent z-0" />
+        <div className="pointer-events-none absolute top-10 left-10 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl z-0" />
+        <div className="pointer-events-none absolute bottom-0 right-10 w-[32rem] h-[32rem] bg-teal-500/10 rounded-full blur-3xl z-0" />
+
+        <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 pt-10 pb-16 lg:py-16 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
+          
+          {/* Coluna Esquerda: Conteúdo Institucional */}
+          <div className="lg:col-span-6 flex flex-col justify-center space-y-6">
+            
+            {/* Tag / Badge com detalhe luminoso */}
+            <div className="inline-flex items-center gap-2.5">
+              <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-emerald-400">
+                TECNOLOGIA A SERVIÇO DO REINO
+              </span>
+              <span className="h-0.5 w-8 bg-emerald-500/60 rounded-full" />
+            </div>
+
+            {/* Título Principal */}
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem] font-extrabold text-white tracking-tight leading-[1.12]">
+              Gestão completa <br />
+              para uma igreja <br />
+              <span className="text-emerald-400 drop-shadow-[0_0_25px_rgba(52,211,153,0.35)]">
+                mais forte
+              </span>
             </h1>
-            <p className="text-lg text-slate-600">
-              Organize membros, finanças, ministérios e relatórios com transparência, segurança e sem retrabalho.
+
+            {/* Descrição */}
+            <p className="text-sm sm:text-base text-emerald-100/75 leading-relaxed max-w-xl font-normal">
+              O Gestão Eklésia é a plataforma ideal para igrejas, ministérios e campos que desejam organizar sua administração, fortalecer a comunhão e cumprir sua missão com excelência.
             </p>
-            <div className="flex flex-wrap gap-4">
+
+            {/* Grid de 4 Benefícios com Ícones em Cards Verdes Escuros */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+              <div className="p-3 rounded-xl bg-[#042420]/80 border border-emerald-800/40 hover:border-emerald-500/50 transition">
+                <div className="w-8 h-8 rounded-lg bg-emerald-950/90 border border-emerald-700/50 flex items-center justify-center text-emerald-400 mb-2">
+                  <Users className="w-4 h-4" />
+                </div>
+                <h2 className="text-xs font-bold text-white tracking-wide">Membros</h2>
+                <p className="text-[11px] text-emerald-200/60 leading-tight mt-0.5">Cadastro e acompanhamento</p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#042420]/80 border border-emerald-800/40 hover:border-emerald-500/50 transition">
+                <div className="w-8 h-8 rounded-lg bg-emerald-950/90 border border-emerald-700/50 flex items-center justify-center text-emerald-400 mb-2">
+                  <CircleDollarSign className="w-4 h-4" />
+                </div>
+                <h2 className="text-xs font-bold text-white tracking-wide">Financeiro</h2>
+                <p className="text-[11px] text-emerald-200/60 leading-tight mt-0.5">Dízimos, ofertas e relatórios</p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#042420]/80 border border-emerald-800/40 hover:border-emerald-500/50 transition">
+                <div className="w-8 h-8 rounded-lg bg-emerald-950/90 border border-emerald-700/50 flex items-center justify-center text-emerald-400 mb-2">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <h2 className="text-xs font-bold text-white tracking-wide">Eventos</h2>
+                <p className="text-[11px] text-emerald-200/60 leading-tight mt-0.5">Cultos, reuniões e atividades</p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#042420]/80 border border-emerald-800/40 hover:border-emerald-500/50 transition">
+                <div className="w-8 h-8 rounded-lg bg-emerald-950/90 border border-emerald-700/50 flex items-center justify-center text-emerald-400 mb-2">
+                  <BarChart3 className="w-4 h-4" />
+                </div>
+                <h2 className="text-xs font-bold text-white tracking-wide">Relatórios</h2>
+                <p className="text-[11px] text-emerald-200/60 leading-tight mt-0.5">Informações para decisões</p>
+              </div>
+            </div>
+
+            {/* Botões de Ação */}
+            <div className="flex flex-wrap items-center gap-3 pt-2">
               <a
                 href="/pre-cadastro?plan=starter&trial=true"
-                className="px-6 py-3 bg-emerald-700 text-white rounded-full font-bold hover:bg-emerald-800 transition"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition shadow-lg shadow-emerald-900/40 cursor-pointer group"
               >
-                Teste grátis por 7 dias — sem compromisso
+                <span>Comece agora</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </a>
+
               <a
-                href="#contato"
-                className="px-6 py-3 border-2 border-emerald-700 text-emerald-800 rounded-full font-semibold hover:bg-emerald-50 transition"
+                href="#telas"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#042420]/80 hover:bg-[#06332d] text-emerald-100 border border-emerald-700/40 hover:border-emerald-500/60 font-medium text-sm transition cursor-pointer"
               >
-                Agendar demonstração
+                <Play className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
+                <span>Conheça a plataforma</span>
               </a>
             </div>
-            <div className="flex flex-wrap gap-3 text-sm text-slate-600">
-              <span className="px-3 py-1 bg-white/70 border border-[#e7e0d6] rounded-full">Membros organizados</span>
-              <span className="px-3 py-1 bg-white/70 border border-[#e7e0d6] rounded-full">Finanças transparentes</span>
-              <span className="px-3 py-1 bg-white/70 border border-[#e7e0d6] rounded-full">Tudo em um painel</span>
+
+            {/* Versículo / Citação Bíblica em destaque */}
+            <div className="pt-2 border-l-2 border-emerald-500/60 pl-3">
+              <p className="text-xs text-emerald-200/80 italic">
+                “Todas as coisas cooperam para o bem daqueles que amam a Deus.”
+              </p>
+              <p className="text-[11px] font-semibold text-emerald-400 mt-0.5">
+                Romanos 8:28
+              </p>
             </div>
           </div>
-          <div className="bg-white/90 border border-[#e7e0d6] rounded-3xl p-8 shadow-xl backdrop-blur reveal" style={{ animationDelay: '0.2s' }}>
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Painel da igreja</p>
-              <span className="text-xs text-slate-500">Visão em tempo real</span>
+
+          {/* Coluna Direita: Destaque Visual do Produto com Laptop & Badges Flutuantes */}
+          <div className="lg:col-span-6 relative flex items-center justify-center lg:justify-end">
+            
+            {/* Glow esmeralda em torno do mockup */}
+            <div className="absolute -inset-4 bg-emerald-500/15 rounded-3xl blur-2xl pointer-events-none" />
+
+            <div className="relative w-full max-w-[620px] rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-emerald-800/40">
+              <Image
+                src="/img/hero-reference.png"
+                alt="Plataforma Gestão Eklésia"
+                width={1024}
+                height={514}
+                priority
+                sizes="(max-width: 1024px) 100vw, 620px"
+                className="w-full h-auto object-cover object-right"
+              />
             </div>
-            <div className="mt-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-600">Secretaria</span>
-                <span className="text-slate-900 font-semibold">Documentos organizados</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-600">Financeiro</span>
-                <span className="text-slate-900 font-semibold">Entradas e saídas claras</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-600">Pessoas</span>
-                <span className="text-slate-900 font-semibold">Histórico completo</span>
-              </div>
-            </div>
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-[#e7e0d6] bg-emerald-50/70 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Rotina</p>
-                <p className="text-lg font-semibold text-slate-900 mt-2">Agenda integrada</p>
-              </div>
-              <div className="rounded-2xl border border-[#e7e0d6] bg-amber-50/70 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-amber-700">Controle</p>
-                <p className="text-lg font-semibold text-slate-900 mt-2">Segurança e transparência</p>
+
+            {/* Badges Flutuantes Decorativos em Telas Maiores */}
+            <div className="hidden xl:block absolute -top-4 right-12 z-20 pointer-events-none">
+              <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#03231f]/90 border border-emerald-600/40 backdrop-blur-md shadow-xl text-xs font-medium text-emerald-100">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Dados seguros e confiáveis</span>
               </div>
             </div>
+
+            <div className="hidden xl:block absolute bottom-8 -left-6 z-20 pointer-events-none">
+              <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#03231f]/90 border border-emerald-600/40 backdrop-blur-md shadow-xl text-xs font-medium text-emerald-100">
+                <Target className="w-4 h-4 text-emerald-400" />
+                <span>Mais tempo para a missão</span>
+              </div>
+            </div>
+
           </div>
         </div>
-        <div className="relative max-w-6xl mx-auto px-6 pb-14">
-          <div className="grid gap-4 md:grid-cols-3">
-            {metrics.map((metric, index) => (
+
+        {/* Faixa de Métricas Rápidas */}
+        <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 pb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-emerald-900/40">
+            {metrics.map((metric) => (
               <div
                 key={metric.label}
-                className="bg-white/80 border border-[#e7e0d6] rounded-2xl p-5 shadow-sm reveal"
-                style={{ animationDelay: `${0.25 + index * 0.1}s` }}
+                className="bg-[#03231f]/60 border border-emerald-800/30 rounded-2xl p-4 sm:p-5 flex items-center justify-between"
               >
-                <p className="text-2xl font-bold text-slate-900">{metric.value}</p>
-                <p className="text-sm text-slate-600 mt-1">{metric.label}</p>
+                <div>
+                  <p className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{metric.value}</p>
+                  <p className="text-xs sm:text-sm text-emerald-200/70 mt-0.5">{metric.label}</p>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
               </div>
             ))}
           </div>
