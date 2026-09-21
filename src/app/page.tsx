@@ -606,25 +606,48 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Seção Dores / Problemas que resolvemos - Fundo Branco Suave com Cartões Azul & Branco */}
+      {/* Seção Dores / Problemas que resolvemos - Fundo Branco Suave com Imagem Ilustrativa & Cartões */}
       <section id="dores" className="bg-white border-b border-slate-200/80 py-20">
         <div className="max-w-7xl mx-auto px-5 sm:px-8">
-          <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] items-center">
-            <div>
-              <div className="inline-flex items-center gap-2.5 mb-3">
-                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-blue-700">
-                  PROBLEMAS QUE RESOLVEMOS
-                </span>
-                <span className="h-0.5 w-8 bg-blue-600 rounded-full" />
+          <div className="grid gap-12 lg:grid-cols-12 items-center">
+            
+            {/* Coluna Esquerda: Texto Institucional + Imagem Ilustrativa Integrada */}
+            <div className="lg:col-span-6 space-y-6">
+              <div>
+                <div className="inline-flex items-center gap-2.5 mb-3">
+                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-blue-700">
+                    PROBLEMAS QUE RESOLVEMOS
+                  </span>
+                  <span className="h-0.5 w-8 bg-blue-600 rounded-full" />
+                </div>
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
+                  Sua igreja não precisa depender de planilhas, cadernos e informações espalhadas.
+                </h2>
+                <p className="text-slate-600 mt-4 text-sm sm:text-base leading-relaxed">
+                  O Gestão Eklésia centraliza a rotina administrativa para que líderes tenham mais clareza, equipes trabalhem com menos retrabalho e a igreja cresça com organização.
+                </p>
               </div>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                Sua igreja não precisa depender de planilhas, cadernos e informações espalhadas.
-              </h2>
-              <p className="text-slate-600 mt-4 text-sm sm:text-base leading-relaxed">
-                O Gestão Eklésia centraliza a rotina administrativa para que líderes tenham mais clareza, equipes trabalhem com menos retrabalho e a igreja cresça com organização.
-              </p>
+
+              {/* Imagem Ilustrativa Institucional */}
+              <div className="relative rounded-2xl overflow-hidden border border-blue-100 shadow-lg shadow-blue-900/5 group">
+                <Image
+                  src="/img/login-bg.png"
+                  alt="Gestão de igrejas e tecnologia a serviço da missão"
+                  width={600}
+                  height={340}
+                  className="w-full h-48 sm:h-56 lg:h-64 object-cover group-hover:scale-105 transition duration-500"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent flex items-end p-5">
+                  <p className="text-xs sm:text-sm font-medium text-white drop-shadow-md">
+                    Organização ministerial com tecnologia moderna e propósito.
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+
+            {/* Coluna Direita: Grid com os 4 Pilares de Soluções */}
+            <div className="lg:col-span-6 grid gap-4 sm:grid-cols-2">
               {[
                 ['Membros sem acompanhamento', 'Cadastre, acompanhe o histórico ministerial e mantenha dados sempre atualizados.'],
                 ['Finanças pouco transparentes', 'Registre entradas, saídas, categorias e relatórios com total segurança.'],
@@ -633,16 +656,19 @@ export default function LandingPage() {
               ].map(([title, text]) => (
                 <div
                   key={title}
-                  className="bg-slate-50/80 hover:bg-white border border-slate-200 hover:border-blue-300 rounded-2xl p-5 sm:p-6 transition-all duration-300 shadow-sm hover:shadow-md group hover:-translate-y-0.5"
+                  className="bg-slate-50/80 hover:bg-white border border-slate-200 hover:border-blue-300 rounded-2xl p-5 sm:p-6 transition-all duration-300 shadow-sm hover:shadow-md group hover:-translate-y-0.5 flex flex-col justify-between"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-3 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-sm">
-                    <Check className="w-4 h-4" />
+                  <div>
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-3 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                      <Check className="w-4 h-4" />
+                    </div>
+                    <h3 className="font-bold text-slate-900 text-base group-hover:text-blue-900 transition">{title}</h3>
+                    <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">{text}</p>
                   </div>
-                  <h3 className="font-bold text-slate-900 text-base group-hover:text-blue-900 transition">{title}</h3>
-                  <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">{text}</p>
                 </div>
               ))}
             </div>
+
           </div>
         </div>
       </section>
