@@ -7,7 +7,7 @@ import NotificationModal from '@/components/NotificationModal';
 import { formatPhone } from '@/lib/mascaras';
 import { createClient } from '@/lib/supabase-client';
 import { formatarPreco } from '@/config/plans';
-import { Users, CircleDollarSign, Calendar, BarChart3, ArrowRight, Play, CheckCircle2, ShieldCheck, Target, ChevronDown, Sparkles, Check } from 'lucide-react';
+import { Users, CircleDollarSign, Calendar, BarChart3, ArrowRight, Play, CheckCircle2, ShieldCheck, Target, ChevronDown, Sparkles, UserPlus, Coins, FileText, TrendingUp, BookOpen } from 'lucide-react';
 
 const pillars = [
   {
@@ -609,64 +609,129 @@ export default function LandingPage() {
       {/* Seção Dores / Problemas que resolvemos - Fundo Branco Suave com Imagem Ilustrativa & Cartões */}
       <section id="dores" className="bg-white border-b border-slate-200/80 py-20">
         <div className="max-w-7xl mx-auto px-5 sm:px-8">
-          <div className="grid gap-12 lg:grid-cols-12 items-center">
+          <div className="grid gap-12 lg:grid-cols-12 items-start">
             
-            {/* Coluna Esquerda: Texto Institucional + Imagem Ilustrativa Integrada */}
+            {/* Coluna Esquerda: Texto Institucional + Imagem Ilustrativa com Card Flutuante + Versículo */}
             <div className="lg:col-span-6 space-y-6">
               <div>
                 <div className="inline-flex items-center gap-2.5 mb-3">
-                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-blue-700">
+                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-blue-600">
                     PROBLEMAS QUE RESOLVEMOS
                   </span>
                   <span className="h-0.5 w-8 bg-blue-600 rounded-full" />
                 </div>
                 <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                  Sua igreja não precisa depender de planilhas, cadernos e informações espalhadas.
+                  Sua igreja não precisa depender de <span className="text-blue-600">planilhas, cadernos e informações espalhadas.</span>
                 </h2>
                 <p className="text-slate-600 mt-4 text-sm sm:text-base leading-relaxed">
                   O Gestão Eklésia centraliza a rotina administrativa para que líderes tenham mais clareza, equipes trabalhem com menos retrabalho e a igreja cresça com organização.
                 </p>
               </div>
 
-              {/* Imagem Ilustrativa Institucional */}
-              <div className="relative rounded-2xl overflow-hidden border border-blue-100 shadow-lg shadow-blue-900/5 group">
+              {/* Imagem Ilustrativa com Card Institucional Sobreposto */}
+              <div className="relative rounded-3xl overflow-hidden border border-slate-200 shadow-xl group">
                 <Image
                   src="/img/login-bg.png"
                   alt="Gestão de igrejas e tecnologia a serviço da missão"
-                  width={600}
-                  height={340}
-                  className="w-full h-48 sm:h-56 lg:h-64 object-cover group-hover:scale-105 transition duration-500"
+                  width={640}
+                  height={380}
+                  className="w-full h-64 sm:h-72 object-cover group-hover:scale-105 transition duration-700"
                   loading="lazy"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent flex items-end p-5">
-                  <p className="text-xs sm:text-sm font-medium text-white drop-shadow-md">
-                    Organização ministerial com tecnologia moderna e propósito.
+                
+                {/* Painel Institucional Flutuante */}
+                <div className="absolute bottom-4 left-4 right-4 sm:right-auto sm:max-w-md bg-[#0a1832]/90 backdrop-blur-md border border-blue-500/30 rounded-2xl p-3.5 flex items-center gap-3.5 text-white shadow-2xl">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400/40 flex items-center justify-center text-blue-300 shrink-0">
+                    <BookOpen className="w-5 h-5" />
+                  </div>
+                  <p className="text-xs text-slate-200 leading-snug">
+                    Mais tempo para o que realmente importa: <span className="text-blue-300 font-semibold">pessoas, comunhão e a obra de Deus.</span>
                   </p>
                 </div>
               </div>
+
+              {/* Versículo Bíblico Institucional */}
+              <div className="border-l-2 border-blue-600 pl-3.5 pt-0.5">
+                <p className="text-xs sm:text-sm italic text-slate-600">
+                  &ldquo;Tudo, porém, seja feito com decência e ordem.&rdquo;
+                </p>
+                <span className="block text-xs font-semibold text-slate-800 not-italic mt-0.5">
+                  1 Coríntios 14:40
+                </span>
+              </div>
             </div>
 
-            {/* Coluna Direita: Grid com os 4 Pilares de Soluções */}
-            <div className="lg:col-span-6 grid gap-4 sm:grid-cols-2">
-              {[
-                ['Membros sem acompanhamento', 'Cadastre, acompanhe o histórico ministerial e mantenha dados sempre atualizados.'],
-                ['Finanças pouco transparentes', 'Registre entradas, saídas, categorias e relatórios com total segurança.'],
-                ['Documentos dispersos', 'Organize cartas, certificados, atas e registros em um único lugar seguro.'],
-                ['Liderança sem visão geral', 'Acompanhe indicadores, auditoria e módulos estratégicos em tempo real.'],
-              ].map(([title, text]) => (
-                <div
-                  key={title}
-                  className="bg-slate-50/80 hover:bg-white border border-slate-200 hover:border-blue-300 rounded-2xl p-5 sm:p-6 transition-all duration-300 shadow-sm hover:shadow-md group hover:-translate-y-0.5 flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-3 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-sm">
-                      <Check className="w-4 h-4" />
+            {/* Coluna Direita: Grid 2x2 com os 4 Cards de Problemas + Banner Inferior */}
+            <div className="lg:col-span-6 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {[
+                  {
+                    num: '01',
+                    icon: UserPlus,
+                    title: 'Membros sem acompanhamento',
+                    desc: 'Cadastre, acompanhe o histórico ministerial e mantenha os dados sempre atualizados.'
+                  },
+                  {
+                    num: '02',
+                    icon: Coins,
+                    title: 'Finanças pouco transparentes',
+                    desc: 'Registre entradas, saídas, categorias e relatórios com total segurança.'
+                  },
+                  {
+                    num: '03',
+                    icon: FileText,
+                    title: 'Documentos dispersos',
+                    desc: 'Organize cartas, certificados, atas e registros em um único lugar seguro.'
+                  },
+                  {
+                    num: '04',
+                    icon: TrendingUp,
+                    title: 'Liderança sem visão geral',
+                    desc: 'Acompanhe indicadores, auditoria e módulos estratégicos em tempo real.'
+                  }
+                ].map((card) => {
+                  const IconComp = card.icon;
+                  return (
+                    <div
+                      key={card.num}
+                      className="bg-slate-50/70 hover:bg-white border border-slate-200/90 hover:border-blue-300 rounded-3xl p-5 sm:p-6 transition-all duration-300 shadow-xs hover:shadow-md group flex flex-col justify-between relative"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-xs">
+                          <IconComp className="w-5 h-5" />
+                        </div>
+                        <span className="text-xl font-bold text-slate-300 group-hover:text-blue-200 transition">
+                          {card.num}
+                        </span>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-sm sm:text-base group-hover:text-blue-950 transition">
+                          {card.title}
+                        </h3>
+                        <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
+                          {card.desc}
+                        </p>
+                      </div>
                     </div>
-                    <h3 className="font-bold text-slate-900 text-base group-hover:text-blue-900 transition">{title}</h3>
-                    <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">{text}</p>
-                  </div>
+                  );
+                })}
+              </div>
+
+              {/* Destaque / Banner Inferior */}
+              <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/50 border border-blue-200/80 rounded-2xl p-4 sm:p-5 flex items-center gap-4 shadow-xs">
+                <div className="w-11 h-11 rounded-2xl bg-blue-100/80 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
+                  <Target className="w-5 h-5" />
                 </div>
-              ))}
+                <div className="h-8 w-px bg-blue-200 hidden sm:block" />
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600">
+                    IGREJAS MAIS ORGANIZADAS
+                  </p>
+                  <p className="text-sm sm:text-base font-bold text-slate-900 mt-0.5">
+                    Mais tempo para <span className="text-blue-600">a missão.</span>
+                  </p>
+                </div>
+              </div>
             </div>
 
           </div>
