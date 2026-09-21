@@ -511,28 +511,30 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* Hero Section Reformulada */}
+      {/* Hero Section Reformulada com a Imagem de Alta Definição hero3.png */}
       <section
         id="visao"
-        className="relative overflow-hidden bg-[#021815] text-white border-b border-emerald-950"
+        className="relative min-h-[640px] lg:min-h-[720px] overflow-hidden bg-[#021815] text-white border-b border-emerald-950 flex flex-col justify-between"
       >
-        {/* Imagem de Fundo Oficial do Projeto */}
+        {/* Imagem de Fundo Oficial com Laptop e Ambiente */}
         <div 
-          className="pointer-events-none absolute inset-0 bg-cover bg-right md:bg-center z-0 opacity-45 lg:opacity-60"
+          className="pointer-events-none absolute inset-0 bg-cover bg-[75%_center] sm:bg-right lg:bg-center z-0"
           style={{
-            backgroundImage: "url('/img/br_admin.png')",
+            backgroundImage: "url('/img/hero3.png')",
           }}
         />
 
-        {/* Gradientes e Iluminação Verde-Petróleo / Esmeralda */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#021815] via-[#021815]/95 lg:via-[#021815]/80 to-transparent z-0" />
-        <div className="pointer-events-none absolute top-10 left-10 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl z-0" />
-        <div className="pointer-events-none absolute bottom-0 right-10 w-[32rem] h-[32rem] bg-teal-500/10 rounded-full blur-3xl z-0" />
+        {/* Gradiente Escuro Suave no Lado Esquerdo para Legibilidade Perfeita dos Textos */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#021815] via-[#021815]/95 sm:via-[#021815]/85 md:via-[#021815]/70 lg:via-[#021815]/50 to-transparent z-0" />
+        
+        {/* Iluminação Esmeralda de Fundo */}
+        <div className="pointer-events-none absolute top-0 left-0 w-[500px] h-[500px] bg-emerald-600/10 rounded-full blur-3xl z-0" />
+        <div className="pointer-events-none absolute bottom-0 right-10 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-3xl z-0" />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 pt-10 pb-16 lg:py-16 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
+        <div className="relative z-10 max-w-7xl w-full mx-auto px-5 sm:px-8 pt-12 pb-16 lg:py-20 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
           
-          {/* Coluna Esquerda: Conteúdo Institucional */}
-          <div className="lg:col-span-6 flex flex-col justify-center space-y-6">
+          {/* Coluna Esquerda: Conteúdo Institucional com Contraste Perfeito */}
+          <div className="lg:col-span-7 xl:col-span-6 flex flex-col justify-center space-y-6">
             
             {/* Tag / Badge com detalhe luminoso */}
             <div className="inline-flex items-center gap-2.5">
@@ -552,42 +554,42 @@ export default function LandingPage() {
             </h1>
 
             {/* Descrição */}
-            <p className="text-sm sm:text-base text-emerald-100/75 leading-relaxed max-w-xl font-normal">
+            <p className="text-sm sm:text-base text-emerald-100/85 leading-relaxed max-w-xl font-normal">
               O Gestão Eklésia é a plataforma ideal para igrejas, ministérios e campos que desejam organizar sua administração, fortalecer a comunhão e cumprir sua missão com excelência.
             </p>
 
             {/* Grid de 4 Benefícios com Ícones em Cards Verdes Escuros */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-              <div className="p-3 rounded-xl bg-[#042420]/80 border border-emerald-800/40 hover:border-emerald-500/50 transition">
+              <div className="p-3 rounded-xl bg-[#021815]/85 border border-emerald-800/40 hover:border-emerald-500/50 transition backdrop-blur-md">
                 <div className="w-8 h-8 rounded-lg bg-emerald-950/90 border border-emerald-700/50 flex items-center justify-center text-emerald-400 mb-2">
                   <Users className="w-4 h-4" />
                 </div>
                 <h2 className="text-xs font-bold text-white tracking-wide">Membros</h2>
-                <p className="text-[11px] text-emerald-200/60 leading-tight mt-0.5">Cadastro e acompanhamento</p>
+                <p className="text-[11px] text-emerald-200/70 leading-tight mt-0.5">Cadastro e acompanhamento</p>
               </div>
 
-              <div className="p-3 rounded-xl bg-[#042420]/80 border border-emerald-800/40 hover:border-emerald-500/50 transition">
+              <div className="p-3 rounded-xl bg-[#021815]/85 border border-emerald-800/40 hover:border-emerald-500/50 transition backdrop-blur-md">
                 <div className="w-8 h-8 rounded-lg bg-emerald-950/90 border border-emerald-700/50 flex items-center justify-center text-emerald-400 mb-2">
                   <CircleDollarSign className="w-4 h-4" />
                 </div>
                 <h2 className="text-xs font-bold text-white tracking-wide">Financeiro</h2>
-                <p className="text-[11px] text-emerald-200/60 leading-tight mt-0.5">Dízimos, ofertas e relatórios</p>
+                <p className="text-[11px] text-emerald-200/70 leading-tight mt-0.5">Dízimos, ofertas e relatórios</p>
               </div>
 
-              <div className="p-3 rounded-xl bg-[#042420]/80 border border-emerald-800/40 hover:border-emerald-500/50 transition">
+              <div className="p-3 rounded-xl bg-[#021815]/85 border border-emerald-800/40 hover:border-emerald-500/50 transition backdrop-blur-md">
                 <div className="w-8 h-8 rounded-lg bg-emerald-950/90 border border-emerald-700/50 flex items-center justify-center text-emerald-400 mb-2">
                   <Calendar className="w-4 h-4" />
                 </div>
                 <h2 className="text-xs font-bold text-white tracking-wide">Eventos</h2>
-                <p className="text-[11px] text-emerald-200/60 leading-tight mt-0.5">Cultos, reuniões e atividades</p>
+                <p className="text-[11px] text-emerald-200/70 leading-tight mt-0.5">Cultos, reuniões e atividades</p>
               </div>
 
-              <div className="p-3 rounded-xl bg-[#042420]/80 border border-emerald-800/40 hover:border-emerald-500/50 transition">
+              <div className="p-3 rounded-xl bg-[#021815]/85 border border-emerald-800/40 hover:border-emerald-500/50 transition backdrop-blur-md">
                 <div className="w-8 h-8 rounded-lg bg-emerald-950/90 border border-emerald-700/50 flex items-center justify-center text-emerald-400 mb-2">
                   <BarChart3 className="w-4 h-4" />
                 </div>
                 <h2 className="text-xs font-bold text-white tracking-wide">Relatórios</h2>
-                <p className="text-[11px] text-emerald-200/60 leading-tight mt-0.5">Informações para decisões</p>
+                <p className="text-[11px] text-emerald-200/70 leading-tight mt-0.5">Informações para decisões</p>
               </div>
             </div>
 
@@ -595,7 +597,7 @@ export default function LandingPage() {
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <a
                 href="/pre-cadastro?plan=starter&trial=true"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition shadow-lg shadow-emerald-900/40 cursor-pointer group"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition shadow-lg shadow-emerald-900/50 cursor-pointer group"
               >
                 <span>Comece agora</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
@@ -603,7 +605,7 @@ export default function LandingPage() {
 
               <a
                 href="#telas"
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#042420]/80 hover:bg-[#06332d] text-emerald-100 border border-emerald-700/40 hover:border-emerald-500/60 font-medium text-sm transition cursor-pointer"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#021815]/80 hover:bg-emerald-950 text-emerald-100 border border-emerald-700/40 hover:border-emerald-500/60 font-medium text-sm transition backdrop-blur-md cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
                 <span>Conheça a plataforma</span>
@@ -612,7 +614,7 @@ export default function LandingPage() {
 
             {/* Versículo / Citação Bíblica em destaque */}
             <div className="pt-2 border-l-2 border-emerald-500/60 pl-3">
-              <p className="text-xs text-emerald-200/80 italic">
+              <p className="text-xs text-emerald-200/90 italic">
                 “Todas as coisas cooperam para o bem daqueles que amam a Deus.”
               </p>
               <p className="text-[11px] font-semibold text-emerald-400 mt-0.5">
@@ -621,37 +623,19 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Coluna Direita: Destaque Visual do Produto com Laptop & Badges Flutuantes */}
-          <div className="lg:col-span-6 relative flex items-center justify-center lg:justify-end">
+          {/* Coluna Direita: Badges Flutuantes Discretos sobre o Fundo do Laptop */}
+          <div className="hidden lg:flex lg:col-span-5 xl:col-span-6 relative h-full min-h-[380px] flex-col justify-between items-end pointer-events-none">
             
-            {/* Glow esmeralda em torno do mockup */}
-            <div className="absolute -inset-4 bg-emerald-500/15 rounded-3xl blur-2xl pointer-events-none" />
-
-            <div className="relative w-full max-w-[620px] rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-emerald-800/40">
-              <Image
-                src="/img/hero-reference.png"
-                alt="Plataforma Gestão Eklésia"
-                width={1024}
-                height={514}
-                priority
-                sizes="(max-width: 1024px) 100vw, 620px"
-                className="w-full h-auto object-cover object-right"
-              />
+            {/* Badge Superior Direito */}
+            <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#021815]/80 border border-emerald-500/40 backdrop-blur-md shadow-2xl text-xs font-medium text-emerald-100">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Dados seguros e confiáveis</span>
             </div>
 
-            {/* Badges Flutuantes Decorativos em Telas Maiores */}
-            <div className="hidden xl:block absolute -top-4 right-12 z-20 pointer-events-none">
-              <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#03231f]/90 border border-emerald-600/40 backdrop-blur-md shadow-xl text-xs font-medium text-emerald-100">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Dados seguros e confiáveis</span>
-              </div>
-            </div>
-
-            <div className="hidden xl:block absolute bottom-8 -left-6 z-20 pointer-events-none">
-              <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#03231f]/90 border border-emerald-600/40 backdrop-blur-md shadow-xl text-xs font-medium text-emerald-100">
-                <Target className="w-4 h-4 text-emerald-400" />
-                <span>Mais tempo para a missão</span>
-              </div>
+            {/* Badge Inferior Direito */}
+            <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#021815]/80 border border-emerald-500/40 backdrop-blur-md shadow-2xl text-xs font-medium text-emerald-100">
+              <Target className="w-4 h-4 text-emerald-400" />
+              <span>Mais tempo para a missão</span>
             </div>
 
           </div>
