@@ -7,7 +7,7 @@ import NotificationModal from '@/components/NotificationModal';
 import { formatPhone } from '@/lib/mascaras';
 import { createClient } from '@/lib/supabase-client';
 import { formatarPreco } from '@/config/plans';
-import { Users, CircleDollarSign, Calendar, BarChart3, ArrowRight, Play, CheckCircle2, ShieldCheck, Target } from 'lucide-react';
+import { Users, CircleDollarSign, Calendar, BarChart3, ArrowRight, Play, CheckCircle2, ShieldCheck, Target, ChevronDown, Sparkles, Check } from 'lucide-react';
 
 const pillars = [
   {
@@ -16,7 +16,7 @@ const pillars = [
   },
   {
     title: 'Finanças sob controle',
-    text: 'Tesouraria, receitas, despesas e relatórios em um fluxo confiável e simples.'
+    text: 'Tesouraria, receitas, despesas e relatórios em um fluxo confiável, transparente e simples.'
   },
   {
     title: 'Pessoas no centro',
@@ -33,7 +33,7 @@ const modules = [
   },
   {
     title: 'Achados e Perdidos',
-    text: 'Controle de itens encontrados e devoluções com histórico.',
+    text: 'Controle de itens encontrados e devoluções com registro de histórico.',
     bullets: ['Registro rápido', 'Contato com membros', 'Devoluções'],
     icon: '🧾'
   },
@@ -44,8 +44,8 @@ const modules = [
     icon: '🏛️'
   },
   {
-    title: 'Comissão',
-    text: 'Gestão de comissões, equipes e atas com clareza.',
+    title: 'Comissões',
+    text: 'Gestão de comissões, equipes e atas com total clareza.',
     bullets: ['Membros e cargos', 'Reuniões registradas', 'Decisões'],
     icon: '🧩'
   },
@@ -74,20 +74,20 @@ const modules = [
     icon: '🗺️'
   },
   {
-    title: 'Funcionarios',
-    text: 'Controle de equipe com dados, cargos e situação.',
+    title: 'Funcionários',
+    text: 'Controle de equipe com dados, cargos e situação cadastral.',
     bullets: ['Dados e documentos', 'Cargos e setores', 'Status ativo'],
     icon: '👔'
   },
   {
     title: 'Reuniões',
-    text: 'Pautas, atas e participantes em um fluxo simples.',
+    text: 'Pautas, atas e participantes em um fluxo simples e integrado.',
     bullets: ['Convocações', 'Atas', 'Participantes'],
     icon: '🤝'
   },
   {
     title: 'Presidência',
-    text: 'Visão executiva com indicadores e aprovações.',
+    text: 'Visão executiva com indicadores consolidados e aprovações.',
     bullets: ['Indicadores-chave', 'Aprovações', 'Visão consolidada'],
     icon: '👑'
   },
@@ -99,26 +99,26 @@ const modules = [
   },
   {
     title: 'Tesouraria',
-    text: 'Lançamentos e conciliações organizadas.',
-    bullets: ['Entradas e saídas', 'Conferencia', 'Histórico'],
+    text: 'Lançamentos e conciliações financeiras organizadas.',
+    bullets: ['Entradas e saídas', 'Conferência', 'Histórico'],
     icon: '💼'
   },
   {
     title: 'EBD',
-    text: 'Escola bíblica dominical com classes e presença.',
-    bullets: ['Classes e professores', 'Presenca', 'Conteúdos'],
+    text: 'Escola Bíblica Dominical com classes, professores e presença.',
+    bullets: ['Classes e professores', 'Presença', 'Conteúdos'],
     icon: '📘'
   },
   {
     title: 'Auditoria',
-    text: 'Rastreabilidade completa de acessos e ações.',
+    text: 'Rastreabilidade completa de acessos e ações no sistema.',
     bullets: ['Registro de ações', 'Alertas', 'Conformidade'],
     icon: '✅'
   },
   {
     title: 'Chat Interno',
-    text: 'Comunicação rápida entre setores e equipes.',
-    bullets: ['Canais por area', 'Mensagens rápidas', 'Histórico'],
+    text: 'Comunicação rápida e segura entre setores e equipes.',
+    bullets: ['Canais por área', 'Mensagens rápidas', 'Histórico'],
     icon: '💬'
   }
 ];
@@ -137,7 +137,7 @@ const journey = [
   {
     step: '03',
     title: 'Acompanhe resultados',
-    text: 'Relatórios, auditoria e indicadores para tomada de decisao segura.'
+    text: 'Relatórios, auditoria e indicadores para tomada de decisão segura.'
   }
 ];
 
@@ -147,24 +147,22 @@ const metrics = [
   { value: 'LGPD', label: 'Conformidade e segurança' }
 ];
 
-
-
 const faqs = [
   {
     question: 'Quanto tempo leva para implementar?',
-    answer: 'O setup inicial pode ser feito em poucas horas. A equipe de onboarding acompanha sua igreja na implantação.'
+    answer: 'A configuração inicial pode ser feita em poucas horas. A nossa equipe de integração acompanha a sua igreja durante toda a implantação.'
   },
   {
-    question: 'Consigo personalizar documentos e cartoes?',
-    answer: 'Sim. Você pode configurar modelos, cores, logotipo e documentos com QR Code.'
+    question: 'Consigo personalizar documentos e cartões de membro?',
+    answer: 'Sim. Você pode configurar modelos oficiais, cores, logotipo e documentos com validação por QR Code.'
   },
   {
-    question: 'O suporte esta incluso?',
-    answer: 'Sim. Todos os planos incluem suporte e acompanhamento na implantação.'
+    question: 'O suporte técnico está incluso?',
+    answer: 'Sim. Todos os planos incluem suporte contínuo e acompanhamento dedicado na implantação.'
   },
   {
-    question: 'Os dados estão seguros?',
-    answer: 'Sim. Uso Supabase (PostgreSQL enterprise), criptografia SSL/TLS, backup diário e conformidade LGPD.'
+    question: 'Os dados da minha igreja estão seguros?',
+    answer: 'Sim. Utilizamos infraestrutura enterprise (PostgreSQL/Supabase), criptografia ponta a ponta SSL/TLS, rotinas de backup diário e total conformidade com a LGPD.'
   }
 ];
 
@@ -379,22 +377,22 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
+    <div className="min-h-screen bg-[#021815] text-slate-100 selection:bg-emerald-500 selection:text-black">
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap');
         :root {
-          --landing-bg: #f6f2ea;
-          --landing-card: #ffffff;
-          --landing-ink: #1f1b16;
-          --landing-muted: #5f6b66;
-          --landing-accent: #0f766e;
-          --landing-warm: #c26b2b;
-          --landing-line: #e7e0d6;
+          --landing-bg: #021815;
+          --landing-card: #03231f;
+          --landing-ink: #f1f5f9;
+          --landing-muted: #94a3b8;
+          --landing-accent: #10b981;
+          --landing-warm: #f59e0b;
+          --landing-line: rgba(16, 185, 129, 0.15);
         }
         body {
           font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
-          background: radial-gradient(circle at top, #f8f5ef 0%, #eef5f2 55%, #f6f2ea 100%);
-          color: var(--landing-ink);
+          background: #021815;
+          color: #f1f5f9;
         }
         .landing-title {
           font-family: 'DM Serif Display', 'Georgia', serif;
@@ -404,20 +402,20 @@ export default function LandingPage() {
           position: absolute;
           border-radius: 9999px;
           filter: blur(70px);
-          opacity: 0.6;
+          opacity: 0.25;
           animation: float 12s ease-in-out infinite;
         }
         .landing-orb.orb-a {
           width: 420px;
           height: 420px;
-          background: #ccebe3;
+          background: #059669;
           top: -140px;
           left: -120px;
         }
         .landing-orb.orb-b {
           width: 520px;
           height: 520px;
-          background: #f3d8bf;
+          background: #0f766e;
           bottom: -200px;
           right: -140px;
         }
@@ -662,57 +660,82 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="dores" className="max-w-6xl mx-auto px-6 py-16">
-        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] items-start">
+      {/* Seção Dores / Problemas que resolvemos */}
+      <section id="dores" className="max-w-7xl mx-auto px-5 sm:px-8 py-20 border-b border-emerald-950/60">
+        <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] items-center">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Problemas que resolvemos</p>
-            <h2 className="landing-title text-3xl">Sua igreja não precisa depender de planilhas, cadernos e informações espalhadas.</h2>
-            <p className="text-slate-600 mt-3">
-              O Gestão Eklesia centraliza a rotina administrativa para que líderes tenham mais clareza, equipes trabalhem com menos retrabalho e a igreja cresça com organização.
+            <div className="inline-flex items-center gap-2.5 mb-3">
+              <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-emerald-400">
+                PROBLEMAS QUE RESOLVEMOS
+              </span>
+              <span className="h-0.5 w-8 bg-emerald-500/60 rounded-full" />
+            </div>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
+              Sua igreja não precisa depender de planilhas, cadernos e informações espalhadas.
+            </h2>
+            <p className="text-emerald-100/75 mt-4 text-sm sm:text-base leading-relaxed">
+              O Gestão Eklésia centraliza a rotina administrativa para que líderes tenham mais clareza, equipes trabalhem com menos retrabalho e a igreja cresça com organização.
             </p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             {[
-              ['Membros sem acompanhamento', 'Cadastre, acompanhe histórico ministerial e mantenha dados sempre atualizados.'],
-              ['Finanças pouco transparentes', 'Registre entradas, saídas, categorias e relatórios com mais segurança.'],
-              ['Documentos dispersos', 'Organize cartas, certificados, atas e registros em um único lugar.'],
+              ['Membros sem acompanhamento', 'Cadastre, acompanhe o histórico ministerial e mantenha dados sempre atualizados.'],
+              ['Finanças pouco transparentes', 'Registre entradas, saídas, categorias e relatórios com total segurança.'],
+              ['Documentos dispersos', 'Organize cartas, certificados, atas e registros em um único lugar seguro.'],
               ['Liderança sem visão geral', 'Acompanhe indicadores, auditoria e módulos estratégicos em tempo real.'],
             ].map(([title, text]) => (
-              <div key={title} className="bg-white border border-[#e7e0d6] rounded-2xl p-5 shadow-sm hover:shadow-lg transition">
-                <h3 className="font-bold text-slate-900">{title}</h3>
-                <p className="text-sm text-slate-600 mt-2">{text}</p>
+              <div
+                key={title}
+                className="bg-[#03231f]/70 border border-emerald-800/40 hover:border-emerald-500/50 rounded-2xl p-5 sm:p-6 transition duration-300 backdrop-blur-sm group hover:-translate-y-0.5 shadow-lg shadow-black/20"
+              >
+                <div className="w-8 h-8 rounded-lg bg-emerald-950 border border-emerald-700/50 flex items-center justify-center text-emerald-400 mb-3 group-hover:scale-105 transition">
+                  <Check className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-white text-base group-hover:text-emerald-300 transition">{title}</h3>
+                <p className="text-xs sm:text-sm text-emerald-200/70 mt-2 leading-relaxed">{text}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="telas" className="max-w-6xl mx-auto px-6 py-16">
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Veja na pratica</p>
-          <h2 className="landing-title text-3xl">Veja o Gestão Eklesia em funcionamento</h2>
-          <p className="text-slate-600 mt-3">Conheça as telas que ajudam sua equipe a organizar membros, finanças, eventos e relatórios no dia a dia.</p>
+      {/* Seção Telas / Galeria Demonstrativa */}
+      <section id="telas" className="max-w-7xl mx-auto px-5 sm:px-8 py-20 border-b border-emerald-950/60">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <div className="inline-flex items-center gap-2.5 mb-3">
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-emerald-400">
+              VEJA NA PRÁTICA
+            </span>
+            <span className="h-0.5 w-8 bg-emerald-500/60 rounded-full" />
+          </div>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
+            Veja o Gestão Eklésia em funcionamento
+          </h2>
+          <p className="text-emerald-100/75 mt-3 text-sm sm:text-base">
+            Conheça as telas que ajudam sua equipe a organizar membros, finanças, eventos e relatórios no dia a dia.
+          </p>
         </div>
+        
         <div
-          className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory md:justify-center touch-manipulation rounded-2xl border border-slate-200 p-4"
+          className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory md:justify-center touch-manipulation rounded-3xl border border-emerald-800/40 p-5 bg-[#021815]/90 backdrop-blur-md shadow-2xl"
           style={{
             backgroundImage: "url('/img/bgslider.png')",
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
-            minHeight: '220px',
+            minHeight: '230px',
           }}
         >
           {gallery.map((item) => (
             <div
               key={item.src}
-              className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm hover:shadow-lg transition shrink-0 min-w-[150px] sm:min-w-[190px] lg:min-w-[230px] max-w-[230px] snap-start select-none touch-manipulation cursor-pointer"
+              className="bg-[#03231f]/90 border border-emerald-800/50 hover:border-emerald-400/70 rounded-2xl p-2.5 shadow-xl transition-all duration-300 shrink-0 min-w-[160px] sm:min-w-[200px] lg:min-w-[240px] max-w-[240px] snap-start select-none touch-manipulation cursor-pointer group hover:-translate-y-1"
               onClick={() => setSelectedImage(item)}
             >
               <img
                 src={item.src}
                 alt={item.alt}
-                className="w-full h-32 sm:h-36 lg:h-40 object-cover rounded-xl border border-slate-200"
+                className="w-full h-32 sm:h-36 lg:h-40 object-cover rounded-xl border border-emerald-900/60 group-hover:brightness-105 transition"
                 loading="lazy"
                 draggable={false}
               />
@@ -721,50 +744,66 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section
-        id="modulos"
-        className="max-w-6xl mx-auto px-6 py-16 rounded-3xl"
-        style={{
-          backgroundImage: 'linear-gradient(135deg, rgba(15,118,110,0.06), rgba(194,107,43,0.06))',
-        }}
-      >
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Nossos pilares</p>
-          <h2 className="landing-title text-3xl">Tudo que sua igreja precisa, em um único sistema</h2>
-          <p className="text-slate-600 mt-3">Da secretaria ao financeiro, tudo conectado para sua igreja crescer com organização, segurança e transparência.</p>
+      {/* Seção Módulos e Pilares */}
+      <section id="modulos" className="max-w-7xl mx-auto px-5 sm:px-8 py-20 border-b border-emerald-950/60">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <div className="inline-flex items-center gap-2.5 mb-3">
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-emerald-400">
+              NOSSOS PILARES
+            </span>
+            <span className="h-0.5 w-8 bg-emerald-500/60 rounded-full" />
+          </div>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
+            Tudo o que sua igreja precisa, em um único sistema
+          </h2>
+          <p className="text-emerald-100/75 mt-3 text-sm sm:text-base">
+            Da secretaria ao financeiro, tudo conectado para sua igreja crescer com organização, segurança e transparência.
+          </p>
         </div>
-        <div className="grid gap-6 md:grid-cols-3 mb-14">
+
+        <div className="grid gap-6 md:grid-cols-3 mb-12">
           {pillars.map((card) => (
-            <div key={card.title} className="bg-white border border-[#e7e0d6] rounded-2xl p-6 shadow-sm hover:shadow-lg transition duration-300">
-              <h3 className="text-lg font-bold text-slate-900">{card.title}</h3>
-              <p className="text-sm text-slate-600 mt-2">{card.text}</p>
+            <div
+              key={card.title}
+              className="bg-[#03231f]/70 border border-emerald-800/40 hover:border-emerald-500/50 rounded-2xl p-6 sm:p-7 shadow-xl transition duration-300 backdrop-blur-sm hover:-translate-y-1"
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-950 border border-emerald-700/50 flex items-center justify-center text-emerald-400 mb-4 shadow-md">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-white tracking-wide">{card.title}</h3>
+              <p className="text-sm text-emerald-200/75 mt-2.5 leading-relaxed">{card.text}</p>
             </div>
           ))}
         </div>
+
         <div className="flex justify-center">
           <button
             type="button"
             onClick={() => setShowModules((value) => !value)}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full border-2 border-emerald-700 text-emerald-700 font-semibold hover:bg-emerald-700 hover:text-white transition"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/50 hover:border-emerald-400 font-semibold text-sm transition shadow-lg shadow-emerald-950/50 cursor-pointer"
           >
-            {showModules ? 'Ocultar módulos' : 'Ver todos os módulos'}
-            <span className={`transition-transform ${showModules ? 'rotate-180' : ''}`}>▾</span>
+            <span>{showModules ? 'Ocultar módulos' : 'Ver todos os módulos'}</span>
+            <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showModules ? 'rotate-180' : ''}`} />
           </button>
         </div>
+
         <div className={`mt-10 ${showModules ? '' : 'hidden'}`}>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {modules.map((feature) => (
-              <div key={feature.title} className="bg-gradient-to-br from-white to-emerald-50 border border-[#e7e0d6] rounded-2xl p-6 hover:shadow-lg hover:border-emerald-200 transition duration-300">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-slate-900">{feature.title}</h3>
+              <div
+                key={feature.title}
+                className="bg-gradient-to-br from-[#03231f] to-[#021815] border border-emerald-800/40 hover:border-emerald-500/50 rounded-2xl p-5 sm:p-6 transition duration-300 shadow-xl"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-base font-bold text-white">{feature.title}</h3>
                   <span className="text-2xl">{feature.icon}</span>
                 </div>
-                <p className="text-sm text-slate-600 mt-2">{feature.text}</p>
-                <ul className="mt-4 space-y-2 text-sm text-slate-600">
+                <p className="text-xs text-emerald-200/70 mt-1 leading-relaxed">{feature.text}</p>
+                <ul className="mt-4 space-y-1.5 text-xs text-emerald-100/80">
                   {feature.bullets.map((bullet) => (
                     <li key={bullet} className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-emerald-600" />
-                      {bullet}
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                      <span>{bullet}</span>
                     </li>
                   ))}
                 </ul>
@@ -774,56 +813,82 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="fluxo" className="max-w-6xl mx-auto px-6 py-16">
-        <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] items-center">
+      {/* Seção Fluxo de Trabalho */}
+      <section id="fluxo" className="max-w-7xl mx-auto px-5 sm:px-8 py-20 border-b border-emerald-950/60">
+        <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] items-center">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Fluxo de trabalho</p>
-            <h2 className="landing-title text-3xl">Uma jornada simples, clara e previsível</h2>
-            <p className="text-slate-600 mt-3">
+            <div className="inline-flex items-center gap-2.5 mb-3">
+              <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-emerald-400">
+                FLUXO DE TRABALHO
+              </span>
+              <span className="h-0.5 w-8 bg-emerald-500/60 rounded-full" />
+            </div>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
+              Uma jornada simples, clara e previsível
+            </h2>
+            <p className="text-emerald-100/75 mt-4 text-sm sm:text-base leading-relaxed">
               Do cadastro inicial aos relatórios finais. Tudo conectado e com visibilidade para líderes e equipes.
             </p>
-            <div className="mt-8 space-y-5">
+            <div className="mt-8 space-y-6">
               {journey.map((item) => (
-                <div key={item.step} className="flex gap-4">
-                  <div className="h-10 w-10 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold">
+                <div key={item.step} className="flex gap-4 items-start">
+                  <div className="h-10 w-10 shrink-0 rounded-xl bg-emerald-900/90 border border-emerald-600/50 text-emerald-300 flex items-center justify-center font-bold text-sm shadow-md">
                     {item.step}
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
-                    <p className="text-sm text-slate-600 mt-1">{item.text}</p>
+                    <h3 className="text-base font-bold text-white">{item.title}</h3>
+                    <p className="text-xs sm:text-sm text-emerald-200/70 mt-1 leading-relaxed">{item.text}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-          <div className="bg-white border border-[#e7e0d6] rounded-3xl p-8 shadow-xl">
-            <h3 className="text-lg font-semibold text-slate-900">Resumo operacional</h3>
-            <p className="text-sm text-slate-600 mt-2">O que sua equipe acompanha em um único painel.</p>
-            <div className="mt-6 grid gap-4">
-              {['Secretaria ativa', 'Financeiro consolidado', 'Indicadores de crescimento'].map((item) => (
-                <div key={item} className="flex items-center justify-between rounded-2xl border border-[#e7e0d6] p-4">
-                  <span className="text-slate-700 font-semibold">{item}</span>
-                  <span className="text-emerald-700 text-sm font-semibold">OK</span>
+
+          <div className="bg-[#03231f]/80 border border-emerald-800/40 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-md">
+            <h3 className="text-lg font-bold text-white tracking-wide">Resumo operacional</h3>
+            <p className="text-xs sm:text-sm text-emerald-200/70 mt-1.5">O que sua equipe acompanha em um único painel integrado.</p>
+            <div className="mt-6 space-y-3">
+              {['Secretaria ativa e organizada', 'Financeiro consolidado com auditoria', 'Indicadores de crescimento em tempo real'].map((item) => (
+                <div key={item} className="flex items-center justify-between rounded-xl border border-emerald-800/30 bg-[#021815]/60 p-4">
+                  <span className="text-sm font-medium text-emerald-100">{item}</span>
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-emerald-950 border border-emerald-600/40 text-emerald-400">
+                    CONECTADO
+                  </span>
                 </div>
               ))}
             </div>
-            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-amber-700">Acompanhamento</p>
-              <p className="text-lg font-semibold text-slate-900 mt-2">Equipe alinhada e sem retrabalho</p>
+            <div className="mt-6 rounded-xl border border-emerald-700/40 bg-gradient-to-r from-emerald-950/60 to-[#02211c] p-4 flex items-center gap-3.5">
+              <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-400 font-bold">Acompanhamento contínuo</p>
+                <p className="text-sm font-semibold text-white mt-0.5">Equipe alinhada, dados seguros e sem retrabalho</p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="planos" className="max-w-6xl mx-auto px-6 py-16">
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Planos que crescem com você</p>
-          <h2 className="landing-title text-3xl">Escolha o plano ideal</h2>
-          <p className="text-slate-600 mt-3">Todos incluem suporte, onboarding e 7 dias de teste gratuito.</p>
+      {/* Seção Planos */}
+      <section id="planos" className="max-w-7xl mx-auto px-5 sm:px-8 py-20 border-b border-emerald-950/60">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <div className="inline-flex items-center gap-2.5 mb-3">
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-emerald-400">
+              PLANOS QUE CRESCEM COM VOCÊ
+            </span>
+            <span className="h-0.5 w-8 bg-emerald-500/60 rounded-full" />
+          </div>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
+            Escolha o plano ideal para sua igreja
+          </h2>
+          <p className="text-emerald-100/75 mt-3 text-sm sm:text-base">
+            Todos incluem suporte dedicado, onboarding e 7 dias de teste gratuito sem compromisso.
+          </p>
         </div>
+
         {planosLanding.length === 0 && (
-          <p className="text-center text-slate-400 text-sm py-8">Carregando planos...</p>
+          <p className="text-center text-emerald-300/50 text-sm py-8">Carregando planos disponíveis...</p>
         )}
+
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 items-start">
           {planosVisiveis.map((plan, idx) => {
             const featured = idx === 1;
@@ -834,85 +899,87 @@ export default function LandingPage() {
             return (
               <div
                 key={plan.id}
-                className={`rounded-2xl p-6 border transition duration-300 self-start ${
+                className={`rounded-2xl p-6 border transition duration-300 self-start backdrop-blur-md ${
                   featured
-                    ? 'bg-gradient-to-br from-emerald-700 to-emerald-800 text-white border-emerald-700 shadow-xl scale-105'
-                    : 'bg-white text-slate-900 border-[#e7e0d6] hover:shadow-lg'
+                    ? 'bg-gradient-to-b from-[#04332c] to-[#02211c] text-white border-2 border-emerald-400 shadow-[0_0_40px_rgba(16,185,129,0.2)] lg:-translate-y-2 relative'
+                    : 'bg-[#03231f]/70 text-white border-emerald-800/40 hover:border-emerald-500/50 shadow-xl'
                 }`}
               >
                 {featured && (
-                  <span className="inline-flex text-xs font-semibold bg-amber-300 text-slate-900 px-2 py-1 rounded-full">
-                    Mais popular
-                  </span>
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                    <span className="inline-flex text-[11px] font-bold uppercase tracking-wider bg-amber-400 text-slate-950 px-3 py-1 rounded-full shadow-md">
+                      Mais popular
+                    </span>
+                  </div>
                 )}
-                <h3 className="text-xl font-bold mt-4">{plan.name}</h3>
-                <p className={`text-sm mt-2 ${featured ? 'text-blue-100' : 'text-slate-600'}`}>
+                <h3 className="text-xl font-bold mt-2 text-white">{plan.name}</h3>
+                <p className="text-xs text-emerald-200/70 mt-2 min-h-[36px]">
                   {plan.description || ''}
                 </p>
-                <div className="mt-4">
+                <div className="mt-4 pt-3 border-t border-emerald-800/40">
                   {plan.is_price_on_request ? (
-                    <p className="text-2xl font-bold">Consulte-nos</p>
+                    <p className="text-2xl font-bold text-white">Consulte-nos</p>
                   ) : (
                     <>
-                      <p className="text-3xl font-bold">{formatarPreco(plan.price_monthly)}</p>
+                      <p className="text-3xl font-extrabold text-white tracking-tight">{formatarPreco(plan.price_monthly)}</p>
                       {Number(plan.price_annually) > 0 && (
-                        <p className={`text-xs mt-1 ${featured ? 'text-blue-100' : 'text-slate-500'}`}>
+                        <p className="text-xs mt-1 text-emerald-300/70">
                           {formatarPreco(plan.price_annually ?? 0)}/ano
                         </p>
                       )}
                     </>
                   )}
                 </div>
-                <ul className="mt-6 space-y-2 text-sm">
+
+                <ul className="mt-6 space-y-2.5 text-xs text-emerald-100/90">
                   {highlights.map((item) => (
                     <li key={item} className="flex items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full ${featured ? 'bg-amber-200' : 'bg-emerald-600'}`} />
-                      {item}
+                      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${featured ? 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]' : 'bg-emerald-400'}`} />
+                      <span>{item}</span>
                     </li>
                   ))}
                 </ul>
+
                 <a
                   href={plan.is_price_on_request ? '#contato' : `/pre-cadastro?plan=${plan.slug}`}
-                  className={`mt-6 inline-flex w-full justify-center px-4 py-2 rounded-full font-semibold transition ${
+                  className={`mt-6 inline-flex w-full justify-center px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer shadow-lg ${
                     featured
-                      ? 'bg-amber-300 text-slate-900 hover:bg-amber-200'
+                      ? 'bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-amber-950/50'
                       : plan.is_price_on_request
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-emerald-700 text-white hover:bg-emerald-800'
+                        ? 'bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/50'
+                        : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/50'
                   }`}
                 >
                   {plan.is_price_on_request ? 'Falar com consultor' : 'Teste grátis por 7 dias'}
                 </a>
+
                 <button
                   type="button"
                   onClick={() => setExpandedPlanId(isExpanded ? null : plan.id)}
-                  className={`mt-3 flex w-fit items-center justify-center gap-2 text-sm mx-auto ${
-                    featured ? 'text-blue-100 hover:text-white' : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                  className="mt-3.5 flex w-fit items-center justify-center gap-1.5 text-xs mx-auto text-emerald-300/80 hover:text-emerald-200 transition cursor-pointer"
                   aria-expanded={isExpanded}
                 >
-                  Módulos inclusos
-                  <span className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
+                  <span>Módulos inclusos</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
                 </button>
-                <div className={`mt-4 overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[360px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                  <div className={`rounded-xl border p-4 space-y-4 ${
-                    featured ? 'bg-white/90 border-white/30 text-slate-900' : 'bg-white border-slate-200'
-                  }`}>
+
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[360px] opacity-100 mt-3' : 'max-h-0 opacity-0'}`}>
+                  <div className="rounded-xl border border-emerald-800/40 bg-[#021815]/90 p-3.5 space-y-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{modulePack.label}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-400">{modulePack.label}</p>
                       {modules.length > 0 ? (
-                        <ul className="mt-2 space-y-2 text-sm text-slate-600">
+                        <ul className="mt-2 space-y-1.5 text-xs text-emerald-200/80">
                           {modules.map((item) => (
                             <li key={item} className="flex items-center gap-2">
-                              <span className="h-2 w-2 rounded-full bg-emerald-600" />
-                              <span className={item.startsWith('Todos do ') ? 'font-semibold text-slate-900' : ''}>
+                              <span className="h-1 w-1 rounded-full bg-emerald-400" />
+                              <span className={item.startsWith('Todos do ') ? 'font-bold text-white' : ''}>
                                 {item}
                               </span>
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="mt-2 text-sm text-slate-500">Sem módulos adicionais incluídos.</p>
+                        <p className="mt-2 text-xs text-emerald-400/50">Sem módulos adicionais incluídos.</p>
                       )}
                     </div>
                   </div>
@@ -923,129 +990,167 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="faq" className="max-w-6xl mx-auto px-6 py-16">
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Perguntas frequentes</p>
-          <h2 className="landing-title text-3xl">Tire suas dúvidas</h2>
+      {/* Seção Perguntas Frequentes (FAQ) */}
+      <section id="faq" className="max-w-4xl mx-auto px-5 sm:px-8 py-20 border-b border-emerald-950/60">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <div className="inline-flex items-center gap-2.5 mb-3">
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-emerald-400">
+              PERGUNTAS FREQUENTES
+            </span>
+            <span className="h-0.5 w-8 bg-emerald-500/60 rounded-full" />
+          </div>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
+            Tire suas dúvidas
+          </h2>
         </div>
-        <div className="grid gap-4">
+        <div className="grid gap-3.5">
           {faqs.map((faq) => (
-            <details key={faq.question} className="bg-white border border-[#e7e0d6] rounded-xl p-5 hover:shadow-md transition cursor-pointer group">
-              <summary className="font-semibold text-slate-900 cursor-pointer flex justify-between items-center">
-                {faq.question}
-                <span className="ml-2 group-open:rotate-180 transition duration-300">▾</span>
+            <details
+              key={faq.question}
+              className="bg-[#03231f]/60 border border-emerald-800/30 hover:border-emerald-500/40 rounded-xl p-5 transition duration-200 text-white group"
+            >
+              <summary className="font-semibold text-white cursor-pointer flex justify-between items-center text-sm sm:text-base select-none">
+                <span>{faq.question}</span>
+                <ChevronDown className="w-4 h-4 ml-2 text-emerald-400 group-open:rotate-180 transition-transform duration-300 shrink-0" />
               </summary>
-              <p className="text-sm text-slate-600 mt-2">{faq.answer}</p>
+              <p className="text-xs sm:text-sm text-emerald-100/75 mt-3 leading-relaxed border-t border-emerald-800/30 pt-3">
+                {faq.answer}
+              </p>
             </details>
           ))}
         </div>
       </section>
 
-      <section id="contato" className="max-w-6xl mx-auto px-6 py-16">
-        <div className="grid gap-10 lg:grid-cols-[1fr_1fr] items-start">
+      {/* Seção Contato */}
+      <section id="contato" className="max-w-7xl mx-auto px-5 sm:px-8 py-20 border-b border-emerald-950/60">
+        <div className="grid gap-12 lg:grid-cols-[1fr_1fr] items-start">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">Fale com nossa equipe</p>
-            <h2 className="landing-title text-3xl">Atendimento consultivo, do início ao fim</h2>
-            <p className="text-slate-600 mt-3">
-              Nosso time está pronto para entender a realidade da sua igreja e ajudar você a tirar o máximo do Gestão Eklésia — desde a demonstração até a implantação completa.
+            <div className="inline-flex items-center gap-2.5 mb-3">
+              <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-emerald-400">
+                FALE COM NOSSA EQUIPE
+              </span>
+              <span className="h-0.5 w-8 bg-emerald-500/60 rounded-full" />
+            </div>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
+              Atendimento consultivo, do início ao fim
+            </h2>
+            <p className="text-emerald-100/75 mt-4 text-sm sm:text-base leading-relaxed">
+              Nosso time está pronto para entender a realidade da sua igreja e ajudar você a tirar o máximo proveito do Gestão Eklésia — desde a demonstração até a implantação completa.
             </p>
-            <div className="mt-8 space-y-4 text-sm text-slate-700">
-              <div className="flex items-start gap-3">
-                <span className="text-emerald-600 text-base mt-0.5">✦</span>
+            <div className="mt-8 space-y-4 text-sm">
+              <div className="flex items-start gap-3.5 bg-[#03231f]/40 border border-emerald-800/30 rounded-xl p-3.5">
+                <span className="text-emerald-400 font-bold text-base mt-0.5">✦</span>
                 <div>
-                  <p className="font-semibold">Demonstração personalizada</p>
-                  <p className="text-slate-500 text-xs mt-0.5">Mostramos o sistema funcionando com os dados da sua realidade — via videochamada, sem compromisso.</p>
+                  <p className="font-semibold text-white">Demonstração personalizada</p>
+                  <p className="text-emerald-200/70 text-xs mt-0.5 leading-relaxed">Mostramos o sistema funcionando com foco na realidade da sua igreja — via videochamada, sem compromisso.</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
-                <span className="text-emerald-600 text-base mt-0.5">✦</span>
+              <div className="flex items-start gap-3.5 bg-[#03231f]/40 border border-emerald-800/30 rounded-xl p-3.5">
+                <span className="text-emerald-400 font-bold text-base mt-0.5">✦</span>
                 <div>
-                  <p className="font-semibold">Trial de 7 dias acompanhado</p>
-                  <p className="text-slate-500 text-xs mt-0.5">Você experimenta o sistema completo enquanto nossa equipe te guia nas configurações iniciais.</p>
+                  <p className="font-semibold text-white">Trial de 7 dias com acompanhamento</p>
+                  <p className="text-emerald-200/70 text-xs mt-0.5 leading-relaxed">Você experimenta o sistema completo enquanto nossa equipe guia sua igreja nas configurações iniciais.</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
-                <span className="text-emerald-600 text-base mt-0.5">✦</span>
+              <div className="flex items-start gap-3.5 bg-[#03231f]/40 border border-emerald-800/30 rounded-xl p-3.5">
+                <span className="text-emerald-400 font-bold text-base mt-0.5">✦</span>
                 <div>
-                  <p className="font-semibold">Implantação estruturada</p>
-                  <p className="text-slate-500 text-xs mt-0.5">Apoio no cadastro de membros, configuração de módulos e treinamento da equipe administrativa.</p>
+                  <p className="font-semibold text-white">Implantação estruturada</p>
+                  <p className="text-emerald-200/70 text-xs mt-0.5 leading-relaxed">Apoio no cadastro inicial de membros, configuração de módulos e capacitação da equipe administrativa.</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
-                <span className="text-emerald-600 text-base mt-0.5">✦</span>
+              <div className="flex items-start gap-3.5 bg-[#03231f]/40 border border-emerald-800/30 rounded-xl p-3.5">
+                <span className="text-emerald-400 font-bold text-base mt-0.5">✦</span>
                 <div>
-                  <p className="font-semibold">Suporte contínuo</p>
-                  <p className="text-slate-500 text-xs mt-0.5">Segunda a sexta, 9h às 18h (Brasília). Respondemos em até 24h úteis.</p>
+                  <p className="font-semibold text-white">Suporte contínuo</p>
+                  <p className="text-emerald-200/70 text-xs mt-0.5 leading-relaxed">De segunda a sexta, das 9h às 18h (horário de Brasília). Atendimento ágil e atencioso.</p>
                 </div>
               </div>
             </div>
           </div>
-          <div className="bg-white border border-[#e7e0d6] rounded-2xl p-6 shadow-lg">
+
+          <div className="bg-[#03231f]/80 border border-emerald-800/50 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-md">
             <form onSubmit={handleContactSubmit} className="space-y-4">
               {error && (
-                <div className="bg-red-100 border border-red-300 text-sm text-red-900 p-3 rounded-lg">
+                <div className="bg-red-950/80 border border-red-500/50 text-sm text-red-200 p-3.5 rounded-xl">
                   {error}
                 </div>
               )}
-              <input
-                type="text"
-                name="ministerio"
-                value={contactData.ministerio}
-                onChange={handleContactChange}
-                placeholder="Nome da sua igreja ou ministério"
-                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-              <input
-                type="text"
-                name="pastor"
-                value={contactData.pastor}
-                onChange={handleContactChange}
-                placeholder="Seu nome completo"
-                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-              <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-emerald-300/80 mb-1">Nome da Igreja / Ministério</label>
                 <input
                   type="text"
-                  name="whatsapp"
-                  value={contactData.whatsapp}
+                  name="ministerio"
+                  value={contactData.ministerio}
                   onChange={handleContactChange}
-                  placeholder="WhatsApp (com DDD)"
-                  className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                <input
-                  type="email"
-                  name="email"
-                  value={contactData.email}
-                  onChange={handleContactChange}
-                  placeholder="Email para contato"
-                  className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder="Ex: Igreja Batista Central"
+                  className="w-full px-4 py-3 rounded-xl bg-[#021815]/90 border border-emerald-800/50 text-white placeholder:text-emerald-300/30 text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition"
                 />
               </div>
-              <textarea
-                name="mensagem"
-                value={contactData.mensagem}
-                onChange={handleContactChange}
-                rows={4}
-                placeholder="Conte-nos um pouco sobre sua igreja ou como podemos ajudar..."
-                className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
-              />
+              <div>
+                <label className="block text-xs font-semibold text-emerald-300/80 mb-1">Seu Nome Completo</label>
+                <input
+                  type="text"
+                  name="pastor"
+                  value={contactData.pastor}
+                  onChange={handleContactChange}
+                  placeholder="Ex: Pr. João Silva"
+                  className="w-full px-4 py-3 rounded-xl bg-[#021815]/90 border border-emerald-800/50 text-white placeholder:text-emerald-300/30 text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-emerald-300/80 mb-1">WhatsApp</label>
+                  <input
+                    type="text"
+                    name="whatsapp"
+                    value={contactData.whatsapp}
+                    onChange={handleContactChange}
+                    placeholder="(00) 00000-0000"
+                    className="w-full px-4 py-3 rounded-xl bg-[#021815]/90 border border-emerald-800/50 text-white placeholder:text-emerald-300/30 text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-emerald-300/80 mb-1">E-mail</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={contactData.email}
+                    onChange={handleContactChange}
+                    placeholder="contato@igreja.com.br"
+                    className="w-full px-4 py-3 rounded-xl bg-[#021815]/90 border border-emerald-800/50 text-white placeholder:text-emerald-300/30 text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-emerald-300/80 mb-1">Mensagem (opcional)</label>
+                <textarea
+                  name="mensagem"
+                  value={contactData.mensagem}
+                  onChange={handleContactChange}
+                  rows={3}
+                  placeholder="Conte-nos sobre a estrutura da sua igreja ou suas dúvidas..."
+                  className="w-full px-4 py-3 rounded-xl bg-[#021815]/90 border border-emerald-800/50 text-white placeholder:text-emerald-300/30 text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition resize-none"
+                />
+              </div>
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full px-4 py-3 bg-emerald-700 text-white rounded-lg font-bold hover:bg-emerald-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition shadow-lg shadow-emerald-950 cursor-pointer disabled:opacity-50 text-sm"
               >
                 {loading ? 'Enviando...' : 'Quero falar com um consultor'}
               </button>
-              <p className="text-xs text-slate-500">
-                Ao enviar, você concorda com nossa política de privacidade.
+              <p className="text-[11px] text-emerald-300/50 text-center">
+                Ao enviar, você concorda com nossa política de privacidade. Seus dados estão seguros.
               </p>
             </form>
           </div>
         </div>
       </section>
 
-      <footer className="border-t border-slate-200 py-10 text-center text-xs text-slate-500">
-        Gestão Eklesia — tecnologia para igrejas. Desenvolvido por Moove Sistemas.
+      {/* Rodapé Oficial */}
+      <footer className="border-t border-emerald-950/80 py-10 text-center text-xs text-emerald-300/60 bg-[#011210]">
+        Gestão Eklésia — Tecnologia para igrejas. Desenvolvido por {BRAND.company}.
       </footer>
     </div>
   );
