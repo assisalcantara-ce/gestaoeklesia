@@ -424,7 +424,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-5 sm:px-8 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Image
-              src={BRAND.logoHorizontal}
+              src="/icons/logob.png"
               alt="Gestão Eklésia"
               width={160}
               height={44}
@@ -1077,7 +1077,7 @@ export default function LandingPage() {
             {/* Coluna 1: Marca & Resumo */}
             <div className="lg:col-span-2 space-y-4">
               <Image
-                src={BRAND.logoHorizontal}
+                src="/icons/logob.png"
                 alt="Gestão Eklésia"
                 width={160}
                 height={44}
