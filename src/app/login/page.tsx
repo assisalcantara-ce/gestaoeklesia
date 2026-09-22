@@ -180,7 +180,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[#031536] text-white relative overflow-x-hidden selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col justify-between bg-[#031536] text-white relative overflow-x-hidden selection:bg-blue-600 selection:text-white">
       {/* Imagem de Fundo Oficial do App (bg_app.png) */}
       <div 
         className="pointer-events-none absolute inset-0 bg-cover bg-center z-0"
@@ -193,7 +193,7 @@ export default function LoginPage() {
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-950/40 via-transparent to-blue-950/20 z-0" />
 
       {/* Cabeçalho com Logo */}
-      <header className="relative z-10 w-full max-w-7xl mx-auto px-6 sm:px-10 pt-7 pb-4 flex items-center justify-between">
+      <header className="relative z-10 w-full max-w-7xl mx-auto px-5 sm:px-10 pt-4 sm:pt-6 pb-2 sm:pb-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center">
             <Image
@@ -201,7 +201,7 @@ export default function LoginPage() {
               alt={BRAND.name}
               width={140}
               height={40}
-              className="h-8 w-auto object-contain"
+              className="h-7 sm:h-8 w-auto object-contain"
               priority
             />
           </div>
@@ -209,89 +209,89 @@ export default function LoginPage() {
 
         <a
           href="https://www.gestaoeklesia.com.br/"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs sm:text-sm font-medium text-blue-50 border border-white/15 backdrop-blur-md transition duration-200 hover:border-blue-300/40 cursor-pointer shadow-sm"
+          className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs sm:text-sm font-medium text-blue-50 border border-white/15 backdrop-blur-md transition duration-200 hover:border-blue-300/40 cursor-pointer shadow-sm"
         >
           <span>← Voltar ao site</span>
         </a>
       </header>
 
       {/* Conteúdo Principal Split-Screen */}
-      <main className="relative z-10 w-full max-w-7xl mx-auto px-6 sm:px-10 py-8 lg:py-10 flex-1 flex items-center">
-        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+      <main className="relative z-10 w-full max-w-7xl mx-auto px-5 sm:px-10 py-3 sm:py-6 lg:py-8 flex-1 flex items-center">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 xl:gap-12 items-center">
           
           {/* Coluna Esquerda: Apresentação & Cartões de Recursos */}
           <div className="lg:col-span-7 flex flex-col justify-center max-w-xl">
             {/* Traço azul vibrante */}
-            <div className="w-12 h-1 bg-blue-400 rounded-full mb-6 shadow-[0_0_14px_rgba(96,165,250,0.8)]" />
+            <div className="w-12 h-1 bg-blue-400 rounded-full mb-3 sm:mb-5 shadow-[0_0_14px_rgba(96,165,250,0.8)]" />
 
             {/* Título Principal */}
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-[1.18]">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-extrabold text-white tracking-tight leading-[1.18]">
               Bem-vindo ao <br />
               Gestão <span className="text-sky-400">Eklésia</span>
             </h1>
 
             {/* Subtítulo */}
-            <p className="mt-4 text-base sm:text-lg text-blue-100/75 font-normal leading-relaxed">
+            <p className="mt-2.5 sm:mt-3.5 text-xs sm:text-sm lg:text-base text-blue-100/75 font-normal leading-relaxed">
               A plataforma completa para a gestão da sua igreja, ministério ou campo, com simplicidade, segurança e foco na missão.
             </p>
 
             {/* Grid de Recursos / Destaques */}
-            <div className="mt-8 space-y-3 sm:space-y-3.5">
+            <div className="mt-5 sm:mt-6 space-y-2 sm:space-y-2.5 xl:space-y-3">
               {/* Item 1: Gestão de membros */}
-              <div className="flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-white/[0.04] border border-blue-400/20 backdrop-blur-md transition duration-200 hover:border-sky-400/40 hover:bg-white/[0.07]">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center shrink-0 text-sky-400">
-                  <Users className="w-5 h-5" />
+              <div className="flex items-center gap-3 sm:gap-4 px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-2xl bg-white/[0.04] border border-blue-400/20 backdrop-blur-md transition duration-200 hover:border-sky-400/40 hover:bg-white/[0.07]">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center shrink-0 text-sky-400">
+                  <Users className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                 </div>
                 <div>
-                  <h4 className="text-sm sm:text-base font-semibold text-white">
+                  <h4 className="text-xs sm:text-sm font-semibold text-white">
                     Gestão de membros
                   </h4>
-                  <p className="text-xs text-blue-200/70">
+                  <p className="text-[11px] sm:text-xs text-blue-200/70">
                     Cadastro completo e histórico ministerial
                   </p>
                 </div>
               </div>
 
               {/* Item 2: Controle financeiro */}
-              <div className="flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-white/[0.04] border border-blue-400/20 backdrop-blur-md transition duration-200 hover:border-sky-400/40 hover:bg-white/[0.07]">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center shrink-0 text-sky-400">
-                  <Wallet className="w-5 h-5" />
+              <div className="flex items-center gap-3 sm:gap-4 px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-2xl bg-white/[0.04] border border-blue-400/20 backdrop-blur-md transition duration-200 hover:border-sky-400/40 hover:bg-white/[0.07]">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center shrink-0 text-sky-400">
+                  <Wallet className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                 </div>
                 <div>
-                  <h4 className="text-sm sm:text-base font-semibold text-white">
+                  <h4 className="text-xs sm:text-sm font-semibold text-white">
                     Controle financeiro
                   </h4>
-                  <p className="text-xs text-blue-200/70">
+                  <p className="text-[11px] sm:text-xs text-blue-200/70">
                     Dízimos, ofertas e prestações de contas
                   </p>
                 </div>
               </div>
 
               {/* Item 3: Agenda e eventos */}
-              <div className="flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-white/[0.04] border border-blue-400/20 backdrop-blur-md transition duration-200 hover:border-sky-400/40 hover:bg-white/[0.07]">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center shrink-0 text-sky-400">
-                  <Calendar className="w-5 h-5" />
+              <div className="flex items-center gap-3 sm:gap-4 px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-2xl bg-white/[0.04] border border-blue-400/20 backdrop-blur-md transition duration-200 hover:border-sky-400/40 hover:bg-white/[0.07]">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center shrink-0 text-sky-400">
+                  <Calendar className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                 </div>
                 <div>
-                  <h4 className="text-sm sm:text-base font-semibold text-white">
+                  <h4 className="text-xs sm:text-sm font-semibold text-white">
                     Agenda e eventos
                   </h4>
-                  <p className="text-xs text-blue-200/70">
+                  <p className="text-[11px] sm:text-xs text-blue-200/70">
                     Cultos, reuniões e atividades
                   </p>
                 </div>
               </div>
 
               {/* Item 4: Relatórios em tempo real */}
-              <div className="flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-white/[0.04] border border-blue-400/20 backdrop-blur-md transition duration-200 hover:border-sky-400/40 hover:bg-white/[0.07]">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center shrink-0 text-sky-400">
-                  <BarChart3 className="w-5 h-5" />
+              <div className="flex items-center gap-3 sm:gap-4 px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-2xl bg-white/[0.04] border border-blue-400/20 backdrop-blur-md transition duration-200 hover:border-sky-400/40 hover:bg-white/[0.07]">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center shrink-0 text-sky-400">
+                  <BarChart3 className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                 </div>
                 <div>
-                  <h4 className="text-sm sm:text-base font-semibold text-white">
+                  <h4 className="text-xs sm:text-sm font-semibold text-white">
                     Relatórios em tempo real
                   </h4>
-                  <p className="text-xs text-blue-200/70">
+                  <p className="text-[11px] sm:text-xs text-blue-200/70">
                     Informações para melhores decisões
                   </p>
                 </div>
@@ -299,8 +299,8 @@ export default function LoginPage() {
             </div>
 
             {/* Versículo bíblico no rodapé da coluna */}
-            <div className="mt-8 flex items-start gap-3 text-xs text-blue-200/65 italic">
-              <div className="w-6 h-[2px] bg-blue-400/70 mt-2 shrink-0" />
+            <div className="mt-5 sm:mt-6 flex items-start gap-3 text-[11px] sm:text-xs text-blue-200/65 italic">
+              <div className="w-6 h-[2px] bg-blue-400/70 mt-1.5 shrink-0" />
               <div>
                 <p>&ldquo;Tudo coopera para o bem daqueles que amam a Deus.&rdquo;</p>
                 <p className="not-italic text-blue-300/80 font-medium mt-0.5">Romanos 8:28</p>
@@ -310,30 +310,30 @@ export default function LoginPage() {
 
           {/* Coluna Direita: Card de Acesso da Instituição (Branco) */}
           <div className="lg:col-span-5 w-full flex justify-center lg:justify-end">
-            <div className="w-full max-w-[430px] bg-white rounded-3xl p-7 sm:p-9 shadow-2xl shadow-blue-950/70 border border-slate-100 text-slate-900 transition duration-300">
+            <div className="w-full max-w-[420px] bg-white rounded-3xl p-5 sm:p-7 xl:p-8 shadow-2xl shadow-blue-950/70 border border-slate-100 text-slate-900 transition duration-300">
               
               {/* Ícone Superior Central da Igreja */}
-              <div className="flex justify-center mb-5">
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
-                  <Church className="w-6 h-6" />
+              <div className="flex justify-center mb-3 sm:mb-4">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
+                  <Church className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
               </div>
 
               {/* Título & Subtítulo */}
-              <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+              <div className="text-center mb-4 sm:mb-5">
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Acesso da sua Instituição
                 </h2>
-                <p className="mt-1.5 text-xs text-slate-500 leading-normal max-w-xs mx-auto">
+                <p className="mt-1 text-[11px] sm:text-xs text-slate-500 leading-normal max-w-xs mx-auto">
                   Entre com suas credenciais para acessar o Gestão Eklésia.
                 </p>
               </div>
 
               {/* Formulário de Login */}
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5">
                 {/* Alerta de Erro */}
                 {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium flex items-start gap-2.5">
+                  <div className="p-2.5 sm:p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
                     <span>{error}</span>
                   </div>
@@ -341,7 +341,7 @@ export default function LoginPage() {
 
                 {/* E-mail Institucional */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     E-mail institucional
                   </label>
                   <div className="relative">
@@ -354,14 +354,14 @@ export default function LoginPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       placeholder="seu@email.com.br"
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/60 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-blue-600 rounded-xl text-slate-900 text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
+                      className="w-full pl-10 pr-3.5 py-2 sm:py-2.5 bg-slate-50/60 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-blue-600 rounded-xl text-slate-900 text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
                     />
                   </div>
                 </div>
 
                 {/* Senha */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Senha
                   </label>
                   <div className="relative">
@@ -374,7 +374,7 @@ export default function LoginPage() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       placeholder="Sua senha"
-                      className="w-full pl-10 pr-10 py-2.5 bg-slate-50/60 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-blue-600 rounded-xl text-slate-900 text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
+                      className="w-full pl-10 pr-10 py-2 sm:py-2.5 bg-slate-50/60 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-blue-600 rounded-xl text-slate-900 text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
                     />
                     <button
                       type="button"
@@ -386,7 +386,7 @@ export default function LoginPage() {
                   </div>
 
                   {/* Links Lembrar & Esqueceu Senha */}
-                  <div className="flex items-center justify-between mt-2.5 text-xs">
+                  <div className="flex items-center justify-between mt-2 text-xs">
                     <label className="flex items-center gap-1.5 text-slate-500 hover:text-slate-700 cursor-pointer select-none">
                       <input
                         type="checkbox"
@@ -416,7 +416,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-2 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 shadow-md shadow-blue-600/30 hover:shadow-lg hover:shadow-blue-600/40 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                  className="w-full mt-1.5 sm:mt-2 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-2.5 sm:py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 shadow-md shadow-blue-600/30 hover:shadow-lg hover:shadow-blue-600/40 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {loading ? (
                     <>
@@ -433,8 +433,8 @@ export default function LoginPage() {
               </form>
 
               {/* Mensagem de Segurança no rodapé do Card */}
-              <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-500 font-normal">
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+              <div className="mt-4 sm:mt-5 pt-3 sm:pt-4 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500 font-normal">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                 <span>Ambiente seguro e com criptografia SSL.</span>
               </div>
             </div>
@@ -444,18 +444,18 @@ export default function LoginPage() {
       </main>
 
       {/* Rodapé Inferior */}
-      <footer className="relative z-10 w-full bg-[#020d24] border-t border-blue-950 py-4 px-6 sm:px-10">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-blue-200/60">
+      <footer className="relative z-10 w-full bg-[#020d24] border-t border-blue-950 py-3 sm:py-4 px-5 sm:px-10 shrink-0">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-2.5 sm:gap-4 text-[11px] sm:text-xs text-blue-200/60">
           {/* Logo compacta / Icone à esquerda */}
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-blue-600/30 flex items-center justify-center text-sky-400 border border-blue-500/20">
-              <Church className="w-3.5 h-3.5" />
+            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-blue-600/30 flex items-center justify-center text-sky-400 border border-blue-500/20">
+              <Church className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             </div>
             <span className="font-medium text-white/90">{BRAND.name}</span>
           </div>
 
           {/* Links Centrais */}
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
             <Link href="/" className="hover:text-blue-300 transition">
               Início
             </Link>

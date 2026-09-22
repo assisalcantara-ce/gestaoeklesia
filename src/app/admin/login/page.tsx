@@ -139,7 +139,7 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[#041d1a] text-white relative overflow-x-hidden selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col justify-between bg-[#041d1a] text-white relative overflow-x-hidden selection:bg-emerald-500 selection:text-white">
       {/* Imagem de Fundo Oficial do Admin (br_admin.png) */}
       <div 
         className="pointer-events-none absolute inset-0 bg-cover bg-center z-0"
@@ -152,15 +152,15 @@ export default function AdminLoginPage() {
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-emerald-950/40 via-transparent to-emerald-950/20 z-0" />
 
       {/* Barra de Navegação Superior */}
-      <header className="relative z-10 w-full max-w-7xl mx-auto px-6 sm:px-10 pt-7 pb-4 flex items-center justify-between">
+      <header className="relative z-10 w-full max-w-7xl mx-auto px-5 sm:px-10 pt-4 sm:pt-6 pb-2 sm:pb-3 flex items-center justify-between shrink-0">
         {/* Logo Container */}
-        <div className="bg-white px-4 py-2 rounded-xl shadow-md flex items-center justify-center">
+        <div className="bg-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl shadow-md flex items-center justify-center">
           <Image
             src={BRAND.logoHorizontal}
             alt={BRAND.name}
             width={130}
             height={36}
-            className="h-7 w-auto object-contain"
+            className="h-6 sm:h-7 w-auto object-contain"
             priority
           />
         </div>
@@ -168,7 +168,7 @@ export default function AdminLoginPage() {
         {/* Botão Voltar para o site */}
         <Link
           href="/"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-medium text-emerald-100/90 border border-white/10 backdrop-blur-md transition duration-200 hover:border-emerald-500/30"
+          className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-medium text-emerald-100/90 border border-white/10 backdrop-blur-md transition duration-200 hover:border-emerald-500/30 shadow-sm"
         >
           <ArrowLeft className="w-4 h-4 text-emerald-400" />
           <span>Voltar para o site</span>
@@ -176,70 +176,70 @@ export default function AdminLoginPage() {
       </header>
 
       {/* Conteúdo Central em 2 Colunas */}
-      <main className="relative z-10 w-full max-w-7xl mx-auto px-6 sm:px-10 py-8 lg:py-12 flex-1 flex items-center">
-        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+      <main className="relative z-10 w-full max-w-7xl mx-auto px-5 sm:px-10 py-3 sm:py-6 lg:py-8 flex-1 flex items-center">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 xl:gap-12 items-center">
           
           {/* Coluna Esquerda: Apresentação & Benefícios */}
           <div className="lg:col-span-7 flex flex-col justify-center max-w-xl">
             {/* Traço verde esmeralda */}
-            <div className="w-12 h-1 bg-emerald-400 rounded-full mb-6 shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
+            <div className="w-12 h-1 bg-emerald-400 rounded-full mb-3 sm:mb-5 shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
 
             {/* Título Principal */}
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-[1.15]">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-extrabold text-white tracking-tight leading-[1.15]">
               Bem-vindo ao <br />
               Backoffice <span className="text-emerald-400">{BRAND.name}</span>
             </h1>
 
             {/* Subtítulo */}
-            <p className="mt-4 text-base sm:text-lg text-emerald-100/70 font-normal leading-relaxed">
+            <p className="mt-2.5 sm:mt-3.5 text-xs sm:text-sm lg:text-base text-emerald-100/70 font-normal leading-relaxed">
               Gestão central da plataforma, acompanhamento de instituições, planos e resultados em um só lugar.
             </p>
 
             {/* Grid / Lista de Recursos */}
-            <div className="mt-8 space-y-3 sm:space-y-3.5">
+            <div className="mt-5 sm:mt-6 space-y-2 sm:space-y-2.5 xl:space-y-3">
               {/* Item 1 */}
-              <div className="flex items-center gap-4 px-4 py-3.5 rounded-xl bg-white/[0.04] border border-emerald-500/20 backdrop-blur-sm transition duration-200 hover:border-emerald-400/40 hover:bg-white/[0.06]">
-                <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-400/30 flex items-center justify-center shrink-0 text-emerald-400">
-                  <Compass className="w-5 h-5" />
+              <div className="flex items-center gap-3 sm:gap-4 px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-white/[0.04] border border-emerald-500/20 backdrop-blur-sm transition duration-200 hover:border-emerald-400/40 hover:bg-white/[0.06]">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-emerald-500/10 border border-emerald-400/30 flex items-center justify-center shrink-0 text-emerald-400">
+                  <Compass className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                 </div>
-                <span className="text-sm sm:text-base font-medium text-emerald-50/90">
+                <span className="text-xs sm:text-sm font-medium text-emerald-50/90">
                   Visão estratégica
                 </span>
               </div>
 
               {/* Item 2 */}
-              <div className="flex items-center gap-4 px-4 py-3.5 rounded-xl bg-white/[0.04] border border-emerald-500/20 backdrop-blur-sm transition duration-200 hover:border-emerald-400/40 hover:bg-white/[0.06]">
-                <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-400/30 flex items-center justify-center shrink-0 text-emerald-400">
-                  <Building2 className="w-5 h-5" />
+              <div className="flex items-center gap-3 sm:gap-4 px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-white/[0.04] border border-emerald-500/20 backdrop-blur-sm transition duration-200 hover:border-emerald-400/40 hover:bg-white/[0.06]">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-emerald-500/10 border border-emerald-400/30 flex items-center justify-center shrink-0 text-emerald-400">
+                  <Building2 className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                 </div>
-                <span className="text-sm sm:text-base font-medium text-emerald-50/90">
+                <span className="text-xs sm:text-sm font-medium text-emerald-50/90">
                   Gestão de instituições
                 </span>
               </div>
 
               {/* Item 3 */}
-              <div className="flex items-center gap-4 px-4 py-3.5 rounded-xl bg-white/[0.04] border border-emerald-500/20 backdrop-blur-sm transition duration-200 hover:border-emerald-400/40 hover:bg-white/[0.06]">
-                <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-400/30 flex items-center justify-center shrink-0 text-emerald-400">
-                  <CreditCard className="w-5 h-5" />
+              <div className="flex items-center gap-3 sm:gap-4 px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-white/[0.04] border border-emerald-500/20 backdrop-blur-sm transition duration-200 hover:border-emerald-400/40 hover:bg-white/[0.06]">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-emerald-500/10 border border-emerald-400/30 flex items-center justify-center shrink-0 text-emerald-400">
+                  <CreditCard className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                 </div>
-                <span className="text-sm sm:text-base font-medium text-emerald-50/90">
+                <span className="text-xs sm:text-sm font-medium text-emerald-50/90">
                   Controle de assinaturas
                 </span>
               </div>
 
               {/* Item 4 */}
-              <div className="flex items-center gap-4 px-4 py-3.5 rounded-xl bg-white/[0.04] border border-emerald-500/20 backdrop-blur-sm transition duration-200 hover:border-emerald-400/40 hover:bg-white/[0.06]">
-                <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-400/30 flex items-center justify-center shrink-0 text-emerald-400">
-                  <BarChart3 className="w-5 h-5" />
+              <div className="flex items-center gap-3 sm:gap-4 px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-white/[0.04] border border-emerald-500/20 backdrop-blur-sm transition duration-200 hover:border-emerald-400/40 hover:bg-white/[0.06]">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-emerald-500/10 border border-emerald-400/30 flex items-center justify-center shrink-0 text-emerald-400">
+                  <BarChart3 className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                 </div>
-                <span className="text-sm sm:text-base font-medium text-emerald-50/90">
+                <span className="text-xs sm:text-sm font-medium text-emerald-50/90">
                   Relatórios em tempo real
                 </span>
               </div>
             </div>
 
             {/* Frase inferior de efeito */}
-            <div className="mt-8 flex items-center gap-3 text-xs sm:text-sm text-emerald-200/60 italic">
+            <div className="mt-5 sm:mt-6 flex items-center gap-3 text-[11px] sm:text-xs text-emerald-200/60 italic">
               <div className="w-6 h-[2px] bg-emerald-400/70" />
               <span>Tecnologia a serviço de uma gestão de excelência.</span>
             </div>
@@ -247,14 +247,14 @@ export default function AdminLoginPage() {
 
           {/* Coluna Direita: Card de Login Branco */}
           <div className="lg:col-span-5 w-full flex justify-center lg:justify-end">
-            <div className="w-full max-w-[430px] bg-white rounded-3xl p-7 sm:p-9 shadow-2xl shadow-emerald-950/60 border border-slate-100 text-slate-900 transition duration-300">
+            <div className="w-full max-w-[420px] bg-white rounded-3xl p-5 sm:p-7 xl:p-8 shadow-2xl shadow-emerald-950/60 border border-slate-100 text-slate-900 transition duration-300">
               
               {/* Ícone Superior Central */}
-              <div className="flex justify-center mb-5">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 shadow-sm">
+              <div className="flex justify-center mb-3 sm:mb-4">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 shadow-sm">
                   {/* Duplo display / ícone de acesso de operador */}
                   <svg
-                    className="w-6 h-6 stroke-current"
+                    className="w-5 h-5 sm:w-6 sm:h-6 stroke-current"
                     viewBox="0 0 24 24"
                     fill="none"
                     strokeWidth="2"
@@ -268,20 +268,20 @@ export default function AdminLoginPage() {
               </div>
 
               {/* Título & Descrição do Card */}
-              <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+              <div className="text-center mb-4 sm:mb-5">
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Acesso Administrativo
                 </h2>
-                <p className="mt-1.5 text-xs text-slate-500 leading-normal max-w-xs mx-auto">
+                <p className="mt-1 text-[11px] sm:text-xs text-slate-500 leading-normal max-w-xs mx-auto">
                   Entre com seu e-mail de operador para acessar o Backoffice.
                 </p>
               </div>
 
               {/* Formulário de Login */}
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5">
                 {/* Alerta de Erro */}
                 {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium flex items-start gap-2.5">
+                  <div className="p-2.5 sm:p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium flex items-start gap-2">
                     <ShieldAlert className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
                     <span>{error}</span>
                   </div>
@@ -289,7 +289,7 @@ export default function AdminLoginPage() {
 
                 {/* Campo E-mail */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     E-mail de Operador da Plataforma
                   </label>
                   <div className="relative">
@@ -302,14 +302,14 @@ export default function AdminLoginPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       placeholder="admin@gestaoeklesia.com.br"
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/60 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-emerald-500 rounded-xl text-slate-900 text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition"
+                      className="w-full pl-10 pr-3.5 py-2 sm:py-2.5 bg-slate-50/60 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-emerald-500 rounded-xl text-slate-900 text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition"
                     />
                   </div>
                 </div>
 
                 {/* Campo Senha */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Senha de Acesso
                   </label>
                   <div className="relative">
@@ -322,7 +322,7 @@ export default function AdminLoginPage() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       placeholder="••••••••"
-                      className="w-full pl-10 pr-10 py-2.5 bg-slate-50/60 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-emerald-500 rounded-xl text-slate-900 text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition tracking-wider"
+                      className="w-full pl-10 pr-10 py-2 sm:py-2.5 bg-slate-50/60 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-emerald-500 rounded-xl text-slate-900 text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition tracking-wider"
                     />
                     <button
                       type="button"
@@ -334,7 +334,7 @@ export default function AdminLoginPage() {
                   </div>
 
                   {/* Link Esqueceu Senha */}
-                  <div className="flex justify-end mt-2">
+                  <div className="flex justify-end mt-1.5 sm:mt-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -354,7 +354,7 @@ export default function AdminLoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-2 flex items-center justify-center gap-2 bg-[#00875a] hover:bg-[#00734c] text-white py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 shadow-md shadow-emerald-700/25 hover:shadow-lg hover:shadow-emerald-700/35 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                  className="w-full mt-1.5 sm:mt-2 flex items-center justify-center gap-2 bg-[#00875a] hover:bg-[#00734c] text-white py-2.5 sm:py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 shadow-md shadow-emerald-700/25 hover:shadow-lg hover:shadow-emerald-700/35 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {loading ? (
                     <>
@@ -371,8 +371,8 @@ export default function AdminLoginPage() {
               </form>
 
               {/* Mensagem de Segurança no rodapé do Card */}
-              <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-emerald-700 font-medium">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <div className="mt-4 sm:mt-5 pt-3 sm:pt-4 border-t border-slate-100 flex items-center justify-center gap-2 text-[10px] sm:text-[11px] text-emerald-700 font-medium">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 <span>Área estritamente restrita à equipe proprietária.</span>
               </div>
             </div>
@@ -382,18 +382,18 @@ export default function AdminLoginPage() {
       </main>
 
       {/* Barra de Rodapé */}
-      <footer className="relative z-10 w-full bg-[#021311] border-t border-emerald-950 py-4 px-6 sm:px-10">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-emerald-100/60">
+      <footer className="relative z-10 w-full bg-[#021311] border-t border-emerald-950 py-3 sm:py-4 px-5 sm:px-10 shrink-0">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-2.5 sm:gap-4 text-[11px] sm:text-xs text-emerald-100/60">
           {/* Logo compacta / Icone à esquerda */}
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center font-bold text-white text-xs border border-white/10">
+            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/10 flex items-center justify-center font-bold text-white text-xs border border-white/10">
               E
             </div>
             <span className="font-medium text-white/80">{BRAND.name}</span>
           </div>
 
           {/* Links Centrais */}
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
             <Link href="/" className="hover:text-emerald-300 transition">
               Início
             </Link>
