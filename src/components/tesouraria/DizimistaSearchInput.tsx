@@ -42,7 +42,7 @@ export default function DizimistaSearchInput({
   return (
     <div ref={containerRef} className="relative w-full">
       <div className="relative flex items-center">
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+        <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
         <input
           type="text"
           placeholder="Buscar dizimista por nome..."
@@ -56,8 +56,8 @@ export default function DizimistaSearchInput({
             }
           }}
           onFocus={() => !disabled && setIsOpen(true)}
-          className={`w-full pl-9 pr-8 py-2 border rounded-lg text-sm focus:outline-none focus:border-[#123b63] ${
-            disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'border-gray-200'
+          className={`w-full pl-10 pr-8 py-2.5 border rounded-xl text-xs sm:text-sm bg-white transition focus:outline-none focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 ${
+            disabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'border-slate-200 hover:border-slate-300 text-slate-800'
           }`}
         />
         {query && !disabled && (
@@ -67,7 +67,7 @@ export default function DizimistaSearchInput({
               setQuery('');
               onSelectDizimista(null);
             }}
-            className="absolute right-2.5 text-gray-400 hover:text-gray-600"
+            className="absolute right-3 text-slate-400 hover:text-slate-600"
           >
             <X className="h-4 w-4" />
           </button>

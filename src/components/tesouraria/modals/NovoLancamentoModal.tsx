@@ -279,56 +279,56 @@ export default function NovoLancamentoModal({
 
             {/* LINHA INTEIRA: Bloco de Identificação do Dizimista (se Tipo === 'dizimo') */}
             {form.tipo_movimento === 'entrada' && form.tipo_recebimento === 'dizimo' && (
-              <div className="col-span-full p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 shadow-xs">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                  {/* Coluna 1: Identificação do Dizimista + Checkbox Avulso */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="block text-xs font-bold text-[#123b63]">
-                        Identificação do Dizimista
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={!!form.is_dizimo_avulso}
-                          onChange={(e) =>
+              <div className="col-span-full p-4 sm:p-5 bg-slate-50/70 border-2 border-slate-300 rounded-2xl space-y-3.5 shadow-xs">
+                {/* Linha 1: Identificação do Dizimista + Checkbox Dízimo Avulso */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-[#123b63]">
+                    Identificação do Dizimista
+                  </label>
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="flex-1">
+                      {!form.is_dizimo_avulso ? (
+                        <DizimistaSearchInput
+                          dizimistas={dizimistasFormulario}
+                          selectedNome={form.dizimista_nome || ''}
+                          onSelectDizimista={(diz) => {
+                            const dizCompleto = dizimistasFormulario.find((item) => item.id === diz?.id);
                             setForm((p) => ({
                               ...p,
-                              is_dizimo_avulso: e.target.checked,
-                              dizimista_id: e.target.checked ? '' : p.dizimista_id,
-                              dizimista_nome: e.target.checked ? '' : p.dizimista_nome,
-                            }))
-                          }
-                          className="w-4 h-4 text-[#123b63] rounded border-slate-300 focus:ring-[#123b63]"
+                              dizimista_id: diz?.id || '',
+                              dizimista_nome: diz?.nome || '',
+                              congregacao_id: dizCompleto?.congregacaoId || p.congregacao_id,
+                              observacoes: diz?.nome ? `Dízimo de ${diz.nome}` : p.observacoes,
+                            }));
+                          }}
                         />
-                        <span className="font-semibold text-slate-700">Dízimo Avulso</span>
-                        <span className="text-[10px] text-slate-400">(dispensar nome)</span>
-                      </label>
+                      ) : (
+                        <div className="w-full text-xs text-slate-500 italic bg-slate-100 px-3.5 py-2.5 rounded-xl border border-slate-200 flex items-center h-[42px]">
+                          Lançamento marcado como Dízimo Avulso (sem identificação nominal).
+                        </div>
+                      )}
                     </div>
-
-                    {!form.is_dizimo_avulso ? (
-                      <DizimistaSearchInput
-                        dizimistas={dizimistasFormulario}
-                        selectedNome={form.dizimista_nome || ''}
-                        onSelectDizimista={(diz) => {
-                          const dizCompleto = dizimistasFormulario.find((item) => item.id === diz?.id);
+                    <label className="shrink-0 flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-700 cursor-pointer select-none py-2 px-1">
+                      <input
+                        type="checkbox"
+                        checked={!!form.is_dizimo_avulso}
+                        onChange={(e) =>
                           setForm((p) => ({
                             ...p,
-                            dizimista_id: diz?.id || '',
-                            dizimista_nome: diz?.nome || '',
-                            congregacao_id: dizCompleto?.congregacaoId || p.congregacao_id,
-                            observacoes: diz?.nome ? `Dízimo de ${diz.nome}` : p.observacoes,
-                          }));
-                        }}
+                            is_dizimo_avulso: e.target.checked,
+                            dizimista_id: e.target.checked ? '' : p.dizimista_id,
+                            dizimista_nome: e.target.checked ? '' : p.dizimista_nome,
+                          }))
+                        }
+                        className="w-4 h-4 text-[#123b63] rounded border-slate-300 focus:ring-[#123b63]"
                       />
-                    ) : (
-                      <div className="text-xs text-slate-500 italic bg-slate-100 px-3.5 py-2.5 rounded-xl border border-slate-200">
-                        Lançamento marcado como Dízimo Avulso.
-                      </div>
-                    )}
+                      <span>Dízimo Avulso</span>
+                    </label>
                   </div>
+                </div>
 
-                  {/* Coluna 2: Congregação do Dizimista */}
+                {/* Linha 2: Congregação do Dizimista e Cargo / Vínculo (2 colunas) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-slate-700">Congregação do Dizimista</label>
                     <input
@@ -340,11 +340,10 @@ export default function NovoLancamentoModal({
                           : dizimistasFormulario.find((d) => d.id === form.dizimista_id)?.congregacaoNome ||
                             (form.congregacao_id ? congNome(form.congregacao_id) : 'Selecione o dizimista')
                       }
-                      className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm bg-white text-slate-700 font-medium"
+                      className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm bg-white text-slate-700 font-medium h-[42px]"
                     />
                   </div>
 
-                  {/* Coluna 3: Cargo / Vínculo do Dizimista */}
                   <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-slate-700">Cargo / Vínculo</label>
                     <input
@@ -357,7 +356,7 @@ export default function NovoLancamentoModal({
                           ? String(dizimistasFormulario.find((d) => d.id === form.dizimista_id)?.tipoCadastro).toUpperCase()
                           : '—'
                       }
-                      className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm bg-white text-slate-700 font-medium"
+                      className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm bg-white text-slate-700 font-medium h-[42px]"
                     />
                   </div>
                 </div>
