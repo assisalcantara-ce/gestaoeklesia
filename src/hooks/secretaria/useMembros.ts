@@ -1418,6 +1418,7 @@ export function useMembros() {
     cpfInputRef,
 
     // Permissões de usuário
+    isAdmin: userCtx.isAdmin,
     isSupervisor,
     isAuxiliar,
 

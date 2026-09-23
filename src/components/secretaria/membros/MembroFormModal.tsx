@@ -37,6 +37,7 @@ export interface MembroFormModalProps {
   loadingDizimosHistorico: boolean;
   isDizimista: boolean;
   setIsDizimista: (val: boolean) => void;
+  isAdmin?: boolean;
 }
 
 export default function MembroFormModal({
@@ -74,7 +75,15 @@ export default function MembroFormModal({
   loadingDizimosHistorico,
   isDizimista,
   setIsDizimista,
+  isAdmin = false,
 }: MembroFormModalProps) {
+  const [editandoMatricula, setEditandoMatricula] = React.useState(false);
+
+  // Reseta estado de edição da matrícula ao abrir ou trocar de membro
+  React.useEffect(() => {
+    setEditandoMatricula(false);
+  }, [showForm, membroEditando?.id]);
+
   console.log('props recebidas', {
     supervisoesOptions,
     camposOptions,
@@ -164,14 +173,47 @@ export default function MembroFormModal({
               {/* Linha 0: Matrícula */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Matrícula</label>
-                  <input
-                    type="text"
-                    placeholder="Automática"
-                    value={dadosPessoais.matricula || ''}
-                    disabled
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-600 cursor-not-allowed"
-                  />
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Matrícula {editandoMatricula && <span className="text-teal-600 font-bold">(Modo Edição)</span>}
+                  </label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      placeholder="Automática"
+                      value={dadosPessoais.matricula || ''}
+                      disabled={!editandoMatricula}
+                      onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, matricula: e.target.value }))}
+                      className={`flex-1 px-3 py-2 border rounded-md text-sm transition ${
+                        editandoMatricula
+                          ? 'border-teal-500 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500'
+                          : 'border-gray-300 bg-gray-100 text-gray-600 cursor-not-allowed'
+                      }`}
+                    />
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setEditandoMatricula((prev) => !prev)}
+                        title={editandoMatricula ? 'Concluir edição de matrícula' : 'Editar matrícula (Admin)'}
+                        className={`px-3 py-2 text-xs font-semibold rounded-md border transition flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                          editandoMatricula
+                            ? 'bg-teal-600 text-white border-teal-600 hover:bg-teal-700 shadow-sm'
+                            : 'bg-white text-teal-700 border-teal-300 hover:bg-teal-50 hover:border-teal-400'
+                        }`}
+                      >
+                        {editandoMatricula ? (
+                          <>
+                            <span>✓</span>
+                            <span>Salvar Matrícula</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>✏️</span>
+                            <span>Editar Matrícula</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 

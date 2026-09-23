@@ -106,6 +106,7 @@ export default function MembrosPage() {
     fileInputRef,
 
     // Permissões de usuário
+    isAdmin,
     isSupervisor,
     isAuxiliar,
 
@@ -439,6 +440,7 @@ export default function MembrosPage() {
                 loadingDizimosHistorico={loadingDizimosHistorico}
                 isDizimista={isDizimista}
                 setIsDizimista={setIsDizimista}
+                isAdmin={isAdmin}
               />
             </div>
           )}
