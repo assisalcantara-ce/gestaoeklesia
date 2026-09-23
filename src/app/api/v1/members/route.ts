@@ -143,6 +143,22 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query
 
     if (error) {
+      if (
+        error.code === 'PGRST103' ||
+        error.message?.toLowerCase().includes('range not satisfiable') ||
+        error.details?.toLowerCase().includes('range not satisfiable')
+      ) {
+        return NextResponse.json({
+          data: [],
+          pagination: {
+            page,
+            limit,
+            total: count || 0,
+            total_pages: count ? Math.ceil(count / limit) : 0,
+          },
+        })
+      }
+
       return NextResponse.json(
         { error: error.message },
         { status: 400 }
@@ -150,7 +166,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      data,
+      data: data || [],
       pagination: {
         page,
         limit,

@@ -514,6 +514,11 @@ export function useMembros() {
     }
   }, [fetchMembers, currentPage, itemsPerPage, searchTerm, statusFilter, cargoFilter, sortOrdemAlfabetica]);
 
+  // Resetar para primeira página ao alterar filtros ou busca
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, cargoFilter, sortOrdemAlfabetica]);
+
   // Debounce para recarregar a lista quando filtros/busca/página mudam
   useEffect(() => {
     const timer = setTimeout(() => {

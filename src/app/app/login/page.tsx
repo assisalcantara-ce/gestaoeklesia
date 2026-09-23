@@ -118,11 +118,11 @@ export default function MobileLoginPage() {
         <div className="mb-4 sm:mb-6 flex flex-col items-center text-center gap-2 sm:gap-3">
           <div className="p-2 sm:p-2.5 bg-[#111827] rounded-2xl border border-slate-800/80 shadow-lg">
             <Image
-              src="/brand/logo-white.png"
+              src="/icons/logob.png"
               alt="Gestão Eklésia"
-              width={140}
-              height={38}
-              className="h-7 sm:h-8 w-auto object-contain"
+              width={180}
+              height={55}
+              className="h-8 sm:h-9 w-auto object-contain"
               priority
             />
           </div>

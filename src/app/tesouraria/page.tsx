@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import PageLayout from '@/components/PageLayout';
 import NotificationModal from '@/components/NotificationModal';
-import { Plus, X, TrendingUp, Building2, Tag, Users, Lock, List, Printer, QrCode, UserPlus, FileText, Pencil, Trash2, Wallet, Landmark, Sparkles } from 'lucide-react';
+import { Plus, TrendingUp, Building2, Tag, Users, Lock, List, Printer, QrCode, UserPlus, FileText, Pencil, Trash2, Wallet, Landmark, Sparkles } from 'lucide-react';
 import TesourariaTable from '@/components/tesouraria/TesourariaTable';
 import TesourariaToolbar from '@/components/tesouraria/TesourariaToolbar';
 import FechamentoCaixaModal from '@/components/tesouraria/modals/FechamentoCaixaModal';
@@ -16,9 +16,10 @@ import AdicionarDizimistaModal from '@/components/tesouraria/modals/AdicionarDiz
 import TesourariaCharts from '@/components/tesouraria/TesourariaCharts';
 import FechamentoCaixaTable from '@/components/tesouraria/FechamentoCaixaTable';
 import DizimistasTable from '@/components/tesouraria/DizimistasTable';
-import DizimistaSearchInput from '@/components/tesouraria/DizimistaSearchInput';
+import NovoLancamentoModal from '@/components/tesouraria/modals/NovoLancamentoModal';
 import DestinoQrModal from '@/components/tesouraria/modals/DestinoQrModal';
 import DestinoModal from '@/components/tesouraria/modals/DestinoModal';
+import EditarClassificacaoLancamentoModal from '@/components/tesouraria/modals/EditarClassificacaoLancamentoModal';
 import ArrecadacaoDigitalContent from '@/components/tesouraria/ArrecadacaoDigitalContent';
 import FaturasContent from '@/components/tesouraria/FaturasContent';
 import { useTesouraria } from '@/hooks/tesouraria/useTesouraria';
@@ -192,477 +193,37 @@ export default function TesourariaPage() {
               loadingMes={t.loadingMes}
             />
 
-            {/* Formulário inline */}
-            {t.showForm && (
-              <div className="bg-white rounded-2xl border-2 border-[#123b63] p-5 shadow-lg space-y-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-base font-bold text-[#123b63]">
-                      {t.editId ? 'Editar Lançamento' : 'Novo Lançamento'}
-                    </h3>
-                    {t.form.codigo_registro && (
-                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                        {t.form.codigo_registro}
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => {
-                      t.setShowForm(false);
-                      t.setEditId(null);
-                      t.setForm(t.emptyForm());
-                      t.resetDizForm();
-                    }}
-                  >
-                    <X className="h-5 w-5 text-gray-400 hover:text-gray-700" />
-                  </button>
-                </div>
-
-                <div className="flex gap-2">
-                  {(['entrada', 'saida'] as const).map((mv) => (
-                    <button
-                      key={mv}
-                      type="button"
-                      onClick={() =>
-                        t.setForm((p) => ({
-                          ...p,
-                          tipo_movimento: mv,
-                          tipo_recebimento: mv === 'entrada' ? 'oferta' : '',
-                          categoria_saida: '',
-                          categoria_id: '',
-                        }))
-                      }
-                      className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${
-                        t.form.tipo_movimento === mv
-                          ? mv === 'entrada'
-                            ? 'bg-green-600 text-white border-green-600'
-                          : 'bg-red-500 text-white border-red-500'
-                          : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      {mv === 'entrada' ? '↑ Entrada (Receita)' : '↓ Saída (Despesa)'}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* Código / ID do Registro */}
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block text-xs font-semibold text-gray-600">
-                        Código / ID do Registro
-                      </label>
-                      <span className="text-[10px] text-gray-400">Automático / Editável</span>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Ex: REG-2026-000001"
-                      value={t.form.codigo_registro}
-                      onChange={(e) => t.setForm((p) => ({ ...p, codigo_registro: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase focus:border-[#123b63] focus:ring-1 focus:ring-[#123b63]"
-                    />
-                  </div>
-
-                  {/* Caixa / Congregação */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Caixa</label>
-                    {t.scope.isFinanceiroLocal ? (
-                      <input
-                        readOnly
-                        value={t.congNome(t.scope.congregacaoId)}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500"
-                      />
-                    ) : (
-                      <select
-                        value={t.form.congregacao_id}
-                        onChange={(e) => {
-                          const novaCongId = e.target.value;
-                          t.setForm((p) => {
-                            const dizimistaPertence = t.dizimistasCompletos.some(
-                              (d) => d.id === p.dizimista_id && (!novaCongId || d.congregacaoId === novaCongId)
-                            );
-                            return {
-                              ...p,
-                              congregacao_id: novaCongId,
-                              dizimista_id: dizimistaPertence ? p.dizimista_id : '',
-                              dizimista_nome: dizimistaPertence ? p.dizimista_nome : '',
-                            };
-                          });
-                        }}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      >
-                        <option value="">Selecione o(a) {t.nomenclaturas?.divisao1 || 'congregação'} *</option>
-                        {t.congregacoes.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.nome}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-
-                  {/* Tipo de Entrada ou Categoria de Saída */}
-                  {t.form.tipo_movimento === 'entrada' ? (
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">
-                        Tipo de recebimento <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={t.form.tipo_recebimento}
-                        onChange={(e) => {
-                          const val = e.target.value as any;
-                          t.setForm((p) => {
-                            let autoCatId = p.categoria_id;
-                            if (val === 'dizimo') {
-                              const catDiz = t.finCategorias.find((c) =>
-                                (c.tipo_movimento === 'entrada' || c.tipo_movimento === 'ambos') &&
-                                (c.nome.toLowerCase().includes('dízimo') || c.nome.toLowerCase().includes('dizimo'))
-                              );
-                              if (catDiz) autoCatId = catDiz.id;
-                            }
-                            return {
-                              ...p,
-                              tipo_recebimento: val,
-                              categoria_id: autoCatId,
-                              is_dizimo_avulso: false,
-                              dizimista_id: '',
-                              dizimista_nome: '',
-                            };
-                          });
-                        }}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      >
-                        <option value="">Selecione</option>
-                        {t.TIPOS.map((tr) => (
-                          <option key={tr.value} value={tr.value}>
-                            {tr.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">
-                        Categoria da despesa <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={t.form.categoria_id || t.form.categoria_saida}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const found = t.finCategorias.find((c) => c.id === val);
-                          t.setForm((p) => ({
-                            ...p,
-                            categoria_id: found ? found.id : '',
-                            categoria_saida: found ? (found.codigo || found.nome) : val,
-                          }));
-                        }}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      >
-                        <option value="">Selecione a categoria</option>
-                        {t.finCategorias
-                          .filter((c) => c.tipo_movimento === 'saida' || c.tipo_movimento === 'ambos')
-                          .map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.icone ? `${c.icone} ` : ''}{c.nome} {c.codigo ? `(${c.codigo})` : ''}
-                            </option>
-                          ))}
-                        {t.finCategorias.filter((c) => c.tipo_movimento === 'saida' || c.tipo_movimento === 'ambos').length === 0 &&
-                          t.TIPOS_SAIDA.map((ts) => (
-                            <option key={ts.value} value={ts.value}>
-                              {ts.label}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Departamento */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Departamento</label>
-                    <select
-                      value={t.form.departamento_id}
-                      onChange={(e) => t.setForm((p) => ({ ...p, departamento_id: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                    >
-                      <option value="">Caixa da Igreja</option>
-                      {t.departamentos.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.sigla} – {d.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* LINHA INTEIRA: Bloco de Identificação do Dizimista (se Tipo === 'dizimo') */}
-                  {t.form.tipo_movimento === 'entrada' && t.form.tipo_recebimento === 'dizimo' && (
-                    <div className="col-span-full p-4 bg-slate-50/80 border border-slate-200 rounded-xl space-y-3 shadow-xs">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                        {/* Coluna 1: Identificação do Dizimista + Checkbox Avulso */}
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between items-center">
-                            <label className="block text-xs font-bold text-[#123b63]">
-                              Identificação do Dizimista
-                            </label>
-                            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                checked={!!t.form.is_dizimo_avulso}
-                                onChange={(e) =>
-                                  t.setForm((p) => ({
-                                    ...p,
-                                    is_dizimo_avulso: e.target.checked,
-                                    dizimista_id: e.target.checked ? '' : p.dizimista_id,
-                                    dizimista_nome: e.target.checked ? '' : p.dizimista_nome,
-                                  }))
-                                }
-                                className="w-4 h-4 text-[#123b63] rounded border-gray-300 focus:ring-[#123b63]"
-                              />
-                              <span className="font-semibold text-gray-700">Dízimo Avulso</span>
-                              <span className="text-[10px] text-gray-400">(dispensar nome)</span>
-                            </label>
-                          </div>
-
-                          {!t.form.is_dizimo_avulso ? (
-                            <DizimistaSearchInput
-                              dizimistas={t.dizimistasFormulario}
-                              selectedNome={t.form.dizimista_nome || ''}
-                              onSelectDizimista={(diz) => {
-                                const dizCompleto = t.dizimistasFormulario.find((item) => item.id === diz?.id);
-                                t.setForm((p) => ({
-                                  ...p,
-                                  dizimista_id: diz?.id || '',
-                                  dizimista_nome: diz?.nome || '',
-                                  congregacao_id: dizCompleto?.congregacaoId || p.congregacao_id,
-                                  observacoes: diz?.nome ? `Dízimo de ${diz.nome}` : p.observacoes,
-                                }));
-                              }}
-                            />
-                          ) : (
-                            <div className="text-xs text-gray-500 italic bg-gray-100 px-3 py-2 rounded-lg border border-gray-200">
-                              Lançamento marcado como Dízimo Avulso.
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Coluna 2: Congregação do Dizimista */}
-                        <div className="space-y-1.5">
-                          <label className="block text-xs font-semibold text-gray-600">Congregação do Dizimista</label>
-                          <input
-                            type="text"
-                            readOnly
-                            value={
-                              t.form.is_dizimo_avulso
-                                ? '— (Dízimo Avulso)'
-                                : t.dizimistasFormulario.find((d) => d.id === t.form.dizimista_id)?.congregacaoNome ||
-                                  (t.form.congregacao_id ? t.congNome(t.form.congregacao_id) : 'Selecione o dizimista')
-                            }
-                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 font-medium h-[38px]"
-                          />
-                        </div>
-
-                        {/* Coluna 3: Cargo / Vínculo do Dizimista */}
-                        <div className="space-y-1.5">
-                          <label className="block text-xs font-semibold text-gray-600">Cargo / Vínculo</label>
-                          <input
-                            type="text"
-                            readOnly
-                            value={
-                              t.form.is_dizimo_avulso
-                                ? 'Dízimo Avulso'
-                                : t.dizimistasFormulario.find((d) => d.id === t.form.dizimista_id)?.tipoCadastro
-                                ? t.dizimistasFormulario.find((d) => d.id === t.form.dizimista_id)?.tipoCadastro?.toUpperCase()
-                                : '—'
-                            }
-                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 font-medium h-[38px]"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Valor */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Valor (R$) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="0,00"
-                      value={t.form.valor}
-                      onChange={(e) => {
-                        const raw = e.target.value.replace(/[^\d,]/g, '');
-                        t.setForm((p) => ({ ...p, valor: raw }));
-                      }}
-                      onBlur={(e) => {
-                        const raw = e.target.value.replace(/\./g, '').replace(',', '.');
-                        const num = parseFloat(raw);
-                        if (!isNaN(num) && num > 0) {
-                          t.setForm((p) => ({
-                            ...p,
-                            valor: num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                          }));
-                        }
-                      }}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
-
-                  {/* Data */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Data <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={t.form.data_lancamento}
-                      onChange={(e) => t.setForm((p) => ({ ...p, data_lancamento: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
-
-
-
-                  {/* Conta / Caixa */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Conta / Caixa</label>
-                    {t.finContas.length === 0 ? (
-                      <div className="w-full border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-400 flex items-center justify-between gap-2">
-                        <span>Nenhuma conta cadastrada.</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            t.setShowForm(false);
-                            t.setAba('contas');
-                          }}
-                          className="text-[#123b63] font-semibold hover:underline whitespace-nowrap"
-                        >
-                          + Cadastrar
-                        </button>
-                      </div>
-                    ) : (
-                      <select
-                        value={t.form.conta_id}
-                        onChange={(e) => t.setForm((p) => ({ ...p, conta_id: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      >
-                        <option value="">Padrão do ministério</option>
-                        {t.finContas.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.nome}
-                            {c.is_padrao ? ' ★' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-
-                  {/* Forma de entrada / Forma de saída */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      {t.form.tipo_movimento === 'saida' ? 'Forma de Saída' : 'Forma de Entrada'}
-                    </label>
-                    <select
-                      value={t.form.forma_pagamento}
-                      onChange={(e) => t.setForm((p) => ({ ...p, forma_pagamento: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                    >
-                      <option value="EM ESPÉCIE">EM ESPÉCIE</option>
-                      <option value="PIX">PIX</option>
-                      <option value="CARTÃO DE CRÉDITO">CARTÃO DE CRÉDITO</option>
-                      <option value="DEPÓSITO BANCÁRIO">DEPÓSITO BANCÁRIO</option>
-                      <option value="BOLETO">BOLETO</option>
-                    </select>
-                  </div>
-
-                  {/* Categoria financeira (apenas para Entrada) */}
-                  {t.form.tipo_movimento === 'entrada' && (
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria financeira (opcional)</label>
-                      {t.finCategorias.filter((c) => c.tipo_movimento === 'entrada' || c.tipo_movimento === 'ambos').length === 0 ? (
-                        <div className="w-full border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-400 flex items-center justify-between gap-2">
-                          <span>Sem categorias disponíveis.</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              t.setShowForm(false);
-                              t.setAba('categorias');
-                            }}
-                            className="text-[#123b63] font-semibold hover:underline whitespace-nowrap"
-                          >
-                            Configurar
-                          </button>
-                        </div>
-                      ) : (
-                        <select
-                          value={t.form.categoria_id}
-                          onChange={(e) => t.setForm((p) => ({ ...p, categoria_id: e.target.value }))}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                        >
-                          <option value="">Sem categoria (Geral)</option>
-                          {t.finCategorias
-                            .filter((c) => c.tipo_movimento === 'entrada' || c.tipo_movimento === 'ambos')
-                            .map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.icone ? `${c.icone} ` : ''}
-                                {c.nome} {c.codigo ? `(${c.codigo})` : ''}
-                              </option>
-                            ))}
-                        </select>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Referência */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Referência (evento/campanha)</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Festa das Nações"
-                      value={t.form.referencia}
-                      onChange={(e) => t.setForm((p) => ({ ...p, referencia: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
-
-                  {/* Observações */}
-                  <div className="sm:col-span-2 lg:col-span-3">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Observações</label>
-                    <textarea
-                      rows={2}
-                      placeholder="Observações do lançamento..."
-                      value={t.form.observacoes}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        t.setForm((p) => ({ ...p, observacoes: val, descricao: val }));
-                      }}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#123b63]"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() => t.handleSave()}
-                    disabled={t.saving}
-                    className="px-6 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition disabled:opacity-50"
-                  >
-                    {t.saving ? 'Salvando...' : t.editId ? 'Atualizar' : 'Registrar'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      t.setShowForm(false);
-                      t.setEditId(null);
-                      t.setForm(t.emptyForm());
-                      t.resetDizForm();
-                    }}
-                    className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Modal Novo Lançamento */}
+            <NovoLancamentoModal
+              isOpen={t.showForm}
+              onClose={() => {
+                t.setShowForm(false);
+                t.setEditId(null);
+                t.setForm(t.emptyForm());
+                t.resetDizForm();
+              }}
+              form={t.form}
+              setForm={t.setForm}
+              editId={t.editId}
+              saving={t.saving}
+              handleSave={t.handleSave}
+              resetDizForm={t.resetDizForm}
+              emptyForm={t.emptyForm}
+              setShowForm={t.setShowForm}
+              setEditId={t.setEditId}
+              setAba={t.setAba}
+              scope={t.scope}
+              congNome={t.congNome}
+              nomenclaturas={t.nomenclaturas}
+              congregacoes={t.congregacoes}
+              departamentos={t.departamentos}
+              finContas={t.finContas}
+              finCategorias={t.finCategorias}
+              dizimistasFormulario={t.dizimistasFormulario}
+              dizimistasCompletos={t.dizimistasCompletos}
+              TIPOS={t.TIPOS}
+              TIPOS_SAIDA={t.TIPOS_SAIDA}
+            />
 
             {/* Tabela de Lançamentos */}
             <TesourariaTable
@@ -1450,6 +1011,23 @@ export default function TesourariaPage() {
         }}
         destino={t.qrDestino as any}
         fmtBRL={t.fmtBRL}
+      />
+
+      {/* Modal Dedicado de Reclassificação Restrita de Lançamento (Tipo & Dizimista) */}
+      <EditarClassificacaoLancamentoModal
+        isOpen={Boolean(t.lancamentoEditandoClassificacao)}
+        onClose={() => t.setLancamentoEditandoClassificacao(null)}
+        lancamento={t.lancamentoEditandoClassificacao}
+        onSuccess={() => {
+          t.loadLancamentosMes(t.filtroMes);
+          t.loadDizimistasData();
+        }}
+        showModal={t.showModal}
+        fmtDate={t.fmtDate}
+        fmtBRL={t.fmtBRL}
+        congNome={t.congNome}
+        finContas={t.contasFull}
+        finCategorias={t.categoriasFull}
       />
 
       {/* Bloco Exclusivo de Impressão de Relatórios (Exibido no @media print APENAS nas abas de relatórios/dizimistas) */}

@@ -165,6 +165,7 @@ export async function PUT(request: NextRequest) {
   const { admin, ministryId } = context;
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
+  const action = searchParams.get('action');
 
   if (!id) {
     return NextResponse.json(
@@ -181,6 +182,45 @@ export async function PUT(request: NextRequest) {
       { error: 'Body inválido. Envie um JSON bem formado.' },
       { status: 400 }
     );
+  }
+
+  // ── Modo Reclassificação Restrita (tipo_recebimento e member_id apenas) ──
+  if (action === 'classificacao') {
+    const allowedKeys = new Set(['tipo_recebimento', 'member_id', 'action']);
+    const extraKeys = Object.keys(body).filter((k) => !allowedKeys.has(k));
+    if (extraKeys.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Campos não autorizados para reclassificação: ${extraKeys.join(', ')}. Apenas 'tipo_recebimento' e 'member_id' podem ser alterados.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!body.tipo_recebimento || typeof body.tipo_recebimento !== 'string' || !body.tipo_recebimento.trim()) {
+      return NextResponse.json(
+        { error: 'O campo tipo_recebimento é obrigatório.' },
+        { status: 400 }
+      );
+    }
+
+    try {
+      const service = new TesourariaService(admin);
+      const lancamento = await service.atualizarClassificacao(
+        id,
+        ministryId,
+        String(body.tipo_recebimento),
+        body.member_id ? String(body.member_id) : null,
+        context.userId
+      );
+      return NextResponse.json({ success: true, data: lancamento });
+    } catch (err: any) {
+      console.error('[PUT /api/v1/tesouraria/lancamentos?action=classificacao]', err);
+      return NextResponse.json(
+        { error: err?.message || 'Erro ao reclassificar lançamento.' },
+        { status: 400 }
+      );
+    }
   }
 
   try {
@@ -223,6 +263,77 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(
       { error: err?.message || 'Erro interno ao atualizar lançamento.' },
+      { status: 400 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  let context: Awaited<ReturnType<typeof resolveTenantAuth>>;
+  try {
+    context = await resolveTenantAuth(request);
+  } catch (err: any) {
+    const isUnauth = err?.message === 'UNAUTHORIZED';
+    return NextResponse.json(
+      { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
+      { status: isUnauth ? 401 : 403 }
+    );
+  }
+
+  const { admin, ministryId } = context;
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get('id');
+
+  if (!id) {
+    return NextResponse.json(
+      { error: 'ID do lançamento não informado no parâmetro da URL.' },
+      { status: 400 }
+    );
+  }
+
+  let body: Record<string, any>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: 'Body inválido. Envie um JSON bem formado.' },
+      { status: 400 }
+    );
+  }
+
+  // Validação estrita: rejeita qualquer campo fora de tipo_recebimento e member_id
+  const allowedKeys = new Set(['tipo_recebimento', 'member_id', 'action']);
+  const extraKeys = Object.keys(body).filter((k) => !allowedKeys.has(k));
+  if (extraKeys.length > 0) {
+    return NextResponse.json(
+      {
+        error: `Campos não autorizados para reclassificação: ${extraKeys.join(', ')}. Apenas 'tipo_recebimento' e 'member_id' podem ser alterados.`,
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!body.tipo_recebimento || typeof body.tipo_recebimento !== 'string' || !body.tipo_recebimento.trim()) {
+    return NextResponse.json(
+      { error: 'O campo tipo_recebimento é obrigatório.' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const service = new TesourariaService(admin);
+    const lancamento = await service.atualizarClassificacao(
+      id,
+      ministryId,
+      String(body.tipo_recebimento),
+      body.member_id ? String(body.member_id) : null,
+      context.userId
+    );
+    return NextResponse.json({ success: true, data: lancamento });
+  } catch (err: any) {
+    console.error('[PATCH /api/v1/tesouraria/lancamentos]', err);
+    return NextResponse.json(
+      { error: err?.message || 'Erro ao reclassificar lançamento.' },
       { status: 400 }
     );
   }

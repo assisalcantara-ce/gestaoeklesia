@@ -167,6 +167,100 @@ export class TesourariaRepository {
     return data as LancamentoRow;
   }
 
+  /**
+   * Atualização restrita e segura: Altera exclusivamente o tipo de recebimento e a identificação do membro/dizimista.
+   * Todos os demais campos financeiros permanecem imutáveis.
+   */
+  async atualizarClassificacao(
+    id: string,
+    ministryId: string,
+    tipoRecebimento: string,
+    memberId: string | null,
+    userId?: string | null
+  ): Promise<LancamentoRow> {
+    // 1. Verificar se o lançamento existe e pertence ao ministry_id
+    const { data: lancamentoExistente, error: getErr } = await this.supabase
+      .from('tesouraria_lancamentos')
+      .select('*')
+      .eq('id', id)
+      .eq('ministry_id', ministryId)
+      .maybeSingle();
+
+    if (getErr || !lancamentoExistente) {
+      throw new Error('Lançamento não encontrado ou não pertence a esta instituição.');
+    }
+
+    // 2. Se memberId foi informado, validar se pertence ao mesmo ministry_id
+    if (memberId) {
+      const { data: membro, error: memErr } = await this.supabase
+        .from('members')
+        .select('id, name, ministry_id')
+        .eq('id', memberId)
+        .eq('ministry_id', ministryId)
+        .maybeSingle();
+
+      if (memErr || !membro) {
+        throw new Error('O membro selecionado não pertence à instituição autorizada.');
+      }
+    }
+
+    // 3. Atualizar exclusivamente tipo_recebimento e member_id
+    const { data: lancamentoAtualizado, error: updateErr } = await this.supabase
+      .from('tesouraria_lancamentos')
+      .update({
+        tipo_recebimento: tipoRecebimento.trim(),
+        member_id: memberId || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('ministry_id', ministryId)
+      .select('*')
+      .single();
+
+    if (updateErr) {
+      throw new Error(`Erro ao atualizar classificação do lançamento: ${updateErr.message}`);
+    }
+
+    // 4. Registrar log de auditoria
+    if (lancamentoExistente) {
+      try {
+        await this.supabase.from('audit_logs').insert([
+          {
+            ministry_id: ministryId,
+            user_id: userId || null,
+            usuario_id: userId || null,
+            action: 'UPDATE',
+            acao: 'reclassificar',
+            resource_type: 'tesouraria_lancamentos',
+            modulo: 'financeiro',
+            tabela_afetada: 'tesouraria_lancamentos',
+            resource_id: id,
+            registro_id: id,
+            descricao: `Reclassificação de lançamento: Tipo '${lancamentoExistente.tipo_recebimento}' ➔ '${tipoRecebimento.trim()}'`,
+            old_data: {
+              tipo_recebimento: lancamentoExistente.tipo_recebimento,
+              member_id: lancamentoExistente.member_id,
+            },
+            dados_anteriores: {
+              tipo_recebimento: lancamentoExistente.tipo_recebimento,
+              member_id: lancamentoExistente.member_id,
+            },
+            new_data: {
+              tipo_recebimento: tipoRecebimento.trim(),
+              member_id: memberId || null,
+            },
+            status: 'sucesso',
+            status_code: 200,
+          },
+        ]);
+      } catch (auditErr) {
+        console.warn('Aviso: falha ao gravar log de auditoria da reclassificação:', auditErr);
+      }
+    }
+
+    return lancamentoAtualizado as LancamentoRow;
+  }
+
   async deletarLancamento(id: string, ministryId: string, userId?: string | null): Promise<boolean> {
     // 1. Buscar os dados do lançamento para preservar o histórico/auditoria
     const { data: lancamento } = await this.supabase

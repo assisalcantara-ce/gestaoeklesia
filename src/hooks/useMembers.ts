@@ -92,6 +92,21 @@ export function useMembers() {
             }
           }
 
+          // Quando a página solicitada está além dos registros ou tabela vazia
+          if (response.status === 416 || message.toLowerCase().includes('range not satisfiable')) {
+            setMembers([])
+            setError(null)
+            return {
+              data: [],
+              pagination: {
+                page,
+                limit,
+                total: 0,
+                total_pages: 0,
+              },
+            }
+          }
+
           throw new Error(message)
         }
 

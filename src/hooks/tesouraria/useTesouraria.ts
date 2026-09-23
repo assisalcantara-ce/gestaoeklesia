@@ -28,6 +28,9 @@ export interface Lancamento {
   conta_id?: string | null;
   categoria_id?: string | null;
   member_id?: string | null;
+  member_nome?: string | null;
+  member_cpf?: string | null;
+  member_matricula?: string | null;
   codigo_registro?: string | null;
   origem_modulo?: string | null;
   forma_pagamento?: string | null;
@@ -435,10 +438,11 @@ export function useTesouraria() {
   const [confirmDelCat, setConfirmDelCat] = useState<string | null>(null);
   const [filtroCatTipo, setFiltroCatTipo] = useState<'' | 'entrada' | 'saida' | 'ambos'>('');
 
-  // Formulário
+  // Formulário & Reclassificação
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormLanc>(emptyForm());
   const [editId, setEditId] = useState<string | null>(null);
+  const [lancamentoEditandoClassificacao, setLancamentoEditandoClassificacao] = useState<Lancamento | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const [confirmDuplicidadeCodigo, setConfirmDuplicidadeCodigo] = useState<{ open: boolean; codigo: string } | null>(null);
@@ -627,7 +631,7 @@ export function useTesouraria() {
       setLoadingMes(true);
       let q = supabase
         .from('tesouraria_lancamentos')
-        .select('*, congregacoes(nome), departamentos(nome, sigla)')
+        .select('*, congregacoes(nome), departamentos(nome, sigla), members(id, name, cpf, matricula)')
         .eq('ministry_id', ministryId)
         .gte('data_lancamento', `${mes}-01`)
         .lt('data_lancamento', `${mesProximo(mes)}-01`);
@@ -644,6 +648,9 @@ export function useTesouraria() {
           ...item,
           congregacao_nome: item.congregacoes?.nome ?? 'Sede / Geral',
           departamento_nome: item.departamentos?.nome ?? item.departamentos?.sigla ?? '—',
+          member_nome: item.members?.name ?? null,
+          member_cpf: item.members?.cpf ?? null,
+          member_matricula: item.members?.matricula ?? null,
         }));
         setLancamentosMes(formatados);
       }
@@ -695,7 +702,7 @@ export function useTesouraria() {
     try {
       let q = supabase
         .from('tesouraria_lancamentos')
-        .select('*, congregacoes(nome), departamentos(nome, sigla)')
+        .select('*, congregacoes(nome), departamentos(nome, sigla), members(id, name, cpf, matricula)')
         .eq('ministry_id', ministryId)
         .gte('data_lancamento', `${mes}-01`)
         .lt('data_lancamento', `${mesProximo(mes)}-01`);
@@ -712,6 +719,9 @@ export function useTesouraria() {
           ...item,
           congregacao_nome: item.congregacoes?.nome ?? 'Sede / Geral',
           departamento_nome: item.departamentos?.nome ?? item.departamentos?.sigla ?? '—',
+          member_nome: item.members?.name ?? null,
+          member_cpf: item.members?.cpf ?? null,
+          member_matricula: item.members?.matricula ?? null,
         }));
         setLancamentosRelMes(formatados);
       }
@@ -945,39 +955,8 @@ export function useTesouraria() {
   }, [resetDizForm]);
 
   const handleEdit = useCallback((l: Lancamento) => {
-    setEditId(l.id);
-    let catId = l.categoria_id || '';
-    if (!catId && l.tipo_recebimento && finCategorias.length > 0) {
-      const match = finCategorias.find(
-        (c) =>
-          c.id === l.tipo_recebimento ||
-          c.nome.toLowerCase() === l.tipo_recebimento?.toLowerCase() ||
-          c.codigo === l.tipo_recebimento
-      );
-      if (match) {
-        catId = match.id;
-      }
-    }
-
-    setForm({
-      data_lancamento: l.data_lancamento,
-      tipo_movimento: l.tipo_movimento,
-      tipo_recebimento: (l.tipo_recebimento as TipoRecebimento) || 'dizimo',
-      categoria_saida: l.tipo_recebimento || '',
-      forma_pagamento: (l as any).forma_pagamento === 'A VISTA' ? 'EM ESPÉCIE' : ((l as any).forma_pagamento || 'EM ESPÉCIE'),
-      valor: Number(l.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      referencia: l.referencia || '',
-      observacoes: l.observacoes || '',
-      descricao: l.descricao || '',
-      congregacao_id: l.congregacao_id || '',
-      departamento_id: l.departamento_id || '',
-      conta_id: l.conta_id || '',
-      categoria_id: catId,
-      codigo_registro: l.codigo_registro || '',
-      is_dizimo: l.tipo_recebimento === 'dizimo',
-    });
-    setShowForm(true);
-  }, [finCategorias]);
+    setLancamentoEditandoClassificacao(l);
+  }, []);
 
   const handleSave = useCallback(async (options?: { forcarDuplicidade?: boolean }) => {
     if (!form.data_lancamento || !form.valor) {
@@ -1481,13 +1460,15 @@ export function useTesouraria() {
     handleSaveCat,
     handleDeleteCat,
     emptyFormCat,
-    // Formulário Lançamento
+    // Formulário Lançamento & Reclassificação
     showForm,
     setShowForm,
     form,
     setForm,
     editId,
     setEditId,
+    lancamentoEditandoClassificacao,
+    setLancamentoEditandoClassificacao,
     saving,
     confirmDel,
     setConfirmDel,
@@ -1547,6 +1528,7 @@ export function useTesouraria() {
     webhookFiltroProcessado,
     setWebhookFiltroProcessado,
     loadDizimistasData,
+    loadLancamentosMes,
     showAddDizimistaModal,
     setShowAddDizimistaModal,
     // Gráficos

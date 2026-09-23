@@ -199,6 +199,34 @@ export class TesourariaService {
     return this.repository.atualizarLancamento(id, ministryId, payload);
   }
 
+  async atualizarClassificacao(
+    id: string,
+    ministryId: string,
+    tipoRecebimento: string,
+    memberId: string | null,
+    userId?: string | null
+  ): Promise<LancamentoRow> {
+    if (!id || !id.trim()) {
+      throw new Error('O ID do lançamento é obrigatório para reclassificação.');
+    }
+
+    if (!ministryId || !ministryId.trim()) {
+      throw new Error('O ministry_id é obrigatório.');
+    }
+
+    if (!tipoRecebimento || !tipoRecebimento.trim()) {
+      throw new Error('O tipo de recebimento é obrigatório.');
+    }
+
+    return this.repository.atualizarClassificacao(
+      id.trim(),
+      ministryId.trim(),
+      tipoRecebimento.trim(),
+      memberId ? memberId.trim() : null,
+      userId
+    );
+  }
+
   async deletarLancamento(id: string, ministryId: string, userId?: string | null): Promise<boolean> {
     if (!id || id.trim().length === 0) {
       throw new Error('O ID do lançamento é obrigatório para exclusão.');

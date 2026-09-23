@@ -58,7 +58,18 @@ async function listEmployeesFallback(
     .order('created_at', { ascending: false })
 
   const { data: employeesRows, error: employeesErr, count } = await employeesQuery
-  if (employeesErr) throw employeesErr
+  if (employeesErr) {
+    if (
+      employeesErr.code === 'PGRST103' ||
+      employeesErr.message?.toLowerCase().includes('range not satisfiable')
+    ) {
+      return {
+        data: [],
+        count: count || 0,
+      }
+    }
+    throw employeesErr
+  }
 
   const rows = (employeesRows as any[]) || []
   const memberIds = Array.from(new Set(rows.map((row: any) => row.member_id).filter(Boolean)))
@@ -150,6 +161,18 @@ export async function GET(request: NextRequest) {
             { status: 400 }
           )
         }
+      }
+      if (
+        (error as any).code === 'PGRST103' ||
+        error.message?.toLowerCase().includes('range not satisfiable')
+      ) {
+        return NextResponse.json({
+          data: [],
+          count: count || 0,
+          page,
+          limit,
+          total_pages: count ? Math.ceil(count / limit) : 0,
+        })
       }
       return NextResponse.json(
         { error: getSupabaseErrorText(error) || error.message },

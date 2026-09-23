@@ -154,13 +154,13 @@ export default function AdminLoginPage() {
       {/* Barra de Navegação Superior */}
       <header className="relative z-10 w-full max-w-7xl mx-auto px-5 sm:px-10 pt-4 sm:pt-6 pb-2 sm:pb-3 flex items-center justify-between shrink-0">
         {/* Logo Container */}
-        <div className="bg-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl shadow-md flex items-center justify-center">
+        <div className="flex items-center">
           <Image
-            src={BRAND.logoHorizontal}
+            src="/icons/logob.png"
             alt={BRAND.name}
-            width={130}
-            height={36}
-            className="h-6 sm:h-7 w-auto object-contain"
+            width={170}
+            height={52}
+            className="h-7 sm:h-8 w-auto object-contain"
             priority
           />
         </div>
