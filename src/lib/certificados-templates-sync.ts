@@ -162,10 +162,16 @@ export async function loadCertificadosTemplatesForCurrentUser(
     const normalizeStr = (s: string) =>
       (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-    // Limpar modelos duplicados em MAIÚSCULAS criados anteriormente (ex: 'CASAMENTO', 'APRESENTAÇÃO DE CRIANÇAS')
+    // Limpar modelos duplicados ou obsoletos (ex: 'ministerial-pastor2-padrao', 'CASAMENTO', 'APRESENTAÇÃO DE CRIANÇAS')
     const duplicados = fromDb.filter((t: any) => {
       const n = (t.nome || t.name || '').trim();
+      const k = t.template_key || t.id || '';
       return (
+        k === 'ministerial-pastor2-padrao' ||
+        n === 'Consagração Pastor(a) II' ||
+        n === 'Consagração Pastor II' ||
+        n === 'Consagracao Pastor(a) II' ||
+        n === 'Consagracao Pastor II' ||
         n === 'CASAMENTO' ||
         n === 'APRESENTAÇÃO DE CRIANÇAS' ||
         n === 'APRESENTACAO DE CRIANCAS' ||
@@ -193,7 +199,7 @@ export async function loadCertificadosTemplatesForCurrentUser(
       const cargoKey = (padrao as any).cargo_key as string | undefined;
       if (cargoKey && cargosAtivos.length > 0) {
         const cargoNorm = normalizeStr(cargoKey);
-        const cargoPermitido = cargosAtivos.some((c) => c === cargoNorm);
+        const cargoPermitido = cargosAtivos.some((c) => c === cargoNorm || c.startsWith(cargoNorm) || cargoNorm.startsWith(c));
         if (!cargoPermitido) continue; // pular templates cujo cargo não está ativo
       }
 
@@ -218,18 +224,20 @@ export async function loadCertificadosTemplatesForCurrentUser(
         padrao.backgroundUrl &&
         (!existente.backgroundUrl ||
           existente.backgroundUrl !== padrao.backgroundUrl ||
-          ((padrao.id === 'casamento-padrao' || padrao.id === 'batismo-aguas-padrao' || padrao.id === 'diaconisa-padrao') && JSON.stringify(existente.elementos) !== JSON.stringify(padrao.elementos)))
+          (existente.nome && existente.nome !== padrao.nome) ||
+          ((padrao.id === 'casamento-padrao' || padrao.id === 'batismo-aguas-padrao' || padrao.id === 'diaconisa-padrao' || padrao.id === 'ministerial-evangelista-padrao' || padrao.id === 'consagracao-obreiro-padrao' || padrao.id === 'ministerial-pastor-padrao' || padrao.id === 'ministerial-pastora-padrao' || padrao.id === 'consagracao-diacono-padrao' || padrao.id === 'ministerial-presbitero-padrao' || padrao.id === 'ministerial-missionario-padrao') && JSON.stringify(existente.elementos) !== JSON.stringify(padrao.elementos)))
       ) {
-        // Template existente com background ou elementos desatualizados — atualizar para o modelo nativo oficial
+        // Template existente com background, nome ou elementos desatualizados — atualizar para o modelo nativo oficial
         const updatedData = {
           ...existente,
+          nome: padrao.nome,
           backgroundUrl: padrao.backgroundUrl,
           elementos: padrao.elementos,
           cargo_key: cargoKey,
         };
         await supabase
           .from('certificados_templates')
-          .update({ template_data: updatedData })
+          .update({ name: padrao.nome, template_data: updatedData })
           .eq('ministry_id', ministryId)
           .eq('template_key', padrao.id);
         // Atualizar localmente também
@@ -247,7 +255,7 @@ export async function loadCertificadosTemplatesForCurrentUser(
             t.cargo_key ?? padraoMap.get(t.id ?? t.template_key)?.cargo_key;
           if (!cargoKey) return true; // sem cargo_key, sempre mostrar
           const cargoNorm = normalizeStr(cargoKey);
-          return cargosAtivos.some((c) => c === cargoNorm);
+          return cargosAtivos.some((c) => c === cargoNorm || c.startsWith(cargoNorm) || cargoNorm.startsWith(c));
         });
 
     return { templates: filtered, ministryId };

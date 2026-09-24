@@ -15,6 +15,9 @@ import { getCargosMinisteriais, type CargoMinisterial } from '@/lib/cargos-utils
 import { formatCpf, formatPhone } from '@/lib/mascaras';
 import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer';
 import type { Member } from '@/types/supabase';
+import { comissoesService } from '@/services/comissoes-service';
+import { consacracaoService } from '@/services/consagracao-service';
+import type { Comissao } from '@/types/comissoes';
 
 interface SimpleOption {
   id: string;
@@ -89,6 +92,8 @@ export default function ConsagracaoPage() {
   const [cargosMinisteriais] = useState<CargoMinisterial[]>(() => getCargosMinisteriais());
 
   const [registros, setRegistros] = useState<any[]>([]);
+  const [comissoesAtivas, setComissoesAtivas] = useState<Comissao[]>([]);
+  const [loadingComissoes, setLoadingComissoes] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingRegistro, setEditingRegistro] = useState<any | null>(null);
   const [statusMensagem, setStatusMensagem] = useState('');
@@ -106,6 +111,7 @@ export default function ConsagracaoPage() {
   const [formRegistro, setFormRegistro] = useState({
     tipo_registro: 'chegada',
     categoria_registro: '',
+    comissao_id: '',
     member_id: '',
     numero_processo: '',
     data_processo: todayIso(),
@@ -206,6 +212,17 @@ export default function ConsagracaoPage() {
       if (isSupervisor && ctx.supervisaoId) {
         const uVisiveis = div3Regs.filter((u) => u.parentId === ctx.supervisaoId);
         scopeCongIds = uVisiveis.map((u) => u.id);
+      }
+
+      setLoadingComissoes(true);
+      try {
+        const comissoes = await comissoesService.listarComissoes(resolvedMinistryId, { status: 'ativa' });
+        setComissoesAtivas(comissoes);
+      } catch (err) {
+        console.error('Erro ao carregar comissões ativas:', err);
+        setComissoesAtivas([]);
+      } finally {
+        setLoadingComissoes(false);
       }
     }
 
@@ -347,6 +364,7 @@ export default function ConsagracaoPage() {
     setFormRegistro({
       tipo_registro: 'chegada',
       categoria_registro: '',
+      comissao_id: '',
       member_id: '',
       numero_processo: '',
       data_processo: todayIso(),
@@ -591,6 +609,7 @@ export default function ConsagracaoPage() {
 
     const payload = {
       ministry_id: ministryId,
+      comissao_id: formRegistro.comissao_id || null,
       member_id: tipoRegistro === 'progressao' ? formRegistro.member_id || null : null,
       tipo_registro: tipoRegistro,
       regiao: formRegistro.categoria_registro || null,
@@ -710,36 +729,51 @@ export default function ConsagracaoPage() {
       return;
     }
 
-    if (!processRegistro) return;
-    const { error } = await supabase
-      .from('consagracao_registros')
-      .update({ status_processo: status, updated_at: new Date().toISOString() })
-      .eq('id', processRegistro.id);
-    if (error) {
-      if (isConsagracaoTableMissing(error)) {
-        setConsagracaoModuleReady(false);
-        setStatusMensagem('Módulo Consagração indisponível: tabela public.consagracao_registros não encontrada. Aplique as migrations de Consagração no Supabase.');
-        return;
+    if (!processRegistro || !ministryId) return;
+
+    try {
+      if (status === 'homologar') {
+        const res = await consacracaoService.homologarProcesso(processRegistro.id, ministryId);
+        setStatusMensagem(res.message || 'Processo homologado com sucesso.');
+      } else {
+        const { error } = await supabase
+          .from('consagracao_registros')
+          .update({ status_processo: status, updated_at: new Date().toISOString() })
+          .eq('id', processRegistro.id)
+          .eq('ministry_id', ministryId);
+
+        if (error) {
+          if (isConsagracaoTableMissing(error)) {
+            setConsagracaoModuleReady(false);
+            setStatusMensagem('Módulo Consagração indisponível: tabela public.consagracao_registros não encontrada.');
+            return;
+          }
+          setStatusMensagem(`Erro ao atualizar status: ${error.message}`);
+          return;
+        }
+
+        const tipoProcesso = normalizeTipoRegistro(processRegistro.tipo_registro || '');
+        if (tipoProcesso === 'progressao' && processRegistro.member_id) {
+          await syncMemberProgressStatus(
+            processRegistro.member_id,
+            status,
+            processRegistro.cargo_pretendido || '',
+            processRegistro.cargo_ocupa || ''
+          );
+        }
+
+        setStatusMensagem('Status do processo atualizado com sucesso.');
       }
-      setStatusMensagem('Erro ao atualizar status.');
-      return;
-    }
-    setRegistros((prev) =>
-      prev.map((r) => (r.id === processRegistro.id ? { ...r, status_processo: status } : r))
-    );
 
-    const tipoProcesso = normalizeTipoRegistro(processRegistro.tipo_registro || '');
-    if (tipoProcesso === 'progressao' && processRegistro.member_id) {
-      await syncMemberProgressStatus(
-        processRegistro.member_id,
-        status,
-        processRegistro.cargo_pretendido || '',
-        processRegistro.cargo_ocupa || ''
+      setRegistros((prev) =>
+        prev.map((r) => (r.id === processRegistro.id ? { ...r, status_processo: status } : r))
       );
+      setProcessModalOpen(false);
+      setProcessRegistro(null);
+    } catch (err: any) {
+      console.error('Erro ao processar status:', err);
+      setStatusMensagem(err.message || 'Erro ao processar registro.');
     }
-
-    setProcessModalOpen(false);
-    setProcessRegistro(null);
   };
 
   if (ctx.loading) return <div className="p-8">Carregando...</div>;
@@ -907,6 +941,20 @@ export default function ConsagracaoPage() {
                             <option value="">Selecione</option>
                             {CATEGORIA_REGISTRO_OPTIONS.map((categoria) => (
                               <option key={categoria} value={categoria}>{categoria}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">Comissão Responsável</label>
+                          <select
+                            className="mt-1 w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={formRegistro.comissao_id}
+                            onChange={(e) => setFormRegistro({ ...formRegistro, comissao_id: e.target.value })}
+                            disabled={loadingComissoes}
+                          >
+                            <option value="">{loadingComissoes ? 'Carregando comissões...' : 'Nenhuma / Sem comissão'}</option>
+                            {comissoesAtivas.map((com) => (
+                              <option key={com.id} value={com.id}>{com.nome}</option>
                             ))}
                           </select>
                         </div>
@@ -1471,6 +1519,7 @@ export default function ConsagracaoPage() {
                               setFormRegistro({
                                 tipo_registro: normalizeTipoRegistro(reg.tipo_registro || ''),
                                 categoria_registro: reg.regiao || '',
+                                comissao_id: reg.comissao_id || '',
                                 member_id: reg.member_id || '',
                                 numero_processo: reg.numero_processo || '',
                                 data_processo: reg.data_processo || '',

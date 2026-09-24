@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import NotificationModal from '@/components/NotificationModal';
-import { getCargosMinisteriais, saveCargosMinisteriais, type CargoMinisterial } from '@/lib/cargos-utils';
+import { getCargosMinisteriais, saveCargosMinisteriais, normalizeCargosMinisteriais, CARGOS_NATIVOS_NOMES, type CargoMinisterial } from '@/lib/cargos-utils';
 import { useAppDialog } from '@/providers/AppDialogProvider'
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { createClient } from '@/lib/supabase-client'
@@ -1067,8 +1067,9 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
       const org = rawNomenclaturas?.[ORG_NOMENCLATURAS_KEY];
       const cargos = rawNomenclaturas?.[CARGOS_MINISTERIAIS_KEY];
       if (Array.isArray(cargos)) {
-        setCargosMinisteriais(cargos as CargoMinisterial[]);
-        saveCargosMinisteriais(cargos as CargoMinisterial[]);
+        const normalizedCargos = normalizeCargosMinisteriais(cargos);
+        setCargosMinisteriais(normalizedCargos);
+        saveCargosMinisteriais(normalizedCargos);
       }
       if (org) {
         const schemaVersion = Number(org?.schemaVersion || 0);
@@ -1390,7 +1391,7 @@ function NomenclaturaContent({ onNotification }: { onNotification: (title: strin
                 <span className={`flex-1 font-semibold ${cargo.ativo ? 'text-gray-800' : 'text-gray-400 line-through'}`}>
                   {cargo.nome}
                 </span>
-                {isEditing && cargo.id > 8 && (
+                {isEditing && !CARGOS_NATIVOS_NOMES.some(n => n.toLowerCase() === cargo.nome.toLowerCase()) && (
                   <button
                     onClick={() => removerCargo(cargo.id)}
                     className="text-red-500 hover:text-red-700 transition"
