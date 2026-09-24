@@ -955,6 +955,64 @@ export function useTesouraria() {
   }, [resetDizForm]);
 
   const handleEdit = useCallback((l: Lancamento) => {
+    // Se for lançamento de arrecadação digital / gateway ASAAS, abre o modal restrito de reclassificação
+    const isGatewayDigital =
+      l.origem_modulo === 'gateway' ||
+      l.origem_modulo === 'asaas' ||
+      Boolean(l.origem_id && l.tipo_movimento === 'entrada');
+
+    if (isGatewayDigital) {
+      setLancamentoEditandoClassificacao(l);
+      return;
+    }
+
+    setEditId(l.id);
+    let catId = l.categoria_id || '';
+    if (!catId && l.tipo_recebimento && finCategorias.length > 0) {
+      const match = finCategorias.find(
+        (c) =>
+          c.id === l.tipo_recebimento ||
+          c.nome.toLowerCase() === l.tipo_recebimento?.toLowerCase() ||
+          c.codigo === l.tipo_recebimento
+      );
+      if (match) {
+        catId = match.id;
+      }
+    }
+
+    const isAvulso =
+      l.tipo_recebimento === 'dizimo' &&
+      !l.member_id &&
+      (l.observacoes?.toLowerCase().includes('avulso') ||
+        l.referencia?.toLowerCase().includes('avulso') ||
+        l.descricao?.toLowerCase().includes('avulso'));
+
+    setForm({
+      data_lancamento: l.data_lancamento,
+      tipo_movimento: l.tipo_movimento,
+      tipo_recebimento: (l.tipo_recebimento as TipoRecebimento) || 'oferta',
+      categoria_saida: l.tipo_movimento === 'saida' ? (l.tipo_recebimento || '') : '',
+      valor: typeof l.valor === 'number'
+        ? l.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : String(l.valor),
+      descricao: l.descricao || '',
+      referencia: l.referencia || '',
+      observacoes: l.observacoes || '',
+      forma_pagamento: l.forma_pagamento || 'EM ESPÉCIE',
+      congregacao_id: l.congregacao_id || '',
+      departamento_id: l.departamento_id || '',
+      conta_id: l.conta_id || '',
+      categoria_id: catId,
+      codigo_registro: l.codigo_registro || '',
+      is_dizimo: l.tipo_recebimento === 'dizimo',
+      is_dizimo_avulso: Boolean(isAvulso),
+      dizimista_id: l.member_id || '',
+      dizimista_nome: l.member_nome || '',
+    });
+    setShowForm(true);
+  }, [finCategorias]);
+
+  const handleEditClassificacao = useCallback((l: Lancamento) => {
     setLancamentoEditandoClassificacao(l);
   }, []);
 
@@ -1001,6 +1059,7 @@ export function useTesouraria() {
         tipo_movimento: form.tipo_movimento,
         tipo_recebimento: tipoRecebimentoFinal,
         valor: valNum,
+        forma_pagamento: form.forma_pagamento || 'EM ESPÉCIE',
         referencia: form.referencia || (form.dizimista_nome ? `Dízimo: ${form.dizimista_nome}` : null),
         observacoes: obsFinal || null,
         descricao: obsFinal || null,
@@ -1008,6 +1067,7 @@ export function useTesouraria() {
         departamento_id: form.departamento_id || null,
         conta_id: form.conta_id || null,
         categoria_id: categoriaIdFinal,
+        member_id: form.dizimista_id || null,
         codigo_registro: form.codigo_registro?.trim() || null,
         permitir_duplicidade: options?.forcarDuplicidade ? true : undefined,
       };
@@ -1478,6 +1538,7 @@ export function useTesouraria() {
     handleCancelarDuplicado,
     handleNovoLancamento,
     handleEdit,
+    handleEditClassificacao,
     handleSave,
     handleDelete,
     emptyForm,

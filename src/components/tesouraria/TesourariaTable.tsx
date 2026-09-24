@@ -18,6 +18,7 @@ export interface TesourariaTableProps {
     canDelete?: boolean;
   };
   handleEdit?: (item: any) => void;
+  handleEditClassificacao?: (item: any) => void;
   setConfirmDel?: (id: string) => void;
   finContas?: FinConta[];
   finCategorias?: FinCategoria[];
@@ -34,6 +35,7 @@ export default function TesourariaTable({
   totalFiltrado,
   scope,
   handleEdit,
+  handleEditClassificacao,
   setConfirmDel,
   finContas = [],
   finCategorias = [],
@@ -313,13 +315,19 @@ export default function TesourariaTable({
                           </button>
 
                           {/* Botão 2: Editar / Reclassificar (Disponível para todos os lançamentos com permissão de escrita) */}
-                          {scope.canWrite && handleEdit && (
+                          {scope.canWrite && (handleEdit || handleEditClassificacao) && (
                             <button
                               type="button"
-                              onClick={() => handleEdit(l)}
+                              onClick={() => {
+                                if (isDigitalPix && handleEditClassificacao) {
+                                  handleEditClassificacao(l);
+                                } else if (handleEdit) {
+                                  handleEdit(l);
+                                }
+                              }}
                               className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition cursor-pointer"
-                              title="Editar / Reclassificar Lançamento"
-                              aria-label="Editar / Reclassificar Lançamento"
+                              title={isDigitalPix ? 'Reclassificar Lançamento / Dizimista' : 'Editar Lançamento'}
+                              aria-label={isDigitalPix ? 'Reclassificar Lançamento / Dizimista' : 'Editar Lançamento'}
                             >
                               <Pencil className="h-4 w-4" />
                             </button>

@@ -119,6 +119,7 @@ export async function POST(request: NextRequest) {
       categoria_id:         body.categoria_id     ?? null,
       member_id:            body.member_id         ?? null,
       codigo_registro:      body.codigo_registro   ?? null,
+      forma_pagamento:      body.forma_pagamento   ?? null,
       permitir_duplicidade: Boolean(body.permitir_duplicidade),
     });
 
@@ -239,6 +240,7 @@ export async function PUT(request: NextRequest) {
       conta_id:             body.conta_id,
       categoria_id:         body.categoria_id,
       member_id:            body.member_id,
+      forma_pagamento:      body.forma_pagamento,
       codigo_registro:      body.codigo_registro !== undefined ? body.codigo_registro : undefined,
       permitir_duplicidade: Boolean(body.permitir_duplicidade),
     });

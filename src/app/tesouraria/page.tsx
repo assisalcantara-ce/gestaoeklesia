@@ -236,6 +236,7 @@ export default function TesourariaPage() {
               totalFiltrado={t.entradasFiltradas - t.saidasFiltradas}
               scope={t.scope}
               handleEdit={t.handleEdit}
+              handleEditClassificacao={t.handleEditClassificacao}
               setConfirmDel={t.setConfirmDel}
               finContas={t.finContas}
               finCategorias={t.finCategorias}
@@ -388,6 +389,7 @@ export default function TesourariaPage() {
                   totalFiltrado={t.entradasRelatorio - t.saidasRelatorio}
                   scope={t.scope}
                   handleEdit={t.handleEdit}
+                  handleEditClassificacao={t.handleEditClassificacao}
                   setConfirmDel={t.setConfirmDel}
                   finContas={t.finContas}
                   finCategorias={t.finCategorias}

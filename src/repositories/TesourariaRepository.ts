@@ -19,6 +19,7 @@ export interface LancamentoInsert {
   categoria_id?: string | null;
   member_id?: string | null;
   codigo_registro?: string | null;
+  forma_pagamento?: string | null;
 }
 
 export interface LancamentoRow extends LancamentoInsert {

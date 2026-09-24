@@ -19,6 +19,7 @@ export interface CriarLancamentoDTO {
   categoria_id?: string | null;
   member_id?: string | null;
   codigo_registro?: string | null;
+  forma_pagamento?: string | null;
   permitir_duplicidade?: boolean;
 }
 
@@ -92,6 +93,7 @@ export class TesourariaService {
       categoria_id: dto.categoria_id ?? null,
       member_id: dto.member_id ?? null,
       codigo_registro: codigo,
+      forma_pagamento: dto.forma_pagamento ?? null,
     });
 
     // ── Caso 1: Usuário confirmou/permitiu salvar com código duplicado ──────────
@@ -180,6 +182,7 @@ export class TesourariaService {
     if (dto.conta_id !== undefined) payload.conta_id = dto.conta_id;
     if (dto.categoria_id !== undefined) payload.categoria_id = dto.categoria_id;
     if (dto.member_id !== undefined) payload.member_id = dto.member_id;
+    if (dto.forma_pagamento !== undefined) payload.forma_pagamento = dto.forma_pagamento;
 
     if (dto.codigo_registro !== undefined) {
       if (dto.codigo_registro && dto.codigo_registro.trim().length > 0) {
