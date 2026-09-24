@@ -8,7 +8,9 @@ import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
 import { comissoesService } from '@/services/comissoes-service';
+import jsPDF from 'jspdf';
 import {
   Comissao,
   ComissaoInput,
@@ -19,6 +21,7 @@ import {
 
 export default function ComissaoPage() {
   const { ctx, bloqueado } = useRequireModulo('comissao');
+  const { ministry } = useCurrentMinistry();
   const planFeatures = usePlanFeatures();
 
   // Estados de navegação e filtros da lista principal
@@ -62,6 +65,7 @@ export default function ComissaoPage() {
   // Estados de Exclusão de Integrante
   const [deletingIntegrante, setDeletingIntegrante] = useState<ComissaoIntegrante | null>(null);
   const [removingMember, setRemovingMember] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   // Modal de Notificação
   const [notification, setNotification] = useState<{
@@ -270,6 +274,195 @@ export default function ComissaoPage() {
       setMemberActionError(error?.message || 'Erro ao remover integrante da comissão.');
     } finally {
       setRemovingMember(false);
+    }
+  };
+
+  // Gerar PDF A4 de Identificação da Comissão (para afixação em porta / mural)
+  const handleGerarPdf = async () => {
+    if (!selectedComissao) return;
+
+    try {
+      setGeneratingPdf(true);
+
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 15;
+      const contentWidth = pageWidth - margin * 2;
+
+      // Dados do Tenant / Ministério
+      const tenantNome = (ministry?.name || ministry?.nome || 'CONVENÇÃO / MINISTÉRIO').toUpperCase();
+      const tenantCidadeUf = [ministry?.city || ministry?.cidade, ministry?.state || ministry?.estado]
+        .filter(Boolean)
+        .join(' - ');
+      const tenantCnpj = ministry?.cnpj ? `CNPJ: ${ministry.cnpj}` : '';
+
+      // Moldura externa elegante (Borda dupla)
+      doc.setDrawColor(18, 59, 99); // #123b63 (Navy)
+      doc.setLineWidth(1.2);
+      doc.roundedRect(margin, margin, contentWidth, pageHeight - margin * 2, 4, 4, 'S');
+
+      doc.setDrawColor(203, 213, 225); // Slate 300
+      doc.setLineWidth(0.4);
+      doc.roundedRect(margin + 2.5, margin + 2.5, contentWidth - 5, pageHeight - margin * 2 - 5, 2.5, 2.5, 'S');
+
+      // Topo / Faixa Superior Institucional do Tenant
+      doc.setFillColor(18, 59, 99);
+      doc.roundedRect(margin + 4, margin + 4, contentWidth - 8, 30, 2, 2, 'F');
+
+      // Título Institucional (Nome do Tenant)
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      const tenantHeaderLines = doc.splitTextToSize(tenantNome, contentWidth - 20);
+      doc.text(tenantHeaderLines, pageWidth / 2, margin + 13, { align: 'center' });
+
+      // Subtítulo da Faixa
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(200, 225, 255);
+      const subFaixa = [tenantCidadeUf, tenantCnpj].filter(Boolean).join('  •  ') || 'CONVENÇÃO / MINISTÉRIO';
+      doc.text(subFaixa, pageWidth / 2, margin + 21, { align: 'center' });
+
+      doc.setFontSize(7.5);
+      doc.setTextColor(224, 242, 254);
+      doc.text('IDENTIFICAÇÃO DE SALA DE ATENDIMENTO E AVALIAÇÃO', pageWidth / 2, margin + 27, { align: 'center' });
+
+      let currentY = margin + 44;
+
+      // TÍTULO DA COMISSÃO EM DESTAQUE
+      doc.setTextColor(18, 59, 99);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(22);
+      const titleLines = doc.splitTextToSize(selectedComissao.nome.toUpperCase(), contentWidth - 20);
+      doc.text(titleLines, pageWidth / 2, currentY, { align: 'center' });
+      currentY += titleLines.length * 9;
+
+      // Linha decorativa abaixo do título
+      doc.setDrawColor(18, 59, 99);
+      doc.setLineWidth(1);
+      doc.line(pageWidth / 2 - 40, currentY, pageWidth / 2 + 40, currentY);
+      currentY += 6;
+
+      // Descrição / Objetivo da Comissão (se houver)
+      if (selectedComissao.descricao) {
+        doc.setTextColor(100, 116, 139);
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(10);
+        const descLines = doc.splitTextToSize(`"${selectedComissao.descricao}"`, contentWidth - 30);
+        doc.text(descLines, pageWidth / 2, currentY, { align: 'center' });
+        currentY += descLines.length * 5 + 4;
+      } else {
+        currentY += 4;
+      }
+
+      // Banner / Cabeçalho da Seção de Integrantes
+      doc.setFillColor(241, 245, 249); // slate-100
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(margin + 8, currentY, contentWidth - 16, 10, 2, 2, 'FD');
+
+      doc.setTextColor(30, 41, 59); // slate-800
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('MEMBROS INTEGRANTES DA COMISSÃO', pageWidth / 2, currentY + 6.8, { align: 'center' });
+
+      currentY += 15;
+
+      // Listagem dos Integrantes
+      if (integrantes.length === 0) {
+        doc.setTextColor(148, 163, 184);
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(11);
+        doc.text('Nenhum integrante vinculado no momento.', pageWidth / 2, currentY + 10, { align: 'center' });
+      } else {
+        const itemHeight = 22;
+        const itemWidth = contentWidth - 16;
+        const startX = margin + 8;
+
+        integrantes.forEach((int, index) => {
+          // Fundo do card do integrante (alternado suave)
+          if (index % 2 === 0) {
+            doc.setFillColor(255, 255, 255);
+          } else {
+            doc.setFillColor(248, 250, 252);
+          }
+
+          doc.setDrawColor(226, 232, 240); // slate-200
+          doc.setLineWidth(0.4);
+          doc.roundedRect(startX, currentY, itemWidth, itemHeight, 2, 2, 'FD');
+
+          // Faixa lateral de destaque no card
+          doc.setFillColor(18, 59, 99);
+          doc.roundedRect(startX, currentY, 3, itemHeight, 1, 1, 'F');
+
+          // Nome do Ministro
+          doc.setTextColor(15, 23, 42); // slate-900
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(11.5);
+          const nomeText = int.member?.name ? int.member.name.toUpperCase() : 'MINISTRO NÃO INFORMADO';
+          doc.text(nomeText, startX + 7, currentY + 8.5);
+
+          // Cargo Ministerial (se houver)
+          const cargoMin = int.member?.cargo_ministerial ? int.member.cargo_ministerial.toUpperCase() : 'MINISTRO';
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8.5);
+          doc.setTextColor(71, 85, 105);
+          doc.text(`Cargo Ministerial: ${cargoMin}`, startX + 7, currentY + 16.5);
+
+          // Badge com o Cargo na Comissão (à direita)
+          const funcaoText = (int.cargo || 'Membro').toUpperCase();
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          const badgeWidth = Math.max(doc.getTextWidth(funcaoText) + 8, 28);
+          const badgeX = startX + itemWidth - badgeWidth - 5;
+          const badgeY = currentY + 5.5;
+
+          // Fundo azul claro da Badge
+          doc.setFillColor(224, 242, 254); // sky-100
+          doc.setDrawColor(186, 230, 253); // sky-200
+          doc.setLineWidth(0.3);
+          doc.roundedRect(badgeX, badgeY, badgeWidth, 10, 2, 2, 'FD');
+
+          // Texto da Badge
+          doc.setTextColor(3, 105, 161); // sky-700
+          doc.text(funcaoText, badgeX + badgeWidth / 2, badgeY + 6.8, { align: 'center' });
+
+          currentY += itemHeight + 3.5;
+        });
+      }
+
+      // Rodapé da Folha (Data e Orientação com Identificação do Tenant)
+      const footerY = pageHeight - margin - 10;
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.4);
+      doc.line(margin + 8, footerY - 4, pageWidth - margin - 8, footerY - 4);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      const dataEmissao = new Date().toLocaleDateString('pt-BR');
+      doc.text(`Documento de Afixação Oficial  •  Emitido em ${dataEmissao}`, margin + 8, footerY + 2);
+      doc.text(tenantNome, pageWidth - margin - 8, footerY + 2, { align: 'right' });
+
+      // Salvar / Abrir PDF
+      const sanitizedName = selectedComissao.nome.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      doc.save(`comissao_${sanitizedName}_porta_a4.pdf`);
+    } catch (err: any) {
+      console.error('Erro ao gerar PDF da comissão:', err);
+      setNotification({
+        isOpen: true,
+        title: 'Erro ao gerar PDF',
+        message: err?.message || 'Não foi possível gerar o PDF da comissão.',
+        type: 'error',
+      });
+    } finally {
+      setGeneratingPdf(false);
     }
   };
 
@@ -696,12 +889,32 @@ export default function ComissaoPage() {
                     </p>
                   )}
                 </div>
-                <button
-                  onClick={handleCloseIntegrantesModal}
-                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg text-sm transition hover:bg-slate-100"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleGerarPdf}
+                    disabled={generatingPdf}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded-lg text-xs font-semibold shadow-xs transition disabled:opacity-50"
+                    title="Gerar PDF A4 da comissão para afixação na porta"
+                  >
+                    {generatingPdf ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-slate-600 border-t-transparent rounded-full animate-spin"></div>
+                        <span>Gerando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>📄</span>
+                        <span>Imprimir Folha da Porta (PDF)</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleCloseIntegrantesModal}
+                    className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg text-sm transition hover:bg-slate-100"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
 
               {/* Corpo do Modal */}
@@ -948,10 +1161,29 @@ export default function ComissaoPage() {
 
                 {/* Lista de Integrantes Atuais */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                       Integrantes Atuais ({integrantes.length})
                     </h4>
+                    <button
+                      type="button"
+                      onClick={handleGerarPdf}
+                      disabled={generatingPdf}
+                      className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#123b63] text-white hover:bg-[#0f2a45] rounded-lg text-xs font-bold shadow-sm transition disabled:opacity-50"
+                      title="Gerar PDF A4 da comissão para afixação na porta"
+                    >
+                      {generatingPdf ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Gerando PDF...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-base">🖨️</span>
+                          <span>Imprimir Folha da Porta (PDF)</span>
+                        </>
+                      )}
+                    </button>
                   </div>
 
                   {loadingIntegrantes ? (
@@ -1080,12 +1312,22 @@ export default function ComissaoPage() {
                 <span className="text-xs text-slate-500">
                   Total de {integrantes.length} ministro(s) vinculado(s)
                 </span>
-                <button
-                  onClick={handleCloseIntegrantesModal}
-                  className="px-4 py-1.5 bg-[#123b63] text-white rounded-lg text-xs font-semibold hover:bg-[#0f2a45] transition"
-                >
-                  Concluir / Fechar
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleGerarPdf}
+                    disabled={generatingPdf}
+                    className="px-3.5 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-semibold shadow-xs transition disabled:opacity-50 inline-flex items-center gap-1.5"
+                  >
+                    <span>📄</span>
+                    <span>Gerar PDF (A4)</span>
+                  </button>
+                  <button
+                    onClick={handleCloseIntegrantesModal}
+                    className="px-4 py-1.5 bg-[#123b63] text-white rounded-lg text-xs font-semibold hover:bg-[#0f2a45] transition"
+                  >
+                    Concluir / Fechar
+                  </button>
+                </div>
               </div>
             </div>
           </div>
