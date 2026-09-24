@@ -55,6 +55,7 @@ export async function fetchCertificadosTemplatesFromSupabase(
         if (!t) return null;
         return {
           ...t,
+          template_key: r.template_key,
           id: t.id || r.template_key,
           nome: t.nome || r.name,
           ativo: r.is_active === true,
@@ -161,7 +162,7 @@ export async function loadCertificadosTemplatesForCurrentUser(
     const normalizeStr = (s: string) =>
       (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-    // Limpar modelos duplicados ou intitulados em MAIÚSCULAS criados anteriormente (ex: 'CASAMENTO', 'APRESENTAÇÃO DE CRIANÇAS')
+    // Limpar modelos duplicados em MAIÚSCULAS criados anteriormente (ex: 'CASAMENTO', 'APRESENTAÇÃO DE CRIANÇAS')
     const duplicados = fromDb.filter((t: any) => {
       const n = (t.nome || t.name || '').trim();
       return (
@@ -196,7 +197,7 @@ export async function loadCertificadosTemplatesForCurrentUser(
         if (!cargoPermitido) continue; // pular templates cujo cargo não está ativo
       }
 
-      const existente = fromDb.find((t: any) => t.template_key === padrao.id || t.id === padrao.id);
+      const existente = fromDb.find((t: any) => t.template_key === padrao.id || t.id === padrao.id || (t.nome && normalizeStr(t.nome) === normalizeStr(padrao.nome)));
       if (!existente) {
         // Novo template — inserir
         const row = {
