@@ -337,24 +337,8 @@ export default function ConsagracaoPage() {
   }, [ctx.loading, bloqueado]);
 
   useEffect(() => {
-    if (formRegistro.tipo_registro !== 'progressao') {
-      setMemberQuery('');
-      setMemberResults([]);
-      setMemberOpen(false);
-      setFotoBloqueada(false);
-      return;
-    }
-  }, [formRegistro.tipo_registro]);
-
-  useEffect(() => {
     let cancelled = false;
     const query = memberQuery.trim();
-
-    if (formRegistro.tipo_registro !== 'progressao') {
-      setMemberResults([]);
-      setMemberOpen(false);
-      return;
-    }
 
     if (suppressNextSearchRef.current) {
       suppressNextSearchRef.current = false;
@@ -387,7 +371,7 @@ export default function ConsagracaoPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [memberQuery, fetchMembers, formRegistro.tipo_registro]);
+  }, [memberQuery, fetchMembers]);
 
   const compressImage = (base64: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -570,6 +554,7 @@ export default function ConsagracaoPage() {
 
     setFormRegistro((prev) => ({
       ...prev,
+      tipo_registro: 'progressao',
       member_id: member.id,
       nome: member.name || (member as any).nome || prev.nome,
       cpf: formatCpf((member as any).cpf || cf.cpf || prev.cpf || ''),
@@ -2648,52 +2633,39 @@ export default function ConsagracaoPage() {
                               setFormRegistro((prev) => ({
                                 ...prev,
                                 nome: value,
-                                member_id: isProgressao ? '' : prev.member_id,
-                                cpf: isProgressao ? '' : prev.cpf,
-                                data_nascimento: isProgressao ? '' : prev.data_nascimento,
-                                rg: isProgressao ? '' : prev.rg,
-                                estado_civil: isProgressao ? '' : prev.estado_civil,
-                                nacionalidade: isProgressao ? '' : prev.nacionalidade,
-                                naturalidade: isProgressao ? '' : prev.naturalidade,
-                                uf: isProgressao ? '' : prev.uf,
-                                email: isProgressao ? '' : prev.email,
-                                telefone: isProgressao ? '' : prev.telefone,
-                                nome_pai: isProgressao ? '' : prev.nome_pai,
-                                nome_mae: isProgressao ? '' : prev.nome_mae,
-                                nome_conjuge: isProgressao ? '' : prev.nome_conjuge,
-                                matricula: isProgressao ? '' : prev.matricula,
-                                foto_url: isProgressao ? '' : prev.foto_url,
+                                member_id: '',
                               }));
-                              if (isProgressao) {
-                                setMemberQuery(value);
-                                setFotoBloqueada(false);
-                              } else {
-                                setMemberQuery('');
-                                setMemberResults([]);
-                                setMemberOpen(false);
-                              }
+                              setMemberQuery(value);
+                              setFotoBloqueada(false);
                             }}
-                            placeholder={isProgressao ? 'Digite o nome ou CPF para buscar no cadastro' : 'Preenchimento manual'}
+                            placeholder="Digite o nome ou CPF para buscar membro/ministro no cadastro"
                           />
-                          {isProgressao && memberOpen && memberResults.length > 0 && (
-                            <div className="absolute z-20 mt-2 w-full bg-white border rounded-lg shadow-lg max-h-60 overflow-auto">
+                          {memberOpen && memberResults.length > 0 && (
+                            <div className="absolute z-20 mt-2 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-auto divide-y divide-slate-100">
                               {memberResults.map((m) => (
                                 <button
                                   key={m.id}
                                   type="button"
                                   onClick={() => handleSelectMember(m)}
-                                  className="w-full px-4 py-2 text-left hover:bg-blue-50 text-sm"
+                                  className="w-full px-4 py-2.5 text-left hover:bg-teal-50/70 transition flex items-center justify-between text-sm"
                                 >
-                                  <div className="font-semibold text-gray-800">{m.name}</div>
-                                  <div className="text-xs text-gray-500">CPF: {(m as any).cpf || '-'}</div>
+                                  <div>
+                                    <div className="font-semibold text-gray-800">{m.name}</div>
+                                    <div className="text-xs text-gray-500">
+                                      CPF: {(m as any).cpf || '-'} • Matrícula: {(m as any).matricula || '-'}
+                                    </div>
+                                  </div>
+                                  {(m as any).cargo_ministerial && (
+                                    <span className="text-xs font-semibold px-2 py-0.5 bg-teal-100 text-teal-800 rounded-full">
+                                      {(m as any).cargo_ministerial}
+                                    </span>
+                                  )}
                                 </button>
                               ))}
                             </div>
                           )}
                           <p className="mt-1 text-xs text-gray-500">
-                            {isProgressao
-                              ? 'No tipo Progressão, a busca é dinâmica e o cadastro é preenchido automaticamente ao selecionar um ministro.'
-                              : 'No tipo Candidato ou Filiação, o preenchimento é manual.'}
+                            Digite para buscar um membro/ministro já cadastrado (preenchimento automático) ou preencha manualmente para novos candidatos/filiações.
                           </p>
                           {(fieldErrors.nome || fieldErrors.member_id) && (
                             <p className="mt-1 text-xs text-red-600">{fieldErrors.member_id || fieldErrors.nome}</p>
