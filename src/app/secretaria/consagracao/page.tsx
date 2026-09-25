@@ -17,6 +17,8 @@ import type { Member } from '@/types/supabase';
 import { comissoesService } from '@/services/comissoes-service';
 import { consacracaoService } from '@/services/consagracao-service';
 import type { Comissao } from '@/types/comissoes';
+import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
+import { substituirPlaceholdersCertificado } from '@/lib/certificados-utils';
 
 interface SimpleOption {
   id: string;
@@ -1192,8 +1194,20 @@ export default function ConsagracaoPage() {
     }, 400);
   };
 
-  const handleImprimirFichaCandidato = (reg: any) => {
+  const handleImprimirFichaCandidato = async (reg: any) => {
     if (!reg) return;
+
+    // Buscar comissão e integrantes vinculados ao processo
+    let comissaoNome = '';
+    let integrantes: any[] = [];
+    if (reg.comissao_id && ministryId) {
+      comissaoNome = reg.comissao?.nome || comissoes.find((c) => c.id === reg.comissao_id)?.nome || '';
+      try {
+        integrantes = await comissoesService.listarIntegrantes(reg.comissao_id, ministryId);
+      } catch (err) {
+        console.error('Erro ao buscar integrantes da comissão para a ficha:', err);
+      }
+    }
 
     const win = window.open('', '_blank');
     if (!win) {
@@ -1337,15 +1351,24 @@ export default function ConsagracaoPage() {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 32px;
-            margin-top: 40px;
-            padding-top: 12px;
+            margin-top: 24px;
+            padding-top: 8px;
+            page-break-inside: avoid;
+          }
+          .signatures-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px 24px;
+            margin-top: 14px;
+            page-break-inside: avoid;
           }
           .signature-item {
             text-align: center;
+            page-break-inside: avoid;
           }
           .signature-line {
             border-top: 1px solid #334155;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
           }
           .signature-name {
             font-size: 11px;
@@ -1553,14 +1576,72 @@ export default function ConsagracaoPage() {
           </div>
         ` : ''}
 
-        ${reg.observacoes ? `
-          <div class="section-title">Observações / Parecer</div>
-          <div class="field" style="margin-bottom: 8px;">
-            <div class="field-value" style="font-weight: normal; white-space: pre-wrap;">${reg.observacoes}</div>
+        <!-- Seção: Comissão de Consagração & Deliberação -->
+        ${reg.comissao_id ? `
+          <div class="section-title">Comissão de Consagração & Parecer</div>
+          <div class="field" style="margin-bottom: 12px; background: #f8fafc;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <div>
+                <span class="field-label">Comissão Responsável:</span>
+                <span class="field-value" style="font-weight: 700; color: #0f766e;">${comissaoNome || 'Comissão de Consagração'}</span>
+              </div>
+              <div>
+                <span class="field-label">Deliberação:</span>
+                <span style="font-weight: 700; font-size: 11px;">[ &nbsp; ] Deferido &nbsp;&nbsp;&nbsp; [ &nbsp; ] Indeferido</span>
+              </div>
+            </div>
+            ${reg.observacoes ? `
+              <div style="margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+                <span class="field-label">Parecer Registrado / Observações:</span>
+                <div class="field-value" style="font-weight: normal; font-size: 11px; white-space: pre-wrap;">${reg.observacoes}</div>
+              </div>
+            ` : `
+              <div style="margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+                <span class="field-label">Parecer da Comissão:</span>
+                <div style="height: 36px; border-bottom: 1px dotted #94a3b8; margin-top: 4px;"></div>
+              </div>
+            `}
           </div>
-        ` : ''}
 
-        
+          ${integrantes.length > 0 ? `
+            <div style="margin-top: 14px; margin-bottom: 16px;">
+              <div class="field-label" style="margin-bottom: 10px; font-size: 10px; color: #0f766e; font-weight: 800;">Assinatura dos Integrantes da Comissão</div>
+              <div class="signatures-grid">
+                ${integrantes.map((int: any) => `
+                  <div class="signature-item">
+                    <div class="signature-line"></div>
+                    <div class="signature-name">${int.member?.name || 'Integrante'}</div>
+                    <div class="signature-role">${int.cargo || 'Integrante'}${int.member?.cargo_ministerial ? ` • ${int.member.cargo_ministerial}` : ''}</div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : `
+            <div class="field" style="margin-top: 8px; margin-bottom: 16px; color: #64748b; font-style: italic; font-size: 11px;">
+              Nenhum integrante cadastrado nesta comissão até o momento.
+            </div>
+          `}
+        ` : `
+          ${reg.observacoes ? `
+            <div class="section-title">Observações / Parecer</div>
+            <div class="field" style="margin-bottom: 12px;">
+              <div class="field-value" style="font-weight: normal; white-space: pre-wrap;">${reg.observacoes}</div>
+            </div>
+          ` : ''}
+        `}
+
+        <div class="signatures">
+          <div class="signature-item">
+            <div class="signature-line"></div>
+            <div class="signature-name">${reg.pastor_solicitante || responsavel || 'Pastor Solicitante'}</div>
+            <div class="signature-role">Pastor Solicitante / Indicação</div>
+          </div>
+          <div class="signature-item">
+            <div class="signature-line"></div>
+            <div class="signature-name">${responsavel || 'Presidente do Ministério'}</div>
+            <div class="signature-role">Pastor Presidente / Presidente do Ministério</div>
+          </div>
+        </div>
 
         <div class="footer">
           Documento gerado pelo Sistema de Gestão Eklésia em ${hoje} às ${hora} | Processo nº ${reg.numero_processo || '-'}
@@ -1574,6 +1655,287 @@ export default function ConsagracaoPage() {
     setTimeout(() => {
       win.print();
     }, 400);
+  };
+
+  const handleEmitirCertificado = async (reg: any) => {
+    if (!reg) return;
+
+    if (reg.status_processo !== 'homologar') {
+      setStatusMensagem('O Certificado de Consagração só pode ser emitido para processos homologados.');
+      return;
+    }
+
+    if (!ministryId || (reg.ministry_id && reg.ministry_id !== ministryId)) {
+      setStatusMensagem('Acesso negado: o processo não pertence ao ministério atual.');
+      return;
+    }
+
+    try {
+      let cargoHomologado = '';
+
+      // Prioridade 1: Buscar cargo resultante efetivamente aplicado em members.cargo_ministerial
+      if (reg.member_id) {
+        const { data: memberData, error: memberErr } = await supabase
+          .from('members')
+          .select('id, ministry_id, cargo_ministerial')
+          .eq('id', reg.member_id)
+          .eq('ministry_id', ministryId)
+          .single();
+
+        if (!memberErr && memberData?.cargo_ministerial) {
+          cargoHomologado = String(memberData.cargo_ministerial).trim();
+        }
+      }
+
+      // Prioridade 2: Dados específicos de resultado persistidos no registro do processo
+      if (!cargoHomologado && reg.cargo_resultante) {
+        cargoHomologado = String(reg.cargo_resultante).trim();
+      }
+
+      // Prioridade 3: Fallback seguro baseado no tipo de processo
+      if (!cargoHomologado) {
+        const tipo = normalizeTipoRegistro(reg.tipo_registro || '');
+        if (tipo === 'progressao') {
+          cargoHomologado = (reg.cargo_pretendido || '').trim();
+        } else {
+          cargoHomologado = (reg.cargo_pretendido || reg.cargo_ocupa || '').trim();
+        }
+      }
+
+      if (!cargoHomologado) {
+        setStatusMensagem('Não foi possível identificar o cargo homologado para este processo.');
+        return;
+      }
+
+      const { templates } = await loadCertificadosTemplatesForCurrentUser(supabase);
+
+      const norm = (s: string) =>
+        s
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim();
+      const cargoNorm = norm(cargoHomologado);
+
+      const activeTemplates = (templates || []).filter(
+        (t: any) => t.ativo !== false && (t.categoria === 'ministerial' || t.categoria === 'consagracao-obreiro')
+      );
+
+      // 1. Correspondência exata por cargo_key
+      let matchedTemplate = activeTemplates.find((t: any) => t.cargo_key && norm(t.cargo_key) === cargoNorm);
+
+      // 2. Correspondência por nome do template
+      if (!matchedTemplate) {
+        matchedTemplate = activeTemplates.find((t: any) => {
+          const tNomeNorm = norm(t.nome || t.name || '');
+          return tNomeNorm === cargoNorm || tNomeNorm === `consagracao ${cargoNorm}` || tNomeNorm.includes(cargoNorm);
+        });
+      }
+
+      // 3. Correspondência parcial (ex: "Pastor Presidente" / "Pastor")
+      if (!matchedTemplate) {
+        matchedTemplate = activeTemplates.find((t: any) => {
+          if (!t.cargo_key) return false;
+          const ckNorm = norm(t.cargo_key);
+          return cargoNorm.includes(ckNorm) || ckNorm.includes(cargoNorm);
+        });
+      }
+
+      if (!matchedTemplate) {
+        setStatusMensagem(`Não existe um modelo de certificado configurado para o cargo ${cargoHomologado}. Configure o modelo em Configurações → Certificados.`);
+        return;
+      }
+
+      const win = window.open('', '_blank');
+      if (!win) {
+        alert('Por favor, permita popups para emitir o certificado.');
+        return;
+      }
+
+      const congNome = getCongregacaoNome(reg.congregacao_id) || '-';
+      const churchNome = churchInfo.nome || 'Gestão Eklésia';
+      const churchLogo = churchInfo.logoUrl || '';
+      const responsavel = churchInfo.responsavel || responsavelTenant || '';
+      const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const dataConsagFormatada = reg.data_processo ? reg.data_processo.split('-').reverse().join('/') : hoje;
+
+      const dadosCertificado: Record<string, any> = {
+        ministro_nome: reg.nome || '',
+        obreiro_nome: reg.nome || '',
+        candidato_nome: reg.nome || '',
+        matricula: reg.matricula || '',
+        cargo_ministerial: cargoHomologado,
+        cargo: cargoHomologado,
+        congregacao: congNome,
+        data_consagracao: dataConsagFormatada,
+        data_emissao: hoje,
+        nome_igreja: churchNome,
+        presidente_nome: responsavel,
+        pastor_nome: responsavel,
+        cpf: reg.cpf ? formatCpf(reg.cpf) : '',
+        numero_processo: reg.numero_processo || '',
+      };
+
+      const elementosHtml = (matchedTemplate.elementos || [])
+        .filter((el: any) => el.visivel !== false)
+        .map((el: any) => {
+          const left = el.x || 0;
+          const top = el.y || 0;
+          const width = el.largura || 100;
+          const height = el.altura || 30;
+          const opacity = el.transparencia ?? 1;
+
+          if (el.tipo === 'texto') {
+            const textoFinal = substituirPlaceholdersCertificado(el.texto || '', dadosCertificado, matchedTemplate.categoria);
+            const fontSize = el.fontSize || 16;
+            const cor = el.cor || '#000000';
+            const fonte = el.fonte || 'Arial';
+            const align = el.alinhamento || 'left';
+            const bold = el.negrito ? 'bold' : 'normal';
+            const italic = el.italico ? 'italic' : 'normal';
+            const underline = el.sublinhado ? 'underline' : 'none';
+            const shadow = el.sombreado ? 'text-shadow: 2px 2px 2px rgba(0,0,0,0.5);' : '';
+            const justify = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
+
+            return `
+              <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; font-size: ${fontSize}px; color: ${cor}; font-family: '${fonte}', sans-serif; font-weight: ${bold}; font-style: ${italic}; text-decoration: ${underline}; ${shadow} text-align: ${align}; opacity: ${opacity}; display: flex; align-items: center; justify-content: ${justify}; word-break: break-word; line-height: 1.2; box-sizing: border-box;">
+                ${textoFinal}
+              </div>
+            `;
+          }
+
+          if (el.tipo === 'logo') {
+            const logoSrc = churchLogo || el.imagemUrl;
+            if (!logoSrc) return '';
+            return `
+              <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; opacity: ${opacity}; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
+                <img src="${logoSrc}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" />
+              </div>
+            `;
+          }
+
+          if (el.tipo === 'imagem') {
+            if (!el.imagemUrl) return '';
+            return `
+              <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; opacity: ${opacity}; border-radius: ${el.borderRadius || 0}px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
+                <img src="${el.imagemUrl}" alt="Imagem" style="width: 100%; height: 100%; object-fit: contain;" />
+              </div>
+            `;
+          }
+
+          if (el.tipo === 'foto-membro') {
+            const fotoSrc = reg.foto_url || el.foto || el.imagemUrl;
+            if (!fotoSrc) return '';
+            return `
+              <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; opacity: ${opacity}; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
+                <img src="${fotoSrc}" alt="Foto" style="width: 100%; height: 100%; object-fit: cover;" />
+              </div>
+            `;
+          }
+
+          return '';
+        })
+        .join('');
+
+      const safeDocTitle = `Certificado_Consagracao_${(reg.nome || 'Membro').replace(/[^a-zA-Z0-9_-]/g, '_')}_${cargoHomologado.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+
+      win.document.write(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8">
+          <title>${safeDocTitle}</title>
+          <style>
+            @page {
+              size: A4 landscape;
+              margin: 0;
+            }
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+            }
+            html, body {
+              width: 100%;
+              height: 100%;
+              margin: 0;
+              padding: 0;
+              background-color: #f3f4f6;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .certificate-container {
+              position: relative;
+              width: 840px;
+              height: 595px;
+              background-color: #ffffff;
+              overflow: hidden;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            }
+            .certificate-bg {
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 840px;
+              height: 595px;
+              object-fit: cover;
+              z-index: 1;
+            }
+            .certificate-content {
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 840px;
+              height: 595px;
+              z-index: 2;
+            }
+            @media print {
+              html, body {
+                background-color: transparent !important;
+                display: block !important;
+              }
+              .certificate-container {
+                width: 100vw !important;
+                height: 100vh !important;
+                max-width: none !important;
+                max-height: none !important;
+                box-shadow: none !important;
+                page-break-inside: avoid;
+              }
+              .certificate-bg, .certificate-content {
+                width: 100% !important;
+                height: 100% !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="certificate-container">
+            ${matchedTemplate.backgroundUrl ? `<img class="certificate-bg" src="${matchedTemplate.backgroundUrl}" alt="Fundo Certificado" />` : ''}
+            <div class="certificate-content">
+              ${elementosHtml}
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 400);
+            };
+          </script>
+        </body>
+        </html>
+      `);
+
+      win.document.close();
+      win.focus();
+    } catch (err: any) {
+      console.error('Erro ao emitir certificado:', err);
+      setStatusMensagem(`Erro ao emitir certificado: ${err.message || 'Erro desconhecido'}`);
+    }
   };
 
   const handleNovoRegistro = () => {
@@ -1692,7 +2054,7 @@ export default function ConsagracaoPage() {
   const homologadosCount = registros.filter((r) => r.status_processo === 'homologar').length;
   const isProgressao = formRegistro.tipo_registro === 'progressao';
   const isFiliacao = formRegistro.tipo_registro === 'filiacao';
-  const statusIsError = /(erro|preencha|obrigat|nao foi possivel|não foi possível)/i.test(statusMensagem);
+  const statusIsError = /(erro|preencha|obrigat|nao foi possivel|não foi possível|não existe|nao existe)/i.test(statusMensagem);
 
   if (ctx.loading || planFeatures.loading) return <div className="p-8 text-gray-500">Carregando...</div>;
 
@@ -2107,6 +2469,27 @@ export default function ConsagracaoPage() {
                             <span>Reabrir</span>
                           </button>
                         )}
+
+                        {/* Certificado de Consagração (habilitado apenas quando Homologado) */}
+                        <button
+                          type="button"
+                          disabled={reg.status_processo !== 'homologar'}
+                          className={`inline-flex items-center justify-center px-2.5 h-8 rounded-lg border transition text-xs font-semibold shadow-xs gap-1 ${
+                            reg.status_processo === 'homologar'
+                              ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 cursor-pointer'
+                              : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-60'
+                          }`}
+                          onClick={() => handleEmitirCertificado(reg)}
+                          title={
+                            reg.status_processo === 'homologar'
+                              ? 'Emitir Certificado de Consagração'
+                              : 'Certificado disponível apenas após a homologação do processo'
+                          }
+                          aria-label="Emitir Certificado de Consagração"
+                        >
+                          <span>🎓</span>
+                          <span>Certificado</span>
+                        </button>
 
                         {/* Excluir Processo (Secretaria Geral / Admin) */}
                         {canCadastrarEditar && (
