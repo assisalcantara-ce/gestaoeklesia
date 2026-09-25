@@ -642,6 +642,22 @@ export default function ConsagracaoPage() {
     const tipoRegistro = normalizeTipoRegistro(formRegistro.tipo_registro);
     const nextErrors: Record<string, string> = {};
 
+    if (!formRegistro.numero_processo?.trim()) {
+      nextErrors.numero_processo = 'Número do processo é obrigatório.';
+    }
+
+    if (!formRegistro.tipo_registro?.trim()) {
+      nextErrors.tipo_registro = 'Tipo de registro é obrigatório.';
+    }
+
+    if (!formRegistro.categoria_registro?.trim()) {
+      nextErrors.categoria_registro = 'Selecione a categoria do registro.';
+    }
+
+    if (!formRegistro.comissao_id?.trim()) {
+      nextErrors.comissao_id = 'Selecione a comissão responsável.';
+    }
+
     if (!formRegistro.nome.trim()) {
       nextErrors.nome = 'Nome completo é obrigatório.';
     }
@@ -2536,20 +2552,32 @@ export default function ConsagracaoPage() {
                       <h4 className="text-sm font-semibold text-teal-700 border-b border-gray-100 pb-2">Dados do Processo</h4>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1">Número do Processo</label>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">
+                            Número do Processo <span className="text-red-500">*</span>
+                          </label>
                           <input
-                            className="mt-1 w-full px-3 py-2 border-2 border-teal-500 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={`mt-1 w-full px-3 py-2 border-2 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 ${fieldErrors.numero_processo ? 'border-red-500 focus:ring-red-400' : 'border-teal-500 focus:ring-blue-500'}`}
                             value={formRegistro.numero_processo}
                             readOnly
                           />
+                          {fieldErrors.numero_processo && (
+                            <p className="mt-1 text-xs text-red-600">{fieldErrors.numero_processo}</p>
+                          )}
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo de Registro</label>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">
+                            Tipo de Registro <span className="text-red-500">*</span>
+                          </label>
                           <select
-                            className="mt-1 w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={`mt-1 w-full px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${fieldErrors.tipo_registro ? 'border-red-500 focus:ring-red-400' : 'border-teal-500 focus:ring-blue-500'}`}
                             value={formRegistro.tipo_registro}
                             onChange={(e) => {
                               const value = normalizeTipoRegistro(e.target.value);
+                              setFieldErrors((prev) => {
+                                const next = { ...prev };
+                                delete next.tipo_registro;
+                                return next;
+                              });
                               setFormRegistro((prev) => {
                                 const leavingProgressao = prev.tipo_registro === 'progressao' && value !== 'progressao';
                                 return {
@@ -2569,7 +2597,6 @@ export default function ConsagracaoPage() {
                                 setMemberResults([]);
                                 setMemberOpen(false);
                                 setFotoBloqueada(false);
-                                setFieldErrors({});
                               }
                             }}
                           >
@@ -2577,33 +2604,60 @@ export default function ConsagracaoPage() {
                               <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                           </select>
+                          {fieldErrors.tipo_registro && (
+                            <p className="mt-1 text-xs text-red-600">{fieldErrors.tipo_registro}</p>
+                          )}
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1">Categoria do Registro</label>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">
+                            Categoria do Registro <span className="text-red-500">*</span>
+                          </label>
                           <select
-                            className="mt-1 w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={`mt-1 w-full px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${fieldErrors.categoria_registro ? 'border-red-500 focus:ring-red-400' : 'border-teal-500 focus:ring-blue-500'}`}
                             value={formRegistro.categoria_registro}
-                            onChange={(e) => setFormRegistro({ ...formRegistro, categoria_registro: e.target.value })}
+                            onChange={(e) => {
+                              setFieldErrors((prev) => {
+                                const next = { ...prev };
+                                delete next.categoria_registro;
+                                return next;
+                              });
+                              setFormRegistro({ ...formRegistro, categoria_registro: e.target.value });
+                            }}
                           >
                             <option value="">Selecione</option>
                             {CATEGORIA_REGISTRO_OPTIONS.map((categoria) => (
                               <option key={categoria} value={categoria}>{categoria}</option>
                             ))}
                           </select>
+                          {fieldErrors.categoria_registro && (
+                            <p className="mt-1 text-xs text-red-600">{fieldErrors.categoria_registro}</p>
+                          )}
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1">Comissão Responsável</label>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">
+                            Comissão Responsável <span className="text-red-500">*</span>
+                          </label>
                           <select
-                            className="mt-1 w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={`mt-1 w-full px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${fieldErrors.comissao_id ? 'border-red-500 focus:ring-red-400' : 'border-teal-500 focus:ring-blue-500'}`}
                             value={formRegistro.comissao_id}
-                            onChange={(e) => setFormRegistro({ ...formRegistro, comissao_id: e.target.value })}
+                            onChange={(e) => {
+                              setFieldErrors((prev) => {
+                                const next = { ...prev };
+                                delete next.comissao_id;
+                                return next;
+                              });
+                              setFormRegistro({ ...formRegistro, comissao_id: e.target.value });
+                            }}
                             disabled={loadingComissoes}
                           >
-                            <option value="">{loadingComissoes ? 'Carregando comissões...' : 'Nenhuma / Sem comissão'}</option>
+                            <option value="">{loadingComissoes ? 'Carregando comissões...' : 'Selecione a comissão...'}</option>
                             {comissoesAtivas.map((com) => (
                               <option key={com.id} value={com.id}>{com.nome}</option>
                             ))}
                           </select>
+                          {fieldErrors.comissao_id && (
+                            <p className="mt-1 text-xs text-red-600">{fieldErrors.comissao_id}</p>
+                          )}
                         </div>
                       </div>
                     </div>
