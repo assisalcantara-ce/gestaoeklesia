@@ -889,32 +889,12 @@ export default function ComissaoPage() {
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleGerarPdf}
-                    disabled={generatingPdf}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded-lg text-xs font-semibold shadow-xs transition disabled:opacity-50"
-                    title="Gerar PDF A4 da comissão para afixação na porta"
-                  >
-                    {generatingPdf ? (
-                      <>
-                        <div className="w-3.5 h-3.5 border-2 border-slate-600 border-t-transparent rounded-full animate-spin"></div>
-                        <span>Gerando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>📄</span>
-                        <span>Imprimir Folha da Porta (PDF)</span>
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={handleCloseIntegrantesModal}
-                    className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg text-sm transition hover:bg-slate-100"
-                  >
-                    ✕
-                  </button>
-                </div>
+                <button
+                  onClick={handleCloseIntegrantesModal}
+                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg text-sm transition hover:bg-slate-100"
+                >
+                  ✕
+                </button>
               </div>
 
               {/* Corpo do Modal */}
@@ -1161,29 +1141,10 @@ export default function ComissaoPage() {
 
                 {/* Lista de Integrantes Atuais */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                       Integrantes Atuais ({integrantes.length})
                     </h4>
-                    <button
-                      type="button"
-                      onClick={handleGerarPdf}
-                      disabled={generatingPdf}
-                      className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#123b63] text-white hover:bg-[#0f2a45] rounded-lg text-xs font-bold shadow-sm transition disabled:opacity-50"
-                      title="Gerar PDF A4 da comissão para afixação na porta"
-                    >
-                      {generatingPdf ? (
-                        <>
-                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span>Gerando PDF...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="text-base">🖨️</span>
-                          <span>Imprimir Folha da Porta (PDF)</span>
-                        </>
-                      )}
-                    </button>
                   </div>
 
                   {loadingIntegrantes ? (
