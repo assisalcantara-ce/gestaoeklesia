@@ -533,15 +533,15 @@ export function useMembros() {
     if (!ministryId) return;
 
     try {
-      // Buscar IDs de processos DEFERIDOS no tenant para ocultação temporária de Ativos
-      const { data: deferidosData } = await supabase
+      // Buscar IDs de processos em tramitação (em_processo ou deferir) no tenant para ocultação temporária de Ativos
+      const { data: tramitacaoData } = await supabase
         .from('consagracao_registros')
         .select('member_id')
         .eq('ministry_id', ministryId)
-        .eq('status_processo', 'deferir')
+        .in('status_processo', ['em_processo', 'deferir'])
         .not('member_id', 'is', null);
 
-      const deferidosIds = new Set((deferidosData || []).map((d: any) => d.member_id).filter(Boolean));
+      const tramitacaoIds = new Set((tramitacaoData || []).map((d: any) => d.member_id).filter(Boolean));
 
       const { data, error } = await supabase
         .from('members')
@@ -549,7 +549,7 @@ export function useMembros() {
         .eq('ministry_id', ministryId);
 
       if (!error && data) {
-        const filteredData = data.filter((m: any) => !deferidosIds.has(m.id));
+        const filteredData = data.filter((m: any) => !tramitacaoIds.has(m.id));
         const overviewList = filteredData.map(memberToMembro);
         setMembrosOverview(overviewList);
         setTotalMembrosCount(filteredData.length);

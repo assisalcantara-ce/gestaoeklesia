@@ -309,16 +309,16 @@ export const comissoesService = {
     if (ministrosError) throw ministrosError;
     if (!ministros || ministros.length === 0) return [];
 
-    // 2. Buscar ministros com processo DEFERIDO aguardando homologação no tenant
-    const { data: deferidosData } = await supabase
+    // 2. Buscar ministros com processo em tramitação (em_processo ou deferir) no tenant
+    const { data: tramitacaoData } = await supabase
       .from('consagracao_registros')
       .select('member_id')
       .eq('ministry_id', ministryId)
-      .eq('status_processo', 'deferir')
+      .in('status_processo', ['em_processo', 'deferir'])
       .not('member_id', 'is', null);
 
-    const idsDeferidos = new Set((deferidosData || []).map((d: any) => d.member_id).filter(Boolean));
-    const ministrosAtivos = (ministros as MinistroDisponivel[]).filter((m) => !idsDeferidos.has(m.id));
+    const idsTramitacao = new Set((tramitacaoData || []).map((d: any) => d.member_id).filter(Boolean));
+    const ministrosAtivos = (ministros as MinistroDisponivel[]).filter((m) => !idsTramitacao.has(m.id));
 
     if (!comissaoId) {
       return ministrosAtivos;

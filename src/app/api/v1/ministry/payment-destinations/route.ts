@@ -239,7 +239,7 @@ export async function POST(request: NextRequest) {
   // Resolve gateway com credenciais
   const { data: gw } = await ctx.admin
     .from('ministry_payment_gateways')
-    .select('id, encrypted_credentials')
+    .select('id, encrypted_credentials, environment')
     .eq('ministry_id', ctx.ministryId)
     .eq('gateway', 'asaas')
     .eq('is_active', true)
@@ -281,14 +281,15 @@ export async function POST(request: NextRequest) {
 
   // Gera o QR Code PIX Estático no ASAAS sem valor fixado
   try {
-    const activeKey = await getAsaasActivePixAddressKey(apiKey);
-    const descText = `${String(label).trim()} (${String(tipo_recebimento)})`;
+    const activeKey = await getAsaasActivePixAddressKey(apiKey, gw.environment);
+    const descText = `${String(label).trim()}`.slice(0, 35);
 
     const staticQr = await createAsaasStaticPixQrCode(
       apiKey,
       activeKey,
       descText,
-      externalRef
+      externalRef,
+      gw.environment
     );
 
     pixQrCodeId = staticQr.id;

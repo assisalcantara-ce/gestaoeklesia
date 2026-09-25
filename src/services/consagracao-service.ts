@@ -196,6 +196,21 @@ export const consacracaoService = {
       throw new Error('A Comissão não possui permissão para cadastrar ou alterar dados do processo.');
     }
 
+    const normalizeCargo = (v: string | null | undefined) =>
+      String(v || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toUpperCase();
+
+    if (
+      input.cargo_ocupa &&
+      input.cargo_pretendido &&
+      normalizeCargo(input.cargo_ocupa) === normalizeCargo(input.cargo_pretendido)
+    ) {
+      throw new Error('O cargo pretendido deve ser diferente do cargo atual.');
+    }
+
     const supabase = createClient();
 
     const payload: Record<string, any> = {
@@ -256,6 +271,21 @@ export const consacracaoService = {
     }
     if (userNivel === 'supervisor') {
       throw new Error('A Comissão não possui permissão para alterar dados cadastrais do processo.');
+    }
+
+    const normalizeCargo = (v: string | null | undefined) =>
+      String(v || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toUpperCase();
+
+    if (
+      input.cargo_ocupa &&
+      input.cargo_pretendido &&
+      normalizeCargo(input.cargo_ocupa) === normalizeCargo(input.cargo_pretendido)
+    ) {
+      throw new Error('O cargo pretendido deve ser diferente do cargo atual.');
     }
 
     const supabase = createClient();

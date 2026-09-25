@@ -86,27 +86,27 @@ export async function GET(request: NextRequest) {
       query = query.eq('congregacao_id', congregacaoParam)
     }
 
-    // Identificar ministros/membros com processo de consagração DEFERIDO aguardando homologação no tenant atual
-    // Regra: Enquanto o processo estiver DEFERIDO, o membro fica temporariamente oculto da lista operacional de Ativos.
+    // Identificar ministros/membros com processo de consagração em tramitação (em_processo ou deferir) no tenant atual
+    // Regra: Enquanto o processo estiver em tramitação (em_processo ou deferir), o membro fica temporariamente oculto da lista operacional de Ativos.
     const isFiltroAtivo = !statusParam || statusParam.toLowerCase() === 'ativo' || statusParam.toLowerCase() === 'active';
-    let deferidosMemberIds: string[] = [];
+    let emTramitacaoMemberIds: string[] = [];
 
     if (isFiltroAtivo) {
       try {
-        const { data: deferidosData } = await admin
+        const { data: tramitacaoData } = await admin
           .from('consagracao_registros')
           .select('member_id')
           .eq('ministry_id', ministryId)
-          .eq('status_processo', 'deferir')
+          .in('status_processo', ['em_processo', 'deferir'])
           .not('member_id', 'is', null);
 
-        if (deferidosData && deferidosData.length > 0) {
-          deferidosMemberIds = deferidosData
+        if (tramitacaoData && tramitacaoData.length > 0) {
+          emTramitacaoMemberIds = tramitacaoData
             .map((d: any) => d.member_id)
             .filter((id: any) => typeof id === 'string' && id.trim() !== '');
         }
       } catch (consErr) {
-        console.warn('Verificação de processos deferidos de consagração:', consErr);
+        console.warn('Verificação de processos de consagração em tramitação:', consErr);
       }
     }
 
@@ -121,9 +121,9 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', normalizedStatus)
     }
 
-    // Ocultar da lista de Ativos membros com processo DEFERIDO aguardando homologação
-    if (isFiltroAtivo && deferidosMemberIds.length > 0) {
-      query = query.not('id', 'in', `(${deferidosMemberIds.join(',')})`);
+    // Ocultar da lista de Ativos membros com processo em tramitação (em_processo ou deferir)
+    if (isFiltroAtivo && emTramitacaoMemberIds.length > 0) {
+      query = query.not('id', 'in', `(${emTramitacaoMemberIds.join(',')})`);
     }
 
     if (cargoParam && cargoParam.toUpperCase() !== 'TODOS') {

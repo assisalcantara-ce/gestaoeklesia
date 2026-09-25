@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveTenantAuth } from '@/lib/tenant-auth'
 import { isArrecadacaoDigitalAllowedForTenant } from '@/lib/plan-permissions'
+import { temAcesso } from '@/lib/access-control'
 import {
   encryptCredentials,
   decryptCredentials,
@@ -50,11 +51,38 @@ export async function GET(request: NextRequest) {
     const hasAccess =
       ctx.isOwner ||
       ctx.nivel === 'administrador' ||
-      ctx.nivel === 'financeiro'
+      ctx.nivel === 'financeiro' ||
+      ctx.nivel === 'tesoureiro_geral' ||
+      ctx.nivel === 'tesouraria_local' ||
+      ctx.nivel === 'financeiro_local' ||
+      temAcesso(ctx.nivel, 'tesouraria') ||
+      temAcesso(ctx.nivel, 'financeiro') ||
+      (ctx.roles ?? []).some((r) =>
+        [
+          'ADMINISTRADOR',
+          'ADMIN',
+          'TESOUREIRO_GERAL',
+          'FINANCEIRO',
+          'TESOURARIA_LOCAL',
+          'FINANCEIRO_LOCAL',
+          'ADMIN_LOCAL',
+        ].includes(r.toUpperCase())
+      ) ||
+      (ctx.permissions ?? []).some((p) =>
+        [
+          'ADMINISTRADOR',
+          'ADMIN',
+          'TESOUREIRO_GERAL',
+          'FINANCEIRO',
+          'TESOURARIA_LOCAL',
+          'FINANCEIRO_LOCAL',
+          'ADMIN_LOCAL',
+        ].includes(p.toUpperCase())
+      )
 
     if (!hasAccess) {
       return NextResponse.json(
-        { error: 'Acesso negado. Requer permissão ADMINISTRADOR ou FINANCEIRO.', code: 'FORBIDDEN' },
+        { error: 'Acesso negado. Requer permissão ADMINISTRADOR ou TESOURARIA.', code: 'FORBIDDEN' },
         { status: 403 }
       )
     }

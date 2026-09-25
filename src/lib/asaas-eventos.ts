@@ -31,9 +31,16 @@ export interface AsaasEventoCharge {
 async function asaasRequest<T>(
   apiKey: string,
   path: string,
-  init: RequestInit
+  init: RequestInit,
+  environment?: string
 ): Promise<T> {
-  const baseUrl = process.env.ASAAS_API_URL || 'https://api.asaas.com/v3';
+  let baseUrl = process.env.ASAAS_API_URL || 'https://api.asaas.com/v3';
+  if (environment === 'production') {
+    baseUrl = 'https://api.asaas.com/v3';
+  } else if (environment === 'sandbox') {
+    baseUrl = 'https://api-sandbox.asaas.com/v3';
+  }
+
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
@@ -213,11 +220,12 @@ export interface AsaasStaticPixQrCode {
 /**
  * Obtém uma Chave PIX ativa na conta ASAAS do tenant.
  */
-export async function getAsaasActivePixAddressKey(apiKey: string): Promise<string> {
+export async function getAsaasActivePixAddressKey(apiKey: string, environment?: string): Promise<string> {
   const res = await asaasRequest<{ data: Array<{ key: string; status: string }> }>(
     apiKey,
     '/pix/addressKeys?limit=10',
-    { method: 'GET' }
+    { method: 'GET' },
+    environment
   );
 
   const activeKey = res.data?.find((k) => k.status === 'ACTIVE')?.key || res.data?.[0]?.key;
@@ -234,23 +242,29 @@ export async function createAsaasStaticPixQrCode(
   apiKey: string,
   addressKey: string,
   description: string,
-  externalRef: string
+  externalRef: string,
+  environment?: string
 ): Promise<AsaasStaticPixQrCode> {
   const res = await asaasRequest<{
     id: string;
     payload: string;
     externalReference: string;
     description?: string;
-  }>(apiKey, '/pix/qrCodes/static', {
-    method: 'POST',
-    body: JSON.stringify({
-      addressKey,
-      description: description.slice(0, 500),
-      format: 'ALL',
-      allowsMultiplePayments: true,
-      externalReference: externalRef,
-    }),
-  });
+  }>(
+    apiKey,
+    '/pix/qrCodes/static',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        addressKey,
+        description: description.slice(0, 35),
+        format: 'ALL',
+        allowsMultiplePayments: true,
+        externalReference: externalRef,
+      }),
+    },
+    environment
+  );
 
   return {
     id: res.id,
@@ -265,12 +279,14 @@ export async function createAsaasStaticPixQrCode(
  */
 export async function deleteAsaasStaticPixQrCode(
   apiKey: string,
-  pixQrCodeId: string
+  pixQrCodeId: string,
+  environment?: string
 ): Promise<void> {
   await asaasRequest<{ deleted: boolean }>(
     apiKey,
     `/pix/qrCodes/static/${pixQrCodeId}`,
-    { method: 'DELETE' }
+    { method: 'DELETE' },
+    environment
   );
 }
 

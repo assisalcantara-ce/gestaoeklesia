@@ -78,7 +78,7 @@ async function removeAsaasStaticQrCodeIfPresent(
   // 2. Busca o gateway ASAAS do tenant para obter as credenciais
   const { data: gw } = await admin
     .from('ministry_payment_gateways')
-    .select('id, encrypted_credentials')
+    .select('id, encrypted_credentials, environment')
     .eq('id', dest.gateway_id || '')
     .eq('ministry_id', ministryId)
     .eq('gateway', 'asaas')
@@ -98,7 +98,7 @@ async function removeAsaasStaticQrCodeIfPresent(
     const apiKey = creds.apiKey ?? creds.api_key ?? '';
     if (!apiKey) throw new Error('API Key ausente nas credenciais.');
 
-    await deleteAsaasStaticPixQrCode(apiKey, dest.pix_qr_code_id);
+    await deleteAsaasStaticPixQrCode(apiKey, dest.pix_qr_code_id, gw.environment);
     return { success: true };
   } catch (err: any) {
     return {

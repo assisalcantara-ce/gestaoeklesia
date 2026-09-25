@@ -658,12 +658,20 @@ export default function ConsagracaoPage() {
       nextErrors.comissao_id = 'Selecione a comissão responsável.';
     }
 
-    if (!formRegistro.nome.trim()) {
-      nextErrors.nome = 'Nome completo é obrigatório.';
-    }
+    const normalizeCargo = (v: string | null | undefined) =>
+      String(v || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toUpperCase();
 
-    if (!formRegistro.cargo_pretendido) {
+    if (!formRegistro.cargo_pretendido?.trim()) {
       nextErrors.cargo_pretendido = 'Selecione o cargo pretendido.';
+    } else if (
+      formRegistro.cargo_ocupa?.trim() &&
+      normalizeCargo(formRegistro.cargo_ocupa) === normalizeCargo(formRegistro.cargo_pretendido)
+    ) {
+      nextErrors.cargo_pretendido = 'O cargo pretendido deve ser diferente do cargo atual.';
     }
 
     if (tipoRegistro === 'progressao') {
@@ -675,13 +683,40 @@ export default function ConsagracaoPage() {
       }
     }
 
-    if (tipoRegistro === 'filiacao' && !formRegistro.origem_instituicao.trim()) {
+    if (tipoRegistro === 'filiacao' && !formRegistro.origem_instituicao?.trim()) {
       nextErrors.origem_instituicao = 'Instituição de origem é obrigatória para filiação.';
     }
 
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors(nextErrors);
-      setStatusMensagem('Preencha os campos obrigatórios destacados em vermelho.');
+      const errorFieldsOrder = [
+        'numero_processo',
+        'tipo_registro',
+        'categoria_registro',
+        'comissao_id',
+        'nome',
+        'member_id',
+        'cargo_ocupa',
+        'cargo_pretendido',
+        'origem_instituicao',
+      ];
+      const firstErrorField = errorFieldsOrder.find((k) => nextErrors[k]) || Object.keys(nextErrors)[0];
+      const firstErrorMsg = nextErrors[firstErrorField] || 'Preencha os campos obrigatórios destacados em vermelho.';
+      setStatusMensagem(firstErrorMsg);
+
+      setTimeout(() => {
+        const targetEl = document.querySelector(
+          `[name="${firstErrorField}"], [name="consagracao_${firstErrorField}"], #${firstErrorField}, [data-field="${firstErrorField}"]`
+        );
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (targetEl instanceof HTMLElement) {
+            try {
+              targetEl.focus();
+            } catch {}
+          }
+        }
+      }, 50);
       return;
     }
 
@@ -2556,6 +2591,8 @@ export default function ConsagracaoPage() {
                             Número do Processo <span className="text-red-500">*</span>
                           </label>
                           <input
+                            name="numero_processo"
+                            id="numero_processo"
                             className={`mt-1 w-full px-3 py-2 border-2 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 ${fieldErrors.numero_processo ? 'border-red-500 focus:ring-red-400' : 'border-teal-500 focus:ring-blue-500'}`}
                             value={formRegistro.numero_processo}
                             readOnly
@@ -2569,6 +2606,8 @@ export default function ConsagracaoPage() {
                             Tipo de Registro <span className="text-red-500">*</span>
                           </label>
                           <select
+                            name="tipo_registro"
+                            id="tipo_registro"
                             className={`mt-1 w-full px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${fieldErrors.tipo_registro ? 'border-red-500 focus:ring-red-400' : 'border-teal-500 focus:ring-blue-500'}`}
                             value={formRegistro.tipo_registro}
                             onChange={(e) => {
@@ -2613,6 +2652,8 @@ export default function ConsagracaoPage() {
                             Categoria do Registro <span className="text-red-500">*</span>
                           </label>
                           <select
+                            name="categoria_registro"
+                            id="categoria_registro"
                             className={`mt-1 w-full px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${fieldErrors.categoria_registro ? 'border-red-500 focus:ring-red-400' : 'border-teal-500 focus:ring-blue-500'}`}
                             value={formRegistro.categoria_registro}
                             onChange={(e) => {
@@ -2638,6 +2679,8 @@ export default function ConsagracaoPage() {
                             Comissão Responsável <span className="text-red-500">*</span>
                           </label>
                           <select
+                            name="comissao_id"
+                            id="comissao_id"
                             className={`mt-1 w-full px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${fieldErrors.comissao_id ? 'border-red-500 focus:ring-red-400' : 'border-teal-500 focus:ring-blue-500'}`}
                             value={formRegistro.comissao_id}
                             onChange={(e) => {
@@ -2987,9 +3030,13 @@ export default function ConsagracaoPage() {
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1">Cargo que ocupa</label>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">
+                            Cargo que ocupa {isProgressao && <span className="text-red-500">*</span>}
+                          </label>
                           {isProgressao ? (
                             <select
+                              name="cargo_ocupa"
+                              id="cargo_ocupa"
                               className={`mt-1 w-full px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${fieldErrors.cargo_ocupa ? 'border-red-500 focus:ring-red-400' : 'border-teal-500 focus:ring-blue-500'}`}
                               value={formRegistro.cargo_ocupa}
                               onChange={(e) => {
@@ -3012,6 +3059,8 @@ export default function ConsagracaoPage() {
                             </select>
                           ) : (
                             <input
+                              name="cargo_ocupa"
+                              id="cargo_ocupa"
                               className="mt-1 w-full px-3 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-500"
                               value="Não se aplica"
                               readOnly
@@ -3022,8 +3071,12 @@ export default function ConsagracaoPage() {
                           )}
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1">Cargo pretendido</label>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">
+                            Cargo pretendido <span className="text-red-500">*</span>
+                          </label>
                           <select
+                            name="cargo_pretendido"
+                            id="cargo_pretendido"
                             className={`mt-1 w-full px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${fieldErrors.cargo_pretendido ? 'border-red-500 focus:ring-red-400' : 'border-teal-500 focus:ring-blue-500'}`}
                             value={formRegistro.cargo_pretendido}
                             onChange={(e) => {
@@ -3058,6 +3111,8 @@ export default function ConsagracaoPage() {
                           <div className="md:col-span-2">
                             <label className="block text-sm font-semibold text-gray-700 mb-1">Instituição de origem *</label>
                             <input
+                              name="origem_instituicao"
+                              id="origem_instituicao"
                               className={`mt-1 w-full px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${fieldErrors.origem_instituicao ? 'border-red-500 focus:ring-red-400' : 'border-amber-400 focus:ring-amber-500'}`}
                               value={formRegistro.origem_instituicao}
                               onChange={(e) => {
