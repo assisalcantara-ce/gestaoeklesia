@@ -273,75 +273,102 @@ export default function MembrosTable({
                     </span>
                   </td>
                   <td className="border border-gray-300 px-4 py-3">
-                    <div className="flex justify-center gap-2">
-                      <button
-                        onClick={() => setMembroImprimindo(membro)}
-                        className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition"
-                        title="Imprimir Ficha"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                          />
-                        </svg>
-                      </button>
+                    <div className="flex justify-center items-center gap-2">
+                      <div className="relative group inline-flex items-center justify-center">
+                        <button
+                          onClick={() => setMembroImprimindo(membro)}
+                          className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition"
+                          title="Imprimir Ficha"
+                          aria-label="Imprimir Ficha"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                            />
+                          </svg>
+                        </button>
+                        <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-30">
+                          Imprimir Ficha
+                        </span>
+                      </div>
+
                       {!isAuxiliar && (
-                        <button
-                          onClick={async () => {
-                            const templatesBase = await ensureTemplatesSnapshot();
-                            if (!hasActiveTemplate(membro.tipoCadastro, templatesBase)) {
-                              setNotification({
-                                isOpen: true,
-                                title: 'Template Ausente',
-                                message: getMensagemSemTemplate(membro.tipoCadastro),
-                                type: 'warning',
-                              });
-                              return;
-                            }
-                            setMembroImprimindoCartao(membro);
-                          }}
-                          className="p-2 text-purple-600 hover:bg-purple-100 rounded-lg transition"
-                          title="Imprimir Cartão"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
-                            />
-                          </svg>
-                        </button>
+                        <div className="relative group inline-flex items-center justify-center">
+                          <button
+                            onClick={async () => {
+                              const templatesBase = await ensureTemplatesSnapshot();
+                              if (!hasActiveTemplate(membro.tipoCadastro, templatesBase)) {
+                                setNotification({
+                                  isOpen: true,
+                                  title: 'Template Ausente',
+                                  message: getMensagemSemTemplate(membro.tipoCadastro),
+                                  type: 'warning',
+                                });
+                                return;
+                              }
+                              setMembroImprimindoCartao(membro);
+                            }}
+                            className="p-2 text-purple-600 hover:bg-purple-100 rounded-lg transition"
+                            title="Imprimir Cartão"
+                            aria-label="Imprimir Cartão"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
+                              />
+                            </svg>
+                          </button>
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-30">
+                            Imprimir Cartão
+                          </span>
+                        </div>
                       )}
+
                       {!isSupervisor && (
-                        <button
-                          onClick={() => abrirEdicao(membro)}
-                          className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition"
-                          title="Editar"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
-                        </button>
+                        <div className="relative group inline-flex items-center justify-center">
+                          <button
+                            onClick={() => abrirEdicao(membro)}
+                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition"
+                            title="Editar"
+                            aria-label="Editar"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              />
+                            </svg>
+                          </button>
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-30">
+                            Editar
+                          </span>
+                        </div>
                       )}
+
                       {!isSupervisor && !isAuxiliar && (
-                        <button
-                          onClick={() => abrirConfirmacaoDeletar(membro)}
-                          className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition"
-                          title="Deletar"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+                        <div className="relative group inline-flex items-center justify-center">
+                          <button
+                            onClick={() => abrirConfirmacaoDeletar(membro)}
+                            className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition"
+                            title="Excluir"
+                            aria-label="Excluir"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-30">
+                            Excluir
+                          </span>
+                        </div>
                       )}
                     </div>
                   </td>

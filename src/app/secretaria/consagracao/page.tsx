@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
-import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
@@ -81,9 +80,16 @@ export default function ConsagracaoPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const suppressNextSearchRef = useRef(false);
 
-  const [activeTab, setActiveTab] = useState(() => isSupervisor ? 'registros' : 'cadastro');
   const [ministryId, setMinistryId] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
+
+  const [filtroBusca, setFiltroBusca] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('');
+  const [filtroCampoId, setFiltroCampoId] = useState('');
+  const [filtroCongregacaoId, setFiltroCongregacaoId] = useState('');
+  const [filtroComissaoId, setFiltroComissaoId] = useState('');
+  const [comissoes, setComissoes] = useState<Comissao[]>([]);
 
   const [nomenclaturas, setNomenclaturas] = useState<OrgNomenclaturasState | null>(null);
   const [supervisoes, setSupervisoes] = useState<SimpleOption[]>([]);
@@ -96,6 +102,15 @@ export default function ConsagracaoPage() {
   const [loadingComissoes, setLoadingComissoes] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingRegistro, setEditingRegistro] = useState<any | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [registroParaExcluir, setRegistroParaExcluir] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [responsavelTenant, setResponsavelTenant] = useState('');
+  const [churchInfo, setChurchInfo] = useState<{ nome: string; logoUrl: string; responsavel: string }>({
+    nome: '',
+    logoUrl: '',
+    responsavel: ''
+  });
   const [statusMensagem, setStatusMensagem] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [processModalOpen, setProcessModalOpen] = useState(false);
@@ -147,12 +162,6 @@ export default function ConsagracaoPage() {
     foto_url: ''
   });
 
-  const tabs = isSupervisor
-    ? [{ id: 'registros', label: 'Registros', icon: '📑' }]
-    : [
-        { id: 'cadastro', label: 'Cadastro de Processos', icon: '📝' },
-        { id: 'registros', label: 'Registros', icon: '📑' }
-      ];
 
   const getNextProcessNumber = async () => {
     if (!ministryId || !consagracaoModuleReady) return '';
@@ -204,22 +213,63 @@ export default function ConsagracaoPage() {
       const div2Regs = orgService.getDivisao2();
       const div3Regs = orgService.getDivisao3();
 
-      setSupervisoes(div1Regs.map((u) => ({ id: u.id, nome: u.nome })));
+      // Divisão 1: Congregações (filhas da Divisão 2)
+      // Divisão 2: Campos / Setores (filhos da Divisão 3)
+      // Divisão 3: Supervisões / Regionais (topo da hierarquia)
+      setCongregacoes(div1Regs.map((u) => ({ id: u.id, nome: u.nome, campo_id: u.parentId })));
       setCampos(div2Regs.map((u) => ({ id: u.id, nome: u.nome, supervisao_id: u.parentId })));
-      setCongregacoes(div3Regs.map((u) => ({ id: u.id, nome: u.nome, campo_id: u.parentId })));
+      setSupervisoes(div3Regs.map((u) => ({ id: u.id, nome: u.nome })));
 
-      // Determina IDs de unidades visíveis para o supervisor
+      // Determina IDs de congregações visíveis para o supervisor
       if (isSupervisor && ctx.supervisaoId) {
-        const uVisiveis = div3Regs.filter((u) => u.parentId === ctx.supervisaoId);
+        const camposDaSupervisao = div2Regs.filter((c) => c.parentId === ctx.supervisaoId).map((c) => c.id);
+        const uVisiveis = div1Regs.filter((u) => u.parentId === ctx.supervisaoId || (u.parentId && camposDaSupervisao.includes(u.parentId)));
         scopeCongIds = uVisiveis.map((u) => u.id);
+      }
+
+      // Buscar dados do ministério e responsável configurado no perfil da igreja
+      let responsavel = '';
+      let churchNome = '';
+      let churchLogo = '';
+      try {
+        const [{ data: minData }, { data: configData }] = await Promise.all([
+          supabase.from('ministries').select('name, logo_url, cnpj_cpf').eq('id', resolvedMinistryId).maybeSingle(),
+          supabase.from('configurations').select('church_profile').eq('ministry_id', resolvedMinistryId).maybeSingle()
+        ]);
+        if (minData) {
+          churchNome = minData.name || '';
+          churchLogo = minData.logo_url || '';
+        }
+        if (configData?.church_profile && typeof configData.church_profile === 'object') {
+          const cp = configData.church_profile as any;
+          responsavel = cp.responsavel || '';
+          if (!churchNome && cp.nome) churchNome = cp.nome;
+          if (!churchLogo && cp.logo) churchLogo = cp.logo;
+        }
+      } catch (err) {
+        console.error('Erro ao buscar dados do ministério/configurações:', err);
+      }
+      setChurchInfo({
+        nome: churchNome,
+        logoUrl: churchLogo,
+        responsavel: responsavel
+      });
+      setResponsavelTenant(responsavel);
+      if (responsavel) {
+        setFormRegistro((prev) => ({
+          ...prev,
+          pastor_solicitante: prev.pastor_solicitante || responsavel,
+        }));
       }
 
       setLoadingComissoes(true);
       try {
-        const comissoes = await comissoesService.listarComissoes(resolvedMinistryId, { status: 'ativa' });
-        setComissoesAtivas(comissoes);
+        const comissoesLista = await comissoesService.listarComissoes(resolvedMinistryId);
+        setComissoes(comissoesLista);
+        setComissoesAtivas(comissoesLista.filter((c) => c.status === 'ativa'));
       } catch (err) {
-        console.error('Erro ao carregar comissões ativas:', err);
+        console.error('Erro ao carregar comissões:', err);
+        setComissoes([]);
         setComissoesAtivas([]);
       } finally {
         setLoadingComissoes(false);
@@ -389,7 +439,7 @@ export default function ConsagracaoPage() {
       congregacao_id: '',
       cargo_ocupa: '',
       cargo_pretendido: '',
-      pastor_solicitante: '',
+      pastor_solicitante: responsavelTenant || '',
       origem_instituicao: '',
       origem_cidade: '',
       origem_uf: '',
@@ -416,14 +466,6 @@ export default function ConsagracaoPage() {
   const handleSelectMember = (member: Member) => {
     const cf = ((member as any).custom_fields || {}) as Record<string, any>;
     const fotoUrl = (member as any).foto_url || cf.fotoUrl || '';
-    const cargoOcupa =
-      (member as any).cargo_ministerial ||
-      cf.cargoMinisterial ||
-      (member as any).occupation ||
-      cf.qualFuncao ||
-      cf.cargo ||
-      '';
-    const processDate = new Date().toISOString().slice(0, 10);
 
     const normalizeText = (value: unknown) =>
       String(value || '')
@@ -431,6 +473,37 @@ export default function ConsagracaoPage() {
         .replace(/[\u0300-\u036f]/g, '')
         .trim()
         .toUpperCase();
+
+    const matchCargoMinisterial = (rawCargo: unknown) => {
+      const target = normalizeText(rawCargo);
+      if (!target) return '';
+      // 1. Match exato com lista de cargos ministeriais
+      const exact = cargosMinisteriais.find((c) => normalizeText(c.nome) === target);
+      if (exact) return exact.nome;
+      // 2. Match parcial / prefixo (ex: "OBREIRO" -> "Obreiro(a)", "MISSIONARIO" -> "Missionário(a)")
+      const partial = cargosMinisteriais.find((c) => {
+        const cNorm = normalizeText(c.nome);
+        return cNorm.startsWith(target) || target.startsWith(cNorm);
+      });
+      if (partial) return partial.nome;
+      return String(rawCargo || '').trim();
+    };
+
+    const rawCargo =
+      (member as any).cargo_ministerial ||
+      cf.cargoMinisterial ||
+      cf.cargo_ministerial ||
+      (member as any).cargo ||
+      cf.cargo ||
+      (member as any).dados_cargos?.cargo_ministerial ||
+      (member as any).dados_cargos?.cargo ||
+      (member as any).qual_funcao ||
+      cf.qualFuncao ||
+      (member as any).occupation ||
+      '';
+
+    const cargoOcupa = matchCargoMinisterial(rawCargo);
+    const processDate = new Date().toISOString().slice(0, 10);
 
     const findOptionIdByName = (options: SimpleOption[], rawName: unknown) => {
       const target = normalizeText(rawName);
@@ -513,8 +586,8 @@ export default function ConsagracaoPage() {
       supervisao_id: memberSupervisaoId || '',
       campo_id: memberCampoId || '',
       congregacao_id: memberCongregacaoId || '',
-      cargo_ocupa: cargoOcupa || prev.cargo_ocupa,
-      pastor_solicitante: prev.pastor_solicitante,
+      cargo_ocupa: cargoOcupa || '',
+      pastor_solicitante: prev.pastor_solicitante || responsavelTenant || '',
       foto_url: fotoUrl || prev.foto_url
     }));
   };
@@ -776,6 +849,796 @@ export default function ConsagracaoPage() {
     }
   };
 
+  const limparFiltros = () => {
+    setFiltroBusca('');
+    setFiltroTipo('');
+    setFiltroStatus('');
+    setFiltroCampoId('');
+    setFiltroCongregacaoId('');
+    setFiltroComissaoId('');
+  };
+
+  const temFiltrosAtivos = Boolean(
+    filtroBusca.trim() || filtroTipo || filtroStatus || filtroCampoId || filtroCongregacaoId || filtroComissaoId
+  );
+
+  const getCongregacaoNome = (congId: string) => {
+    if (!congId) return '-';
+    const found = congregacoes.find((c) => c.id === congId);
+    return found?.nome || '-';
+  };
+
+  const getCampoNome = (campoId: string) => {
+    if (!campoId) return '-';
+    const found = campos.find((c) => c.id === campoId);
+    return found?.nome || '-';
+  };
+
+  const handleImprimirLista = () => {
+    if (registrosFiltrados.length === 0) return;
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert('Por favor, permita popups para imprimir o relatório.');
+      return;
+    }
+
+    const churchNome = churchInfo.nome || 'Gestão Eklésia';
+    const churchLogo = churchInfo.logoUrl || '';
+    const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    const filtrosAplicados: string[] = [];
+    if (filtroBusca.trim()) filtrosAplicados.push(`Busca: "${filtroBusca.trim()}"`);
+    if (filtroTipo) {
+      const tipoLabel = filtroTipo === 'chegada' ? 'Chegada (Novo)' : filtroTipo === 'progressao' ? 'Progressão' : 'Filiação';
+      filtrosAplicados.push(`Tipo: ${tipoLabel}`);
+    }
+    if (filtroStatus) {
+      filtrosAplicados.push(`Status: ${STATUS_LABELS[filtroStatus] || filtroStatus}`);
+    }
+    if (filtroCampoId) {
+      filtrosAplicados.push(`${labelCampo}: ${getCampoNome(filtroCampoId)}`);
+    }
+    if (filtroCongregacaoId) {
+      filtrosAplicados.push(`${labelCongregacao}: ${getCongregacaoNome(filtroCongregacaoId)}`);
+    }
+    if (filtroComissaoId) {
+      const comissaoNome = comissoes.find((c) => c.id === filtroComissaoId)?.nome || 'Comissão Selecionada';
+      filtrosAplicados.push(`Comissão: ${comissaoNome}`);
+    }
+
+    const filtroResumo = filtrosAplicados.length > 0 ? filtrosAplicados.join(' | ') : 'Todos os processos (sem filtros)';
+
+    const rowsHtml = registrosFiltrados
+      .map((reg, idx) => {
+        const tipo = normalizeTipoRegistro(reg.tipo_registro || '');
+        const tipoLabel = tipo === 'progressao' ? 'Progressão' : tipo === 'filiacao' ? 'Filiação' : 'Chegada';
+        const dataProc = reg.data_processo ? reg.data_processo.split('-').reverse().join('/') : '-';
+        const congNome = getCongregacaoNome(reg.congregacao_id);
+        const campoNome = getCampoNome(reg.campo_id);
+        const localNome = campoNome !== '-' && campoNome !== congNome ? `${congNome} / ${campoNome}` : congNome;
+        const statusLabel = STATUS_LABELS[reg.status_processo] || reg.status_processo || 'Em Processo';
+        const cpfFmt = reg.cpf ? formatCpf(reg.cpf) : '-';
+        const cargoAtual = reg.cargo_ocupa || (tipo === 'chegada' ? 'Não se aplica' : '-');
+        const cargoPretendido = reg.cargo_pretendido || '-';
+
+        return `
+          <tr>
+            <td style="text-align: center; font-size: 11px; font-weight: bold; color: #475569;">${idx + 1}</td>
+            <td style="font-family: monospace; font-size: 11px; font-weight: 600; color: #1e293b; white-space: nowrap;">${reg.numero_processo || '-'}</td>
+            <td style="font-size: 11px; color: #475569; white-space: nowrap;">${dataProc}</td>
+            <td style="font-size: 11px; font-weight: 600; color: #0f172a;">
+              ${reg.nome || '-'}
+              ${cpfFmt !== '-' ? `<br/><span style="font-size: 10px; font-weight: normal; color: #64748b; font-family: monospace;">CPF: ${cpfFmt}</span>` : ''}
+            </td>
+            <td style="font-size: 11px; white-space: nowrap;">
+              <span class="badge ${tipo}">${tipoLabel}</span>
+            </td>
+            <td style="font-size: 11px; color: #334155;">${cargoAtual}</td>
+            <td style="font-size: 11px; font-weight: 600; color: #0f766e;">${cargoPretendido}</td>
+            <td style="font-size: 11px; color: #334155;">${localNome}</td>
+            <td style="font-size: 11px; white-space: nowrap;">
+              <span class="status-badge ${reg.status_processo || 'em_processo'}">${statusLabel}</span>
+            </td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    win.document.write(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8">
+        <title>Relação de Processos de Consagração - ${churchNome}</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #0f172a;
+            background: #fff;
+            padding: 24px 32px;
+            font-size: 12px;
+          }
+          .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid #0f766e;
+            padding-bottom: 14px;
+            margin-bottom: 16px;
+          }
+          .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+          }
+          .header-logo {
+            width: 56px;
+            height: 56px;
+            object-fit: contain;
+            border-radius: 8px;
+          }
+          .header-title h1 {
+            font-size: 18px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.3px;
+          }
+          .header-title h2 {
+            font-size: 13px;
+            font-weight: 600;
+            color: #0f766e;
+            margin-top: 2px;
+            text-transform: uppercase;
+          }
+          .header-right {
+            text-align: right;
+            font-size: 11px;
+            color: #64748b;
+          }
+          .filter-bar {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 16px;
+            font-size: 11px;
+            color: #475569;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 4px;
+          }
+          th, td {
+            border: 1px solid #e2e8f0;
+            padding: 8px 10px;
+            text-align: left;
+            vertical-align: middle;
+          }
+          th {
+            background: #0f766e;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+          }
+          tr:nth-child(even) {
+            background: #f8fafc;
+          }
+          .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+          }
+          .badge.chegada { background: #e0f2fe; color: #0369a1; }
+          .badge.progressao { background: #e0e7ff; color: #4338ca; }
+          .badge.filiacao { background: #fef3c7; color: #b45309; }
+
+          .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+          }
+          .status-badge.em_processo { background: #ccfbf1; color: #0f766e; }
+          .status-badge.deferir { background: #dcfce7; color: #15803d; }
+          .status-badge.indeferir { background: #fee2e2; color: #b91c1c; }
+          .status-badge.homologar { background: #f3e8ff; color: #7e22ce; }
+
+          .footer-section {
+            margin-top: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            font-size: 11px;
+            color: #64748b;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 12px;
+          }
+          .signature-box {
+            text-align: center;
+            min-width: 240px;
+          }
+          .signature-line {
+            border-top: 1px solid #334155;
+            margin-bottom: 4px;
+          }
+          .signature-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #1e293b;
+          }
+          .signature-role {
+            font-size: 10px;
+            color: #64748b;
+          }
+
+          @media print {
+            body { padding: 0; }
+            .no-print { display: none !important; }
+            @page { size: A4 landscape; margin: 1.2cm; }
+            tr { page-break-inside: avoid; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="no-print" style="margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px;">
+          <button onclick="window.print()" style="padding: 8px 18px; font-size: 12px; font-weight: bold; background: #0f766e; color: white; border: none; border-radius: 6px; cursor: pointer;">
+            🖨️ Imprimir / Salvar PDF
+          </button>
+          <button onclick="window.close()" style="padding: 8px 14px; font-size: 12px; font-weight: 600; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
+            Fechar
+          </button>
+        </div>
+
+        <div class="header">
+          <div class="header-left">
+            ${churchLogo ? `<img src="${churchLogo}" class="header-logo" alt="Logo" />` : ''}
+            <div class="header-title">
+              <h1>${churchNome}</h1>
+              <h2>Relação de Processos de Consagração de Obreiros</h2>
+            </div>
+          </div>
+          <div class="header-right">
+            <div><strong>Emissão:</strong> ${hoje} às ${hora}</div>
+            <div><strong>Total:</strong> ${registrosFiltrados.length} processo(s)</div>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <div><strong>Filtros aplicados:</strong> ${filtroResumo}</div>
+          <div><strong>Listagem Oficial</strong></div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 32px; text-align: center;">#</th>
+              <th style="width: 90px;">Nº Processo</th>
+              <th style="width: 75px;">Data</th>
+              <th>Ministro / Obreiro</th>
+              <th style="width: 90px;">Tipo</th>
+              <th>Cargo Atual</th>
+              <th>Cargo Pretendido</th>
+              <th>${labelCongregacao} / ${labelCampo}</th>
+              <th style="width: 95px;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+
+        <div class="footer-section">
+          <div>
+            Documento emitido via Sistema de Gestão Eklésia.<br/>
+            Total de processos listados: <strong>${registrosFiltrados.length}</strong>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
+
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+    }, 400);
+  };
+
+  const handleImprimirFichaCandidato = (reg: any) => {
+    if (!reg) return;
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert('Por favor, permita popups para imprimir a ficha.');
+      return;
+    }
+
+    const churchNome = churchInfo.nome || 'Gestão Eklésia';
+    const churchLogo = churchInfo.logoUrl || '';
+    const responsavel = churchInfo.responsavel || responsavelTenant || '';
+    const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    const tipo = normalizeTipoRegistro(reg.tipo_registro || '');
+    const tipoLabel = tipo === 'progressao' ? 'Progressão (já cadastrado)' : tipo === 'filiacao' ? 'Filiação (vindo de outro ministério)' : 'Candidato (Novo cadastro / Chegada)';
+    const statusLabel = STATUS_LABELS[reg.status_processo] || reg.status_processo || 'Em Processo';
+    const dataProc = reg.data_processo ? reg.data_processo.split('-').reverse().join('/') : '-';
+    const dataNasc = reg.data_nascimento ? reg.data_nascimento.split('-').reverse().join('/') : '-';
+    const dataConsagOrigem = reg.origem_data_consagracao ? reg.origem_data_consagracao.split('-').reverse().join('/') : '-';
+    const dataAutorizacao = reg.data_autorizacao ? reg.data_autorizacao.split('-').reverse().join('/') : '-';
+    
+    const congNome = getCongregacaoNome(reg.congregacao_id);
+    const campoNome = getCampoNome(reg.campo_id);
+    const supervisaoNome = supervisoes.find((s) => s.id === reg.supervisao_id)?.nome || '-';
+
+    win.document.write(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8">
+        <title>Ficha do Candidato - ${reg.nome || 'Consagração'}</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #0f172a;
+            background: #fff;
+            padding: 24px 32px;
+            font-size: 12px;
+            line-height: 1.4;
+          }
+          .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid #0f766e;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+          }
+          .header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+          }
+          .header-logo {
+            width: 56px;
+            height: 56px;
+            object-fit: contain;
+            border-radius: 8px;
+          }
+          .header-title h1 {
+            font-size: 17px;
+            font-weight: 800;
+            color: #0f172a;
+          }
+          .header-title h2 {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f766e;
+            text-transform: uppercase;
+          }
+          .header-right {
+            text-align: right;
+            font-size: 11px;
+            color: #64748b;
+          }
+          .process-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+          }
+          .section-title {
+            font-size: 11px;
+            font-weight: 800;
+            color: #0f766e;
+            text-transform: uppercase;
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 4px;
+            margin-top: 14px;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+          }
+          .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+          .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+          .field {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 6px 10px;
+          }
+          .field-label {
+            font-size: 9px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+          }
+          .field-value {
+            font-size: 12px;
+            font-weight: 600;
+            color: #1e293b;
+          }
+          .photo-box {
+            width: 100px;
+            height: 125px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f1f5f9;
+            flex-shrink: 0;
+          }
+          .photo-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+          .photo-placeholder {
+            font-size: 10px;
+            font-weight: bold;
+            color: #94a3b8;
+          }
+          .signatures {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-top: 40px;
+            padding-top: 12px;
+          }
+          .signature-item {
+            text-align: center;
+          }
+          .signature-line {
+            border-top: 1px solid #334155;
+            margin-bottom: 6px;
+          }
+          .signature-name {
+            font-size: 11px;
+            font-weight: 700;
+            color: #0f172a;
+          }
+          .signature-role {
+            font-size: 10px;
+            color: #64748b;
+          }
+          .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+          }
+          .badge-status {
+            background: #ccfbf1;
+            color: #0f766e;
+            border: 1px solid #99f6e4;
+          }
+          .footer {
+            margin-top: 24px;
+            text-align: center;
+            font-size: 10px;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 8px;
+          }
+          @media print {
+            body { padding: 0; }
+            .no-print { display: none !important; }
+            @page { size: A4 portrait; margin: 1.5cm; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="no-print" style="margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px;">
+          <button onclick="window.print()" style="padding: 8px 18px; font-size: 12px; font-weight: bold; background: #0f766e; color: white; border: none; border-radius: 6px; cursor: pointer;">
+            🖨️ Imprimir Ficha
+          </button>
+          <button onclick="window.close()" style="padding: 8px 14px; font-size: 12px; font-weight: 600; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
+            Fechar
+          </button>
+        </div>
+
+        <div class="header">
+          <div class="header-left">
+            ${churchLogo ? `<img src="${churchLogo}" class="header-logo" alt="Logo" />` : ''}
+            <div class="header-title">
+              <h1>${churchNome}</h1>
+              <h2>Ficha de Processo de Consagração de Obreiro</h2>
+            </div>
+          </div>
+          <div class="header-right">
+            <div><strong>Emissão:</strong> ${hoje} às ${hora}</div>
+            <div><strong>Status:</strong> <span class="badge badge-status">${statusLabel}</span></div>
+          </div>
+        </div>
+
+        <div class="process-box">
+          <div>
+            <span class="field-label">NÚMERO DO PROCESSO</span>
+            <div style="font-family: monospace; font-size: 15px; font-weight: 800; color: #0f766e;">${reg.numero_processo || 'S/N'}</div>
+          </div>
+          <div>
+            <span class="field-label">DATA DO PROCESSO</span>
+            <div class="field-value">${dataProc}</div>
+          </div>
+          <div>
+            <span class="field-label">TIPO DE PROCESSO</span>
+            <div class="field-value">${tipoLabel}</div>
+          </div>
+          ${reg.categoria_registro || reg.regiao ? `
+            <div>
+              <span class="field-label">CATEGORIA</span>
+              <div class="field-value">${reg.categoria_registro || reg.regiao}</div>
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="section-title">1. Dados do Candidato / Ministro</div>
+        <div style="display: flex; gap: 14px; margin-bottom: 8px;">
+          <div class="photo-box">
+            ${reg.foto_url ? `<img src="${reg.foto_url}" alt="Foto" />` : `<span class="photo-placeholder">3x4 FOTO</span>`}
+          </div>
+          <div style="flex: 1;" class="grid-2">
+            <div class="field" style="grid-column: span 2;">
+              <div class="field-label">Nome Completo</div>
+              <div class="field-value" style="font-size: 13px;">${reg.nome || '-'}</div>
+            </div>
+            <div class="field">
+              <div class="field-label">CPF</div>
+              <div class="field-value">${reg.cpf ? formatCpf(reg.cpf) : '-'}</div>
+            </div>
+            <div class="field">
+              <div class="field-label">RG / Órgão Emissor</div>
+              <div class="field-value">${reg.rg || '-'} ${reg.orgao_emissor ? `(${reg.orgao_emissor})` : ''}</div>
+            </div>
+            <div class="field">
+              <div class="field-label">Data de Nascimento</div>
+              <div class="field-value">${dataNasc}</div>
+            </div>
+            <div class="field">
+              <div class="field-label">Sexo</div>
+              <div class="field-value">${reg.sexo || '-'}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-3" style="margin-bottom: 8px;">
+          <div class="field">
+            <div class="field-label">Estado Civil</div>
+            <div class="field-value">${reg.estado_civil || '-'}</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Cônjuge</div>
+            <div class="field-value">${reg.nome_conjuge || '-'}</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Nacionalidade / Naturalidade</div>
+            <div class="field-value">${reg.nacionalidade || 'Brasileira'} ${reg.naturalidade ? `- ${reg.naturalidade}/${reg.uf || ''}` : ''}</div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom: 8px;">
+          <div class="field">
+            <div class="field-label">Filiação (Pai / Mãe)</div>
+            <div class="field-value">
+              ${reg.nome_pai ? `Pai: ${reg.nome_pai}` : ''}
+              ${reg.nome_pai && reg.nome_mae ? '<br/>' : ''}
+              ${reg.nome_mae ? `Mãe: ${reg.nome_mae}` : ''}
+              ${!reg.nome_pai && !reg.nome_mae ? '-' : ''}
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label">Contatos (Telefone / E-mail)</div>
+            <div class="field-value">
+              ${reg.telefone ? `Tel: ${reg.telefone}` : ''}
+              ${reg.telefone && reg.email ? '<br/>' : ''}
+              ${reg.email ? `Email: ${reg.email}` : ''}
+              ${!reg.telefone && !reg.email ? '-' : ''}
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title">2. Dados Ministeriais e Lotação</div>
+        <div class="grid-3" style="margin-bottom: 8px;">
+          <div class="field">
+            <div class="field-label">Cargo Atual / Ocupado</div>
+            <div class="field-value">${reg.cargo_ocupa || 'Não se aplica'}</div>
+          </div>
+          <div class="field" style="background: #f0fdfa; border-color: #99f6e4;">
+            <div class="field-label" style="color: #0f766e;">Cargo Pretendido</div>
+            <div class="field-value" style="color: #0f766e; font-size: 13px;">${reg.cargo_pretendido || '-'}</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Matrícula do Membro</div>
+            <div class="field-value">${reg.matricula || '-'}</div>
+          </div>
+        </div>
+
+        <div class="grid-3" style="margin-bottom: 8px;">
+          <div class="field">
+            <div class="field-label">${labelSupervisao}</div>
+            <div class="field-value">${supervisaoNome}</div>
+          </div>
+          <div class="field">
+            <div class="field-label">${labelCampo}</div>
+            <div class="field-value">${campoNome}</div>
+          </div>
+          <div class="field">
+            <div class="field-label">${labelCongregacao}</div>
+            <div class="field-value">${congNome}</div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom: 8px;">
+          <div class="field">
+            <div class="field-label">Indicação / Pastor Solicitante</div>
+            <div class="field-value">${reg.pastor_solicitante || responsavel || '-'}</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Data de Autorização / Homologação</div>
+            <div class="field-value">${dataAutorizacao !== '-' ? dataAutorizacao : 'Aguardando tramitação'}</div>
+          </div>
+        </div>
+
+        ${tipo === 'filiacao' || reg.origem_instituicao ? `
+          <div class="section-title">3. Dados da Instituição de Origem</div>
+          <div class="grid-3" style="margin-bottom: 8px;">
+            <div class="field">
+              <div class="field-label">Instituição de Origem</div>
+              <div class="field-value">${reg.origem_instituicao || '-'}</div>
+            </div>
+            <div class="field">
+              <div class="field-label">Cidade / UF de Origem</div>
+              <div class="field-value">${reg.origem_cidade || '-'}${reg.origem_uf ? `/${reg.origem_uf}` : ''}</div>
+            </div>
+            <div class="field">
+              <div class="field-label">Data Consagração na Origem</div>
+              <div class="field-value">${dataConsagOrigem}</div>
+            </div>
+          </div>
+        ` : ''}
+
+        ${reg.observacoes ? `
+          <div class="section-title">Observações / Parecer</div>
+          <div class="field" style="margin-bottom: 8px;">
+            <div class="field-value" style="font-weight: normal; white-space: pre-wrap;">${reg.observacoes}</div>
+          </div>
+        ` : ''}
+
+        
+
+        <div class="footer">
+          Documento gerado pelo Sistema de Gestão Eklésia em ${hoje} às ${hora} | Processo nº ${reg.numero_processo || '-'}
+        </div>
+      </body>
+      </html>
+    `);
+
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+    }, 400);
+  };
+
+  const handleNovoRegistro = () => {
+    setStatusMensagem('');
+    resetForm();
+    setShowForm(true);
+    ensureNumeroProcesso();
+  };
+
+  const handleEditRegistro = (reg: any) => {
+    setEditingRegistro(reg);
+    setFormRegistro({
+      tipo_registro: normalizeTipoRegistro(reg.tipo_registro || ''),
+      categoria_registro: reg.regiao || '',
+      comissao_id: reg.comissao_id || '',
+      member_id: reg.member_id || '',
+      numero_processo: reg.numero_processo || '',
+      data_processo: reg.data_processo || todayIso(),
+      nome: reg.nome || '',
+      data_nascimento: reg.data_nascimento || '',
+      sexo: reg.sexo || 'MASCULINO',
+      rg: reg.rg || '',
+      orgao_emissor: reg.orgao_emissor || '',
+      estado_civil: reg.estado_civil || '',
+      nacionalidade: reg.nacionalidade || '',
+      naturalidade: reg.naturalidade || '',
+      uf: reg.uf || '',
+      email: reg.email || '',
+      cpf: reg.cpf ? formatCpf(reg.cpf) : '',
+      telefone: reg.telefone ? formatPhone(reg.telefone) : '',
+      nome_pai: reg.nome_pai || '',
+      nome_mae: reg.nome_mae || '',
+      nome_conjuge: reg.nome_conjuge || '',
+      matricula: reg.matricula || '',
+      supervisao_id: reg.supervisao_id || '',
+      campo_id: reg.campo_id || '',
+      congregacao_id: reg.congregacao_id || '',
+      cargo_ocupa: reg.cargo_ocupa || '',
+      cargo_pretendido: reg.cargo_pretendido || '',
+      pastor_solicitante: reg.pastor_solicitante || responsavelTenant || '',
+      origem_instituicao: reg.origem_instituicao || '',
+      origem_cidade: reg.origem_cidade || '',
+      origem_uf: reg.origem_uf || '',
+      origem_data_consagracao: reg.origem_data_consagracao || '',
+      data_autorizacao: reg.data_autorizacao || '',
+      status_processo: reg.status_processo || 'em_processo',
+      observacoes: reg.observacoes || '',
+      foto_url: reg.foto_url || ''
+    });
+    if (reg.tipo_registro === 'progressao' && reg.nome) {
+      suppressNextSearchRef.current = true;
+      setMemberQuery(reg.nome);
+    }
+    setFotoBloqueada(Boolean(reg.foto_url));
+    setShowForm(true);
+  };
+
+  const registrosFiltrados = useMemo(() => {
+    return registros.filter((reg) => {
+      // 1. Busca textual (nome, cpf, numero_processo, cargo_pretendido)
+      if (filtroBusca.trim()) {
+        const query = filtroBusca.trim().toLowerCase();
+        const nomeMatch = (reg.nome || '').toLowerCase().includes(query);
+        const cpfLimpo = (reg.cpf || '').replace(/\D/g, '');
+        const queryLimpa = query.replace(/\D/g, '');
+        const cpfMatch = queryLimpa ? cpfLimpo.includes(queryLimpa) : false;
+        const numMatch = (reg.numero_processo || '').toLowerCase().includes(query);
+        const cargoPretendidoMatch = (reg.cargo_pretendido || '').toLowerCase().includes(query);
+        if (!nomeMatch && !cpfMatch && !numMatch && !cargoPretendidoMatch) return false;
+      }
+
+      // 2. Tipo de processo
+      if (filtroTipo && filtroTipo !== 'TODOS') {
+        const regTipo = normalizeTipoRegistro(reg.tipo_registro || '');
+        if (regTipo !== filtroTipo) return false;
+      }
+
+      // 3. Status
+      if (filtroStatus && filtroStatus !== 'TODOS') {
+        if (reg.status_processo !== filtroStatus) return false;
+      }
+
+      // 4. Grupo / Campo
+      if (filtroCampoId && filtroCampoId !== 'TODOS') {
+        if (reg.campo_id !== filtroCampoId) return false;
+      }
+
+      // 5. Congregação
+      if (filtroCongregacaoId && filtroCongregacaoId !== 'TODOS') {
+        if (reg.congregacao_id !== filtroCongregacaoId) return false;
+      }
+
+      // 6. Comissão Responsável
+      if (filtroComissaoId && filtroComissaoId !== 'TODOS') {
+        if (reg.comissao_id !== filtroComissaoId) return false;
+      }
+
+      return true;
+    });
+  }, [registros, filtroBusca, filtroTipo, filtroStatus, filtroCampoId, filtroCongregacaoId, filtroComissaoId]);
+
   if (ctx.loading) return <div className="p-8">Carregando...</div>;
   if (bloqueado) return null;
   if (loadingData) return <div className="p-8">Carregando...</div>;
@@ -859,31 +1722,367 @@ export default function ConsagracaoPage() {
         </div>
       )}
 
-      <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab}>
-        {activeTab === 'cadastro' && (
-          <Section icon="📝" title="Cadastro de Processos">
-            <div className="flex items-center justify-between gap-4 mb-6">
-              <p className="text-gray-500">Cadastre processos de chegada, progressão e filiação ministerial.</p>
-              {!isSupervisor && (
-              <button
-                className={`text-white px-4 py-2 rounded-lg transition shadow-md ${consagracaoModuleReady ? 'bg-teal-500 hover:bg-teal-600' : 'bg-gray-400 cursor-not-allowed'}`}
-                onClick={() => {
-                  setStatusMensagem('');
-                  resetForm();
-                  setShowForm(true);
-                      ensureNumeroProcesso();
-                }}
-                disabled={!consagracaoModuleReady}
-                title={!consagracaoModuleReady ? 'Aplique as migrations do módulo de Consagração no Supabase' : 'Novo Registro'}
-              >
-                + Novo Registro
-              </button>
-              )}
+            <Section icon="📋" title="Processos de Consagração">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <p className="text-gray-500 text-sm">
+            Separação de ministros: chegadas, progressão e filiação ministerial.
+          </p>
+          {!isSupervisor && (
+            <button
+              className={`inline-flex items-center gap-2 text-white px-5 py-2.5 rounded-xl font-semibold transition shadow-md ${
+                consagracaoModuleReady ? 'bg-teal-600 hover:bg-teal-700' : 'bg-gray-400 cursor-not-allowed'
+              }`}
+              onClick={handleNovoRegistro}
+              disabled={!consagracaoModuleReady}
+              title={!consagracaoModuleReady ? 'Aplique as migrations do módulo de Consagração no Supabase' : 'Novo Registro'}
+            >
+              <span>➕</span> Novo Registro
+            </button>
+          )}
+        </div>
+
+        {/* Filtros */}
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 space-y-3">
+          {/* Linha 1: Buscar, Tipo de Processo, Status */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Buscar</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                  placeholder="Nome, CPF ou nº processo..."
+                  value={filtroBusca}
+                  onChange={(e) => setFiltroBusca(e.target.value)}
+                />
+                <span className="absolute left-2.5 top-2 text-gray-400 text-xs">🔍</span>
+              </div>
             </div>
 
-            {showForm && (
-              <div className="bg-white rounded-lg shadow-md p-6 mb-6 max-w-6xl mx-auto">
-                <div className="grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Tipo de Processo</label>
+              <select
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                value={filtroTipo}
+                onChange={(e) => setFiltroTipo(e.target.value)}
+              >
+                <option value="">Todos os Tipos</option>
+                <option value="chegada">Chegada (Novo)</option>
+                <option value="progressao">Progressão</option>
+                <option value="filiacao">Filiação</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Status</label>
+              <select
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                value={filtroStatus}
+                onChange={(e) => setFiltroStatus(e.target.value)}
+              >
+                <option value="">Todos os Status</option>
+                <option value="em_processo">Em Processo</option>
+                <option value="deferir">Deferido</option>
+                <option value="indeferir">Indeferido</option>
+                <option value="homologar">Homologado</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Linha 2: Grupo, Congregação, Comissão Responsável e Botões Limpar / Imprimir Lista */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end pt-1">
+            {showCampo && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">{labelCampo}</label>
+                <select
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                  value={filtroCampoId}
+                  onChange={(e) => {
+                    const newCampoId = e.target.value;
+                    setFiltroCampoId(newCampoId);
+                    if (filtroCongregacaoId) {
+                      const cong = congregacoes.find((c) => c.id === filtroCongregacaoId);
+                      if (cong && cong.campo_id !== newCampoId) {
+                        setFiltroCongregacaoId('');
+                      }
+                    }
+                  }}
+                >
+                  <option value="">Todos os {labelCampo}s</option>
+                  {campos.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {showCongregacao && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">{labelCongregacao}</label>
+                <select
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                  value={filtroCongregacaoId}
+                  onChange={(e) => {
+                    const newCongId = e.target.value;
+                    setFiltroCongregacaoId(newCongId);
+                    if (newCongId) {
+                      const cong = congregacoes.find((c) => c.id === newCongId);
+                      if (cong?.campo_id) {
+                        setFiltroCampoId(cong.campo_id);
+                      }
+                    }
+                  }}
+                >
+                  <option value="">Todas as {labelCongregacao}s</option>
+                  {(filtroCampoId
+                    ? congregacoes.filter((c) => c.campo_id === filtroCampoId)
+                    : congregacoes
+                  ).map((c) => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Comissão Responsável</label>
+              <select
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                value={filtroComissaoId}
+                onChange={(e) => setFiltroComissaoId(e.target.value)}
+              >
+                <option value="">Todas as Comissões</option>
+                {comissoes.map((com) => (
+                  <option key={com.id} value={com.id}>
+                    {com.nome} {com.status === 'inativa' ? '(Inativa)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 justify-end">
+              <button
+                type="button"
+                onClick={limparFiltros}
+                disabled={!temFiltrosAtivos}
+                className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg border transition ${
+                  temFiltrosAtivos
+                    ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100 hover:text-slate-900 shadow-sm cursor-pointer'
+                    : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
+                }`}
+                title="Limpar todos os filtros"
+              >
+                <span>✕</span> Limpar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleImprimirLista}
+                disabled={registrosFiltrados.length === 0}
+                className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg transition shadow-sm ${
+                  registrosFiltrados.length > 0
+                    ? 'bg-slate-800 hover:bg-slate-900 text-white cursor-pointer'
+                    : 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60'
+                }`}
+                title="Imprimir listagem de processos filtrados"
+              >
+                <span>🖨️</span> Imprimir Lista
+              </button>
+            </div>
+          </div>
+
+          {temFiltrosAtivos && (
+            <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 text-xs">
+              <span className="text-gray-500">
+                Exibindo <strong>{registrosFiltrados.length}</strong> de <strong>{registros.length}</strong> processos
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Tabela de Processos */}
+        {loadingData ? (
+          <div className="p-12 text-center text-gray-500">
+            <div className="inline-block animate-spin text-2xl mb-2">⏳</div>
+            <p className="text-sm font-medium">Carregando processos de consagração...</p>
+          </div>
+        ) : !consagracaoModuleReady ? (
+          <div className="p-8 text-center text-amber-800 bg-amber-50 rounded-xl border border-amber-200">
+            <p className="font-semibold">Módulo de Consagração indisponível.</p>
+            <p className="text-xs text-amber-600 mt-1">Aplique as migrations da tabela public.consagracao_registros no Supabase.</p>
+          </div>
+        ) : registros.length === 0 ? (
+          <div className="p-12 text-center text-gray-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+            <span className="text-3xl mb-2 block">📑</span>
+            <p className="text-base font-semibold text-slate-700">Nenhum processo cadastrado</p>
+            <p className="text-xs text-gray-500 mt-1">Clique no botão "+ Novo Registro" para cadastrar o primeiro processo.</p>
+          </div>
+        ) : registrosFiltrados.length === 0 ? (
+          <div className="p-12 text-center text-gray-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+            <span className="text-3xl mb-2 block">🔍</span>
+            <p className="text-base font-semibold text-slate-700">Nenhum processo encontrado</p>
+            <p className="text-xs text-gray-500 mt-1">Tente ajustar os filtros de busca ou clique abaixo para limpar.</p>
+            <button
+              onClick={limparFiltros}
+              className="mt-3 px-4 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
+            >
+              Limpar Filtros
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="min-w-full text-sm divide-y divide-gray-200">
+              <thead className="bg-slate-100 text-slate-700 text-xs uppercase font-semibold">
+                <tr>
+                  <th className="py-3 px-4 text-left">Nº Processo</th>
+                  <th className="py-3 px-4 text-left">Data</th>
+                  <th className="py-3 px-4 text-left">Ministro / Obreiro</th>
+                  <th className="py-3 px-4 text-left">Tipo</th>
+                  <th className="py-3 px-4 text-left">Cargo Pretendido</th>
+                  <th className="py-3 px-4 text-left">Congregação / Campo</th>
+                  <th className="py-3 px-4 text-left">Status</th>
+                  <th className="py-3 px-4 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 bg-white">
+                {registrosFiltrados.map((reg) => {
+                  const tipo = normalizeTipoRegistro(reg.tipo_registro || '');
+                  const congNome = getCongregacaoNome(reg.congregacao_id);
+                  const campoNome = getCampoNome(reg.campo_id);
+                  return (
+                    <tr key={reg.id} className="hover:bg-slate-50/80 transition">
+                      <td className="py-3 px-4 font-mono font-medium text-slate-700">
+                        {reg.numero_processo || '-'}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                        {reg.data_processo ? reg.data_processo.split('-').reverse().join('/') : '-'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-slate-800">{reg.nome}</div>
+                        {reg.cpf && (
+                          <div className="text-xs text-gray-400 font-mono">{formatCpf(reg.cpf)}</div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <span
+                          className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                            tipo === 'progressao'
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              : tipo === 'filiacao'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-sky-50 text-sky-700 border-sky-200'
+                          }`}
+                        >
+                          {tipo === 'progressao' ? 'Progressão' : tipo === 'filiacao' ? 'Filiação' : 'Chegada'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-medium text-teal-800">
+                        {reg.cargo_pretendido || '-'}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 text-xs">
+                        <div className="font-medium text-slate-800">{congNome}</div>
+                        {campoNome !== '-' && <div className="text-gray-400">{campoNome}</div>}
+                      </td>
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <span
+                          className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold border ${
+                            reg.status_processo === 'deferir'
+                              ? 'bg-green-50 text-green-700 border-green-200'
+                              : reg.status_processo === 'indeferir'
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : reg.status_processo === 'homologar'
+                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                              : 'bg-teal-50 text-teal-700 border-teal-200'
+                          }`}
+                        >
+                          {STATUS_LABELS[reg.status_processo] || reg.status_processo || 'Em Processo'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center whitespace-nowrap space-x-1">
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 transition text-sm shadow-xs"
+                          onClick={() => handleImprimirFichaCandidato(reg)}
+                          title="Imprimir Ficha do Candidato"
+                          aria-label="Imprimir Ficha do Candidato"
+                        >
+                          🖨️
+                        </button>
+                        {!isSupervisor && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition text-sm shadow-xs"
+                            onClick={() => handleEditRegistro(reg)}
+                            title="Editar processo"
+                            aria-label="Editar processo"
+                          >
+                            ✏️
+                          </button>
+                        )}
+                        {!isSupervisor && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition text-sm shadow-xs"
+                            onClick={() => {
+                              setProcessRegistro(reg);
+                              setProcessModalOpen(true);
+                            }}
+                            title="Tramitar / Homologar status"
+                            aria-label="Tramitar / Homologar status"
+                          >
+                            ⚖️
+                          </button>
+                        )}
+                        {!isSupervisor && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition text-sm shadow-xs"
+                            onClick={() => {
+                              setRegistroParaExcluir(reg);
+                              setDeleteModalOpen(true);
+                            }}
+                            title="Excluir processo"
+                            aria-label="Excluir processo"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
+      {/* Modal de Cadastro / Edição */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] flex flex-col my-auto border border-gray-100 animate-in fade-in zoom-in duration-150">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-slate-50 rounded-t-2xl">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">
+                  {editingRegistro ? 'Editar Processo de Consagração' : 'Novo Processo de Consagração'}
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {editingRegistro ? `Processo nº ${formRegistro.numero_processo || '-'}` : 'Preencha os dados do ministro para registrar o processo'}
+                </p>
+              </div>
+              <button
+                className="text-gray-400 hover:text-gray-700 text-xl font-bold p-1 rounded-lg hover:bg-gray-200 transition"
+                onClick={() => {
+                  resetForm();
+                  setShowForm(false);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6">
+<div className="grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6">
                   <div className="space-y-4">
                     <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 space-y-4">
                       <h4 className="text-sm font-semibold text-teal-700 border-b border-gray-100 pb-2">Dados do Processo</h4>
@@ -1210,7 +2409,19 @@ export default function ConsagracaoPage() {
                             <select
                               className="mt-1 w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                               value={formRegistro.supervisao_id}
-                              onChange={(e) => setFormRegistro({ ...formRegistro, supervisao_id: e.target.value })}
+                              onChange={(e) => {
+                                const newSupId = e.target.value;
+                                setFormRegistro((prev) => {
+                                  const currentCampo = campos.find((c) => c.id === prev.campo_id);
+                                  const keepCampo = Boolean(currentCampo && currentCampo.supervisao_id === newSupId);
+                                  return {
+                                    ...prev,
+                                    supervisao_id: newSupId,
+                                    campo_id: keepCampo ? prev.campo_id : '',
+                                    congregacao_id: keepCampo ? prev.congregacao_id : '',
+                                  };
+                                });
+                              }}
                             >
                               <option value="">Selecione</option>
                               {supervisoes.map((s) => (
@@ -1225,10 +2436,26 @@ export default function ConsagracaoPage() {
                             <select
                               className="mt-1 w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                               value={formRegistro.campo_id}
-                              onChange={(e) => setFormRegistro({ ...formRegistro, campo_id: e.target.value })}
+                              onChange={(e) => {
+                                const newCampoId = e.target.value;
+                                const campoObj = campos.find((c) => c.id === newCampoId);
+                                setFormRegistro((prev) => {
+                                  const currentCong = congregacoes.find((cg) => cg.id === prev.congregacao_id);
+                                  const keepCong = Boolean(currentCong && currentCong.campo_id === newCampoId);
+                                  return {
+                                    ...prev,
+                                    campo_id: newCampoId,
+                                    supervisao_id: campoObj?.supervisao_id || prev.supervisao_id,
+                                    congregacao_id: keepCong ? prev.congregacao_id : '',
+                                  };
+                                });
+                              }}
                             >
                               <option value="">Selecione</option>
-                              {campos.map((c) => (
+                              {(formRegistro.supervisao_id
+                                ? campos.filter((c) => c.supervisao_id === formRegistro.supervisao_id)
+                                : campos
+                              ).map((c) => (
                                 <option key={c.id} value={c.id}>{c.nome}</option>
                               ))}
                             </select>
@@ -1240,10 +2467,28 @@ export default function ConsagracaoPage() {
                             <select
                               className="mt-1 w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                               value={formRegistro.congregacao_id}
-                              onChange={(e) => setFormRegistro({ ...formRegistro, congregacao_id: e.target.value })}
+                              onChange={(e) => {
+                                const newCongId = e.target.value;
+                                const congObj = congregacoes.find((cg) => cg.id === newCongId);
+                                const campoObj = congObj?.campo_id ? campos.find((c) => c.id === congObj.campo_id) : null;
+                                setFormRegistro((prev) => ({
+                                  ...prev,
+                                  congregacao_id: newCongId,
+                                  campo_id: congObj?.campo_id || prev.campo_id,
+                                  supervisao_id: campoObj?.supervisao_id || prev.supervisao_id,
+                                }));
+                              }}
                             >
                               <option value="">Selecione</option>
-                              {congregacoes.map((c) => (
+                              {(formRegistro.campo_id
+                                ? congregacoes.filter((c) => c.campo_id === formRegistro.campo_id)
+                                : formRegistro.supervisao_id
+                                ? congregacoes.filter((c) => {
+                                    const cCampo = campos.find((cp) => cp.id === c.campo_id);
+                                    return cCampo?.supervisao_id === formRegistro.supervisao_id;
+                                  })
+                                : congregacoes
+                              ).map((c) => (
                                 <option key={c.id} value={c.id}>{c.nome}</option>
                               ))}
                             </select>
@@ -1271,6 +2516,10 @@ export default function ConsagracaoPage() {
                               {cargosMinisteriais.filter((c) => c.ativo).map((cargo) => (
                                 <option key={cargo.id} value={cargo.nome}>{cargo.nome}</option>
                               ))}
+                              {formRegistro.cargo_ocupa &&
+                                !cargosMinisteriais.some((c) => c.nome.toLowerCase() === formRegistro.cargo_ocupa.toLowerCase()) && (
+                                  <option value={formRegistro.cargo_ocupa}>{formRegistro.cargo_ocupa}</option>
+                                )}
                             </select>
                           ) : (
                             <input
@@ -1301,6 +2550,10 @@ export default function ConsagracaoPage() {
                             {cargosMinisteriais.filter((c) => c.ativo).map((cargo) => (
                               <option key={cargo.id} value={cargo.nome}>{cargo.nome}</option>
                             ))}
+                            {formRegistro.cargo_pretendido &&
+                              !cargosMinisteriais.some((c) => c.nome.toLowerCase() === formRegistro.cargo_pretendido.toLowerCase()) && (
+                                <option value={formRegistro.cargo_pretendido}>{formRegistro.cargo_pretendido}</option>
+                              )}
                           </select>
                           {fieldErrors.cargo_pretendido && (
                             <p className="mt-1 text-xs text-red-600">{fieldErrors.cargo_pretendido}</p>
@@ -1435,161 +2688,36 @@ export default function ConsagracaoPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-3 justify-end mt-6">
-                  <button
-                    className="px-4 py-2 rounded-lg border-2 border-gray-300 text-gray-600 hover:text-gray-800"
-                    onClick={() => {
-                      resetForm();
-                      setShowForm(false);
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    className={`px-4 py-2 rounded-lg text-white font-semibold transition shadow-md ${ministryId && consagracaoModuleReady ? 'bg-teal-500 hover:bg-teal-600' : 'bg-gray-400 cursor-not-allowed'}`}
-                    onClick={handleSaveRegistro}
-                    disabled={!ministryId || !consagracaoModuleReady}
-                    title={!consagracaoModuleReady ? 'Aplique as migrations do módulo de Consagração no Supabase' : (!ministryId ? 'Sem ministério associado ao usuário' : 'Salvar registro')}
-                  >
-                    Salvar
-                  </button>
+                
+              <div className="flex gap-3 justify-end mt-6">
+                <button
+                  className="px-4 py-2 rounded-lg border-2 border-gray-300 text-gray-600 hover:text-gray-800"
+                  onClick={() => {
+                    resetForm();
+                    setShowForm(false);
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className={`px-4 py-2 rounded-lg text-white font-semibold transition shadow-md ${ministryId && consagracaoModuleReady ? 'bg-teal-500 hover:bg-teal-600' : 'bg-gray-400 cursor-not-allowed'}`}
+                  onClick={handleSaveRegistro}
+                  disabled={!ministryId || !consagracaoModuleReady}
+                  title={!consagracaoModuleReady ? 'Aplique as migrations do módulo de Consagração no Supabase' : (!ministryId ? 'Sem ministério associado ao usuário' : 'Salvar registro')}
+                >
+                  Salvar
+                </button>
+              </div>
+
+              {statusMensagem && (
+                <div className={`mt-4 px-4 py-3 rounded border ${statusIsError ? 'bg-red-50 border-red-200 text-red-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+                  {statusMensagem}
                 </div>
-
-                {statusMensagem && (
-                  <div className={`mt-4 px-4 py-3 rounded border ${statusIsError ? 'bg-red-50 border-red-200 text-red-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
-                    {statusMensagem}
-                  </div>
-                )}
-              </div>
-            )}
-          </Section>
-        )}
-
-        {activeTab === 'registros' && (
-          <Section icon="📑" title="Registros">
-            {registros.length === 0 && (
-              <p className="text-gray-500 text-center py-8">Nenhum registro cadastrado.</p>
-            )}
-
-            {registros.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-200 text-gray-800 text-left">
-                      <th className="py-2">Foto</th>
-                      <th className="py-2">Nº Processo</th>
-                      <th className="py-2">Data Proc.</th>
-                      <th className="py-2">Nome</th>
-                      <th className="py-2">CPF</th>
-                      <th className="py-2">Cargo Pretendido</th>
-                      <th className="py-2">Tipo</th>
-                      <th className="py-2">Registro</th>
-                      <th className="py-2 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {registros.map((reg) => (
-                      <tr key={reg.id} className="border-t">
-                        <td className="py-2">
-                          <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
-                            {reg.foto_url ? (
-                              <img src={reg.foto_url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="text-[10px] text-gray-400">SEM FOTO</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-2">{reg.numero_processo || '-'}</td>
-                        <td className="py-2">{reg.data_processo || '-'}</td>
-                        <td className="py-2">{reg.nome}</td>
-                        <td className="py-2">{reg.cpf || '-'}</td>
-                        <td className="py-2">{reg.cargo_pretendido || '-'}</td>
-                        <td className="py-2">{TIPO_REGISTRO_LABELS[reg.tipo_registro] || reg.tipo_registro || '-'}</td>
-                        <td className="py-2">
-                          <span className="text-xs font-semibold text-blue-600">
-                            {STATUS_LABELS[reg.status_processo] || reg.status_processo}
-                          </span>
-                        </td>
-                        <td className="py-2 text-right space-x-2">
-                          {!isSupervisor && (
-                          <button
-                            className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition text-xs font-semibold"
-                            onClick={() => {
-                              setEditingRegistro(reg);
-                              setFormRegistro({
-                                tipo_registro: normalizeTipoRegistro(reg.tipo_registro || ''),
-                                categoria_registro: reg.regiao || '',
-                                comissao_id: reg.comissao_id || '',
-                                member_id: reg.member_id || '',
-                                numero_processo: reg.numero_processo || '',
-                                data_processo: reg.data_processo || '',
-                                nome: reg.nome || '',
-                                data_nascimento: reg.data_nascimento || '',
-                                sexo: reg.sexo || 'MASCULINO',
-                                rg: reg.rg || '',
-                                orgao_emissor: reg.orgao_emissor || '',
-                                estado_civil: reg.estado_civil || '',
-                                nacionalidade: reg.nacionalidade || '',
-                                naturalidade: reg.naturalidade || '',
-                                uf: reg.uf || '',
-                                email: reg.email || '',
-                                cpf: reg.cpf ? formatCpf(reg.cpf) : '',
-                                telefone: reg.telefone ? formatPhone(reg.telefone) : '',
-                                nome_pai: reg.nome_pai || '',
-                                nome_mae: reg.nome_mae || '',
-                                nome_conjuge: reg.nome_conjuge || '',
-                                matricula: reg.matricula || '',
-                                supervisao_id: reg.supervisao_id || '',
-                                campo_id: reg.campo_id || '',
-                                congregacao_id: reg.congregacao_id || '',
-                                cargo_ocupa: reg.cargo_ocupa || '',
-                                cargo_pretendido: reg.cargo_pretendido || '',
-                                pastor_solicitante: reg.pastor_solicitante || '',
-                                origem_instituicao: reg.origem_instituicao || '',
-                                origem_cidade: reg.origem_cidade || '',
-                                origem_uf: reg.origem_uf || '',
-                                origem_data_consagracao: reg.origem_data_consagracao || '',
-                                data_autorizacao: reg.data_autorizacao || '',
-                                status_processo: reg.status_processo || 'em_processo',
-                                observacoes: reg.observacoes || '',
-                                foto_url: reg.foto_url || ''
-                              });
-                              setShowForm(true);
-                              setActiveTab('cadastro');
-                            }}
-                          >
-                            Editar
-                          </button>
-                          )}
-                          {!isSupervisor && (
-                          <button
-                            className="inline-flex items-center gap-1 px-3 py-1 bg-red-50 text-red-700 rounded hover:bg-red-100 transition text-xs font-semibold"
-                            onClick={() => handleDeleteRegistro(reg.id)}
-                          >
-                            Excluir
-                          </button>
-                          )}
-                          {!isSupervisor && (
-                          <button
-                            className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 transition text-xs font-semibold"
-                            onClick={() => {
-                              setProcessRegistro(reg);
-                              setProcessModalOpen(true);
-                            }}
-                          >
-                            Processar
-                          </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Section>
-        )}
-      </Tabs>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       </div>
 
       <input
@@ -1599,6 +2727,65 @@ export default function ConsagracaoPage() {
         className="hidden"
         onChange={handleFotoUpload}
       />
+
+      {deleteModalOpen && registroParaExcluir && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100 animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0 text-2xl">
+                ⚠️
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-slate-800">Excluir registro?</h3>
+                <p className="text-sm text-slate-600 mt-2">
+                  Tem certeza que deseja excluir este processo de consagração?
+                </p>
+                {registroParaExcluir.nome && (
+                  <p className="text-xs text-slate-500 font-medium mt-1">
+                    Candidato: <strong>{registroParaExcluir.nome}</strong> {registroParaExcluir.numero_processo ? `(Processo nº ${registroParaExcluir.numero_processo})` : ''}
+                  </p>
+                )}
+                <p className="text-xs text-red-600 font-semibold mt-2">
+                  Esta ação não poderá ser desfeita.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  if (deleting) return;
+                  setDeleteModalOpen(false);
+                  setRegistroParaExcluir(null);
+                }}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (deleting || !registroParaExcluir) return;
+                  setDeleting(true);
+                  try {
+                    await handleDeleteRegistro(registroParaExcluir.id);
+                    setDeleteModalOpen(false);
+                    setRegistroParaExcluir(null);
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 rounded-xl transition shadow-sm cursor-pointer"
+              >
+                {deleting ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {processModalOpen && processRegistro && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
