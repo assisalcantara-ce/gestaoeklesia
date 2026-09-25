@@ -513,13 +513,11 @@ export default function ConsagracaoPage() {
       return String(rawCargo).trim();
     };
 
-    // Origem: members.cargo_ministerial (com fallback para custom_fields caso o membro tenha sido importado com cargo em custom_fields)
+    // Origem oficial: members.cargo_ministerial (com fallback para custom_fields somente se cargo_ministerial for nulo)
     const rawCargo =
       (member as any).cargo_ministerial ||
       cf.cargoMinisterial ||
       cf.cargo_ministerial ||
-      (member as any).cargo ||
-      cf.cargo ||
       '';
 
     const cargoOcupa = matchCargoMinisterial(rawCargo);

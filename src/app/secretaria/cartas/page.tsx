@@ -454,9 +454,9 @@ export default function CartasPage() {
     const cf = (member?.custom_fields && typeof member.custom_fields === 'object') ? member.custom_fields : {};
     const cargo =
       String(
+        member?.cargo_ministerial ||
         (cf as any).cargoMinisterial ||
         (cf as any).cargo_ministerial ||
-        member?.cargo_ministerial ||
         ''
       );
     

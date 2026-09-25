@@ -408,7 +408,7 @@ export function useMembros() {
   const memberToMembro = (member: any): Membro => {
     const cf = member.custom_fields && typeof member.custom_fields === 'object' ? member.custom_fields : {};
     const cargoMinisterial = String(
-      (cf as any).cargoMinisterial || (cf as any).cargo_ministerial || member.cargo_ministerial || ''
+      member.cargo_ministerial || (cf as any).cargoMinisterial || (cf as any).cargo_ministerial || ''
     );
     const stableUniqueId =
       member.unique_id ||
