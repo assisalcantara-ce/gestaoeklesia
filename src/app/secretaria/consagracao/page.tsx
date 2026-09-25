@@ -1578,29 +1578,35 @@ export default function ConsagracaoPage() {
 
         <!-- Seção: Comissão de Consagração & Deliberação -->
         ${reg.comissao_id ? `
-          <div class="section-title">Comissão de Consagração & Parecer</div>
-          <div class="field" style="margin-bottom: 12px; background: #f8fafc;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <div>
-                <span class="field-label">Comissão Responsável:</span>
-                <span class="field-value" style="font-weight: 700; color: #0f766e;">${comissaoNome || 'Comissão de Consagração'}</span>
+          <div class="section-title">Comissão de Consagração & Parecer (${comissaoNome || 'Comissão Responsável'})</div>
+          
+          <div style="background: #f8fafc; border: 1.5px solid #0f766e; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;">
+            <div style="font-size: 10px; font-weight: 800; color: #0f766e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+              DECISÃO DA COMISSÃO
+            </div>
+            <div style="display: flex; gap: 32px; align-items: center; font-size: 12px; font-weight: 700; color: #1e293b;">
+              <div style="display: flex; align-items: center; gap: 8px; ${reg.status_processo === 'deferir' || reg.status_processo === 'homologar' ? 'color: #15803d; font-weight: 800;' : ''}">
+                <span style="font-size: 16px; line-height: 1; font-family: monospace;">${reg.status_processo === 'deferir' || reg.status_processo === 'homologar' ? '☑' : '☐'}</span>
+                <span>${reg.status_processo === 'homologar' ? 'DEFERIDO (Homologado)' : reg.status_processo === 'deferir' ? 'DEFERIDO (Registrado)' : 'DEFERIDO'}</span>
               </div>
-              <div>
-                <span class="field-label">Deliberação:</span>
-                <span style="font-weight: 700; font-size: 11px;">[ &nbsp; ] Deferido &nbsp;&nbsp;&nbsp; [ &nbsp; ] Indeferido</span>
+              <div style="display: flex; align-items: center; gap: 8px; ${reg.status_processo === 'indeferir' ? 'color: #b91c1c; font-weight: 800;' : ''}">
+                <span style="font-size: 16px; line-height: 1; font-family: monospace;">${reg.status_processo === 'indeferir' ? '☑' : '☐'}</span>
+                <span>${reg.status_processo === 'indeferir' ? 'INDEFERIDO (Registrado)' : 'INDEFERIDO'}</span>
+              </div>
+              <div style="margin-left: auto; font-size: 11px; color: #64748b; font-weight: normal;">
+                Data da Deliberação: ____/____/________
               </div>
             </div>
+          </div>
+
+          <div class="field" style="margin-bottom: 12px; background: #f8fafc;">
+            <div class="field-label" style="text-transform: uppercase; font-weight: 800; color: #475569; margin-bottom: 4px;">Parecer / Despacho da Comissão</div>
             ${reg.observacoes ? `
-              <div style="margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
-                <span class="field-label">Parecer Registrado / Observações:</span>
-                <div class="field-value" style="font-weight: normal; font-size: 11px; white-space: pre-wrap;">${reg.observacoes}</div>
+              <div style="font-size: 11px; color: #334155; font-style: italic; background: #fff; padding: 6px 10px; border-radius: 4px; border: 1px solid #e2e8f0; margin-bottom: 6px;">
+                <strong>Observações Registradas:</strong> ${reg.observacoes}
               </div>
-            ` : `
-              <div style="margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
-                <span class="field-label">Parecer da Comissão:</span>
-                <div style="height: 36px; border-bottom: 1px dotted #94a3b8; margin-top: 4px;"></div>
-              </div>
-            `}
+            ` : ''}
+            <div style="height: 38px; border-bottom: 1px dotted #94a3b8; margin-top: 4px;"></div>
           </div>
 
           ${integrantes.length > 0 ? `

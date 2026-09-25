@@ -298,7 +298,9 @@ export default function MembrosTable({
                       {!isAuxiliar && (
                         <div className="relative group inline-flex items-center justify-center">
                           <button
+                            disabled={!possuiFoto}
                             onClick={async () => {
+                              if (!possuiFoto) return;
                               const templatesBase = await ensureTemplatesSnapshot();
                               if (!hasActiveTemplate(membro.tipoCadastro, templatesBase)) {
                                 setNotification({
@@ -311,8 +313,16 @@ export default function MembrosTable({
                               }
                               setMembroImprimindoCartao(membro);
                             }}
-                            className="p-2 text-purple-600 hover:bg-purple-100 rounded-lg transition"
-                            title="Imprimir Cartão"
+                            className={`p-2 rounded-lg transition ${
+                              possuiFoto
+                                ? 'text-purple-600 hover:bg-purple-100 cursor-pointer'
+                                : 'text-gray-300 opacity-40 cursor-not-allowed'
+                            }`}
+                            title={
+                              possuiFoto
+                                ? 'Imprimir Cartão'
+                                : 'Membro sem foto (impressão de cartão indisponível)'
+                            }
                             aria-label="Imprimir Cartão"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -325,7 +335,7 @@ export default function MembrosTable({
                             </svg>
                           </button>
                           <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-30">
-                            Imprimir Cartão
+                            {possuiFoto ? 'Imprimir Cartão' : 'Sem foto'}
                           </span>
                         </div>
                       )}

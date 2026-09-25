@@ -699,6 +699,26 @@ export default function ComissaoPage() {
         <!-- PARTE 2 — PARECER DA COMISSÃO -->
         <div class="part-title">PARTE 2 — PARECER DA COMISSÃO (${comissao.nome.toUpperCase()})</div>
 
+        <!-- Bloco de Decisão / Deliberação -->
+        <div style="background: #f8fafc; border: 1.5px solid #0f766e; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;">
+          <div style="font-size: 10px; font-weight: 800; color: #0f766e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+            DECISÃO DA COMISSÃO
+          </div>
+          <div style="display: flex; gap: 32px; align-items: center; font-size: 12px; font-weight: 700; color: #1e293b;">
+            <div style="display: flex; align-items: center; gap: 8px; ${processo.status_processo === 'deferir' || processo.status_processo === 'homologar' ? 'color: #15803d; font-weight: 800;' : ''}">
+              <span style="font-size: 16px; line-height: 1; font-family: monospace;">${processo.status_processo === 'deferir' || processo.status_processo === 'homologar' ? '☑' : '☐'}</span>
+              <span>${processo.status_processo === 'homologar' ? 'DEFERIDO (Homologado)' : processo.status_processo === 'deferir' ? 'DEFERIDO (Registrado)' : 'DEFERIDO'}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; ${processo.status_processo === 'indeferir' ? 'color: #b91c1c; font-weight: 800;' : ''}">
+              <span style="font-size: 16px; line-height: 1; font-family: monospace;">${processo.status_processo === 'indeferir' ? '☑' : '☐'}</span>
+              <span>${processo.status_processo === 'indeferir' ? 'INDEFERIDO (Registrado)' : 'INDEFERIDO'}</span>
+            </div>
+            <div style="margin-left: auto; font-size: 11px; color: #64748b; font-weight: normal;">
+              Data da Deliberação: ____/____/________
+            </div>
+          </div>
+        </div>
+
         <div class="parecer-box">
           <div style="font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase;">
             PARECER / DESPACHO DA COMISSÃO:
@@ -2757,20 +2777,13 @@ export default function ComissaoPage() {
                 )}
               </div>
 
-              <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+              <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end">
                 <button
                   type="button"
                   onClick={() => setVisualizandoProcesso(null)}
-                  className="px-4 py-2 border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold transition"
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold transition"
                 >
-                  Voltar para a Lista
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleImprimirFichaProcesso(visualizandoProcesso, selectedComissaoProcessos)}
-                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
-                >
-                  <span>🖨️</span> Imprimir Ficha do Processo
+                  Fechar
                 </button>
               </div>
             </div>
