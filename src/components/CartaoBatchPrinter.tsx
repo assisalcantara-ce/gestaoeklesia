@@ -106,8 +106,48 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
       console.error('Erro ao carregar config da igreja:', e);
     }
 
+    // Enriquecer dados dos membros direto do banco para garantir integridade total (CPF, RG, Filiação, etc.)
+    const memberIds = membros.map((m) => m.id).filter(Boolean);
+    let mapaDbMembers: Record<string, any> = {};
+    if (memberIds.length > 0) {
+      try {
+        const { data: dbRows } = await supabase
+          .from('members')
+          .select('*')
+          .in('id', memberIds);
+        if (dbRows) {
+          dbRows.forEach((r: any) => {
+            mapaDbMembers[r.id] = r;
+          });
+        }
+      } catch (enrichErr) {
+        console.warn('Não foi possível buscar dados adicionais dos membros:', enrichErr);
+      }
+    }
+
+    const membrosPreparados: Membro[] = membros.map((membro) => {
+      const dbRow = mapaDbMembers[membro.id] || {};
+      const cf = (dbRow.custom_fields && typeof dbRow.custom_fields === 'object') ? dbRow.custom_fields : {};
+      return {
+        ...membro,
+        ...cf,
+        ...(membro as any),
+        nome: membro.nome || dbRow.name || cf.nome || '',
+        cpf: membro.cpf || dbRow.cpf || cf.cpf || '',
+        rg: membro.rg || dbRow.rg || cf.rg || '',
+        nomePai: membro.nomePai || dbRow.nome_pai || cf.nomePai || cf.nome_pai || '',
+        nomeMae: membro.nomeMae || dbRow.nome_mae || cf.nomeMae || cf.nome_mae || '',
+        dataNascimento: membro.dataNascimento || dbRow.data_nascimento || cf.dataNascimento || cf.data_nascimento || '',
+        naturalidade: membro.naturalidade || dbRow.naturalidade || cf.naturalidade || '',
+        nacionalidade: membro.nacionalidade || dbRow.nacionalidade || cf.nacionalidade || 'BRASILEIRA',
+        estadoCivil: membro.estadoCivil || dbRow.estado_civil || cf.estadoCivil || cf.estado_civil || '',
+        cargoMinisterial: membro.cargoMinisterial || dbRow.cargo_ministerial || cf.cargoMinisterial || cf.cargo_ministerial || '',
+        tipoCadastro: (membro.tipoCadastro || dbRow.tipo_cadastro || dbRow.role || 'membro') as any,
+      };
+    });
+
     // Pega o tipo de impressão do primeiro template encontrado
-    const tempTemplate = carregarTemplateAtivo(templates, membros[0].tipoCadastro) || carregarTemplateAtivo(templates, 'membro');
+    const tempTemplate = carregarTemplateAtivo(templates, membrosPreparados[0].tipoCadastro) || carregarTemplateAtivo(templates, 'membro');
     const tipoImpressao = tempTemplate?.tipoImpressao || 'pvc';
     const orientacao = tempTemplate?.orientacao || 'landscape';
 
@@ -168,6 +208,7 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
       const membroComConfig = {
         ...membro,
         validadeAnos: template.validadeAnos || 1,
+        nomeIgreja: configIgreja?.nome || 'Igreja',
         dataEmissao: template.dataEmissao || membro.dataEmissao
       };
 
@@ -259,8 +300,8 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
       const margemEsquerda = 18.5; // Centralizar aprox (210 - (85.6*2)) / 2
       const espacamentoH = 2; // Pequeno respiro entre colunas
 
-      for (let i = 0; i < membros.length; i += cartoesPorPagina) {
-        const fatiaMembros = membros.slice(i, i + cartoesPorPagina);
+      for (let i = 0; i < membrosPreparados.length; i += cartoesPorPagina) {
+        const fatiaMembros = membrosPreparados.slice(i, i + cartoesPorPagina);
         if (i > 0) pdf.addPage();
 
         const imagensFrente: (string | null)[] = [];
@@ -318,7 +359,7 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
     } else {
       // Modo PVC Original
       let membroIdx = 0;
-      for (const membro of membros) {
+      for (const membro of membrosPreparados) {
         const template = carregarTemplateAtivo(templates, membro.tipoCadastro) || carregarTemplateAtivo(templates, 'membro');
         if (template) {
           if (membroIdx > 0) pdf.addPage([largCartaoMM, altCartaoMM], 'landscape');
@@ -381,7 +422,7 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         {membros.map((membro) => (
           <div key={`qr-${membro.id}`} id={`source-qr-${membro.id}`}>
-            <QRCode value={membro.uniqueId} size={128} level="H" />
+            <QRCode value={membro.uniqueId || membro.id} size={128} level="H" />
           </div>
         ))}
       </div>

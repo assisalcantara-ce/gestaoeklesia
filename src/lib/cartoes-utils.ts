@@ -64,6 +64,8 @@ function normalizeNomenclaturasForCartoes(raw: any): any {
   return raw;
 }
 
+import { formatCpf } from '@/lib/mascaras';
+
 export function substituirPlaceholders(texto: string, membro: any, nomenclaturasInput?: any): string {
   if (!texto || !membro) return texto;
 
@@ -77,68 +79,171 @@ export function substituirPlaceholders(texto: string, membro: any, nomenclaturas
 
   // DIVISÃO 1 (Supervisão/Principal)
   const divisao1Label = nomenclaturas?.divisaoPrincipal?.opcao1 || 'IGREJA';
-  const valorSupervisao = membro.supervisao || '';
+  const valorSupervisao = membro.supervisao || membro.supervisao_nome || '';
   
   // Primeiro: substituir valor {divisao1_valor}
-  resultado = resultado.replace(/\{divisao1_valor\}/g, valorSupervisao);
+  resultado = resultado.replace(/\{divisao1_valor\}/gi, valorSupervisao);
   
   // Depois: substituir rótulo {divisao1}
-  resultado = resultado.replace(/\{divisao1\}(?!_)/g, divisao1Label);
+  resultado = resultado.replace(/\{divisao1\}(?!_)/gi, divisao1Label);
   
   // Padrão dinâmico {NOME DA [rótulo]}
   const nomeComDivisao1 = `{NOME DA ${divisao1Label}}`;
-  resultado = resultado.replace(new RegExp(nomeComDivisao1.replace(/[{}]/g, '\\$&'), 'g'), valorSupervisao);
+  resultado = resultado.replace(new RegExp(nomeComDivisao1.replace(/[{}]/g, '\\$&'), 'gi'), valorSupervisao);
 
   // DIVISÃO 2 (Região/Campo/Secundária)
   const divisao2Label = nomenclaturas?.divisaoSecundaria?.opcao1 || 'CAMPO';
-  const valorRegiao = membro.campo || '';
+  const valorRegiao = membro.campo || membro.campo_nome || '';
   
   // Primeiro: substituir valor {divisao2_valor}
-  resultado = resultado.replace(/\{divisao2_valor\}/g, valorRegiao);
+  resultado = resultado.replace(/\{divisao2_valor\}/gi, valorRegiao);
   
   // Depois: substituir rótulo {divisao2}
-  resultado = resultado.replace(/\{divisao2\}(?!_)/g, divisao2Label);
+  resultado = resultado.replace(/\{divisao2\}(?!_)/gi, divisao2Label);
   
   // Padrão dinâmico {NOME DA [rótulo]}
   const nomeComDivisao2 = `{NOME DA ${divisao2Label}}`;
-  resultado = resultado.replace(new RegExp(nomeComDivisao2.replace(/[{}]/g, '\\$&'), 'g'), valorRegiao);
+  resultado = resultado.replace(new RegExp(nomeComDivisao2.replace(/[{}]/g, '\\$&'), 'gi'), valorRegiao);
 
   // DIVISÃO 3 (Congregação/Terciária)
   const divisao3Label = nomenclaturas?.divisaoTerciaria?.opcao1 || 'NENHUMA';
-  const valorCongregacao = membro.congregacao || '';
+  const valorCongregacao = membro.congregacao || membro.congregacao_nome || '';
   
   // Primeiro: substituir valor {divisao3_valor}
-  resultado = resultado.replace(/\{divisao3_valor\}/g, valorCongregacao);
+  resultado = resultado.replace(/\{divisao3_valor\}/gi, valorCongregacao);
   
   // Depois: substituir rótulo {divisao3}
-  resultado = resultado.replace(/\{divisao3\}(?!_)/g, divisao3Label);
+  resultado = resultado.replace(/\{divisao3\}(?!_)/gi, divisao3Label);
   
   // Padrão dinâmico {NOME DA [rótulo]}
   const nomeComDivisao3 = `{NOME DA ${divisao3Label}}`;
-  resultado = resultado.replace(new RegExp(nomeComDivisao3.replace(/[{}]/g, '\\$&'), 'g'), valorCongregacao);
+  resultado = resultado.replace(new RegExp(nomeComDivisao3.replace(/[{}]/g, '\\$&'), 'gi'), valorCongregacao);
 
   // ============================================================
   // SUBSTITUIÇÕES PADRÃO DE CAMPOS DO MEMBRO
   // ============================================================
 
-
   PLACEHOLDERS_CONFIG.forEach(ph => {
-    const regex = new RegExp(ph.placeholder.replace(/[{}]/g, '\\$&'), 'g');
-    let valor = membro[ph.campo] || '';
+    const regex = new RegExp(ph.placeholder.replace(/[{}]/g, '\\$&'), 'gi');
+    let valor = membro[ph.campo] ?? '';
 
-    // Tratamentos especiais
+    // Tratamentos especiais e fallbacks robustos
+
+    if (ph.campo === 'cpf') {
+      const rawCpf =
+        membro.cpf ??
+        membro.CPF ??
+        membro.cpf_cnpj ??
+        membro.cpf_formatado ??
+        membro.custom_fields?.cpf ??
+        membro.custom_fields?.CPF ??
+        membro.customFields?.cpf ??
+        '';
+      valor = rawCpf ? formatCpf(String(rawCpf)) : '';
+    }
+
+    if (ph.campo === 'rg') {
+      valor =
+        membro.rg ??
+        membro.RG ??
+        membro.custom_fields?.rg ??
+        membro.custom_fields?.RG ??
+        membro.customFields?.rg ??
+        valor ??
+        '';
+    }
+
+    if (ph.campo === 'nome') {
+      valor =
+        membro.nome ??
+        membro.name ??
+        membro.custom_fields?.nome ??
+        membro.custom_fields?.name ??
+        valor ??
+        '';
+    }
+
+    if (ph.campo === 'matricula') {
+      valor =
+        membro.matricula ??
+        membro.custom_fields?.matricula ??
+        valor ??
+        '';
+    }
+
+    if (ph.campo === 'cargoMinisterial') {
+      valor =
+        membro.cargoMinisterial ||
+        membro.cargo_ministerial ||
+        membro.custom_fields?.cargoMinisterial ||
+        membro.custom_fields?.cargo_ministerial ||
+        membro.cargo ||
+        '';
+    }
+
+    if (ph.campo === 'nomePai') {
+      valor =
+        membro.nomePai ||
+        membro.nome_pai ||
+        membro.custom_fields?.nomePai ||
+        membro.custom_fields?.nome_pai ||
+        '';
+    }
+
+    if (ph.campo === 'nomeMae') {
+      valor =
+        membro.nomeMae ||
+        membro.nome_mae ||
+        membro.custom_fields?.nomeMae ||
+        membro.custom_fields?.nome_mae ||
+        '';
+    }
+
     if (ph.campo === 'filiacao') {
-      valor = [membro.nomePai, membro.nomeMae]
-        .filter(v => v)
-        .join(' e ');
+      const pai =
+        membro.nomePai ||
+        membro.nome_pai ||
+        membro.custom_fields?.nomePai ||
+        membro.custom_fields?.nome_pai ||
+        '';
+      const mae =
+        membro.nomeMae ||
+        membro.nome_mae ||
+        membro.custom_fields?.nomeMae ||
+        membro.custom_fields?.nome_mae ||
+        '';
+      valor = [pai, mae].filter(v => v).join(' e ');
+    }
+
+    if (ph.campo === 'naturalidade') {
+      valor =
+        membro.naturalidade ||
+        membro.custom_fields?.naturalidade ||
+        '';
+    }
+
+    if (ph.campo === 'nacionalidade') {
+      valor =
+        membro.nacionalidade ||
+        membro.custom_fields?.nacionalidade ||
+        'BRASILEIRA';
     }
 
     if (ph.campo === 'dataConsagracao') {
-      valor = membro.dataConsagracao || membro.dataConsagracaoRecebimento || '';
+      valor =
+        membro.dataConsagracao ||
+        membro.data_consagracao ||
+        membro.dataConsagracaoRecebimento ||
+        membro.custom_fields?.dataConsagracao ||
+        '';
     }
 
     if (ph.campo === 'dataEmissao') {
-      valor = membro.dataEmissao || membro.data_emissao || '';
+      valor =
+        membro.dataEmissao ||
+        membro.data_emissao ||
+        membro.custom_fields?.dataEmissao ||
+        '';
       if (!valor) {
         const hoje = new Date();
         const dia = String(hoje.getDate()).padStart(2, '0');
@@ -149,12 +254,19 @@ export function substituirPlaceholders(texto: string, membro: any, nomenclaturas
     }
 
     if (ph.campo === 'dataBatismo' && !valor) {
-      valor = membro.dataBatismoAguas || '';
+      valor =
+        membro.dataBatismo ||
+        membro.data_batismo ||
+        membro.dataBatismoAguas ||
+        membro.data_batismo_aguas ||
+        membro.custom_fields?.dataBatismo ||
+        membro.custom_fields?.data_batismo ||
+        membro.custom_fields?.dataBatismoAguas ||
+        '';
     }
 
     // Tratamento dinâmico de Validade
     if (ph.campo === 'validade') {
-      // Se tiver validadeAnos configurado (vem do template em uso)
       const anos = membro.validadeAnos || 1;
       const dataBase = new Date();
       dataBase.setFullYear(dataBase.getFullYear() + anos);
@@ -166,7 +278,7 @@ export function substituirPlaceholders(texto: string, membro: any, nomenclaturas
     }
 
     if (ph.campo === 'validadeCredencial') {
-      valor = membro.dataValidadeCredencial || '';
+      valor = membro.dataValidadeCredencial || membro.data_validade_credencial || membro.custom_fields?.dataValidadeCredencial || '';
       if (!valor) {
         const anos = membro.validadeAnos || 1;
         const dataEmissaoRaw = membro.dataEmissao || membro.data_emissao;
@@ -181,9 +293,9 @@ export function substituirPlaceholders(texto: string, membro: any, nomenclaturas
 
     // Tratamento de Estado Civil conforme sexo
     if (ph.campo === 'estadoCivil') {
-      const sexo = String(membro.sexo || '').toUpperCase();
+      const sexo = String(membro.sexo || membro.custom_fields?.sexo || '').toUpperCase();
       const isFeminino = sexo === 'FEMININO' || sexo === 'F';
-      const raw = String(membro.estadoCivil || '').toLowerCase().trim();
+      const raw = String(membro.estadoCivil || membro.estado_civil || membro.custom_fields?.estadoCivil || membro.custom_fields?.estado_civil || '').toLowerCase().trim();
       // Normaliza variantes femininas/masculinas para a raiz neutra
       const normalizado = raw
         .replace(/^casada$/, 'casado')
@@ -197,7 +309,7 @@ export function substituirPlaceholders(texto: string, membro: any, nomenclaturas
       else if (normalizado === 'divorciado') valor = isFeminino ? 'Divorciada' : 'Divorciado';
       else if (normalizado === 'uniao_estavel' || normalizado === 'uniao estavel') valor = 'União Estável';
       else if (normalizado === 'outros' || normalizado === 'outro') valor = 'Outros';
-      else valor = membro.estadoCivil || '';
+      else valor = membro.estadoCivil || membro.estado_civil || membro.custom_fields?.estadoCivil || '';
     }
 
     // Formatação de data (se for do tipo YYYY-MM-DD)
@@ -215,8 +327,6 @@ export function substituirPlaceholders(texto: string, membro: any, nomenclaturas
 
     resultado = resultado.replace(regex, String(valor));
   });
-
-
 
   return resultado;
 }

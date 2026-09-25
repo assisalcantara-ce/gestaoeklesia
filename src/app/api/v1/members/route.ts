@@ -86,6 +86,30 @@ export async function GET(request: NextRequest) {
       query = query.eq('congregacao_id', congregacaoParam)
     }
 
+    // Identificar ministros/membros com processo de consagração DEFERIDO aguardando homologação no tenant atual
+    // Regra: Enquanto o processo estiver DEFERIDO, o membro fica temporariamente oculto da lista operacional de Ativos.
+    const isFiltroAtivo = !statusParam || statusParam.toLowerCase() === 'ativo' || statusParam.toLowerCase() === 'active';
+    let deferidosMemberIds: string[] = [];
+
+    if (isFiltroAtivo) {
+      try {
+        const { data: deferidosData } = await admin
+          .from('consagracao_registros')
+          .select('member_id')
+          .eq('ministry_id', ministryId)
+          .eq('status_processo', 'deferir')
+          .not('member_id', 'is', null);
+
+        if (deferidosData && deferidosData.length > 0) {
+          deferidosMemberIds = deferidosData
+            .map((d: any) => d.member_id)
+            .filter((id: any) => typeof id === 'string' && id.trim() !== '');
+        }
+      } catch (consErr) {
+        console.warn('Verificação de processos deferidos de consagração:', consErr);
+      }
+    }
+
     // Aplicar filtros
     if (statusParam && statusParam.toUpperCase() !== 'TODOS') {
       const normalizedStatus =
@@ -95,6 +119,11 @@ export async function GET(request: NextRequest) {
             ? 'inactive'
             : statusParam.toLowerCase()
       query = query.eq('status', normalizedStatus)
+    }
+
+    // Ocultar da lista de Ativos membros com processo DEFERIDO aguardando homologação
+    if (isFiltroAtivo && deferidosMemberIds.length > 0) {
+      query = query.not('id', 'in', `(${deferidosMemberIds.join(',')})`);
     }
 
     if (cargoParam && cargoParam.toUpperCase() !== 'TODOS') {

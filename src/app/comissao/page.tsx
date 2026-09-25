@@ -2464,7 +2464,7 @@ export default function ComissaoPage() {
         {/* MODAL DE PROCESSOS DA COMISSÃO */}
         {selectedComissaoProcessos && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-slate-100 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col border border-slate-100 overflow-hidden">
               {/* Cabeçalho do Modal */}
               <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
                 <div className="flex items-center gap-3">
@@ -2514,12 +2514,13 @@ export default function ComissaoPage() {
                     <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                       <thead className="bg-slate-50 text-slate-700 font-semibold text-xs uppercase">
                         <tr>
-                          <th className="px-4 py-3">Nº Processo</th>
-                          <th className="px-4 py-3">Ministro / Obreiro</th>
-                          <th className="px-4 py-3">Tipo</th>
-                          <th className="px-4 py-3">Cargo Pretendido</th>
-                          <th className="px-4 py-3">Status</th>
-                          <th className="px-4 py-3 text-center">Ações</th>
+                          <th className="px-3.5 py-3">Nº Processo</th>
+                          <th className="px-3.5 py-3">Data</th>
+                          <th className="px-3.5 py-3">Ministro / Candidato</th>
+                          <th className="px-3.5 py-3">Tipo</th>
+                          <th className="px-3.5 py-3">Cargo Pretendido</th>
+                          <th className="px-3.5 py-3 text-center">Status</th>
+                          <th className="px-3.5 py-3 text-right">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
@@ -2529,13 +2530,19 @@ export default function ComissaoPage() {
                             tipo === 'progressao' ? 'Progressão' : tipo === 'filiacao' ? 'Filiação' : 'Chegada';
                           const statusLabel =
                             STATUS_LABELS[proc.status_processo] || proc.status_processo || 'Em Processo';
+                          const dataProcFormatada = proc.data_processo
+                            ? proc.data_processo.split('-').reverse().join('/')
+                            : '-';
 
                           return (
                             <tr key={proc.id} className="hover:bg-slate-50/80 transition-colors">
-                              <td className="px-4 py-3 font-mono font-medium text-slate-800 whitespace-nowrap">
+                              <td className="px-3.5 py-3 font-mono font-medium text-slate-800 whitespace-nowrap">
                                 {proc.numero_processo || '-'}
                               </td>
-                              <td className="px-4 py-3">
+                              <td className="px-3.5 py-3 text-slate-600 whitespace-nowrap text-xs">
+                                {dataProcFormatada}
+                              </td>
+                              <td className="px-3.5 py-3">
                                 <div className="font-semibold text-slate-900">{proc.nome}</div>
                                 {proc.cpf && (
                                   <div className="text-[11px] text-slate-400 font-mono">
@@ -2543,7 +2550,7 @@ export default function ComissaoPage() {
                                   </div>
                                 )}
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
+                              <td className="px-3.5 py-3 whitespace-nowrap">
                                 <span
                                   className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
                                     tipo === 'progressao'
@@ -2556,10 +2563,10 @@ export default function ComissaoPage() {
                                   {tipoLabel}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 font-medium text-teal-800 text-xs">
+                              <td className="px-3.5 py-3 font-medium text-teal-800 text-xs">
                                 {proc.cargo_pretendido || '-'}
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
+                              <td className="px-3.5 py-3 text-center whitespace-nowrap">
                                 <span
                                   className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold border ${
                                     proc.status_processo === 'deferir'
@@ -2574,14 +2581,22 @@ export default function ComissaoPage() {
                                   {statusLabel}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-center whitespace-nowrap">
+                              <td className="px-3.5 py-3 text-right whitespace-nowrap space-x-1.5">
                                 <button
                                   type="button"
                                   onClick={() => setVisualizandoProcesso(proc)}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition"
                                   title="Visualizar detalhes do processo"
                                 >
                                   👁️ Visualizar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleImprimirFichaProcesso(proc, selectedComissaoProcessos)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-lg text-xs font-semibold transition"
+                                  title="Imprimir Ficha do Processo"
+                                >
+                                  🖨️ Ficha
                                 </button>
                               </td>
                             </tr>

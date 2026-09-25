@@ -145,6 +145,7 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'gestao',
     'agenda',
     'suporte',
+    'comissao',
   ],
   tesoureiro_geral: [
     'dashboard',
@@ -254,6 +255,8 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'suporte',
     'geolocalizacao',
     'agenda',
+    'comissao',
+    'gestao',
   ],
   financeiro: [
     'tesouraria',
@@ -266,6 +269,7 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'gestao',
     'agenda',
     'suporte',
+    'comissao',
   ],
   tesoureiro_geral: [
     'tesouraria',
@@ -277,6 +281,7 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
   ],
   supervisor: [
     'secretaria',
+    'comissao',
   ],
   secretaria_local: [
     'secretaria',

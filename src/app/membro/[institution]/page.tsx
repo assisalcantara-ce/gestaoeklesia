@@ -437,7 +437,19 @@ export default function PublicMemberPage({ params }: PageProps) {
         setInstitutionName(json.institution_name);
       }
 
-      setIsExisting(!!json.exists);
+      if (json.exists && json.data) {
+        setFormData({
+          ...EMPTY_FORM,
+          ...json.data,
+        });
+        setIsExisting(true);
+      } else {
+        setFormData({
+          ...EMPTY_FORM,
+          tipo_cadastro: 'membro',
+        });
+        setIsExisting(false);
+      }
       setStage('form');
     } catch (err: any) {
       setErrorMessage(err?.message || 'Erro de conexão ao servidor.');
@@ -462,11 +474,6 @@ export default function PublicMemberPage({ params }: PageProps) {
 
     if (!formData.nome_mae.trim()) {
       setErrorMessage('Nome da Mãe é obrigatório.');
-      return;
-    }
-
-    if (!formData.data_batismo_aguas) {
-      setErrorMessage('Data de Batismo é obrigatória.');
       return;
     }
 
@@ -1011,11 +1018,10 @@ export default function PublicMemberPage({ params }: PageProps) {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Data de Batismo nas Águas *
+                      Data de Batismo nas Águas (Opcional)
                     </label>
                     <input
                       type="date"
-                      required
                       value={formData.data_batismo_aguas}
                       onChange={(e) => setFormData({ ...formData, data_batismo_aguas: e.target.value })}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:border-[#123b63] focus:ring-2 focus:ring-[#123b63]/20 outline-none"

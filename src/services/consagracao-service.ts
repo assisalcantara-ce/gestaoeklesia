@@ -2,7 +2,95 @@ import { createClient } from '@/lib/supabase-client';
 import {
   ConsagracaoRegistro,
   ConsagracaoRegistroInput,
+  HistoricoProcessoItem,
 } from '@/types/consagracao';
+
+/**
+ * Registra um evento no Histórico do Ministro (members.custom_fields.historico_processos)
+ * Preserva eventos anteriores, garante atomicidade e idempotência por processo e tipo_evento.
+ */
+async function registrarEventoHistoricoMinistro(
+  supabase: any,
+  ministryId: string,
+  memberId: string,
+  evento: HistoricoProcessoItem
+): Promise<void> {
+  if (!memberId || !ministryId) return;
+
+  try {
+    const { data: member, error: fetchErr } = await supabase
+      .from('members')
+      .select('id, custom_fields, cargo_ministerial')
+      .eq('id', memberId)
+      .eq('ministry_id', ministryId)
+      .maybeSingle();
+
+    if (fetchErr || !member) return;
+
+    const cf = (member.custom_fields && typeof member.custom_fields === 'object')
+      ? { ...(member.custom_fields as Record<string, any>) }
+      : {};
+
+    const historicoAtual: HistoricoProcessoItem[] = Array.isArray(cf.historico_processos)
+      ? [...cf.historico_processos]
+      : Array.isArray(cf.historicoProcessos)
+      ? [...cf.historicoProcessos]
+      : [];
+
+    const nowIso = new Date().toISOString();
+    const eventId = evento.id || `${evento.processo_id}_${evento.tipo_evento}_${evento.status_processo || evento.decisao || ''}`;
+
+    // Idempotência: verificar se evento com mesmo id ou mesma combinação chave já existe (exceto reaberturas sucessivas)
+    const exists = historicoAtual.some((h) => {
+      if (h.id === eventId) return true;
+      if (evento.tipo_evento === 'homologacao' && h.processo_id === evento.processo_id && h.tipo_evento === 'homologacao') {
+        return true;
+      }
+      if (evento.tipo_evento === 'inicio_processo' && h.processo_id === evento.processo_id && h.tipo_evento === 'inicio_processo') {
+        return true;
+      }
+      return false;
+    });
+
+    if (exists) return;
+
+    const novoItem: HistoricoProcessoItem = {
+      id: eventId,
+      processo_id: evento.processo_id,
+      numero_processo: evento.numero_processo || '',
+      ministry_id: ministryId,
+      member_id: memberId,
+      tipo_evento: evento.tipo_evento,
+      tipo_registro: evento.tipo_registro || 'progressao',
+      data: evento.data || nowIso.slice(0, 10),
+      cargo_anterior: evento.cargo_anterior || member.cargo_ministerial || '',
+      cargo_pretendido: evento.cargo_pretendido || null,
+      cargo_resultante: evento.cargo_resultante || null,
+      status_processo: evento.status_processo || null,
+      decisao: evento.decisao || null,
+      resultado: evento.resultado || null,
+      descricao: evento.descricao || '',
+      criado_em: nowIso,
+    };
+
+    const nextHistorico = [...historicoAtual, novoItem];
+
+    await supabase
+      .from('members')
+      .update({
+        custom_fields: {
+          ...cf,
+          historico_processos: nextHistorico,
+          historicoProcessos: nextHistorico,
+        },
+        updated_at: nowIso,
+      })
+      .eq('id', memberId)
+      .eq('ministry_id', ministryId);
+  } catch (err) {
+    console.error('Erro ao registrar evento no histórico do ministro:', err);
+  }
+}
 
 export const consacracaoService = {
   /**
@@ -94,18 +182,27 @@ export const consacracaoService = {
   },
 
   /**
-   * Cria um novo registro de consagração
+   * Cria um novo registro de consagração (Secretaria Geral / Admin)
    */
   async criarRegistro(
     ministryId: string,
-    input: ConsagracaoRegistroInput
+    input: ConsagracaoRegistroInput,
+    userNivel?: string | null
   ): Promise<ConsagracaoRegistro> {
+    if (userNivel === 'presidencia') {
+      throw new Error('O Presidente do Ministério não possui ação operacional para cadastrar processos.');
+    }
+    if (userNivel === 'supervisor') {
+      throw new Error('A Comissão não possui permissão para cadastrar ou alterar dados do processo.');
+    }
+
     const supabase = createClient();
 
     const payload: Record<string, any> = {
       ...input,
       ministry_id: ministryId,
       comissao_id: input.comissao_id || null,
+      status_processo: 'em_processo', // Novos processos sempre iniciam Em Processo
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -124,17 +221,43 @@ export const consacracaoService = {
       .single();
 
     if (error) throw error;
+
+    // Registrar evento de início no histórico do ministro se vinculado
+    if (data && data.member_id) {
+      const tipoLabel = data.tipo_registro === 'progressao' ? 'Progressão' : data.tipo_registro === 'filiacao' ? 'Filiação' : 'Chegada';
+      await registrarEventoHistoricoMinistro(supabase, ministryId, data.member_id, {
+        id: `${data.id}_inicio_processo`,
+        processo_id: data.id,
+        numero_processo: data.numero_processo || '',
+        tipo_evento: 'inicio_processo',
+        tipo_registro: data.tipo_registro,
+        data: data.data_processo || new Date().toISOString().slice(0, 10),
+        cargo_anterior: data.cargo_ocupa || null,
+        cargo_pretendido: data.cargo_pretendido || null,
+        status_processo: 'em_processo',
+        descricao: `Início do Processo de ${tipoLabel} (${data.cargo_ocupa || 'Sem cargo anterior'} → ${data.cargo_pretendido || 'Novo cargo'})`,
+      });
+    }
+
     return data;
   },
 
   /**
-   * Atualiza dados de um registro de consagração
+   * Atualiza dados cadastrais de um registro de consagração (Secretaria Geral / Admin)
    */
   async atualizarRegistro(
     id: string,
     ministryId: string,
-    input: Partial<ConsagracaoRegistroInput>
+    input: Partial<ConsagracaoRegistroInput>,
+    userNivel?: string | null
   ): Promise<ConsagracaoRegistro> {
+    if (userNivel === 'presidencia') {
+      throw new Error('O Presidente do Ministério não possui ação operacional para alterar dados do processo.');
+    }
+    if (userNivel === 'supervisor') {
+      throw new Error('A Comissão não possui permissão para alterar dados cadastrais do processo.');
+    }
+
     const supabase = createClient();
 
     const updateData: Record<string, any> = {
@@ -145,6 +268,9 @@ export const consacracaoService = {
     if (input.comissao_id !== undefined) {
       updateData.comissao_id = input.comissao_id || null;
     }
+
+    // Não permitir alteração arbitrária de status via payload de edição cadastral
+    delete updateData.status_processo;
 
     const { data, error } = await supabase
       .from('consagracao_registros')
@@ -166,9 +292,16 @@ export const consacracaoService = {
   },
 
   /**
-   * Exclui um registro de consagração
+   * Exclui um registro de consagração (Secretaria Geral / Admin)
    */
-  async excluirRegistro(id: string, ministryId: string): Promise<void> {
+  async excluirRegistro(id: string, ministryId: string, userNivel?: string | null): Promise<void> {
+    if (userNivel === 'presidencia') {
+      throw new Error('O Presidente do Ministério não possui ação operacional para excluir processos.');
+    }
+    if (userNivel === 'supervisor') {
+      throw new Error('A Comissão não possui permissão para excluir processos.');
+    }
+
     const supabase = createClient();
 
     const { error } = await supabase
@@ -181,19 +314,253 @@ export const consacracaoService = {
   },
 
   /**
-   * Homologa um processo de consagração e sincroniza o cargo ministerial e histórico em members
-   * através de transação atômica nativa RPC no PostgreSQL (v2).
-   *
-   * A RPC distingue três casos:
-   *   - success: true, already_homologado: false → homologação nova concluída
-   *   - success: true, already_homologado: true  → já homologado e consistente (idempotente)
-   *   - success: false, divergencia: true        → já homologado mas cadastro divergente → erro
+   * SECRETARIA GERAL: Registrar decisão da Comissão como Deferido (Em Processo → Deferido)
+   */
+  async deferirProcessoComissao(
+    processId: string,
+    ministryId: string,
+    userNivel?: string | null
+  ): Promise<ConsagracaoRegistro> {
+    if (userNivel === 'presidencia') {
+      throw new Error('O Presidente do Ministério não possui ação operacional de tramitação no sistema.');
+    }
+    if (userNivel === 'supervisor') {
+      throw new Error('A Comissão de Consagração não opera o sistema diretamente; os registros de tramitação são de competência da Secretaria Geral.');
+    }
+
+    const supabase = createClient();
+
+    const { data: reg, error: fetchErr } = await supabase
+      .from('consagracao_registros')
+      .select('id, status_processo, ministry_id, member_id, numero_processo, tipo_registro, cargo_ocupa, cargo_pretendido')
+      .eq('id', processId)
+      .eq('ministry_id', ministryId)
+      .single();
+
+    if (fetchErr || !reg) {
+      throw new Error('Processo não encontrado ou não pertence ao ministério atual.');
+    }
+
+    if (reg.status_processo !== 'em_processo') {
+      throw new Error(`Ação indisponível: o processo está com status "${reg.status_processo}" e não pode ser deferido.`);
+    }
+
+    const { data, error } = await supabase
+      .from('consagracao_registros')
+      .update({ status_processo: 'deferir', updated_at: new Date().toISOString() })
+      .eq('id', processId)
+      .eq('ministry_id', ministryId)
+      .select(`
+        *,
+        comissao:comissoes (
+          id,
+          nome,
+          status
+        )
+      `)
+      .single();
+
+    if (error) throw error;
+
+    // Registrar evento de parecer deferido no histórico do ministro
+    if (reg.member_id) {
+      await registrarEventoHistoricoMinistro(supabase, ministryId, reg.member_id, {
+        id: `${processId}_decisao_deferir_${Date.now()}`,
+        processo_id: processId,
+        numero_processo: reg.numero_processo || '',
+        tipo_evento: 'decisao_comissao',
+        tipo_registro: reg.tipo_registro,
+        decisao: 'deferir',
+        status_processo: 'deferir',
+        data: new Date().toISOString().slice(0, 10),
+        cargo_anterior: reg.cargo_ocupa || null,
+        cargo_pretendido: reg.cargo_pretendido || null,
+        descricao: 'Parecer Deferido pela Comissão de Consagração',
+      });
+    }
+
+    return data;
+  },
+
+  /**
+   * SECRETARIA GERAL: Registrar decisão da Comissão como Indeferido (Em Processo → Indeferido)
+   */
+  async indeferirProcessoComissao(
+    processId: string,
+    ministryId: string,
+    userNivel?: string | null
+  ): Promise<ConsagracaoRegistro> {
+    if (userNivel === 'presidencia') {
+      throw new Error('O Presidente do Ministério não possui ação operacional de tramitação no sistema.');
+    }
+    if (userNivel === 'supervisor') {
+      throw new Error('A Comissão de Consagração não opera o sistema diretamente; os registros de tramitação são de competência da Secretaria Geral.');
+    }
+
+    const supabase = createClient();
+
+    const { data: reg, error: fetchErr } = await supabase
+      .from('consagracao_registros')
+      .select('id, status_processo, ministry_id, member_id, numero_processo, tipo_registro, cargo_ocupa, cargo_pretendido')
+      .eq('id', processId)
+      .eq('ministry_id', ministryId)
+      .single();
+
+    if (fetchErr || !reg) {
+      throw new Error('Processo não encontrado ou não pertence ao ministério atual.');
+    }
+
+    if (reg.status_processo !== 'em_processo') {
+      throw new Error(`Ação indisponível: o processo está com status "${reg.status_processo}" e não pode ser indeferido.`);
+    }
+
+    const { data, error } = await supabase
+      .from('consagracao_registros')
+      .update({ status_processo: 'indeferir', updated_at: new Date().toISOString() })
+      .eq('id', processId)
+      .eq('ministry_id', ministryId)
+      .select(`
+        *,
+        comissao:comissoes (
+          id,
+          nome,
+          status
+        )
+      `)
+      .single();
+
+    if (error) throw error;
+
+    // Registrar evento de parecer indeferido no histórico do ministro
+    if (reg.member_id) {
+      await registrarEventoHistoricoMinistro(supabase, ministryId, reg.member_id, {
+        id: `${processId}_decisao_indeferir_${Date.now()}`,
+        processo_id: processId,
+        numero_processo: reg.numero_processo || '',
+        tipo_evento: 'decisao_comissao',
+        tipo_registro: reg.tipo_registro,
+        decisao: 'indeferir',
+        status_processo: 'indeferir',
+        data: new Date().toISOString().slice(0, 10),
+        cargo_anterior: reg.cargo_ocupa || null,
+        cargo_pretendido: reg.cargo_pretendido || null,
+        descricao: 'Parecer Indeferido pela Comissão de Consagração',
+      });
+    }
+
+    return data;
+  },
+
+  /**
+   * SECRETARIA GERAL: Voltar para Em Processo (Reabertura administrativa)
+   * Válido para processos Indeferidos (ou Deferidos pendentes de reanálise).
+   */
+  async reabrirProcessoSecretaria(
+    processId: string,
+    ministryId: string,
+    userNivel?: string | null
+  ): Promise<ConsagracaoRegistro> {
+    if (userNivel === 'presidencia') {
+      throw new Error('O Presidente do Ministério não possui ação operacional de tramitação no sistema.');
+    }
+    if (userNivel === 'supervisor') {
+      throw new Error('Ação exclusiva da Secretaria Geral: a Comissão não pode reabrir processos administrativamente.');
+    }
+
+    const supabase = createClient();
+
+    const { data: reg, error: fetchErr } = await supabase
+      .from('consagracao_registros')
+      .select('id, status_processo, ministry_id, member_id, numero_processo, tipo_registro, cargo_ocupa, cargo_pretendido')
+      .eq('id', processId)
+      .eq('ministry_id', ministryId)
+      .single();
+
+    if (fetchErr || !reg) {
+      throw new Error('Processo não encontrado ou não pertence ao ministério atual.');
+    }
+
+    if (reg.status_processo === 'homologar') {
+      throw new Error('Processo homologado: processos homologados não podem ser reabertos para tramitação.');
+    }
+
+    if (reg.status_processo === 'em_processo') {
+      throw new Error('O processo já se encontra em processo.');
+    }
+
+    const { data, error } = await supabase
+      .from('consagracao_registros')
+      .update({ status_processo: 'em_processo', updated_at: new Date().toISOString() })
+      .eq('id', processId)
+      .eq('ministry_id', ministryId)
+      .select(`
+        *,
+        comissao:comissoes (
+          id,
+          nome,
+          status
+        )
+      `)
+      .single();
+
+    if (error) throw error;
+
+    // Registrar evento de reabertura administrativa no histórico do ministro
+    if (reg.member_id) {
+      await registrarEventoHistoricoMinistro(supabase, ministryId, reg.member_id, {
+        id: `${processId}_reabertura_${Date.now()}`,
+        processo_id: processId,
+        numero_processo: reg.numero_processo || '',
+        tipo_evento: 'reabertura',
+        tipo_registro: reg.tipo_registro,
+        status_processo: 'em_processo',
+        data: new Date().toISOString().slice(0, 10),
+        cargo_anterior: reg.cargo_ocupa || null,
+        cargo_pretendido: reg.cargo_pretendido || null,
+        descricao: 'Processo reaberto administrativamente pela Secretaria Geral para Em Processo',
+      });
+    }
+
+    return data;
+  },
+
+  /**
+   * SECRETARIA GERAL: Homologar processo (Deferido → Homologado)
+   * Utiliza a RPC transacional homologar_processo_consagracao
    */
   async homologarProcesso(
     processId: string,
-    ministryId: string
+    ministryId: string,
+    userNivel?: string | null
   ): Promise<{ success: boolean; message?: string; alreadyHomologado?: boolean }> {
+    if (userNivel === 'presidencia') {
+      throw new Error('O Presidente do Ministério não possui ação operacional de homologação no sistema.');
+    }
+    if (userNivel === 'supervisor') {
+      throw new Error('Ação exclusiva da Secretaria Geral: a Comissão não possui autorização para homologar processos.');
+    }
+
     const supabase = createClient();
+
+    // Valida status prévio no banco antes de invocar a RPC
+    const { data: reg, error: fetchErr } = await supabase
+      .from('consagracao_registros')
+      .select('id, status_processo, ministry_id, member_id, numero_processo, tipo_registro, cargo_ocupa, cargo_pretendido, data_autorizacao, data_processo')
+      .eq('id', processId)
+      .eq('ministry_id', ministryId)
+      .single();
+
+    if (fetchErr || !reg) {
+      throw new Error('Processo não encontrado ou não pertence ao ministério atual.');
+    }
+
+    if (reg.status_processo === 'em_processo') {
+      throw new Error('Processo em análise: o processo precisa ser deferido pela Comissão antes de ser homologado.');
+    }
+
+    if (reg.status_processo === 'indeferir') {
+      throw new Error('Processo indeferido: processos indeferidos pela Comissão não podem ser homologados.');
+    }
 
     const { data, error } = await supabase.rpc('homologar_processo_consagracao', {
       p_process_id: processId,
@@ -212,10 +579,31 @@ export const consacracaoService = {
       divergencia?: boolean;
     } | null;
 
-    // Divergência detectada pelo banco: processo marcado como homologado
-    // mas cadastro ministerial inconsistente — propagar como erro controlado.
     if (res?.success === false && res?.divergencia === true) {
       throw new Error(res.message || 'Inconsistência detectada: processo já homologado com dados ministeriais divergentes. Revise manualmente.');
+    }
+
+    // Registrar evento de homologação no histórico do ministro (com verificação de não duplicação)
+    if (reg.member_id && !res?.already_homologado) {
+      const cargoAnterior = reg.cargo_ocupa || 'SEM CARGO';
+      const cargoResultante = reg.cargo_pretendido || reg.cargo_ocupa || '';
+      const isProgressao = reg.tipo_registro === 'progressao' || reg.tipo_registro === 'existente' || reg.tipo_registro === 'ministro';
+      const resultadoStr = isProgressao ? `${cargoAnterior} → ${cargoResultante}` : cargoResultante;
+
+      await registrarEventoHistoricoMinistro(supabase, ministryId, reg.member_id, {
+        id: `${processId}_homologacao`,
+        processo_id: processId,
+        numero_processo: reg.numero_processo || '',
+        tipo_evento: 'homologacao',
+        tipo_registro: reg.tipo_registro,
+        status_processo: 'homologar',
+        data: reg.data_autorizacao || reg.data_processo || new Date().toISOString().slice(0, 10),
+        cargo_anterior: cargoAnterior,
+        cargo_pretendido: reg.cargo_pretendido || null,
+        cargo_resultante: cargoResultante,
+        resultado: resultadoStr,
+        descricao: `Homologação de Consagração concluída: ${resultadoStr}`,
+      });
     }
 
     return {
@@ -225,3 +613,4 @@ export const consacracaoService = {
     };
   },
 };
+

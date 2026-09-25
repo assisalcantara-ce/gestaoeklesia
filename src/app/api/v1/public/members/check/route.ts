@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
 
   const { data: member, error: memErr } = await admin
     .from('members')
-    .select('id')
+    .select('*')
     .eq('ministry_id', ministryId)
     .or(`cpf.eq.${cleanCpf},cpf.eq.${formattedCpf}`)
     .maybeSingle();
@@ -151,9 +151,73 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // ── 6. Retorno estrito de segurança (sem expor quaisquer dados cadastrais) ──
+  function toDateInputString(val: any): string {
+    if (!val) return '';
+    const str = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+      return str.slice(0, 10);
+    }
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) {
+      const [d, m, y] = str.split('/');
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    return '';
+  }
+
+  // ── 6. Retorno dos dados permitidos para auto-preenchimento do formulário ──
+  if (member) {
+    const cf = (member.custom_fields && typeof member.custom_fields === 'object') ? member.custom_fields : {};
+
+    let tipoCadastro = member.tipo_cadastro || member.role || cf.tipoCadastro || 'membro';
+    const tipoLower = String(tipoCadastro).toLowerCase().trim();
+    if (tipoLower === 'obreiro' || tipoLower === 'ministro') {
+      tipoCadastro = 'ministro';
+    } else {
+      tipoCadastro = 'membro';
+    }
+
+    const memberData = {
+      tipo_cadastro: tipoCadastro,
+      cargo_ministerial: member.cargo_ministerial || cf.cargoMinisterial || cf.cargo_ministerial || '',
+      name: member.name || cf.nome || '',
+      nome_pai: member.nome_pai || cf.nomePai || cf.nome_pai || '',
+      nome_mae: member.nome_mae || cf.nomeMae || cf.nome_mae || '',
+      rg: member.rg || cf.rg || '',
+      data_batismo_aguas: toDateInputString(member.data_batismo_aguas || cf.dataBatismoAguas || cf.data_batismo_aguas || cf.dataBatismo),
+      email: member.email || cf.email || '',
+      phone: member.phone || cf.phone || '',
+      celular: member.celular || cf.celular || member.phone || '',
+      whatsapp: member.whatsapp || cf.whatsapp || member.celular || member.phone || '',
+      data_nascimento: toDateInputString(member.data_nascimento || cf.dataNascimento || cf.data_nascimento),
+      sexo: (member.sexo || cf.sexo || '').toUpperCase(),
+      estado_civil: (member.estado_civil || cf.estadoCivil || cf.estado_civil || '').toUpperCase(),
+      nome_conjuge: member.nome_conjuge || cf.nomeConjuge || cf.nome_conjuge || '',
+      cpf_conjuge: member.cpf_conjuge || cf.cpfConjuge || cf.cpf_conjuge || '',
+      data_nascimento_conjuge: toDateInputString(member.data_nascimento_conjuge || cf.dataNascimentoConjuge || cf.data_nascimento_conjuge),
+      profissao: member.profissao || cf.profissao || '',
+      cep: member.cep || cf.cep || '',
+      logradouro: member.logradouro || cf.logradouro || '',
+      numero: member.numero || cf.numero || '',
+      bairro: member.bairro || cf.bairro || '',
+      complemento: member.complemento || cf.complemento || '',
+      cidade: member.cidade || cf.cidade || '',
+      estado: member.estado || cf.uf || cf.estado || '',
+      escolaridade: member.escolaridade || cf.escolaridade || '',
+      nacionalidade: member.nacionalidade || cf.nacionalidade || 'BRASILEIRA',
+      naturalidade: member.naturalidade || cf.naturalidade || '',
+      uf_naturalidade: member.uf_naturalidade || cf.ufNaturalidade || cf.uf_naturalidade || '',
+      foto_url: member.foto_url || cf.fotoUrl || '',
+    };
+
+    return NextResponse.json({
+      exists: true,
+      institution_name: ministry.name,
+      data: memberData,
+    });
+  }
+
   return NextResponse.json({
-    exists: !!member,
+    exists: false,
     institution_name: ministry.name,
   });
 }

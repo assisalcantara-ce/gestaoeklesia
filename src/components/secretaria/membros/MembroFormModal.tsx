@@ -1031,6 +1031,105 @@ export default function MembroFormModal({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 />
               </div>
+
+              {/* Histórico / Trajetória de Consagrações e Processos */}
+              {membroEditando && (
+                <div className="p-4 border border-slate-200 rounded-lg bg-slate-50 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>📜</span> Histórico de Processos e Consagração
+                    </h3>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {((membroEditando?.historico_processos || membroEditando?.historicoProcessos || membroEditando?.custom_fields?.historico_processos || []) as Array<any>).length} registro(s)
+                    </span>
+                  </div>
+
+                  {((membroEditando?.historico_processos || membroEditando?.historicoProcessos || membroEditando?.custom_fields?.historico_processos || []) as Array<any>).length === 0 ? (
+                    <p className="text-xs text-slate-500 italic py-2 text-center">
+                      Nenhum processo de consagração registrado no histórico deste ministro.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {((membroEditando?.historico_processos || membroEditando?.historicoProcessos || membroEditando?.custom_fields?.historico_processos || []) as Array<any>)
+                        .slice()
+                        .reverse()
+                        .map((item: any, idx: number) => {
+                          const isHomologado = item.tipo_evento === 'homologacao' || item.status_processo === 'homologar';
+                          const isDeferido = item.decisao === 'deferir' || item.status_processo === 'deferir';
+                          const isIndeferido = item.decisao === 'indeferir' || item.status_processo === 'indeferir';
+                          const isReaberto = item.tipo_evento === 'reabertura';
+
+                          const badgeColor = isHomologado
+                            ? 'bg-purple-100 text-purple-800 border-purple-200'
+                            : isDeferido
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                            : isIndeferido
+                            ? 'bg-red-100 text-red-800 border-red-200'
+                            : isReaberto
+                            ? 'bg-amber-100 text-amber-800 border-amber-200'
+                            : 'bg-sky-100 text-sky-800 border-sky-200';
+
+                          const badgeLabel = isHomologado
+                            ? 'Homologado'
+                            : isDeferido
+                            ? 'Comissão: Deferido'
+                            : isIndeferido
+                            ? 'Comissão: Indeferido'
+                            : isReaberto
+                            ? 'Reaberto'
+                            : 'Início do Processo';
+
+                          const dataFormatada = item.data
+                            ? item.data.split('-').reverse().join('/')
+                            : item.criado_em
+                            ? new Date(item.criado_em).toLocaleDateString('pt-BR')
+                            : '-';
+
+                          return (
+                            <div
+                              key={item.id || idx}
+                              className="bg-white p-2.5 rounded-lg border border-slate-200 text-xs space-y-1 shadow-2xs"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badgeColor}`}>
+                                    {badgeLabel}
+                                  </span>
+                                  {item.numero_processo && (
+                                    <span className="font-mono text-[11px] font-bold text-slate-700">
+                                      Proc. nº {item.numero_processo}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  {dataFormatada}
+                                </span>
+                              </div>
+
+                              {item.resultado ? (
+                                <div className="font-semibold text-slate-800 text-[11px]">
+                                  {item.resultado}
+                                </div>
+                              ) : item.cargo_anterior || item.cargo_pretendido ? (
+                                <div className="text-slate-600 text-[11px]">
+                                  {item.cargo_anterior ? `De: ${item.cargo_anterior}` : ''}
+                                  {item.cargo_anterior && item.cargo_pretendido ? ' → ' : ''}
+                                  {item.cargo_pretendido ? `Para: ${item.cargo_pretendido}` : ''}
+                                </div>
+                              ) : null}
+
+                              {item.descricao && (
+                                <p className="text-slate-500 text-[10px] italic">
+                                  {item.descricao}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

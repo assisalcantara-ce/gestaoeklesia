@@ -533,15 +533,26 @@ export function useMembros() {
     if (!ministryId) return;
 
     try {
-      const { data, count, error } = await supabase
+      // Buscar IDs de processos DEFERIDOS no tenant para ocultação temporária de Ativos
+      const { data: deferidosData } = await supabase
+        .from('consagracao_registros')
+        .select('member_id')
+        .eq('ministry_id', ministryId)
+        .eq('status_processo', 'deferir')
+        .not('member_id', 'is', null);
+
+      const deferidosIds = new Set((deferidosData || []).map((d: any) => d.member_id).filter(Boolean));
+
+      const { data, error } = await supabase
         .from('members')
-        .select('id, name, status, role, tipo_cadastro, cargo_ministerial, data_nascimento, created_at, congregacao_id, matricula, custom_fields', { count: 'exact' })
+        .select('id, name, status, role, tipo_cadastro, cargo_ministerial, data_nascimento, created_at, congregacao_id, matricula, custom_fields')
         .eq('ministry_id', ministryId);
 
       if (!error && data) {
-        const overviewList = data.map(memberToMembro);
+        const filteredData = data.filter((m: any) => !deferidosIds.has(m.id));
+        const overviewList = filteredData.map(memberToMembro);
         setMembrosOverview(overviewList);
-        setTotalMembrosCount(count ?? data.length);
+        setTotalMembrosCount(filteredData.length);
       }
     } catch (err) {
       console.error('Erro ao carregar dados de overview:', err);

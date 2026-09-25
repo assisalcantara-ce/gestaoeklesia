@@ -75,6 +75,18 @@ export default function ConsagracaoPage() {
   const { ctx, bloqueado } = useRequireModulo('comissao');
   const planFeatures = usePlanFeatures();
   const isSupervisor = ctx.nivel === 'supervisor';
+  const isAdmin = ctx.nivel === 'administrador';
+  const isSecretarioGeral = ctx.nivel === 'secretario_geral';
+  const isPresidencia = ctx.nivel === 'presidencia';
+
+  // A Secretaria Geral (e Administrador) é o único operador de tramitação no sistema.
+  // A Comissão de Consagração analisa fora do sistema e devolve o parecer.
+  // O Presidente é signatário e não possui ação operacional de tramitação.
+  const canOperarTramitacao = isSecretarioGeral || ctx.nivel === 'auxiliar_secretaria' || isAdmin || (!isSupervisor && !isPresidencia && ctx.podeEscrever('secretaria'));
+
+  // Capacidade de cadastrar novo processo ou editar dados cadastrais
+  const canCadastrarEditar = canOperarTramitacao;
+
   const supabase = useMemo(() => createClient(), []);
   const { fetchMembers } = useMembers();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -214,20 +226,29 @@ export default function ConsagracaoPage() {
       const div3Regs = orgService.getDivisao3();
 
       // Divisão 1: Congregações (filhas da Divisão 2)
-      // Divisão 2: Campos / Setores (filhos da Divisão 3)
+      // Divisão 2: Campos / Grupos (filhos da Divisão 3)
       // Divisão 3: Supervisões / Regionais (topo da hierarquia)
-      setCongregacoes(div1Regs.map((u) => ({ id: u.id, nome: u.nome, campo_id: u.parentId })));
-      setCampos(div2Regs.map((u) => ({ id: u.id, nome: u.nome, supervisao_id: u.parentId })));
+      const congregacoesValidas = div1Regs
+        .filter((u) => u.tabelaOrigem === 'congregacoes' || !div3Regs.some((s) => s.id === u.id))
+        .map((u) => ({
+          id: u.id,
+          nome: u.nome,
+          campo_id: u.tabelaOrigem === 'congregacoes' ? (u.parentId || null) : null,
+          supervisao_id: null,
+        }));
+
+      setCongregacoes(congregacoesValidas);
+      setCampos(div2Regs.map((u) => ({ id: u.id, nome: u.nome, supervisao_id: u.parentId || null })));
       setSupervisoes(div3Regs.map((u) => ({ id: u.id, nome: u.nome })));
 
       // Determina IDs de congregações visíveis para o supervisor
       if (isSupervisor && ctx.supervisaoId) {
         const camposDaSupervisao = div2Regs.filter((c) => c.parentId === ctx.supervisaoId).map((c) => c.id);
-        const uVisiveis = div1Regs.filter((u) => u.parentId === ctx.supervisaoId || (u.parentId && camposDaSupervisao.includes(u.parentId)));
+        const uVisiveis = congregacoesValidas.filter((u) => (u.campo_id && camposDaSupervisao.includes(u.campo_id)));
         scopeCongIds = uVisiveis.map((u) => u.id);
       }
 
-      // Buscar dados do ministério e responsável configurado no perfil da igreja
+      // Buscar dados do ministério e responsável configurado no perfil da igreja (Configurações -> Geral)
       let responsavel = '';
       let churchNome = '';
       let churchLogo = '';
@@ -242,7 +263,7 @@ export default function ConsagracaoPage() {
         }
         if (configData?.church_profile && typeof configData.church_profile === 'object') {
           const cp = configData.church_profile as any;
-          responsavel = cp.responsavel || '';
+          responsavel = String(cp.responsavel || '').trim();
           if (!churchNome && cp.nome) churchNome = cp.nome;
           if (!churchLogo && cp.logo) churchLogo = cp.logo;
         }
@@ -475,6 +496,7 @@ export default function ConsagracaoPage() {
         .toUpperCase();
 
     const matchCargoMinisterial = (rawCargo: unknown) => {
+      if (!rawCargo) return '';
       const target = normalizeText(rawCargo);
       if (!target) return '';
       // 1. Match exato com lista de cargos ministeriais
@@ -483,23 +505,19 @@ export default function ConsagracaoPage() {
       // 2. Match parcial / prefixo (ex: "OBREIRO" -> "Obreiro(a)", "MISSIONARIO" -> "Missionário(a)")
       const partial = cargosMinisteriais.find((c) => {
         const cNorm = normalizeText(c.nome);
-        return cNorm.startsWith(target) || target.startsWith(cNorm);
+        return cNorm === target || cNorm.startsWith(target) || target.startsWith(cNorm);
       });
       if (partial) return partial.nome;
-      return String(rawCargo || '').trim();
+      return String(rawCargo).trim();
     };
 
+    // Origem: members.cargo_ministerial (com fallback para custom_fields caso o membro tenha sido importado com cargo em custom_fields)
     const rawCargo =
       (member as any).cargo_ministerial ||
       cf.cargoMinisterial ||
       cf.cargo_ministerial ||
       (member as any).cargo ||
       cf.cargo ||
-      (member as any).dados_cargos?.cargo_ministerial ||
-      (member as any).dados_cargos?.cargo ||
-      (member as any).qual_funcao ||
-      cf.qualFuncao ||
-      (member as any).occupation ||
       '';
 
     const cargoOcupa = matchCargoMinisterial(rawCargo);
@@ -512,46 +530,31 @@ export default function ConsagracaoPage() {
       return found?.id || '';
     };
 
-    const memberSupervisaoIdRaw =
-      String((member as any).supervisao_id || cf.supervisao_id || '') ||
-      findOptionIdByName(
-        supervisoes,
-        (member as any).supervisao || cf.supervisao || cf.regional || cf.divisao3
-      );
-
-    const memberCampoIdRaw =
-      String((member as any).campo_id || cf.campo_id || '') ||
-      findOptionIdByName(
-        campos,
-        (member as any).campo || cf.campo || cf.setor || cf.divisao2
-      );
-
+    // Resolução de Congregação do Membro (apenas congregações válidas do tenant)
     const memberCongregacaoIdRaw =
-      String((member as any).congregacao_id || cf.congregacao_id || '') ||
-      findOptionIdByName(
-        congregacoes,
-        (member as any).congregacao || cf.congregacao || cf.igreja || cf.divisao1
-      );
+      (congregacoes.some((cg) => cg.id === (member as any).congregacao_id) ? (member as any).congregacao_id : '') ||
+      (congregacoes.some((cg) => cg.id === cf.congregacao_id) ? cf.congregacao_id : '') ||
+      findOptionIdByName(congregacoes, (member as any).congregacao || cf.congregacao || cf.igreja || cf.divisao1) ||
+      findOptionIdByName(congregacoes, (member as any).supervisao || cf.supervisao); // Caso o nome da congregação tenha sido gravado no campo supervisao
+
+    const congregacaoFromId = congregacoes.find((c) => c.id === memberCongregacaoIdRaw) || null;
+
+    // Resolução de Grupo / Campo
+    const memberCampoIdRaw =
+      congregacaoFromId?.campo_id ||
+      (campos.some((cp) => cp.id === (member as any).campo_id) ? (member as any).campo_id : '') ||
+      (campos.some((cp) => cp.id === cf.campo_id) ? cf.campo_id : '') ||
+      findOptionIdByName(campos, (member as any).campo || cf.campo || cf.setor || cf.divisao2);
 
     const campoFromId = campos.find((c) => c.id === memberCampoIdRaw) || null;
-    const congregacaoFromId = congregacoes.find((c) => c.id === memberCongregacaoIdRaw) || null;
-    const campoFromCongregacao = congregacaoFromId?.campo_id
-      ? campos.find((c) => c.id === congregacaoFromId.campo_id) || null
-      : null;
 
-    const memberSupervisaoId =
-      memberSupervisaoIdRaw ||
+    // Resolução de Supervisão / Regional
+    const memberSupervisaoIdRaw =
       campoFromId?.supervisao_id ||
       congregacaoFromId?.supervisao_id ||
-      campoFromCongregacao?.supervisao_id ||
-      '';
-
-    const memberCampoId =
-      memberCampoIdRaw ||
-      congregacaoFromId?.campo_id ||
-      '';
-
-    const memberCongregacaoId = memberCongregacaoIdRaw || '';
+      (supervisoes.some((sp) => sp.id === (member as any).supervisao_id) ? (member as any).supervisao_id : '') ||
+      (supervisoes.some((sp) => sp.id === cf.supervisao_id) ? cf.supervisao_id : '') ||
+      findOptionIdByName(supervisoes, (member as any).supervisao || cf.supervisao || cf.regional || cf.divisao3);
 
     suppressNextSearchRef.current = true;
     setMemberQuery(member.name || (member as any).nome || '');
@@ -561,6 +564,7 @@ export default function ConsagracaoPage() {
       const next = { ...prev };
       delete next.nome;
       delete next.member_id;
+      delete next.cargo_ocupa;
       return next;
     });
 
@@ -583,10 +587,12 @@ export default function ConsagracaoPage() {
       nome_conjuge: (member as any).nome_conjuge || cf.nomeConjuge || prev.nome_conjuge,
       matricula: (member as any).matricula || cf.matricula || prev.matricula,
       data_processo: prev.data_processo || processDate,
-      supervisao_id: memberSupervisaoId || '',
-      campo_id: memberCampoId || '',
-      congregacao_id: memberCongregacaoId || '',
+      supervisao_id: memberSupervisaoIdRaw || '',
+      campo_id: memberCampoIdRaw || '',
+      congregacao_id: memberCongregacaoIdRaw || '',
       cargo_ocupa: cargoOcupa || '',
+      // Preservar cargo pretendido intocado
+      cargo_pretendido: prev.cargo_pretendido,
       pastor_solicitante: prev.pastor_solicitante || responsavelTenant || '',
       foto_url: fotoUrl || prev.foto_url
     }));
@@ -726,30 +732,26 @@ export default function ConsagracaoPage() {
     }
 
     if (editingRegistro) {
-      const { error } = await supabase
-        .from('consagracao_registros')
-        .update({ ...normalizedPayload, updated_at: new Date().toISOString() })
-        .eq('id', editingRegistro.id);
-      if (error) {
-        if (isConsagracaoTableMissing(error)) {
-          setConsagracaoModuleReady(false);
-          setStatusMensagem('Módulo Consagração indisponível: tabela public.consagracao_registros não encontrada. Aplique as migrations de Consagração no Supabase.');
-          return;
-        }
-        setStatusMensagem(`Erro ao atualizar registro: ${error.message}`);
+      try {
+        await consacracaoService.atualizarRegistro(
+          editingRegistro.id,
+          ministryId,
+          normalizedPayload,
+          ctx.nivel
+        );
+      } catch (err: any) {
+        setStatusMensagem(`Erro ao atualizar registro: ${err.message}`);
         return;
       }
     } else {
-      const { error } = await supabase
-        .from('consagracao_registros')
-        .insert(normalizedPayload);
-      if (error) {
-        if (isConsagracaoTableMissing(error)) {
-          setConsagracaoModuleReady(false);
-          setStatusMensagem('Módulo Consagração indisponível: tabela public.consagracao_registros não encontrada. Aplique as migrations de Consagração no Supabase.');
-          return;
-        }
-        setStatusMensagem(`Erro ao criar registro: ${error.message}`);
+      try {
+        await consacracaoService.criarRegistro(
+          ministryId,
+          normalizedPayload,
+          ctx.nivel
+        );
+      } catch (err: any) {
+        setStatusMensagem(`Erro ao criar registro: ${err.message}`);
         return;
       }
     }
@@ -763,15 +765,14 @@ export default function ConsagracaoPage() {
       );
     }
 
-    setStatusMensagem('Registro salvo.');
+    setStatusMensagem('Registro salvo com sucesso.');
     resetForm();
     setShowForm(false);
     await ensureNumeroProcesso();
-    const { data, error } = await supabase
-      .from('consagracao_registros')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (!error && data) setRegistros(data);
+    if (ministryId) {
+      const data = await consacracaoService.listarRegistros(ministryId);
+      setRegistros(data);
+    }
   };
 
   const handleDeleteRegistro = async (id: string) => {
@@ -780,72 +781,107 @@ export default function ConsagracaoPage() {
       return;
     }
 
-    const { error } = await supabase
-      .from('consagracao_registros')
-      .delete()
-      .eq('id', id);
-    if (error) {
-      if (isConsagracaoTableMissing(error)) {
-        setConsagracaoModuleReady(false);
-        setStatusMensagem('Módulo Consagração indisponível: tabela public.consagracao_registros não encontrada. Aplique as migrations de Consagração no Supabase.');
-        return;
-      }
-      setStatusMensagem('Erro ao remover registro.');
-      return;
+    if (!ministryId) return;
+
+    try {
+      setDeleting(true);
+      await consacracaoService.excluirRegistro(id, ministryId, ctx.nivel);
+      setRegistros((prev) => prev.filter((r) => r.id !== id));
+      setDeleteModalOpen(false);
+      setRegistroParaExcluir(null);
+      setStatusMensagem('Processo excluído com sucesso.');
+    } catch (err: any) {
+      setStatusMensagem(`Erro ao remover registro: ${err.message}`);
+    } finally {
+      setDeleting(false);
     }
-    setRegistros((prev) => prev.filter((r) => r.id !== id));
   };
 
-  const handleUpdateStatus = async (status: string) => {
-    if (!consagracaoModuleReady) {
-      setStatusMensagem('Módulo Consagração indisponível: tabela de registros não encontrada no banco.');
-      return;
-    }
-
+  /**
+   * COMISSÃO: Deliberação de mérito (Deferir / Indeferir)
+   */
+  const handleComissaoDecisao = async (decisao: 'deferir' | 'indeferir') => {
     if (!processRegistro || !ministryId) return;
 
     try {
-      if (status === 'homologar') {
-        const res = await consacracaoService.homologarProcesso(processRegistro.id, ministryId);
-        setStatusMensagem(res.message || 'Processo homologado com sucesso.');
+      if (decisao === 'deferir') {
+        await consacracaoService.deferirProcessoComissao(processRegistro.id, ministryId, ctx.nivel);
+        setStatusMensagem('Processo deferido pela Comissão com sucesso.');
       } else {
-        const { error } = await supabase
-          .from('consagracao_registros')
-          .update({ status_processo: status, updated_at: new Date().toISOString() })
-          .eq('id', processRegistro.id)
-          .eq('ministry_id', ministryId);
+        await consacracaoService.indeferirProcessoComissao(processRegistro.id, ministryId, ctx.nivel);
+        setStatusMensagem('Processo indeferido pela Comissão.');
+      }
 
-        if (error) {
-          if (isConsagracaoTableMissing(error)) {
-            setConsagracaoModuleReady(false);
-            setStatusMensagem('Módulo Consagração indisponível: tabela public.consagracao_registros não encontrada.');
-            return;
-          }
-          setStatusMensagem(`Erro ao atualizar status: ${error.message}`);
-          return;
-        }
-
-        const tipoProcesso = normalizeTipoRegistro(processRegistro.tipo_registro || '');
-        if (tipoProcesso === 'progressao' && processRegistro.member_id) {
-          await syncMemberProgressStatus(
-            processRegistro.member_id,
-            status,
-            processRegistro.cargo_pretendido || '',
-            processRegistro.cargo_ocupa || ''
-          );
-        }
-
-        setStatusMensagem('Status do processo atualizado com sucesso.');
+      const tipoProcesso = normalizeTipoRegistro(processRegistro.tipo_registro || '');
+      if (tipoProcesso === 'progressao' && processRegistro.member_id) {
+        await syncMemberProgressStatus(
+          processRegistro.member_id,
+          decisao,
+          processRegistro.cargo_pretendido || '',
+          processRegistro.cargo_ocupa || ''
+        );
       }
 
       setRegistros((prev) =>
-        prev.map((r) => (r.id === processRegistro.id ? { ...r, status_processo: status } : r))
+        prev.map((r) => (r.id === processRegistro.id ? { ...r, status_processo: decisao } : r))
       );
       setProcessModalOpen(false);
       setProcessRegistro(null);
     } catch (err: any) {
-      console.error('Erro ao processar status:', err);
-      setStatusMensagem(err.message || 'Erro ao processar registro.');
+      console.error('Erro na deliberação da Comissão:', err);
+      setStatusMensagem(err.message || 'Erro ao deliberar sobre o processo.');
+    }
+  };
+
+  /**
+   * SECRETARIA GERAL: Homologação do processo
+   */
+  const handleSecretariaHomologar = async () => {
+    if (!processRegistro || !ministryId) return;
+
+    try {
+      const res = await consacracaoService.homologarProcesso(processRegistro.id, ministryId, ctx.nivel);
+      setStatusMensagem(res.message || 'Processo homologado com sucesso.');
+
+      setRegistros((prev) =>
+        prev.map((r) => (r.id === processRegistro.id ? { ...r, status_processo: 'homologar' } : r))
+      );
+      setProcessModalOpen(false);
+      setProcessRegistro(null);
+    } catch (err: any) {
+      console.error('Erro ao homologar processo:', err);
+      setStatusMensagem(err.message || 'Erro ao homologar processo.');
+    }
+  };
+
+  /**
+   * SECRETARIA GERAL: Reabertura administrativa (Voltar para Em Processo)
+   */
+  const handleSecretariaReabrir = async () => {
+    if (!processRegistro || !ministryId) return;
+
+    try {
+      await consacracaoService.reabrirProcessoSecretaria(processRegistro.id, ministryId, ctx.nivel);
+      setStatusMensagem('Processo reaberto para Em Processo.');
+
+      const tipoProcesso = normalizeTipoRegistro(processRegistro.tipo_registro || '');
+      if (tipoProcesso === 'progressao' && processRegistro.member_id) {
+        await syncMemberProgressStatus(
+          processRegistro.member_id,
+          'em_processo',
+          processRegistro.cargo_pretendido || '',
+          processRegistro.cargo_ocupa || ''
+        );
+      }
+
+      setRegistros((prev) =>
+        prev.map((r) => (r.id === processRegistro.id ? { ...r, status_processo: 'em_processo' } : r))
+      );
+      setProcessModalOpen(false);
+      setProcessRegistro(null);
+    } catch (err: any) {
+      console.error('Erro ao reabrir processo:', err);
+      setStatusMensagem(err.message || 'Erro ao reabrir processo.');
     }
   };
 
@@ -1727,7 +1763,7 @@ export default function ConsagracaoPage() {
           <p className="text-gray-500 text-sm">
             Separação de ministros: chegadas, progressão e filiação ministerial.
           </p>
-          {!isSupervisor && (
+          {canCadastrarEditar && (
             <button
               className={`inline-flex items-center gap-2 text-white px-5 py-2.5 rounded-xl font-semibold transition shadow-md ${
                 consagracaoModuleReady ? 'bg-teal-600 hover:bg-teal-700' : 'bg-gray-400 cursor-not-allowed'
@@ -2008,7 +2044,8 @@ export default function ConsagracaoPage() {
                         >
                           🖨️
                         </button>
-                        {!isSupervisor && (
+                        {/* Editar Cadastro (Secretaria Geral / Admin) */}
+                        {canCadastrarEditar && (
                           <button
                             type="button"
                             className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition text-sm shadow-xs"
@@ -2019,21 +2056,60 @@ export default function ConsagracaoPage() {
                             ✏️
                           </button>
                         )}
-                        {!isSupervisor && (
+
+                        {/* SECRETARIA GERAL: Registrar decisão da Comissão (quando Em Processo) */}
+                        {canOperarTramitacao && reg.status_processo === 'em_processo' && (
                           <button
                             type="button"
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition text-sm shadow-xs"
+                            className="inline-flex items-center justify-center px-2.5 h-8 rounded-lg bg-teal-50 text-teal-700 border border-teal-300 hover:bg-teal-100 transition text-xs font-semibold shadow-xs gap-1"
                             onClick={() => {
                               setProcessRegistro(reg);
                               setProcessModalOpen(true);
                             }}
-                            title="Tramitar / Homologar status"
-                            aria-label="Tramitar / Homologar status"
+                            title="Registrar decisão da Comissão"
+                            aria-label="Registrar decisão da Comissão"
                           >
-                            ⚖️
+                            <span>📝</span>
+                            <span>Registrar decisão</span>
                           </button>
                         )}
-                        {!isSupervisor && (
+
+                        {/* SECRETARIA GERAL: Homologação (quando Deferido) */}
+                        {canOperarTramitacao && reg.status_processo === 'deferir' && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center px-2.5 h-8 rounded-lg bg-purple-50 text-purple-700 border border-purple-300 hover:bg-purple-100 transition text-xs font-semibold shadow-xs gap-1"
+                            onClick={() => {
+                              setProcessRegistro(reg);
+                              setProcessModalOpen(true);
+                            }}
+                            title="Secretaria Geral: Homologar / Reabrir"
+                            aria-label="Homologar Processo"
+                          >
+                            <span>📜</span>
+                            <span>Homologar</span>
+                          </button>
+                        )}
+
+                        {/* SECRETARIA GERAL: Reabertura administrativa (quando Indeferido) */}
+                        {canOperarTramitacao && reg.status_processo === 'indeferir' && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center px-2.5 h-8 rounded-lg bg-amber-50 text-amber-700 border border-amber-300 hover:bg-amber-100 transition text-xs font-semibold shadow-xs gap-1"
+                            onClick={() => {
+                              setProcessRegistro(reg);
+                              setProcessModalOpen(true);
+                            }}
+                            title="Secretaria Geral: Reabrir Processo"
+                            aria-label="Reabrir Processo"
+                          >
+                            <span>🔄</span>
+                            <span>Reabrir</span>
+                          </button>
+                        )}
+
+                        {/* Excluir Processo (Secretaria Geral / Admin) */}
+                        {canCadastrarEditar && (
                           <button
                             type="button"
                             className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition text-sm shadow-xs"
@@ -2628,16 +2704,14 @@ export default function ConsagracaoPage() {
                         </div>
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-1">Status do Processo</label>
-                          <select
-                            className="mt-1 w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={formRegistro.status_processo}
-                            onChange={(e) => setFormRegistro({ ...formRegistro, status_processo: e.target.value })}
-                          >
-                            <option value="em_processo">Em Processo</option>
-                            <option value="deferir">Deferido</option>
-                            <option value="indeferir">Indeferido</option>
-                            <option value="homologar">Homologado</option>
-                          </select>
+                          <div className="mt-1 px-3 py-2 bg-slate-100 border border-slate-300 rounded-lg flex items-center justify-between">
+                            <span className="text-sm font-semibold text-slate-800">
+                              {STATUS_LABELS[formRegistro.status_processo] || formRegistro.status_processo || 'Em Processo'}
+                            </span>
+                            <span className="text-xs text-slate-500 italic">
+                              (Fluxo de tramitação)
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -2788,43 +2862,134 @@ export default function ConsagracaoPage() {
       )}
 
       {processModalOpen && processRegistro && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Alterar Registro - Processos</h3>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-gray-100">
+            {/* Cabeçalho do Modal */}
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">
+                  {processRegistro.status_processo === 'em_processo'
+                    ? '📝'
+                    : processRegistro.status_processo === 'deferir'
+                    ? '📜'
+                    : '🔄'}
+                </span>
+                <h3 className="text-lg font-bold text-slate-800">
+                  {processRegistro.status_processo === 'em_processo'
+                    ? 'Decisão da Comissão'
+                    : processRegistro.status_processo === 'deferir'
+                    ? 'Homologação — Secretaria Geral'
+                    : 'Reabertura — Secretaria Geral'}
+                </h3>
+              </div>
               <button
-                className="text-gray-500 hover:text-gray-800"
-                onClick={() => setProcessModalOpen(false)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
+                onClick={() => {
+                  setProcessModalOpen(false);
+                  setProcessRegistro(null);
+                }}
               >
-                X
+                ✕
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                className="px-4 py-3 bg-green-100 text-green-700 rounded-lg font-semibold hover:bg-green-200"
-                onClick={() => handleUpdateStatus('deferir')}
-              >
-                Deferir
-              </button>
-              <button
-                className="px-4 py-3 bg-red-100 text-red-700 rounded-lg font-semibold hover:bg-red-200"
-                onClick={() => handleUpdateStatus('indeferir')}
-              >
-                Indeferir
-              </button>
-              <button
-                className="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg font-semibold hover:bg-blue-200"
-                onClick={() => handleUpdateStatus('em_processo')}
-              >
-                Em Processo
-              </button>
-              <button
-                className="px-4 py-3 bg-emerald-100 text-emerald-700 rounded-lg font-semibold hover:bg-emerald-200"
-                onClick={() => handleUpdateStatus('homologar')}
-              >
-                Homologar
-              </button>
+
+            {/* Resumo do Processo */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-5 space-y-2 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Nº Processo:</span>
+                <span className="font-bold text-slate-800">{processRegistro.numero_processo || '-'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Candidato / Ministro:</span>
+                <span className="font-bold text-slate-900">{processRegistro.nome}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Cargo Pretendido:</span>
+                <span className="font-semibold text-teal-700">{processRegistro.cargo_pretendido || '-'}</span>
+              </div>
+              <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                <span className="text-slate-500 font-medium">Status Atual:</span>
+                <span
+                  className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                    processRegistro.status_processo === 'deferir'
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : processRegistro.status_processo === 'indeferir'
+                      ? 'bg-red-50 text-red-700 border-red-200'
+                      : processRegistro.status_processo === 'homologar'
+                      ? 'bg-purple-50 text-purple-700 border-purple-200'
+                      : 'bg-teal-50 text-teal-700 border-teal-200'
+                  }`}
+                >
+                  {STATUS_LABELS[processRegistro.status_processo] || processRegistro.status_processo || 'Em Processo'}
+                </span>
+              </div>
             </div>
+
+            {/* Ações Específicas por Status */}
+            {processRegistro.status_processo === 'em_processo' && canOperarTramitacao && (
+              <div className="space-y-4">
+                <p className="text-xs text-slate-600 bg-slate-100 border border-slate-200 p-3 rounded-lg">
+                  📝 <strong>Secretaria Geral:</strong> Registre abaixo a decisão recebida da Comissão de Consagração após análise da Ficha do Processo.
+                </p>
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <button
+                    type="button"
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition shadow-sm cursor-pointer"
+                    onClick={() => handleComissaoDecisao('deferir')}
+                  >
+                    <span>✅</span> Deferido
+                  </button>
+                  <button
+                    type="button"
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition shadow-sm cursor-pointer"
+                    onClick={() => handleComissaoDecisao('indeferir')}
+                  >
+                    <span>❌</span> Indeferido
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {processRegistro.status_processo === 'deferir' && canOperarTramitacao && (
+              <div className="space-y-4">
+                <p className="text-xs text-slate-600 bg-purple-50 border border-purple-200 p-3 rounded-lg">
+                  📜 <strong>Secretaria Geral:</strong> Processo deferido pela Comissão. Homologue para efetivar oficialmente os registros e histórico ministerial, ou reabra se houver pendência administrativa.
+                </p>
+                <div className="flex flex-col gap-2 pt-2">
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition shadow-md cursor-pointer"
+                    onClick={handleSecretariaHomologar}
+                  >
+                    <span>📜</span> Homologar Consagração
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition text-sm cursor-pointer"
+                    onClick={handleSecretariaReabrir}
+                  >
+                    <span>🔄</span> Voltar para Em Processo (Reabrir)
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {processRegistro.status_processo === 'indeferir' && canOperarTramitacao && (
+              <div className="space-y-4">
+                <p className="text-xs text-slate-600 bg-red-50 border border-red-200 p-3 rounded-lg">
+                  🔄 <strong>Secretaria Geral:</strong> Processo indeferido pela Comissão. A Secretaria Geral pode reabri-lo administrativamente para uma nova análise pela Comissão.
+                </p>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition shadow-md cursor-pointer"
+                    onClick={handleSecretariaReabrir}
+                  >
+                    <span>🔄</span> Voltar para Em Processo (Reabrir)
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

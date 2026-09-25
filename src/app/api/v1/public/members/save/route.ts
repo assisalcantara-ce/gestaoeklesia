@@ -168,13 +168,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!normalizedBody.data_batismo_aguas || typeof normalizedBody.data_batismo_aguas !== 'string' || !normalizedBody.data_batismo_aguas.trim()) {
-    return NextResponse.json(
-      { error: 'Data de Batismo é obrigatória.' },
-      { status: 400 }
-    );
-  }
-
   // ── 7. Buscar se o membro já existe no ministério ──────────────────────────
   const formattedCpf = `${cleanCpf.slice(0, 3)}.${cleanCpf.slice(3, 6)}.${cleanCpf.slice(6, 9)}-${cleanCpf.slice(9)}`;
 
