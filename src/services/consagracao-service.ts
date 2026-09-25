@@ -324,7 +324,7 @@ export const consacracaoService = {
   /**
    * Exclui um registro de consagração (Secretaria Geral / Admin)
    */
-  async excluirRegistro(id: string, ministryId: string, userNivel?: string | null): Promise<void> {
+  async excluirRegistro(id: string, ministryId: string, userNivel?: string | null, clientOverride?: any): Promise<void> {
     if (userNivel === 'presidencia') {
       throw new Error('O Presidente do Ministério não possui ação operacional para excluir processos.');
     }
@@ -332,7 +332,35 @@ export const consacracaoService = {
       throw new Error('A Comissão não possui permissão para excluir processos.');
     }
 
-    const supabase = createClient();
+    const supabase = clientOverride || createClient();
+
+    const { data: reg, error: fetchErr } = await supabase
+      .from('consagracao_registros')
+      .select('id, status_processo, ministry_id, member_id, numero_processo')
+      .eq('id', id)
+      .eq('ministry_id', ministryId)
+      .maybeSingle();
+
+    if (fetchErr || !reg) {
+      throw new Error('Processo não encontrado ou não pertence ao ministério atual.');
+    }
+
+    if (reg.status_processo === 'homologar') {
+      throw new Error('Processos homologados não podem ser excluídos, pois fazem parte do histórico oficial da consagração.');
+    }
+
+    // Registrar rastreabilidade da exclusão no histórico do ministro antes de remover o processo
+    if (reg.member_id) {
+      await registrarEventoHistoricoMinistro(supabase, ministryId, reg.member_id, {
+        id: `${id}_exclusao_processo_${Date.now()}`,
+        processo_id: id,
+        numero_processo: reg.numero_processo || '',
+        tipo_evento: 'cancelamento',
+        status_processo: reg.status_processo,
+        data: new Date().toISOString().slice(0, 10),
+        descricao: `Processo nº ${reg.numero_processo || id} excluído antes da homologação. Cargo atual preservado.`,
+      });
+    }
 
     const { error } = await supabase
       .from('consagracao_registros')

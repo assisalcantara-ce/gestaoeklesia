@@ -1231,15 +1231,17 @@ export default function ConsagracaoPage() {
   const handleImprimirFichaCandidato = async (reg: any) => {
     if (!reg) return;
 
-    // Buscar comissão e integrantes vinculados ao processo
+    // Buscar comissão vinculada ao processo
     let comissaoNome = '';
-    let integrantes: any[] = [];
     if (reg.comissao_id && ministryId) {
       comissaoNome = reg.comissao?.nome || comissoes.find((c) => c.id === reg.comissao_id)?.nome || '';
-      try {
-        integrantes = await comissoesService.listarIntegrantes(reg.comissao_id, ministryId);
-      } catch (err) {
-        console.error('Erro ao buscar integrantes da comissão para a ficha:', err);
+      if (!comissaoNome) {
+        try {
+          const comissaoData = await comissoesService.obterComissaoPorId(reg.comissao_id, ministryId);
+          comissaoNome = comissaoData?.nome || '';
+        } catch (err) {
+          console.error('Erro ao buscar comissão para a ficha:', err);
+        }
       }
     }
 
@@ -1252,6 +1254,7 @@ export default function ConsagracaoPage() {
     const churchNome = churchInfo.nome || 'Gestão Eklésia';
     const churchLogo = churchInfo.logoUrl || '';
     const responsavel = churchInfo.responsavel || responsavelTenant || '';
+    const pastorIndicante = reg.pastor_solicitante || responsavel || '-';
     const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
@@ -1267,12 +1270,30 @@ export default function ConsagracaoPage() {
     const campoNome = getCampoNome(reg.campo_id);
     const supervisaoNome = supervisoes.find((s) => s.id === reg.supervisao_id)?.nome || '-';
 
+    let decisaoTexto = 'Em Processo';
+    let decisaoCor = '#0f766e';
+    if (reg.status_processo === 'homologar') {
+      decisaoTexto = 'DEFERIDO (Homologado)';
+      decisaoCor = '#15803d';
+    } else if (reg.status_processo === 'deferir') {
+      decisaoTexto = 'DEFERIDO (Registrado)';
+      decisaoCor = '#15803d';
+    } else if (reg.status_processo === 'indeferir') {
+      decisaoTexto = 'INDEFERIDO';
+      decisaoCor = '#b91c1c';
+    } else if (reg.status_processo === 'em_processo' || reg.status_processo === 'aguardando') {
+      decisaoTexto = 'EM PROCESSO';
+      decisaoCor = '#0284c7';
+    } else if (STATUS_LABELS[reg.status_processo]) {
+      decisaoTexto = STATUS_LABELS[reg.status_processo].toUpperCase();
+    }
+
     win.document.write(`
       <!DOCTYPE html>
       <html lang="pt-BR">
       <head>
         <meta charset="UTF-8">
-        <title>Ficha do Candidato - ${reg.nome || 'Consagração'}</title>
+        <title>Ficha do Processo do Obreiro - ${reg.nome || 'Consagração'}</title>
         <style>
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body {
@@ -1380,38 +1401,6 @@ export default function ConsagracaoPage() {
             font-size: 10px;
             font-weight: bold;
             color: #94a3b8;
-          }
-          .signatures {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 32px;
-            margin-top: 24px;
-            padding-top: 8px;
-            page-break-inside: avoid;
-          }
-          .signatures-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 20px 24px;
-            margin-top: 14px;
-            page-break-inside: avoid;
-          }
-          .signature-item {
-            text-align: center;
-            page-break-inside: avoid;
-          }
-          .signature-line {
-            border-top: 1px solid #334155;
-            margin-bottom: 4px;
-          }
-          .signature-name {
-            font-size: 11px;
-            font-weight: 700;
-            color: #0f172a;
-          }
-          .signature-role {
-            font-size: 10px;
-            color: #64748b;
           }
           .badge {
             display: inline-block;
@@ -1581,17 +1570,6 @@ export default function ConsagracaoPage() {
           </div>
         </div>
 
-        <div class="grid-2" style="margin-bottom: 8px;">
-          <div class="field">
-            <div class="field-label">Indicação / Pastor Solicitante</div>
-            <div class="field-value">${reg.pastor_solicitante || responsavel || '-'}</div>
-          </div>
-          <div class="field">
-            <div class="field-label">Data de Autorização / Homologação</div>
-            <div class="field-value">${dataAutorizacao !== '-' ? dataAutorizacao : 'Aguardando tramitação'}</div>
-          </div>
-        </div>
-
         ${tipo === 'filiacao' || reg.origem_instituicao ? `
           <div class="section-title">3. Dados da Instituição de Origem</div>
           <div class="grid-3" style="margin-bottom: 8px;">
@@ -1610,77 +1588,66 @@ export default function ConsagracaoPage() {
           </div>
         ` : ''}
 
-        <!-- Seção: Comissão de Consagração & Deliberação -->
-        ${reg.comissao_id ? `
-          <div class="section-title">Comissão de Consagração & Parecer (${comissaoNome || 'Comissão Responsável'})</div>
-          
-          <div style="background: #f8fafc; border: 1.5px solid #0f766e; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;">
-            <div style="font-size: 10px; font-weight: 800; color: #0f766e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
-              DECISÃO DA COMISSÃO
+        <!-- Seção: Registro da Avaliação (Histórico Oficial) -->
+        <div class="section-title">Registro da Avaliação</div>
+        
+        <div style="background: #f8fafc; border: 1.5px solid #0f766e; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;">
+          <div class="grid-2" style="margin-bottom: 8px;">
+            <div class="field" style="background: #ffffff; border-color: #cbd5e1;">
+              <div class="field-label" style="color: #0f766e; font-weight: 800;">COMISSÃO RESPONSÁVEL PELA AVALIAÇÃO</div>
+              <div class="field-value" style="font-size: 13px; font-weight: 700; color: #0f172a;">
+                ${comissaoNome || 'Comissão não informada'}
+              </div>
             </div>
-            <div style="display: flex; gap: 32px; align-items: center; font-size: 12px; font-weight: 700; color: #1e293b;">
-              <div style="display: flex; align-items: center; gap: 8px; ${reg.status_processo === 'deferir' || reg.status_processo === 'homologar' ? 'color: #15803d; font-weight: 800;' : ''}">
-                <span style="font-size: 16px; line-height: 1; font-family: monospace;">${reg.status_processo === 'deferir' || reg.status_processo === 'homologar' ? '☑' : '☐'}</span>
-                <span>${reg.status_processo === 'homologar' ? 'DEFERIDO (Homologado)' : reg.status_processo === 'deferir' ? 'DEFERIDO (Registrado)' : 'DEFERIDO'}</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px; ${reg.status_processo === 'indeferir' ? 'color: #b91c1c; font-weight: 800;' : ''}">
-                <span style="font-size: 16px; line-height: 1; font-family: monospace;">${reg.status_processo === 'indeferir' ? '☑' : '☐'}</span>
-                <span>${reg.status_processo === 'indeferir' ? 'INDEFERIDO (Registrado)' : 'INDEFERIDO'}</span>
-              </div>
-              <div style="margin-left: auto; font-size: 11px; color: #64748b; font-weight: normal;">
-                Data da Deliberação: ____/____/________
+            <div class="field" style="background: #ffffff; border-color: #cbd5e1;">
+              <div class="field-label" style="color: #0f766e; font-weight: 800;">PASTOR SOLICITANTE / INDICAÇÃO</div>
+              <div class="field-value" style="font-size: 13px; font-weight: 700; color: #0f172a;">
+                ${pastorIndicante}
               </div>
             </div>
           </div>
 
-          <div class="field" style="margin-bottom: 12px; background: #f8fafc;">
-            <div class="field-label" style="text-transform: uppercase; font-weight: 800; color: #475569; margin-bottom: 4px;">Parecer / Despacho da Comissão</div>
-            ${reg.observacoes ? `
-              <div style="font-size: 11px; color: #334155; font-style: italic; background: #fff; padding: 6px 10px; border-radius: 4px; border: 1px solid #e2e8f0; margin-bottom: 6px;">
-                <strong>Observações Registradas:</strong> ${reg.observacoes}
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: ${reg.observacoes || dataAutorizacao !== '-' ? '8px' : '0'};">
+            <div class="field" style="background: #ffffff;">
+              <div class="field-label">PROCESSO AVALIADO</div>
+              <div class="field-value" style="font-family: monospace; font-weight: 800; color: #0f766e;">
+                ${reg.numero_processo || 'S/N'}
               </div>
-            ` : ''}
-            <div style="height: 38px; border-bottom: 1px dotted #94a3b8; margin-top: 4px;"></div>
+            </div>
+            <div class="field" style="background: #ffffff;">
+              <div class="field-label">DATA DO PROCESSO</div>
+              <div class="field-value">${dataProc}</div>
+            </div>
+            <div class="field" style="background: #ffffff;">
+              <div class="field-label">TIPO DE PROCESSO</div>
+              <div class="field-value">${tipoLabel}</div>
+            </div>
+            <div class="field" style="background: #ffffff;">
+              <div class="field-label">DECISÃO DA COMISSÃO</div>
+              <div class="field-value" style="font-weight: 800; color: ${decisaoCor};">
+                ${decisaoTexto}
+              </div>
+            </div>
           </div>
 
-          ${integrantes.length > 0 ? `
-            <div style="margin-top: 14px; margin-bottom: 16px;">
-              <div class="field-label" style="margin-bottom: 10px; font-size: 10px; color: #0f766e; font-weight: 800;">Assinatura dos Integrantes da Comissão</div>
-              <div class="signatures-grid">
-                ${integrantes.map((int: any) => `
-                  <div class="signature-item">
-                    <div class="signature-line"></div>
-                    <div class="signature-name">${int.member?.name || 'Integrante'}</div>
-                    <div class="signature-role">${int.cargo || 'Integrante'}${int.member?.cargo_ministerial ? ` • ${int.member.cargo_ministerial}` : ''}</div>
+          ${reg.observacoes || dataAutorizacao !== '-' ? `
+            <div class="grid-2" style="margin-top: 4px;">
+              ${dataAutorizacao !== '-' ? `
+                <div class="field" style="background: #ffffff;">
+                  <div class="field-label">DATA DE AUTORIZAÇÃO / HOMOLOGAÇÃO</div>
+                  <div class="field-value">${dataAutorizacao}</div>
+                </div>
+              ` : ''}
+              ${reg.observacoes ? `
+                <div class="field" style="background: #ffffff; ${dataAutorizacao === '-' ? 'grid-column: span 2;' : ''}">
+                  <div class="field-label">PARECER / OBSERVAÇÕES REGISTRADAS</div>
+                  <div class="field-value" style="font-weight: normal; font-size: 11px; color: #334155; white-space: pre-wrap;">
+                    ${reg.observacoes}
                   </div>
-                `).join('')}
-              </div>
-            </div>
-          ` : `
-            <div class="field" style="margin-top: 8px; margin-bottom: 16px; color: #64748b; font-style: italic; font-size: 11px;">
-              Nenhum integrante cadastrado nesta comissão até o momento.
-            </div>
-          `}
-        ` : `
-          ${reg.observacoes ? `
-            <div class="section-title">Observações / Parecer</div>
-            <div class="field" style="margin-bottom: 12px;">
-              <div class="field-value" style="font-weight: normal; white-space: pre-wrap;">${reg.observacoes}</div>
+                </div>
+              ` : ''}
             </div>
           ` : ''}
-        `}
-
-        <div class="signatures">
-          <div class="signature-item">
-            <div class="signature-line"></div>
-            <div class="signature-name">${reg.pastor_solicitante || responsavel || 'Pastor Solicitante'}</div>
-            <div class="signature-role">Pastor Solicitante / Indicação</div>
-          </div>
-          <div class="signature-item">
-            <div class="signature-line"></div>
-            <div class="signature-name">${responsavel || 'Presidente do Ministério'}</div>
-            <div class="signature-role">Pastor Presidente / Presidente do Ministério</div>
-          </div>
         </div>
 
         <div class="footer">
@@ -2535,12 +2502,24 @@ export default function ConsagracaoPage() {
                         {canCadastrarEditar && (
                           <button
                             type="button"
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition text-sm shadow-xs"
+                            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg border text-sm shadow-xs transition ${
+                              reg.status_processo === 'homologar'
+                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
+                                : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 cursor-pointer'
+                            }`}
                             onClick={() => {
+                              if (reg.status_processo === 'homologar') {
+                                setStatusMensagem('Processos homologados não podem ser excluídos, pois fazem parte do histórico oficial da consagração.');
+                                return;
+                              }
                               setRegistroParaExcluir(reg);
                               setDeleteModalOpen(true);
                             }}
-                            title="Excluir processo"
+                            title={
+                              reg.status_processo === 'homologar'
+                                ? 'Processos homologados não podem ser excluídos, pois fazem parte do histórico oficial da consagração.'
+                                : 'Excluir processo'
+                            }
                             aria-label="Excluir processo"
                           >
                             🗑️
@@ -3270,7 +3249,7 @@ export default function ConsagracaoPage() {
         onChange={handleFotoUpload}
       />
 
-      {deleteModalOpen && registroParaExcluir && (
+      {deleteModalOpen && registroParaExcluir && registroParaExcluir.status_processo !== 'homologar' && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100 animate-in zoom-in-95 duration-150">
             <div className="flex items-start gap-4">
@@ -3278,12 +3257,12 @@ export default function ConsagracaoPage() {
                 ⚠️
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-slate-800">Excluir registro?</h3>
+                <h3 className="text-lg font-bold text-slate-800">Excluir processo?</h3>
                 <p className="text-sm text-slate-600 mt-2">
-                  Tem certeza que deseja excluir este processo de consagração?
+                  Esta ação excluirá o processo. O candidato voltará à lista de ativos e seu cargo atual será preservado, pois a consagração ainda não foi homologada.
                 </p>
                 {registroParaExcluir.nome && (
-                  <p className="text-xs text-slate-500 font-medium mt-1">
+                  <p className="text-xs text-slate-500 font-medium mt-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
                     Candidato: <strong>{registroParaExcluir.nome}</strong> {registroParaExcluir.numero_processo ? `(Processo nº ${registroParaExcluir.numero_processo})` : ''}
                   </p>
                 )}

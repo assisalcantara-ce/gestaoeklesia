@@ -79,7 +79,7 @@ export interface HistoricoProcessoItem {
   numero_processo?: string;
   ministry_id?: string;
   member_id?: string;
-  tipo_evento: 'inicio_processo' | 'decisao_comissao' | 'reabertura' | 'homologacao';
+  tipo_evento: 'inicio_processo' | 'decisao_comissao' | 'reabertura' | 'homologacao' | 'cancelamento' | 'exclusao_processo';
   tipo_registro?: string;
   data: string;
   cargo_anterior?: string | null;
