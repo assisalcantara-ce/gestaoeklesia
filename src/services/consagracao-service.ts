@@ -697,5 +697,266 @@ export const consacracaoService = {
       message: res?.message || 'Processo homologado com sucesso.',
     };
   },
+
+  /**
+   * Obtém o HISTÓRICO COMPLETO do ministro agregando:
+   * 1. members.custom_fields.historico_processos
+   * 2. members.dados_cargos
+   * 3. members.data_consagracao / cargo_ministerial
+   * 4. consagracao_registros do membro no tenant (com comissão)
+   *
+   * Garante idempotência, sem duplicatas, ordenado do mais recente para o mais antigo.
+   */
+  async obterHistoricoCompletoMinistro(
+    memberId: string,
+    ministryId: string
+  ): Promise<{
+    ministro: {
+      id: string;
+      nome: string;
+      matricula: string;
+      cpf: string;
+      cargo_atual: string;
+      data_consagracao_atual: string | null;
+      foto_url: string | null;
+      congregacao_nome?: string | null;
+    };
+    eventos: HistoricoProcessoItem[];
+  }> {
+    const supabase = createClient();
+
+    // 1. Buscar dados do membro
+    const { data: member, error: memErr } = await supabase
+      .from('members')
+      .select('id, name, matricula, cpf, cargo_ministerial, data_consagracao, foto_url, congregacao_id, dados_cargos, custom_fields')
+      .eq('id', memberId)
+      .eq('ministry_id', ministryId)
+      .single();
+
+    if (memErr || !member) {
+      throw new Error('Ministro não encontrado ou não pertence ao ministério atual.');
+    }
+
+    // 2. Buscar processos de consagração registrados para o membro no tenant
+    const { data: processosRaw, error: procErr } = await supabase
+      .from('consagracao_registros')
+      .select(`
+        *,
+        comissao:comissoes (
+          id,
+          nome,
+          status
+        )
+      `)
+      .eq('member_id', memberId)
+      .eq('ministry_id', ministryId)
+      .order('created_at', { ascending: false });
+
+    if (procErr) {
+      console.error('Erro ao buscar processos de consagração do ministro:', procErr);
+    }
+
+    const processos = processosRaw || [];
+    const processosMap = new Map<string, any>();
+    processos.forEach((p: any) => {
+      processosMap.set(p.id, p);
+    });
+
+    // 3. Extrair eventos de custom_fields.historico_processos
+    const cf = (member.custom_fields && typeof member.custom_fields === 'object')
+      ? (member.custom_fields as Record<string, any>)
+      : {};
+
+    const rawHistorico: HistoricoProcessoItem[] = Array.isArray(cf.historico_processos)
+      ? [...cf.historico_processos]
+      : Array.isArray(cf.historicoProcessos)
+      ? [...cf.historicoProcessos]
+      : [];
+
+    const eventosMap = new Map<string, HistoricoProcessoItem>();
+
+    // 3.1. Enriquecer eventos do custom_fields
+    rawHistorico.forEach((item) => {
+      const proc = item.processo_id ? processosMap.get(item.processo_id) : null;
+      const key = item.id || `${item.processo_id}_${item.tipo_evento}_${item.data}`;
+
+      eventosMap.set(key, {
+        ...item,
+        numero_processo: item.numero_processo || proc?.numero_processo || '',
+        comissao_nome: item.comissao_nome || proc?.comissao?.nome || null,
+        pastor_solicitante: item.pastor_solicitante || proc?.pastor_solicitante || null,
+        parecer: item.parecer || proc?.observacoes || null,
+        status_processo: item.status_processo || proc?.status_processo || null,
+      });
+    });
+
+    // 3.2. Integrar processos que eventualmente não tenham gerado evento em custom_fields
+    processos.forEach((proc: any) => {
+      const tipoLabel = proc.tipo_registro === 'progressao' ? 'Progressão' : proc.tipo_registro === 'filiacao' ? 'Filiação' : 'Chegada';
+      const comissaoNome = proc.comissao?.nome || null;
+      const dataProc = proc.data_processo || proc.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+
+      // Evento de Início de Processo
+      const inicioKey = `${proc.id}_inicio_processo`;
+      if (!eventosMap.has(inicioKey)) {
+        eventosMap.set(inicioKey, {
+          id: inicioKey,
+          processo_id: proc.id,
+          numero_processo: proc.numero_processo || '',
+          ministry_id: ministryId,
+          member_id: memberId,
+          tipo_evento: 'inicio_processo',
+          tipo_registro: proc.tipo_registro,
+          data: dataProc,
+          cargo_anterior: proc.cargo_ocupa || null,
+          cargo_pretendido: proc.cargo_pretendido || null,
+          status_processo: 'em_processo',
+          comissao_nome: comissaoNome,
+          pastor_solicitante: proc.pastor_solicitante || null,
+          descricao: `Início do Processo de ${tipoLabel} (${proc.cargo_ocupa || 'Sem cargo anterior'} → ${proc.cargo_pretendido || 'Novo cargo'})`,
+          criado_em: proc.created_at,
+        });
+      }
+
+      // Evento de Decisão da Comissão (se houver deliberação deferir ou indeferir)
+      if (proc.status_processo === 'deferir' || proc.status_processo === 'indeferir' || proc.status_processo === 'homologar') {
+        const decisaoKey = `${proc.id}_decisao_${proc.status_processo === 'indeferir' ? 'indeferir' : 'deferir'}`;
+        const existingDecisao = Array.from(eventosMap.values()).find(
+          (e) => e.processo_id === proc.id && e.tipo_evento === 'decisao_comissao'
+        );
+
+        if (!existingDecisao) {
+          eventosMap.set(decisaoKey, {
+            id: decisaoKey,
+            processo_id: proc.id,
+            numero_processo: proc.numero_processo || '',
+            ministry_id: ministryId,
+            member_id: memberId,
+            tipo_evento: 'decisao_comissao',
+            tipo_registro: proc.tipo_registro,
+            decisao: proc.status_processo === 'indeferir' ? 'indeferir' : 'deferir',
+            status_processo: proc.status_processo,
+            parecer: proc.observacoes || null,
+            data: proc.data_autorizacao || proc.updated_at?.slice(0, 10) || dataProc,
+            cargo_anterior: proc.cargo_ocupa || null,
+            cargo_pretendido: proc.cargo_pretendido || null,
+            comissao_nome: comissaoNome,
+            pastor_solicitante: proc.pastor_solicitante || null,
+            descricao: `Parecer ${proc.status_processo === 'indeferir' ? 'Indeferido' : 'Deferido'} pela Comissão de Consagração${proc.observacoes ? `: ${proc.observacoes}` : ''}`,
+            criado_em: proc.updated_at || proc.created_at,
+          });
+        }
+      }
+
+      // Evento de Homologação (se homologado)
+      if (proc.status_processo === 'homologar') {
+        const homologacaoKey = `${proc.id}_homologacao`;
+        const existingHomolog = Array.from(eventosMap.values()).find(
+          (e) => e.processo_id === proc.id && e.tipo_evento === 'homologacao'
+        );
+
+        if (!existingHomolog) {
+          const cargoAnterior = proc.cargo_ocupa || 'SEM CARGO';
+          const cargoResultante = proc.cargo_pretendido || proc.cargo_ocupa || '';
+          const isProgressao = proc.tipo_registro === 'progressao' || proc.tipo_registro === 'existente' || proc.tipo_registro === 'ministro';
+          const resultadoStr = isProgressao ? `${cargoAnterior} → ${cargoResultante}` : cargoResultante;
+
+          eventosMap.set(homologacaoKey, {
+            id: homologacaoKey,
+            processo_id: proc.id,
+            numero_processo: proc.numero_processo || '',
+            ministry_id: ministryId,
+            member_id: memberId,
+            tipo_evento: 'homologacao',
+            tipo_registro: proc.tipo_registro,
+            status_processo: 'homologar',
+            data: proc.data_autorizacao || proc.data_processo || proc.updated_at?.slice(0, 10) || dataProc,
+            cargo_anterior: cargoAnterior,
+            cargo_pretendido: proc.cargo_pretendido || null,
+            cargo_resultante: cargoResultante,
+            resultado: resultadoStr,
+            comissao_nome: comissaoNome,
+            pastor_solicitante: proc.pastor_solicitante || null,
+            parecer: proc.observacoes || null,
+            descricao: `Homologação de Consagração concluída: ${resultadoStr}`,
+            criado_em: proc.updated_at || proc.created_at,
+          });
+        }
+      }
+    });
+
+    // 4. Integrar marcos de `dados_cargos` (histórico ministerial de ordenações / recebimentos)
+    const dadosCargos = (member.dados_cargos && typeof member.dados_cargos === 'object')
+      ? (member.dados_cargos as Record<string, any>)
+      : {};
+
+    Object.entries(dadosCargos).forEach(([cargoNome, info]: [string, any]) => {
+      if (!info || typeof info !== 'object') return;
+      const dataConsag = info.dataConsagracaoRecebimento || info.dataConsagracao || info.data;
+      if (!dataConsag) return;
+
+      const marcoKey = `marco_cargo_${cargoNome.trim().toUpperCase()}_${dataConsag}`;
+      if (!eventosMap.has(marcoKey)) {
+        eventosMap.set(marcoKey, {
+          id: marcoKey,
+          tipo_evento: 'marco_ministerial',
+          cargo: cargoNome.trim().toUpperCase(),
+          data: dataConsag,
+          local: info.localConsagracao || null,
+          local_origem: info.localOrigem || null,
+          descricao: `Registro de Consagração / Recebimento no cargo de ${cargoNome.trim().toUpperCase()}${info.localConsagracao ? ` (${info.localConsagracao})` : ''}`,
+          criado_em: dataConsag,
+        });
+      }
+    });
+
+    // 5. Se houver data_consagracao no cadastro e nenhum evento para o cargo atual, registrar como marco inicial
+    if (member.data_consagracao && member.cargo_ministerial) {
+      const cargoAtualNome = String(member.cargo_ministerial).trim().toUpperCase();
+      const currentConsagData = String(member.data_consagracao).slice(0, 10);
+      const marcoAtualKey = `marco_cargo_${cargoAtualNome}_${currentConsagData}`;
+
+      if (!eventosMap.has(marcoAtualKey)) {
+        const hasSimilar = Array.from(eventosMap.values()).some(
+          (e) => (e.cargo_resultante === cargoAtualNome || e.cargo === cargoAtualNome) && e.data === currentConsagData
+        );
+        if (!hasSimilar) {
+          eventosMap.set(marcoAtualKey, {
+            id: marcoAtualKey,
+            tipo_evento: 'marco_ministerial',
+            cargo: cargoAtualNome,
+            data: currentConsagData,
+            descricao: `Consagração Ministerial: ${cargoAtualNome}`,
+            criado_em: currentConsagData,
+          });
+        }
+      }
+    }
+
+    // 6. Ordenar todos os eventos: Mais recente primeiro (decrescente por data e criado_em)
+    const eventosOrdenados = Array.from(eventosMap.values()).sort((a, b) => {
+      const dateA = a.data || a.criado_em || '';
+      const dateB = b.data || b.criado_em || '';
+      if (dateA !== dateB) {
+        return dateB.localeCompare(dateA);
+      }
+      return (b.criado_em || '').localeCompare(a.criado_em || '');
+    });
+
+    return {
+      ministro: {
+        id: member.id,
+        nome: member.name || 'Sem nome',
+        matricula: member.matricula || '-',
+        cpf: member.cpf || '-',
+        cargo_atual: member.cargo_ministerial || 'Não informado',
+        data_consagracao_atual: member.data_consagracao ? String(member.data_consagracao).slice(0, 10) : null,
+        foto_url: member.foto_url || null,
+        congregacao_nome: null,
+      },
+      eventos: eventosOrdenados,
+    };
+  },
 };
+
 

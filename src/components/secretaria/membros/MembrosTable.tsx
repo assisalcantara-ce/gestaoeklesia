@@ -33,6 +33,7 @@ export interface MembrosTableProps {
   getMensagemSemTemplate: (tipo: string) => string;
   setNotification: (notif: any) => void;
   setMembroImprimindoCartao: (membro: any) => void;
+  abrirHistoricoMembro?: (membro: any) => void;
   startIndex: number;
   endIndex: number;
   currentPage: number;
@@ -59,6 +60,7 @@ export default function MembrosTable({
   getMensagemSemTemplate,
   setNotification,
   setMembroImprimindoCartao,
+  abrirHistoricoMembro,
   startIndex,
   endIndex,
   currentPage,
@@ -127,14 +129,23 @@ export default function MembrosTable({
             <div className="mt-3 flex gap-2 flex-wrap">
               <button
                 onClick={() => setMembroImprimindo(membro)}
-                className="flex-1 min-w-[70px] px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200 transition"
+                className="flex-1 min-w-[65px] px-2.5 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200 transition"
               >
                 Ver
               </button>
+              {abrirHistoricoMembro && (
+                <button
+                  onClick={() => abrirHistoricoMembro(membro)}
+                  className="flex-1 min-w-[75px] px-2.5 py-2 bg-teal-50 text-teal-700 rounded-lg text-xs font-semibold hover:bg-teal-100 transition flex items-center justify-center gap-1"
+                >
+                  <span>📜</span>
+                  <span>Histórico</span>
+                </button>
+              )}
               {!isSupervisor && (
                 <button
                   onClick={() => abrirEdicao(membro)}
-                  className="flex-1 min-w-[70px] px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition"
+                  className="flex-1 min-w-[65px] px-2.5 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition"
                 >
                   Editar
                 </button>
@@ -143,7 +154,7 @@ export default function MembrosTable({
                 onClick={() => {
                   void abrirDocumentosMembro(membro);
                 }}
-                className="flex-1 min-w-[90px] px-3 py-2 bg-purple-50 text-purple-700 rounded-lg text-xs font-semibold hover:bg-purple-100 transition"
+                className="flex-1 min-w-[80px] px-2.5 py-2 bg-purple-50 text-purple-700 rounded-lg text-xs font-semibold hover:bg-purple-100 transition"
               >
                 Documentos
               </button>
@@ -294,6 +305,22 @@ export default function MembrosTable({
                           Imprimir Ficha
                         </span>
                       </div>
+
+                      {abrirHistoricoMembro && (
+                        <div className="relative group inline-flex items-center justify-center">
+                          <button
+                            onClick={() => abrirHistoricoMembro(membro)}
+                            className="p-2 text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition flex items-center justify-center cursor-pointer"
+                            title="Histórico do Ministro"
+                            aria-label="Histórico do Ministro"
+                          >
+                            <span className="text-sm">📜</span>
+                          </button>
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-30">
+                            Histórico
+                          </span>
+                        </div>
+                      )}
 
                       {!isAuxiliar && (
                         <div className="relative group inline-flex items-center justify-center">

@@ -58,15 +58,14 @@ export async function GET(request: NextRequest) {
       .eq('id', member.ministry_id as string)
       .maybeSingle();
 
-    // QR payload: base64 JSON — para verificação futura
-    const qrPayload = Buffer.from(
-      JSON.stringify({
-        mid: member.id,
-        uid: member.unique_id,
-        min: member.ministry_id,
-        ts: Math.floor(Date.now() / 1000),
-      }),
-    ).toString('base64');
+    // QR payload: URL canônica oficial para validação da credencial
+    const uniqueId = member.unique_id || member.id;
+    const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
+    const proto = request.headers.get('x-forwarded-proto') || 'https';
+    const baseUrl = host
+      ? `${proto}://${host}`
+      : (process.env.NEXT_PUBLIC_APP_URL || 'https://www.gestaoeklesia.com.br');
+    const qrPayload = `${baseUrl}/validar/credencial/${encodeURIComponent(uniqueId)}`;
 
     return NextResponse.json({
       nome: member.name,

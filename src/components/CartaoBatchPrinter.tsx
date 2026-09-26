@@ -420,11 +420,20 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
       </button>
 
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
-        {membros.map((membro) => (
-          <div key={`qr-${membro.id}`} id={`source-qr-${membro.id}`}>
-            <QRCode value={membro.uniqueId || membro.id} size={128} level="H" />
-          </div>
-        ))}
+        {membros.map((membro) => {
+          const uniqueId = membro.uniqueId || membro.id || '';
+          const baseUrl =
+            typeof window !== 'undefined' && window.location.origin
+              ? window.location.origin
+              : (process.env.NEXT_PUBLIC_APP_URL || 'https://www.gestaoeklesia.com.br');
+          const qrUrl = `${baseUrl}/validar/credencial/${encodeURIComponent(uniqueId)}`;
+
+          return (
+            <div key={`qr-${membro.id}`} id={`source-qr-${membro.id}`}>
+              <QRCode value={qrUrl} size={128} level="H" />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -263,17 +263,25 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
           </div>
         );
       }
-      case 'qrcode':
+      case 'qrcode': {
+        const uniqueId = membro.uniqueId || membro.id || '';
+        const baseUrl =
+          typeof window !== 'undefined' && window.location.origin
+            ? window.location.origin
+            : (process.env.NEXT_PUBLIC_APP_URL || 'https://www.gestaoeklesia.com.br');
+        const qrUrl = `${baseUrl}/validar/credencial/${encodeURIComponent(uniqueId)}`;
+
         return (
           <div key={elemento.id} style={estilo}>
             <QRCode
-              value={membro.uniqueId || membro.id}
+              value={qrUrl}
               size={Math.min(elemento.largura, elemento.altura)}
               level="H"
               includeMargin={false}
             />
           </div>
         );
+      }
 
       case 'imagem': {
         const isTransparentBg = !elemento.backgroundColor || elemento.backgroundColor === 'transparent';

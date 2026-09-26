@@ -12,6 +12,7 @@ import { useUserContext } from '@/hooks/useUserContext';
 import { createClient } from '@/lib/supabase-client';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { useMembers } from '@/hooks/useMembers';
+import QRCode from 'qrcode';
 import type {
   Member,
   TemplateCategoria,
@@ -495,9 +496,60 @@ export default function CartasPage() {
     } as Record<string, string>;
   };
 
+  const [previewQrMap, setPreviewQrMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+    const qrElements = (canvasContent.elements || []).filter(
+      (el) => el.tipo === 'qrcode' && el.visivel !== false
+    );
+
+    if (qrElements.length === 0) {
+      setPreviewQrMap({});
+      return;
+    }
+
+    const baseUrl =
+      typeof window !== 'undefined' && window.location.origin
+        ? window.location.origin
+        : (process.env.NEXT_PUBLIC_APP_URL || 'https://www.gestaoeklesia.com.br');
+    const previewQrUrl = `${baseUrl}/validar/documento/carta/PREVIEW`;
+
+    Promise.all(
+      qrElements.map(async (el) => {
+        const qrSize = Math.min(el.largura, el.altura);
+        try {
+          const dataUrl = await QRCode.toDataURL(previewQrUrl, {
+            width: Math.max(qrSize * 3, 200),
+            margin: 1,
+            color: {
+              dark: el.cor || '#000000',
+              light: '#ffffff',
+            },
+          });
+          return { id: el.id, dataUrl };
+        } catch {
+          return { id: el.id, dataUrl: '' };
+        }
+      })
+    ).then((results) => {
+      if (!isMounted) return;
+      const map: Record<string, string> = {};
+      results.forEach((r) => {
+        if (r.dataUrl) map[r.id] = r.dataUrl;
+      });
+      setPreviewQrMap(map);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [canvasContent]);
+
   const renderCanvasHtml = (
     canvas: CartaCanvasData,
-    map: Record<string, string>
+    map: Record<string, string>,
+    qrDataUrls?: Record<string, string>
   ) => {
     const safeCanvas = normalizeCanvasData(canvas);
     const bgStyle = safeCanvas.backgroundUrl
@@ -538,6 +590,18 @@ export default function CartasPage() {
             `opacity:${el.transparencia ?? 1};`,
           ].join('');
           return `<img src="${src}" style="${style}" />`;
+        }
+
+        if (el.tipo === 'qrcode') {
+          const qrSrc = qrDataUrls?.[el.id];
+          if (!qrSrc) return '';
+          const style = [
+            baseStyle,
+            'display:flex; align-items:center; justify-content:center;',
+            `opacity:${el.transparencia ?? 1};`,
+            'box-sizing:border-box;',
+          ].join('');
+          return `<div style="${style}"><img src="${qrSrc}" alt="QR Code Autenticidade Documental" style="width:100%; height:100%; object-fit:contain;" /></div>`;
         }
 
         if (el.tipo === 'chapa') {
@@ -589,8 +653,8 @@ export default function CartasPage() {
 
   const previewHtml = useMemo(() => {
     const map = buildPlaceholderMap(selectedMember);
-    return renderCanvasHtml(canvasContent, map);
-  }, [canvasContent, selectedMember, issueFields, configIgreja]);
+    return renderCanvasHtml(canvasContent, map, previewQrMap);
+  }, [canvasContent, selectedMember, issueFields, configIgreja, previewQrMap]);
 
   const lastIssuedLabel = useMemo(() => {
     const issuedAt = records[0]?.issued_at;
@@ -1611,8 +1675,39 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
 
     setIsIssuing(true);
     try {
+      // 1. Gerar identificador único da emissão documental antes de persistir
+      const cartaRegistroId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+      const baseUrl =
+        typeof window !== 'undefined' && window.location.origin
+          ? window.location.origin
+          : (process.env.NEXT_PUBLIC_APP_URL || 'https://www.gestaoeklesia.com.br');
+      const qrDocUrl = `${baseUrl}/validar/documento/carta/${encodeURIComponent(cartaRegistroId)}`;
+
+      // 2. Gerar QR Codes de autenticidade documental para os elementos do template
+      const qrElements = (canvasContent.elements || []).filter(
+        (el) => el.tipo === 'qrcode' && el.visivel !== false
+      );
+      const issueQrMap: Record<string, string> = {};
+
+      for (const el of qrElements) {
+        const qrSize = Math.min(el.largura, el.altura);
+        const dataUrl = await QRCode.toDataURL(qrDocUrl, {
+          width: Math.max(qrSize * 3, 200),
+          margin: 1,
+          color: {
+            dark: el.cor || '#000000',
+            light: '#ffffff',
+          },
+        });
+        issueQrMap[el.id] = dataUrl;
+      }
+
       const map = buildPlaceholderMap(selectedMember);
-      const renderedHtml = renderCanvasHtml(canvasContent, map);
+      const renderedHtml = renderCanvasHtml(canvasContent, map, issueQrMap);
 
       const {
         data: { user },
@@ -1621,6 +1716,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
       const docCategoria: TemplateCategoria = selectedTemplate.categoria || 'carta';
 
       const payload = {
+        id: cartaRegistroId,
         ministry_id: ministryId,
         member_id: selectedMember.id,
         template_id: selectedTemplate.id,

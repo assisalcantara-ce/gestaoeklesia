@@ -12,10 +12,12 @@ import { useMembros } from '@/hooks/secretaria/useMembros';
 
 import { useState } from 'react';
 import PublicMemberQrModal from '@/components/secretaria/membros/PublicMemberQrModal';
+import HistoricoMinistroModal from '@/components/secretaria/membros/HistoricoMinistroModal';
 
 export default function MembrosPage() {
   const { bloqueado } = useRequireModulo('secretaria');
   const [showPublicQrModal, setShowPublicQrModal] = useState(false);
+  const [membroHistorico, setMembroHistorico] = useState<any | null>(null);
 
   const {
     // Estado: membros e configuração
@@ -383,6 +385,7 @@ export default function MembrosPage() {
                 isAuxiliar={isAuxiliar}
                 setMembroImprimindo={setMembroImprimindo}
                 abrirEdicao={abrirEdicao}
+                abrirHistoricoMembro={setMembroHistorico}
                 abrirDocumentosMembro={abrirDocumentosMembro}
                 abrirConfirmacaoDeletar={abrirConfirmacaoDeletar}
                 ensureTemplatesSnapshot={ensureTemplatesSnapshot}
@@ -465,6 +468,15 @@ export default function MembrosPage() {
         institutionName={configIgreja.nome || 'Igreja'}
         logoUrl={configIgreja.logo}
       />
+
+      {/* Modal de Histórico Completo do Ministro */}
+      {membroHistorico && (
+        <HistoricoMinistroModal
+          membro={membroHistorico}
+          onClose={() => setMembroHistorico(null)}
+          configIgreja={configIgreja}
+        />
+      )}
     </>
   );
 }

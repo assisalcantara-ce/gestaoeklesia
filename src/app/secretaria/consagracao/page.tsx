@@ -19,6 +19,7 @@ import { consacracaoService } from '@/services/consagracao-service';
 import type { Comissao } from '@/types/comissoes';
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
 import { substituirPlaceholdersCertificado } from '@/lib/certificados-utils';
+import QRCode from 'qrcode';
 
 interface SimpleOption {
   id: string;
@@ -1674,19 +1675,55 @@ export default function ConsagracaoPage() {
 
     try {
       let cargoHomologado = '';
+      let memberUniqueId = '';
 
-      // Prioridade 1: Buscar cargo resultante efetivamente aplicado em members.cargo_ministerial
+      // Prioridade 1: Buscar cargo resultante e unique_id efetivamente aplicados em members
       if (reg.member_id) {
         const { data: memberData, error: memberErr } = await supabase
           .from('members')
-          .select('id, ministry_id, cargo_ministerial')
+          .select('id, ministry_id, cargo_ministerial, unique_id, custom_fields')
           .eq('id', reg.member_id)
           .eq('ministry_id', ministryId)
           .single();
 
-        if (!memberErr && memberData?.cargo_ministerial) {
-          cargoHomologado = String(memberData.cargo_ministerial).trim();
+        if (!memberErr && memberData) {
+          if (memberData.cargo_ministerial) {
+            cargoHomologado = String(memberData.cargo_ministerial).trim();
+          }
+          memberUniqueId =
+            memberData.unique_id ||
+            (memberData.custom_fields as any)?.uniqueId ||
+            '';
         }
+      }
+
+      // Se ainda não tiver unique_id mas temos CPF/registro, buscar por CPF
+      if (!memberUniqueId && reg.cpf) {
+        const cpfLimpo = String(reg.cpf).replace(/\D/g, '');
+        if (cpfLimpo) {
+          const { data: mByCpf } = await supabase
+            .from('members')
+            .select('id, unique_id, custom_fields, cargo_ministerial')
+            .eq('ministry_id', ministryId)
+            .eq('cpf', cpfLimpo)
+            .maybeSingle();
+
+          if (mByCpf) {
+            if (!cargoHomologado && mByCpf.cargo_ministerial) {
+              cargoHomologado = String(mByCpf.cargo_ministerial).trim();
+            }
+            memberUniqueId =
+              mByCpf.unique_id ||
+              (mByCpf.custom_fields as any)?.uniqueId ||
+              mByCpf.id ||
+              '';
+          }
+        }
+      }
+
+      // Se ainda assim não tiver, usar reg.member_id ou identificador seguro
+      if (!memberUniqueId) {
+        memberUniqueId = reg.member_id || reg.id || '';
       }
 
       // Prioridade 2: Dados específicos de resultado persistidos no registro do processo
@@ -1778,66 +1815,104 @@ export default function ConsagracaoPage() {
         numero_processo: reg.numero_processo || '',
       };
 
-      const elementosHtml = (matchedTemplate.elementos || [])
-        .filter((el: any) => el.visivel !== false)
-        .map((el: any) => {
-          const left = el.x || 0;
-          const top = el.y || 0;
-          const width = el.largura || 100;
-          const height = el.altura || 30;
-          const opacity = el.transparencia ?? 1;
+      const baseUrl =
+        typeof window !== 'undefined' && window.location.origin
+          ? window.location.origin
+          : (process.env.NEXT_PUBLIC_APP_URL || 'https://www.gestaoeklesia.com.br');
+      const validacaoUrl = `${baseUrl}/validar/credencial/${encodeURIComponent(memberUniqueId)}`;
 
-          if (el.tipo === 'texto') {
-            const textoFinal = substituirPlaceholdersCertificado(el.texto || '', dadosCertificado, matchedTemplate.categoria);
-            const fontSize = el.fontSize || 16;
-            const cor = el.cor || '#000000';
-            const fonte = el.fonte || 'Arial';
-            const align = el.alinhamento || 'left';
-            const bold = el.negrito ? 'bold' : 'normal';
-            const italic = el.italico ? 'italic' : 'normal';
-            const underline = el.sublinhado ? 'underline' : 'none';
-            const shadow = el.sombreado ? 'text-shadow: 2px 2px 2px rgba(0,0,0,0.5);' : '';
-            const justify = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
+      const elementosHtmlArray = await Promise.all(
+        (matchedTemplate.elementos || [])
+          .filter((el: any) => el.visivel !== false)
+          .map(async (el: any) => {
+            const left = el.x || 0;
+            const top = el.y || 0;
+            const width = el.largura || 100;
+            const height = el.altura || 30;
+            const opacity = el.transparencia ?? 1;
 
-            return `
-              <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; font-size: ${fontSize}px; color: ${cor}; font-family: '${fonte}', sans-serif; font-weight: ${bold}; font-style: ${italic}; text-decoration: ${underline}; ${shadow} text-align: ${align}; opacity: ${opacity}; display: flex; align-items: center; justify-content: ${justify}; word-break: break-word; line-height: 1.2; box-sizing: border-box;">
-                ${textoFinal}
-              </div>
-            `;
-          }
+            if (el.tipo === 'texto') {
+              const textoFinal = substituirPlaceholdersCertificado(el.texto || '', dadosCertificado, matchedTemplate.categoria);
+              const fontSize = el.fontSize || 16;
+              const cor = el.cor || '#000000';
+              const fonte = el.fonte || 'Arial';
+              const align = el.alinhamento || 'left';
+              const bold = el.negrito ? 'bold' : 'normal';
+              const italic = el.italico ? 'italic' : 'normal';
+              const underline = el.sublinhado ? 'underline' : 'none';
+              const shadow = el.sombreado ? 'text-shadow: 2px 2px 2px rgba(0,0,0,0.5);' : '';
+              const justify = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
 
-          if (el.tipo === 'logo') {
-            const logoSrc = churchLogo || el.imagemUrl;
-            if (!logoSrc) return '';
-            return `
-              <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; opacity: ${opacity}; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
-                <img src="${logoSrc}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" />
-              </div>
-            `;
-          }
+              return `
+                <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; font-size: ${fontSize}px; color: ${cor}; font-family: '${fonte}', sans-serif; font-weight: ${bold}; font-style: ${italic}; text-decoration: ${underline}; ${shadow} text-align: ${align}; opacity: ${opacity}; display: flex; align-items: center; justify-content: ${justify}; word-break: break-word; line-height: 1.2; box-sizing: border-box;">
+                  ${textoFinal}
+                </div>
+              `;
+            }
 
-          if (el.tipo === 'imagem') {
-            if (!el.imagemUrl) return '';
-            return `
-              <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; opacity: ${opacity}; border-radius: ${el.borderRadius || 0}px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
-                <img src="${el.imagemUrl}" alt="Imagem" style="width: 100%; height: 100%; object-fit: contain;" />
-              </div>
-            `;
-          }
+            if (el.tipo === 'logo') {
+              const logoSrc = churchLogo || el.imagemUrl;
+              if (!logoSrc) return '';
+              return `
+                <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; opacity: ${opacity}; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
+                  <img src="${logoSrc}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" />
+                </div>
+              `;
+            }
 
-          if (el.tipo === 'foto-membro') {
-            const fotoSrc = reg.foto_url || el.foto || el.imagemUrl;
-            if (!fotoSrc) return '';
-            return `
-              <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; opacity: ${opacity}; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
-                <img src="${fotoSrc}" alt="Foto" style="width: 100%; height: 100%; object-fit: cover;" />
-              </div>
-            `;
-          }
+            if (el.tipo === 'imagem') {
+              if (!el.imagemUrl) return '';
+              return `
+                <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; opacity: ${opacity}; border-radius: ${el.borderRadius || 0}px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
+                  <img src="${el.imagemUrl}" alt="Imagem" style="width: 100%; height: 100%; object-fit: contain;" />
+                </div>
+              `;
+            }
 
-          return '';
-        })
-        .join('');
+            if (el.tipo === 'foto-membro') {
+              const fotoSrc = reg.foto_url || el.foto || el.imagemUrl;
+              if (!fotoSrc) return '';
+              return `
+                <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; opacity: ${opacity}; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
+                  <img src="${fotoSrc}" alt="Foto" style="width: 100%; height: 100%; object-fit: cover;" />
+                </div>
+              `;
+            }
+
+            if (el.tipo === 'qrcode') {
+              try {
+                const qrSize = Math.min(width, height);
+                const qrDataUrl = await QRCode.toDataURL(validacaoUrl, {
+                  width: Math.max(qrSize * 3, 200),
+                  margin: 1,
+                  color: {
+                    dark: el.cor || '#000000',
+                    light: '#ffffff',
+                  },
+                });
+
+                return `
+                  <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; opacity: ${opacity}; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
+                    <img src="${qrDataUrl}" alt="QR Code Autenticação Ministerial" style="width: 100%; height: 100%; object-fit: contain;" />
+                  </div>
+                `;
+              } catch (qrErr) {
+                console.error('Erro ao gerar QR Code para certificado:', qrErr);
+                return '';
+              }
+            }
+
+            if (el.tipo === 'chapa') {
+              return `
+                <div style="position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px; background-color: ${el.cor || '#ff0000'}; opacity: ${opacity}; border-radius: ${el.borderRadius || 0}px; box-sizing: border-box;"></div>
+              `;
+            }
+
+            return '';
+          })
+      );
+
+      const elementosHtml = elementosHtmlArray.join('');
 
       const safeDocTitle = `Certificado_Consagracao_${(reg.nome || 'Membro').replace(/[^a-zA-Z0-9_-]/g, '_')}_${cargoHomologado.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 

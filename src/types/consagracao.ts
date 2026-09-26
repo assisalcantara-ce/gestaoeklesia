@@ -73,21 +73,36 @@ export type ConsagracaoRegistroInput = Omit<
   'id' | 'created_at' | 'updated_at' | 'comissao'
 >;
 
+export type TipoEventoHistorico =
+  | 'inicio_processo'
+  | 'decisao_comissao'
+  | 'reabertura'
+  | 'homologacao'
+  | 'cancelamento'
+  | 'exclusao_processo'
+  | 'marco_ministerial'
+  | 'mudanca_cargo';
+
 export interface HistoricoProcessoItem {
   id?: string;
-  processo_id: string;
+  processo_id?: string;
   numero_processo?: string;
   ministry_id?: string;
   member_id?: string;
-  tipo_evento: 'inicio_processo' | 'decisao_comissao' | 'reabertura' | 'homologacao' | 'cancelamento' | 'exclusao_processo';
+  tipo_evento: TipoEventoHistorico;
   tipo_registro?: string;
   data: string;
   cargo_anterior?: string | null;
   cargo_pretendido?: string | null;
   cargo_resultante?: string | null;
+  cargo?: string | null;
+  local?: string | null;
+  local_origem?: string | null;
   status_processo?: string | null;
   decisao?: string | null;
   parecer?: string | null;
+  comissao_nome?: string | null;
+  pastor_solicitante?: string | null;
   descricao?: string;
   resultado?: string | null;
   criado_em?: string;

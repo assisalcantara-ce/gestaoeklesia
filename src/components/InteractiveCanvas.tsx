@@ -473,7 +473,7 @@ export default function InteractiveCanvas({
                 break;
 
             case 'qrcode':
-                // Gerar QR code apontando para a verificação da carteirinha digital
+                // Gerar QR code demonstrativo apontando para a rota canônica de validação
                 conteudo = (
                     <div
                         style={{
@@ -491,7 +491,7 @@ export default function InteractiveCanvas({
                         }}
                     >
                         <QRCodeSVG
-                            value={typeof window !== 'undefined' ? `${window.location.origin}/app/carteirinha` : 'https://app.gestaoeklesia.com.br/app/carteirinha'}
+                            value={typeof window !== 'undefined' ? `${window.location.origin}/validar/credencial/DEMO-EXEMPLO` : 'https://www.gestaoeklesia.com.br/validar/credencial/DEMO-EXEMPLO'}
                             size={Math.min(elemento.largura, elemento.altura) - 8}
                             fgColor={elemento.cor || '#000000'}
                         />
