@@ -197,11 +197,11 @@ export default function LoginPage() {
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center">
             <Image
-              src={BRAND.logoHorizontal}
+              src="/icons/logob.png"
               alt={BRAND.name}
-              width={140}
-              height={40}
-              className="h-7 sm:h-8 w-auto object-contain"
+              width={260}
+              height={70}
+              className="h-11 sm:h-14 md:h-16 w-auto object-contain drop-shadow-md"
               priority
             />
           </div>

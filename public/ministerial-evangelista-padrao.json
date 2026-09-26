@@ -1,0 +1,78 @@
+{
+  "name": "Consagração Evangelista",
+  "template_key": "ministerial-evangelista-padrao",
+  "categoria": "ministerial",
+  "template_data": {
+    "elementos": [
+      {
+        "id": "ea7378a8-958b-43d3-afdb-b382080cfedc",
+        "tipo": "logo",
+        "x": 54,
+        "y": 224,
+        "largura": 94,
+        "altura": 116,
+        "fontSize": 16,
+        "cor": "#111827",
+        "fonte": "Arial",
+        "alinhamento": "left",
+        "visivel": true
+      },
+      {
+        "id": "8f382add-8fcb-4bcf-9dd3-524e74caa5a4",
+        "tipo": "texto",
+        "x": 196,
+        "y": 210,
+        "largura": 440,
+        "altura": 41,
+        "fontSize": 22,
+        "cor": "#004080",
+        "fonte": "Comic Sans MS",
+        "alinhamento": "center",
+        "visivel": true,
+        "texto": "{ministro_nome}"
+      },
+      {
+        "id": "161d7f6b-1f34-42ed-8508-3a48ffd84cd6",
+        "tipo": "texto",
+        "x": 181,
+        "y": 512,
+        "largura": 233,
+        "altura": 21,
+        "fontSize": 9,
+        "cor": "#000000",
+        "fonte": "Comic Sans MS",
+        "alinhamento": "center",
+        "visivel": true,
+        "texto": "{nome_igreja}"
+      },
+      {
+        "id": "1777052623192saa853y",
+        "tipo": "texto",
+        "x": 426,
+        "y": 511,
+        "largura": 205,
+        "altura": 23,
+        "fontSize": 9,
+        "cor": "#000000",
+        "fonte": "Comic Sans MS",
+        "alinhamento": "center",
+        "visivel": true,
+        "texto": "{data_consagracao}"
+      },
+      {
+        "id": "575622f1-1457-445e-b368-1253f93513ec",
+        "tipo": "qrcode",
+        "x": 708,
+        "y": 471,
+        "largura": 90,
+        "altura": 90,
+        "fontSize": 16,
+        "cor": "#111827",
+        "fonte": "Arial",
+        "alinhamento": "left",
+        "visivel": true
+      }
+    ],
+    "backgroundUrl": "/img/cert_evangelista.jpg"
+  }
+}
