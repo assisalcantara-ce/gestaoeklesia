@@ -43,7 +43,8 @@ export async function GET(
         `id, unique_id, name, matricula, foto_url,
          cargo_ministerial, tipo_cadastro, status,
          data_consagracao, data_validade_credencial,
-         congregacao_id, ministry_id, dados_cargos, custom_fields`
+         congregacao, congregacao_id, supervisao, campo,
+         ministry_id, dados_cargos, custom_fields`
       );
 
     if (isUuid) {
@@ -66,18 +67,21 @@ export async function GET(
 
     // 2. Verificar processos homologados no tenant para este membro
     let hasProcessoHomologado = false;
+    let procHomologadoData: any = null;
     if (member.ministry_id) {
       const { data: procHomologado } = await admin
         .from('consagracao_registros')
-        .select('id, status_processo')
+        .select('id, status_processo, congregacao_id, campo_id, supervisao_id')
         .eq('member_id', member.id)
         .eq('ministry_id', member.ministry_id)
         .eq('status_processo', 'homologar')
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (procHomologado) {
         hasProcessoHomologado = true;
+        procHomologadoData = procHomologado;
       }
     }
 
@@ -118,17 +122,39 @@ export async function GET(
       }
     }
 
-    // 6. Buscar congregação (se houver)
+    // 6. Buscar congregação correta (se houver)
     let congregacaoNome: string | null = null;
-    if (member.congregacao_id) {
+    let nomeCongregacaoDb: string | null = null;
+    const targetCongId = procHomologadoData?.congregacao_id || member.congregacao_id;
+
+    if (targetCongId) {
       const { data: cong } = await admin
         .from('congregacoes')
-        .select('nome')
-        .eq('id', member.congregacao_id as string)
+        .select('id, nome')
+        .eq('id', targetCongId as string)
         .maybeSingle();
-      congregacaoNome = (cong as any)?.nome ?? null;
-    } else if ((cf as any).congregacao) {
-      congregacaoNome = String((cf as any).congregacao);
+      nomeCongregacaoDb = (cong as any)?.nome ?? null;
+    }
+
+    const nomeCongregacaoTexto = 
+      (typeof member.congregacao === 'string' && member.congregacao.trim()) ||
+      (typeof (cf as any).congregacao === 'string' && (cf as any).congregacao.trim()) ||
+      (typeof (cf as any).congregacao_nome === 'string' && (cf as any).congregacao_nome.trim()) ||
+      (typeof (cf as any).nomeCongregacao === 'string' && (cf as any).nomeCongregacao.trim()) ||
+      null;
+
+    const isRegionalOuSupervisao = (nome: string | null) => {
+      if (!nome) return false;
+      const n = nome.trim().toUpperCase();
+      return n.startsWith('REGIONAL') || n.startsWith('SUPERVIS') || n.startsWith('REGIÃO') || n.startsWith('REGIAO');
+    };
+
+    if (nomeCongregacaoTexto && (!nomeCongregacaoDb || isRegionalOuSupervisao(nomeCongregacaoDb))) {
+      congregacaoNome = nomeCongregacaoTexto;
+    } else if (nomeCongregacaoDb && !isRegionalOuSupervisao(nomeCongregacaoDb)) {
+      congregacaoNome = nomeCongregacaoDb;
+    } else {
+      congregacaoNome = nomeCongregacaoTexto || nomeCongregacaoDb || null;
     }
 
     // 7. Buscar Ministério/Igreja

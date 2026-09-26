@@ -72,7 +72,8 @@ export default async function ValidarCredencialPage({ params }: PageProps) {
           `id, unique_id, name, matricula, foto_url,
            cargo_ministerial, tipo_cadastro, status,
            data_consagracao, data_validade_credencial,
-           congregacao_id, ministry_id, dados_cargos, custom_fields`
+           congregacao, congregacao_id, supervisao, campo,
+           ministry_id, dados_cargos, custom_fields`
         );
 
       if (isUuid) {
@@ -91,10 +92,11 @@ export default async function ValidarCredencialPage({ params }: PageProps) {
           // Checar se há processo homologado
           const { data: procHomologado } = await admin
             .from('consagracao_registros')
-            .select('id')
+            .select('id, congregacao_id, campo_id, supervisao_id')
             .eq('member_id', member.id)
             .eq('ministry_id', member.ministry_id)
             .eq('status_processo', 'homologar')
+            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
@@ -102,16 +104,42 @@ export default async function ValidarCredencialPage({ params }: PageProps) {
             hasProcessoHomologado = true;
           }
 
-          // Buscar dados da congregação
-          if (member.congregacao_id) {
+          // Resolução inteligente da Congregação Local:
+          // 1. Prioridade: se o processo homologado tiver congregacao_id distinta da supervisão
+          let nomeCongregacaoDb: string | null = null;
+          const targetCongId = procHomologado?.congregacao_id || member.congregacao_id;
+
+          if (targetCongId) {
             const { data: cong } = await admin
               .from('congregacoes')
-              .select('nome')
-              .eq('id', member.congregacao_id as string)
+              .select('id, nome')
+              .eq('id', targetCongId as string)
               .maybeSingle();
-            congregacaoNome = (cong as any)?.nome ?? null;
-          } else if (member.custom_fields && typeof member.custom_fields === 'object') {
-            congregacaoNome = (member.custom_fields as any).congregacao || null;
+            nomeCongregacaoDb = (cong as any)?.nome ?? null;
+          }
+
+          // 2. Extrair congregação em texto direto de members e custom_fields
+          const cf = member.custom_fields && typeof member.custom_fields === 'object' ? member.custom_fields : {};
+          const nomeCongregacaoTexto = 
+            (typeof member.congregacao === 'string' && member.congregacao.trim()) ||
+            (typeof (cf as any).congregacao === 'string' && (cf as any).congregacao.trim()) ||
+            (typeof (cf as any).congregacao_nome === 'string' && (cf as any).congregacao_nome.trim()) ||
+            (typeof (cf as any).nomeCongregacao === 'string' && (cf as any).nomeCongregacao.trim()) ||
+            null;
+
+          const isRegionalOuSupervisao = (nome: string | null) => {
+            if (!nome) return false;
+            const n = nome.trim().toUpperCase();
+            return n.startsWith('REGIONAL') || n.startsWith('SUPERVIS') || n.startsWith('REGIÃO') || n.startsWith('REGIAO');
+          };
+
+          // Se o nome vindo do banco for uma Regional/Supervisão, mas temos o texto específico da congregação local, usar o texto local
+          if (nomeCongregacaoTexto && (!nomeCongregacaoDb || isRegionalOuSupervisao(nomeCongregacaoDb))) {
+            congregacaoNome = nomeCongregacaoTexto;
+          } else if (nomeCongregacaoDb && !isRegionalOuSupervisao(nomeCongregacaoDb)) {
+            congregacaoNome = nomeCongregacaoDb;
+          } else {
+            congregacaoNome = nomeCongregacaoTexto || nomeCongregacaoDb || null;
           }
 
           // Buscar dados do ministério
