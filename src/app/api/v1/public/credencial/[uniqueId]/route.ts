@@ -43,7 +43,7 @@ export async function GET(
         `id, unique_id, name, matricula, foto_url,
          cargo_ministerial, tipo_cadastro, status,
          data_consagracao, data_validade_credencial,
-         congregacao, congregacao_id, supervisao, campo,
+         congregacao_id,
          ministry_id, dados_cargos, custom_fields`
       );
 
@@ -137,7 +137,7 @@ export async function GET(
     }
 
     const nomeCongregacaoTexto = 
-      (typeof member.congregacao === 'string' && member.congregacao.trim()) ||
+      (typeof (member as any).congregacao === 'string' && (member as any).congregacao.trim()) ||
       (typeof (cf as any).congregacao === 'string' && (cf as any).congregacao.trim()) ||
       (typeof (cf as any).congregacao_nome === 'string' && (cf as any).congregacao_nome.trim()) ||
       (typeof (cf as any).nomeCongregacao === 'string' && (cf as any).nomeCongregacao.trim()) ||

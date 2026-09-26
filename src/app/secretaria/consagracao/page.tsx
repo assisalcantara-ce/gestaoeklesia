@@ -1681,7 +1681,7 @@ export default function ConsagracaoPage() {
       if (reg.member_id) {
         const { data: memberData, error: memberErr } = await supabase
           .from('members')
-          .select('id, ministry_id, cargo_ministerial, unique_id, custom_fields')
+          .select('id, ministry_id, cargo_ministerial, unique_id')
           .eq('id', reg.member_id)
           .eq('ministry_id', ministryId)
           .single();
@@ -1690,10 +1690,9 @@ export default function ConsagracaoPage() {
           if (memberData.cargo_ministerial) {
             cargoHomologado = String(memberData.cargo_ministerial).trim();
           }
-          memberUniqueId =
-            memberData.unique_id ||
-            (memberData.custom_fields as any)?.uniqueId ||
-            '';
+          if (memberData.unique_id && typeof memberData.unique_id === 'string' && memberData.unique_id.trim()) {
+            memberUniqueId = memberData.unique_id.trim();
+          }
         }
       }
 
@@ -1703,7 +1702,7 @@ export default function ConsagracaoPage() {
         if (cpfLimpo) {
           const { data: mByCpf } = await supabase
             .from('members')
-            .select('id, unique_id, custom_fields, cargo_ministerial')
+            .select('id, unique_id, cargo_ministerial')
             .eq('ministry_id', ministryId)
             .eq('cpf', cpfLimpo)
             .maybeSingle();
@@ -1712,18 +1711,16 @@ export default function ConsagracaoPage() {
             if (!cargoHomologado && mByCpf.cargo_ministerial) {
               cargoHomologado = String(mByCpf.cargo_ministerial).trim();
             }
-            memberUniqueId =
-              mByCpf.unique_id ||
-              (mByCpf.custom_fields as any)?.uniqueId ||
-              mByCpf.id ||
-              '';
+            if (mByCpf.unique_id && typeof mByCpf.unique_id === 'string' && mByCpf.unique_id.trim()) {
+              memberUniqueId = mByCpf.unique_id.trim();
+            }
           }
         }
       }
 
-      // Se ainda assim não tiver, usar reg.member_id ou identificador seguro
       if (!memberUniqueId) {
-        memberUniqueId = reg.member_id || reg.id || '';
+        setStatusMensagem('Não foi possível emitir o certificado: o membro não possui um identificador ministerial oficial (unique_id) cadastrado.');
+        return;
       }
 
       // Prioridade 2: Dados específicos de resultado persistidos no registro do processo

@@ -72,7 +72,7 @@ export default async function ValidarCredencialPage({ params }: PageProps) {
           `id, unique_id, name, matricula, foto_url,
            cargo_ministerial, tipo_cadastro, status,
            data_consagracao, data_validade_credencial,
-           congregacao, congregacao_id, supervisao, campo,
+           congregacao_id,
            ministry_id, dados_cargos, custom_fields`
         );
 
@@ -121,7 +121,7 @@ export default async function ValidarCredencialPage({ params }: PageProps) {
           // 2. Extrair congregação em texto direto de members e custom_fields
           const cf = member.custom_fields && typeof member.custom_fields === 'object' ? member.custom_fields : {};
           const nomeCongregacaoTexto = 
-            (typeof member.congregacao === 'string' && member.congregacao.trim()) ||
+            (typeof (member as any).congregacao === 'string' && (member as any).congregacao.trim()) ||
             (typeof (cf as any).congregacao === 'string' && (cf as any).congregacao.trim()) ||
             (typeof (cf as any).congregacao_nome === 'string' && (cf as any).congregacao_nome.trim()) ||
             (typeof (cf as any).nomeCongregacao === 'string' && (cf as any).nomeCongregacao.trim()) ||
