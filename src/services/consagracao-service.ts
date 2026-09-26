@@ -68,6 +68,7 @@ async function registrarEventoHistoricoMinistro(
       cargo_resultante: evento.cargo_resultante || null,
       status_processo: evento.status_processo || null,
       decisao: evento.decisao || null,
+      parecer: evento.parecer || null,
       resultado: evento.resultado || null,
       descricao: evento.descricao || '',
       criado_em: nowIso,
@@ -377,13 +378,19 @@ export const consacracaoService = {
   async deferirProcessoComissao(
     processId: string,
     ministryId: string,
-    userNivel?: string | null
+    userNivel?: string | null,
+    parecer?: string | null
   ): Promise<ConsagracaoRegistro> {
     if (userNivel === 'presidencia') {
       throw new Error('O Presidente do Ministério não possui ação operacional de tramitação no sistema.');
     }
     if (userNivel === 'supervisor') {
       throw new Error('A Comissão de Consagração não opera o sistema diretamente; os registros de tramitação são de competência da Secretaria Geral.');
+    }
+
+    const parecerTratado = (parecer || '').trim();
+    if (!parecerTratado) {
+      throw new Error('O parecer da Comissão deve ser registrado antes de lançar a decisão.');
     }
 
     const supabase = createClient();
@@ -405,7 +412,11 @@ export const consacracaoService = {
 
     const { data, error } = await supabase
       .from('consagracao_registros')
-      .update({ status_processo: 'deferir', updated_at: new Date().toISOString() })
+      .update({
+        status_processo: 'deferir',
+        observacoes: parecerTratado,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', processId)
       .eq('ministry_id', ministryId)
       .select(`
@@ -429,11 +440,12 @@ export const consacracaoService = {
         tipo_evento: 'decisao_comissao',
         tipo_registro: reg.tipo_registro,
         decisao: 'deferir',
+        parecer: parecerTratado,
         status_processo: 'deferir',
         data: new Date().toISOString().slice(0, 10),
         cargo_anterior: reg.cargo_ocupa || null,
         cargo_pretendido: reg.cargo_pretendido || null,
-        descricao: 'Parecer Deferido pela Comissão de Consagração',
+        descricao: `Parecer Deferido pela Comissão de Consagração: ${parecerTratado}`,
       });
     }
 
@@ -446,13 +458,19 @@ export const consacracaoService = {
   async indeferirProcessoComissao(
     processId: string,
     ministryId: string,
-    userNivel?: string | null
+    userNivel?: string | null,
+    parecer?: string | null
   ): Promise<ConsagracaoRegistro> {
     if (userNivel === 'presidencia') {
       throw new Error('O Presidente do Ministério não possui ação operacional de tramitação no sistema.');
     }
     if (userNivel === 'supervisor') {
       throw new Error('A Comissão de Consagração não opera o sistema diretamente; os registros de tramitação são de competência da Secretaria Geral.');
+    }
+
+    const parecerTratado = (parecer || '').trim();
+    if (!parecerTratado) {
+      throw new Error('O parecer da Comissão deve ser registrado antes de lançar a decisão.');
     }
 
     const supabase = createClient();
@@ -474,7 +492,11 @@ export const consacracaoService = {
 
     const { data, error } = await supabase
       .from('consagracao_registros')
-      .update({ status_processo: 'indeferir', updated_at: new Date().toISOString() })
+      .update({
+        status_processo: 'indeferir',
+        observacoes: parecerTratado,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', processId)
       .eq('ministry_id', ministryId)
       .select(`
@@ -498,11 +520,12 @@ export const consacracaoService = {
         tipo_evento: 'decisao_comissao',
         tipo_registro: reg.tipo_registro,
         decisao: 'indeferir',
+        parecer: parecerTratado,
         status_processo: 'indeferir',
         data: new Date().toISOString().slice(0, 10),
         cargo_anterior: reg.cargo_ocupa || null,
         cargo_pretendido: reg.cargo_pretendido || null,
-        descricao: 'Parecer Indeferido pela Comissão de Consagração',
+        descricao: `Parecer Indeferido pela Comissão de Consagração: ${parecerTratado}`,
       });
     }
 
@@ -600,10 +623,10 @@ export const consacracaoService = {
 
     const supabase = createClient();
 
-    // Valida status prévio no banco antes de invocar a RPC
+    // Valida status prévio e presença obrigatória do parecer no banco antes de invocar a RPC
     const { data: reg, error: fetchErr } = await supabase
       .from('consagracao_registros')
-      .select('id, status_processo, ministry_id, member_id, numero_processo, tipo_registro, cargo_ocupa, cargo_pretendido, data_autorizacao, data_processo')
+      .select('id, status_processo, ministry_id, member_id, numero_processo, tipo_registro, cargo_ocupa, cargo_pretendido, data_autorizacao, data_processo, observacoes')
       .eq('id', processId)
       .eq('ministry_id', ministryId)
       .single();
@@ -618,6 +641,10 @@ export const consacracaoService = {
 
     if (reg.status_processo === 'indeferir') {
       throw new Error('Processo indeferido: processos indeferidos pela Comissão não podem ser homologados.');
+    }
+
+    if (!reg.observacoes || !reg.observacoes.trim()) {
+      throw new Error('Não é possível homologar: o processo deferido não possui parecer/despacho da Comissão registrado.');
     }
 
     const { data, error } = await supabase.rpc('homologar_processo_consagracao', {

@@ -129,6 +129,8 @@ export default function ConsagracaoPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [processModalOpen, setProcessModalOpen] = useState(false);
   const [processRegistro, setProcessRegistro] = useState<any | null>(null);
+  const [parecerInput, setParecerInput] = useState('');
+  const [parecerError, setParecerError] = useState('');
   const [consagracaoModuleReady, setConsagracaoModuleReady] = useState(true);
 
   const [memberQuery, setMemberQuery] = useState('');
@@ -839,12 +841,19 @@ export default function ConsagracaoPage() {
   const handleComissaoDecisao = async (decisao: 'deferir' | 'indeferir') => {
     if (!processRegistro || !ministryId) return;
 
+    const parecerTratado = (parecerInput || '').trim();
+    if (!parecerTratado) {
+      setParecerError('O parecer da Comissão deve ser registrado antes de lançar a decisão.');
+      return;
+    }
+    setParecerError('');
+
     try {
       if (decisao === 'deferir') {
-        await consacracaoService.deferirProcessoComissao(processRegistro.id, ministryId, ctx.nivel);
+        await consacracaoService.deferirProcessoComissao(processRegistro.id, ministryId, ctx.nivel, parecerTratado);
         setStatusMensagem('Processo deferido pela Comissão com sucesso.');
       } else {
-        await consacracaoService.indeferirProcessoComissao(processRegistro.id, ministryId, ctx.nivel);
+        await consacracaoService.indeferirProcessoComissao(processRegistro.id, ministryId, ctx.nivel, parecerTratado);
         setStatusMensagem('Processo indeferido pela Comissão.');
       }
 
@@ -859,13 +868,16 @@ export default function ConsagracaoPage() {
       }
 
       setRegistros((prev) =>
-        prev.map((r) => (r.id === processRegistro.id ? { ...r, status_processo: decisao } : r))
+        prev.map((r) => (r.id === processRegistro.id ? { ...r, status_processo: decisao, observacoes: parecerTratado } : r))
       );
       setProcessModalOpen(false);
       setProcessRegistro(null);
+      setParecerInput('');
+      setParecerError('');
     } catch (err: any) {
       console.error('Erro na deliberação da Comissão:', err);
       setStatusMensagem(err.message || 'Erro ao deliberar sobre o processo.');
+      setParecerError(err.message || 'Erro ao deliberar sobre o processo.');
     }
   };
 
@@ -1592,7 +1604,7 @@ export default function ConsagracaoPage() {
         <div class="section-title">Registro da Avaliação</div>
         
         <div style="background: #f8fafc; border: 1.5px solid #0f766e; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;">
-          <div class="grid-2" style="margin-bottom: 8px;">
+          <div class="grid-3" style="margin-bottom: ${reg.observacoes || dataAutorizacao !== '-' ? '8px' : '0'};">
             <div class="field" style="background: #ffffff; border-color: #cbd5e1;">
               <div class="field-label" style="color: #0f766e; font-weight: 800;">COMISSÃO RESPONSÁVEL PELA AVALIAÇÃO</div>
               <div class="field-value" style="font-size: 13px; font-weight: 700; color: #0f172a;">
@@ -1605,26 +1617,9 @@ export default function ConsagracaoPage() {
                 ${pastorIndicante}
               </div>
             </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: ${reg.observacoes || dataAutorizacao !== '-' ? '8px' : '0'};">
-            <div class="field" style="background: #ffffff;">
-              <div class="field-label">PROCESSO AVALIADO</div>
-              <div class="field-value" style="font-family: monospace; font-weight: 800; color: #0f766e;">
-                ${reg.numero_processo || 'S/N'}
-              </div>
-            </div>
-            <div class="field" style="background: #ffffff;">
-              <div class="field-label">DATA DO PROCESSO</div>
-              <div class="field-value">${dataProc}</div>
-            </div>
-            <div class="field" style="background: #ffffff;">
-              <div class="field-label">TIPO DE PROCESSO</div>
-              <div class="field-value">${tipoLabel}</div>
-            </div>
-            <div class="field" style="background: #ffffff;">
-              <div class="field-label">DECISÃO DA COMISSÃO</div>
-              <div class="field-value" style="font-weight: 800; color: ${decisaoCor};">
+            <div class="field" style="background: #ffffff; border-color: #cbd5e1;">
+              <div class="field-label" style="color: #0f766e; font-weight: 800;">DECISÃO DA COMISSÃO</div>
+              <div class="field-value" style="font-size: 13px; font-weight: 800; color: ${decisaoCor};">
                 ${decisaoTexto}
               </div>
             </div>
@@ -1640,8 +1635,8 @@ export default function ConsagracaoPage() {
               ` : ''}
               ${reg.observacoes ? `
                 <div class="field" style="background: #ffffff; ${dataAutorizacao === '-' ? 'grid-column: span 2;' : ''}">
-                  <div class="field-label">PARECER / OBSERVAÇÕES REGISTRADAS</div>
-                  <div class="field-value" style="font-weight: normal; font-size: 11px; color: #334155; white-space: pre-wrap;">
+                  <div class="field-label" style="color: #0f766e; font-weight: 800;">PARECER / DESPACHO DA COMISSÃO</div>
+                  <div class="field-value" style="font-weight: 600; font-size: 11px; color: #1e293b; white-space: pre-wrap;">
                     ${reg.observacoes}
                   </div>
                 </div>
@@ -2433,6 +2428,8 @@ export default function ConsagracaoPage() {
                             className="inline-flex items-center justify-center px-2.5 h-8 rounded-lg bg-teal-50 text-teal-700 border border-teal-300 hover:bg-teal-100 transition text-xs font-semibold shadow-xs gap-1"
                             onClick={() => {
                               setProcessRegistro(reg);
+                              setParecerInput(reg.observacoes || '');
+                              setParecerError('');
                               setProcessModalOpen(true);
                             }}
                             title="Registrar decisão da Comissão"
@@ -2450,6 +2447,8 @@ export default function ConsagracaoPage() {
                             className="inline-flex items-center justify-center px-2.5 h-8 rounded-lg bg-purple-50 text-purple-700 border border-purple-300 hover:bg-purple-100 transition text-xs font-semibold shadow-xs gap-1"
                             onClick={() => {
                               setProcessRegistro(reg);
+                              setParecerInput(reg.observacoes || '');
+                              setParecerError('');
                               setProcessModalOpen(true);
                             }}
                             title="Secretaria Geral: Homologar / Reabrir"
@@ -2467,6 +2466,8 @@ export default function ConsagracaoPage() {
                             className="inline-flex items-center justify-center px-2.5 h-8 rounded-lg bg-amber-50 text-amber-700 border border-amber-300 hover:bg-amber-100 transition text-xs font-semibold shadow-xs gap-1"
                             onClick={() => {
                               setProcessRegistro(reg);
+                              setParecerInput(reg.observacoes || '');
+                              setParecerError('');
                               setProcessModalOpen(true);
                             }}
                             title="Secretaria Geral: Reabrir Processo"
@@ -3334,6 +3335,8 @@ export default function ConsagracaoPage() {
                 onClick={() => {
                   setProcessModalOpen(false);
                   setProcessRegistro(null);
+                  setParecerInput('');
+                  setParecerError('');
                 }}
               >
                 ✕
@@ -3378,6 +3381,33 @@ export default function ConsagracaoPage() {
                 <p className="text-xs text-slate-600 bg-slate-100 border border-slate-200 p-3 rounded-lg">
                   📝 <strong>Secretaria Geral:</strong> Registre abaixo a decisão recebida da Comissão de Consagração após análise da Ficha do Processo.
                 </p>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    PARECER / DESPACHO DA COMISSÃO <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-slate-500">
+                    Transcreva neste campo o parecer registrado pela Comissão na Ficha do Processo.
+                  </p>
+                  <textarea
+                    rows={4}
+                    value={parecerInput}
+                    onChange={(e) => {
+                      setParecerInput(e.target.value);
+                      if (parecerError) setParecerError('');
+                    }}
+                    placeholder="Ex.: Candidato avaliado e aprovado por unanimidade pela comissão..."
+                    className={`w-full p-3 text-sm border rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none transition resize-y ${
+                      parecerError ? 'border-red-500 bg-red-50/40' : 'border-slate-300 bg-white'
+                    }`}
+                  />
+                  {parecerError && (
+                    <p className="text-xs text-red-600 font-semibold mt-1 animate-in fade-in duration-150">
+                      ⚠️ {parecerError}
+                    </p>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-3 pt-2">
                   <button
                     type="button"

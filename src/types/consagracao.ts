@@ -87,6 +87,7 @@ export interface HistoricoProcessoItem {
   cargo_resultante?: string | null;
   status_processo?: string | null;
   decisao?: string | null;
+  parecer?: string | null;
   descricao?: string;
   resultado?: string | null;
   criado_em?: string;
