@@ -17,6 +17,7 @@ const EXEMPT_PREFIXES = [
   '/auth',
   '/membro',
   '/formularios',
+  '/validar',
   '/app',
 ];
 

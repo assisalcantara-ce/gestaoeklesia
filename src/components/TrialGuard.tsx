@@ -22,6 +22,7 @@ const BYPASS_PATHS = [
   '/admin',
   '/formularios',
   '/membro',
+  '/validar',
   '/app',
 ]
 

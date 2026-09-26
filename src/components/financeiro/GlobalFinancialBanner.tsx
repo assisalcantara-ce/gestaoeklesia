@@ -47,6 +47,7 @@ export default function GlobalFinancialBanner() {
       pathname === '/login' ||
       pathname === '/pre-cadastro' ||
       pathname.startsWith('/membro') ||
+      pathname.startsWith('/validar') ||
       pathname.startsWith('/app') ||
       pathname.startsWith('/formularios')
     ) return true;
