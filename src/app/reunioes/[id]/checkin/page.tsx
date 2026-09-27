@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import { createClient } from '@/lib/supabase-client';
 
 interface ParticipanteSnapshot {
   id: string;
@@ -99,12 +100,30 @@ export default function CheckinReuniaoPage() {
   const scanningRef = useRef(false);
   const [manualQrInput, setManualQrInput] = useState('');
 
+  // ─── Helper de Autenticação ───────────────────────────────────────────────
+  const fetchAutenticado = useCallback(async (url: string, options: RequestInit = {}) => {
+    const supabase = createClient();
+    const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+
+    if (sessionErr || !session?.access_token) {
+      throw new Error('Sessão expirada ou não autenticada. Faça login novamente.');
+    }
+
+    const headers = new Headers(options.headers || {});
+    headers.set('Authorization', `Bearer ${session.access_token}`);
+
+    return fetch(url, {
+      ...options,
+      headers,
+    });
+  }, []);
+
   // ─── 1. Carregar Dados da Reunião e Snapshot ──────────────────────────────
   const carregarReuniao = useCallback(async () => {
     if (!reuniaoId) return;
     try {
       setLoading(true);
-      const res = await fetch(`/api/v1/reunioes/${reuniaoId}`);
+      const res = await fetchAutenticado(`/api/v1/reunioes/${reuniaoId}`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -122,7 +141,7 @@ export default function CheckinReuniaoPage() {
     } finally {
       setLoading(false);
     }
-  }, [reuniaoId]);
+  }, [reuniaoId, fetchAutenticado]);
 
   useEffect(() => {
     if (!bloqueado && reuniaoId) {
@@ -144,7 +163,7 @@ export default function CheckinReuniaoPage() {
 
       try {
         setEnviando(true);
-        const res = await fetch(`/api/v1/reunioes/${reuniaoId}/checkin`, {
+        const res = await fetchAutenticado(`/api/v1/reunioes/${reuniaoId}/checkin`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -238,7 +257,7 @@ export default function CheckinReuniaoPage() {
         setManualQrInput('');
       }
     },
-    [reuniaoId, enviando]
+    [reuniaoId, enviando, fetchAutenticado]
   );
 
   // ─── 2.1 Executar Encerramento Oficial da Reunião ─────────────────────────
@@ -249,7 +268,7 @@ export default function CheckinReuniaoPage() {
       setEncerrando(true);
       pararCamera();
 
-      const res = await fetch(`/api/v1/reunioes/${reuniaoId}/encerrar`, {
+      const res = await fetchAutenticado(`/api/v1/reunioes/${reuniaoId}/encerrar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });

@@ -27,6 +27,10 @@ import {
   Check,
   ExternalLink,
   Search,
+  Printer,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 interface ParticipanteSnapshot {
@@ -42,6 +46,7 @@ interface ParticipanteSnapshot {
   unique_id_snapshot?: string | null;
   status_presenca: 'pendente' | 'presente' | 'falta' | 'falta_justificada';
   created_at: string;
+  data_hora_checkin?: string | null;
 }
 
 interface ReuniaoDetalhes {
@@ -84,9 +89,15 @@ export default function DetalhesReuniaoPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
 
-  // Filtro de busca na lista de ministros
+  // Filtros da lista de ministros
   const [buscaMinistro, setBuscaMinistro] = useState<string>('');
+  const [filtroCongregacao, setFiltroCongregacao] = useState<string>('todas');
+  const [filtroCargo, setFiltroCargo] = useState<string>('todos');
   const [filtroPresenca, setFiltroPresenca] = useState<string>('todos');
+
+  // Paginação
+  const [itensPorPagina, setItensPorPagina] = useState<number>(10);
+  const [paginaAtual, setPaginaAtual] = useState<number>(1);
 
   // Modais de Ação
   const [modalPainelAberto, setModalPainelAberto] = useState<boolean>(false);
@@ -96,6 +107,9 @@ export default function DetalhesReuniaoPage() {
 
   const [modalEncerrarAberto, setModalEncerrarAberto] = useState<boolean>(false);
   const [encerrando, setEncerrando] = useState<boolean>(false);
+
+  // Data/hora para exibição no relatório de impressão
+  const [dataHoraImpressao, setDataHoraImpressao] = useState<string>('');
 
   // ─── Helper de Autenticação ───────────────────────────────────────────────
   const fetchAutenticado = useCallback(async (url: string, options: RequestInit = {}) => {
@@ -162,7 +176,6 @@ export default function DetalhesReuniaoPage() {
     setCopiado(false);
 
     try {
-      // 1. Consultar estado do token
       const resGet = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`);
       const dataGet = await resGet.json();
 
@@ -172,7 +185,6 @@ export default function DetalhesReuniaoPage() {
         });
       }
 
-      // Se não há token ativo e a reunião não está encerrada, gerar novo token
       if (reuniao.status !== 'encerrada') {
         const resPost = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`, {
           method: 'POST',
@@ -226,22 +238,126 @@ export default function DetalhesReuniaoPage() {
     }
   };
 
+  // ─── Listas Dinâmicas de Opções para os Filtros (derivadas do Snapshot) ───
+  const congregacoesDisponiveis = useMemo(() => {
+    const setCong = new Set<string>();
+    participantes.forEach((p) => {
+      const nome = p.nome_congregacao_snapshot?.trim();
+      if (nome) {
+        setCong.add(nome);
+      }
+    });
+    return Array.from(setCong).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [participantes]);
+
+  const cargosDisponiveis = useMemo(() => {
+    const setCargos = new Set<string>();
+    participantes.forEach((p) => {
+      const cargo = p.cargo_snapshot?.trim();
+      if (cargo) {
+        setCargos.add(cargo);
+      }
+    });
+    return Array.from(setCargos).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [participantes]);
+
   // ─── Filtro dos Participantes do Snapshot ──────────────────────────────────
   const participantesFiltrados = useMemo(() => {
-    return participantes.filter((p) => {
-      const matchBusca =
-        !buscaMinistro.trim() ||
-        p.nome_ministro_snapshot.toLowerCase().includes(buscaMinistro.toLowerCase()) ||
-        p.cargo_snapshot.toLowerCase().includes(buscaMinistro.toLowerCase()) ||
-        (p.nome_congregacao_snapshot &&
-          p.nome_congregacao_snapshot.toLowerCase().includes(buscaMinistro.toLowerCase()));
+    const busca = buscaMinistro.trim().toLowerCase();
 
+    return participantes.filter((p) => {
+      // 1. Busca por nome do ministro
+      const matchBusca =
+        !busca ||
+        p.nome_ministro_snapshot.toLowerCase().includes(busca) ||
+        p.cargo_snapshot.toLowerCase().includes(busca) ||
+        (p.nome_congregacao_snapshot &&
+          p.nome_congregacao_snapshot.toLowerCase().includes(busca)) ||
+        (p.area_snapshot && p.area_snapshot.toLowerCase().includes(busca)) ||
+        (p.unique_id_snapshot && p.unique_id_snapshot.toLowerCase().includes(busca)) ||
+        (p.carteirinha_numero_snapshot &&
+          p.carteirinha_numero_snapshot.toLowerCase().includes(busca));
+
+      // 2. Filtro Congregação
+      const matchCongregacao =
+        filtroCongregacao === 'todas' ||
+        p.nome_congregacao_snapshot?.trim().toLowerCase() === filtroCongregacao.toLowerCase();
+
+      // 3. Filtro Cargo
+      const matchCargo =
+        filtroCargo === 'todos' ||
+        p.cargo_snapshot?.trim().toLowerCase() === filtroCargo.toLowerCase();
+
+      // 4. Filtro Presença
       const matchPresenca =
         filtroPresenca === 'todos' || p.status_presenca === filtroPresenca;
 
-      return matchBusca && matchPresenca;
+      return matchBusca && matchCongregacao && matchCargo && matchPresenca;
     });
-  }, [participantes, buscaMinistro, filtroPresenca]);
+  }, [participantes, buscaMinistro, filtroCongregacao, filtroCargo, filtroPresenca]);
+
+  // ─── Reset automático de página ao alterar qualquer filtro ─────────────────
+  const limparFiltros = () => {
+    setBuscaMinistro('');
+    setFiltroCongregacao('todas');
+    setFiltroCargo('todos');
+    setFiltroPresenca('todos');
+    setPaginaAtual(1);
+  };
+
+  const handleBuscaChange = (val: string) => {
+    setBuscaMinistro(val);
+    setPaginaAtual(1);
+  };
+
+  const handleCongregacaoChange = (val: string) => {
+    setFiltroCongregacao(val);
+    setPaginaAtual(1);
+  };
+
+  const handleCargoChange = (val: string) => {
+    setFiltroCargo(val);
+    setPaginaAtual(1);
+  };
+
+  const handlePresencaChange = (val: string) => {
+    setFiltroPresenca(val);
+    setPaginaAtual(1);
+  };
+
+  const handleItensPorPaginaChange = (val: number) => {
+    setItensPorPagina(val);
+    setPaginaAtual(1);
+  };
+
+  // ─── Paginação Client-Side ────────────────────────────────────────────────
+  const totalRegistrosFiltrados = participantesFiltrados.length;
+  const totalPaginas = Math.max(1, Math.ceil(totalRegistrosFiltrados / itensPorPagina));
+  const paginaCorrigida = Math.min(paginaAtual, totalPaginas);
+
+  const participantesPaginados = useMemo(() => {
+    const inicio = (paginaCorrigida - 1) * itensPorPagina;
+    return participantesFiltrados.slice(inicio, inicio + itensPorPagina);
+  }, [participantesFiltrados, paginaCorrigida, itensPorPagina]);
+
+  const indiceInicioExibicao = totalRegistrosFiltrados > 0 ? (paginaCorrigida - 1) * itensPorPagina + 1 : 0;
+  const indiceFimExibicao = Math.min(paginaCorrigida * itensPorPagina, totalRegistrosFiltrados);
+
+  // ─── Ação: Imprimir Lista Filtrada ─────────────────────────────────────────
+  const handleImprimir = () => {
+    setDataHoraImpressao(new Date().toLocaleString('pt-BR'));
+    // Pequeno delay para garantir que dataHoraImpressao seja renderizada antes do print
+    setTimeout(() => {
+      window.print();
+    }, 50);
+  };
+
+  // Tem filtros ativos?
+  const temFiltrosAtivos =
+    Boolean(buscaMinistro.trim()) ||
+    filtroCongregacao !== 'todas' ||
+    filtroCargo !== 'todos' ||
+    filtroPresenca !== 'todos';
 
   // Contadores de Presença
   const countPresentes = useMemo(
@@ -562,112 +678,404 @@ export default function DetalhesReuniaoPage() {
         </div>
       </section>
 
-      {/* ─── 3. SNAPSHOT DE PARTICIPANTES ─── */}
-      <section className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+      {/* ─── 3. SNAPSHOT DE PARTICIPANTES (MINISTROS CONVOCADOS) ─── */}
+      <section className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden print:hidden">
+        {/* Barra de Título */}
+        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-black text-slate-900">Ministros Convocados</h2>
             <p className="text-xs text-slate-500">Snapshot de elegibilidade ministerial desta reunião</p>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-64">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Buscar ministro..."
-                value={buscaMinistro}
-                onChange={(e) => setBuscaMinistro(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-teal-500"
-              />
-            </div>
-
-            <select
-              value={filtroPresenca}
-              onChange={(e) => setFiltroPresenca(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:border-teal-500"
-            >
-              <option value="todos">Todos</option>
-              <option value="presente">Presentes</option>
-              <option value="falta">Faltas</option>
-              <option value="falta_justificada">Justificados</option>
-              <option value="pendente">Pendentes</option>
-            </select>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+              {totalRegistrosFiltrados} {totalRegistrosFiltrados === 1 ? 'ministro convocado' : 'ministros convocados'}
+            </span>
           </div>
         </div>
 
+        {/* Barra Única e Responsiva de Filtros e Ações */}
+        <div className="p-4 bg-slate-50/70 border-b border-slate-100">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* 1. Busca por nome do ministro */}
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Buscar por nome do ministro..."
+                value={buscaMinistro}
+                onChange={(e) => handleBuscaChange(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-teal-500 shadow-sm transition"
+              />
+            </div>
+
+            {/* 2. Filtro Congregação */}
+            <div className="w-full sm:w-auto min-w-[150px]">
+              <select
+                value={filtroCongregacao}
+                onChange={(e) => handleCongregacaoChange(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:border-teal-500 shadow-sm transition"
+              >
+                <option value="todas">Congregação: Todas</option>
+                {congregacoesDisponiveis.map((cong) => (
+                  <option key={cong} value={cong}>
+                    {cong}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. Filtro Cargo */}
+            <div className="w-full sm:w-auto min-w-[130px]">
+              <select
+                value={filtroCargo}
+                onChange={(e) => handleCargoChange(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:border-teal-500 shadow-sm transition"
+              >
+                <option value="todos">Cargo: Todos</option>
+                {cargosDisponiveis.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 4. Filtro Presença */}
+            <div className="w-full sm:w-auto min-w-[130px]">
+              <select
+                value={filtroPresenca}
+                onChange={(e) => handlePresencaChange(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:border-teal-500 shadow-sm transition"
+              >
+                <option value="todos">Presença: Todos</option>
+                <option value="presente">Presentes</option>
+                <option value="pendente">Pendentes</option>
+                <option value="falta">Faltas</option>
+                <option value="falta_justificada">Faltas Justificadas</option>
+              </select>
+            </div>
+
+            {/* 5. Botão Limpar */}
+            {temFiltrosAtivos && (
+              <button
+                onClick={limparFiltros}
+                title="Limpar todos os filtros"
+                className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5 shadow-sm active:scale-95"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                <span>Limpar</span>
+              </button>
+            )}
+
+            {/* 6. Botão Imprimir Lista */}
+            <button
+              onClick={handleImprimir}
+              className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5 shadow-sm active:scale-95 ml-auto"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Imprimir Lista</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Tabela de Ministros Convocados */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50/80 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-100">
+                <th className="py-3 px-4 w-12 text-center">Nº</th>
                 <th className="py-3 px-4">Ministro</th>
                 <th className="py-3 px-4">Cargo</th>
                 <th className="py-3 px-4">Congregação / Área</th>
                 <th className="py-3 px-4">Identificador</th>
+                <th className="py-3 px-4 text-center">Horário Check-in</th>
                 <th className="py-3 px-4 text-right">Status de Presença</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {participantesFiltrados.length === 0 ? (
+              {participantesPaginados.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400 italic">
-                    Nenhum ministro encontrado com os filtros selecionados.
+                  <td colSpan={7} className="py-10 text-center text-slate-400 italic space-y-2">
+                    <Users className="w-8 h-8 text-slate-300 mx-auto mb-1" />
+                    <p>Nenhum ministro encontrado com os filtros selecionados.</p>
+                    {temFiltrosAtivos && (
+                      <button
+                        onClick={limparFiltros}
+                        className="text-teal-600 hover:text-teal-700 font-bold text-xs underline mt-1"
+                      >
+                        Limpar filtros aplicados
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
-                participantesFiltrados.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50/60 transition">
-                    <td className="py-3 px-4 font-bold text-slate-900">
-                      {p.nome_ministro_snapshot}
-                    </td>
+                participantesPaginados.map((p, idx) => {
+                  const numeroGlobal = (paginaCorrigida - 1) * itensPorPagina + idx + 1;
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-50/60 transition">
+                      <td className="py-3 px-4 text-center text-slate-400 font-mono text-[11px]">
+                        {numeroGlobal}
+                      </td>
 
-                    <td className="py-3 px-4 text-slate-600">
-                      {p.cargo_snapshot}
-                    </td>
+                      <td className="py-3 px-4 font-bold text-slate-900">
+                        {p.nome_ministro_snapshot}
+                      </td>
 
-                    <td className="py-3 px-4 text-slate-600">
-                      <p className="font-semibold">{p.nome_congregacao_snapshot || 'Sede'}</p>
-                      {p.area_snapshot && (
-                        <p className="text-[10px] text-slate-400">{p.area_snapshot}</p>
-                      )}
-                    </td>
+                      <td className="py-3 px-4 text-slate-600 font-semibold">
+                        {p.cargo_snapshot}
+                      </td>
 
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-500">
-                      {p.unique_id_snapshot || p.carteirinha_numero_snapshot || '—'}
-                    </td>
+                      <td className="py-3 px-4 text-slate-600">
+                        <p className="font-semibold">{p.nome_congregacao_snapshot || 'Sede'}</p>
+                        {p.area_snapshot && (
+                          <p className="text-[10px] text-slate-400">{p.area_snapshot}</p>
+                        )}
+                      </td>
 
-                    <td className="py-3 px-4 text-right">
-                      {p.status_presenca === 'presente' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                          Presente
-                        </span>
-                      )}
-                      {p.status_presenca === 'falta' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
-                          <UserX className="w-3.5 h-3.5 text-rose-500" />
-                          Falta
-                        </span>
-                      )}
-                      {p.status_presenca === 'falta_justificada' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200">
-                          <FileCheck2 className="w-3.5 h-3.5 text-amber-500" />
-                          Justificada
-                        </span>
-                      )}
-                      {p.status_presenca === 'pendente' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200">
-                          Pendente
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                      <td className="py-3 px-4 font-mono text-[11px] text-slate-500">
+                        {p.unique_id_snapshot || p.carteirinha_numero_snapshot || '—'}
+                      </td>
+
+                      <td className="py-3 px-4 text-center text-slate-600 font-mono text-[11px]">
+                        {p.data_hora_checkin ? (
+                          <span className="inline-flex items-center gap-1 text-slate-700">
+                            <Clock className="w-3 h-3 text-cyan-600" />
+                            {new Date(p.data_hora_checkin).toLocaleTimeString('pt-BR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        ) : p.status_presenca === 'presente' ? (
+                          <span className="text-emerald-700 text-[10px] font-semibold">Confirmado</span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-4 text-right">
+                        {p.status_presenca === 'presente' && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                            Presente
+                          </span>
+                        )}
+                        {p.status_presenca === 'falta' && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
+                            <UserX className="w-3.5 h-3.5 text-rose-500" />
+                            Falta
+                          </span>
+                        )}
+                        {p.status_presenca === 'falta_justificada' && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200">
+                            <FileCheck2 className="w-3.5 h-3.5 text-amber-500" />
+                            Justificada
+                          </span>
+                        )}
+                        {p.status_presenca === 'pendente' && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200">
+                            Pendente
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Rodapé da Tabela: Paginação Client-Side */}
+        <div className="p-4 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+          {/* Mostrando X–Y de Z ministros */}
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+            <span className="font-semibold text-slate-700">
+              {totalRegistrosFiltrados > 0
+                ? `Mostrando ${indiceInicioExibicao}–${indiceFimExibicao} de ${totalRegistrosFiltrados} ministros`
+                : 'Nenhum registro'}
+            </span>
+
+            {/* Seletor de itens por página */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <span>Exibir:</span>
+              <select
+                value={itensPorPagina}
+                onChange={(e) => handleItensPorPaginaChange(Number(e.target.value))}
+                className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-700 focus:outline-none focus:border-teal-500"
+              >
+                <option value={10}>10 por página</option>
+                <option value={20}>20 por página</option>
+                <option value={50}>50 por página</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Controles de Navegação de Página */}
+          {totalPaginas > 1 && (
+            <div className="flex items-center gap-1 w-full sm:w-auto justify-center sm:justify-end">
+              <button
+                onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
+                disabled={paginaCorrigida <= 1}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 font-bold inline-flex items-center gap-1 transition shadow-sm"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Anterior</span>
+              </button>
+
+              {/* Botões numéricos de páginas */}
+              <div className="flex items-center gap-1 px-1">
+                {Array.from({ length: totalPaginas }, (_, i) => i + 1)
+                  .filter((p) => {
+                    // Mostrar primeiras, últimas e páginas vizinhas da atual
+                    return (
+                      p === 1 ||
+                      p === totalPaginas ||
+                      Math.abs(p - paginaCorrigida) <= 1
+                    );
+                  })
+                  .map((num, i, arr) => {
+                    const prevNum = arr[i - 1];
+                    const showEllipsis = prevNum && num - prevNum > 1;
+
+                    return (
+                      <div key={num} className="flex items-center gap-1">
+                        {showEllipsis && <span className="px-1 text-slate-400">...</span>}
+                        <button
+                          onClick={() => setPaginaAtual(num)}
+                          className={`w-7 h-7 rounded-lg text-xs font-bold transition ${
+                            num === paginaCorrigida
+                              ? 'bg-teal-600 text-white shadow-sm'
+                              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          {num}
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <button
+                onClick={() => setPaginaAtual((prev) => Math.min(totalPaginas, prev + 1))}
+                disabled={paginaCorrigida >= totalPaginas}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 font-bold inline-flex items-center gap-1 transition shadow-sm"
+              >
+                <span>Próximo</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
       </section>
+
+      {/* ─── DOCUMENTO EXCLUSIVO DE IMPRESSÃO (CSS @media print) ─── */}
+      <div className="hidden print:block text-black bg-white p-6 font-sans">
+        {/* Cabeçalho Institucional Gestão Eklésia */}
+        <div className="border-b-2 border-slate-900 pb-4 mb-4 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-black tracking-tight uppercase text-slate-900">Gestão Eklésia</span>
+              <span className="text-xs bg-slate-900 text-white font-bold px-2 py-0.5 rounded">Reuniões</span>
+            </div>
+            <p className="text-xs text-slate-600 font-semibold mt-0.5">Sistema Integrado de Gestão Ministerial</p>
+          </div>
+          <div className="text-right text-xs text-slate-600 space-y-0.5">
+            <p className="font-bold text-slate-900">Lista de Ministros Convocados</p>
+            <p>Emissão: {dataHoraImpressao || new Date().toLocaleString('pt-BR')}</p>
+          </div>
+        </div>
+
+        {/* Metadados da Reunião Impressa */}
+        <div className="bg-slate-50 border border-slate-300 rounded-lg p-3 mb-4 text-xs space-y-1">
+          <div className="flex justify-between items-start">
+            <h1 className="text-sm font-black text-slate-900 uppercase">{reuniao.titulo}</h1>
+            <span className="font-bold uppercase text-[11px] px-2 py-0.5 rounded border border-slate-400">
+              Status: {reuniao.status}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-slate-700 pt-1">
+            <p><strong>Data:</strong> {dataFormatada}</p>
+            <p><strong>Horário:</strong> {reuniao.horario_inicio ? reuniao.horario_inicio.slice(0, 5) : '—'}</p>
+            <p><strong>Local:</strong> {reuniao.local}</p>
+            <p><strong>Congregação:</strong> {reuniao.congregacoes?.nome || 'Geral / Todas'}</p>
+          </div>
+          {reuniao.pauta && (
+            <p className="text-slate-600 pt-1 border-t border-slate-200">
+              <strong>Pauta:</strong> {reuniao.pauta}
+            </p>
+          )}
+
+          {/* Filtros Utilizados na Impressão */}
+          {temFiltrosAtivos && (
+            <div className="pt-1.5 border-t border-slate-200 text-[11px] text-slate-600 flex flex-wrap gap-x-4">
+              <strong>Filtros aplicados:</strong>
+              {buscaMinistro.trim() && <span>Busca: &ldquo;{buscaMinistro}&rdquo;</span>}
+              {filtroCongregacao !== 'todas' && <span>Congregação: {filtroCongregacao}</span>}
+              {filtroCargo !== 'todos' && <span>Cargo: {filtroCargo}</span>}
+              {filtroPresenca !== 'todos' && <span>Presença: {filtroPresenca}</span>}
+            </div>
+          )}
+        </div>
+
+        {/* Tabela de Impressão com TODOS os Registros Filtrados */}
+        <table className="w-full text-left text-xs border-collapse border border-slate-300">
+          <thead>
+            <tr className="bg-slate-100 text-slate-900 font-bold uppercase text-[10px] border-b border-slate-300">
+              <th className="p-2 border border-slate-300 w-8 text-center">Nº</th>
+              <th className="p-2 border border-slate-300">Ministro</th>
+              <th className="p-2 border border-slate-300">Cargo</th>
+              <th className="p-2 border border-slate-300">Congregação / Área</th>
+              <th className="p-2 border border-slate-300 text-center">Horário Check-in</th>
+              <th className="p-2 border border-slate-300 text-center">Status de Presença</th>
+            </tr>
+          </thead>
+          <tbody>
+            {participantesFiltrados.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="p-4 text-center text-slate-500 italic border border-slate-300">
+                  Nenhum registro para os filtros selecionados.
+                </td>
+              </tr>
+            ) : (
+              participantesFiltrados.map((p, idx) => (
+                <tr key={p.id} className="border-b border-slate-200">
+                  <td className="p-2 border border-slate-300 text-center font-mono text-[11px]">{idx + 1}</td>
+                  <td className="p-2 border border-slate-300 font-bold text-slate-900">{p.nome_ministro_snapshot}</td>
+                  <td className="p-2 border border-slate-300 text-slate-800">{p.cargo_snapshot}</td>
+                  <td className="p-2 border border-slate-300 text-slate-700">
+                    {p.nome_congregacao_snapshot || 'Sede'}
+                    {p.area_snapshot ? ` - ${p.area_snapshot}` : ''}
+                  </td>
+                  <td className="p-2 border border-slate-300 text-center font-mono text-[11px]">
+                    {p.data_hora_checkin
+                      ? new Date(p.data_hora_checkin).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                      : p.status_presenca === 'presente'
+                      ? 'Confirmado'
+                      : '—'}
+                  </td>
+                  <td className="p-2 border border-slate-300 text-center font-bold uppercase text-[10px]">
+                    {p.status_presenca === 'presente' && 'Presente'}
+                    {p.status_presenca === 'falta' && 'Falta'}
+                    {p.status_presenca === 'falta_justificada' && 'Falta Justificada'}
+                    {p.status_presenca === 'pendente' && 'Pendente'}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+
+        {/* Rodapé do Documento Impresso */}
+        <div className="mt-4 pt-3 border-t border-slate-300 flex justify-between items-center text-[11px] text-slate-600">
+          <p>
+            <strong>Total de registros impressos:</strong> {participantesFiltrados.length} ministro(s)
+          </p>
+          <p>
+            Documento gerado eletronicamente pelo <strong>Gestão Eklésia</strong> em {dataHoraImpressao || new Date().toLocaleString('pt-BR')}
+          </p>
+        </div>
+      </div>
 
       {/* ─── MODAL: PAINEL TV ─── */}
       {modalPainelAberto && (
