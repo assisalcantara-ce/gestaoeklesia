@@ -23,7 +23,6 @@ import type {
   CartaTemplate,
   CartaRegistro,
 } from '@/types/supabase';
-import { Manrope, Playfair_Display } from 'next/font/google';
 import {
   AlignCenter,
   AlignLeft,
@@ -55,9 +54,6 @@ import {
   Send,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-
-const headingFont = Playfair_Display({ subsets: ['latin'], weight: ['600', '700'] });
-const bodyFont = Manrope({ subsets: ['latin'], weight: ['400', '500', '600'] });
 
 const CANVAS_A4 = { width: 794, height: 1123 };
 
@@ -1788,7 +1784,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         autoClose={notification.autoClose}
       />
 
-      <div className={`${bodyFont.className} relative`}>
+      <div className="relative font-sans">
         <div className="absolute inset-0 -z-10">
           <div className="absolute inset-0 bg-gradient-to-br from-[#fff7ed] via-white to-[#e0f2fe]" />
           <div className="absolute -right-16 -top-20 h-72 w-72 rounded-full bg-[#f97316]/15 blur-3xl" />
@@ -1799,7 +1795,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-[0.3em] text-amber-600">Secretaria geral</p>
-              <h2 className={`${headingFont.className} text-2xl md:text-3xl text-[#123b63]`}>
+              <h2 className="font-serif text-2xl md:text-3xl font-bold text-[#123b63]">
                 Cartas e Declarações com elegância e rapidez
               </h2>
               <p className="text-sm text-gray-600 max-w-xl">
