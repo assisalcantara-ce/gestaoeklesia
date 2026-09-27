@@ -222,7 +222,35 @@ export async function GET(
 
     const ministry = (reuniao as any)?.ministries;
 
-    // 8. Resposta estritamente não-sensível e anônima
+    // 8. Buscar as últimas 10 entradas (check-ins) da reunião
+    const { data: ultimosCheckinsRaw } = await admin
+      .from('reunioes_checkins')
+      .select(`
+        id,
+        data_hora_checkin,
+        participante:reunioes_participantes (
+          nome_ministro_snapshot,
+          cargo_snapshot,
+          nome_congregacao_snapshot
+        ),
+        member:members (
+          foto_url
+        )
+      `)
+      .eq('reuniao_id', reuniao.id)
+      .eq('ministry_id', tokenRow.ministry_id)
+      .order('data_hora_checkin', { ascending: false })
+      .limit(10);
+
+    const ultimasEntradas = (ultimosCheckinsRaw || []).map((c: any) => ({
+      nome: c.participante?.nome_ministro_snapshot || 'Ministro',
+      cargo: c.participante?.cargo_snapshot || 'Ministro',
+      congregacao: c.participante?.nome_congregacao_snapshot || 'Sede Central',
+      foto_url: c.member?.foto_url || null,
+      data_hora_checkin: c.data_hora_checkin,
+    }));
+
+    // 9. Resposta estritamente não-sensível e anônima
     return NextResponse.json({
       success: true,
       painel: {
@@ -246,6 +274,7 @@ export async function GET(
           percentual_presenca: percentualPresenca,
           percentual_ausencia: percentualAusencia,
         },
+        ultimas_entradas: ultimasEntradas,
         consolidado_congregacoes: consolidadoPorCongregacao,
         consolidado_areas: consolidadoPorArea,
         atualizado_em: agoraIso,
