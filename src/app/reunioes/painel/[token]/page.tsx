@@ -292,33 +292,33 @@ export default function PainelInformativoPublicoPage() {
     : '—';
 
   return (
-    <main className="min-h-screen bg-[#050b14] text-slate-100 flex flex-col justify-between p-3 sm:p-5 lg:p-6 select-none font-sans overflow-x-hidden">
+    <main className="min-h-screen bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(14,165,233,0.15),rgba(5,11,20,1))] text-slate-100 flex flex-col justify-between p-3 sm:p-5 lg:p-6 select-none font-sans overflow-x-hidden">
       {/* ─── 1. CABEÇALHO DA REUNIÃO & RELÓGIO DIGITAL ─── */}
-      <header className="bg-[#0b172a]/95 border border-[#1b2e4b] rounded-3xl p-4 lg:p-5 shadow-2xl flex flex-col lg:flex-row items-center justify-between gap-4">
+      <header className="bg-gradient-to-r from-[#0b1b36]/90 via-[#0a182f]/95 to-[#0b1b36]/90 border border-cyan-500/30 rounded-3xl p-4 lg:p-5 shadow-[0_10px_30px_-10px_rgba(6,182,212,0.15)] backdrop-blur-md flex flex-col lg:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3.5 text-center lg:text-left">
           {inst.logo_url ? (
             <img
               src={inst.logo_url}
               alt={inst.nome}
-              className="w-14 h-14 lg:w-16 lg:h-16 object-contain rounded-2xl bg-white/5 p-1 border border-[#1b2e4b]"
+              className="w-14 h-14 lg:w-16 lg:h-16 object-contain rounded-2xl bg-white/5 p-1 border border-cyan-500/30 shadow-md shadow-cyan-950/50"
             />
           ) : (
-            <div className="w-14 h-14 lg:w-16 lg:h-16 bg-gradient-to-br from-teal-500 to-cyan-700 text-white font-black text-xl rounded-2xl flex items-center justify-center shadow-lg">
+            <div className="w-14 h-14 lg:w-16 lg:h-16 bg-gradient-to-br from-teal-400 via-cyan-500 to-blue-600 text-white font-black text-xl rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
               <Building2 className="w-8 h-8" />
             </div>
           )}
 
           <div>
             <div className="flex items-center gap-2 justify-center lg:justify-start">
-              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-400 text-[11px] font-extrabold uppercase tracking-widest">
-                <Sparkles className="w-3.5 h-3.5" />
+              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 text-[11px] font-extrabold uppercase tracking-widest shadow-[0_0_12px_rgba(6,182,212,0.25)]">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
                 Painel Ministerial Oficial
               </span>
             </div>
-            <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-white tracking-tight mt-0.5 uppercase">
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-white tracking-tight mt-0.5 uppercase drop-shadow">
               {reuniao.titulo}
             </h1>
-            <p className="text-slate-400 text-xs sm:text-sm font-semibold tracking-wide">
+            <p className="text-slate-300/80 text-xs sm:text-sm font-semibold tracking-wide">
               {inst.nome.toUpperCase()}
             </p>
           </div>
@@ -326,28 +326,28 @@ export default function PainelInformativoPublicoPage() {
 
         {/* Metadados da Convocação + Relógio em Tempo Real */}
         <div className="flex flex-wrap items-center justify-center lg:justify-end gap-2.5 text-xs text-slate-300">
-          <div className="flex items-center gap-2 bg-[#0d1e38] px-3.5 py-2 rounded-2xl border border-[#1f375b]">
-            <Calendar className="w-4 h-4 text-teal-400" />
-            <span className="font-semibold capitalize">{dataFormatada}</span>
+          <div className="flex items-center gap-2 bg-[#0c2140]/80 px-3.5 py-2 rounded-2xl border border-cyan-500/30 shadow-sm">
+            <Calendar className="w-4 h-4 text-cyan-400" />
+            <span className="font-semibold capitalize text-slate-200">{dataFormatada}</span>
           </div>
 
-          <div className="flex items-center gap-2 bg-[#0d1e38] px-3.5 py-2 rounded-2xl border border-[#1f375b]">
-            <Clock className="w-4 h-4 text-cyan-400" />
-            <span className="font-semibold">{reuniao.horario_inicio}</span>
+          <div className="flex items-center gap-2 bg-[#0c2140]/80 px-3.5 py-2 rounded-2xl border border-cyan-500/30 shadow-sm">
+            <Clock className="w-4 h-4 text-teal-400" />
+            <span className="font-semibold text-slate-200">{reuniao.horario_inicio}</span>
           </div>
 
-          <div className="flex items-center gap-2 bg-[#0d1e38] px-3.5 py-2 rounded-2xl border border-[#1f375b]">
+          <div className="flex items-center gap-2 bg-[#0c2140]/80 px-3.5 py-2 rounded-2xl border border-cyan-500/30 shadow-sm">
             <MapPin className="w-4 h-4 text-rose-400" />
-            <span className="font-semibold">{reuniao.local}</span>
+            <span className="font-semibold text-slate-200">{reuniao.local}</span>
           </div>
 
           {/* Relógio Digital da TV */}
-          <div className="bg-[#0a1b33] px-4 py-2 rounded-2xl border border-teal-500/50 text-right shadow-lg">
-            <div className="text-cyan-400 font-mono text-base lg:text-lg font-black tracking-wider leading-none">
+          <div className="bg-gradient-to-b from-[#0e2547] to-[#081529] px-4 py-2 rounded-2xl border border-cyan-400/60 text-right shadow-[0_0_15px_rgba(6,182,212,0.25)]">
+            <div className="text-cyan-300 font-mono text-base lg:text-lg font-black tracking-wider leading-none drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]">
               {horaLocal || '00:00:00'}
             </div>
             <div className="text-[10px] text-emerald-400 font-bold flex items-center justify-end gap-1 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] animate-ping" />
               Em tempo real
             </div>
           </div>
@@ -359,40 +359,40 @@ export default function PainelInformativoPublicoPage() {
         {/* COLUNA ESQUERDA (~30% / 4 colunas lg): 4 CARDS VERTICAIS */}
         <div className="lg:col-span-4 flex flex-col justify-between gap-3.5">
           {/* Card 1: Total Convocado */}
-          <div className="bg-[#0b172a]/95 border border-[#1b2e4b] rounded-3xl p-4 shadow-xl flex items-center justify-between relative overflow-hidden">
+          <div className="bg-gradient-to-br from-[#0c2144]/95 via-[#0a1b38]/90 to-[#071328]/95 border border-blue-500/40 rounded-3xl p-4 shadow-[0_8px_20px_-6px_rgba(59,130,246,0.2)] flex items-center justify-between relative overflow-hidden">
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/20 border border-blue-400/50 text-blue-300 flex items-center justify-center shadow-[0_0_12px_rgba(59,130,246,0.3)]">
                 <Users className="w-6 h-6" />
               </div>
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-300/80 block">
                   Total Convocado
                 </span>
-                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none">
+                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none drop-shadow">
                   {ind.total_esperado}
                 </span>
-                <span className="text-[10px] font-semibold text-slate-500 block mt-0.5">
+                <span className="text-[10px] font-semibold text-slate-400 block mt-0.5">
                   Ministros Elegíveis
                 </span>
               </div>
             </div>
-            <Users className="w-5 h-5 text-slate-600 mr-1" />
+            <Users className="w-5 h-5 text-blue-400/60 mr-1" />
           </div>
 
           {/* Card 2: Presentes */}
-          <div className="bg-[#0b172a]/95 border border-[#1b2e4b] rounded-3xl p-4 shadow-xl flex items-center justify-between relative overflow-hidden">
+          <div className="bg-gradient-to-br from-[#06292b]/95 via-[#071f29]/90 to-[#05141f]/95 border border-teal-400/60 rounded-3xl p-4 shadow-[0_8px_20px_-6px_rgba(20,184,166,0.25)] flex items-center justify-between relative overflow-hidden">
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-teal-500/15 border border-teal-500/30 text-teal-400 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-teal-500/20 border border-teal-400/60 text-teal-300 flex items-center justify-center shadow-[0_0_12px_rgba(20,184,166,0.35)]">
                 <UserCheck className="w-6 h-6" />
               </div>
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-teal-400 block">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-teal-300 block">
                   Presentes
                 </span>
-                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none">
+                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none drop-shadow">
                   {ind.total_presente}
                 </span>
-                <span className="text-[10px] font-semibold text-slate-400 block mt-0.5">
+                <span className="text-[10px] font-semibold text-teal-200/70 block mt-0.5">
                   Check-in Registrado
                 </span>
               </div>
@@ -401,14 +401,14 @@ export default function PainelInformativoPublicoPage() {
             <div className="relative w-12 h-12 flex items-center justify-center">
               <svg className="w-12 h-12 -rotate-90" viewBox="0 0 36 36">
                 <path
-                  className="text-slate-800"
+                  className="text-slate-800/80"
                   strokeWidth="3.5"
                   stroke="currentColor"
                   fill="none"
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 />
                 <path
-                  className="text-teal-400 transition-all duration-700 ease-out"
+                  className="text-teal-400 transition-all duration-700 ease-out drop-shadow-[0_0_6px_rgba(45,212,191,0.6)]"
                   strokeDasharray={`${Math.min(100, ind.percentual_presenca)}, 100`}
                   strokeWidth="3.5"
                   strokeLinecap="round"
@@ -424,19 +424,19 @@ export default function PainelInformativoPublicoPage() {
           </div>
 
           {/* Card 3: Ausentes */}
-          <div className="bg-[#0b172a]/95 border border-[#1b2e4b] rounded-3xl p-4 shadow-xl flex items-center justify-between relative overflow-hidden">
+          <div className="bg-gradient-to-br from-[#2e0e1a]/95 via-[#220d18]/90 to-[#140810]/95 border border-rose-500/50 rounded-3xl p-4 shadow-[0_8px_20px_-6px_rgba(244,63,94,0.25)] flex items-center justify-between relative overflow-hidden">
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-400/50 text-rose-300 flex items-center justify-center shadow-[0_0_12px_rgba(244,63,94,0.35)]">
                 <UserX className="w-6 h-6" />
               </div>
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-rose-400 block">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-rose-300 block">
                   Ausentes
                 </span>
-                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none">
+                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none drop-shadow">
                   {ind.total_ausente}
                 </span>
-                <span className="text-[10px] font-semibold text-slate-400 block mt-0.5">
+                <span className="text-[10px] font-semibold text-rose-200/70 block mt-0.5">
                   Sem Check-in
                 </span>
               </div>
@@ -445,14 +445,14 @@ export default function PainelInformativoPublicoPage() {
             <div className="relative w-12 h-12 flex items-center justify-center">
               <svg className="w-12 h-12 -rotate-90" viewBox="0 0 36 36">
                 <path
-                  className="text-slate-800"
+                  className="text-slate-800/80"
                   strokeWidth="3.5"
                   stroke="currentColor"
                   fill="none"
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 />
                 <path
-                  className="text-rose-400 transition-all duration-700 ease-out"
+                  className="text-rose-400 transition-all duration-700 ease-out drop-shadow-[0_0_6px_rgba(251,113,133,0.6)]"
                   strokeDasharray={`${Math.min(100, ind.percentual_ausencia)}, 100`}
                   strokeWidth="3.5"
                   strokeLinecap="round"
@@ -468,19 +468,19 @@ export default function PainelInformativoPublicoPage() {
           </div>
 
           {/* Card 4: Justificados */}
-          <div className="bg-[#0b172a]/95 border border-[#1b2e4b] rounded-3xl p-4 shadow-xl flex items-center justify-between relative overflow-hidden">
+          <div className="bg-gradient-to-br from-[#2b1c0a]/95 via-[#201509]/90 to-[#140c05]/95 border border-amber-500/50 rounded-3xl p-4 shadow-[0_8px_20px_-6px_rgba(245,158,11,0.25)] flex items-center justify-between relative overflow-hidden">
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400/50 text-amber-300 flex items-center justify-center shadow-[0_0_12px_rgba(245,158,11,0.35)]">
                 <FileCheck2 className="w-6 h-6" />
               </div>
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 block">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300 block">
                   Justificados
                 </span>
-                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none">
+                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none drop-shadow">
                   {ind.total_justificado}
                 </span>
-                <span className="text-[10px] font-semibold text-slate-400 block mt-0.5">
+                <span className="text-[10px] font-semibold text-amber-200/70 block mt-0.5">
                   Justificativas Aceitas
                 </span>
               </div>
@@ -493,14 +493,14 @@ export default function PainelInformativoPublicoPage() {
                   <>
                     <svg className="w-12 h-12 -rotate-90" viewBox="0 0 36 36">
                       <path
-                        className="text-slate-800"
+                        className="text-slate-800/80"
                         strokeWidth="3.5"
                         stroke="currentColor"
                         fill="none"
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       />
                       <path
-                        className="text-amber-400 transition-all duration-700 ease-out"
+                        className="text-amber-400 transition-all duration-700 ease-out drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]"
                         strokeDasharray={`${Math.min(100, pctJust)}, 100`}
                         strokeWidth="3.5"
                         strokeLinecap="round"
@@ -520,26 +520,26 @@ export default function PainelInformativoPublicoPage() {
         </div>
 
         {/* COLUNA DIREITA (~70% / 8 colunas lg): CARD "ÚLTIMAS ENTRADAS" */}
-        <div className="lg:col-span-8 bg-[#0b172a]/95 border border-[#1b2e4b] rounded-3xl p-5 lg:p-6 shadow-2xl flex flex-col justify-between">
+        <div className="lg:col-span-8 bg-gradient-to-br from-[#0c203d]/95 via-[#09182f]/95 to-[#071328]/95 border border-cyan-500/40 rounded-3xl p-5 lg:p-6 shadow-[0_12px_35px_-8px_rgba(6,182,212,0.2)] flex flex-col justify-between">
           <div>
             {/* Título do Card */}
-            <div className="flex items-center justify-between border-b border-[#1b2e4b] pb-3 mb-3">
+            <div className="flex items-center justify-between border-b border-cyan-500/20 pb-3 mb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-2xl bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 flex items-center justify-center shadow-[0_0_10px_rgba(6,182,212,0.3)]">
                   <Clock className="w-5 h-5" />
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-black text-white tracking-wide uppercase">
                     Últimas Entradas
                   </h2>
-                  <p className="text-[11px] text-slate-400 font-medium">
+                  <p className="text-[11px] text-cyan-300/70 font-medium">
                     Últimos check-ins registrados nesta reunião
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-[11px] font-bold text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#07152b] border border-cyan-500/30 text-[11px] font-bold text-slate-300 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] animate-pulse" />
                 <span>Atualização automática</span>
               </div>
             </div>
@@ -548,9 +548,9 @@ export default function PainelInformativoPublicoPage() {
             <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1 custom-scrollbar">
               {ultimasEntradas.length === 0 ? (
                 <div className="py-14 text-center text-slate-500 space-y-2">
-                  <UserCheck className="w-10 h-10 mx-auto text-slate-600 opacity-60" />
-                  <p className="text-sm font-semibold">Aguardando primeiros check-ins da reunião...</p>
-                  <p className="text-xs text-slate-600">As entradas registradas no terminal aparecerão aqui em tempo real.</p>
+                  <UserCheck className="w-10 h-10 mx-auto text-cyan-500/30" />
+                  <p className="text-sm font-semibold text-slate-400">Aguardando primeiros check-ins da reunião...</p>
+                  <p className="text-xs text-slate-500">As entradas registradas no terminal aparecerão aqui em tempo real.</p>
                 </div>
               ) : (
                 ultimasEntradas.map((item, idx) => {
@@ -569,9 +569,9 @@ export default function PainelInformativoPublicoPage() {
                       key={itemKey || idx}
                       className={`flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all duration-500 ${
                         idx === 0
-                          ? 'bg-gradient-to-r from-teal-950/40 via-[#0d2138] to-[#0a182d] border-teal-500/40 shadow-md shadow-teal-950/30'
-                          : 'bg-[#0a1628]/70 border-[#182945] hover:bg-[#0d1d33]'
-                      } ${isNovo ? 'ring-2 ring-teal-400 animate-pulse' : ''}`}
+                          ? 'bg-gradient-to-r from-teal-950/70 via-[#0e2c4c] to-[#081b33] border-teal-400/80 shadow-[0_0_15px_rgba(20,184,166,0.3)]'
+                          : 'bg-[#081930]/80 border-slate-700/60 hover:border-cyan-500/40 hover:bg-[#0b213f]'
+                      } ${isNovo ? 'ring-2 ring-teal-400 shadow-[0_0_20px_rgba(45,212,191,0.5)] animate-pulse' : ''}`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         {/* Foto do Ministro ou Ícone Fallback */}
@@ -579,11 +579,15 @@ export default function PainelInformativoPublicoPage() {
                           <img
                             src={item.foto_url}
                             alt={item.nome}
-                            className="w-11 h-11 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-teal-500/50 shadow"
+                            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full object-cover border-2 shadow ${
+                              idx === 0 ? 'border-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.4)]' : 'border-cyan-500/40'
+                            }`}
                           />
                         ) : (
-                          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#162744] border-2 border-slate-700 text-teal-300 flex items-center justify-center font-bold text-base shadow">
-                            <User className="w-6 h-6 text-teal-400" />
+                          <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#10294c] border-2 text-teal-300 flex items-center justify-center font-bold text-base shadow ${
+                            idx === 0 ? 'border-teal-400' : 'border-cyan-500/40'
+                          }`}>
+                            <User className="w-6 h-6 text-teal-300" />
                           </div>
                         )}
 
@@ -593,13 +597,13 @@ export default function PainelInformativoPublicoPage() {
                               {item.nome}
                             </h3>
                             {idx === 0 && (
-                              <span className="px-2 py-0.5 rounded-full bg-teal-500 text-[#050b14] text-[10px] font-black uppercase tracking-wider">
+                              <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-teal-400 to-emerald-400 text-[#050b14] text-[10px] font-black uppercase tracking-wider shadow-[0_0_10px_rgba(45,212,191,0.5)]">
                                 Novo
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                            <span className="text-slate-300 font-semibold">{item.cargo}</span>
+                          <p className="text-[11px] text-slate-300/80 truncate mt-0.5">
+                            <span className="text-teal-300 font-semibold">{item.cargo}</span>
                             <span className="mx-1.5 opacity-40">•</span>
                             <span>{item.congregacao}</span>
                           </p>
@@ -624,33 +628,33 @@ export default function PainelInformativoPublicoPage() {
 
       {/* ─── 3. PARTE INFERIOR: ÍNDICE GERAL DE PRESENÇA & CONSOLIDAÇÃO POR CONGREGAÇÃO ─── */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-stretch">
-        {/* Gráfico do Quórum de Presença (4 colunas lg) */}
-        <div className="lg:col-span-5 bg-[#0b172a]/95 border border-[#1b2e4b] rounded-3xl p-4 sm:p-5 shadow-xl flex flex-col justify-between space-y-4">
+        {/* Gráfico do Quórum de Presença (5 colunas lg) */}
+        <div className="lg:col-span-5 bg-gradient-to-br from-[#0c203d]/95 via-[#09182f]/95 to-[#071328]/95 border border-cyan-500/40 rounded-3xl p-4 sm:p-5 shadow-[0_8px_25px_-6px_rgba(6,182,212,0.15)] flex flex-col justify-between space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-              <span className="text-teal-400">📊</span>
+              <span className="text-teal-400 drop-shadow">📊</span>
               Índice Geral de Presença
             </h2>
-            <span className="px-2.5 py-0.5 bg-teal-500/20 text-teal-300 text-[10px] font-bold rounded-full border border-teal-500/30">
+            <span className="px-2.5 py-0.5 bg-teal-500/20 text-teal-300 text-[10px] font-bold rounded-full border border-teal-400/40 shadow-[0_0_8px_rgba(45,212,191,0.2)]">
               Quórum Atingido
             </span>
           </div>
 
           <div className="flex items-center justify-center my-auto py-2">
             <div className="text-center">
-              <span className="text-5xl sm:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-emerald-400 to-cyan-300 tracking-tighter">
+              <span className="text-5xl sm:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-emerald-400 to-cyan-300 tracking-tighter drop-shadow-[0_0_15px_rgba(45,212,191,0.3)]">
                 {ind.percentual_presenca}%
               </span>
-              <p className="text-[11px] font-bold text-slate-400 mt-1 uppercase tracking-widest">
+              <p className="text-[11px] font-bold text-cyan-300/80 mt-1 uppercase tracking-widest">
                 Quórum Atingido
               </p>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <div className="w-full bg-[#0d1e38] h-3.5 rounded-full overflow-hidden p-0.5 border border-[#1f375b]">
+            <div className="w-full bg-[#071426] h-3.5 rounded-full overflow-hidden p-0.5 border border-cyan-500/30">
               <div
-                className="bg-gradient-to-r from-teal-500 via-emerald-400 to-cyan-400 h-full rounded-full transition-all duration-1000 ease-out"
+                className="bg-gradient-to-r from-teal-400 via-emerald-400 to-cyan-300 h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_12px_rgba(45,212,191,0.6)]"
                 style={{ width: `${Math.min(100, ind.percentual_presenca)}%` }}
               />
             </div>
@@ -663,13 +667,13 @@ export default function PainelInformativoPublicoPage() {
         </div>
 
         {/* Tabela Consolidada por Congregação (7 colunas lg) */}
-        <div className="lg:col-span-7 bg-[#0b172a]/95 border border-[#1b2e4b] rounded-3xl p-4 sm:p-5 shadow-xl flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between border-b border-[#1b2e4b] pb-2.5">
+        <div className="lg:col-span-7 bg-gradient-to-br from-[#0c203d]/95 via-[#09182f]/95 to-[#071328]/95 border border-cyan-500/40 rounded-3xl p-4 sm:p-5 shadow-[0_8px_25px_-6px_rgba(6,182,212,0.15)] flex flex-col justify-between space-y-3">
+          <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2.5">
             <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
               <Building2 className="w-4 h-4 text-cyan-400" />
               Consolidação por Congregação
             </h2>
-            <span className="text-[11px] text-slate-400 font-semibold">
+            <span className="text-[11px] text-cyan-300/70 font-semibold">
               {data.consolidado_congregacoes.length} Unidades
             </span>
           </div>
@@ -679,23 +683,23 @@ export default function PainelInformativoPublicoPage() {
               data.consolidado_congregacoes.map((item, index) => (
                 <div
                   key={index}
-                  className="bg-[#0a1628]/80 border border-[#1b2e4b] rounded-2xl p-2.5 flex items-center justify-between gap-3 text-xs"
+                  className="bg-[#071830]/90 border border-cyan-500/30 hover:border-cyan-400/50 rounded-2xl p-2.5 flex items-center justify-between gap-3 text-xs transition"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-white truncate">{item.congregacao}</p>
-                    <div className="w-full bg-[#07101e] h-2 rounded-full overflow-hidden mt-1.5 border border-[#132238]">
+                    <div className="w-full bg-[#050f1f] h-2 rounded-full overflow-hidden mt-1.5 border border-slate-800">
                       <div
-                        className="bg-teal-400 h-full rounded-full transition-all duration-700 ease-out"
+                        className="bg-gradient-to-r from-teal-400 to-cyan-400 h-full rounded-full transition-all duration-700 ease-out shadow-[0_0_8px_rgba(45,212,191,0.5)]"
                         style={{ width: `${Math.min(100, item.percentual_presenca)}%` }}
                       />
                     </div>
                   </div>
 
                   <div className="text-right flex items-center gap-2.5">
-                    <div className="text-slate-400 text-[11px]">
+                    <div className="text-slate-300 text-[11px]">
                       <span className="text-white font-bold">{item.total_presente}</span> / {item.total_esperado}
                     </div>
-                    <span className="px-2 py-0.5 bg-[#07101e] rounded-lg font-mono font-bold text-teal-300 text-xs border border-[#1b2e4b]">
+                    <span className="px-2 py-0.5 bg-[#051124] rounded-lg font-mono font-bold text-teal-300 text-xs border border-teal-500/40 shadow-sm">
                       {item.percentual_presenca}%
                     </span>
                   </div>
@@ -711,14 +715,14 @@ export default function PainelInformativoPublicoPage() {
       </section>
 
       {/* ─── 4. RODAPÉ INSTITUCIONAL & SINCRONIZAÇÃO ─── */}
-      <footer className="mt-4 pt-3 border-t border-[#1b2e4b] flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+      <footer className="mt-4 pt-3 border-t border-cyan-500/20 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-semibold text-slate-400">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse" />
+          <span className="font-semibold text-slate-300">
             Painel Ativo • Atualização contínua a cada 5s
           </span>
           {atualizandoSilencioso && (
-            <span className="text-teal-400 text-[11px] font-medium animate-pulse ml-2">
+            <span className="text-cyan-300 text-[11px] font-medium animate-pulse ml-2">
               (sincronizando...)
             </span>
           )}
@@ -726,11 +730,11 @@ export default function PainelInformativoPublicoPage() {
 
         <div className="text-center sm:text-right font-medium text-[11px]">
           Última sincronização:{' '}
-          <span className="text-slate-400 font-bold">
+          <span className="text-cyan-300 font-bold">
             {new Date(data.atualizado_em).toLocaleTimeString('pt-BR')}
           </span>
-          <span className="mx-2">•</span>
-          <strong>GESTÃO EKLÉSIA™</strong>
+          <span className="mx-2 text-slate-600">•</span>
+          <strong className="text-slate-300">GESTÃO EKLÉSIA™</strong>
         </div>
       </footer>
     </main>
