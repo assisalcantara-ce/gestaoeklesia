@@ -114,6 +114,18 @@ export async function GET(
       },
     });
   } catch (err: any) {
+    if (err?.message === 'UNAUTHORIZED') {
+      return NextResponse.json(
+        { error: 'Não autorizado. Faça login novamente.', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    }
+    if (err?.message === 'NO_MINISTRY') {
+      return NextResponse.json(
+        { error: 'Usuário sem ministério associado.', code: 'NO_MINISTRY' },
+        { status: 403 }
+      );
+    }
     return NextResponse.json(
       { error: 'Erro interno ao consultar detalhes da reunião.', detail: err?.message },
       { status: 500 }
