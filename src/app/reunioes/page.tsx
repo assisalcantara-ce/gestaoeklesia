@@ -1,10 +1,9 @@
-'use client';
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import { createClient } from '@/lib/supabase-client';
 import {
   Calendar,
   Clock,
@@ -88,6 +87,24 @@ export default function ReunioesPage() {
   // Estado de Encerramento
   const [encerrando, setEncerrando] = useState<boolean>(false);
 
+  // ─── Helper de Autenticação para Chamadas do Frontend ──────────────────────
+  const fetchAutenticado = useCallback(async (url: string, options: RequestInit = {}) => {
+    const supabase = createClient();
+    const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+
+    if (sessionErr || !session?.access_token) {
+      throw new Error('Sessão expirada ou não autenticada. Faça login novamente.');
+    }
+
+    const headers = new Headers(options.headers || {});
+    headers.set('Authorization', `Bearer ${session.access_token}`);
+
+    return fetch(url, {
+      ...options,
+      headers,
+    });
+  }, []);
+
   // ─── 1. Carregar Reuniões do Tenant ────────────────────────────────────────
   const carregarReunioes = useCallback(async () => {
     try {
@@ -99,7 +116,7 @@ export default function ReunioesPage() {
         params.append('status', filtroStatus);
       }
 
-      const res = await fetch(`/api/v1/reunioes?${params.toString()}`, {
+      const res = await fetchAutenticado(`/api/v1/reunioes?${params.toString()}`, {
         cache: 'no-store',
       });
 
@@ -115,7 +132,7 @@ export default function ReunioesPage() {
     } finally {
       setLoading(false);
     }
-  }, [filtroStatus]);
+  }, [filtroStatus, fetchAutenticado]);
 
   useEffect(() => {
     if (!bloqueado && planFeatures.hasFeature('meetings_module')) {
@@ -153,7 +170,7 @@ export default function ReunioesPage() {
         horario_limite_entrada: formHorarioLimite,
       };
 
-      const res = await fetch('/api/v1/reunioes', {
+      const res = await fetchAutenticado('/api/v1/reunioes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -192,7 +209,7 @@ export default function ReunioesPage() {
 
     try {
       // 1. Consultar estado do token
-      const resGet = await fetch(`/api/v1/reunioes/${reuniao.id}/painel/token`);
+      const resGet = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`);
       const dataGet = await resGet.json();
 
       if (dataGet.success && dataGet.status_efetivo === 'ativo' && dataGet.token_info) {
@@ -204,7 +221,7 @@ export default function ReunioesPage() {
 
       // Se não há token ativo e a reunião não está encerrada, gerar novo token
       if (reuniao.status !== 'encerrada') {
-        const resPost = await fetch(`/api/v1/reunioes/${reuniao.id}/painel/token`, {
+        const resPost = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ duracao_horas: 24 }),
@@ -239,7 +256,7 @@ export default function ReunioesPage() {
 
     try {
       setEncerrando(true);
-      const res = await fetch(`/api/v1/reunioes/${reuniaoSelecionada.id}/encerrar`, {
+      const res = await fetchAutenticado(`/api/v1/reunioes/${reuniaoSelecionada.id}/encerrar`, {
         method: 'POST',
       });
       const data = await res.json();
