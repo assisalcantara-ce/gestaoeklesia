@@ -32,6 +32,13 @@ const SIDEBAR_PREFIXES = [
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+
+  // O Painel Informativo de Reuniões é uma página pública e standalone (TV / Projetor)
+  const isStandalone = pathname === '/reunioes/painel' || pathname.startsWith('/reunioes/painel/');
+  if (isStandalone) {
+    return <>{children}</>;
+  }
+
   const showSidebar = SIDEBAR_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(prefix + '/'),
   );
