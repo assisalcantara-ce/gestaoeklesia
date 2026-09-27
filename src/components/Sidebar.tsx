@@ -179,7 +179,7 @@ export default function Sidebar() {
       id: 'ebd',
       label: 'EBD',
       icon: '📖',
-      path: '/ebd/dashboard/geral',
+      path: '/ebd/dashboard',
       modulo: 'ebd',
       ebdMenu: true,
       featureFlag: 'ebd_module',

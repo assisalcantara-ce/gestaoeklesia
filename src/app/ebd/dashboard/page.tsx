@@ -344,7 +344,7 @@ function DashboardConteudo({
                 { label: 'Trimestres',        icon: '📅', path: '/ebd/trimestres',   color: 'bg-teal-50 hover:bg-teal-100 border-teal-200'   },
                 { label: 'Turmas',            icon: '🏫', path: '/ebd/turmas',       color: 'bg-amber-50 hover:bg-amber-100 border-amber-200' },
                 { label: 'Histórico',         icon: '📋', path: '/ebd/historico',    color: 'bg-purple-50 hover:bg-purple-100 border-purple-200' },
-                { label: 'Certificados',      icon: '🏆', path: '/ebd/certificados', color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200' },
+                { label: 'Relatórios',        icon: '📊', path: '/ebd/relatorios',   color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200' },
               ].map(item => (
                 <Link key={item.path} href={item.path}
                   className={`border rounded-lg p-4 transition flex flex-col items-center gap-2 text-center ${item.color}`}>

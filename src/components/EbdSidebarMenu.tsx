@@ -1,35 +1,20 @@
 'use client';
 
 /**
- * EbdSidebarMenu — menu hierárquico de 3 níveis exclusivo do módulo EBD.
+ * EbdSidebarMenu — menu operacional simplificado do módulo EBD.
  *
- * Estrutura fiel ao mapa mental:
- *
- * EBD (raiz — gerenciada pelo Sidebar pai)
- * ├─ Dashboard                     ← nível 1 (folha — renderização condicional: admin=global, usuário=local)
- * ├─ Cadastro                      ← nível 1 (agrupador)
- * │   ├─ Classes                   ← nível 2 (folha)
- * │   ├─ Turmas                    ← nível 2 (folha)
- * │   ├─ Superintendente           ← nível 2 (folha)
- * │   ├─ Professores               ← nível 2 (folha)
- * │   └─ Alunos                    ← nível 2 (agrupador + folha própria)
- * │       └─ Carteirinha           ← nível 3 (folha)
- * ├─ Aulas                         ← nível 1 (agrupador)
- * │   ├─ Frequência                ← nível 2 (folha)
- * │   ├─ Avaliações                ← nível 2 (folha)
- * │   └─ Material de apoio         ← nível 2 (folha)
- * ├─ Relatórios                    ← nível 1 (agrupador)
- * │   ├─ Boletim de aula           ← nível 2 (folha)
- * │   ├─ Histórico de presença     ← nível 2 (folha)
- * │   ├─ Aniversariantes           ← nível 2 (folha)
- * │   ├─ Professores               ← nível 2 (folha)
- * │   └─ Alunos                    ← nível 2 (folha)
- * ├─ Pedidos                       ← nível 1 (agrupador)
- * │   ├─ Revistas                  ← nível 2 (folha)
- * │   └─ Material extra            ← nível 2 (folha)
- * ├─ Certificado por classe        ← nível 1 (folha)
- * └─ Caixa                         ← nível 1 (agrupador)
- *     └─ Caixa                     ← nível 1 (folha → /ebd/ofertas)
+ * Estrutura:
+ * EBD (raiz)
+ * ├─ Dashboard             (/ebd/dashboard)
+ * ├─ Chamada Dominical     (/ebd/chamada)
+ * ├─ Turmas                (/ebd/turmas)
+ * ├─ Alunos & Matrículas   (/ebd/alunos)
+ * ├─ Professores           (/ebd/cadastro/professores)
+ * ├─ Trimestres            (/ebd/trimestres)
+ * ├─ Revistas / Pedidos    (/ebd/revistas)
+ * ├─ Classes               (/ebd/cadastro/classes)
+ * ├─ Relatórios            (/ebd/relatorios)
+ * └─ Ofertas EBD           (/ebd/ofertas)
  */
 
 import { useState, useEffect } from 'react';
@@ -41,81 +26,85 @@ interface EbdNode {
   id: string;
   /** Texto exibido no menu */
   label: string;
-  /** Rota de navegação — ausente em agrupadores que não têm página própria */
-  path?: string;
-  /** Filhos — presente em agrupadores; ausente em folhas */
+  /** Rota de navegação */
+  path: string;
+  /** IDs adicionais correspondentes a este item de menu para highlight */
+  matchIds?: string[];
+  /** Filhos opcionais se houver agrupador */
   children?: EbdNode[];
 }
 
-// ─── Árvore de dados EBD ─────────────────────────────────────────────────────
-// Ordem e hierarquia fiéis ao mapa mental.
+// ─── Árvore de dados EBD Simplificada ────────────────────────────────────────
 
 export const EBD_TREE: EbdNode[] = [
-  // ── Nível 1: Dashboard (único — conteúdo muda por permissão) ──
-  { id: 'ebd-dashboard', label: 'Dashboard', path: '/ebd/dashboard' },
-
-  // ── Nível 1: Cadastro ──
   {
-    id: 'ebd-cadastro',
-    label: 'Cadastro',
-    children: [
-      // Nível 2 — folhas simples
-      { id: 'ebd-cadastro-classes',          label: 'Classes',         path: '/ebd/cadastro/classes'          },
-      { id: 'ebd-cadastro-superintendente',  label: 'Superintendente', path: '/ebd/cadastro/superintendentes' },
-      { id: 'ebd-cadastro-professores',      label: 'Professores',     path: '/ebd/cadastro/professores'      },
-      { id: 'ebd-cadastro-turmas',           label: 'Turmas',          path: '/ebd/turmas'                    },
-      // Nível 2 — agrupador com folha própria
-      {
-        id: 'ebd-cadastro-alunos',
-        label: 'Alunos',
-        path: '/ebd/alunos',
-      },
-    ],
+    id: 'ebd-dashboard',
+    label: 'Dashboard',
+    path: '/ebd/dashboard',
+    matchIds: ['ebd-dashboard', 'ebd-dashboard-geral', 'ebd-dashboard-local'],
   },
-
-  // ── Nível 1: Aulas ──
   {
-    id: 'ebd-aulas',
-    label: 'Aulas',
-    children: [
-      // Nível 2 — folhas
-      { id: 'ebd-aulas-trimestres',  label: 'Trimestres',        path: '/ebd/trimestres' },
-      { id: 'ebd-aulas-frequencia', label: 'Frequência',        path: '/ebd/chamada'    },
-      { id: 'ebd-aulas-avaliacoes', label: 'Avaliações',        path: '/ebd/avaliacoes' },
-      { id: 'ebd-aulas-material',   label: 'Material de apoio', path: '/ebd/material'   },
-    ],
+    id: 'ebd-aulas-frequencia',
+    label: 'Chamada Dominical',
+    path: '/ebd/chamada',
+    matchIds: ['ebd-chamada', 'ebd-aulas-frequencia'],
   },
-
-  // ── Nível 1: Relatórios ──
+  {
+    id: 'ebd-cadastro-turmas',
+    label: 'Turmas',
+    path: '/ebd/turmas',
+    matchIds: ['ebd-turmas', 'ebd-cadastro-turmas'],
+  },
+  {
+    id: 'ebd-cadastro-alunos',
+    label: 'Alunos & Matrículas',
+    path: '/ebd/alunos',
+    matchIds: ['ebd-alunos', 'ebd-cadastro-alunos', 'ebd-cadastro-alunos-carteirinha'],
+  },
+  {
+    id: 'ebd-cadastro-professores',
+    label: 'Professores',
+    path: '/ebd/cadastro/professores',
+    matchIds: ['ebd-professores', 'ebd-cadastro-professores', 'ebd-cadastro-superintendente'],
+  },
+  {
+    id: 'ebd-trimestres',
+    label: 'Trimestres',
+    path: '/ebd/trimestres',
+    matchIds: ['ebd-trimestres', 'ebd-aulas-trimestres'],
+  },
+  {
+    id: 'ebd-pedidos-revistas',
+    label: 'Revistas / Pedidos',
+    path: '/ebd/revistas',
+    matchIds: ['ebd-revistas', 'ebd-pedidos-revistas', 'ebd-pedidos'],
+  },
+  {
+    id: 'ebd-cadastro-classes',
+    label: 'Classes',
+    path: '/ebd/cadastro/classes',
+    matchIds: ['ebd-classes', 'ebd-cadastro-classes'],
+  },
   {
     id: 'ebd-relatorios',
-    label: 'Relatórios',
-    children: [
-      // Nível 2 — folhas
-      { id: 'ebd-relatorios-boletim',          label: 'Boletim de aula',      path: '/ebd/relatorios/boletim'          },
-      { id: 'ebd-relatorios-historico',        label: 'Histórico de presença', path: '/ebd/historico'                   },
-      { id: 'ebd-relatorios-aniversariantes',  label: 'Aniversariantes',      path: '/ebd/relatorios/aniversariantes'  },
-      { id: 'ebd-relatorios-professores',      label: 'Professores',          path: '/ebd/relatorios/professores'      },
-      { id: 'ebd-relatorios-alunos',           label: 'Alunos',               path: '/ebd/relatorios/alunos'           },
+    label: 'Relatórios Consolidados',
+    path: '/ebd/relatorios',
+    matchIds: [
+      'ebd-relatorios',
+      'ebd-relatorios-boletim',
+      'ebd-relatorios-historico',
+      'ebd-relatorios-aniversariantes',
+      'ebd-relatorios-professores',
+      'ebd-relatorios-alunos',
+      'ebd-historico',
     ],
   },
-
-  // ── Nível 1: Pedidos ──
   {
-    id: 'ebd-pedidos',
-    label: 'Pedidos',
-    children: [
-      // Nível 2 — folhas
-      { id: 'ebd-pedidos-revistas', label: 'Revistas',       path: '/ebd/revistas'         },
-      { id: 'ebd-pedidos-material', label: 'Material extra', path: '/ebd/pedidos/material' },
-    ],
+    id: 'ebd-caixa',
+    label: 'Ofertas EBD',
+    path: '/ebd/ofertas',
+    matchIds: ['ebd-caixa', 'ebd-ofertas'],
   },
-
-  // ── Nível 1: Certificado por classe — folha sem filhos ──
-  { id: 'ebd-certificados', label: 'Certificado por classe', path: '/ebd/certificados' },
-
-  // ── Nível 1: Caixa ──
-  { id: 'ebd-caixa', label: 'Caixa', path: '/ebd/ofertas' },
 ];
 
 // ─── Conjunto de todos os IDs EBD (para uso externo no parentMap) ─────────────
@@ -124,9 +113,10 @@ function collectAllIds(nodes: EbdNode[]): string[] {
   const ids: string[] = [];
   for (const node of nodes) {
     ids.push(node.id);
+    if (node.matchIds) ids.push(...node.matchIds);
     if (node.children) ids.push(...collectAllIds(node.children));
   }
-  return ids;
+  return [...new Set(ids)];
 }
 
 export const ALL_EBD_IDS = collectAllIds(EBD_TREE);
@@ -139,7 +129,7 @@ function findAncestors(
   path: string[] = [],
 ): string[] | null {
   for (const node of nodes) {
-    if (node.id === targetId) return path;
+    if (node.id === targetId || (node.matchIds && node.matchIds.includes(targetId))) return path;
     if (node.children) {
       const found = findAncestors(node.children, targetId, [...path, node.id]);
       if (found !== null) return found;
@@ -157,10 +147,8 @@ interface EbdSidebarMenuProps {
 }
 
 export default function EbdSidebarMenu({ activeMenu, onNavigate }: EbdSidebarMenuProps) {
-  // IDs dos agrupadores internos que estão expandidos
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  // Auto-expande ancestrais quando activeMenu muda
   useEffect(() => {
     const ancestors = findAncestors(EBD_TREE, activeMenu);
     if (ancestors && ancestors.length > 0) {
@@ -180,32 +168,24 @@ export default function EbdSidebarMenu({ activeMenu, onNavigate }: EbdSidebarMen
     });
   };
 
-  // ─── Renderizador recursivo ──────────────────────────────────────────────
-  // depth 0 = nível 1 (filho direto do EBD raiz)
-  // depth 1 = nível 2
-  // depth 2 = nível 3
-
   const renderNode = (node: EbdNode, depth: number) => {
-    const isExpanded  = expanded.has(node.id);
-    const isActive    = activeMenu === node.id;
+    const isExpanded = expanded.has(node.id);
+    const isActive =
+      activeMenu === node.id || (node.matchIds && node.matchIds.includes(activeMenu));
     const hasChildren = !!node.children?.length;
 
-    // Recuo visual por nível
     const paddingClass =
-      depth === 0 ? 'pl-6'
-      : depth === 1 ? 'pl-10'
-      : 'pl-14';
+      depth === 0 ? 'pl-6' : depth === 1 ? 'pl-10' : 'pl-14';
 
-    // Marcador visual por nível
-    const marker =
-      depth === 0 ? <span className="text-orange-400 text-xs flex-shrink-0">▸</span>
-      : depth === 1 ? <span className="text-white/40 text-xs flex-shrink-0 font-bold">–</span>
-      : <span className="text-white/25 text-xs flex-shrink-0">·</span>;
+    const marker = (
+      <span className={`text-xs flex-shrink-0 ${isActive ? 'text-white font-bold' : 'text-orange-400'}`}>
+        ▸
+      </span>
+    );
 
     const handleClick = () => {
       if (hasChildren) {
         toggleExpanded(node.id);
-        // Agrupadores com path próprio também navegam ao clicar
         if (node.path) onNavigate(node.id, node.path);
       } else if (node.path) {
         onNavigate(node.id, node.path);
@@ -235,7 +215,6 @@ export default function EbdSidebarMenu({ activeMenu, onNavigate }: EbdSidebarMen
           )}
         </button>
 
-        {/* Filhos — renderizados recursivamente ao expandir */}
         {hasChildren && isExpanded && (
           <div className={depth === 0 ? 'bg-black/10' : ''}>
             {node.children!.map(child => renderNode(child, depth + 1))}

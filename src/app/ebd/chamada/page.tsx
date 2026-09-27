@@ -8,14 +8,24 @@ import { createClient } from '@/lib/supabase-client';
 import { resolveEbdScope } from '@/lib/cartoes-templates-sync';
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import NotificationModal from '@/components/NotificationModal';
-import { CheckCircle2, XCircle, Plus, Trash2, Save, UserPlus, Calendar, AlertCircle, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, Plus, Trash2, Save, UserPlus, Calendar, AlertCircle, Clock, Smartphone, MessageCircle, Copy, Check, RefreshCw } from 'lucide-react';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
 interface Congregacao { id: string; nome: string; }
 interface EbdTurma    { id: string; nome: string; church_id: string; professor_titular_id: string | null; }
 interface EbdAluno    { id: string; nome: string; }
-interface EbdProfessor{ id: string; nome: string; }
+interface EbdProfessor{ id: string; nome: string; telefone?: string | null; }
+
+interface TokenInfo {
+  id?: string;
+  status: 'nao_gerado' | 'ativo' | 'finalizado' | 'expirado' | 'revogado';
+  expires_at?: string;
+  finalizado_em?: string;
+  url?: string;
+  whatsapp_url?: string | null;
+  whatsapp_message?: string;
+}
 
 interface EbdTrimestre {
   id: string; numero: number; ano: number; descricao: string;
@@ -122,6 +132,11 @@ export default function EbdChamadaPage() {
   const [formaOferta, setFormaOferta] = useState('dinheiro');
   const [ofertaSalva, setOfertaSalva] = useState(false);
 
+  // Link Temporário / Chamada Rápida do Professor
+  const [tokenInfo,   setTokenInfo]   = useState<TokenInfo | null>(null);
+  const [gerandoLink, setGerandoLink] = useState(false);
+  const [copiado,     setCopiado]     = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [msg,    setMsg]    = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
   const [modalNotify, setModalNotify] = useState<{
@@ -142,7 +157,7 @@ export default function EbdChamadaPage() {
     const cid = churchIdRef.current;
     const [orgService, profsR] = await Promise.all([
       obterEstruturaOrganizacionalService(mid, supabase),
-      supabase.from('ebd_professores').select('id, nome').eq('ministry_id', mid).eq('ativo', true).order('nome'),
+      supabase.from('ebd_professores').select('id, nome, telefone').eq('ministry_id', mid).eq('ativo', true).order('nome'),
     ]);
 
     let div1Options = orgService.getOptionsFormatadas(1);
@@ -165,6 +180,7 @@ export default function EbdChamadaPage() {
     setAula(null);
     setFreqs([]);
     setVisitantes([]);
+    setTokenInfo(null);
     setAulasMap(new Map());
   }, [supabase]);
 
@@ -220,7 +236,7 @@ export default function EbdChamadaPage() {
   useEffect(() => {
     if (selTurma && trimestre) {
       loadAulasMap(selTurma, trimestre);
-      setSelData(null); setAula(null); setFreqs([]); setVisitantes([]);
+      setSelData(null); setAula(null); setFreqs([]); setVisitantes([]); setTokenInfo(null);
     }
   }, [selTurma, trimestre, loadAulasMap]);
 
@@ -243,6 +259,32 @@ export default function EbdChamadaPage() {
       .eq('turma_id', selTurma)
       .eq('data_aula', selData)
       .maybeSingle();
+
+    // Busca token de chamada para a turma e data
+    const { data: tokenDb } = await supabase
+      .from('ebd_chamada_tokens')
+      .select('id, status, expires_at, finalizado_em, professor_id')
+      .eq('turma_id', selTurma)
+      .eq('data_aula', selData)
+      .maybeSingle();
+
+    if (tokenDb) {
+      let st: 'ativo' | 'finalizado' | 'expirado' | 'revogado' = tokenDb.status;
+      if (tokenDb.status === 'ativo' && tokenDb.expires_at && new Date(tokenDb.expires_at) < new Date()) {
+        st = 'expirado';
+      }
+      setTokenInfo(prev => ({
+        id: tokenDb.id,
+        status: st,
+        expires_at: tokenDb.expires_at,
+        finalizado_em: tokenDb.finalizado_em,
+        url: prev && prev.id === tokenDb.id ? prev.url : undefined,
+        whatsapp_url: prev && prev.id === tokenDb.id ? prev.whatsapp_url : undefined,
+        whatsapp_message: prev && prev.id === tokenDb.id ? prev.whatsapp_message : undefined,
+      }));
+    } else {
+      setTokenInfo({ status: 'nao_gerado' });
+    }
 
     // Busca alunos matriculados na turma
     const { data: matsData } = await supabase
@@ -304,6 +346,65 @@ export default function EbdChamadaPage() {
   useEffect(() => {
     if (selTurma && selData) carregarAula();
   }, [selTurma, selData, carregarAula]);
+
+  // ── Ações do Link Temporário de Chamada ───────────────────────────────────
+
+  const gerarLinkChamada = async (isRegenerate = false) => {
+    if (!selTurma || !selData) return;
+    setGerandoLink(true);
+    try {
+      const turma = turmas.find(t => t.id === selTurma);
+      const profId = aulaForm.professor_id || turma?.professor_titular_id || undefined;
+
+      const res = await fetch('/api/v1/ebd/chamada/gerar-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          turma_id: selTurma,
+          data_aula: selData,
+          professor_id: profId,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        flash('erro', data.error || 'Erro ao gerar link de chamada.');
+        setGerandoLink(false);
+        return;
+      }
+
+      setTokenInfo({
+        id: data.token,
+        status: 'ativo',
+        expires_at: data.expires_at,
+        url: data.url,
+        whatsapp_url: data.whatsapp_url,
+        whatsapp_message: data.whatsapp_message,
+      });
+      flash('ok', isRegenerate ? 'Novo link gerado! O anterior foi revogado.' : 'Link de chamada gerado com sucesso!');
+    } catch (err: any) {
+      flash('erro', err.message || 'Erro ao comunicar com o servidor.');
+    } finally {
+      setGerandoLink(false);
+    }
+  };
+
+  const copiarLink = (url: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2500);
+    flash('ok', 'Link copiado para a área de transferência!');
+  };
+
+  const enviarWhatsapp = () => {
+    if (!tokenInfo?.url) return;
+    if (tokenInfo.whatsapp_url) {
+      window.open(tokenInfo.whatsapp_url, '_blank');
+    } else {
+      const msg = tokenInfo.whatsapp_message || `Olá professor! Segue o link para a chamada da EBD: ${tokenInfo.url}`;
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+    }
+  };
 
   // ── Toggle presença ──────────────────────────────────────────────────────
 
@@ -487,6 +588,9 @@ export default function EbdChamadaPage() {
   // ── Derived ──────────────────────────────────────────────────────────────
 
   const turmasFiltradas = turmas.filter(t => !selCong || t.church_id === selCong);
+  const turmaAtual      = turmas.find(t => t.id === selTurma);
+  const profAtualId     = aulaForm.professor_id || turmaAtual?.professor_titular_id;
+  const profAtual       = professores.find(p => p.id === profAtualId);
   const presentes       = freqs.filter(f => f.presente).length;
   const ausentes        = freqs.filter(f => !f.presente).length;
   const pctPresenca     = freqs.length > 0 ? Math.round((presentes / freqs.length) * 100) : 0;
@@ -665,6 +769,206 @@ export default function EbdChamadaPage() {
                     {new Date(selData + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
                   </span>
                   <div className="h-px flex-1 bg-gray-200" />
+                </div>
+
+                {/* ── Área: Chamada Rápida do Professor (Link Temporário) ── */}
+                <div className="bg-white rounded-xl border border-blue-200/80 shadow-sm p-5 mb-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold flex-shrink-0">
+                        <Smartphone className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-800">Chamada Rápida do Professor</h3>
+                        <p className="text-xs text-gray-500">Envie o link temporário para o professor registrar a presença no celular sem login</p>
+                      </div>
+                    </div>
+
+                    {/* Badge de Status */}
+                    <div>
+                      {tokenInfo?.status === 'ativo' && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          Link Ativo
+                        </span>
+                      )}
+                      {tokenInfo?.status === 'finalizado' && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                          Chamada Finalizada
+                        </span>
+                      )}
+                      {(tokenInfo?.status === 'expirado' || tokenInfo?.status === 'revogado') && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                          {tokenInfo?.status === 'expirado' ? 'Link Expirado' : 'Link Revogado'}
+                        </span>
+                      )}
+                      {(!tokenInfo || tokenInfo.status === 'nao_gerado') && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                          <Clock className="w-3.5 h-3.5 text-gray-400" />
+                          Não gerado
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Detalhes da Turma e Professor */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 py-3 text-xs border-b border-gray-100 bg-gray-50/50 rounded-lg px-3.5 my-3.5">
+                    <div>
+                      <span className="text-gray-400 font-medium block mb-0.5">Turma:</span>
+                      <span className="font-semibold text-gray-700">{turmaAtual?.nome || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 font-medium block mb-0.5">Professor responsável:</span>
+                      <span className="font-semibold text-gray-700">{profAtual?.nome || 'Não definido'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 font-medium block mb-0.5">WhatsApp / Telefone:</span>
+                      <span className={`font-semibold ${profAtual?.telefone ? 'text-gray-700' : 'text-gray-400 italic'}`}>
+                        {profAtual?.telefone ? fmtFone(profAtual.telefone) : 'Não cadastrado'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Conteúdo de Ação e Compartilhamento */}
+                  <div className="pt-1">
+                    {/* Caso: Chamada Finalizada */}
+                    {tokenInfo?.status === 'finalizado' && (
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-blue-50/60 border border-blue-100 p-4 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs font-bold text-blue-900">Chamada dominical concluída pelo professor</p>
+                            <p className="text-[11px] text-blue-700 mt-0.5">
+                              {tokenInfo.finalizado_em
+                                ? `Finalizada em ${new Date(tokenInfo.finalizado_em).toLocaleString('pt-BR')}. Os dados já estão registrados.`
+                                : 'A lista de frequência e visitantes desta aula já foram finalizados.'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (confirm('A chamada já foi finalizada. Deseja realmente gerar um novo link de chamada para este domingo?')) {
+                              gerarLinkChamada(true);
+                            }
+                          }}
+                          disabled={gerandoLink}
+                          className="text-xs px-3 py-1.5 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-lg font-medium transition"
+                        >
+                          {gerandoLink ? 'Gerando...' : 'Reabrir / Gerar novo link'}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Caso: Link Ativo com URL disponível nesta sessão */}
+                    {tokenInfo?.status === 'ativo' && tokenInfo.url && (
+                      <div className="space-y-3">
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
+                          {/* Caixa com o link */}
+                          <div className="flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 font-mono select-all overflow-x-auto">
+                            <span className="truncate">{tokenInfo.url}</span>
+                          </div>
+
+                          {/* Botão Copiar */}
+                          <button
+                            onClick={() => copiarLink(tokenInfo.url!)}
+                            className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition"
+                          >
+                            {copiado ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                            {copiado ? 'Copiado!' : 'Copiar link'}
+                          </button>
+
+                          {/* Botão Enviar pelo WhatsApp */}
+                          <button
+                            onClick={enviarWhatsapp}
+                            className="flex items-center justify-center gap-2 px-4 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-xl text-xs font-bold shadow-sm transition hover:shadow"
+                          >
+                            <MessageCircle className="w-4 h-4 fill-white" />
+                            Enviar pelo WhatsApp
+                          </button>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs text-gray-400 gap-2">
+                          <span>
+                            {tokenInfo.expires_at
+                              ? `Válido até ${new Date(tokenInfo.expires_at).toLocaleString('pt-BR')}`
+                              : 'Link temporário válido por 48h'}
+                          </span>
+                          <button
+                            onClick={() => {
+                              if (confirm('Ao gerar um novo link, o link anterior enviado ao professor será revogado imediatamente. Deseja continuar?')) {
+                                gerarLinkChamada(true);
+                              }
+                            }}
+                            disabled={gerandoLink}
+                            className="text-[11px] text-gray-400 hover:text-red-500 underline transition"
+                          >
+                            {gerandoLink ? 'Gerando...' : 'Gerar novo link (revoga o atual)'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Caso: Link Ativo existente no banco sem a URL na memória da sessão (recarga da página) */}
+                    {tokenInfo?.status === 'ativo' && !tokenInfo.url && (
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-emerald-50/50 border border-emerald-100 p-3.5 rounded-xl">
+                        <div>
+                          <p className="text-xs font-semibold text-emerald-900">Existe um link ativo gerado para este domingo.</p>
+                          <p className="text-[11px] text-emerald-700 mt-0.5">
+                            {tokenInfo.expires_at
+                              ? `Válido até ${new Date(tokenInfo.expires_at).toLocaleString('pt-BR')}. Por segurança, o token não é salvo em texto puro.`
+                              : 'Link temporário ativo.'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => gerarLinkChamada(true)}
+                          disabled={gerandoLink}
+                          className="flex items-center gap-1.5 text-xs px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-sm transition"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${gerandoLink ? 'animate-spin' : ''}`} />
+                          {gerandoLink ? 'Gerando...' : 'Gerar novo link'}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Caso: Expirado ou Revogado */}
+                    {(tokenInfo?.status === 'expirado' || tokenInfo?.status === 'revogado') && (
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-amber-50 border border-amber-200 p-3.5 rounded-xl">
+                        <div>
+                          <p className="text-xs font-semibold text-amber-900">
+                            {tokenInfo.status === 'expirado' ? 'O link anterior expirou.' : 'O link anterior foi revogado.'}
+                          </p>
+                          <p className="text-[11px] text-amber-700 mt-0.5">Gere um novo link para liberar o acesso do professor.</p>
+                        </div>
+                        <button
+                          onClick={() => gerarLinkChamada(true)}
+                          disabled={gerandoLink}
+                          className="flex items-center gap-1.5 text-xs px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold transition"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${gerandoLink ? 'animate-spin' : ''}`} />
+                          {gerandoLink ? 'Gerando...' : 'Gerar novo link'}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Caso: Não gerado */}
+                    {(!tokenInfo || tokenInfo.status === 'nao_gerado') && (
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <p className="text-xs text-gray-500">
+                          O professor receberá uma página limpa e rápida para marcar presença e faltas no celular, sem login.
+                        </p>
+                        <button
+                          onClick={() => gerarLinkChamada(false)}
+                          disabled={gerandoLink}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-[#123b63] hover:bg-[#0f2a45] text-white rounded-xl text-xs font-semibold shadow-sm transition flex-shrink-0"
+                        >
+                          <Smartphone className="w-4 h-4" />
+                          {gerandoLink ? 'Gerando link...' : 'GERAR LINK DE CHAMADA'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
