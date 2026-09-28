@@ -7,6 +7,7 @@ import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { createClient } from '@/lib/supabase-client';
+import { calcularStatusEfetivoReuniao, StatusReuniaoEfetivo } from '@/lib/reunioes-utils';
 import {
   ArrowLeft,
   Calendar,
@@ -100,6 +101,9 @@ export default function DetalhesReuniaoPage() {
   const [paginaAtual, setPaginaAtual] = useState<number>(1);
 
   // Modais de Ação
+  const [modalCheckinAberto, setModalCheckinAberto] = useState<boolean>(false);
+  const [copiadoCheckin, setCopiadoCheckin] = useState<boolean>(false);
+
   const [modalPainelAberto, setModalPainelAberto] = useState<boolean>(false);
   const [carregandoToken, setCarregandoToken] = useState<boolean>(false);
   const [tokenInfo, setTokenInfo] = useState<{ url_painel?: string; token?: string } | null>(null);
@@ -168,9 +172,41 @@ export default function DetalhesReuniaoPage() {
     }
   }, [bloqueado, planFeatures, carregarDetalhes]);
 
+  const statusEfetivo: StatusReuniaoEfetivo = useMemo(() => {
+    if (!reuniao) return 'agendada';
+    return calcularStatusEfetivoReuniao(reuniao);
+  }, [reuniao]);
+
+  // ─── Verificação de Horário Limite de Check-in ─────────────────────────────
+  const isCheckinExpirado = useMemo(() => {
+    if (!reuniao) return false;
+    if (reuniao.status === 'encerrada' || reuniao.status === 'cancelada') return true;
+    if (reuniao.limite_checkin_em) {
+      return new Date().toISOString() > reuniao.limite_checkin_em;
+    }
+    return false;
+  }, [reuniao]);
+
+  const urlCheckinTerminal = useMemo(() => {
+    if (typeof window !== 'undefined' && reuniao?.id) {
+      return `${window.location.origin}/reunioes/${reuniao.id}/checkin`;
+    }
+    return '';
+  }, [reuniao?.id]);
+
+  const copiarLinkCheckin = () => {
+    if (urlCheckinTerminal) {
+      navigator.clipboard.writeText(urlCheckinTerminal);
+      setCopiadoCheckin(true);
+      setTimeout(() => setCopiadoCheckin(false), 2500);
+    }
+  };
+
   // ─── 2. Ação: Painel TV ───────────────────────────────────────────────────
   const abrirPainelTv = async () => {
     if (!reuniao) return;
+    if (reuniao.status === 'encerrada') return;
+
     setModalPainelAberto(true);
     setCarregandoToken(true);
     setCopiado(false);
@@ -185,19 +221,17 @@ export default function DetalhesReuniaoPage() {
         });
       }
 
-      if (reuniao.status !== 'encerrada') {
-        const resPost = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ duracao_horas: 24 }),
+      const resPost = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duracao_horas: 24 }),
+      });
+      const dataPost = await resPost.json();
+      if (dataPost.success) {
+        setTokenInfo({
+          url_painel: `${window.location.origin}/reunioes/painel/${dataPost.token}`,
+          token: dataPost.token,
         });
-        const dataPost = await resPost.json();
-        if (dataPost.success) {
-          setTokenInfo({
-            url_painel: `${window.location.origin}/reunioes/painel/${dataPost.token}`,
-            token: dataPost.token,
-          });
-        }
       }
     } catch (err) {
       console.warn('Erro ao obter token do painel:', err);
@@ -486,15 +520,26 @@ export default function DetalhesReuniaoPage() {
             <span>Voltar para Reuniões</span>
           </Link>
 
-          {/* Botão Check-in (disponível quando ativa/agendada) */}
-          {reuniao.status !== 'encerrada' && reuniao.status !== 'cancelada' && (
-            <Link
-              href={`/reunioes/${reuniao.id}/checkin`}
+          {/* Botão Terminal Check-in com Validação de Horário Limite */}
+          {isCheckinExpirado ? (
+            <button
+              type="button"
+              disabled
+              title="Check-in encerrado. O horário limite foi atingido."
+              className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-400 text-xs font-bold rounded-xl border border-slate-200 cursor-not-allowed shadow-none"
+            >
+              <QrCode className="w-4 h-4 text-slate-400" />
+              <span>Terminal Check-in (Encerrado)</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setModalCheckinAberto(true)}
               className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow transition"
             >
               <QrCode className="w-4 h-4" />
               <span>Terminal Check-in</span>
-            </Link>
+            </button>
           )}
         </div>
       }
@@ -505,25 +550,25 @@ export default function DetalhesReuniaoPage() {
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
               {/* Badge de Status Oficial */}
-              {reuniao.status === 'agendada' && (
+              {statusEfetivo === 'agendada' && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
                   <span className="w-2 h-2 rounded-full bg-blue-500" />
                   Agendada
                 </span>
               )}
-              {reuniao.status === 'em_andamento' && (
+              {statusEfetivo === 'em_andamento' && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 animate-pulse">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   Em Andamento
                 </span>
               )}
-              {reuniao.status === 'encerrada' && (
+              {statusEfetivo === 'encerrada' && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold border border-slate-300">
                   <CheckCircle2 className="w-4 h-4 text-slate-500" />
                   Reunião Encerrada
                 </span>
               )}
-              {reuniao.status === 'cancelada' && (
+              {statusEfetivo === 'cancelada' && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
                   Cancelada
                 </span>
@@ -549,13 +594,26 @@ export default function DetalhesReuniaoPage() {
 
           {/* Botões Operacionais */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={abrirPainelTv}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5 border border-slate-300"
-            >
-              <Tv className="w-4 h-4 text-cyan-600" />
-              <span>Painel TV</span>
-            </button>
+            {reuniao.status === 'encerrada' ? (
+              <button
+                type="button"
+                disabled
+                title="Painel indisponível. A reunião foi encerrada."
+                className="px-3.5 py-2 bg-slate-100 text-slate-400 font-bold text-xs rounded-xl border border-slate-200 cursor-not-allowed inline-flex items-center gap-1.5"
+              >
+                <Tv className="w-4 h-4 text-slate-400" />
+                <span>Painel TV</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={abrirPainelTv}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5 border border-slate-300"
+              >
+                <Tv className="w-4 h-4 text-cyan-600" />
+                <span>Painel TV</span>
+              </button>
+            )}
 
             {reuniao.status === 'encerrada' && (
               <Link
@@ -1077,6 +1135,98 @@ export default function DetalhesReuniaoPage() {
         </div>
       </div>
 
+      {/* ─── MODAL: TERMINAL CHECK-IN ─── */}
+      {modalCheckinAberto && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center font-bold">
+                  <QrCode className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-slate-900">Terminal de Check-in</h2>
+                  <p className="text-[11px] text-slate-500">Registro de presença dos ministros</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalCheckinAberto(false)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {isCheckinExpirado ? (
+                <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl text-center space-y-1">
+                  <AlertTriangle className="w-6 h-6 text-amber-600 mx-auto" />
+                  <p className="font-bold text-xs">Check-in encerrado.</p>
+                  <p className="text-[11px] text-amber-700">O horário limite foi atingido.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                    <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+                      {/* QR Code gerado dinamicamente para o link do terminal */}
+                      {urlCheckinTerminal && (
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                            urlCheckinTerminal
+                          )}&bgcolor=FFFFFF&color=0F172A`}
+                          alt="QR Code Terminal Check-in"
+                          className="w-40 h-40 object-contain rounded-lg"
+                        />
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-semibold mt-2">
+                      Aponte a câmera do dispositivo ou leitor
+                    </span>
+                  </div>
+
+                  {/* URL Box */}
+                  <div className="p-3 bg-slate-900 text-teal-300 font-mono text-xs rounded-xl break-all border border-slate-800 flex items-center justify-between gap-2">
+                    <span className="truncate">{urlCheckinTerminal}</span>
+                    <button
+                      onClick={copiarLinkCheckin}
+                      className="p-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition shrink-0"
+                      title="Copiar link"
+                    >
+                      {copiadoCheckin ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={copiarLinkCheckin}
+                      className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition"
+                    >
+                      {copiadoCheckin ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiadoCheckin ? 'Link Copiado!' : 'Copiar Link'}</span>
+                    </button>
+
+                    <Link
+                      href={`/reunioes/${reuniao.id}/checkin`}
+                      className="flex-1 py-2 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-1.5 transition text-center"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Abrir Check-in</span>
+                    </Link>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={() => setModalCheckinAberto(false)}
+              className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ─── MODAL: PAINEL TV ─── */}
       {modalPainelAberto && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1100,52 +1250,60 @@ export default function DetalhesReuniaoPage() {
             </div>
 
             <div className="space-y-3 text-xs">
-              <p className="text-slate-600 font-medium leading-relaxed">
-                Este link seguro exibe apenas indicadores agregados e consolidados em tempo real, sem necessidade de login.
-              </p>
-
-              {carregandoToken ? (
-                <div className="p-6 text-center text-slate-400">
-                  <RefreshCw className="w-5 h-5 animate-spin mx-auto text-cyan-600 mb-2" />
-                  <span>Obtendo chave de exibição segura...</span>
-                </div>
-              ) : tokenInfo?.url_painel ? (
-                <div className="space-y-2">
-                  <div className="p-3 bg-slate-900 text-teal-300 font-mono text-xs rounded-xl break-all border border-slate-800 flex items-center justify-between gap-2">
-                    <span className="truncate">{tokenInfo.url_painel}</span>
-                    <button
-                      onClick={copiarLinkPainel}
-                      className="p-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition"
-                      title="Copiar link"
-                    >
-                      {copiado ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={copiarLinkPainel}
-                      className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5"
-                    >
-                      {copiado ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiado ? 'Link Copiado!' : 'Copiar Link'}</span>
-                    </button>
-
-                    <a
-                      href={tokenInfo.url_painel}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-1.5"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Abrir na TV</span>
-                    </a>
-                  </div>
+              {reuniao.status === 'encerrada' ? (
+                <div className="p-3 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-xs text-center font-medium">
+                  Painel indisponível. A reunião foi encerrada.
                 </div>
               ) : (
-                <div className="p-3 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-xs">
-                  Reunião encerrada ou painel inativo.
-                </div>
+                <>
+                  <p className="text-slate-600 font-medium leading-relaxed">
+                    Este link seguro exibe apenas indicadores agregados e consolidados em tempo real, sem necessidade de login.
+                  </p>
+
+                  {carregandoToken ? (
+                    <div className="p-6 text-center text-slate-400">
+                      <RefreshCw className="w-5 h-5 animate-spin mx-auto text-cyan-600 mb-2" />
+                      <span>Obtendo chave de exibição segura...</span>
+                    </div>
+                  ) : tokenInfo?.url_painel ? (
+                    <div className="space-y-2">
+                      <div className="p-3 bg-slate-900 text-teal-300 font-mono text-xs rounded-xl break-all border border-slate-800 flex items-center justify-between gap-2">
+                        <span className="truncate">{tokenInfo.url_painel}</span>
+                        <button
+                          onClick={copiarLinkPainel}
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition"
+                          title="Copiar link"
+                        >
+                          {copiado ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={copiarLinkPainel}
+                          className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5"
+                        >
+                          {copiado ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiado ? 'Link Copiado!' : 'Copiar Link'}</span>
+                        </button>
+
+                        <a
+                          href={tokenInfo.url_painel}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-1.5"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Abrir na TV</span>
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-xs">
+                      Painel inativo ou não inicializado.
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

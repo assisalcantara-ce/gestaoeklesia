@@ -6,6 +6,7 @@ import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { createClient } from '@/lib/supabase-client';
+import { calcularStatusEfetivoReuniao, StatusReuniaoEfetivo } from '@/lib/reunioes-utils';
 import {
   Calendar,
   Clock,
@@ -38,6 +39,7 @@ interface ReuniaoItem {
   horario_limite_entrada?: string | null;
   limite_checkin_em?: string | null;
   status: 'agendada' | 'em_andamento' | 'encerrada' | 'cancelada';
+  status_efetivo?: StatusReuniaoEfetivo;
   iniciada_em?: string | null;
   encerrada_em?: string | null;
   total_esperados: number;
@@ -113,12 +115,7 @@ export default function ReunioesPage() {
       setLoading(true);
       setError(null);
 
-      const params = new URLSearchParams();
-      if (filtroStatus !== 'todas') {
-        params.append('status', filtroStatus);
-      }
-
-      const res = await fetchAutenticado(`/api/v1/reunioes?${params.toString()}`, {
+      const res = await fetchAutenticado('/api/v1/reunioes', {
         cache: 'no-store',
       });
 
@@ -128,13 +125,19 @@ export default function ReunioesPage() {
         throw new Error(data.error || 'Erro ao carregar lista de reuniões.');
       }
 
-      setReunioes(data.reunioes || []);
+      // Adicionar status_efetivo calculado para cada reunião
+      const listaTratada: ReuniaoItem[] = (data.reunioes || []).map((r: ReuniaoItem) => ({
+        ...r,
+        status_efetivo: calcularStatusEfetivoReuniao(r),
+      }));
+
+      setReunioes(listaTratada);
     } catch (err: any) {
       setError(err?.message || 'Falha ao buscar reuniões do servidor.');
     } finally {
       setLoading(false);
     }
-  }, [filtroStatus, fetchAutenticado]);
+  }, [fetchAutenticado]);
 
   useEffect(() => {
     if (!bloqueado && planFeatures.hasFeature('meetings_module')) {
@@ -277,17 +280,17 @@ export default function ReunioesPage() {
     }
   };
 
-  // ─── Indicadores Reais Calculados ──────────────────────────────────────────
+  // ─── Indicadores Reais Calculados (baseados no status efetivo) ────────────
   const totalAgendadas = useMemo(
-    () => reunioes.filter((r) => r.status === 'agendada').length,
+    () => reunioes.filter((r) => (r.status_efetivo || r.status) === 'agendada').length,
     [reunioes]
   );
   const totalEmAndamento = useMemo(
-    () => reunioes.filter((r) => r.status === 'em_andamento').length,
+    () => reunioes.filter((r) => (r.status_efetivo || r.status) === 'em_andamento').length,
     [reunioes]
   );
   const totalEncerradas = useMemo(
-    () => reunioes.filter((r) => r.status === 'encerrada').length,
+    () => reunioes.filter((r) => (r.status_efetivo || r.status) === 'encerrada').length,
     [reunioes]
   );
   const totalAusenciasGerais = useMemo(
@@ -295,17 +298,30 @@ export default function ReunioesPage() {
     [reunioes]
   );
 
-  // Filtro em memória por texto de busca
+  // Filtro em memória por status efetivo e por texto de busca
   const reunioesFiltradas = useMemo(() => {
-    if (!filtroBusca.trim()) return reunioes;
-    const term = filtroBusca.toLowerCase();
-    return reunioes.filter(
-      (r) =>
-        r.titulo.toLowerCase().includes(term) ||
-        r.local.toLowerCase().includes(term) ||
-        (r.congregacoes?.nome && r.congregacoes.nome.toLowerCase().includes(term))
-    );
-  }, [reunioes, filtroBusca]);
+    return reunioes.filter((r) => {
+      const stEfetivo = r.status_efetivo || r.status;
+
+      // 1. Filtro de Status
+      if (filtroStatus !== 'todas' && stEfetivo !== filtroStatus) {
+        return false;
+      }
+
+      // 2. Filtro de Busca
+      if (filtroBusca.trim()) {
+        const term = filtroBusca.toLowerCase();
+        const matchTitulo = r.titulo.toLowerCase().includes(term);
+        const matchLocal = r.local.toLowerCase().includes(term);
+        const matchCongregacao = r.congregacoes?.nome?.toLowerCase().includes(term);
+        if (!matchTitulo && !matchLocal && !matchCongregacao) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [reunioes, filtroStatus, filtroBusca]);
 
   // ─── Verificação de Plano ──────────────────────────────────────────────────
   if (ctx.loading || planFeatures.loading) {
@@ -511,6 +527,8 @@ export default function ReunioesPage() {
                   ? Number(((r.total_presentes / r.total_esperados) * 100).toFixed(1))
                   : 0;
 
+              const statusEfetivo = r.status_efetivo || r.status;
+
               return (
                 <div
                   key={r.id}
@@ -520,25 +538,25 @@ export default function ReunioesPage() {
                   <div className="space-y-2 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       {/* Badge de Status Oficial */}
-                      {r.status === 'agendada' && (
+                      {statusEfetivo === 'agendada' && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
                           <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                           Agendada
                         </span>
                       )}
-                      {r.status === 'em_andamento' && (
+                      {statusEfetivo === 'em_andamento' && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 animate-pulse">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           Em Andamento
                         </span>
                       )}
-                      {r.status === 'encerrada' && (
+                      {statusEfetivo === 'encerrada' && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold border border-slate-300">
                           <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
                           Encerrada
                         </span>
                       )}
-                      {r.status === 'cancelada' && (
+                      {statusEfetivo === 'cancelada' && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
                           Cancelada
                         </span>
@@ -602,7 +620,7 @@ export default function ReunioesPage() {
                   {/* ─── 5. AÇÕES POR REUNIÃO ─── */}
                   <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
                     {/* Botão Check-in (disponível quando não encerrada/cancelada) */}
-                    {r.status !== 'encerrada' && r.status !== 'cancelada' && (
+                    {statusEfetivo !== 'encerrada' && statusEfetivo !== 'cancelada' && (
                       <Link
                         href={`/reunioes/${r.id}/checkin`}
                         className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-sm transition inline-flex items-center gap-1.5"
@@ -624,7 +642,7 @@ export default function ReunioesPage() {
                     </button>
 
                     {/* Botão Faltas da Reunião (quando encerrada) */}
-                    {r.status === 'encerrada' && (
+                    {statusEfetivo === 'encerrada' && (
                       <Link
                         href={`/reunioes/faltas?reuniao_id=${r.id}`}
                         className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5"
@@ -636,7 +654,7 @@ export default function ReunioesPage() {
                     )}
 
                     {/* Botão Encerrar Reunião (quando agendada/em andamento) */}
-                    {r.status !== 'encerrada' && r.status !== 'cancelada' && (
+                    {statusEfetivo !== 'encerrada' && statusEfetivo !== 'cancelada' && (
                       <button
                         onClick={() => {
                           setReuniaoSelecionada(r);

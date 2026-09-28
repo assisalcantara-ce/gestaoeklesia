@@ -76,17 +76,6 @@ export default function CheckinReuniaoPage() {
   const [participantes, setParticipantes] = useState<ParticipanteSnapshot[]>([]);
   const [feedback, setFeedback] = useState<CheckinFeedback | null>(null);
 
-  // Estados de Encerramento da Reunião
-  const [modalEncerrarAberto, setModalEncerrarAberto] = useState(false);
-  const [encerrando, setEncerrando] = useState(false);
-  const [resumoEncerramento, setResumoEncerramento] = useState<{
-    total_esperados: number;
-    total_presentes: number;
-    total_ausentes: number;
-    total_justificados: number;
-    encerrada_em?: string;
-  } | null>(null);
-
   // Modo de operação: 'camera' ou 'manual'
   const [modo, setModo] = useState<'camera' | 'manual'>('camera');
   const [busca, setBusca] = useState('');
@@ -99,6 +88,7 @@ export default function CheckinReuniaoPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const scanningRef = useRef(false);
   const [manualQrInput, setManualQrInput] = useState('');
+  const usbInputRef = useRef<HTMLInputElement | null>(null);
 
   // ─── Helper de Autenticação ───────────────────────────────────────────────
   const fetchAutenticado = useCallback(async (url: string, options: RequestInit = {}) => {
@@ -155,6 +145,16 @@ export default function CheckinReuniaoPage() {
       setHasBarcodeDetector(true);
     }
   }, []);
+
+  // Foco automático no campo USB ao carregar ou mudar para modo câmera
+  useEffect(() => {
+    if (!loading && modo === 'camera') {
+      const timer = setTimeout(() => {
+        usbInputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, modo]);
 
   // ─── 2. Executar Chamada de Check-in no Backend ────────────────────────────
   const realizarCheckin = useCallback(
@@ -255,67 +255,14 @@ export default function CheckinReuniaoPage() {
       } finally {
         setEnviando(false);
         setManualQrInput('');
+        // Devolver o foco imediatamente para o campo USB após qualquer tentativa
+        setTimeout(() => {
+          usbInputRef.current?.focus();
+        }, 100);
       }
     },
     [reuniaoId, enviando, fetchAutenticado]
   );
-
-  // ─── 2.1 Executar Encerramento Oficial da Reunião ─────────────────────────
-  const executarEncerramento = async () => {
-    if (!reuniaoId || encerrando) return;
-
-    try {
-      setEncerrando(true);
-      pararCamera();
-
-      const res = await fetchAutenticado(`/api/v1/reunioes/${reuniaoId}/encerrar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Erro ao encerrar reunião.');
-      }
-
-      setResumoEncerramento(data.resumo);
-      setModalEncerrarAberto(false);
-
-      // Atualizar status local da reunião para encerrada
-      setReuniao((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: 'encerrada',
-              total_esperados: data.resumo.total_esperados,
-              total_presentes: data.resumo.total_presentes,
-              total_ausentes: data.resumo.total_ausentes,
-              total_justificados: data.resumo.total_justificados,
-            }
-          : prev
-      );
-
-      // Atualizar lista local de participantes convertendo pendentes para falta
-      setParticipantes((prev) =>
-        prev.map((p) => (p.status_presenca === 'pendente' ? { ...p, status_presenca: 'falta' } : p))
-      );
-
-      setFeedback({
-        type: 'success',
-        title: 'Reunião Encerrada com Sucesso!',
-        message: 'Faltas registradas, tokens inativados e processo de advertências iniciado.',
-      });
-    } catch (err: any) {
-      setFeedback({
-        type: 'error',
-        title: 'Erro no Encerramento',
-        message: err?.message || 'Falha ao processar o encerramento da reunião.',
-      });
-    } finally {
-      setEncerrando(false);
-    }
-  };
 
   // ─── 3. Controle da Câmera e Scanner ──────────────────────────────────────
   const iniciarCamera = async () => {
@@ -665,34 +612,51 @@ export default function CheckinReuniaoPage() {
             )}
 
             {/* Entrada Rápida de Código / Leitor USB */}
-            <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3 space-y-2">
-              <label className="text-[11px] font-semibold text-slate-400">Leitor USB / Digitação Rápida</label>
-              <div className="flex gap-2">
+            <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="usb-reader-input" className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                  <QrCode className="w-3.5 h-3.5 text-teal-400" />
+                  Leitor USB / Digitação Rápida
+                </label>
+                <span className="text-[10px] text-slate-500">Pistola USB pronta</span>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (manualQrInput.trim() && !enviando && !isEncerrada && !isExpirado) {
+                    realizarCheckin({ qr_code: manualQrInput.trim(), metodo_leitura: 'qrcode_carteirinha' });
+                  }
+                }}
+                className="flex gap-2"
+              >
                 <input
+                  id="usb-reader-input"
+                  ref={usbInputRef}
                   type="text"
-                  placeholder="URL do QR ou UniqueId..."
+                  placeholder="Aponte a pistola USB ou digite o código..."
                   value={manualQrInput}
                   onChange={(e) => setManualQrInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && manualQrInput.trim()) {
-                      realizarCheckin({ qr_code: manualQrInput.trim(), metodo_leitura: 'qrcode_carteirinha' });
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (manualQrInput.trim() && !enviando && !isEncerrada && !isExpirado) {
+                        realizarCheckin({ qr_code: manualQrInput.trim(), metodo_leitura: 'qrcode_carteirinha' });
+                      }
                     }
                   }}
                   disabled={enviando || isEncerrada || Boolean(isExpirado)}
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-teal-500"
+                  autoComplete="off"
+                  className="flex-1 bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none shadow-inner transition"
                 />
                 <button
-                  onClick={() => {
-                    if (manualQrInput.trim()) {
-                      realizarCheckin({ qr_code: manualQrInput.trim(), metodo_leitura: 'qrcode_carteirinha' });
-                    }
-                  }}
+                  type="submit"
                   disabled={!manualQrInput.trim() || enviando || isEncerrada || Boolean(isExpirado)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-teal-400 text-xs font-bold rounded-xl border border-slate-700 transition"
+                  className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 disabled:bg-slate-800 text-white disabled:text-slate-500 text-xs font-bold rounded-xl border border-teal-500/30 transition shadow"
                 >
-                  OK
+                  {enviando ? '...' : 'OK'}
                 </button>
-              </div>
+              </form>
             </div>
           </div>
         )}
@@ -766,112 +730,7 @@ export default function CheckinReuniaoPage() {
             </div>
           </div>
         )}
-
-        {/* ─── Ação Administrativa: Encerrar Reunião ─── */}
-        {!isEncerrada ? (
-          <div className="pt-4">
-            <button
-              onClick={() => setModalEncerrarAberto(true)}
-              disabled={encerrando}
-              className="w-full py-3.5 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 font-bold text-xs rounded-2xl transition flex items-center justify-center gap-2 shadow-lg active:scale-95"
-            >
-              <AlertTriangle className="w-4 h-4 text-rose-400" />
-              Encerrar Reunião Ministerial
-            </button>
-          </div>
-        ) : (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-center space-y-3">
-            <CheckCircle2 className="w-8 h-8 text-teal-400 mx-auto" />
-            <div>
-              <h3 className="text-sm font-bold text-white">Reunião Oficialmente Encerrada</h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {resumoEncerramento?.encerrada_em
-                  ? `Finalizada em ${new Date(resumoEncerramento.encerrada_em).toLocaleString('pt-BR')}`
-                  : 'Faltas e advertências processadas pela Secretaria.'}
-              </p>
-            </div>
-            <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-800 text-center">
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase">Total</p>
-                <p className="text-sm font-bold text-white">{reuniao?.total_esperados || 0}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase">Presentes</p>
-                <p className="text-sm font-bold text-emerald-400">{reuniao?.total_presentes || 0}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase">Faltas</p>
-                <p className="text-sm font-bold text-rose-400">{reuniao?.total_ausentes || 0}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase">Justific.</p>
-                <p className="text-sm font-bold text-amber-400">{reuniao?.total_justificados || 0}</p>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
-
-      {/* ─── Modal de Confirmação de Encerramento ─── */}
-      {modalEncerrarAberto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mx-auto">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-
-            <div className="text-center space-y-1.5">
-              <h2 className="text-base font-bold text-white">Encerrar Reunião Ministerial?</h2>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Esta ação fechará oficialmente a reunião e executará as seguintes rotinas no sistema:
-              </p>
-            </div>
-
-            <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2 text-xs text-slate-300">
-              <div className="flex items-start gap-2">
-                <span className="text-rose-400 font-bold">•</span>
-                <span>Bloquear imediatamente novos check-ins de ministros.</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-rose-400 font-bold">•</span>
-                <span>Registrar <strong>01 falta</strong> para cada ministro ausente.</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-rose-400 font-bold">•</span>
-                <span>Gerar os protocolos de <strong>Cartas de Advertência</strong>.</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-rose-400 font-bold">•</span>
-                <span>Inativar os links públicos do painel em TV/Telão.</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                onClick={() => setModalEncerrarAberto(false)}
-                disabled={encerrando}
-                className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 font-bold text-xs rounded-xl transition"
-              >
-                Voltar / Cancelar
-              </button>
-              <button
-                onClick={executarEncerramento}
-                disabled={encerrando}
-                className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2"
-              >
-                {encerrando ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Encerrando...
-                  </>
-                ) : (
-                  'Confirmar Encerramento'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

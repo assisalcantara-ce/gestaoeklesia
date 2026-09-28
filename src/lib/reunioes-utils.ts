@@ -90,3 +90,47 @@ export function hashTokenPainel(token: string): string {
   return crypto.createHash('sha256').update(token.trim()).digest('hex');
 }
 
+export type StatusReuniaoEfetivo = 'agendada' | 'em_andamento' | 'encerrada' | 'cancelada';
+
+/**
+ * Calcula o status efetivo/operacional da reunião de forma consistente.
+ * Regras:
+ * 1. Se o status persistido for 'encerrada' ou 'cancelada', preserva o status persistido.
+ * 2. Se a data/hora de início da reunião já chegou (ou passou) e a reunião não está encerrada,
+ *    o status operacional é 'em_andamento'.
+ * 3. Se a data/hora de início ainda é futura, o status é 'agendada'.
+ * 4. Nenhuma reunião cuja data/hora já passou permanece como 'agendada'.
+ */
+export function calcularStatusEfetivoReuniao(reuniao: {
+  data_reuniao?: string | null;
+  horario_inicio?: string | null;
+  status?: string | null;
+}): StatusReuniaoEfetivo {
+  if (reuniao.status === 'encerrada') return 'encerrada';
+  if (reuniao.status === 'cancelada') return 'cancelada';
+
+  if (!reuniao.data_reuniao) {
+    return (reuniao.status as StatusReuniaoEfetivo) || 'agendada';
+  }
+
+  try {
+    const horaInicio = (reuniao.horario_inicio || '00:00').trim().slice(0, 5);
+    const isoInicio = `${reuniao.data_reuniao.trim()}T${horaInicio.length === 5 ? horaInicio + ':00' : '00:00:00'}-03:00`;
+    const inicioDate = new Date(isoInicio);
+
+    if (isNaN(inicioDate.getTime())) {
+      return (reuniao.status as StatusReuniaoEfetivo) || 'agendada';
+    }
+
+    const agora = new Date();
+    // Se a data/hora de início já chegou ou passou
+    if (agora >= inicioDate) {
+      return 'em_andamento';
+    }
+
+    return 'agendada';
+  } catch {
+    return (reuniao.status as StatusReuniaoEfetivo) || 'agendada';
+  }
+}
+
