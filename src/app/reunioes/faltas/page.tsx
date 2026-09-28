@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import { createClient } from '@/lib/supabase-client';
 import {
   Search,
   AlertTriangle,
@@ -87,6 +88,24 @@ export default function FaltasJustificativasPage() {
   const [salvando, setSalvando] = useState<boolean>(false);
   const [motivoAbono, setMotivoAbono] = useState<string>('');
 
+  // ─── Helper de Autenticação ───────────────────────────────────────────────
+  const fetchAutenticado = useCallback(async (url: string, options: RequestInit = {}) => {
+    const supabase = createClient();
+    const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+
+    if (sessionErr || !session?.access_token) {
+      throw new Error('Sessão expirada ou não autenticada. Faça login novamente.');
+    }
+
+    const headers = new Headers(options.headers || {});
+    headers.set('Authorization', `Bearer ${session.access_token}`);
+
+    return fetch(url, {
+      ...options,
+      headers,
+    });
+  }, []);
+
   // ─── 1. Carregar Listagem de Faltas ────────────────────────────────────────
   const carregarFaltas = useCallback(async () => {
     try {
@@ -98,7 +117,7 @@ export default function FaltasJustificativasPage() {
       if (filtroDataInicio) params.append('data_inicio', filtroDataInicio);
       if (filtroDataFim) params.append('data_fim', filtroDataFim);
 
-      const res = await fetch(`/api/v1/reunioes/faltas?${params.toString()}`);
+      const res = await fetchAutenticado(`/api/v1/reunioes/faltas?${params.toString()}`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -111,7 +130,7 @@ export default function FaltasJustificativasPage() {
     } finally {
       setLoading(false);
     }
-  }, [filtroSituacao, filtroDataInicio, filtroDataFim]);
+  }, [filtroSituacao, filtroDataInicio, filtroDataFim, fetchAutenticado]);
 
   useEffect(() => {
     if (!bloqueado) {
@@ -138,7 +157,7 @@ export default function FaltasJustificativasPage() {
 
     try {
       setSalvando(true);
-      const res = await fetch(`/api/v1/reunioes/faltas/${faltaSelecionada.id}/justificar`, {
+      const res = await fetchAutenticado(`/api/v1/reunioes/faltas/${faltaSelecionada.id}/justificar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -184,7 +203,7 @@ export default function FaltasJustificativasPage() {
 
     try {
       setSalvando(true);
-      const res = await fetch(`/api/v1/reunioes/faltas/${faltaSelecionada.id}/abonar`, {
+      const res = await fetchAutenticado(`/api/v1/reunioes/faltas/${faltaSelecionada.id}/abonar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

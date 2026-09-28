@@ -188,6 +188,18 @@ export async function POST(
       total_justificados: countJustificados || 0,
     });
   } catch (err: any) {
+    if (err?.message === 'UNAUTHORIZED') {
+      return NextResponse.json(
+        { error: 'Não autorizado. Faça login novamente.', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    }
+    if (err?.message === 'NO_MINISTRY') {
+      return NextResponse.json(
+        { error: 'Usuário sem ministério associado.', code: 'NO_MINISTRY' },
+        { status: 403 }
+      );
+    }
     return NextResponse.json(
       { error: 'Erro interno ao processar justificativa.', detail: err?.message },
       { status: 500 }
@@ -279,6 +291,18 @@ export async function GET(
       falta,
     });
   } catch (err: any) {
+    if (err?.message === 'UNAUTHORIZED') {
+      return NextResponse.json(
+        { error: 'Não autorizado. Faça login novamente.', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    }
+    if (err?.message === 'NO_MINISTRY') {
+      return NextResponse.json(
+        { error: 'Usuário sem ministério associado.', code: 'NO_MINISTRY' },
+        { status: 403 }
+      );
+    }
     return NextResponse.json(
       { error: 'Erro interno ao consultar falta ministerial.', detail: err?.message },
       { status: 500 }
