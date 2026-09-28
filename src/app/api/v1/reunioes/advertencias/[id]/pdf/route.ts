@@ -39,7 +39,7 @@ export async function GET(
       return NextResponse.json({ error: 'ID da advertência é obrigatório.' }, { status: 400 });
     }
 
-    // 1. Buscar a advertência no tenant com joins da reunião, participante e ministério
+    // 1. Buscar a advertência no tenant com joins da reunião, membro e ministério
     const { data: advertencia, error: advErr } = await ctx.admin
       .from('reunioes_advertencias')
       .select(`
@@ -61,12 +61,17 @@ export async function GET(
         members (
           id,
           name,
+          matricula,
           cargo_ministerial,
           congregacoes ( id, nome )
         ),
         ministries (
           id,
           name,
+          cnpj_cpf,
+          address_city,
+          address_state,
+          responsible_name,
           logo_url
         )
       `)
@@ -89,7 +94,8 @@ export async function GET(
         reunioes_participantes (
           nome_ministro_snapshot,
           cargo_snapshot,
-          nome_congregacao_snapshot
+          nome_congregacao_snapshot,
+          area_snapshot
         )
       `)
       .eq('id', advertencia.falta_id)
@@ -103,6 +109,10 @@ export async function GET(
     const nomeMinistro = partSnapshot?.nome_ministro_snapshot || member?.name || 'Ministro';
     const cargoMinistro = partSnapshot?.cargo_snapshot || member?.cargo_ministerial || 'Ministro';
     const nomeCongregacao = partSnapshot?.nome_congregacao_snapshot || member?.congregacoes?.nome || 'Sede';
+    const matricula = member?.matricula || null;
+    const setorArea = partSnapshot?.area_snapshot || null;
+
+    const cidadeUf = [ministry?.address_city, ministry?.address_state].filter(Boolean).join(' - ');
 
     const dataFormatada = reuniao?.data_reuniao
       ? new Date(reuniao.data_reuniao + 'T00:00:00').toLocaleDateString('pt-BR')
@@ -110,46 +120,24 @@ export async function GET(
 
     const filename = `Carta_Advertencia_${advertencia.numero_protocolo.replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
 
-    // 3. Verificar se o tenant possui modelo oficial cadastrado
-    const { data: modeloOficial } = await ctx.admin
-      .from('reunioes_modelos_advertencia')
-      .select('storage_bucket, storage_path')
-      .eq('ministry_id', ctx.ministryId)
-      .eq('ativo', true)
-      .maybeSingle();
-
-    if (modeloOficial) {
-      const { data: fileData, error: dlErr } = await ctx.admin.storage
-        .from(modeloOficial.storage_bucket || 'cartas-templates')
-        .download(modeloOficial.storage_path);
-
-      if (!dlErr && fileData) {
-        const arrayBuffer = await fileData.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        return new NextResponse(buffer as any, {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `inline; filename="${filename}"`,
-            'Cache-Control': 'private, max-age=3600',
-          },
-        });
-      }
-    }
-
-    // 4. Fallback: Gerar PDF via jsPDF Server-side caso o tenant ainda não tenha cadastrado o modelo oficial
+    // 3. Gerar PDF oficial dinâmico via jsPDF Server-side preenchido com dados reais
     const pdfBuffer = await gerarCartaAdvertenciaPDF({
       protocolo: advertencia.numero_protocolo,
       nomeMinisterio: ministry?.name || 'GESTÃO EKLÉSIA',
+      cnpjMinisterio: ministry?.cnpj_cpf || null,
+      cidadeUf: cidadeUf || null,
       logoMinisterioUrl: ministry?.logo_url || null,
       nomeMinistro,
+      matriculaMinistro: matricula,
       cargoMinistro,
       nomeCongregacao,
+      setorArea,
       tituloReuniao: reuniao?.titulo || 'Reunião Ministerial',
       dataReuniao: dataFormatada,
       horarioInicio: reuniao?.horario_inicio ? reuniao.horario_inicio.slice(0, 5) : '08:00',
-      localReuniao: reuniao?.local || 'Templo Central',
+      localReuniao: reuniao?.local || 'Templo Sede',
       dataEmissao: new Date(advertencia.created_at).toLocaleString('pt-BR'),
+      nomePresidente: ministry?.responsible_name || null,
     });
 
     return new NextResponse(pdfBuffer as any, {

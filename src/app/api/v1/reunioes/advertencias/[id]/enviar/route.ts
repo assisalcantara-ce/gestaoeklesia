@@ -73,12 +73,17 @@ export async function POST(
           id,
           name,
           email,
+          matricula,
           cargo_ministerial,
           congregacoes ( id, nome )
         ),
         ministries (
           id,
           name,
+          cnpj_cpf,
+          address_city,
+          address_state,
+          responsible_name,
           logo_url
         )
       `)
@@ -112,7 +117,8 @@ export async function POST(
         reunioes_participantes (
           nome_ministro_snapshot,
           cargo_snapshot,
-          nome_congregacao_snapshot
+          nome_congregacao_snapshot,
+          area_snapshot
         )
       `)
       .eq('id', advertencia.falta_id)
@@ -149,6 +155,10 @@ export async function POST(
     const nomeMinistro = partSnapshot?.nome_ministro_snapshot || member?.name || 'Ministro';
     const cargoMinistro = partSnapshot?.cargo_snapshot || member?.cargo_ministerial || 'Ministro';
     const nomeCongregacao = partSnapshot?.nome_congregacao_snapshot || member?.congregacoes?.nome || 'Sede';
+    const matricula = member?.matricula || null;
+    const setorArea = partSnapshot?.area_snapshot || null;
+
+    const cidadeUf = [ministry?.address_city, ministry?.address_state].filter(Boolean).join(' - ');
 
     const dataFormatada = reuniao?.data_reuniao
       ? new Date(reuniao.data_reuniao + 'T00:00:00').toLocaleDateString('pt-BR')
@@ -160,13 +170,18 @@ export async function POST(
       protocolo: advertencia.numero_protocolo,
       emailDestinatario,
       nomeMinistro,
+      matriculaMinistro: matricula,
       cargoMinistro,
       nomeCongregacao,
+      setorArea,
       tituloReuniao: reuniao?.titulo || 'Reunião Ministerial',
       dataReuniao: dataFormatada,
       horarioInicio: reuniao?.horario_inicio ? reuniao.horario_inicio.slice(0, 5) : '08:00',
-      localReuniao: reuniao?.local || 'Templo Central',
+      localReuniao: reuniao?.local || 'Templo Sede',
       nomeMinisterio: ministry?.name || 'GESTÃO EKLÉSIA',
+      cnpjMinisterio: ministry?.cnpj_cpf || null,
+      cidadeUf: cidadeUf || null,
+      nomePresidente: ministry?.responsible_name || null,
       dataEmissao: new Date(advertencia.created_at).toLocaleString('pt-BR'),
       ministryId: ctx.ministryId,
       supabaseAdmin: ctx.admin,

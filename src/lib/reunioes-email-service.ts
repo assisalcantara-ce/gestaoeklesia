@@ -1,18 +1,23 @@
 import { Resend } from 'resend';
-import { createServerClient } from '@/lib/supabase-server';
+import { gerarCartaAdvertenciaPDF } from '@/lib/reunioes-advertencia-pdf';
 
 export interface EnviarAdvertenciaParams {
   advertenciaId: string;
   protocolo: string;
   emailDestinatario: string;
   nomeMinistro: string;
+  matriculaMinistro?: string | null;
   cargoMinistro: string;
   nomeCongregacao: string;
+  setorArea?: string | null;
   tituloReuniao: string;
   dataReuniao: string;
   horarioInicio: string;
   localReuniao: string;
   nomeMinisterio: string;
+  cnpjMinisterio?: string | null;
+  cidadeUf?: string | null;
+  nomePresidente?: string | null;
   dataEmissao: string;
   ministryId: string;
   supabaseAdmin?: any;
@@ -180,7 +185,7 @@ function gerarTemplateEmailAdvertencia(params: EnviarAdvertenciaParams): string 
 
           <div class="warning-box">
             <strong>Orientações para Justificativa:</strong><br>
-            Segue em anexo a <strong>Carta de Advertência</strong> oficial da instituição em formato PDF. Conforme o regimento interno, caso deseje apresentar justificativa, preencha o campo próprio de próprio punho (manuscrito) ou procure a Secretaria Geral dentro do prazo regulamentar.
+            Segue em anexo a <strong>Carta de Advertência</strong> oficial gerada pelo sistema em formato PDF. Conforme o regimento interno, caso deseje apresentar justificativa, preencha o campo de próprio punho (manuscrito) ou procure a Secretaria Geral dentro do prazo regulamentar.
           </div>
         </div>
         <div class="footer">
@@ -203,7 +208,7 @@ export function validarEmailDestinatario(email?: string | null): boolean {
 }
 
 /**
- * Envia a Carta de Advertência Ministerial por e-mail anexando o PDF oficial cadastrado pelo tenant.
+ * Envia a Carta de Advertência Ministerial por e-mail anexando o PDF gerado dinamicamente com dados reais do obreiro.
  */
 export async function enviarEmailCartaAdvertencia(params: EnviarAdvertenciaParams): Promise<EnviarAdvertenciaResult> {
   const emailDestino = params.emailDestinatario?.trim();
@@ -218,7 +223,7 @@ export async function enviarEmailCartaAdvertencia(params: EnviarAdvertenciaParam
   if (!params.ministryId) {
     return {
       sucesso: false,
-      erro: 'Identificador do ministério (tenant) ausente para localização do modelo oficial.',
+      erro: 'Identificador do ministério (tenant) ausente para despacho da advertência.',
     };
   }
 
@@ -232,41 +237,29 @@ export async function enviarEmailCartaAdvertencia(params: EnviarAdvertenciaParam
   }
 
   try {
-    const supabaseAdmin = params.supabaseAdmin || createServerClient();
+    // 1. Gerar PDF dinâmico com os dados reais do ministro e ministério
+    const uint8Pdf = await gerarCartaAdvertenciaPDF({
+      protocolo: params.protocolo,
+      nomeMinisterio: params.nomeMinisterio,
+      cnpjMinisterio: params.cnpjMinisterio,
+      cidadeUf: params.cidadeUf,
+      nomeMinistro: params.nomeMinistro,
+      matriculaMinistro: params.matriculaMinistro,
+      cargoMinistro: params.cargoMinistro,
+      nomeCongregacao: params.nomeCongregacao,
+      setorArea: params.setorArea,
+      tituloReuniao: params.tituloReuniao,
+      dataReuniao: params.dataReuniao,
+      horarioInicio: params.horarioInicio,
+      localReuniao: params.localReuniao,
+      dataEmissao: params.dataEmissao,
+      nomePresidente: params.nomePresidente,
+    });
 
-    // 1. Localizar o modelo oficial cadastrado pelo tenant
-    const { data: modelo, error: modErr } = await supabaseAdmin
-      .from('reunioes_modelos_advertencia')
-      .select('id, storage_bucket, storage_path, nome_arquivo_original, ativo')
-      .eq('ministry_id', params.ministryId)
-      .eq('ativo', true)
-      .maybeSingle();
-
-    if (modErr || !modelo) {
-      return {
-        sucesso: false,
-        erro: 'A instituição não possui um modelo oficial de Carta de Advertência cadastrado no sistema. Faça o upload do PDF oficial nas configurações do módulo de reuniões.',
-      };
-    }
-
-    // 2. Baixar o arquivo PDF oficial do Storage
-    const bucket = modelo.storage_bucket || 'cartas-templates';
-    const { data: fileData, error: downloadError } = await supabaseAdmin.storage
-      .from(bucket)
-      .download(modelo.storage_path);
-
-    if (downloadError || !fileData) {
-      return {
-        sucesso: false,
-        erro: `Não foi possível recuperar o arquivo PDF do modelo oficial armazenado: ${downloadError?.message || 'Arquivo não encontrado'}.`,
-      };
-    }
-
-    const arrayBuffer = await fileData.arrayBuffer();
-    const pdfBuffer = Buffer.from(arrayBuffer);
+    const pdfBuffer = Buffer.from(uint8Pdf);
     const filename = `Carta_Advertencia_${params.protocolo.replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
 
-    // 3. Inicializar cliente Resend
+    // 2. Inicializar cliente Resend
     const resend = new Resend(apiKey);
     const fromAddress = process.env.RESEND_FROM || 'Gestão Eklésia <notificacoes@gestaoeklesia.com.br>';
 

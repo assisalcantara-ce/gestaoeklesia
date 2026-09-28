@@ -187,8 +187,8 @@ export default function ModalModeloAdvertencia({
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex gap-3 text-blue-900">
             <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
             <div className="text-xs leading-relaxed">
-              <strong className="block font-semibold mb-0.5">Diretriz Institucional e Estatutária:</strong>
-              Cada ministério/igreja deve utilizar o seu próprio modelo oficial de <strong>Carta de Advertência</strong>, em conformidade com o seu estatuto e regimento interno. O sistema anexará este arquivo PDF oficial aos comunicados automáticos de ausência.
+              <strong className="block font-semibold mb-0.5">Modelo Institucional de Referência:</strong>
+              Cadastre o modelo oficial de <strong>Carta de Advertência</strong> da sua denominação/convenção. O Eklésia utilizará sua estrutura e regimento como referência para <strong>gerar dinamicamente os documentos oficiais em PDF preenchidos com os dados reais de cada ministro faltoso</strong>.
             </div>
           </div>
 
@@ -221,7 +221,7 @@ export default function ModalModeloAdvertencia({
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full border border-emerald-200">
                     <ShieldCheck className="w-3.5 h-3.5" />
-                    Modelo Ativo Cadastrado
+                    Modelo de Referência Ativo
                   </span>
                 </div>
 
@@ -253,7 +253,7 @@ export default function ModalModeloAdvertencia({
                       className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg border border-teal-200 transition"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
-                      Visualizar PDF Atual
+                      Visualizar PDF de Referência
                     </a>
                   </div>
                 )}
@@ -264,7 +264,7 @@ export default function ModalModeloAdvertencia({
                 <div>
                   <strong>Nenhum modelo cadastrado.</strong>
                   <p className="mt-0.5 text-amber-700">
-                    Para enviar advertências automáticas por e-mail com validade jurídica institucional, faça o upload do PDF oficial abaixo.
+                    Faça o upload do PDF institucional de referência para manter conformidade com os modelos eclesiásticos da sua liderança.
                   </p>
                 </div>
               </div>
