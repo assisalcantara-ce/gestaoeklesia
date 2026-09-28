@@ -40,7 +40,19 @@ export default function MinisteriosPage() {
   const [confirmDeleteMinisterio, setConfirmDeleteMinisterio] = useState<SupabaseMinistry | null>(null)
   const [selectedTechnicalAccessMinistry, setSelectedTechnicalAccessMinistry] = useState<SupabaseMinistry | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
-  const [globalStats, setGlobalStats] = useState<{ total: number; ativos: number; trials: number; suspensos: number; pendentes: number; leads?: number; mrr?: string } | null>(null)
+  const [globalStats, setGlobalStats] = useState<{
+    total: number;
+    ativos: number;
+    trials: number;
+    suspensos: number;
+    pendentes: number;
+    leads?: number;
+    leads_ativos?: number;
+    leads_expirados?: number;
+    leads_total?: number;
+    mrr?: string;
+    mrr_raw?: number;
+  } | null>(null)
   
   // Clientes 2.1: Estados dos Filtros da Toolbar Executiva
   const [searchTerm, setSearchTerm] = useState('')
@@ -312,10 +324,10 @@ export default function MinisteriosPage() {
     if (globalStats) {
       return {
         ativos: globalStats.ativos ?? 0,
-        leads: globalStats.leads ?? 0,
+        leads: globalStats.leads ?? globalStats.leads_ativos ?? 0,
         trials: globalStats.trials ?? 0,
         pendentes: globalStats.pendentes ?? 0,
-        mrr: globalStats.mrr || 'Em implantação',
+        mrr: globalStats.mrr || 'R$ 0,00',
       }
     }
     return {
@@ -323,7 +335,7 @@ export default function MinisteriosPage() {
       leads: 0,
       trials: 0,
       pendentes: 0,
-      mrr: 'Em implantação',
+      mrr: 'R$ 0,00',
     }
   }, [globalStats])
 
@@ -437,7 +449,7 @@ export default function MinisteriosPage() {
               <ExecutiveMetricCard
                 title="Leads Pendentes"
                 value={stats.leads}
-                subtitle="Cadastros aguardando conversão"
+                subtitle="Pré-cadastros em período de teste"
                 icon={Inbox}
                 color="blue"
               />
@@ -453,7 +465,7 @@ export default function MinisteriosPage() {
               <ExecutiveMetricCard
                 title="Cobranças Pendentes"
                 value={stats.pendentes}
-                subtitle="Faturas em aberto no Asaas"
+                subtitle="Faturas em aberto (banco local)"
                 icon={CreditCard}
                 color="amber"
               />
@@ -461,7 +473,7 @@ export default function MinisteriosPage() {
               <ExecutiveMetricCard
                 title="Receita Mensal (MRR)"
                 value={stats.mrr}
-                subtitle="Faturamento recorrente mensal"
+                subtitle="Faturamento recorrente de clientes ativos"
                 icon={TrendingUp}
                 color="slate"
               />

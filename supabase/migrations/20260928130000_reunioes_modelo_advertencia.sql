@@ -1,5 +1,6 @@
 -- ============================================================
 -- MÓDULO REUNIÕES — MODELO OFICIAL DE CARTA DE ADVERTÊNCIA POR TENANT
+-- Migration: 20260928130000_reunioes_modelo_advertencia.sql
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.reunioes_modelos_advertencia (
@@ -23,28 +24,20 @@ CREATE INDEX IF NOT EXISTS idx_reunioes_modelos_adv_ministry ON public.reunioes_
 -- RLS
 ALTER TABLE public.reunioes_modelos_advertencia ENABLE ROW LEVEL SECURITY;
 
--- Políticas de RLS
+-- Políticas de RLS usando as funções padrão do Gestão Eklésia
+DROP POLICY IF EXISTS "reunioes_modelos_advertencia_tenant_access" ON public.reunioes_modelos_advertencia;
 DROP POLICY IF EXISTS "reunioes_modelos_advertencia_select_tenant" ON public.reunioes_modelos_advertencia;
-CREATE POLICY "reunioes_modelos_advertencia_select_tenant"
-    ON public.reunioes_modelos_advertencia
-    FOR SELECT
-    USING (
-        ministry_id IN (
-            SELECT ministry_id FROM public.users WHERE id = auth.uid()
-        )
-    );
-
 DROP POLICY IF EXISTS "reunioes_modelos_advertencia_all_tenant" ON public.reunioes_modelos_advertencia;
-CREATE POLICY "reunioes_modelos_advertencia_all_tenant"
+
+CREATE POLICY "reunioes_modelos_advertencia_tenant_access"
     ON public.reunioes_modelos_advertencia
     FOR ALL
+    TO authenticated
     USING (
-        ministry_id IN (
-            SELECT ministry_id FROM public.users WHERE id = auth.uid()
-        )
+        ministry_id IN (SELECT public.get_owned_ministry_ids())
+        OR ministry_id IN (SELECT public.get_linked_ministry_ids())
     )
     WITH CHECK (
-        ministry_id IN (
-            SELECT ministry_id FROM public.users WHERE id = auth.uid()
-        )
+        ministry_id IN (SELECT public.get_owned_ministry_ids())
+        OR ministry_id IN (SELECT public.get_linked_ministry_ids())
     );

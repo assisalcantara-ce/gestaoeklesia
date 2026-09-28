@@ -13,7 +13,13 @@ async function ensureBucket(supabaseAdmin: any) {
     const { data, error } = await supabaseAdmin.storage.listBuckets();
     if (error) return;
     const exists = Array.isArray(data) && data.some((bucket: any) => bucket?.name === BUCKET);
-    if (exists) return;
+    if (exists) {
+      await supabaseAdmin.storage.updateBucket(BUCKET, {
+        fileSizeLimit: String(MAX_BYTES),
+        allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+      });
+      return;
+    }
     await supabaseAdmin.storage.createBucket(BUCKET, {
       public: false,
       fileSizeLimit: String(MAX_BYTES),
