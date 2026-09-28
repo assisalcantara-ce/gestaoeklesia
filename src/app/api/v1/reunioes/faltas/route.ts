@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
         created_at,
         updated_at,
         reunioes ( id, titulo, data_reuniao, horario_inicio, local, congregacao_id ),
+        members ( id, name, email ),
         reunioes_participantes (
           id,
           nome_ministro_snapshot,
@@ -73,6 +74,8 @@ export async function GET(request: NextRequest) {
           id,
           numero_protocolo,
           status_envio,
+          email_destinatario,
+          erro_mensagem,
           enviada_em
         )
       `)

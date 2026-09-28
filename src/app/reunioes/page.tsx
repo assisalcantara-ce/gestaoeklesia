@@ -25,7 +25,9 @@ import {
   Check,
   Copy,
   ExternalLink,
+  FileText,
 } from 'lucide-react';
+import ModalModeloAdvertencia from '@/components/reunioes/ModalModeloAdvertencia';
 
 interface ReuniaoItem {
   id: string;
@@ -71,6 +73,7 @@ export default function ReunioesPage() {
   const [modalNovaAberto, setModalNovaAberto] = useState<boolean>(false);
   const [modalPainelAberto, setModalPainelAberto] = useState<boolean>(false);
   const [modalEncerrarAberto, setModalEncerrarAberto] = useState<boolean>(false);
+  const [modalModeloAberto, setModalModeloAberto] = useState<boolean>(false);
   const [reuniaoSelecionada, setReuniaoSelecionada] = useState<ReuniaoItem | null>(null);
 
   // Estado do formulário Nova Reunião
@@ -379,6 +382,15 @@ export default function ReunioesPage() {
       activeMenu="reunioes"
       headerExtra={
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setModalModeloAberto(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition border border-slate-300 shadow-sm"
+            title="Configurar Modelo Oficial de Carta de Advertência da Instituição"
+          >
+            <FileText className="w-4 h-4 text-blue-600" />
+            <span>Modelo de Carta</span>
+          </button>
+
           <Link
             href="/reunioes/faltas"
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition border border-slate-300 shadow-sm"
@@ -928,6 +940,12 @@ export default function ReunioesPage() {
           </div>
         </div>
       )}
+
+      {/* ─── MODAL: MODELO OFICIAL DE ADVERTÊNCIA ─── */}
+      <ModalModeloAdvertencia
+        aberto={modalModeloAberto}
+        onFechar={() => setModalModeloAberto(false)}
+      />
     </PageLayout>
   );
 }

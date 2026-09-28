@@ -108,7 +108,36 @@ export async function GET(
       ? new Date(reuniao.data_reuniao + 'T00:00:00').toLocaleDateString('pt-BR')
       : '—';
 
-    // 3. Gerar PDF via jsPDF Server-side
+    const filename = `Carta_Advertencia_${advertencia.numero_protocolo.replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
+
+    // 3. Verificar se o tenant possui modelo oficial cadastrado
+    const { data: modeloOficial } = await ctx.admin
+      .from('reunioes_modelos_advertencia')
+      .select('storage_bucket, storage_path')
+      .eq('ministry_id', ctx.ministryId)
+      .eq('ativo', true)
+      .maybeSingle();
+
+    if (modeloOficial) {
+      const { data: fileData, error: dlErr } = await ctx.admin.storage
+        .from(modeloOficial.storage_bucket || 'cartas-templates')
+        .download(modeloOficial.storage_path);
+
+      if (!dlErr && fileData) {
+        const arrayBuffer = await fileData.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        return new NextResponse(buffer as any, {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `inline; filename="${filename}"`,
+            'Cache-Control': 'private, max-age=3600',
+          },
+        });
+      }
+    }
+
+    // 4. Fallback: Gerar PDF via jsPDF Server-side caso o tenant ainda não tenha cadastrado o modelo oficial
     const pdfBuffer = await gerarCartaAdvertenciaPDF({
       protocolo: advertencia.numero_protocolo,
       nomeMinisterio: ministry?.name || 'GESTÃO EKLÉSIA',
@@ -122,8 +151,6 @@ export async function GET(
       localReuniao: reuniao?.local || 'Templo Central',
       dataEmissao: new Date(advertencia.created_at).toLocaleString('pt-BR'),
     });
-
-    const filename = `Carta_Advertencia_${advertencia.numero_protocolo.replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
 
     return new NextResponse(pdfBuffer as any, {
       status: 200,

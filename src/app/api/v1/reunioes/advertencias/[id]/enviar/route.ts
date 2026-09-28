@@ -168,6 +168,8 @@ export async function POST(
       localReuniao: reuniao?.local || 'Templo Central',
       nomeMinisterio: ministry?.name || 'GESTÃO EKLÉSIA',
       dataEmissao: new Date(advertencia.created_at).toLocaleString('pt-BR'),
+      ministryId: ctx.ministryId,
+      supabaseAdmin: ctx.admin,
     });
 
     const agoraIso = new Date().toISOString();

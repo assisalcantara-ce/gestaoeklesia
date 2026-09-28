@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { gerarCartaAdvertenciaPDF } from '@/lib/reunioes-advertencia-pdf';
+import { createServerClient } from '@/lib/supabase-server';
 
 export interface EnviarAdvertenciaParams {
   advertenciaId: string;
@@ -14,6 +14,8 @@ export interface EnviarAdvertenciaParams {
   localReuniao: string;
   nomeMinisterio: string;
   dataEmissao: string;
+  ministryId: string;
+  supabaseAdmin?: any;
 }
 
 export interface EnviarAdvertenciaResult {
@@ -178,7 +180,7 @@ function gerarTemplateEmailAdvertencia(params: EnviarAdvertenciaParams): string 
 
           <div class="warning-box">
             <strong>Orientações para Justificativa:</strong><br>
-            Segue em anexo a <strong>Carta de Advertência</strong> oficial em formato PDF. Conforme o regimento interno, caso deseje apresentar justificativa, preencha o campo próprio de próprio punho (manuscrito) ou procure a Secretaria Geral dentro do prazo regulamentar.
+            Segue em anexo a <strong>Carta de Advertência</strong> oficial da instituição em formato PDF. Conforme o regimento interno, caso deseje apresentar justificativa, preencha o campo próprio de próprio punho (manuscrito) ou procure a Secretaria Geral dentro do prazo regulamentar.
           </div>
         </div>
         <div class="footer">
@@ -201,7 +203,7 @@ export function validarEmailDestinatario(email?: string | null): boolean {
 }
 
 /**
- * Envia a Carta de Advertência Ministerial por e-mail com o PDF gerado em anexo.
+ * Envia a Carta de Advertência Ministerial por e-mail anexando o PDF oficial cadastrado pelo tenant.
  */
 export async function enviarEmailCartaAdvertencia(params: EnviarAdvertenciaParams): Promise<EnviarAdvertenciaResult> {
   const emailDestino = params.emailDestinatario?.trim();
@@ -210,6 +212,13 @@ export async function enviarEmailCartaAdvertencia(params: EnviarAdvertenciaParam
     return {
       sucesso: false,
       erro: `Endereço de e-mail inválido ou ausente: "${params.emailDestinatario || ''}"`,
+    };
+  }
+
+  if (!params.ministryId) {
+    return {
+      sucesso: false,
+      erro: 'Identificador do ministério (tenant) ausente para localização do modelo oficial.',
     };
   }
 
@@ -223,24 +232,41 @@ export async function enviarEmailCartaAdvertencia(params: EnviarAdvertenciaParam
   }
 
   try {
-    // 1. Gerar o binário do PDF da Carta de Advertência
-    const pdfUint8 = await gerarCartaAdvertenciaPDF({
-      protocolo: params.protocolo,
-      nomeMinisterio: params.nomeMinisterio,
-      nomeMinistro: params.nomeMinistro,
-      cargoMinistro: params.cargoMinistro,
-      nomeCongregacao: params.nomeCongregacao,
-      tituloReuniao: params.tituloReuniao,
-      dataReuniao: params.dataReuniao,
-      horarioInicio: params.horarioInicio,
-      localReuniao: params.localReuniao,
-      dataEmissao: params.dataEmissao,
-    });
+    const supabaseAdmin = params.supabaseAdmin || createServerClient();
 
-    const pdfBuffer = Buffer.from(pdfUint8);
+    // 1. Localizar o modelo oficial cadastrado pelo tenant
+    const { data: modelo, error: modErr } = await supabaseAdmin
+      .from('reunioes_modelos_advertencia')
+      .select('id, storage_bucket, storage_path, nome_arquivo_original, ativo')
+      .eq('ministry_id', params.ministryId)
+      .eq('ativo', true)
+      .maybeSingle();
+
+    if (modErr || !modelo) {
+      return {
+        sucesso: false,
+        erro: 'A instituição não possui um modelo oficial de Carta de Advertência cadastrado no sistema. Faça o upload do PDF oficial nas configurações do módulo de reuniões.',
+      };
+    }
+
+    // 2. Baixar o arquivo PDF oficial do Storage
+    const bucket = modelo.storage_bucket || 'cartas-templates';
+    const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+      .from(bucket)
+      .download(modelo.storage_path);
+
+    if (downloadError || !fileData) {
+      return {
+        sucesso: false,
+        erro: `Não foi possível recuperar o arquivo PDF do modelo oficial armazenado: ${downloadError?.message || 'Arquivo não encontrado'}.`,
+      };
+    }
+
+    const arrayBuffer = await fileData.arrayBuffer();
+    const pdfBuffer = Buffer.from(arrayBuffer);
     const filename = `Carta_Advertencia_${params.protocolo.replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
 
-    // 2. Inicializar cliente Resend
+    // 3. Inicializar cliente Resend
     const resend = new Resend(apiKey);
     const fromAddress = process.env.RESEND_FROM || 'Gestão Eklésia <notificacoes@gestaoeklesia.com.br>';
 

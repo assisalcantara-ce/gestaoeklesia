@@ -15,7 +15,13 @@ import {
   Eye,
   Paperclip,
   Clock,
+  Send,
+  Mail,
+  ShieldCheck,
+  Settings,
+  AlertCircle,
 } from 'lucide-react';
+import ModalModeloAdvertencia from '@/components/reunioes/ModalModeloAdvertencia';
 
 interface FaltaItem {
   id: string;
@@ -33,6 +39,11 @@ interface FaltaItem {
     horario_inicio: string;
     local: string;
     congregacao_id?: string | null;
+  } | null;
+  members?: {
+    id: string;
+    name: string;
+    email?: string | null;
   } | null;
   reunioes_participantes?: {
     id: string;
@@ -55,6 +66,8 @@ interface FaltaItem {
     id: string;
     numero_protocolo: string;
     status_envio: string;
+    email_destinatario?: string | null;
+    erro_mensagem?: string | null;
     enviada_em?: string | null;
     pdf_url?: string | null;
   }>;
@@ -80,6 +93,25 @@ export default function FaltasJustificativasPage() {
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
   const [modalJustificarAberto, setModalJustificarAberto] = useState(false);
   const [modalAbonarAberto, setModalAbonarAberto] = useState(false);
+  const [modalModeloAberto, setModalModeloAberto] = useState(false);
+
+  // Estado do Modelo Oficial do Tenant
+  const [statusModelo, setStatusModelo] = useState<{
+    configurado: boolean;
+    carregando: boolean;
+    modelo: any;
+  }>({
+    configurado: false,
+    carregando: true,
+    modelo: null,
+  });
+
+  // Estado de envio de e-mail da advertência
+  const [enviandoEmail, setEnviandoEmail] = useState<boolean>(false);
+  const [feedbackEnvio, setFeedbackEnvio] = useState<{
+    tipo: 'sucesso' | 'erro';
+    texto: string;
+  } | null>(null);
 
   // Formulário de Justificativa
   const [tipoJustificativa, setTipoJustificativa] = useState<string>('manuscrita_secretaria');
@@ -105,6 +137,24 @@ export default function FaltasJustificativasPage() {
       headers,
     });
   }, []);
+
+  // ─── 0. Carregar Status do Modelo Oficial ─────────────────────────────────
+  const carregarStatusModelo = useCallback(async () => {
+    try {
+      setStatusModelo((prev) => ({ ...prev, carregando: true }));
+      const res = await fetchAutenticado('/api/v1/reunioes/configuracoes/modelo-advertencia');
+      const data = await res.json();
+      if (res.ok) {
+        setStatusModelo({
+          configurado: Boolean(data.configurado),
+          carregando: false,
+          modelo: data.modelo || null,
+        });
+      }
+    } catch {
+      setStatusModelo((prev) => ({ ...prev, carregando: false }));
+    }
+  }, [fetchAutenticado]);
 
   // ─── 1. Carregar Listagem de Faltas ────────────────────────────────────────
   const carregarFaltas = useCallback(async () => {
@@ -135,8 +185,69 @@ export default function FaltasJustificativasPage() {
   useEffect(() => {
     if (!bloqueado) {
       carregarFaltas();
+      carregarStatusModelo();
     }
-  }, [bloqueado, carregarFaltas]);
+  }, [bloqueado, carregarFaltas, carregarStatusModelo]);
+
+  const abrirDetalhes = (falta: FaltaItem) => {
+    setFaltaSelecionada(falta);
+    setFeedbackEnvio(null);
+    setModalDetalhesAberto(true);
+    carregarStatusModelo();
+  };
+
+  const handleEnviarEmailAdvertencia = async (advertenciaId: string) => {
+    if (!statusModelo.configurado) {
+      setFeedbackEnvio({
+        tipo: 'erro',
+        texto: 'Modelo oficial de advertência não configurado. Cadastre o PDF oficial antes de enviar.',
+      });
+      return;
+    }
+
+    setEnviandoEmail(true);
+    setFeedbackEnvio(null);
+
+    try {
+      const res = await fetchAutenticado(`/api/v1/reunioes/advertencias/${advertenciaId}/enviar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ forcar_reenvio: true }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.sucesso) {
+        throw new Error(data.error || data.detail || 'Falha ao despachar e-mail da advertência.');
+      }
+
+      setFeedbackEnvio({
+        tipo: 'sucesso',
+        texto: 'Carta enviada com sucesso.',
+      });
+
+      // Recarregar faltas e atualizar faltaSelecionada
+      const params = new URLSearchParams();
+      if (filtroSituacao !== 'todas') params.append('situacao', filtroSituacao);
+      if (filtroDataInicio) params.append('data_inicio', filtroDataInicio);
+      if (filtroDataFim) params.append('data_fim', filtroDataFim);
+
+      const resList = await fetchAutenticado(`/api/v1/reunioes/faltas?${params.toString()}`);
+      const dataList = await resList.json();
+      if (resList.ok && dataList.faltas) {
+        setFaltas(dataList.faltas);
+        const atualizada = dataList.faltas.find((f: FaltaItem) => f.id === faltaSelecionada?.id);
+        if (atualizada) setFaltaSelecionada(atualizada);
+      }
+    } catch (err: any) {
+      setFeedbackEnvio({
+        tipo: 'erro',
+        texto: err?.message || 'Erro inesperado ao enviar e-mail.',
+      });
+    } finally {
+      setEnviandoEmail(false);
+    }
+  };
 
   // ─── 2. Filtro Local por Texto (Ministro / Congregação / Reunião) ──────────
   const faltasFiltradas = useMemo(() => {
@@ -263,13 +374,24 @@ export default function FaltasJustificativasPage() {
       description="Prontuário de ausências ministeriais, justificativas e abonos da Secretaria Geral"
       activeMenu="reunioes"
       headerExtra={
-        <button
-          onClick={carregarFaltas}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition border border-slate-300"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Atualizar Lista
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setModalModeloAberto(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition border border-slate-300 shadow-sm"
+            title="Configurar Modelo Oficial de Carta de Advertência da Instituição"
+          >
+            <FileText className="w-4 h-4 text-blue-600" />
+            <span>Modelo de Carta</span>
+          </button>
+
+          <button
+            onClick={carregarFaltas}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition border border-slate-300 shadow-sm"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Atualizar Lista</span>
+          </button>
+        </div>
       }
     >
       <div className="space-y-6">
@@ -447,10 +569,7 @@ export default function FaltasJustificativasPage() {
 
                         <td className="py-3.5 px-4 text-right space-x-1.5">
                           <button
-                            onClick={() => {
-                              setFaltaSelecionada(falta);
-                              setModalDetalhesAberto(true);
-                            }}
+                            onClick={() => abrirDetalhes(falta)}
                             className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition inline-flex items-center gap-1"
                             title="Ver detalhes"
                           >
@@ -564,30 +683,161 @@ export default function FaltasJustificativasPage() {
               </div>
 
               {/* Advertência associada */}
-              {faltaSelecionada.reunioes_advertencias && faltaSelecionada.reunioes_advertencias.length > 0 && (
-                <div className="border-t pt-3 space-y-1.5">
-                  <h3 className="font-bold text-slate-800 text-xs">Carta de Advertência Oficial</h3>
-                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-bold text-rose-900 text-xs">
-                        Protocolo: {faltaSelecionada.reunioes_advertencias[0].numero_protocolo}
-                      </p>
-                      <p className="text-[11px] text-rose-700 mt-0.5">
-                        Status: <span className="font-semibold uppercase">{faltaSelecionada.reunioes_advertencias[0].status_envio}</span>
-                      </p>
+              {faltaSelecionada.reunioes_advertencias && faltaSelecionada.reunioes_advertencias.length > 0 && (() => {
+                const adv = faltaSelecionada.reunioes_advertencias[0];
+                const emailDestino = adv.email_destinatario || faltaSelecionada.members?.email || '';
+
+                return (
+                  <div className="border-t pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                        Carta de Advertência Oficial
+                      </h3>
+                      {statusModelo.configurado ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          Modelo oficial: Cadastrado ✓
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                          Modelo não configurado
+                        </span>
+                      )}
                     </div>
-                    <a
-                      href={`/api/v1/reunioes/advertencias/${faltaSelecionada.reunioes_advertencias[0].id}/pdf`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-2 bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
-                    >
-                      <FileText className="w-4 h-4" />
-                      Visualizar PDF
-                    </a>
+
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                      {/* Protocolo e Status de Envio */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200/80">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">Protocolo Oficial</span>
+                          <p className="font-black text-slate-900 text-sm">{adv.numero_protocolo}</p>
+                        </div>
+
+                        <div className="text-left sm:text-right">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block">Status do Envio</span>
+                          {adv.status_envio === 'enviada' ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100/70 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Enviada {adv.enviada_em ? `em ${new Date(adv.enviada_em).toLocaleDateString('pt-BR')} às ${new Date(adv.enviada_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                            </span>
+                          ) : adv.status_envio === 'erro_envio' ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-100/70 px-2.5 py-0.5 rounded-full border border-rose-200">
+                              <AlertCircle className="w-3 h-3" />
+                              Erro no envio
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-200/70 px-2.5 py-0.5 rounded-full border border-slate-300">
+                              <Clock className="w-3 h-3" />
+                              Pendente
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Exibição detalhada de erro de envio anterior se houver */}
+                      {adv.status_envio === 'erro_envio' && adv.erro_mensagem && (
+                        <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-[11px] text-rose-800 flex items-start gap-2">
+                          <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <strong className="block">Falha no envio anterior:</strong>
+                            <span>{adv.erro_mensagem}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Destinatário do E-mail */}
+                      <div className="flex items-center gap-2 text-xs text-slate-700 bg-white p-2.5 rounded-xl border border-slate-200">
+                        <Mail className="w-4 h-4 text-slate-400 shrink-0" />
+                        <div className="flex-1 truncate">
+                          <span className="text-slate-400 text-[11px]">Destinatário: </span>
+                          <strong className="text-slate-800">{emailDestino || 'E-mail não informado no cadastro do ministro'}</strong>
+                        </div>
+                      </div>
+
+                      {/* Alerta se Modelo NÃO estiver configurado */}
+                      {!statusModelo.configurado && (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 space-y-2">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <strong className="block font-semibold">Modelo oficial de advertência não configurado.</strong>
+                              <span className="text-[11px] text-amber-700">
+                                Para enviar ou visualizar o documento oficial estatutário, configure o modelo PDF da sua instituição.
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setModalModeloAberto(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#123b63] hover:bg-[#1a4f85] text-white font-bold text-xs rounded-xl shadow-sm transition"
+                          >
+                            <Settings className="w-3.5 h-3.5" />
+                            Configurar Modelo
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Feedback de envio em tempo real */}
+                      {feedbackEnvio && (
+                        <div
+                          className={`p-3 rounded-xl text-xs flex items-start gap-2 ${
+                            feedbackEnvio.tipo === 'sucesso'
+                              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800 font-medium'
+                              : 'bg-rose-50 border border-rose-200 text-rose-800'
+                          }`}
+                        >
+                          {feedbackEnvio.tipo === 'sucesso' ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          )}
+                          <div className="flex-1">{feedbackEnvio.texto}</div>
+                        </div>
+                      )}
+
+                      {/* Botões de Ação */}
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <a
+                          href={`/api/v1/reunioes/advertencias/${adv.id}/pdf`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 min-w-[130px] px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 border border-slate-300"
+                        >
+                          <FileText className="w-4 h-4 text-slate-600" />
+                          Visualizar PDF
+                        </a>
+
+                        <button
+                          onClick={() => handleEnviarEmailAdvertencia(adv.id)}
+                          disabled={!statusModelo.configurado || enviandoEmail || !emailDestino}
+                          className="flex-1 min-w-[150px] px-3.5 py-2.5 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5"
+                          title={
+                            !statusModelo.configurado
+                              ? 'Cadastre o modelo oficial antes de enviar'
+                              : !emailDestino
+                              ? 'Ministro sem e-mail cadastrado'
+                              : 'Enviar notificação oficial por e-mail'
+                          }
+                        >
+                          {enviandoEmail ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              <span>Enviando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-4 h-4" />
+                              <span>{adv.status_envio === 'enviada' ? 'Reenviar por e-mail' : 'Enviar por e-mail'}</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             <button
@@ -734,6 +984,13 @@ export default function FaltasJustificativasPage() {
           </div>
         </div>
       )}
+
+      {/* ─── MODAL: MODELO OFICIAL DE ADVERTÊNCIA ─── */}
+      <ModalModeloAdvertencia
+        aberto={modalModeloAberto}
+        onFechar={() => setModalModeloAberto(false)}
+        onModeloAtualizado={() => carregarStatusModelo()}
+      />
     </PageLayout>
   );
 }
