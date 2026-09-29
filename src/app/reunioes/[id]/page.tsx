@@ -680,56 +680,82 @@ export default function DetalhesReuniaoPage() {
       </section>
 
       {/* ─── 2. CARDS DE QUÓRUM E PRESENÇA ─── */}
-      <section className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase">
-            <span>Convocados</span>
-            <Users className="w-4 h-4 text-slate-400" />
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Convocados</span>
+            <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200/80 flex items-center justify-center group-hover:scale-105 transition">
+              <Users className="w-5 h-5" />
+            </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">{totalConvocados}</p>
-          <span className="text-[10px] text-slate-400 font-semibold">Snapshot congelado</span>
+          <div className="mt-3">
+            <p className="text-3xl font-black text-slate-900 tracking-tight leading-none">{totalConvocados}</p>
+            <p className="text-[11px] text-slate-500 font-medium mt-1.5 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-slate-400" />
+              Snapshot congelado
+            </p>
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-emerald-600 text-xs font-bold uppercase">
-            <span>Presentes</span>
-            <UserCheck className="w-4 h-4 text-emerald-600" />
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Presentes</span>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100/80 flex items-center justify-center group-hover:scale-105 transition">
+              <UserCheck className="w-5 h-5" />
+            </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-emerald-600 mt-1">{countPresentes}</p>
-          <span className="text-[10px] text-emerald-700/80 font-semibold">Check-in realizado</span>
+          <div className="mt-3">
+            <p className="text-3xl font-black text-emerald-700 tracking-tight leading-none">{countPresentes}</p>
+            <p className="text-[11px] text-emerald-700 font-medium mt-1.5 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              Check-in realizado
+            </p>
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-rose-600 text-xs font-bold uppercase">
-            <span>Ausentes</span>
-            <UserX className="w-4 h-4 text-rose-500" />
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Ausentes</span>
+            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 border border-rose-100/80 flex items-center justify-center group-hover:scale-105 transition">
+              <UserX className="w-5 h-5" />
+            </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-rose-600 mt-1">
-            {reuniao.status === 'encerrada' ? countFaltas : countPendentes}
-          </p>
-          <span className="text-[10px] text-rose-600/80 font-semibold">
-            {reuniao.status === 'encerrada' ? 'Faltas oficiais' : 'Pendentes'}
-          </span>
+          <div className="mt-3">
+            <p className="text-3xl font-black text-rose-700 tracking-tight leading-none">
+              {reuniao.status === 'encerrada' ? countFaltas : countPendentes}
+            </p>
+            <p className="text-[11px] text-rose-600 font-medium mt-1.5 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-rose-500" />
+              {reuniao.status === 'encerrada' ? 'Faltas oficiais' : 'Pendentes'}
+            </p>
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-amber-600 text-xs font-bold uppercase">
-            <span>Justificados</span>
-            <FileCheck2 className="w-4 h-4 text-amber-500" />
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Justificados</span>
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-100/80 flex items-center justify-center group-hover:scale-105 transition">
+              <FileCheck2 className="w-5 h-5" />
+            </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-amber-600 mt-1">{countJustificadas}</p>
-          <span className="text-[10px] text-amber-700/80 font-semibold">Ausências abonadas</span>
+          <div className="mt-3">
+            <p className="text-3xl font-black text-amber-700 tracking-tight leading-none">{countJustificadas}</p>
+            <p className="text-[11px] text-amber-700 font-medium mt-1.5 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              Ausências abonadas
+            </p>
+          </div>
         </div>
 
-        <div className="col-span-2 lg:col-span-1 bg-gradient-to-br from-teal-900 to-teal-950 text-white p-4 rounded-2xl shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-teal-300 text-xs font-bold uppercase">
-            <span>Índice de Presença</span>
+        <div className="col-span-1 sm:col-span-2 lg:col-span-1 bg-gradient-to-br from-[#123b63] to-[#0a233c] text-white p-5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-teal-300 text-xs font-bold uppercase tracking-wider">
+            <span>Índice Quórum</span>
           </div>
-          <div className="my-auto">
-            <p className="text-2xl sm:text-3xl font-black text-teal-300">{percentualPresenca}%</p>
-            <div className="w-full bg-teal-950 h-1.5 rounded-full overflow-hidden mt-1 border border-teal-800">
+          <div className="mt-3">
+            <p className="text-3xl font-black text-teal-300 tracking-tight leading-none">{percentualPresenca}%</p>
+            <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden mt-2 border border-white/10">
               <div
-                className="bg-teal-400 h-full rounded-full"
+                className="bg-gradient-to-r from-teal-400 to-teal-300 h-full rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(100, percentualPresenca)}%` }}
               />
             </div>

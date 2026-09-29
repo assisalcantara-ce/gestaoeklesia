@@ -11,6 +11,7 @@ import {
   Calendar,
   Clock,
   MapPin,
+  Building2,
   Users,
   QrCode,
   Tv,
@@ -25,6 +26,7 @@ import {
   Check,
   Copy,
   ExternalLink,
+  X,
 } from 'lucide-react';
 
 interface ReuniaoItem {
@@ -328,12 +330,12 @@ export default function ReunioesPage() {
     return (
       <PageLayout
         title="Reuniões Ministeriais"
-        description="Agendamento, presença e acompanhamento das reuniões"
+        description="Painel de convocações, presença em tempo real e acompanhamento de quórum"
         activeMenu="reunioes"
       >
-        <div className="flex items-center justify-center p-16 text-slate-500 gap-3">
-          <RefreshCw className="w-6 h-6 animate-spin text-teal-600" />
-          <span>Carregando módulo de reuniões...</span>
+        <div className="flex flex-col items-center justify-center p-20 text-slate-500 gap-3">
+          <RefreshCw className="w-7 h-7 animate-spin text-teal-600" />
+          <span className="text-sm font-semibold">Carregando painel de reuniões ministeriais...</span>
         </div>
       </PageLayout>
     );
@@ -343,11 +345,11 @@ export default function ReunioesPage() {
     return (
       <PageLayout
         title="Reuniões Ministeriais"
-        description="Agendamento, presença e acompanhamento das reuniões"
+        description="Painel de convocações, presença em tempo real e acompanhamento de quórum"
         activeMenu="reunioes"
       >
-        <div className="bg-white rounded-3xl border border-slate-200 p-10 shadow-sm text-center max-w-2xl mx-auto space-y-5 my-10">
-          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto text-blue-600 border border-blue-200/60">
+        <div className="bg-white rounded-3xl border border-slate-200/90 p-10 shadow-sm text-center max-w-2xl mx-auto space-y-5 my-10">
+          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto text-blue-600 border border-blue-200/60 shadow-sm">
             <Users className="w-8 h-8" />
           </div>
           <div>
@@ -375,13 +377,14 @@ export default function ReunioesPage() {
   return (
     <PageLayout
       title="Reuniões Ministeriais"
-      description="Agendamento, presença e acompanhamento das reuniões"
+      description="Painel de convocações, presença em tempo real e acompanhamento de quórum"
       activeMenu="reunioes"
       headerExtra={
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Link
             href="/reunioes/faltas"
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition border border-slate-300 shadow-sm"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition border border-slate-200 shadow-sm hover:shadow active:scale-95"
+            title="Acessar prontuário de faltas e justificativas"
           >
             <FileCheck2 className="w-4 h-4 text-amber-600" />
             <span>Faltas e Justificativas</span>
@@ -389,7 +392,7 @@ export default function ReunioesPage() {
 
           <button
             onClick={() => setModalNovaAberto(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 text-white text-xs font-bold rounded-xl shadow transition"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition active:scale-95"
           >
             <Plus className="w-4 h-4" />
             <span>Nova Reunião</span>
@@ -397,293 +400,372 @@ export default function ReunioesPage() {
         </div>
       }
     >
-      {/* ─── 1. CARDS DE INDICADORES REAIS DO TENANT ─── */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase">
-            <span>Próximas Reuniões</span>
-            <Calendar className="w-4 h-4 text-teal-600" />
-          </div>
-          <p className="text-3xl font-black text-slate-800 mt-2">{totalAgendadas}</p>
-          <span className="text-[11px] text-slate-400 font-medium">Status: Agendada</span>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase">
-            <span>Em Andamento</span>
-            <Clock className="w-4 h-4 text-emerald-600" />
-          </div>
-          <p className="text-3xl font-black text-emerald-600 mt-2">{totalEmAndamento}</p>
-          <span className="text-[11px] text-slate-400 font-medium">Check-in aberto</span>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase">
-            <span>Reuniões Encerradas</span>
-            <CheckCircle2 className="w-4 h-4 text-blue-600" />
-          </div>
-          <p className="text-3xl font-black text-blue-700 mt-2">{totalEncerradas}</p>
-          <span className="text-[11px] text-slate-400 font-medium">Concluídas e auditadas</span>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase">
-            <span>Ausências Registradas</span>
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
-          </div>
-          <p className="text-3xl font-black text-amber-600 mt-2">{totalAusenciasGerais}</p>
-          <span className="text-[11px] text-slate-400 font-medium">Total de faltas no histórico</span>
-        </div>
-      </section>
-
-      {/* ─── 2. FILTROS & BARRA DE BUSCA ─── */}
-      <section className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Abas de Status Oficiais */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl w-full md:w-auto overflow-x-auto">
-          {[
-            { id: 'todas', label: 'Todas' },
-            { id: 'agendada', label: 'Agendadas' },
-            { id: 'em_andamento', label: 'Em Andamento' },
-            { id: 'encerrada', label: 'Encerradas' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setFiltroStatus(tab.id)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
-                filtroStatus === tab.id
-                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Busca por título / local */}
-        <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Buscar por título ou local..."
-            value={filtroBusca}
-            onChange={(e) => setFiltroBusca(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-teal-500 font-medium"
-          />
-        </div>
-      </section>
-
-      {/* ─── 3. LISTA PRINCIPAL DE REUNIÕES ─── */}
-      <section>
-        {loading ? (
-          <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center text-slate-500">
-            <RefreshCw className="w-6 h-6 animate-spin mx-auto text-teal-600 mb-2" />
-            <p className="text-xs font-semibold">Atualizando reuniões...</p>
-          </div>
-        ) : error ? (
-          <div className="bg-rose-50 border border-rose-200 p-6 rounded-2xl text-center text-rose-700 space-y-2">
-            <AlertTriangle className="w-8 h-8 mx-auto text-rose-500" />
-            <p className="font-bold text-sm">{error}</p>
-            <button
-              onClick={carregarReunioes}
-              className="px-4 py-2 bg-rose-600 text-white font-bold text-xs rounded-xl shadow"
-            >
-              Tentar Novamente
-            </button>
-          </div>
-        ) : reunioesFiltradas.length === 0 ? (
-          /* ─── 7. ESTADO VAZIO INSTITUCIONAL ─── */
-          <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-lg mx-auto my-8 shadow-sm space-y-4">
-            <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mx-auto border border-slate-200">
-              <Calendar className="w-8 h-8" />
+      <div className="space-y-6">
+        {/* ─── 1. CARDS DE INDICADORES EXECUTIVOS (KPIS) ─── */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* KPI 1: Próximas Reuniões */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Próximas Reuniões</span>
+              <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 border border-sky-100/80 flex items-center justify-center group-hover:scale-105 transition">
+                <Calendar className="w-5 h-5" />
+              </div>
             </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-800">Nenhuma reunião cadastrada</h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Cadastre a primeira reunião ministerial para iniciar o acompanhamento.
+            <div className="mt-3">
+              <p className="text-3xl font-black text-slate-900 tracking-tight leading-none">{totalAgendadas}</p>
+              <p className="text-[11px] text-slate-500 font-medium mt-1.5 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-sky-500" />
+                Agendadas no calendário
               </p>
             </div>
-            <button
-              onClick={() => setModalNovaAberto(true)}
-              className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#123b63] hover:bg-[#0f2a45] text-white text-xs font-bold rounded-xl shadow transition"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Nova Reunião</span>
-            </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {reunioesFiltradas.map((r) => {
-              const dataFormatada = r.data_reuniao
-                ? new Date(r.data_reuniao + 'T00:00:00').toLocaleDateString('pt-BR', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                  })
-                : '—';
 
-              const percentualPresenca =
-                r.total_esperados > 0
-                  ? Number(((r.total_presentes / r.total_esperados) * 100).toFixed(1))
-                  : 0;
+          {/* KPI 2: Em Andamento */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Em Andamento</span>
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100/80 flex items-center justify-center group-hover:scale-105 transition">
+                <Clock className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <p className="text-3xl font-black text-emerald-700 tracking-tight leading-none">{totalEmAndamento}</p>
+              <p className="text-[11px] text-emerald-700 font-medium mt-1.5 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full bg-emerald-500 ${totalEmAndamento > 0 ? 'animate-ping' : ''}`} />
+                Check-in ativo em tempo real
+              </p>
+            </div>
+          </div>
 
-              const statusEfetivo = r.status_efetivo || r.status;
+          {/* KPI 3: Reuniões Encerradas */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Reuniões Encerradas</span>
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100/80 flex items-center justify-center group-hover:scale-105 transition">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <p className="text-3xl font-black text-slate-900 tracking-tight leading-none">{totalEncerradas}</p>
+              <p className="text-[11px] text-slate-500 font-medium mt-1.5 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                Histórico e atas arquivadas
+              </p>
+            </div>
+          </div>
 
+          {/* KPI 4: Ausências Registradas */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Ausências Registradas</span>
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-100/80 flex items-center justify-center group-hover:scale-105 transition">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <p className="text-3xl font-black text-amber-700 tracking-tight leading-none">{totalAusenciasGerais}</p>
+              <p className="text-[11px] text-slate-500 font-medium mt-1.5 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                Total de faltas no histórico
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ─── 2. ÁREA DE FILTROS & BARRA DE CONTROLE ─── */}
+        <section className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5">
+          {/* Abas de Navegação */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl overflow-x-auto">
+            {[
+              { id: 'todas', label: 'Todas', count: reunioes.length },
+              { id: 'agendada', label: 'Agendadas', count: totalAgendadas },
+              { id: 'em_andamento', label: 'Em Andamento', count: totalEmAndamento },
+              { id: 'encerrada', label: 'Encerradas', count: totalEncerradas },
+            ].map((tab) => {
+              const isActive = filtroStatus === tab.id;
               return (
-                <div
-                  key={r.id}
-                  className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-sm hover:shadow-md transition flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5"
+                <button
+                  key={tab.id}
+                  onClick={() => setFiltroStatus(tab.id)}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap flex items-center gap-1.5 ${
+                    isActive
+                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/80'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                  }`}
                 >
-                  {/* Informações da Reunião */}
-                  <div className="space-y-2 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {/* Badge de Status Oficial */}
-                      {statusEfetivo === 'agendada' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                          Agendada
-                        </span>
-                      )}
-                      {statusEfetivo === 'em_andamento' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 animate-pulse">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          Em Andamento
-                        </span>
-                      )}
-                      {statusEfetivo === 'encerrada' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold border border-slate-300">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
-                          Encerrada
-                        </span>
-                      )}
-                      {statusEfetivo === 'cancelada' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
-                          Cancelada
-                        </span>
-                      )}
-
-                      <span className="text-xs text-slate-400 font-semibold">•</span>
-                      <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        {dataFormatada}
-                      </span>
-                      <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
-                        {r.horario_inicio ? r.horario_inicio.slice(0, 5) : '—'}
-                      </span>
-                    </div>
-
-                    <h2 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
-                      {r.titulo}
-                    </h2>
-
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-medium">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                        {r.local}
-                      </span>
-                      {r.congregacoes?.nome && (
-                        <span>
-                          Congregação: <strong className="text-slate-700">{r.congregacoes.nome}</strong>
-                        </span>
-                      )}
-                      {r.horario_limite_entrada && (
-                        <span>
-                          Limite Check-in: <strong className="text-slate-700">{r.horario_limite_entrada.slice(0, 5)}</strong>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Quórum / Presença */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-4 min-w-[200px] w-full lg:w-auto flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-xs text-slate-600 mb-1">
-                      <span className="font-bold">Quórum</span>
-                      <span className="font-mono font-bold text-teal-700 text-sm">
-                        {percentualPresenca}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden mb-2">
-                      <div
-                        className="bg-teal-600 h-full rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(100, percentualPresenca)}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-slate-500">
-                      <span>
-                        <strong className="text-slate-800">{r.total_presentes}</strong> presentes
-                      </span>
-                      <span>/ {r.total_esperados} convocados</span>
-                    </div>
-                  </div>
-
-                  {/* ─── 5. AÇÕES POR REUNIÃO ─── */}
-                  <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-                    {/* Botão Check-in (disponível quando não encerrada/cancelada) */}
-                    {statusEfetivo !== 'encerrada' && statusEfetivo !== 'cancelada' && (
-                      <Link
-                        href={`/reunioes/${r.id}/checkin`}
-                        className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-sm transition inline-flex items-center gap-1.5"
-                        title="Abrir terminal de Check-in"
-                      >
-                        <QrCode className="w-4 h-4" />
-                        <span>Check-in</span>
-                      </Link>
-                    )}
-
-                    {/* Botão Painel TV */}
-                    <button
-                      onClick={() => abrirPainelTv(r)}
-                      className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5 border border-slate-200"
-                      title="Exibir link do painel TV"
-                    >
-                      <Tv className="w-4 h-4 text-cyan-600" />
-                      <span>Painel TV</span>
-                    </button>
-
-                    {/* Botão Faltas da Reunião (quando encerrada) */}
-                    {statusEfetivo === 'encerrada' && (
-                      <Link
-                        href={`/reunioes/faltas?reuniao_id=${r.id}`}
-                        className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5"
-                        title="Ver prontuário de faltas desta reunião"
-                      >
-                        <FileCheck2 className="w-4 h-4 text-amber-600" />
-                        <span>Faltas ({r.total_ausentes})</span>
-                      </Link>
-                    )}
-
-                    {/* Botão Encerrar Reunião (quando agendada/em andamento) */}
-                    {statusEfetivo !== 'encerrada' && statusEfetivo !== 'cancelada' && (
-                      <button
-                        onClick={() => {
-                          setReuniaoSelecionada(r);
-                          setModalEncerrarAberto(true);
-                        }}
-                        className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl transition inline-flex items-center gap-1"
-                        title="Encerrar reunião e gerar faltas"
-                      >
-                        <Lock className="w-3.5 h-3.5" />
-                        <span>Encerrar</span>
-                      </button>
-                    )}
-
-                    {/* Botão Detalhes */}
-                    <Link
-                      href={`/reunioes/${r.id}`}
-                      className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold text-xs rounded-xl border border-slate-200 transition inline-flex items-center gap-1"
-                      title="Ver detalhes da reunião e participantes"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Detalhes</span>
-                    </Link>
-                  </div>
-                </div>
+                  <span>{tab.label}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                      isActive ? 'bg-slate-100 text-slate-800' : 'bg-slate-200/60 text-slate-500'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
               );
             })}
           </div>
-        )}
-      </section>
+
+          {/* Busca Integrada */}
+          <div className="relative w-full md:w-80">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar por título, local ou congregação..."
+              value={filtroBusca}
+              onChange={(e) => setFiltroBusca(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-teal-500 font-medium transition"
+            />
+            {filtroBusca && (
+              <button
+                onClick={() => setFiltroBusca('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+                title="Limpar busca"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </section>
+
+        {/* ─── 3. LISTAGEM DE MEETING CARDS EXECUTIVOS ─── */}
+        <section>
+          {loading ? (
+            <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center text-slate-500 shadow-sm">
+              <RefreshCw className="w-6 h-6 animate-spin mx-auto text-teal-600 mb-2" />
+              <p className="text-xs font-semibold">Atualizando reuniões...</p>
+            </div>
+          ) : error ? (
+            <div className="bg-rose-50 border border-rose-200 p-6 rounded-2xl text-center text-rose-700 space-y-2 shadow-sm">
+              <AlertTriangle className="w-8 h-8 mx-auto text-rose-500" />
+              <p className="font-bold text-sm">{error}</p>
+              <button
+                onClick={carregarReunioes}
+                className="px-4 py-2 bg-rose-600 text-white font-bold text-xs rounded-xl shadow transition"
+              >
+                Tentar Novamente
+              </button>
+            </div>
+          ) : reunioesFiltradas.length === 0 ? (
+            /* Estado Vazio */
+            <div className="bg-white rounded-3xl border border-slate-200/90 p-12 text-center max-w-lg mx-auto my-8 shadow-sm space-y-4">
+              <div className="w-16 h-16 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center mx-auto border border-slate-200 shadow-inner">
+                <Calendar className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800">Nenhuma reunião encontrada</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  {filtroBusca || filtroStatus !== 'todas'
+                    ? 'Nenhum registro corresponde aos filtros selecionados.'
+                    : 'Cadastre a primeira reunião ministerial para iniciar o acompanhamento.'}
+                </p>
+              </div>
+              <button
+                onClick={() => setModalNovaAberto(true)}
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#123b63] hover:bg-[#0f2a45] text-white text-xs font-bold rounded-xl shadow transition active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Nova Reunião</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {reunioesFiltradas.map((r) => {
+                const dataFormatada = r.data_reuniao
+                  ? new Date(r.data_reuniao + 'T00:00:00').toLocaleDateString('pt-BR', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : '—';
+
+                const percentualPresenca =
+                  r.total_esperados > 0
+                    ? Number(((r.total_presentes / r.total_esperados) * 100).toFixed(1))
+                    : 0;
+
+                const statusEfetivo = r.status_efetivo || r.status;
+
+                return (
+                  <div
+                    key={r.id}
+                    className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 group"
+                  >
+                    {/* ─── Lado Esquerdo: STATUS → DATA/HORA → TÍTULO → LOCAL/PAUTA ─── */}
+                    <div className="space-y-2.5 flex-1 min-w-0">
+                      {/* Linha 1: Status & Data/Hora */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {statusEfetivo === 'agendada' && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                            Agendada
+                          </span>
+                        )}
+                        {statusEfetivo === 'em_andamento' && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            Em Andamento
+                          </span>
+                        )}
+                        {statusEfetivo === 'encerrada' && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold border border-slate-300">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
+                            Encerrada
+                          </span>
+                        )}
+                        {statusEfetivo === 'cancelada' && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
+                            Cancelada
+                          </span>
+                        )}
+
+                        <span className="text-xs text-slate-300">•</span>
+
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 bg-slate-50 px-2.5 py-0.5 rounded-lg border border-slate-200/80">
+                          <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                          {dataFormatada}
+                        </span>
+
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 bg-slate-50 px-2.5 py-0.5 rounded-lg border border-slate-200/80">
+                          <Clock className="w-3.5 h-3.5 text-slate-500" />
+                          {r.horario_inicio ? r.horario_inicio.slice(0, 5) : '—'}
+                        </span>
+
+                        {r.horario_limite_entrada && (
+                          <span className="text-[11px] font-semibold text-slate-500">
+                            Limite: <strong className="text-slate-700">{r.horario_limite_entrada.slice(0, 5)}</strong>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Linha 2: Título Principal */}
+                      <h2 className="text-base sm:text-lg font-black text-slate-900 leading-snug tracking-tight">
+                        <Link
+                          href={`/reunioes/${r.id}`}
+                          className="hover:text-teal-700 transition"
+                          title="Ver detalhes da reunião"
+                        >
+                          {r.titulo}
+                        </Link>
+                      </h2>
+
+                      {/* Linha 3: Local, Congregação e Pauta */}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 font-medium">
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="text-slate-700">{r.local}</span>
+                        </span>
+
+                        {r.congregacoes?.nome && (
+                          <span className="flex items-center gap-1">
+                            <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>
+                              Congregação: <strong className="text-slate-700">{r.congregacoes.nome}</strong>
+                            </span>
+                          </span>
+                        )}
+
+                        {r.pauta && (
+                          <span className="text-slate-500 line-clamp-1 italic">
+                            — {r.pauta}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ─── Lado Direito: QUÓRUM → AÇÕES (PAINEL TV, FALTAS, DETALHES) ─── */}
+                    <div className="flex flex-col sm:flex-row lg:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                      {/* Bloco Quórum */}
+                      <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-3.5 min-w-[210px] flex flex-col justify-between shadow-inner">
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Quórum</span>
+                          <span className="font-mono font-black text-teal-700 text-sm">
+                            {percentualPresenca}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-200/80 h-2 rounded-full overflow-hidden mb-1.5">
+                          <div
+                            className="bg-gradient-to-r from-teal-500 to-teal-600 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(100, percentualPresenca)}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                          <span>
+                            <strong className="text-slate-800">{r.total_presentes}</strong> presentes
+                          </span>
+                          <span>/ {r.total_esperados} convocados</span>
+                        </div>
+                      </div>
+
+                      {/* Bloco de Ações Agrupadas */}
+                      <div className="flex flex-wrap items-center gap-2 justify-end">
+                        {/* Botão Check-in (disponível quando não encerrada/cancelada) */}
+                        {statusEfetivo !== 'encerrada' && statusEfetivo !== 'cancelada' && (
+                          <Link
+                            href={`/reunioes/${r.id}/checkin`}
+                            className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-sm transition inline-flex items-center gap-1.5 active:scale-95"
+                            title="Abrir terminal de Check-in"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                            <span>Check-in</span>
+                          </Link>
+                        )}
+
+                        {/* Botão Painel TV */}
+                        <button
+                          onClick={() => abrirPainelTv(r)}
+                          className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5 border border-slate-200 shadow-sm active:scale-95"
+                          title="Exibir link do painel TV"
+                        >
+                          <Tv className="w-3.5 h-3.5 text-cyan-600" />
+                          <span>Painel TV</span>
+                        </button>
+
+                        {/* Botão Faltas da Reunião (quando encerrada) */}
+                        {statusEfetivo === 'encerrada' && (
+                          <Link
+                            href={`/reunioes/faltas?reuniao_id=${r.id}`}
+                            className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5 active:scale-95"
+                            title="Ver prontuário de faltas desta reunião"
+                          >
+                            <FileCheck2 className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Faltas ({r.total_ausentes})</span>
+                          </Link>
+                        )}
+
+                        {/* Botão Encerrar Reunião (quando agendada/em andamento) */}
+                        {statusEfetivo !== 'encerrada' && statusEfetivo !== 'cancelada' && (
+                          <button
+                            onClick={() => {
+                              setReuniaoSelecionada(r);
+                              setModalEncerrarAberto(true);
+                            }}
+                            className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl transition inline-flex items-center gap-1 active:scale-95"
+                            title="Encerrar reunião e processar faltas"
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                            <span>Encerrar</span>
+                          </button>
+                        )}
+
+                        {/* Botão Detalhes */}
+                        <Link
+                          href={`/reunioes/${r.id}`}
+                          className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition inline-flex items-center gap-1 active:scale-95"
+                          title="Ver detalhes da reunião e participantes"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Detalhes</span>
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
 
       {/* ─── 6. MODAL: NOVA REUNIÃO MINISTERIAL ─── */}
       {modalNovaAberto && (
@@ -928,7 +1010,6 @@ export default function ReunioesPage() {
           </div>
         </div>
       )}
-
     </PageLayout>
   );
 }

@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { createClient } from '@/lib/supabase-client';
 import {
+  ArrowLeft,
   Search,
   AlertTriangle,
   CheckCircle2,
@@ -391,13 +393,19 @@ export default function FaltasJustificativasPage() {
       title="Faltas e Justificativas"
       description="Prontuário de ausências ministeriais, justificativas e abonos da Secretaria Geral"
       activeMenu="reunioes"
-      backHref="/reunioes"
-      backLabel="Voltar para Reuniões"
       headerExtra={
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Link
+            href="/reunioes"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition border border-slate-200 shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4 text-slate-600" />
+            <span>Voltar para Reuniões</span>
+          </Link>
+
           <button
             onClick={carregarFaltas}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition border border-slate-300 shadow-sm"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition border border-slate-300 shadow-sm"
           >
             <RefreshCw className="w-4 h-4" />
             <span>Atualizar Lista</span>
@@ -406,45 +414,73 @@ export default function FaltasJustificativasPage() {
       }
     >
       <div className="space-y-6">
-        {/* ─── Cards de Resumo ─── */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
-              <FileText className="w-6 h-6" />
+        {/* ─── Cards de Resumo Executivo ─── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Total de Faltas */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Total de Faltas</span>
+              <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200/80 flex items-center justify-center group-hover:scale-105 transition">
+                <FileText className="w-5 h-5" />
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total de Faltas</p>
-              <p className="text-2xl font-black text-slate-800 mt-0.5">{faltas.length}</p>
-            </div>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-rose-200 shadow-sm flex items-center gap-4 border-l-4 border-l-rose-500">
-            <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-rose-600 uppercase tracking-wider">Não Justificadas</p>
-              <p className="text-2xl font-black text-rose-700 mt-0.5">{totalRegistradas}</p>
+            <div className="mt-3">
+              <p className="text-3xl font-black text-slate-900 tracking-tight leading-none">{faltas.length}</p>
+              <p className="text-[11px] text-slate-500 font-medium mt-1.5 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-slate-400" />
+                Histórico geral registrado
+              </p>
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-amber-200 shadow-sm flex items-center gap-4 border-l-4 border-l-amber-500">
-            <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Clock className="w-6 h-6" />
+          {/* Card 2: Não Justificadas */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Não Justificadas</span>
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 border border-rose-100/80 flex items-center justify-center group-hover:scale-105 transition">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Justificadas</p>
-              <p className="text-2xl font-black text-amber-700 mt-0.5">{totalJustificadas}</p>
+            <div className="mt-3">
+              <p className="text-3xl font-black text-rose-700 tracking-tight leading-none">{totalRegistradas}</p>
+              <p className="text-[11px] text-rose-600 font-medium mt-1.5 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-500" />
+                Pendentes de justificativa
+              </p>
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-sm flex items-center gap-4 border-l-4 border-l-emerald-500">
-            <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6" />
+          {/* Card 3: Justificadas */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Justificadas</span>
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-100/80 flex items-center justify-center group-hover:scale-105 transition">
+                <Clock className="w-5 h-5" />
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Abonadas</p>
-              <p className="text-2xl font-black text-emerald-700 mt-0.5">{totalAbonadas}</p>
+            <div className="mt-3">
+              <p className="text-3xl font-black text-amber-700 tracking-tight leading-none">{totalJustificadas}</p>
+              <p className="text-[11px] text-amber-700 font-medium mt-1.5 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                Comprovantes validados
+              </p>
+            </div>
+          </div>
+
+          {/* Card 4: Abonadas */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Abonadas</span>
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100/80 flex items-center justify-center group-hover:scale-105 transition">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <p className="text-3xl font-black text-emerald-700 tracking-tight leading-none">{totalAbonadas}</p>
+              <p className="text-[11px] text-emerald-700 font-medium mt-1.5 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                Secretaria Geral
+              </p>
             </div>
           </div>
         </div>
