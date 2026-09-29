@@ -28,7 +28,7 @@ import {
   Check,
   ExternalLink,
   Search,
-  Printer,
+  FileText,
   RotateCcw,
   ChevronLeft,
   ChevronRight,
@@ -111,9 +111,6 @@ export default function DetalhesReuniaoPage() {
 
   const [modalEncerrarAberto, setModalEncerrarAberto] = useState<boolean>(false);
   const [encerrando, setEncerrando] = useState<boolean>(false);
-
-  // Data/hora para exibição no relatório de impressão
-  const [dataHoraImpressao, setDataHoraImpressao] = useState<string>('');
 
   // ─── Helper de Autenticação ───────────────────────────────────────────────
   const fetchAutenticado = useCallback(async (url: string, options: RequestInit = {}) => {
@@ -377,13 +374,17 @@ export default function DetalhesReuniaoPage() {
   const indiceInicioExibicao = totalRegistrosFiltrados > 0 ? (paginaCorrigida - 1) * itensPorPagina + 1 : 0;
   const indiceFimExibicao = Math.min(paginaCorrigida * itensPorPagina, totalRegistrosFiltrados);
 
-  // ─── Ação: Imprimir Lista Filtrada ─────────────────────────────────────────
-  const handleImprimir = () => {
-    setDataHoraImpressao(new Date().toLocaleString('pt-BR'));
-    // Pequeno delay para garantir que dataHoraImpressao seja renderizada antes do print
-    setTimeout(() => {
-      window.print();
-    }, 50);
+  // ─── Ação: Exportar Relatório PDF Oficial A4 ─────────────────────────────
+  const handleExportarPDF = () => {
+    if (!reuniao?.id) return;
+    const params = new URLSearchParams();
+    if (buscaMinistro.trim()) params.append('busca', buscaMinistro.trim());
+    if (filtroCongregacao !== 'todas') params.append('congregacao', filtroCongregacao);
+    if (filtroCargo !== 'todos') params.append('cargo', filtroCargo);
+    if (filtroPresenca !== 'todos') params.append('presenca', filtroPresenca);
+
+    const queryStr = params.toString() ? `?${params.toString()}` : '';
+    window.open(`/api/v1/reunioes/${reuniao.id}/pdf${queryStr}`, '_blank');
   };
 
   // Tem filtros ativos?
@@ -737,7 +738,7 @@ export default function DetalhesReuniaoPage() {
       </section>
 
       {/* ─── 3. SNAPSHOT DE PARTICIPANTES (MINISTROS CONVOCADOS) ─── */}
-      <section className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden print:hidden">
+      <section className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
         {/* Barra de Título */}
         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
@@ -826,13 +827,14 @@ export default function DetalhesReuniaoPage() {
               </button>
             )}
 
-            {/* 6. Botão Imprimir Lista */}
+            {/* 6. Botão Imprimir / Exportar PDF */}
             <button
-              onClick={handleImprimir}
+              onClick={handleExportarPDF}
               className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5 shadow-sm active:scale-95 ml-auto"
+              title="Gerar e abrir PDF institucional A4"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Imprimir Lista</span>
+              <FileText className="w-3.5 h-3.5" />
+              <span>Imprimir / Exportar PDF</span>
             </button>
           </div>
         </div>
@@ -1026,114 +1028,6 @@ export default function DetalhesReuniaoPage() {
           )}
         </div>
       </section>
-
-      {/* ─── DOCUMENTO EXCLUSIVO DE IMPRESSÃO (CSS @media print) ─── */}
-      <div className="hidden print:block text-black bg-white p-6 font-sans">
-        {/* Cabeçalho Institucional Gestão Eklésia */}
-        <div className="border-b-2 border-slate-900 pb-4 mb-4 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-black tracking-tight uppercase text-slate-900">Gestão Eklésia</span>
-              <span className="text-xs bg-slate-900 text-white font-bold px-2 py-0.5 rounded">Reuniões</span>
-            </div>
-            <p className="text-xs text-slate-600 font-semibold mt-0.5">Sistema Integrado de Gestão Ministerial</p>
-          </div>
-          <div className="text-right text-xs text-slate-600 space-y-0.5">
-            <p className="font-bold text-slate-900">Lista de Ministros Convocados</p>
-            <p>Emissão: {dataHoraImpressao || new Date().toLocaleString('pt-BR')}</p>
-          </div>
-        </div>
-
-        {/* Metadados da Reunião Impressa */}
-        <div className="bg-slate-50 border border-slate-300 rounded-lg p-3 mb-4 text-xs space-y-1">
-          <div className="flex justify-between items-start">
-            <h1 className="text-sm font-black text-slate-900 uppercase">{reuniao.titulo}</h1>
-            <span className="font-bold uppercase text-[11px] px-2 py-0.5 rounded border border-slate-400">
-              Status: {reuniao.status}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-slate-700 pt-1">
-            <p><strong>Data:</strong> {dataFormatada}</p>
-            <p><strong>Horário:</strong> {reuniao.horario_inicio ? reuniao.horario_inicio.slice(0, 5) : '—'}</p>
-            <p><strong>Local:</strong> {reuniao.local}</p>
-            <p><strong>Congregação:</strong> {reuniao.congregacoes?.nome || 'Geral / Todas'}</p>
-          </div>
-          {reuniao.pauta && (
-            <p className="text-slate-600 pt-1 border-t border-slate-200">
-              <strong>Pauta:</strong> {reuniao.pauta}
-            </p>
-          )}
-
-          {/* Filtros Utilizados na Impressão */}
-          {temFiltrosAtivos && (
-            <div className="pt-1.5 border-t border-slate-200 text-[11px] text-slate-600 flex flex-wrap gap-x-4">
-              <strong>Filtros aplicados:</strong>
-              {buscaMinistro.trim() && <span>Busca: &ldquo;{buscaMinistro}&rdquo;</span>}
-              {filtroCongregacao !== 'todas' && <span>Congregação: {filtroCongregacao}</span>}
-              {filtroCargo !== 'todos' && <span>Cargo: {filtroCargo}</span>}
-              {filtroPresenca !== 'todos' && <span>Presença: {filtroPresenca}</span>}
-            </div>
-          )}
-        </div>
-
-        {/* Tabela de Impressão com TODOS os Registros Filtrados */}
-        <table className="w-full text-left text-xs border-collapse border border-slate-300">
-          <thead>
-            <tr className="bg-slate-100 text-slate-900 font-bold uppercase text-[10px] border-b border-slate-300">
-              <th className="p-2 border border-slate-300 w-8 text-center">Nº</th>
-              <th className="p-2 border border-slate-300">Ministro</th>
-              <th className="p-2 border border-slate-300">Cargo</th>
-              <th className="p-2 border border-slate-300">Congregação / Área</th>
-              <th className="p-2 border border-slate-300 text-center">Horário Check-in</th>
-              <th className="p-2 border border-slate-300 text-center">Status de Presença</th>
-            </tr>
-          </thead>
-          <tbody>
-            {participantesFiltrados.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="p-4 text-center text-slate-500 italic border border-slate-300">
-                  Nenhum registro para os filtros selecionados.
-                </td>
-              </tr>
-            ) : (
-              participantesFiltrados.map((p, idx) => (
-                <tr key={p.id} className="border-b border-slate-200">
-                  <td className="p-2 border border-slate-300 text-center font-mono text-[11px]">{idx + 1}</td>
-                  <td className="p-2 border border-slate-300 font-bold text-slate-900">{p.nome_ministro_snapshot}</td>
-                  <td className="p-2 border border-slate-300 text-slate-800">{p.cargo_snapshot}</td>
-                  <td className="p-2 border border-slate-300 text-slate-700">
-                    {p.nome_congregacao_snapshot || 'Sede'}
-                    {p.area_snapshot ? ` - ${p.area_snapshot}` : ''}
-                  </td>
-                  <td className="p-2 border border-slate-300 text-center font-mono text-[11px]">
-                    {p.data_hora_checkin
-                      ? new Date(p.data_hora_checkin).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-                      : p.status_presenca === 'presente'
-                      ? 'Confirmado'
-                      : '—'}
-                  </td>
-                  <td className="p-2 border border-slate-300 text-center font-bold uppercase text-[10px]">
-                    {p.status_presenca === 'presente' && 'Presente'}
-                    {p.status_presenca === 'falta' && 'Falta'}
-                    {p.status_presenca === 'falta_justificada' && 'Falta Justificada'}
-                    {p.status_presenca === 'pendente' && 'Pendente'}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-
-        {/* Rodapé do Documento Impresso */}
-        <div className="mt-4 pt-3 border-t border-slate-300 flex justify-between items-center text-[11px] text-slate-600">
-          <p>
-            <strong>Total de registros impressos:</strong> {participantesFiltrados.length} ministro(s)
-          </p>
-          <p>
-            Documento gerado eletronicamente pelo <strong>Gestão Eklésia</strong> em {dataHoraImpressao || new Date().toLocaleString('pt-BR')}
-          </p>
-        </div>
-      </div>
 
       {/* ─── MODAL: TERMINAL CHECK-IN ─── */}
       {modalCheckinAberto && (

@@ -18,6 +18,8 @@ import {
   Send,
   Mail,
   AlertCircle,
+  Upload,
+  Trash2,
 } from 'lucide-react';
 
 interface FaltaItem {
@@ -101,9 +103,42 @@ export default function FaltasJustificativasPage() {
   // Formulário de Justificativa
   const [tipoJustificativa, setTipoJustificativa] = useState<string>('manuscrita_secretaria');
   const [motivoJustificativa, setMotivoJustificativa] = useState<string>('');
-  const [anexoUrl, setAnexoUrl] = useState<string>('');
+  const [arquivoAnexo, setArquivoAnexo] = useState<File | null>(null);
+  const [erroArquivo, setErroArquivo] = useState<string | null>(null);
+  const [enviandoAnexo, setEnviandoAnexo] = useState<boolean>(false);
   const [salvando, setSalvando] = useState<boolean>(false);
   const [motivoAbono, setMotivoAbono] = useState<string>('');
+
+  const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
+  const EXTENSOES_PERMITIDAS = ['pdf', 'jpg', 'jpeg', 'png'];
+
+  const formatarTamanhoArquivo = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const handleSelecionarArquivo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setErroArquivo(null);
+
+    if (!file) return;
+
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    if (!EXTENSOES_PERMITIDAS.includes(ext)) {
+      setErroArquivo('Formato inválido. Selecione um arquivo PDF, JPG ou PNG.');
+      setArquivoAnexo(null);
+      return;
+    }
+
+    if (file.size > MAX_FILE_BYTES) {
+      setErroArquivo('O arquivo não pode exceder 5 MB.');
+      setArquivoAnexo(null);
+      return;
+    }
+
+    setArquivoAnexo(file);
+  };
 
   // ─── Helper de Autenticação ───────────────────────────────────────────────
   const fetchAutenticado = useCallback(async (url: string, options: RequestInit = {}) => {
@@ -225,13 +260,37 @@ export default function FaltasJustificativasPage() {
 
     try {
       setSalvando(true);
+      setErroArquivo(null);
+
+      let urlAnexo: string | null = null;
+
+      if (arquivoAnexo) {
+        setEnviandoAnexo(true);
+        const formData = new FormData();
+        formData.append('file', arquivoAnexo);
+        formData.append('falta_id', faltaSelecionada.id);
+
+        const uploadRes = await fetchAutenticado('/api/v1/reunioes/faltas/anexo', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok || !uploadData.url) {
+          throw new Error(uploadData.error || 'Erro ao enviar anexo da justificativa.');
+        }
+
+        urlAnexo = uploadData.url;
+        setEnviandoAnexo(false);
+      }
+
       const res = await fetchAutenticado(`/api/v1/reunioes/faltas/${faltaSelecionada.id}/justificar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tipo_justificativa: tipoJustificativa,
           motivo: motivoJustificativa.trim(),
-          anexo_documento_url: anexoUrl.trim() || null,
+          anexo_documento_url: urlAnexo,
         }),
       });
 
@@ -256,12 +315,14 @@ export default function FaltasJustificativasPage() {
 
       setModalJustificarAberto(false);
       setMotivoJustificativa('');
-      setAnexoUrl('');
+      setArquivoAnexo(null);
+      setErroArquivo(null);
       setFaltaSelecionada(null);
     } catch (err: any) {
       alert(err?.message || 'Erro ao registrar justificativa.');
     } finally {
       setSalvando(false);
+      setEnviandoAnexo(false);
     }
   };
 
@@ -330,6 +391,8 @@ export default function FaltasJustificativasPage() {
       title="Faltas e Justificativas"
       description="Prontuário de ausências ministeriais, justificativas e abonos da Secretaria Geral"
       activeMenu="reunioes"
+      backHref="/reunioes"
+      backLabel="Voltar para Reuniões"
       headerExtra={
         <div className="flex items-center gap-3">
           <button
@@ -810,14 +873,72 @@ export default function FaltasJustificativasPage() {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Link do Documento / Anexo (Opcional)</label>
-                <input
-                  type="url"
-                  value={anexoUrl}
-                  onChange={(e) => setAnexoUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-teal-500"
-                />
+                <label className="block font-bold text-slate-700 mb-1">
+                  Documento Comprobatório / Anexo (Opcional)
+                </label>
+
+                {!arquivoAnexo ? (
+                  <div className="space-y-1.5">
+                    <label className="border-2 border-dashed border-slate-200 hover:border-teal-500 bg-slate-50/70 hover:bg-teal-50/30 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition text-center group">
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf"
+                        onChange={handleSelecionarArquivo}
+                        disabled={salvando}
+                        className="hidden"
+                      />
+                      <div className="w-10 h-10 rounded-full bg-white shadow-sm border border-slate-200 flex items-center justify-center text-teal-600 group-hover:scale-110 transition">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-bold text-slate-800">
+                          Anexar documento
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          PDF, JPG ou PNG — máximo 5 MB
+                        </p>
+                      </div>
+                    </label>
+                    {erroArquivo && (
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 px-1">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{erroArquivo}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-teal-50/60 border border-teal-200 rounded-2xl flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                        {arquivoAnexo.name.toLowerCase().endsWith('.pdf') ? (
+                          <FileText className="w-4 h-4" />
+                        ) : (
+                          <Paperclip className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate" title={arquivoAnexo.name}>
+                          {arquivoAnexo.name}
+                        </p>
+                        <p className="text-[10px] text-teal-700 font-medium">
+                          {formatarTamanhoArquivo(arquivoAnexo.size)}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setArquivoAnexo(null);
+                        setErroArquivo(null);
+                      }}
+                      disabled={salvando}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                      title="Remover arquivo"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500">
@@ -828,7 +949,11 @@ export default function FaltasJustificativasPage() {
 
             <div className="flex gap-2 pt-2">
               <button
-                onClick={() => setModalJustificarAberto(false)}
+                onClick={() => {
+                  setModalJustificarAberto(false);
+                  setArquivoAnexo(null);
+                  setErroArquivo(null);
+                }}
                 disabled={salvando}
                 className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
               >
@@ -837,9 +962,16 @@ export default function FaltasJustificativasPage() {
               <button
                 onClick={salvarJustificativa}
                 disabled={!motivoJustificativa.trim() || salvando}
-                className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow transition"
+                className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5"
               >
-                {salvando ? 'Salvando...' : 'Confirmar Justificativa'}
+                {salvando ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>{enviandoAnexo ? 'Enviando anexo...' : 'Salvando...'}</span>
+                  </>
+                ) : (
+                  'Confirmar Justificativa'
+                )}
               </button>
             </div>
           </div>

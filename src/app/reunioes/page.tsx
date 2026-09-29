@@ -613,7 +613,7 @@ export default function ReunioesPage() {
                       <span>
                         <strong className="text-slate-800">{r.total_presentes}</strong> presentes
                       </span>
-                      <span>/ {r.total_esperados} convidados</span>
+                      <span>/ {r.total_esperados} convocados</span>
                     </div>
                   </div>
 
