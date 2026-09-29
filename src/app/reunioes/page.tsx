@@ -27,6 +27,8 @@ import {
   Copy,
   ExternalLink,
   X,
+  FileText,
+  ArrowRight,
 } from 'lucide-react';
 
 interface ReuniaoItem {
@@ -380,21 +382,28 @@ export default function ReunioesPage() {
       description="Painel de convocações, presença em tempo real e acompanhamento de quórum"
       activeMenu="reunioes"
       headerExtra={
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Ação Secundária: Faltas e Justificativas */}
           <Link
             href="/reunioes/faltas"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition border border-slate-200 shadow-sm hover:shadow active:scale-95"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-bold rounded-xl transition-all duration-150 border border-slate-300/80 shadow-sm hover:shadow hover:border-slate-400 active:scale-95"
             title="Acessar prontuário de faltas e justificativas"
           >
             <FileCheck2 className="w-4 h-4 text-amber-600" />
             <span>Faltas e Justificativas</span>
+            {totalAusenciasGerais > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-black">
+                {totalAusenciasGerais}
+              </span>
+            )}
           </Link>
 
+          {/* CTA Principal: Nova Reunião */}
           <button
             onClick={() => setModalNovaAberto(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition active:scale-95"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-600 via-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 text-white text-xs font-black rounded-xl shadow-md hover:shadow-lg transition-all duration-150 active:scale-95 border border-teal-500/30"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>Nova Reunião</span>
           </button>
         </div>
@@ -403,79 +412,90 @@ export default function ReunioesPage() {
       <div className="space-y-6">
         {/* ─── 1. CARDS DE INDICADORES EXECUTIVOS (KPIS) ─── */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* KPI 1: Próximas Reuniões */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+          {/* KPI 1: Próximas Reuniões (Sky/Institucional) */}
+          <div className="bg-gradient-to-br from-white to-sky-50/40 p-5 rounded-2xl border border-sky-200/80 shadow-sm hover:shadow-md hover:border-sky-300 transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Próximas Reuniões</span>
-              <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 border border-sky-100/80 flex items-center justify-center group-hover:scale-105 transition">
+              <span className="text-sky-900 text-xs font-bold uppercase tracking-wider">Próximas Reuniões</span>
+              <div className="w-11 h-11 rounded-2xl bg-sky-100/80 text-sky-700 border border-sky-200 flex items-center justify-center shadow-inner group-hover:scale-105 transition">
                 <Calendar className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-3">
-              <p className="text-3xl font-black text-slate-900 tracking-tight leading-none">{totalAgendadas}</p>
-              <p className="text-[11px] text-slate-500 font-medium mt-1.5 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-sky-500" />
-                Agendadas no calendário
-              </p>
+            <div className="mt-4">
+              <p className="text-4xl font-black text-slate-900 tracking-tight leading-none">{totalAgendadas}</p>
+              <div className="mt-2.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-sky-100/70 text-sky-800 text-[11px] font-bold border border-sky-200/60">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                  Agendadas no calendário
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* KPI 2: Em Andamento */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+          {/* KPI 2: Em Andamento (Emerald/Realtime) */}
+          <div className="bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/70 p-5 rounded-2xl border border-emerald-300 shadow-sm hover:shadow-md hover:border-emerald-400 transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group ring-1 ring-emerald-500/10">
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Em Andamento</span>
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100/80 flex items-center justify-center group-hover:scale-105 transition">
+              <span className="text-emerald-900 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Em Andamento
+              </span>
+              <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center justify-center shadow-inner group-hover:scale-105 transition">
                 <Clock className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-3">
-              <p className="text-3xl font-black text-emerald-700 tracking-tight leading-none">{totalEmAndamento}</p>
-              <p className="text-[11px] text-emerald-700 font-medium mt-1.5 flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full bg-emerald-500 ${totalEmAndamento > 0 ? 'animate-ping' : ''}`} />
-                Check-in ativo em tempo real
-              </p>
+            <div className="mt-4">
+              <p className="text-4xl font-black text-emerald-700 tracking-tight leading-none">{totalEmAndamento}</p>
+              <div className="mt-2.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100/90 text-emerald-900 text-[11px] font-bold border border-emerald-200/80">
+                  <span className={`w-1.5 h-1.5 rounded-full bg-emerald-500 ${totalEmAndamento > 0 ? 'animate-ping' : ''}`} />
+                  Check-in ativo em tempo real
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* KPI 3: Reuniões Encerradas */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+          {/* KPI 3: Reuniões Encerradas (Indigo/Arquivo) */}
+          <div className="bg-gradient-to-br from-white to-indigo-50/40 p-5 rounded-2xl border border-indigo-200/80 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Reuniões Encerradas</span>
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100/80 flex items-center justify-center group-hover:scale-105 transition">
+              <span className="text-indigo-900 text-xs font-bold uppercase tracking-wider">Reuniões Encerradas</span>
+              <div className="w-11 h-11 rounded-2xl bg-indigo-100/80 text-indigo-700 border border-indigo-200 flex items-center justify-center shadow-inner group-hover:scale-105 transition">
                 <CheckCircle2 className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-3">
-              <p className="text-3xl font-black text-slate-900 tracking-tight leading-none">{totalEncerradas}</p>
-              <p className="text-[11px] text-slate-500 font-medium mt-1.5 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                Histórico e atas arquivadas
-              </p>
+            <div className="mt-4">
+              <p className="text-4xl font-black text-slate-900 tracking-tight leading-none">{totalEncerradas}</p>
+              <div className="mt-2.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-100/70 text-indigo-800 text-[11px] font-bold border border-indigo-200/60">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                  Atas e quóruns finalizados
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* KPI 4: Ausências Registradas */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
+          {/* KPI 4: Ausências Registradas (Amber/Prontuário) */}
+          <div className="bg-gradient-to-br from-white to-amber-50/50 p-5 rounded-2xl border border-amber-200/80 shadow-sm hover:shadow-md hover:border-amber-300 transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Ausências Registradas</span>
-              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-100/80 flex items-center justify-center group-hover:scale-105 transition">
+              <span className="text-amber-900 text-xs font-bold uppercase tracking-wider">Ausências Registradas</span>
+              <div className="w-11 h-11 rounded-2xl bg-amber-100/80 text-amber-700 border border-amber-200 flex items-center justify-center shadow-inner group-hover:scale-105 transition">
                 <AlertTriangle className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-3">
-              <p className="text-3xl font-black text-amber-700 tracking-tight leading-none">{totalAusenciasGerais}</p>
-              <p className="text-[11px] text-slate-500 font-medium mt-1.5 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
-                Total de faltas no histórico
-              </p>
+            <div className="mt-4">
+              <p className="text-4xl font-black text-amber-700 tracking-tight leading-none">{totalAusenciasGerais}</p>
+              <div className="mt-2.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100/70 text-amber-900 text-[11px] font-bold border border-amber-200/60">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  Histórico geral de ausências
+                </span>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* ─── 2. ÁREA DE FILTROS & BARRA DE CONTROLE ─── */}
-        <section className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5">
-          {/* Abas de Navegação */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl overflow-x-auto">
+        {/* ─── 2. BARRA DE CONTROLE E NAVEGAÇÃO DO MÓDULO ─── */}
+        <section className="bg-white/95 backdrop-blur p-2.5 sm:p-3 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Abas de Navegação Estilizadas com Badges */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl overflow-x-auto">
             {[
               { id: 'todas', label: 'Todas', count: reunioes.length },
               { id: 'agendada', label: 'Agendadas', count: totalAgendadas },
@@ -487,16 +507,16 @@ export default function ReunioesPage() {
                 <button
                   key={tab.id}
                   onClick={() => setFiltroStatus(tab.id)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap flex items-center gap-1.5 ${
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-150 whitespace-nowrap flex items-center gap-2 ${
                     isActive
-                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/80'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                      ? 'bg-[#123b63] text-white shadow-sm ring-1 ring-black/5'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                   }`}
                 >
                   <span>{tab.label}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                      isActive ? 'bg-slate-100 text-slate-800' : 'bg-slate-200/60 text-slate-500'
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
                     }`}
                   >
                     {tab.count}
@@ -514,12 +534,12 @@ export default function ReunioesPage() {
               placeholder="Buscar por título, local ou congregação..."
               value={filtroBusca}
               onChange={(e) => setFiltroBusca(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-teal-500 font-medium transition"
+              className="w-full pl-9 pr-8 py-2.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-teal-500 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 font-medium transition shadow-inner"
             />
             {filtroBusca && (
               <button
                 onClick={() => setFiltroBusca('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full"
                 title="Limpar busca"
               >
                 <X className="w-3.5 h-3.5" />
@@ -531,24 +551,24 @@ export default function ReunioesPage() {
         {/* ─── 3. LISTAGEM DE MEETING CARDS EXECUTIVOS ─── */}
         <section>
           {loading ? (
-            <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center text-slate-500 shadow-sm">
-              <RefreshCw className="w-6 h-6 animate-spin mx-auto text-teal-600 mb-2" />
-              <p className="text-xs font-semibold">Atualizando reuniões...</p>
+            <div className="bg-white rounded-3xl border border-slate-200 p-16 text-center text-slate-500 shadow-sm space-y-3">
+              <RefreshCw className="w-8 h-8 animate-spin mx-auto text-teal-600" />
+              <p className="text-sm font-bold text-slate-700">Atualizando convocações ministeriais...</p>
             </div>
           ) : error ? (
-            <div className="bg-rose-50 border border-rose-200 p-6 rounded-2xl text-center text-rose-700 space-y-2 shadow-sm">
-              <AlertTriangle className="w-8 h-8 mx-auto text-rose-500" />
+            <div className="bg-rose-50 border border-rose-200 p-8 rounded-3xl text-center text-rose-700 space-y-3 shadow-sm max-w-lg mx-auto">
+              <AlertTriangle className="w-10 h-10 mx-auto text-rose-500" />
               <p className="font-bold text-sm">{error}</p>
               <button
                 onClick={carregarReunioes}
-                className="px-4 py-2 bg-rose-600 text-white font-bold text-xs rounded-xl shadow transition"
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow transition"
               >
                 Tentar Novamente
               </button>
             </div>
           ) : reunioesFiltradas.length === 0 ? (
             /* Estado Vazio */
-            <div className="bg-white rounded-3xl border border-slate-200/90 p-12 text-center max-w-lg mx-auto my-8 shadow-sm space-y-4">
+            <div className="bg-white rounded-3xl border border-slate-200/90 p-14 text-center max-w-md mx-auto my-8 shadow-sm space-y-4">
               <div className="w-16 h-16 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center mx-auto border border-slate-200 shadow-inner">
                 <Calendar className="w-8 h-8" />
               </div>
@@ -557,15 +577,15 @@ export default function ReunioesPage() {
                 <p className="text-xs text-slate-500 mt-1">
                   {filtroBusca || filtroStatus !== 'todas'
                     ? 'Nenhum registro corresponde aos filtros selecionados.'
-                    : 'Cadastre a primeira reunião ministerial para iniciar o acompanhamento.'}
+                    : 'Cadastre a primeira convocação ministerial para iniciar o controle.'}
                 </p>
               </div>
               <button
                 onClick={() => setModalNovaAberto(true)}
-                className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#123b63] hover:bg-[#0f2a45] text-white text-xs font-bold rounded-xl shadow transition active:scale-95"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-[#123b63] hover:bg-[#0f2a45] text-white text-xs font-bold rounded-xl shadow-md transition active:scale-95"
               >
                 <Plus className="w-4 h-4" />
-                <span>+ Nova Reunião</span>
+                <span>Cadastrar Convocação</span>
               </button>
             </div>
           ) : (
@@ -589,175 +609,183 @@ export default function ReunioesPage() {
                 return (
                   <div
                     key={r.id}
-                    className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 group"
+                    className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-200 hover:border-slate-300 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-6 group"
                   >
-                    {/* ─── Lado Esquerdo: STATUS → DATA/HORA → TÍTULO → LOCAL/PAUTA ─── */}
-                    <div className="space-y-2.5 flex-1 min-w-0">
-                      {/* Linha 1: Status & Data/Hora */}
+                    {/* ─── 1. ESQUERDA: IDENTIFICAÇÃO & DETALHES DA REUNIÃO ─── */}
+                    <div className="space-y-3 flex-1 min-w-0">
+                      {/* Linha 1: Status, Data, Horário e Limite */}
                       <div className="flex flex-wrap items-center gap-2">
+                        {/* Status Badge */}
                         {statusEfetivo === 'agendada' && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 text-sky-800 text-xs font-extrabold border border-sky-200">
+                            <span className="w-2 h-2 rounded-full bg-sky-500" />
                             Agendada
                           </span>
                         )}
                         {statusEfetivo === 'em_andamento' && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-extrabold border border-emerald-300 animate-pulse">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
                             Em Andamento
                           </span>
                         )}
                         {statusEfetivo === 'encerrada' && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold border border-slate-300">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-extrabold border border-slate-300">
                             <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
                             Encerrada
                           </span>
                         )}
                         {statusEfetivo === 'cancelada' && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-extrabold border border-rose-200">
                             Cancelada
                           </span>
                         )}
 
-                        <span className="text-xs text-slate-300">•</span>
+                        <span className="text-slate-300">•</span>
 
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 bg-slate-50 px-2.5 py-0.5 rounded-lg border border-slate-200/80">
+                        {/* Data Chip */}
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/80">
                           <Calendar className="w-3.5 h-3.5 text-slate-500" />
                           {dataFormatada}
                         </span>
 
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 bg-slate-50 px-2.5 py-0.5 rounded-lg border border-slate-200/80">
+                        {/* Horário Chip */}
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/80">
                           <Clock className="w-3.5 h-3.5 text-slate-500" />
                           {r.horario_inicio ? r.horario_inicio.slice(0, 5) : '—'}
                         </span>
 
+                        {/* Limite Check-in Chip */}
                         {r.horario_limite_entrada && (
-                          <span className="text-[11px] font-semibold text-slate-500">
-                            Limite: <strong className="text-slate-700">{r.horario_limite_entrada.slice(0, 5)}</strong>
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                            Limite: <strong>{r.horario_limite_entrada.slice(0, 5)}</strong>
                           </span>
                         )}
                       </div>
 
                       {/* Linha 2: Título Principal */}
-                      <h2 className="text-base sm:text-lg font-black text-slate-900 leading-snug tracking-tight">
-                        <Link
-                          href={`/reunioes/${r.id}`}
-                          className="hover:text-teal-700 transition"
-                          title="Ver detalhes da reunião"
-                        >
-                          {r.titulo}
-                        </Link>
-                      </h2>
+                      <div>
+                        <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-snug">
+                          <Link
+                            href={`/reunioes/${r.id}`}
+                            className="hover:text-teal-700 transition flex items-center gap-2 group/link"
+                            title="Ver detalhes da reunião"
+                          >
+                            <span>{r.titulo}</span>
+                            <ArrowRight className="w-4 h-4 opacity-0 group-hover/link:opacity-100 text-teal-600 transition -translate-x-1 group-hover/link:translate-x-0 shrink-0" />
+                          </Link>
+                        </h2>
+                      </div>
 
-                      {/* Linha 3: Local, Congregação e Pauta */}
+                      {/* Linha 3: Local e Congregação */}
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 font-medium">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="text-slate-700">{r.local}</span>
+                        <span className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60">
+                          <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          <strong className="text-slate-800">{r.local}</strong>
                         </span>
 
                         {r.congregacoes?.nome && (
-                          <span className="flex items-center gap-1">
-                            <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60">
+                            <Building2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                             <span>
-                              Congregação: <strong className="text-slate-700">{r.congregacoes.nome}</strong>
+                              Congregação: <strong className="text-slate-800">{r.congregacoes.nome}</strong>
                             </span>
                           </span>
                         )}
+                      </div>
 
-                        {r.pauta && (
-                          <span className="text-slate-500 line-clamp-1 italic">
-                            — {r.pauta}
-                          </span>
-                        )}
+                      {/* Linha 4: Pauta (se houver) */}
+                      {r.pauta && (
+                        <div className="text-xs text-slate-600 bg-slate-50/70 border border-slate-200/60 rounded-xl p-2.5 flex items-start gap-2">
+                          <FileText className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                          <p className="line-clamp-2">
+                            <strong className="text-slate-700">Pauta:</strong> {r.pauta}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ─── 2. CENTRO: BLOCO DE QUÓRUM VISUALMENTE DESTACADO ─── */}
+                    <div className="bg-gradient-to-br from-slate-50 to-slate-100/80 border border-slate-200/90 rounded-2xl p-4 min-w-[220px] w-full lg:w-60 flex flex-col justify-between shadow-sm shrink-0">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Quórum Ministerial</span>
+                        <span className="text-xl font-black font-mono text-teal-700">{percentualPresenca}%</span>
+                      </div>
+                      <div className="w-full bg-slate-200/80 h-2.5 rounded-full overflow-hidden my-1.5 border border-slate-300/40">
+                        <div
+                          className="bg-gradient-to-r from-teal-500 to-teal-600 h-full rounded-full transition-all duration-700 shadow-inner"
+                          style={{ width: `${Math.min(100, percentualPresenca)}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-xs font-semibold text-slate-600 mt-1">
+                        <span>
+                          <strong className="text-slate-900 text-sm font-black">{r.total_presentes}</strong> presentes
+                        </span>
+                        <span>
+                          / <strong className="text-slate-800">{r.total_esperados}</strong> convocados
+                        </span>
                       </div>
                     </div>
 
-                    {/* ─── Lado Direito: QUÓRUM → AÇÕES (PAINEL TV, FALTAS, DETALHES) ─── */}
-                    <div className="flex flex-col sm:flex-row lg:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-                      {/* Bloco Quórum */}
-                      <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-3.5 min-w-[210px] flex flex-col justify-between shadow-inner">
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Quórum</span>
-                          <span className="font-mono font-black text-teal-700 text-sm">
-                            {percentualPresenca}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-200/80 h-2 rounded-full overflow-hidden mb-1.5">
-                          <div
-                            className="bg-gradient-to-r from-teal-500 to-teal-600 h-full rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min(100, percentualPresenca)}%` }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                          <span>
-                            <strong className="text-slate-800">{r.total_presentes}</strong> presentes
-                          </span>
-                          <span>/ {r.total_esperados} convocados</span>
-                        </div>
-                      </div>
-
-                      {/* Bloco de Ações Agrupadas */}
-                      <div className="flex flex-wrap items-center gap-2 justify-end">
-                        {/* Botão Check-in (disponível quando não encerrada/cancelada) */}
-                        {statusEfetivo !== 'encerrada' && statusEfetivo !== 'cancelada' && (
-                          <Link
-                            href={`/reunioes/${r.id}/checkin`}
-                            className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-sm transition inline-flex items-center gap-1.5 active:scale-95"
-                            title="Abrir terminal de Check-in"
-                          >
-                            <QrCode className="w-3.5 h-3.5" />
-                            <span>Check-in</span>
-                          </Link>
-                        )}
-
-                        {/* Botão Painel TV */}
-                        <button
-                          onClick={() => abrirPainelTv(r)}
-                          className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5 border border-slate-200 shadow-sm active:scale-95"
-                          title="Exibir link do painel TV"
-                        >
-                          <Tv className="w-3.5 h-3.5 text-cyan-600" />
-                          <span>Painel TV</span>
-                        </button>
-
-                        {/* Botão Faltas da Reunião (quando encerrada) */}
-                        {statusEfetivo === 'encerrada' && (
-                          <Link
-                            href={`/reunioes/faltas?reuniao_id=${r.id}`}
-                            className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5 active:scale-95"
-                            title="Ver prontuário de faltas desta reunião"
-                          >
-                            <FileCheck2 className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Faltas ({r.total_ausentes})</span>
-                          </Link>
-                        )}
-
-                        {/* Botão Encerrar Reunião (quando agendada/em andamento) */}
-                        {statusEfetivo !== 'encerrada' && statusEfetivo !== 'cancelada' && (
-                          <button
-                            onClick={() => {
-                              setReuniaoSelecionada(r);
-                              setModalEncerrarAberto(true);
-                            }}
-                            className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl transition inline-flex items-center gap-1 active:scale-95"
-                            title="Encerrar reunião e processar faltas"
-                          >
-                            <Lock className="w-3.5 h-3.5" />
-                            <span>Encerrar</span>
-                          </button>
-                        )}
-
-                        {/* Botão Detalhes */}
+                    {/* ─── 3. EXTREMA DIREITA: AÇÕES AGRUPADAS ─── */}
+                    <div className="flex flex-wrap lg:flex-col items-stretch justify-center gap-2 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 min-w-[130px]">
+                      {/* Botão Check-in (disponível quando não encerrada/cancelada) */}
+                      {statusEfetivo !== 'encerrada' && statusEfetivo !== 'cancelada' && (
                         <Link
-                          href={`/reunioes/${r.id}`}
-                          className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition inline-flex items-center gap-1 active:scale-95"
-                          title="Ver detalhes da reunião e participantes"
+                          href={`/reunioes/${r.id}/checkin`}
+                          className="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition flex items-center justify-center gap-1.5 active:scale-95"
+                          title="Abrir terminal de Check-in"
                         >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Detalhes</span>
+                          <QrCode className="w-4 h-4" />
+                          <span>Check-in</span>
                         </Link>
-                      </div>
+                      )}
+
+                      {/* Botão Painel TV */}
+                      <button
+                        onClick={() => abrirPainelTv(r)}
+                        className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 border border-slate-200 shadow-sm hover:shadow active:scale-95"
+                        title="Exibir link do painel TV"
+                      >
+                        <Tv className="w-4 h-4 text-cyan-600" />
+                        <span>Painel TV</span>
+                      </button>
+
+                      {/* Botão Faltas da Reunião (quando encerrada) */}
+                      {statusEfetivo === 'encerrada' && (
+                        <Link
+                          href={`/reunioes/faltas?reuniao_id=${r.id}`}
+                          className="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs rounded-xl border border-amber-300 shadow-sm transition flex items-center justify-center gap-1.5 active:scale-95"
+                          title="Ver prontuário de faltas desta reunião"
+                        >
+                          <FileCheck2 className="w-4 h-4 text-amber-600" />
+                          <span>Faltas ({r.total_ausentes})</span>
+                        </Link>
+                      )}
+
+                      {/* Botão Encerrar Reunião (quando agendada/em andamento) */}
+                      {statusEfetivo !== 'encerrada' && statusEfetivo !== 'cancelada' && (
+                        <button
+                          onClick={() => {
+                            setReuniaoSelecionada(r);
+                            setModalEncerrarAberto(true);
+                          }}
+                          className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition flex items-center justify-center gap-1 active:scale-95"
+                          title="Encerrar reunião e processar faltas"
+                        >
+                          <Lock className="w-3.5 h-3.5" />
+                          <span>Encerrar</span>
+                        </button>
+                      )}
+
+                      {/* Botão Detalhes */}
+                      <Link
+                        href={`/reunioes/${r.id}`}
+                        className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 active:scale-95"
+                        title="Ver detalhes da reunião e participantes"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Detalhes</span>
+                      </Link>
                     </div>
                   </div>
                 );
