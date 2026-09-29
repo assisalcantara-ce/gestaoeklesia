@@ -8,6 +8,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { createServerClient as createSsrClient } from '@supabase/ssr'
 import { NextRequest } from 'next/server'
 
 export function createServerClient() {
@@ -29,22 +30,37 @@ export function createServerClientFromRequest(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
   const authHeader = request.headers.get('Authorization') || request.headers.get('authorization') || ''
-  const token = authHeader.replace(/^Bearer\s+/i, '')
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim()
 
-  return createClient(
+  if (token) {
+    return createClient(
+      supabaseUrl!,
+      anonKey!,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            apikey: anonKey || '',
+          },
+        },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+          detectSessionInUrl: false,
+        },
+      }
+    )
+  }
+
+  return createSsrClient(
     supabaseUrl!,
     anonKey!,
     {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          apikey: anonKey || '',
+      cookies: {
+        getAll() {
+          return request.cookies?.getAll() || []
         },
-      },
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false,
+        setAll() {},
       },
     }
   )

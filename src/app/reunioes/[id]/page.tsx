@@ -111,6 +111,7 @@ export default function DetalhesReuniaoPage() {
 
   const [modalEncerrarAberto, setModalEncerrarAberto] = useState<boolean>(false);
   const [encerrando, setEncerrando] = useState<boolean>(false);
+  const [gerandoPdf, setGerandoPdf] = useState<boolean>(false);
 
   // ─── Helper de Autenticação ───────────────────────────────────────────────
   const fetchAutenticado = useCallback(async (url: string, options: RequestInit = {}) => {
@@ -375,16 +376,34 @@ export default function DetalhesReuniaoPage() {
   const indiceFimExibicao = Math.min(paginaCorrigida * itensPorPagina, totalRegistrosFiltrados);
 
   // ─── Ação: Exportar Relatório PDF Oficial A4 ─────────────────────────────
-  const handleExportarPDF = () => {
-    if (!reuniao?.id) return;
-    const params = new URLSearchParams();
-    if (buscaMinistro.trim()) params.append('busca', buscaMinistro.trim());
-    if (filtroCongregacao !== 'todas') params.append('congregacao', filtroCongregacao);
-    if (filtroCargo !== 'todos') params.append('cargo', filtroCargo);
-    if (filtroPresenca !== 'todos') params.append('presenca', filtroPresenca);
+  const handleExportarPDF = async () => {
+    if (!reuniao?.id || gerandoPdf) return;
+    try {
+      setGerandoPdf(true);
+      const params = new URLSearchParams();
+      if (buscaMinistro.trim()) params.append('busca', buscaMinistro.trim());
+      if (filtroCongregacao !== 'todas') params.append('congregacao', filtroCongregacao);
+      if (filtroCargo !== 'todos') params.append('cargo', filtroCargo);
+      if (filtroPresenca !== 'todos') params.append('presenca', filtroPresenca);
 
-    const queryStr = params.toString() ? `?${params.toString()}` : '';
-    window.open(`/api/v1/reunioes/${reuniao.id}/pdf${queryStr}`, '_blank');
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/pdf${queryStr}`, {
+        cache: 'no-store',
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: 'Falha ao processar e gerar PDF.' }));
+        throw new Error(errData.error || `Erro ${res.status}: Não foi possível gerar o PDF.`);
+      }
+
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+    } catch (err: any) {
+      alert(err?.message || 'Falha na geração do relatório em PDF da reunião.');
+    } finally {
+      setGerandoPdf(false);
+    }
   };
 
   // Tem filtros ativos?
@@ -856,11 +875,21 @@ export default function DetalhesReuniaoPage() {
             {/* 6. Botão Imprimir / Exportar PDF */}
             <button
               onClick={handleExportarPDF}
-              className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5 shadow-sm active:scale-95 ml-auto"
+              disabled={gerandoPdf}
+              className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5 shadow-sm active:scale-95 ml-auto cursor-pointer"
               title="Gerar e abrir PDF institucional A4"
             >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Imprimir / Exportar PDF</span>
+              {gerandoPdf ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Gerando PDF...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Imprimir / Exportar PDF</span>
+                </>
+              )}
             </button>
           </div>
         </div>

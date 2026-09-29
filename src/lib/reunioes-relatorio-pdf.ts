@@ -46,27 +46,52 @@ export interface DadosRelatorioReuniao {
 }
 
 /**
- * Tenta buscar o logo via URL e converter para Base64 para inclusão no jsPDF.
+ * Tenta buscar o logo (Data URI, URL HTTP ou Base64) e converter para inclusão no jsPDF.
  */
 async function carregarLogoBase64(url?: string | null): Promise<{ data: string; format: 'PNG' | 'JPEG' } | null> {
-  if (!url || typeof url !== 'string' || !url.startsWith('http')) return null;
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
-    if (!res.ok) return null;
-    const contentType = (res.headers.get('content-type') || '').toLowerCase();
-    const buffer = Buffer.from(await res.arrayBuffer());
-    if (buffer.length === 0) return null;
+  if (!url || typeof url !== 'string' || !url.trim()) return null;
+  const cleanUrl = url.trim();
 
-    const isPng = contentType.includes('png') || url.toLowerCase().endsWith('.png');
+  // 1. Se já for Data URI (ex: data:image/png;base64,...)
+  if (cleanUrl.startsWith('data:image/')) {
+    const isPng = cleanUrl.includes('image/png') || !cleanUrl.includes('image/jpeg');
     const format = isPng ? 'PNG' : 'JPEG';
-    const base64 = buffer.toString('base64');
     return {
-      data: `data:${isPng ? 'image/png' : 'image/jpeg'};base64,${base64}`,
+      data: cleanUrl,
       format,
     };
-  } catch {
-    return null;
   }
+
+  // 2. Se for uma URL externa HTTP / HTTPS
+  if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+    try {
+      const res = await fetch(cleanUrl, { signal: AbortSignal.timeout(4000) });
+      if (!res.ok) return null;
+      const contentType = (res.headers.get('content-type') || '').toLowerCase();
+      const buffer = Buffer.from(await res.arrayBuffer());
+      if (buffer.length === 0) return null;
+
+      const isPng = contentType.includes('png') || cleanUrl.toLowerCase().endsWith('.png');
+      const format = isPng ? 'PNG' : 'JPEG';
+      const base64 = buffer.toString('base64');
+      return {
+        data: `data:${isPng ? 'image/png' : 'image/jpeg'};base64,${base64}`,
+        format,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  // 3. Se for string Base64 pura (sem data:image/...)
+  if (cleanUrl.length > 50 && /^[A-Za-z0-9+/=\r\n]+$/.test(cleanUrl.slice(0, 50))) {
+    return {
+      data: `data:image/png;base64,${cleanUrl.replace(/\r?\n|\r/g, '')}`,
+      format: 'PNG',
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -106,15 +131,16 @@ export async function gerarRelatorioReuniaoPDF(dados: DadosRelatorioReuniao): Pr
 
   // ─── Função de Desenho do Cabeçalho Institucional ─────────────────────────
   const desenharCabecalho = (_pageNumber?: number) => {
-    const headerTop = 10;
+    const headerTop = 9;
     let textStartX = margin;
-    const maxLogoWidth = 22;
-    const maxLogoHeight = 16;
+    const logoWidth = 18;
+    const logoHeight = 15;
 
+    // Logo do Tenant no Timbre (à esquerda)
     if (logoInfo) {
       try {
-        doc.addImage(logoInfo.data, logoInfo.format, margin, headerTop, maxLogoWidth, maxLogoHeight, undefined, 'FAST');
-        textStartX = margin + maxLogoWidth + 4;
+        doc.addImage(logoInfo.data, logoInfo.format, margin, headerTop, logoWidth, logoHeight, undefined, 'FAST');
+        textStartX = margin + logoWidth + 4;
       } catch {
         textStartX = margin;
       }
@@ -122,7 +148,7 @@ export async function gerarRelatorioReuniaoPDF(dados: DadosRelatorioReuniao): Pr
 
     // Nome da Instituição
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     doc.setTextColor(18, 59, 99); // Azul corporativo
     const nomeIgreja = (dados.nomeMinisterio || 'GESTÃO EKLÉSIA').toUpperCase();
     doc.text(nomeIgreja, textStartX, headerTop + 4);

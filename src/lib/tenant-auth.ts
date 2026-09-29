@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+import { cookies } from 'next/headers';
+import { createServerClient as createSsrClient } from '@supabase/ssr';
 import { createServerClient, createServerClientFromRequest } from '@/lib/supabase-server';
 import {
   hasRole,
@@ -162,14 +164,41 @@ export async function resolveTenantAuth(
   request: NextRequest,
   options?: { checkLegalAcceptance?: boolean }
 ): Promise<TenantAuthContext> {
-  const supabase = createServerClientFromRequest(request);
+  let supabase = createServerClientFromRequest(request);
   const admin = createServerClient();
 
-  // Fluxo nativo Supabase Auth puro
-  const {
+  // Fluxo nativo Supabase Auth puro (Bearer token ou cookies de request)
+  let {
     data: { user },
     error,
   } = await supabase.auth.getUser();
+
+  // Fallback para cookies do next/headers caso ainda não tenha autenticado
+  if ((error || !user?.id) && typeof window === 'undefined') {
+    try {
+      const cookieStore = await cookies();
+      const ssrClient = createSsrClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+        {
+          cookies: {
+            getAll() {
+              return cookieStore.getAll();
+            },
+            setAll() {},
+          },
+        }
+      );
+      const cookieRes = await ssrClient.auth.getUser();
+      if (cookieRes.data?.user?.id) {
+        user = cookieRes.data.user;
+        error = null;
+        supabase = ssrClient as any;
+      }
+    } catch {
+      // Silenciar erro no fallback de cookies
+    }
+  }
 
   if (error || !user?.id) {
     throw new Error('UNAUTHORIZED');

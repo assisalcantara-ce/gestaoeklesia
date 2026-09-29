@@ -48,10 +48,10 @@ export async function GET(
         pauta,
         data_reuniao,
         horario_inicio,
-        horario_fim,
+        horario_limite_entrada,
         local,
         status,
-        total_convocados,
+        total_esperados,
         total_presentes,
         total_ausentes,
         total_justificados,
@@ -93,8 +93,7 @@ export async function GET(
         cargo_snapshot,
         nome_congregacao_snapshot,
         area_snapshot,
-        status_presenca,
-        data_hora_checkin
+        status_presenca
       `)
       .eq('reuniao_id', reuniaoId)
       .eq('ministry_id', ctx.ministryId)
@@ -229,7 +228,7 @@ export async function GET(
       pauta: reuniao.pauta || null,
       dataReuniao: dataFormatada,
       horarioInicio: reuniao.horario_inicio ? reuniao.horario_inicio.slice(0, 5) : '—',
-      horarioFim: reuniao.horario_fim ? reuniao.horario_fim.slice(0, 5) : null,
+      horarioFim: reuniao.horario_limite_entrada ? reuniao.horario_limite_entrada.slice(0, 5) : null,
       localReuniao: reuniao.local || 'Templo Sede',
       nomeCongregacao: (reuniao.congregacoes as any)?.nome || 'Geral / Todas',
       statusReuniao: reuniao.status || 'agendada',
