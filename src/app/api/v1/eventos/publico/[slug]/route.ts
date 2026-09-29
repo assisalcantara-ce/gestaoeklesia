@@ -19,7 +19,7 @@ export async function GET(
   // Buscar evento público pelo slug
   const { data: evento, error } = await admin
     .from('eventos')
-    .select('id, titulo, descricao, tipo, data_inicio, data_fim, local_nome, local_endereco, capacidade, status, is_publico, aceita_inscricao, valor_inscricao, slug, ministry_id')
+    .select('id, titulo, descricao, tipo, data_inicio, data_fim, local_nome, local_endereco, capacidade, status, is_publico, aceita_inscricao, valor_inscricao, inclui_brinde, brinde_habilitado, brinde_distribuicao, brinde_quantidade, inclui_certificado, certificado_habilitado, inclui_alimentacao, inclui_hospedagem, vagas_hospedagem, descricao_hospedagem, slug, ministry_id')
     .eq('slug', slug)
     .eq('is_publico', true)
     .maybeSingle();
@@ -73,6 +73,12 @@ export async function GET(
     is_publico: evento.is_publico,
     aceita_inscricao: evento.aceita_inscricao,
     valor_inscricao: evento.valor_inscricao,
+    inclui_brinde: Boolean(evento.inclui_brinde ?? evento.brinde_habilitado),
+    brinde_distribuicao: evento.brinde_distribuicao ?? 'todos',
+    brinde_quantidade: evento.brinde_quantidade,
+    inclui_certificado: Boolean(evento.inclui_certificado ?? evento.certificado_habilitado),
+    inclui_alimentacao: Boolean(evento.inclui_alimentacao),
+    inclui_hospedagem: Boolean(evento.inclui_hospedagem),
     inscritos_confirmados: confirmados,
     lista_espera: espera,
     vagas_restantes,

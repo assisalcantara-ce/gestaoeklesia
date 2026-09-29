@@ -74,7 +74,9 @@ interface EventoDetalhe {
 
 const TIPO_LABELS: Record<string, string> = {
   culto_especial: 'Culto Especial',
+  congresso: 'Congresso',
   conferencia: 'Conferência',
+  palestra: 'Palestra',
   retiro: 'Retiro',
   evangelismo: 'Evangelismo',
   treinamento: 'Treinamento',

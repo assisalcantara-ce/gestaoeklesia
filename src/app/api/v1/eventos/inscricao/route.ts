@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
       observacoes,
       presente: false,
     })
-    .select('id, status')
+    .select('id, status, tem_brinde')
     .single();
 
   if (insErr || !inscricao) {
@@ -151,6 +151,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       inscricao_id: inscricao.id,
       status: inscricao.status,
+      tem_brinde: Boolean(inscricao.tem_brinde),
       nome,
       evento_titulo: evento.titulo,
       data_inicio: evento.data_inicio,

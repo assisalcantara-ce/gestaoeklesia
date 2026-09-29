@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { CalendarDays, MapPin, Users, Clock, AlertTriangle, CheckCircle2, Loader2, Copy, RefreshCw } from 'lucide-react';
+import { CalendarDays, MapPin, Users, Clock, AlertTriangle, CheckCircle2, Loader2, Copy, RefreshCw, Gift, Award, Utensils, Home } from 'lucide-react';
 
 interface EventoPublico {
   id: string;
@@ -19,6 +19,12 @@ interface EventoPublico {
   is_publico: boolean;
   aceita_inscricao: boolean;
   valor_inscricao: number;
+  inclui_brinde?: boolean;
+  brinde_distribuicao?: string;
+  brinde_quantidade?: number | null;
+  inclui_certificado?: boolean;
+  inclui_alimentacao?: boolean;
+  inclui_hospedagem?: boolean;
   inscritos_confirmados: number;
   lista_espera: number;
   vagas_restantes: number | null;
@@ -58,7 +64,9 @@ function fmtTime(iso: string) {
 function tipoLabel(tipo: string) {
   const map: Record<string, string> = {
     culto_especial: 'Culto Especial',
+    congresso:      'Congresso',
     conferencia:    'Conferência',
+    palestra:       'Palestra',
     retiro:         'Retiro',
     evangelismo:    'Evangelismo',
     treinamento:    'Treinamento',
@@ -77,7 +85,7 @@ export default function EventoPublicoPage() {
   const [form, setForm] = useState<FormState>(FORM_INICIAL);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [sucesso, setSucesso] = useState<{ nome: string; status: string } | null>(null);
+  const [sucesso, setSucesso] = useState<{ nome: string; status: string; tem_brinde?: boolean } | null>(null);
   const [pixData, setPixData] = useState<PixData | null>(null);
   const [pixStatus, setPixStatus] = useState<'pendente' | 'pago' | 'expirado'>('pendente');
   const [copiado, setCopiado] = useState(false);
@@ -109,6 +117,7 @@ export default function EventoPublicoPage() {
         const d = await r.json();
         if (d.status === 'pago') {
           setPixStatus('pago');
+          setSucesso(prev => prev ? { ...prev, status: 'confirmado', tem_brinde: Boolean(d.tem_brinde) } : null);
           stopPolling();
           // Atualizar vagas
           fetch(`/api/v1/eventos/publico/${encodeURIComponent(slug)}`)
@@ -146,11 +155,11 @@ export default function EventoPublicoPage() {
           valor:          data.valor,
         });
         setPixStatus('pendente');
-        setSucesso({ nome: data.nome, status: 'aguardando_pagamento' });
+        setSucesso({ nome: data.nome, status: 'aguardando_pagamento', tem_brinde: Boolean(data.tem_brinde) });
         setForm(FORM_INICIAL);
         if (data.pagamento_id) startPixPolling(data.pagamento_id);
       } else {
-        setSucesso({ nome: data.nome, status: data.status });
+        setSucesso({ nome: data.nome, status: data.status, tem_brinde: Boolean(data.tem_brinde) });
         setForm(FORM_INICIAL);
         // Recarregar dados do evento para atualizar vagas
         fetch(`/api/v1/eventos/publico/${encodeURIComponent(slug)}`)
@@ -247,15 +256,56 @@ export default function EventoPublicoPage() {
               <p className="text-xs text-gray-500">Lista de espera</p>
             </div>
           )}
-          {evento.valor_inscricao > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4 text-center shadow-sm">
-              <p className="text-xs text-gray-500 mb-1">Inscrição</p>
-              <p className="text-xl font-bold text-[#123b63]">
-                {evento.valor_inscricao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </p>
-            </div>
-          )}
+          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center shadow-sm">
+            <p className="text-xs text-gray-500 mb-1">Inscrição</p>
+            <p className="text-xl font-bold text-[#123b63]">
+              {evento.valor_inscricao > 0
+                ? evento.valor_inscricao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                : 'Gratuita'}
+            </p>
+          </div>
         </div>
+
+        {/* Benefícios inclusos na Inscrição */}
+        {(evento.inclui_brinde || evento.inclui_certificado || evento.inclui_alimentacao || evento.inclui_hospedagem) && (
+          <div className="bg-white rounded-xl border border-emerald-200 p-5 shadow-sm space-y-3">
+            <h2 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              Benefícios Inclusos na Inscrição
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {evento.inclui_brinde && (
+                <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200 text-emerald-900 text-xs font-semibold">
+                  <Gift className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    Brinde Oficial{' '}
+                    {evento.brinde_distribuicao === 'quantidade_limitada' && evento.brinde_quantidade
+                      ? `(limitado aos primeiros ${evento.brinde_quantidade} inscritos)`
+                      : '(todos os confirmados)'}
+                  </span>
+                </div>
+              )}
+              {evento.inclui_certificado && (
+                <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-blue-50/70 border border-blue-200 text-blue-900 text-xs font-semibold">
+                  <Award className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>Certificado de Participação</span>
+                </div>
+              )}
+              {evento.inclui_alimentacao && (
+                <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-amber-50/70 border border-amber-200 text-amber-900 text-xs font-semibold">
+                  <Utensils className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Alimentação inclusa</span>
+                </div>
+              )}
+              {evento.inclui_hospedagem && (
+                <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-purple-50/70 border border-purple-200 text-purple-900 text-xs font-semibold">
+                  <Home className="w-4 h-4 text-purple-600 shrink-0" />
+                  <span>Hospedagem inclusa</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Descrição */}
         {evento.descricao && (
@@ -291,10 +341,16 @@ export default function EventoPublicoPage() {
         {sucesso && pixData && sucesso.status === 'aguardando_pagamento' && (
           <div className="bg-white rounded-xl border border-[#123b63]/20 p-6 shadow-md space-y-5">
             {pixStatus === 'pago' ? (
-              <div className="text-center">
-                <CheckCircle2 className="w-14 h-14 text-green-500 mx-auto mb-3" />
-                <h3 className="font-bold text-xl text-gray-800 mb-1">Pagamento confirmado!</h3>
-                <p className="text-gray-600 text-sm">Olá, {sucesso.nome}! Sua inscrição foi confirmada. Nos vemos em breve!</p>
+              <div className="text-center space-y-3">
+                <CheckCircle2 className="w-14 h-14 text-green-500 mx-auto mb-1" />
+                <h3 className="font-bold text-xl text-gray-800">Pagamento confirmado!</h3>
+                <p className="text-gray-600 text-sm">Olá, <strong>{sucesso.nome}</strong>! Sua inscrição foi confirmada. Nos vemos em breve!</p>
+                {sucesso.tem_brinde && (
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold">
+                    <Gift className="w-4 h-4 text-emerald-600" />
+                    <span>✓ Brinde incluso</span>
+                  </div>
+                )}
               </div>
             ) : pixStatus === 'expirado' ? (
               <div className="text-center">
@@ -364,9 +420,9 @@ export default function EventoPublicoPage() {
 
         {/* Sucesso — Gratuito ou Lista de Espera */}
         {sucesso && !pixData && (
-          <div className={`rounded-xl border p-6 text-center ${sucesso.status === 'confirmado' ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
-            <CheckCircle2 className={`w-12 h-12 mx-auto mb-3 ${sucesso.status === 'confirmado' ? 'text-green-500' : 'text-amber-500'}`} />
-            <h3 className="font-bold text-lg text-gray-800 mb-1">
+          <div className={`rounded-xl border p-6 text-center space-y-3 ${sucesso.status === 'confirmado' ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+            <CheckCircle2 className={`w-12 h-12 mx-auto mb-1 ${sucesso.status === 'confirmado' ? 'text-green-500' : 'text-amber-500'}`} />
+            <h3 className="font-bold text-lg text-gray-800">
               {sucesso.status === 'confirmado' ? 'Inscrição confirmada!' : 'Você está na lista de espera!'}
             </h3>
             <p className="text-gray-600 text-sm">
@@ -375,6 +431,12 @@ export default function EventoPublicoPage() {
                 : `Olá, ${sucesso.nome}! O evento está lotado. Você foi adicionado à lista de espera e será notificado se surgir uma vaga.`
               }
             </p>
+            {sucesso.status === 'confirmado' && sucesso.tem_brinde && (
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold">
+                <Gift className="w-4 h-4 text-emerald-600" />
+                <span>✓ Brinde incluso</span>
+              </div>
+            )}
           </div>
         )}
 

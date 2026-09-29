@@ -252,7 +252,7 @@ export default function ConfiguracoesCertificadosPage() {
     });
   };
 
-  const handleAddEl = (tipo: CertificadoElemento['tipo']) => {
+  const handleAddEl = (tipo: CertificadoElemento['tipo'], textoPadrao?: string) => {
     if (!templateEmEdicao) return;
     const base: CertificadoElemento = {
       id: gId(),
@@ -266,7 +266,7 @@ export default function ConfiguracoesCertificadosPage() {
       fonte: 'Arial',
       alinhamento: 'left',
       visivel: true,
-      texto: tipo === 'texto' ? 'Texto do certificado' : undefined,
+      texto: tipo === 'texto' ? (textoPadrao ?? 'Texto do certificado') : undefined,
     };
     setTemplateEmEdicao({
       ...templateEmEdicao,
@@ -850,15 +850,88 @@ export default function ConfiguracoesCertificadosPage() {
 
             {/* Placeholders */}
             <div>
-              <h4 className="text-sm font-bold text-gray-800 mb-2">Variaveis Disponiveis</h4>
-              <ul className="text-xs text-gray-500 space-y-1">
-                {placeholdersAtivos.map((ph) => (
-                  <li key={ph.placeholder} className="flex items-center gap-1">
-                    <code className="bg-gray-100 px-1 rounded">{ph.placeholder}</code>
-                    <span>{ph.label}</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-bold text-gray-800">
+                  {currentCategoria === 'eventos' || currentCategoria === 'evento'
+                    ? 'Variáveis disponíveis para Eventos'
+                    : 'Variáveis Disponíveis'}
+                </h4>
+              </div>
+              <p className="text-[11px] text-gray-400 mb-2.5">
+                {elementoSelecionado && elementoSelecionado.tipo === 'texto'
+                  ? 'Clique em uma variável para inseri-la no texto selecionado:'
+                  : 'Clique em uma variável para adicioná-la ao certificado:'}
+              </p>
+
+              {currentCategoria === 'eventos' || currentCategoria === 'evento' ? (
+                <div className="space-y-3">
+                  {(['PARTICIPANTE', 'EVENTO', 'INSTITUCIONAL', 'CERTIFICADO'] as const).map((grp) => {
+                    const itens = placeholdersAtivos.filter((p) => p.grupo === grp);
+                    if (itens.length === 0) return null;
+                    return (
+                      <div key={grp} className="space-y-1">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider block">
+                          {grp}
+                        </span>
+                        <div className="space-y-1">
+                          {itens.map((ph) => (
+                            <button
+                              key={ph.placeholder}
+                              type="button"
+                              onClick={() => {
+                                if (elementoSelecionado && elementoSelecionado.tipo === 'texto') {
+                                  const atual = elementoSelecionado.texto || '';
+                                  updateEl(elementoSelecionado.id, {
+                                    texto: atual ? `${atual} ${ph.placeholder}` : ph.placeholder,
+                                  });
+                                } else if (templateEmEdicao) {
+                                  handleAddEl('texto', ph.placeholder);
+                                }
+                              }}
+                              className="w-full text-left p-1.5 rounded-lg border border-gray-100 hover:border-blue-300 hover:bg-blue-50/50 transition group flex items-start gap-1.5 cursor-pointer select-none"
+                              title={`Clique para inserir ${ph.placeholder}`}
+                            >
+                              <code className="bg-gray-100 group-hover:bg-blue-100 text-blue-800 text-[11px] px-1 py-0.5 rounded font-mono shrink-0 font-bold">
+                                {ph.placeholder}
+                              </code>
+                              <span className="text-[11px] text-gray-600 group-hover:text-gray-900 leading-tight">
+                                {ph.label}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <ul className="text-xs text-gray-500 space-y-1">
+                  {placeholdersAtivos.map((ph) => (
+                    <li key={ph.placeholder}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (elementoSelecionado && elementoSelecionado.tipo === 'texto') {
+                            const atual = elementoSelecionado.texto || '';
+                            updateEl(elementoSelecionado.id, {
+                              texto: atual ? `${atual} ${ph.placeholder}` : ph.placeholder,
+                            });
+                          } else if (templateEmEdicao) {
+                            handleAddEl('texto', ph.placeholder);
+                          }
+                        }}
+                        className="w-full text-left flex items-center gap-1.5 p-1 rounded hover:bg-gray-100 transition group cursor-pointer"
+                        title={`Clique para inserir ${ph.placeholder}`}
+                      >
+                        <code className="bg-gray-100 group-hover:bg-blue-50 text-blue-700 px-1 rounded text-xs font-mono font-semibold">
+                          {ph.placeholder}
+                        </code>
+                        <span className="text-xs text-gray-600 group-hover:text-gray-900">{ph.label}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>

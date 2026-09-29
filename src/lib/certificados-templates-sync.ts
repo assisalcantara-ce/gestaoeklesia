@@ -162,12 +162,14 @@ export async function loadCertificadosTemplatesForCurrentUser(
     const normalizeStr = (s: string) =>
       (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-    // Limpar modelos duplicados ou obsoletos (ex: 'ministerial-pastor2-padrao', 'CASAMENTO', 'APRESENTAÇÃO DE CRIANÇAS')
+    // Limpar modelos duplicados ou obsoletos (ex: 'ministerial-pastor2-padrao', 'CASAMENTO', 'APRESENTAÇÃO DE CRIANÇAS', modelos antigos de eventos)
     const duplicados = fromDb.filter((t: any) => {
       const n = (t.nome || t.name || '').trim();
       const k = t.template_key || t.id || '';
       return (
         k === 'ministerial-pastor2-padrao' ||
+        k === 'evento-participacao-padrao' ||
+        k === 'evento-participacao' ||
         n === 'Consagração Pastor(a) II' ||
         n === 'Consagração Pastor II' ||
         n === 'Consagracao Pastor(a) II' ||
@@ -177,6 +179,11 @@ export async function loadCertificadosTemplatesForCurrentUser(
         n === 'APRESENTACAO DE CRIANCAS' ||
         n === 'EBD' ||
         n === 'ebd' ||
+        n === 'Certificado de Participação — Padrão' ||
+        n === 'Certificado de Participação - Padrão' ||
+        n === 'Certificado de Participacao — Padrao' ||
+        n === 'Certificado de Participacao - Padrao' ||
+        ((normalizeStr(n) === 'eventos' || normalizeStr(n) === 'evento') && k !== 'evento-padrao') ||
         (n.length > 3 && n === n.toUpperCase() && CERTIFICADOS_TEMPLATES_PADRAO.some((p) => normalizeStr(p.nome) === normalizeStr(n)))
       );
     });
@@ -225,7 +232,7 @@ export async function loadCertificadosTemplatesForCurrentUser(
         (!existente.backgroundUrl ||
           existente.backgroundUrl !== padrao.backgroundUrl ||
           (existente.nome && existente.nome !== padrao.nome) ||
-          ((padrao.id === 'casamento-padrao' || padrao.id === 'batismo-aguas-padrao' || padrao.id === 'diaconisa-padrao' || padrao.id === 'ministerial-evangelista-padrao' || padrao.id === 'consagracao-obreiro-padrao' || padrao.id === 'ministerial-pastor-padrao' || padrao.id === 'ministerial-pastora-padrao' || padrao.id === 'consagracao-diacono-padrao' || padrao.id === 'ministerial-presbitero-padrao' || padrao.id === 'ministerial-missionario-padrao') && JSON.stringify(existente.elementos) !== JSON.stringify(padrao.elementos)))
+          ((padrao.id === 'casamento-padrao' || padrao.id === 'batismo-aguas-padrao' || padrao.id === 'diaconisa-padrao' || padrao.id === 'ministerial-evangelista-padrao' || padrao.id === 'consagracao-obreiro-padrao' || padrao.id === 'ministerial-pastor-padrao' || padrao.id === 'ministerial-pastora-padrao' || padrao.id === 'consagracao-diacono-padrao' || padrao.id === 'ministerial-presbitero-padrao' || padrao.id === 'ministerial-missionario-padrao' || padrao.id === 'evento-padrao') && JSON.stringify(existente.elementos) !== JSON.stringify(padrao.elementos)))
       ) {
         // Template existente com background, nome ou elementos desatualizados — atualizar para o modelo nativo oficial
         const updatedData = {
