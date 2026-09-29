@@ -17,11 +17,8 @@ import {
   Clock,
   Send,
   Mail,
-  ShieldCheck,
-  Settings,
   AlertCircle,
 } from 'lucide-react';
-import ModalModeloAdvertencia from '@/components/reunioes/ModalModeloAdvertencia';
 
 interface FaltaItem {
   id: string;
@@ -93,18 +90,6 @@ export default function FaltasJustificativasPage() {
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
   const [modalJustificarAberto, setModalJustificarAberto] = useState(false);
   const [modalAbonarAberto, setModalAbonarAberto] = useState(false);
-  const [modalModeloAberto, setModalModeloAberto] = useState(false);
-
-  // Estado do Modelo Oficial do Tenant
-  const [statusModelo, setStatusModelo] = useState<{
-    configurado: boolean;
-    carregando: boolean;
-    modelo: any;
-  }>({
-    configurado: false,
-    carregando: true,
-    modelo: null,
-  });
 
   // Estado de envio de e-mail da advertência
   const [enviandoEmail, setEnviandoEmail] = useState<boolean>(false);
@@ -138,24 +123,6 @@ export default function FaltasJustificativasPage() {
     });
   }, []);
 
-  // ─── 0. Carregar Status do Modelo Oficial ─────────────────────────────────
-  const carregarStatusModelo = useCallback(async () => {
-    try {
-      setStatusModelo((prev) => ({ ...prev, carregando: true }));
-      const res = await fetchAutenticado('/api/v1/reunioes/configuracoes/modelo-advertencia');
-      const data = await res.json();
-      if (res.ok) {
-        setStatusModelo({
-          configurado: Boolean(data.configurado),
-          carregando: false,
-          modelo: data.modelo || null,
-        });
-      }
-    } catch {
-      setStatusModelo((prev) => ({ ...prev, carregando: false }));
-    }
-  }, [fetchAutenticado]);
-
   // ─── 1. Carregar Listagem de Faltas ────────────────────────────────────────
   const carregarFaltas = useCallback(async () => {
     try {
@@ -185,26 +152,16 @@ export default function FaltasJustificativasPage() {
   useEffect(() => {
     if (!bloqueado) {
       carregarFaltas();
-      carregarStatusModelo();
     }
-  }, [bloqueado, carregarFaltas, carregarStatusModelo]);
+  }, [bloqueado, carregarFaltas]);
 
   const abrirDetalhes = (falta: FaltaItem) => {
     setFaltaSelecionada(falta);
     setFeedbackEnvio(null);
     setModalDetalhesAberto(true);
-    carregarStatusModelo();
   };
 
   const handleEnviarEmailAdvertencia = async (advertenciaId: string) => {
-    if (!statusModelo.configurado) {
-      setFeedbackEnvio({
-        tipo: 'erro',
-        texto: 'Modelo oficial de advertência não configurado. Cadastre o PDF oficial antes de enviar.',
-      });
-      return;
-    }
-
     setEnviandoEmail(true);
     setFeedbackEnvio(null);
 
@@ -375,15 +332,6 @@ export default function FaltasJustificativasPage() {
       activeMenu="reunioes"
       headerExtra={
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setModalModeloAberto(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition border border-slate-300 shadow-sm"
-            title="Configurar Modelo Oficial de Carta de Advertência da Instituição"
-          >
-            <FileText className="w-4 h-4 text-blue-600" />
-            <span>Modelo de Carta</span>
-          </button>
-
           <button
             onClick={carregarFaltas}
             className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition border border-slate-300 shadow-sm"
@@ -693,17 +641,9 @@ export default function FaltasJustificativasPage() {
                       <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
                         Carta de Advertência Oficial
                       </h3>
-                      {statusModelo.configurado ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                          Modelo oficial: Cadastrado ✓
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                          Modelo não configurado
-                        </span>
-                      )}
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                        Documento Gerado Eletronicamente
+                      </span>
                     </div>
 
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
@@ -755,30 +695,6 @@ export default function FaltasJustificativasPage() {
                         </div>
                       </div>
 
-                      {/* Alerta se Modelo NÃO estiver configurado */}
-                      {!statusModelo.configurado && (
-                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 space-y-2">
-                          <div className="flex items-start gap-2">
-                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                            <div>
-                              <strong className="block font-semibold">Modelo oficial de advertência não configurado.</strong>
-                              <span className="text-[11px] text-amber-700">
-                                Para enviar ou visualizar o documento oficial estatutário, configure o modelo PDF da sua instituição.
-                              </span>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              setModalModeloAberto(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#123b63] hover:bg-[#1a4f85] text-white font-bold text-xs rounded-xl shadow-sm transition"
-                          >
-                            <Settings className="w-3.5 h-3.5" />
-                            Configurar Modelo
-                          </button>
-                        </div>
-                      )}
-
                       {/* Feedback de envio em tempo real */}
                       {feedbackEnvio && (
                         <div
@@ -811,12 +727,10 @@ export default function FaltasJustificativasPage() {
 
                         <button
                           onClick={() => handleEnviarEmailAdvertencia(adv.id)}
-                          disabled={!statusModelo.configurado || enviandoEmail || !emailDestino}
+                          disabled={enviandoEmail || !emailDestino}
                           className="flex-1 min-w-[150px] px-3.5 py-2.5 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5"
                           title={
-                            !statusModelo.configurado
-                              ? 'Cadastre o modelo oficial antes de enviar'
-                              : !emailDestino
+                            !emailDestino
                               ? 'Ministro sem e-mail cadastrado'
                               : 'Enviar notificação oficial por e-mail'
                           }
@@ -985,12 +899,6 @@ export default function FaltasJustificativasPage() {
         </div>
       )}
 
-      {/* ─── MODAL: MODELO OFICIAL DE ADVERTÊNCIA ─── */}
-      <ModalModeloAdvertencia
-        aberto={modalModeloAberto}
-        onFechar={() => setModalModeloAberto(false)}
-        onModeloAtualizado={() => carregarStatusModelo()}
-      />
     </PageLayout>
   );
 }
