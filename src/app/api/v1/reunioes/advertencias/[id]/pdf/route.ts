@@ -120,7 +120,16 @@ export async function GET(
 
     const filename = `Carta_Advertencia_${advertencia.numero_protocolo.replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
 
-    // 3. Gerar PDF oficial dinâmico via jsPDF Server-side preenchido com dados reais
+    // 3. Buscar configuração de textos da advertência do ministério
+    const { data: configRow } = await ctx.admin
+      .from('configurations')
+      .select('reunioes_advertencia, church_profile')
+      .eq('ministry_id', ctx.ministryId)
+      .maybeSingle();
+
+    const configAdvertencia = configRow?.reunioes_advertencia || (configRow?.church_profile as any)?.reunioes_advertencia || null;
+
+    // 4. Gerar PDF oficial dinâmico via jsPDF Server-side preenchido com dados reais
     const pdfBuffer = await gerarCartaAdvertenciaPDF({
       protocolo: advertencia.numero_protocolo,
       nomeMinisterio: ministry?.name || 'GESTÃO EKLÉSIA',
@@ -138,6 +147,7 @@ export async function GET(
       localReuniao: reuniao?.local || 'Templo Sede',
       dataEmissao: new Date(advertencia.created_at).toLocaleString('pt-BR'),
       nomePresidente: ministry?.responsible_name || null,
+      configTextos: configAdvertencia || undefined,
     });
 
     return new NextResponse(pdfBuffer as any, {

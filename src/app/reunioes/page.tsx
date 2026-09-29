@@ -29,6 +29,7 @@ import {
   X,
   FileText,
   ArrowRight,
+  Settings,
 } from 'lucide-react';
 
 interface ReuniaoItem {
@@ -383,6 +384,16 @@ export default function ReunioesPage() {
       activeMenu="reunioes"
       headerExtra={
         <div className="flex flex-wrap items-center gap-3">
+          {/* Ação Secundária: Configurações do Módulo */}
+          <Link
+            href="/reunioes/configuracoes"
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-bold rounded-xl transition-all duration-150 border border-slate-300/80 shadow-sm hover:shadow hover:border-slate-400 active:scale-95"
+            title="Configurações de Textos Institucionais e Advertências"
+          >
+            <Settings className="w-4 h-4 text-slate-600" />
+            <span>Configurações</span>
+          </Link>
+
           {/* Ação Secundária: Faltas e Justificativas */}
           <Link
             href="/reunioes/faltas"

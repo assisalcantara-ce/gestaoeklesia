@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { gerarCartaAdvertenciaPDF } from '@/lib/reunioes-advertencia-pdf';
+import { ConfigAdvertenciaMinisterial } from '@/lib/reunioes-config-advertencia';
 
 export interface EnviarAdvertenciaParams {
   advertenciaId: string;
@@ -17,10 +18,12 @@ export interface EnviarAdvertenciaParams {
   nomeMinisterio: string;
   cnpjMinisterio?: string | null;
   cidadeUf?: string | null;
+  logoMinisterioUrl?: string | null;
   nomePresidente?: string | null;
   dataEmissao: string;
   ministryId: string;
   supabaseAdmin?: any;
+  configTextos?: ConfigAdvertenciaMinisterial | null;
 }
 
 export interface EnviarAdvertenciaResult {
@@ -243,6 +246,7 @@ export async function enviarEmailCartaAdvertencia(params: EnviarAdvertenciaParam
       nomeMinisterio: params.nomeMinisterio,
       cnpjMinisterio: params.cnpjMinisterio,
       cidadeUf: params.cidadeUf,
+      logoMinisterioUrl: params.logoMinisterioUrl,
       nomeMinistro: params.nomeMinistro,
       matriculaMinistro: params.matriculaMinistro,
       cargoMinistro: params.cargoMinistro,
@@ -254,6 +258,7 @@ export async function enviarEmailCartaAdvertencia(params: EnviarAdvertenciaParam
       localReuniao: params.localReuniao,
       dataEmissao: params.dataEmissao,
       nomePresidente: params.nomePresidente,
+      configTextos: params.configTextos,
     });
 
     const pdfBuffer = Buffer.from(uint8Pdf);

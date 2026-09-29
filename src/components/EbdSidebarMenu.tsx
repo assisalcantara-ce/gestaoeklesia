@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * EbdSidebarMenu — menu operacional simplificado do módulo EBD.
+ * EbdSidebarMenu — menu operacional simplificado do módulo EBD com visual integrado ao novo Sidebar institucional.
  *
  * Estrutura:
  * EBD (raiz)
@@ -18,6 +18,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 // ─── Tipo ────────────────────────────────────────────────────────────────────
 
@@ -175,13 +176,7 @@ export default function EbdSidebarMenu({ activeMenu, onNavigate }: EbdSidebarMen
     const hasChildren = !!node.children?.length;
 
     const paddingClass =
-      depth === 0 ? 'pl-6' : depth === 1 ? 'pl-10' : 'pl-14';
-
-    const marker = (
-      <span className={`text-xs flex-shrink-0 ${isActive ? 'text-white font-bold' : 'text-orange-400'}`}>
-        ▸
-      </span>
-    );
+      depth === 0 ? 'pl-11' : depth === 1 ? 'pl-14' : 'pl-16';
 
     const handleClick = () => {
       if (hasChildren) {
@@ -196,27 +191,29 @@ export default function EbdSidebarMenu({ activeMenu, onNavigate }: EbdSidebarMen
       <div key={node.id}>
         <button
           onClick={handleClick}
-          className={`w-full flex items-center gap-2 py-2 pr-3 text-left transition-colors text-sm ${paddingClass} ${
+          className={`w-full flex items-center gap-2.5 py-2 pr-4 text-left transition-all duration-150 text-[13px] ${paddingClass} ${
             isActive
-              ? 'bg-white/20 text-white font-semibold'
-              : 'text-white/60 hover:bg-white/10 hover:text-white'
+              ? 'text-cyan-300 font-semibold bg-cyan-500/10'
+              : 'text-slate-300/80 hover:text-white hover:bg-white/[0.04]'
           }`}
         >
-          {marker}
-          <span className="flex-1 leading-tight">{node.label}</span>
+          <span
+            className={`w-1.5 h-1.5 rounded-full transition-colors flex-shrink-0 ${
+              isActive ? 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]' : 'bg-slate-500/60'
+            }`}
+          />
+          <span className="flex-1 leading-snug truncate">{node.label}</span>
           {hasChildren && (
-            <span
-              className={`text-white/40 text-xs transition-transform duration-200 flex-shrink-0 ${
-                isExpanded ? 'rotate-180' : ''
+            <ChevronDown
+              className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 flex-shrink-0 ${
+                isExpanded ? 'rotate-180 text-cyan-400' : ''
               }`}
-            >
-              ▼
-            </span>
+            />
           )}
         </button>
 
         {hasChildren && isExpanded && (
-          <div className={depth === 0 ? 'bg-black/10' : ''}>
+          <div className={depth === 0 ? 'bg-black/20' : ''}>
             {node.children!.map(child => renderNode(child, depth + 1))}
           </div>
         )}
@@ -225,7 +222,7 @@ export default function EbdSidebarMenu({ activeMenu, onNavigate }: EbdSidebarMen
   };
 
   return (
-    <div className="bg-[#0f2a45] border-y border-white/10">
+    <div className="bg-[#061423]/90 py-1.5 border-t border-b border-white/[0.06]">
       {EBD_TREE.map(node => renderNode(node, 0))}
     </div>
   );

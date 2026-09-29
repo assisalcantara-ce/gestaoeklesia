@@ -125,22 +125,45 @@ export async function gerarRelatorioReuniaoPDF(dados: DadosRelatorioReuniao): Pr
   const pageWidth = 210;
   const pageHeight = 297;
   const margin = 14;
-  const contentWidth = pageWidth - margin * 2;
+  const contentWidth = pageWidth - margin * 2; // 182mm
 
   const logoInfo = await carregarLogoBase64(dados.logoMinisterioUrl);
 
-  // ─── Função de Desenho do Cabeçalho Institucional ─────────────────────────
+  // ─── 1. Função de Desenho do Cabeçalho Institucional ─────────────────────
   const desenharCabecalho = (_pageNumber?: number) => {
-    const headerTop = 9;
+    const headerTop = 8;
+    const logoBoxW = 20;
+    const logoBoxH = 15;
     let textStartX = margin;
-    const logoWidth = 18;
-    const logoHeight = 15;
 
-    // Logo do Tenant no Timbre (à esquerda)
+    // Logo do Tenant no Timbre (à esquerda com contenção proporcional e centralização vertical)
     if (logoInfo) {
       try {
-        doc.addImage(logoInfo.data, logoInfo.format, margin, headerTop, logoWidth, logoHeight, undefined, 'FAST');
-        textStartX = margin + logoWidth + 4;
+        const imgProps = (doc as any).getImageProperties(logoInfo.data);
+        const origW = imgProps.width || 1;
+        const origH = imgProps.height || 1;
+        const imgAspect = origW / origH;
+        const boxAspect = logoBoxW / logoBoxH;
+
+        let finalLogoW = logoBoxW;
+        let finalLogoH = logoBoxH;
+
+        if (imgAspect >= boxAspect) {
+          // Imagem mais larga que a caixa
+          finalLogoW = logoBoxW;
+          finalLogoH = logoBoxW / imgAspect;
+        } else {
+          // Imagem mais alta que a caixa
+          finalLogoH = logoBoxH;
+          finalLogoW = logoBoxH * imgAspect;
+        }
+
+        // Centralização exata dentro do box reservado [margin, headerTop, logoBoxW, logoBoxH]
+        const logoX = margin + (logoBoxW - finalLogoW) / 2;
+        const logoY = headerTop + (logoBoxH - finalLogoH) / 2;
+
+        doc.addImage(logoInfo.data, logoInfo.format, logoX, logoY, finalLogoW, finalLogoH, undefined, 'FAST');
+        textStartX = margin + logoBoxW + 4;
       } catch {
         textStartX = margin;
       }
@@ -149,16 +172,16 @@ export async function gerarRelatorioReuniaoPDF(dados: DadosRelatorioReuniao): Pr
     // Nome da Instituição
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10.5);
-    doc.setTextColor(18, 59, 99); // Azul corporativo
+    doc.setTextColor(18, 59, 99); // Azul institucional Eklésia
     const nomeIgreja = (dados.nomeMinisterio || 'GESTÃO EKLÉSIA').toUpperCase();
-    doc.text(nomeIgreja, textStartX, headerTop + 4);
+    doc.text(nomeIgreja, textStartX, headerTop + 3.8);
 
     // Subtítulo / Órgão
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
+    doc.setFontSize(7.2);
     doc.setTextColor(71, 85, 105);
     const sub = (dados.subtituloMinisterio || 'SISTEMA INTEGRADO DE GESTÃO MINISTERIAL • MESA DIRETORA').toUpperCase();
-    doc.text(sub, textStartX, headerTop + 8);
+    doc.text(sub, textStartX, headerTop + 8.2);
 
     // CNPJ e Localidade
     const infoLinha = [
@@ -169,123 +192,131 @@ export async function gerarRelatorioReuniaoPDF(dados: DadosRelatorioReuniao): Pr
       .join(' • ');
 
     if (infoLinha) {
-      doc.setFontSize(7);
+      doc.setFontSize(6.8);
       doc.setTextColor(100, 116, 139);
-      doc.text(infoLinha, textStartX, headerTop + 12);
+      doc.text(infoLinha, textStartX, headerTop + 12.2);
     }
 
-    // Título do Documento à Direita / Linha Inferior
+    // Título do Documento à Direita
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(18, 59, 99);
-    doc.text('DETALHES DA REUNIÃO MINISTERIAL', pageWidth - margin, headerTop + 4, { align: 'right' });
+    doc.text('DETALHES DA REUNIÃO MINISTERIAL', pageWidth - margin, headerTop + 3.8, { align: 'right' });
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Emissão: ${dados.dataEmissao}`, pageWidth - margin, headerTop + 8, { align: 'right' });
+    doc.text(`Emissão: ${dados.dataEmissao}`, pageWidth - margin, headerTop + 8.2, { align: 'right' });
 
     // Linha Divisória Institucional
-    const lineY = headerTop + 17;
+    const lineY = 25.5;
     doc.setDrawColor(18, 59, 99);
-    doc.setLineWidth(0.6);
+    doc.setLineWidth(0.5);
     doc.line(margin, lineY, pageWidth - margin, lineY);
   };
 
   // Desenhar cabeçalho da página 1
   desenharCabecalho(1);
 
-  let curY = 31;
+  let curY = 28.5;
 
-  // ─── Bloco 1: Informações Principais da Reunião (Página 1) ─────────────────
+  // ─── 2. Bloco: Informações Principais da Reunião ─────────────────────────
+  const temPauta = Boolean(dados.pauta && dados.pauta.trim());
+  const temFiltros = Boolean(dados.filtrosAplicados && dados.filtrosAplicados.trim());
+
+  let boxHeight = 18;
+  if (temPauta && temFiltros) boxHeight = 29;
+  else if (temPauta) boxHeight = 24;
+  else if (temFiltros) boxHeight = 23;
+
   doc.setFillColor(248, 250, 252); // Slate 50
   doc.setDrawColor(226, 232, 240); // Slate 200
   doc.setLineWidth(0.3);
+  doc.roundedRect(margin, curY, contentWidth, boxHeight, 1.5, 1.5, 'FD');
 
-  // Estimativa de altura do box dependendo da pauta
-  const temPauta = Boolean(dados.pauta && dados.pauta.trim());
-  const boxHeight = temPauta ? 36 : 28;
-  doc.roundedRect(margin, curY, contentWidth, boxHeight, 2, 2, 'FD');
-
-  curY += 5;
+  // Título da Reunião
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
+  doc.setFontSize(9.5);
   doc.setTextColor(15, 23, 42); // Slate 900
-  doc.text(dados.tituloReuniao.toUpperCase(), margin + 3.5, curY);
+  doc.text(dados.tituloReuniao.toUpperCase(), margin + 4, curY + 5.2);
 
   // Status Badge
   const statusStr = (dados.statusReuniao || 'AGENDADA').toUpperCase();
   const statusWidth = doc.getTextWidth(statusStr) + 6;
-  const statusX = pageWidth - margin - statusWidth - 3.5;
+  const statusX = pageWidth - margin - statusWidth - 4;
   doc.setFillColor(241, 245, 249);
   doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(statusX, curY - 3.5, statusWidth, 5, 1, 1, 'FD');
+  doc.roundedRect(statusX, curY + 1.8, statusWidth, 4.8, 1, 1, 'FD');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
+  doc.setFontSize(6.8);
   doc.setTextColor(51, 65, 85);
-  doc.text(statusStr, statusX + statusWidth / 2, curY - 0.2, { align: 'center' });
+  doc.text(statusStr, statusX + statusWidth / 2, curY + 5.1, { align: 'center' });
 
-  // Detalhes em grade
-  curY += 5;
-  doc.setFontSize(7.5);
+  // Grade de 4 Colunas Perfeita
+  const rowGridY = curY + 11.2;
+  doc.setFontSize(7.2);
 
-  // Coluna 1
+  // Coluna 1: DATA
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(71, 85, 105);
-  doc.text('DATA:', margin + 3.5, curY);
+  doc.text('DATA:', margin + 4, rowGridY);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(15, 23, 42);
-  doc.text(dados.dataReuniao, margin + 16, curY);
+  doc.text(dados.dataReuniao, margin + 14.5, rowGridY);
 
+  // Coluna 2: HORÁRIO
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(71, 85, 105);
-  doc.text('HORÁRIO:', margin + 45, curY);
+  doc.text('HORÁRIO:', margin + 46, rowGridY);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(15, 23, 42);
   const horarioTexto = dados.horarioFim ? `${dados.horarioInicio} às ${dados.horarioFim}` : dados.horarioInicio;
-  doc.text(horarioTexto, margin + 61, curY);
+  doc.text(horarioTexto, margin + 61, rowGridY);
 
-  // Coluna 2
+  // Coluna 3: LOCAL
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(71, 85, 105);
-  doc.text('LOCAL:', margin + 95, curY);
+  doc.text('LOCAL:', margin + 94, rowGridY);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(15, 23, 42);
-  doc.text(dados.localReuniao || 'Templo Sede', margin + 108, curY);
+  doc.text(dados.localReuniao || 'Templo Sede', margin + 106, rowGridY);
 
+  // Coluna 4: CONGREGAÇÃO
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(71, 85, 105);
-  doc.text('CONGREGAÇÃO:', margin + 140, curY);
+  doc.text('CONGREGAÇÃO:', margin + 138, rowGridY);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(15, 23, 42);
-  doc.text(dados.nomeCongregacao || 'Geral / Todas', margin + 164, curY);
+  doc.text(dados.nomeCongregacao || 'Geral / Todas', margin + 162, rowGridY);
 
-  // Pauta (se houver)
+  let nextInnerY = rowGridY + 5.2;
+
+  // Linha de Pauta (se houver)
   if (temPauta) {
-    curY += 5;
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(71, 85, 105);
-    doc.text('PAUTA:', margin + 3.5, curY);
+    doc.text('PAUTA:', margin + 4, nextInnerY);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(51, 65, 85);
     const pautaTexto = doc.splitTextToSize(dados.pauta || '', contentWidth - 22);
-    doc.text(pautaTexto[0] || '', margin + 16, curY);
+    doc.text(pautaTexto[0] || '', margin + 16, nextInnerY);
+    nextInnerY += 5.2;
   }
 
-  // Linha de filtros aplicados
-  if (dados.filtrosAplicados) {
-    curY += 4.5;
+  // Linha de Filtros Aplicados (se houver)
+  if (temFiltros) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.5);
     doc.setTextColor(180, 83, 9); // Amber 700
-    doc.text(`FILTROS APLICADOS: ${dados.filtrosAplicados}`, margin + 3.5, curY);
+    doc.text(`FILTROS APLICADOS: ${dados.filtrosAplicados}`, margin + 4, nextInnerY);
   }
 
-  curY = curY + (temPauta ? 7 : 6);
+  curY += boxHeight + 4;
 
-  // ─── Bloco 2: Indicadores de Presença (KPI Cards) ──────────────────────────
-  const kpiWidth = (contentWidth - 4 * 2.5) / 5;
-  const kpiHeight = 13;
+  // ─── 3. Cards de Indicadores de Presença (KPIs Uniformes) ─────────────────
+  const gap = 2.5;
+  const kpiWidth = (contentWidth - 4 * gap) / 5; // 34.4mm
+  const kpiHeight = 13.5;
 
   const kpis = [
     { label: 'CONVOCADOS', valor: String(dados.totalConvocados), bg: [241, 245, 249], border: [203, 213, 225], text: [15, 23, 42] },
@@ -296,25 +327,27 @@ export async function gerarRelatorioReuniaoPDF(dados: DadosRelatorioReuniao): Pr
   ];
 
   kpis.forEach((kpi, idx) => {
-    const kpiX = margin + idx * (kpiWidth + 2.5);
+    const kpiX = margin + idx * (kpiWidth + gap);
     doc.setFillColor(kpi.bg[0], kpi.bg[1], kpi.bg[2]);
     doc.setDrawColor(kpi.border[0], kpi.border[1], kpi.border[2]);
     doc.roundedRect(kpiX, curY, kpiWidth, kpiHeight, 1.5, 1.5, 'FD');
 
+    // Título do Indicador
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6);
+    doc.setFontSize(6.2);
     doc.setTextColor(100, 116, 139);
-    doc.text(kpi.label, kpiX + kpiWidth / 2, curY + 4, { align: 'center' });
+    doc.text(kpi.label, kpiX + kpiWidth / 2, curY + 4.3, { align: 'center' });
 
+    // Valor do Indicador
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
+    doc.setFontSize(10.5);
     doc.setTextColor(kpi.text[0], kpi.text[1], kpi.text[2]);
-    doc.text(kpi.valor, kpiX + kpiWidth / 2, curY + 10, { align: 'center' });
+    doc.text(kpi.valor, kpiX + kpiWidth / 2, curY + 10.5, { align: 'center' });
   });
 
-  curY += kpiHeight + 5;
+  curY += kpiHeight + 4.5;
 
-  // ─── Bloco 3: Tabela de Ministros Convocados com autoTable ────────────────
+  // ─── 4. Tabela de Ministros Convocados com autoTable ───────────────────────
   const tableData = dados.participantes.map((p) => {
     const congCompleta = [p.congregacao || 'Sede', p.setorArea ? `(${p.setorArea})` : ''].filter(Boolean).join(' ');
     return [
@@ -330,17 +363,17 @@ export async function gerarRelatorioReuniaoPDF(dados: DadosRelatorioReuniao): Pr
 
   autoTable(doc, {
     startY: curY,
-    head: [['Nº', 'MINISTRO / OBREIRO', 'CARGO', 'CONGREGAÇÃO / ÁREA', 'PRESENÇA', 'CHECK-IN', 'JUSTIFICATIVA']],
+    head: [['Nº', 'MINISTRO / CONVOCADO', 'CARGO', 'CONGREGAÇÃO / ÁREA', 'PRESENÇA', 'CHECK-IN', 'JUSTIFICATIVA']],
     body: tableData,
     theme: 'grid',
-    margin: { top: 30, bottom: 16, left: margin, right: margin },
+    margin: { top: 29, bottom: 14, left: margin, right: margin },
     headStyles: {
       fillColor: [18, 59, 99],
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       fontSize: 7.5,
       halign: 'center',
-      cellPadding: 2,
+      cellPadding: 2.2,
     },
     styles: {
       fontSize: 7,
@@ -351,19 +384,19 @@ export async function gerarRelatorioReuniaoPDF(dados: DadosRelatorioReuniao): Pr
       overflow: 'linebreak',
     },
     columnStyles: {
-      0: { halign: 'center', cellWidth: 9 },
-      1: { halign: 'left', fontStyle: 'bold', cellWidth: 48 },
-      2: { halign: 'left', cellWidth: 30 },
-      3: { halign: 'left', cellWidth: 35 },
-      4: { halign: 'center', fontStyle: 'bold', cellWidth: 23 },
+      0: { halign: 'center', cellWidth: 8 },
+      1: { halign: 'left', fontStyle: 'bold', cellWidth: 52 },
+      2: { halign: 'left', cellWidth: 28 },
+      3: { halign: 'left', cellWidth: 36 },
+      4: { halign: 'center', fontStyle: 'bold', cellWidth: 22 },
       5: { halign: 'center', cellWidth: 16 },
-      6: { halign: 'left', cellWidth: 'auto' },
+      6: { halign: 'left', cellWidth: 20 },
     },
     alternateRowStyles: {
       fillColor: [248, 250, 252],
     },
     didParseCell: (data) => {
-      // Cores personalizadas para status de presença na tabela
+      // Cores semânticas para status de presença na tabela
       if (data.section === 'body' && data.column.index === 4) {
         const val = String(data.cell.raw).toLowerCase();
         if (val.includes('presente')) {
@@ -385,12 +418,12 @@ export async function gerarRelatorioReuniaoPDF(dados: DadosRelatorioReuniao): Pr
     },
   });
 
-  // ─── Rodapé Institucional em Todas as Páginas ─────────────────────────────
+  // ─── 5. Rodapé Institucional em Todas as Páginas ───────────────────────────
   const totalPaginas = (doc as any).internal.getNumberOfPages();
 
   for (let i = 1; i <= totalPaginas; i++) {
     doc.setPage(i);
-    const footerY = pageHeight - 9;
+    const footerY = pageHeight - 8.5;
 
     // Linha do Rodapé
     doc.setDrawColor(226, 232, 240);
@@ -403,10 +436,10 @@ export async function gerarRelatorioReuniaoPDF(dados: DadosRelatorioReuniao): Pr
     doc.setTextColor(100, 116, 139);
 
     const rodapeEsquerda = `Gestão Eklésia • ${dados.nomeMinisterio || 'Ministério'} • Documento emitido em ${dados.dataEmissao}`;
-    doc.text(rodapeEsquerda, margin, footerY + 1.5);
+    doc.text(rodapeEsquerda, margin, footerY + 1.2);
 
     const rodapeDireita = `Página ${i} de ${totalPaginas}`;
-    doc.text(rodapeDireita, pageWidth - margin, footerY + 1.5, { align: 'right' });
+    doc.text(rodapeDireita, pageWidth - margin, footerY + 1.2, { align: 'right' });
   }
 
   const output = doc.output('arraybuffer');

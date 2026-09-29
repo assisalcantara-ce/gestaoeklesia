@@ -164,6 +164,15 @@ export async function POST(
       ? new Date(reuniao.data_reuniao + 'T00:00:00').toLocaleDateString('pt-BR')
       : '—';
 
+    // 3.5. Buscar configuração de textos da advertência do ministério
+    const { data: configRow } = await ctx.admin
+      .from('configurations')
+      .select('reunioes_advertencia, church_profile')
+      .eq('ministry_id', ctx.ministryId)
+      .maybeSingle();
+
+    const configAdvertencia = configRow?.reunioes_advertencia || (configRow?.church_profile as any)?.reunioes_advertencia || null;
+
     // 4. Executar envio pelo serviço de e-mail
     const resultadoEnvio = await enviarEmailCartaAdvertencia({
       advertenciaId: advertencia.id,
@@ -181,10 +190,12 @@ export async function POST(
       nomeMinisterio: ministry?.name || 'GESTÃO EKLÉSIA',
       cnpjMinisterio: ministry?.cnpj_cpf || null,
       cidadeUf: cidadeUf || null,
+      logoMinisterioUrl: ministry?.logo_url || null,
       nomePresidente: ministry?.responsible_name || null,
       dataEmissao: new Date(advertencia.created_at).toLocaleString('pt-BR'),
       ministryId: ctx.ministryId,
       supabaseAdmin: ctx.admin,
+      configTextos: configAdvertencia || undefined,
     });
 
     const agoraIso = new Date().toISOString();
