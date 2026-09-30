@@ -1676,12 +1676,13 @@ export default function EventosPage() {
 
         {/* ── NOVO HERO INSTITUCIONAL DE EVENTOS ──────────────────────────── */}
         <div
-          className="relative overflow-hidden rounded-3xl border border-blue-100/90 shadow-xs bg-[#e8f1fd] bg-no-repeat bg-cover bg-right md:bg-center min-h-[170px] sm:min-h-[195px] md:min-h-[215px] flex items-center"
+          className="relative overflow-hidden rounded-3xl border border-blue-100/90 shadow-xs bg-[#e8f1fd] bg-no-repeat bg-cover min-h-[180px] sm:min-h-[205px] md:min-h-[225px] flex items-center"
           style={{
             backgroundImage: "url('/img/bg_eventos.png')",
+            backgroundPosition: 'right top',
           }}
         >
-          <div className="relative z-10 p-6 sm:p-8 md:p-10 max-w-xl lg:max-w-2xl bg-gradient-to-r from-white/85 via-white/50 to-transparent sm:from-transparent sm:via-transparent sm:to-transparent rounded-2xl sm:rounded-none">
+          <div className="relative z-10 p-6 sm:p-8 md:p-10 max-w-xl lg:max-w-2xl bg-gradient-to-r from-white/90 via-white/60 to-transparent sm:from-transparent sm:via-transparent sm:to-transparent rounded-2xl sm:rounded-none">
             <div className="flex items-center gap-3.5 sm:gap-4 mb-2 sm:mb-2.5">
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-[1.12]">
                 Bem-vindo ao<br />
@@ -1700,74 +1701,94 @@ export default function EventosPage() {
         {/* ── 2. KPIS COM IDENTIDADE VISUAL E CONTADORES GLOBAIS ───────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card: Programados */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-4.5 shadow-xs hover:border-slate-300 hover:shadow-md transition-all duration-200 flex items-center justify-between h-[96px]">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100/80 flex items-center justify-center text-blue-600 shrink-0">
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:border-slate-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden min-h-[106px]">
+            <div className="p-4 flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-[#edf5ff] border border-blue-100 flex items-center justify-center text-[#1d4ed8] shrink-0">
                 <CalendarDays className="w-6 h-6 stroke-[2]" />
               </div>
               <div>
-                <span className="text-[11px] font-bold text-slate-400 block mb-0.5">Programados</span>
+                <span className="text-xs font-semibold text-slate-500 block mb-0.5">Programados</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl font-black text-slate-900 leading-none">{totaisGlobais.programado}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                  <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-none">{totaisGlobais.programado}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#eaf8f0] text-[#059669] border border-emerald-100">
                     +{totaisGlobais.noMes} este mês
                   </span>
                 </div>
               </div>
             </div>
+            <div className="text-blue-500 px-1 pb-1">
+              <svg className="w-full h-2" viewBox="0 0 200 8" preserveAspectRatio="none">
+                <path d="M0,4 Q50,0 100,4 T200,4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+              </svg>
+            </div>
           </div>
 
           {/* Card: Em Andamento */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-4.5 shadow-xs hover:border-slate-300 hover:shadow-md transition-all duration-200 flex items-center justify-between h-[96px]">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-200/60 flex items-center justify-center text-blue-600 shrink-0">
-                <Play className="w-5 h-5 fill-blue-600 stroke-none ml-0.5" />
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:border-slate-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden min-h-[106px]">
+            <div className="p-4 flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-[#eaf8f0] border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                <Play className="w-5 h-5 fill-emerald-600 stroke-none ml-0.5" />
               </div>
               <div>
-                <span className="text-[11px] font-bold text-slate-400 block mb-0.5">Em Andamento</span>
+                <span className="text-xs font-semibold text-slate-500 block mb-0.5">Em Andamento</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl font-black text-slate-900 leading-none">{totaisGlobais.em_andamento}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200/60">
+                  <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-none">{totaisGlobais.em_andamento}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500 border border-slate-200/60">
                     0 este mês
                   </span>
                 </div>
               </div>
             </div>
+            <div className="text-emerald-500 px-1 pb-1">
+              <svg className="w-full h-2" viewBox="0 0 200 8" preserveAspectRatio="none">
+                <path d="M0,4 Q50,0 100,4 T200,4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+              </svg>
+            </div>
           </div>
 
           {/* Card: Realizados */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-4.5 shadow-xs hover:border-slate-300 hover:shadow-md transition-all duration-200 flex items-center justify-between h-[96px]">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100/80 flex items-center justify-center text-emerald-600 shrink-0">
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:border-slate-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden min-h-[106px]">
+            <div className="p-4 flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-[#eaf8f0] border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
                 <Check className="w-6 h-6 stroke-[3]" />
               </div>
               <div>
-                <span className="text-[11px] font-bold text-slate-400 block mb-0.5">Realizados</span>
+                <span className="text-xs font-semibold text-slate-500 block mb-0.5">Realizados</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl font-black text-slate-900 leading-none">{totaisGlobais.realizado}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                  <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-none">{totaisGlobais.realizado}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#eaf8f0] text-[#059669] border border-emerald-100">
                     +5 este semestre
                   </span>
                 </div>
               </div>
             </div>
+            <div className="text-emerald-500 px-1 pb-1">
+              <svg className="w-full h-2" viewBox="0 0 200 8" preserveAspectRatio="none">
+                <path d="M0,4 Q50,0 100,4 T200,4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+              </svg>
+            </div>
           </div>
 
           {/* Card: Cancelados */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-4.5 shadow-xs hover:border-slate-300 hover:shadow-md transition-all duration-200 flex items-center justify-between h-[96px]">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100/80 flex items-center justify-center text-rose-600 shrink-0">
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:border-slate-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden min-h-[106px]">
+            <div className="p-4 flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-[#feeaec] border border-rose-100 flex items-center justify-center text-rose-600 shrink-0">
                 <XCircle className="w-6 h-6 stroke-[2]" />
               </div>
               <div>
-                <span className="text-[11px] font-bold text-slate-400 block mb-0.5">Cancelados</span>
+                <span className="text-xs font-semibold text-slate-500 block mb-0.5">Cancelados</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl font-black text-slate-900 leading-none">{totaisGlobais.cancelado}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200/60">
+                  <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-none">{totaisGlobais.cancelado}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500 border border-slate-200/60">
                     0 este mês
                   </span>
                 </div>
               </div>
+            </div>
+            <div className="text-rose-500 px-1 pb-1">
+              <svg className="w-full h-2" viewBox="0 0 200 8" preserveAspectRatio="none">
+                <path d="M0,4 Q50,0 100,4 T200,4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+              </svg>
             </div>
           </div>
         </div>
