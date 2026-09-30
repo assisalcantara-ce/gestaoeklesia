@@ -875,10 +875,6 @@ export default function EventosPage() {
     [supabase]
   );
 
-  useEffect(() => {
-    if (aba === 'pagamentos' && eventoSelecionado) carregarPagamentos(eventoSelecionado.id);
-  }, [aba, eventoSelecionado, carregarPagamentos]);
-
   // ── Buscar membros ─────────────────────────────────────────────────────────
   const buscarMembro = useCallback(
     async (q: string) => {
@@ -888,11 +884,16 @@ export default function EventosPage() {
       }
       const { data } = await supabase
         .from('members')
-        .select('id, nome_completo')
+        .select('id, name')
         .eq('ministry_id', ministryId)
-        .ilike('nome_completo', `%${q}%`)
+        .ilike('name', `%${q}%`)
         .limit(8);
-      setResultadosMembro((data ?? []) as Membro[]);
+      setResultadosMembro(
+        ((data ?? []) as any[]).map(m => ({
+          id: m.id,
+          nome_completo: m.name ?? '',
+        }))
+      );
     },
     [ministryId, supabase]
   );
@@ -902,6 +903,28 @@ export default function EventosPage() {
   }, [buscaMembro, buscarMembro]);
 
   // ── Memos & Paginação ──────────────────────────────────────────────────────
+  const eventosPagos = useMemo(
+    () => eventos.filter(e => e.evento_pago === true),
+    [eventos]
+  );
+
+  useEffect(() => {
+    if (aba === 'pagamentos') {
+      if (eventoSelecionado && !eventoSelecionado.evento_pago) {
+        const primeiroPago = eventosPagos[0] || null;
+        setEventoSelecionado(primeiroPago);
+      } else if (!eventoSelecionado && eventosPagos.length > 0) {
+        setEventoSelecionado(eventosPagos[0]);
+      }
+    }
+  }, [aba, eventoSelecionado, eventosPagos]);
+
+  useEffect(() => {
+    if (aba === 'pagamentos' && eventoSelecionado && eventoSelecionado.evento_pago) {
+      carregarPagamentos(eventoSelecionado.id);
+    }
+  }, [aba, eventoSelecionado, carregarPagamentos]);
+
   const insPorStatus = useMemo(
     () => ({
       total: inscricoes.length,
@@ -1651,6 +1674,29 @@ export default function EventosPage() {
           </div>
         </div>
 
+        {/* ── NOVO HERO INSTITUCIONAL DE EVENTOS ──────────────────────────── */}
+        <div
+          className="relative overflow-hidden rounded-3xl border border-blue-100/90 shadow-xs bg-[#e8f1fd] bg-no-repeat bg-cover bg-right md:bg-center min-h-[170px] sm:min-h-[195px] md:min-h-[215px] flex items-center"
+          style={{
+            backgroundImage: "url('/img/bg_eventos.png')",
+          }}
+        >
+          <div className="relative z-10 p-6 sm:p-8 md:p-10 max-w-xl lg:max-w-2xl bg-gradient-to-r from-white/85 via-white/50 to-transparent sm:from-transparent sm:via-transparent sm:to-transparent rounded-2xl sm:rounded-none">
+            <div className="flex items-center gap-3.5 sm:gap-4 mb-2 sm:mb-2.5">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-[1.12]">
+                Bem-vindo ao<br />
+                módulo de <span className="text-[#1d4ed8]">Eventos!</span>
+              </h2>
+              <div className="hidden sm:inline-flex items-center justify-center p-2.5 rounded-2xl bg-white/90 backdrop-blur-xs border border-blue-200/80 shadow-xs text-[#1d4ed8] shrink-0 self-center">
+                <CalendarDays className="w-7 h-7 stroke-[2.2]" />
+              </div>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed max-w-md md:max-w-lg">
+              Organize congressos, conferências, encontros e demais eventos da sua igreja. Acompanhe as inscrições, o check-in e toda a movimentação em um só lugar.
+            </p>
+          </div>
+        </div>
+
         {/* ── 2. KPIS COM IDENTIDADE VISUAL E CONTADORES GLOBAIS ───────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card: Programados */}
@@ -1772,7 +1818,11 @@ export default function EventosPage() {
 
           <button
             onClick={() => {
-              if (!eventoSelecionado && eventos.length > 0) setEventoSelecionado(eventos[0]);
+              if (eventoSelecionado && !eventoSelecionado.evento_pago) {
+                setEventoSelecionado(eventosPagos.length > 0 ? eventosPagos[0] : null);
+              } else if (!eventoSelecionado && eventosPagos.length > 0) {
+                setEventoSelecionado(eventosPagos[0]);
+              }
               setAba('pagamentos');
             }}
             className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shadow-xs ${
@@ -3046,12 +3096,13 @@ export default function EventosPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="flex-1">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Evento Selecionado
+                  {aba === 'pagamentos' ? 'Evento Pago Selecionado' : 'Evento Selecionado'}
                 </label>
                 <select
-                  value={eventoSelecionado?.id ?? ''}
+                  value={(aba === 'pagamentos' && !eventoSelecionado?.evento_pago) ? '' : (eventoSelecionado?.id ?? '')}
                   onChange={ev => {
-                    const found = eventos.find(x => x.id === ev.target.value) ?? null;
+                    const lista = aba === 'pagamentos' ? eventosPagos : eventos;
+                    const found = lista.find(x => x.id === ev.target.value) ?? null;
                     setEventoSelecionado(found);
                     setInscricoes([]);
                     setPagamentos([]);
@@ -3061,16 +3112,33 @@ export default function EventosPage() {
                   }}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-[#1d4ed8] transition"
                 >
-                  <option value="">— Selecione um evento —</option>
-                  {eventos.map(ev => (
-                    <option key={ev.id} value={ev.id}>
-                      {fmtDate(ev.data_inicio)} — {ev.titulo} ({statusEventoInfo(ev.status).label})
-                    </option>
-                  ))}
+                  {aba === 'pagamentos' ? (
+                    <>
+                      <option value="">
+                        {eventosPagos.length === 0
+                          ? '— Nenhum evento pago encontrado —'
+                          : '— Selecione um evento pago —'}
+                      </option>
+                      {eventosPagos.map(ev => (
+                        <option key={ev.id} value={ev.id}>
+                          {fmtDate(ev.data_inicio)} — {ev.titulo} ({fmtBRL(ev.valor_inscricao)})
+                        </option>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      <option value="">— Selecione um evento —</option>
+                      {eventos.map(ev => (
+                        <option key={ev.id} value={ev.id}>
+                          {fmtDate(ev.data_inicio)} — {ev.titulo} ({statusEventoInfo(ev.status).label})
+                        </option>
+                      ))}
+                    </>
+                  )}
                 </select>
               </div>
 
-              {eventoSelecionado && (
+              {eventoSelecionado && (aba !== 'pagamentos' || eventoSelecionado.evento_pago) && (
                 <div className="flex items-center gap-2 pt-2 md:pt-5">
                   <button
                     onClick={() => setAba('eventos')}
@@ -3091,7 +3159,7 @@ export default function EventosPage() {
               )}
             </div>
 
-            {eventoSelecionado && (
+            {eventoSelecionado && (aba !== 'pagamentos' || eventoSelecionado.evento_pago) && (
               <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100 text-xs text-slate-600 font-medium">
                 <span className="inline-flex items-center gap-1">
                   <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
@@ -3101,6 +3169,12 @@ export default function EventosPage() {
                   <span className="inline-flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5 text-slate-400" />
                     {eventoSelecionado.local_nome}
+                  </span>
+                )}
+                {eventoSelecionado.evento_pago && (
+                  <span className="inline-flex items-center gap-1 font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full text-[11px]">
+                    <CreditCard className="w-3 h-3" />
+                    {fmtBRL(eventoSelecionado.valor_inscricao)}
                   </span>
                 )}
                 <span
@@ -3600,14 +3674,8 @@ export default function EventosPage() {
         {/* ══════════════════════════════════════════════════════════════════════
             ABA: PAGAMENTOS
         ══════════════════════════════════════════════════════════════════════ */}
-        {aba === 'pagamentos' && eventoSelecionado && (
+        {aba === 'pagamentos' && eventoSelecionado && eventoSelecionado.evento_pago && (
           <div className="space-y-4">
-            {eventoSelecionado.valor_inscricao === 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs font-semibold text-blue-800">
-                Este evento é gratuito. Não há cobranças associadas.
-              </div>
-            )}
-
             <div className="flex justify-between items-center">
               <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">
                 {pagamentos.length} transação(ões) encontrada(s)
@@ -3628,7 +3696,7 @@ export default function EventosPage() {
             ) : pagamentos.length === 0 ? (
               <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center shadow-xs">
                 <CreditCard className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                <p className="text-xs font-bold text-slate-700">Nenhum pagamento registrado até o momento.</p>
+                <p className="text-xs font-bold text-slate-700">Nenhum pagamento registrado até o momento para este evento.</p>
               </div>
             ) : (
               <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
@@ -3824,13 +3892,31 @@ export default function EventosPage() {
         )}
 
         {/* Placeholder: Nenhum evento selecionado nas abas secundárias */}
-        {aba !== 'eventos' && !eventoSelecionado && (
+        {aba !== 'eventos' && (!eventoSelecionado || (aba === 'pagamentos' && !eventoSelecionado.evento_pago)) && (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-xs space-y-3">
-            <CalendarDays className="w-12 h-12 text-slate-300 mx-auto" />
-            <p className="text-xs font-bold text-slate-700">Selecione um evento para visualizar os dados</p>
-            <p className="text-xs text-slate-500">
-              Escolha um evento no seletor acima ou volte para a aba de Eventos.
-            </p>
+            {aba === 'pagamentos' ? (
+              <>
+                <CreditCard className="w-12 h-12 text-slate-300 mx-auto" />
+                <p className="text-xs font-bold text-slate-700">
+                  {eventosPagos.length === 0
+                    ? 'Nenhum evento pago encontrado.'
+                    : 'Selecione um evento pago para visualizar as transações'}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {eventosPagos.length === 0
+                    ? 'Crie ou edite um evento habilitando a opção "Evento pago" para gerenciar cobranças e pagamentos.'
+                    : 'Escolha um evento no seletor acima ou volte para a aba de Eventos.'}
+                </p>
+              </>
+            ) : (
+              <>
+                <CalendarDays className="w-12 h-12 text-slate-300 mx-auto" />
+                <p className="text-xs font-bold text-slate-700">Selecione um evento para visualizar os dados</p>
+                <p className="text-xs text-slate-500">
+                  Escolha um evento no seletor acima ou volte para a aba de Eventos.
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>
