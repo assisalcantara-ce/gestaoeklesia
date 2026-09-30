@@ -823,7 +823,7 @@ export default function EventosPage() {
       setLoadingInsc(true);
       const { data, error } = await supabase
         .from('eventos_inscricoes')
-        .select('*, members(nome_completo)')
+        .select('*, members(name, email, phone)')
         .eq('evento_id', eventoId)
         .order('created_at', { ascending: false });
 
@@ -833,11 +833,13 @@ export default function EventosPage() {
         return;
       }
 
-      type RawInsc = Inscricao & { members?: { nome_completo: string } | null };
+      type RawInsc = Inscricao & { members?: { name?: string | null; email?: string | null; phone?: string | null } | null };
       setInscricoes(
         ((data ?? []) as RawInsc[]).map(i => ({
           ...i,
-          nome_display: i.member_id ? i.members?.nome_completo ?? '—' : i.nome_externo ?? '—',
+          nome_display: i.member_id ? i.members?.name ?? i.nome_externo ?? '—' : i.nome_externo ?? '—',
+          email_externo: i.email_externo || i.members?.email || null,
+          telefone: i.telefone || i.members?.phone || null,
         }))
       );
       setLoadingInsc(false);
