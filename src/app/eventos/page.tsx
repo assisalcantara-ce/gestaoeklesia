@@ -1676,10 +1676,10 @@ export default function EventosPage() {
 
         {/* ── NOVO HERO INSTITUCIONAL DE EVENTOS ──────────────────────────── */}
         <div
-          className="relative overflow-hidden rounded-3xl border border-blue-100/90 shadow-xs bg-[#e8f1fd] bg-no-repeat bg-cover min-h-[180px] sm:min-h-[205px] md:min-h-[225px] flex items-center"
+          className="relative overflow-hidden rounded-3xl border border-blue-100/90 shadow-xs bg-[#e8f1fd] bg-no-repeat bg-cover bg-center min-h-[170px] sm:min-h-[195px] md:min-h-[220px] flex items-center"
           style={{
             backgroundImage: "url('/img/bg_eventos.png')",
-            backgroundPosition: 'right top',
+            backgroundPosition: 'center',
           }}
         >
           <div className="relative z-10 p-6 sm:p-8 md:p-10 max-w-xl lg:max-w-2xl bg-gradient-to-r from-white/90 via-white/60 to-transparent sm:from-transparent sm:via-transparent sm:to-transparent rounded-2xl sm:rounded-none">
