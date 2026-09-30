@@ -42,9 +42,11 @@ import {
   Pencil,
   Play,
   Plus,
+  Printer,
   QrCode,
   RotateCcw,
   Search,
+  Store,
   Tag,
   Ticket,
   Trash2,
@@ -276,10 +278,13 @@ const STATUS_PAGAMENTO: Record<string, { label: string; cor: string }> = {
 };
 
 const FORMAS_PAGAMENTO_OPTIONS: { value: FormaPagamento; label: string }[] = [
-  { value: 'a_vista',  label: 'À vista' },
   { value: 'pix',      label: 'Pix' },
   { value: 'boleto',   label: 'Boleto' },
-  { value: 'cortesia', label: 'Cortesia' },
+];
+
+const FORMAS_PAGAMENTO_BALCAO_OPTIONS: { value: 'a_vista' | 'cortesia'; label: string; desc: string }[] = [
+  { value: 'a_vista',  label: 'À vista', desc: 'Pagamento presencial recebido no ato' },
+  { value: 'cortesia', label: 'Cortesia', desc: 'Isenção / cortesia autorizada (R$ 0,00)' },
 ];
 
 const BENEFICIOS_OPTIONS = [
@@ -586,6 +591,33 @@ export default function EventosPage() {
 
   // ── Tab Check-in ──────────────────────────────────────────────────────────
   const [buscaCheckin, setBuscaCheckin] = useState('');
+
+  // ── Modal Atendimento de Balcão (Inscrição Presencial) ────────────────────
+  const [showBalcaoModal, setShowBalcaoModal] = useState(false);
+  const [balcaoEventoId, setBalcaoEventoId] = useState<string>('');
+  const [balcaoTipoParticipante, setBalcaoTipoParticipante] = useState<'membro' | 'externo'>('membro');
+  const [balcaoMembro, setBalcaoMembro] = useState<Membro | null>(null);
+  const [balcaoBuscaMembro, setBalcaoBuscaMembro] = useState('');
+  const [balcaoResultadosMembro, setBalcaoResultadosMembro] = useState<Membro[]>([]);
+  const [balcaoNome, setBalcaoNome] = useState('');
+  const [balcaoEmail, setBalcaoEmail] = useState('');
+  const [balcaoTelefone, setBalcaoTelefone] = useState('');
+  const [balcaoHospedagem, setBalcaoHospedagem] = useState(false);
+  const [balcaoFormaPagamento, setBalcaoFormaPagamento] = useState<'a_vista' | 'cortesia'>('a_vista');
+  const [balcaoJustificativa, setBalcaoJustificativa] = useState('');
+  const [balcaoSalvando, setBalcaoSalvando] = useState(false);
+  const [balcaoSucesso, setBalcaoSucesso] = useState<{
+    inscricaoId: string;
+    evento: Evento;
+    nomeParticipante: string;
+    emailParticipante?: string;
+    telefoneParticipante?: string;
+    formaPagamento: string;
+    valorPago: number;
+    comHospedagem: boolean;
+    temBrinde?: boolean;
+    dataHora: string;
+  } | null>(null);
 
   // ── Fechar menu dropdown ao clicar fora ────────────────────────────────────
   useEffect(() => {
@@ -901,6 +933,32 @@ export default function EventosPage() {
   useEffect(() => {
     buscarMembro(buscaMembro);
   }, [buscaMembro, buscarMembro]);
+
+  const buscarMembroBalcao = useCallback(
+    async (q: string) => {
+      if (!ministryId || q.length < 3) {
+        setBalcaoResultadosMembro([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('members')
+        .select('id, name')
+        .eq('ministry_id', ministryId)
+        .ilike('name', `%${q}%`)
+        .limit(8);
+      setBalcaoResultadosMembro(
+        ((data ?? []) as any[]).map(m => ({
+          id: m.id,
+          nome_completo: m.name ?? '',
+        }))
+      );
+    },
+    [ministryId, supabase]
+  );
+
+  useEffect(() => {
+    buscarMembroBalcao(balcaoBuscaMembro);
+  }, [balcaoBuscaMembro, buscarMembroBalcao]);
 
   // ── Memos & Paginação ──────────────────────────────────────────────────────
   const eventosPagos = useMemo(
@@ -1221,6 +1279,283 @@ export default function EventosPage() {
       return;
     }
     if (eventoSelecionado) carregarInscricoes(eventoSelecionado.id);
+  };
+
+  // ── Ações do Balcão (Atendimento Presencial) ─────────────────────────────
+  const abrirBalcao = (eventoIdPreferido?: string) => {
+    let idPadrao = eventoIdPreferido || (eventoSelecionado ? eventoSelecionado.id : '');
+    if (!idPadrao) {
+      const primeiroAberto = eventos.find(e => e.aceita_inscricao && e.status !== 'cancelado');
+      idPadrao = primeiroAberto ? primeiroAberto.id : (eventos[0]?.id ?? '');
+    }
+    setBalcaoEventoId(idPadrao);
+    setBalcaoTipoParticipante('membro');
+    setBalcaoMembro(null);
+    setBalcaoBuscaMembro('');
+    setBalcaoResultadosMembro([]);
+    setBalcaoNome('');
+    setBalcaoEmail('');
+    setBalcaoTelefone('');
+    setBalcaoHospedagem(false);
+    setBalcaoFormaPagamento('a_vista');
+    setBalcaoJustificativa('');
+    setBalcaoSucesso(null);
+    setShowBalcaoModal(true);
+  };
+
+  const handleSalvarInscricaoBalcao = async () => {
+    if (!ministryId) return;
+
+    if (!balcaoEventoId) {
+      showModal('Selecione um evento', 'Escolha o evento para o qual deseja realizar a inscrição.', 'error');
+      return;
+    }
+
+    const evento = eventos.find(e => e.id === balcaoEventoId);
+    if (!evento) {
+      showModal('Evento não encontrado', 'O evento selecionado não foi localizado.', 'error');
+      return;
+    }
+
+    const temMembro = balcaoTipoParticipante === 'membro' && !!balcaoMembro;
+    const temExterno = balcaoTipoParticipante === 'externo' && !!balcaoNome.trim();
+
+    if (!temMembro && !temExterno) {
+      showModal(
+        'Participante obrigatório',
+        balcaoTipoParticipante === 'membro'
+          ? 'Busque e selecione um membro do rol da igreja.'
+          : 'Informe o nome do participante externo.',
+        'error'
+      );
+      return;
+    }
+
+    setBalcaoSalvando(true);
+
+    try {
+      // 1. Validar capacidade máxima se configurada
+      if (evento.capacidade != null && evento.capacidade > 0) {
+        const { count, error: countErr } = await supabase
+          .from('eventos_inscricoes')
+          .select('id', { count: 'exact', head: true })
+          .eq('evento_id', evento.id)
+          .eq('status', 'confirmado');
+
+        if (!countErr && count != null && count >= evento.capacidade) {
+          showModal(
+            'Capacidade esgotada',
+            `Este evento já atingiu o limite de ${evento.capacidade} vagas confirmadas. Não é possível cadastrar novas inscrições no balcão.`,
+            'error'
+          );
+          setBalcaoSalvando(false);
+          return;
+        }
+      }
+
+      // 2. Preparar observação descritiva para rastreabilidade
+      const formaTexto = evento.evento_pago
+        ? balcaoFormaPagamento === 'cortesia'
+          ? 'Cortesia'
+          : 'À vista'
+        : 'Gratuito';
+
+      const obsPartes = [
+        '[Balcão] Inscrição presencial',
+        `Pagamento: ${formaTexto}`,
+        balcaoJustificativa.trim() ? `Obs/Justificativa: ${balcaoJustificativa.trim()}` : null,
+      ].filter(Boolean);
+
+      // 3. Inserir inscrição confirmada
+      const { data: novaInsc, error: inscError } = await supabase
+        .from('eventos_inscricoes')
+        .insert({
+          evento_id: evento.id,
+          ministry_id: ministryId,
+          member_id: balcaoTipoParticipante === 'membro' ? balcaoMembro?.id : null,
+          nome_externo: balcaoTipoParticipante === 'externo' ? balcaoNome.trim() : null,
+          email_externo: balcaoTipoParticipante === 'externo' ? balcaoEmail.trim() || null : null,
+          telefone: balcaoTipoParticipante === 'externo' ? balcaoTelefone.trim() || null : null,
+          status: 'confirmado',
+          confirmado_em: new Date().toISOString(),
+          com_hospedagem: balcaoHospedagem,
+          status_hospedagem: balcaoHospedagem ? 'confirmada' : 'nao_aplicavel',
+          observacoes: obsPartes.join(' | '),
+          criado_por: user?.id ?? null,
+        })
+        .select('id, tem_brinde')
+        .single();
+
+      if (inscError) {
+        if (inscError.code === '23505') {
+          showModal('Inscrição duplicada', 'Este participante já possui uma inscrição registrada para este evento.', 'error');
+        } else {
+          showModal('Erro ao registrar inscrição', inscError.message, 'error');
+        }
+        setBalcaoSalvando(false);
+        return;
+      }
+
+      // 4. Registrar transação se o evento for pago
+      const valorCobrado = evento.evento_pago
+        ? balcaoFormaPagamento === 'a_vista'
+          ? (typeof evento.valor_inscricao === 'number' ? evento.valor_inscricao : Number(evento.valor_inscricao) || 0)
+          : 0
+        : 0;
+
+      if (evento.evento_pago) {
+        const { error: pagError } = await supabase.from('eventos_pagamentos').insert({
+          ministry_id: ministryId,
+          inscricao_id: novaInsc.id,
+          gateway: 'balcao',
+          gateway_charge_id: `BALCAO-${novaInsc.id.substring(0, 8).toUpperCase()}`,
+          payment_method: balcaoFormaPagamento,
+          valor: valorCobrado,
+          status: 'pago',
+          paid_at: new Date().toISOString(),
+        });
+        if (pagError) {
+          console.warn('[Balcão] Aviso ao registrar transação de pagamento:', pagError.message);
+        }
+      }
+
+      // 5. Sucesso e dados para comprovante
+      const nomePart = balcaoTipoParticipante === 'membro'
+        ? balcaoMembro?.nome_completo ?? ''
+        : balcaoNome.trim();
+
+      setBalcaoSucesso({
+        inscricaoId: novaInsc.id,
+        evento,
+        nomeParticipante: nomePart,
+        emailParticipante: balcaoTipoParticipante === 'externo' ? balcaoEmail.trim() : undefined,
+        telefoneParticipante: balcaoTipoParticipante === 'externo' ? balcaoTelefone.trim() : undefined,
+        formaPagamento: formaTexto,
+        valorPago: valorCobrado,
+        comHospedagem: balcaoHospedagem,
+        temBrinde: !!novaInsc.tem_brinde,
+        dataHora: new Date().toLocaleString('pt-BR'),
+      });
+
+      // 6. Atualizar listas em segundo plano
+      carregarEventos(filtroPeriodo, filtroMesCustom, filtroStatus, filtroCongEv, buscaEv);
+      if (eventoSelecionado?.id === evento.id) {
+        carregarInscricoes(evento.id);
+        if (evento.evento_pago) carregarPagamentos(evento.id);
+      }
+    } catch (err: any) {
+      showModal('Erro inesperado', err?.message || 'Falha ao processar atendimento no balcão.', 'error');
+    } finally {
+      setBalcaoSalvando(false);
+    }
+  };
+
+  const handleImprimirComprovanteBalcao = () => {
+    if (!balcaoSucesso) return;
+    const win = window.open('', '_blank', 'width=600,height=700');
+    if (!win) {
+      showModal('Aviso', 'Permita a abertura de pop-ups para imprimir o comprovante.', 'info');
+      return;
+    }
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Comprovante de Inscrição - Balcão</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; color: #1e293b; background: #fff; line-height: 1.5; font-size: 13px; }
+          .ticket { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 24px; max-width: 480px; margin: 0 auto; }
+          .header { text-align: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 16px; }
+          .header h1 { font-size: 18px; margin: 0 0 4px 0; color: #0f172a; }
+          .header p { margin: 0; color: #64748b; font-size: 12px; }
+          .badge { display: inline-block; background: #ecfdf5; color: #047857; font-weight: bold; font-size: 11px; padding: 4px 10px; border-radius: 9999px; border: 1px solid #a7f3d0; margin-top: 8px; }
+          .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dotted #f1f5f9; }
+          .label { color: #64748b; font-weight: 500; }
+          .value { font-weight: 600; color: #0f172a; text-align: right; }
+          .total-box { margin-top: 16px; background: #f8fafc; border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; }
+          .total-box .total-label { font-size: 13px; font-weight: bold; color: #334155; }
+          .total-box .total-val { font-size: 18px; font-weight: 800; color: #1d4ed8; }
+          .footer { text-align: center; margin-top: 20px; font-size: 11px; color: #94a3b8; }
+          @media print {
+            body { padding: 0; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="ticket">
+          <div class="header">
+            <h1>${configIgreja.nome || 'Gestão Eklésia'}</h1>
+            <p>Comprovante de Inscrição Presencial (Balcão)</p>
+            <div class="badge">✓ INSCRIÇÃO CONFIRMADA</div>
+          </div>
+          
+          <div class="row">
+            <span class="label">Evento:</span>
+            <span class="value">${balcaoSucesso.evento.titulo}</span>
+          </div>
+          <div class="row">
+            <span class="label">Data/Hora Evento:</span>
+            <span class="value">${new Date(balcaoSucesso.evento.data_inicio).toLocaleString('pt-BR')}</span>
+          </div>
+          ${balcaoSucesso.evento.local_nome ? `
+          <div class="row">
+            <span class="label">Local:</span>
+            <span class="value">${balcaoSucesso.evento.local_nome}</span>
+          </div>` : ''}
+          <div class="row">
+            <span class="label">Participante:</span>
+            <span class="value">${balcaoSucesso.nomeParticipante}</span>
+          </div>
+          ${balcaoSucesso.telefoneParticipante ? `
+          <div class="row">
+            <span class="label">Telefone:</span>
+            <span class="value">${balcaoSucesso.telefoneParticipante}</span>
+          </div>` : ''}
+          <div class="row">
+            <span class="label">Forma de Pagamento:</span>
+            <span class="value">${balcaoSucesso.formaPagamento}</span>
+          </div>
+          ${balcaoSucesso.comHospedagem ? `
+          <div class="row">
+            <span class="label">Hospedagem:</span>
+            <span class="value">Inclusa</span>
+          </div>` : ''}
+          ${balcaoSucesso.temBrinde ? `
+          <div class="row">
+            <span class="label">Brinde do Evento:</span>
+            <span class="value">Contemplado 🎁</span>
+          </div>` : ''}
+          <div class="row">
+            <span class="label">Cód. Inscrição:</span>
+            <span class="value">#${balcaoSucesso.inscricaoId.substring(0, 8).toUpperCase()}</span>
+          </div>
+          <div class="row">
+            <span class="label">Data do Atendimento:</span>
+            <span class="value">${balcaoSucesso.dataHora}</span>
+          </div>
+
+          <div class="total-box">
+            <span class="total-label">Valor Pago:</span>
+            <span class="total-val">${balcaoSucesso.valorPago > 0 ? `R$ ${balcaoSucesso.valorPago.toFixed(2).replace('.', ',')}` : 'R$ 0,00 (Cortesia / Gratuito)'}</span>
+          </div>
+
+          <div class="footer">
+            <p>Guarde este comprovante para apresentação no dia do evento.</p>
+            <p style="margin-top: 4px;">Atendimento realizado via Gestão Eklésia</p>
+          </div>
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `;
+    win.document.write(html);
+    win.document.close();
   };
 
   const handleCheckin = async (insc: Inscricao) => {
@@ -1870,6 +2205,17 @@ export default function EventosPage() {
             <FileBarChart2 className="w-3.5 h-3.5" />
             <span>Relatórios</span>
           </button>
+
+          {scope.canWrite && (
+            <button
+              onClick={() => abrirBalcao(eventoSelecionado?.id)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shadow-xs bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600 active:scale-95"
+              title="Atendimento e Inscrição Presencial"
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>Balcão</span>
+            </button>
+          )}
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════════
@@ -3938,6 +4284,482 @@ export default function EventosPage() {
                 </p>
               </>
             )}
+          </div>
+        )}
+        {/* ══════════════════════════════════════════════════════════════════════
+            MODAL: ATENDIMENTO DE BALCÃO (INSCRIÇÃO PRESENCIAL)
+        ══════════════════════════════════════════════════════════════════════ */}
+        {showBalcaoModal && scope.canWrite && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-100 flex flex-col max-h-[92vh] overflow-hidden">
+              {/* Header */}
+              <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-emerald-50/50 via-white to-white shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100/80 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0">
+                    <Store className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 leading-tight">
+                      Atendimento de Balcão
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Inscrição presencial com confirmação imediata
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBalcaoModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 overflow-y-auto space-y-5 flex-1">
+                {balcaoSucesso ? (
+                  /* ── TELA DE SUCESSO E COMPROVANTE ── */
+                  <div className="space-y-5 animate-in zoom-in-95 duration-150">
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center">
+                      <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto mb-2 shadow-xs">
+                        <CheckCircle2 className="w-7 h-7" />
+                      </div>
+                      <h4 className="text-sm font-bold text-emerald-900">Inscrição Confirmada com Sucesso!</h4>
+                      <p className="text-xs text-emerald-700 mt-0.5">
+                        O participante foi registrado e confirmado no evento.
+                      </p>
+                    </div>
+
+                    {/* Voucher Ticket */}
+                    <div className="border-2 border-dashed border-slate-200 rounded-2xl p-5 bg-slate-50/60 space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+                        <div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Evento</span>
+                          <span className="text-sm font-black text-slate-900">{balcaoSucesso.evento.titulo}</span>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Confirmado
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <span className="text-slate-400 font-medium block">Participante</span>
+                          <span className="font-bold text-slate-800">{balcaoSucesso.nomeParticipante}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 font-medium block">Forma de Pagamento</span>
+                          <span className="font-bold text-slate-800">{balcaoSucesso.formaPagamento}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 font-medium block">Data do Evento</span>
+                          <span className="font-medium text-slate-700">
+                            {new Date(balcaoSucesso.evento.data_inicio).toLocaleString('pt-BR')}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 font-medium block">Cód. Inscrição</span>
+                          <span className="font-mono font-bold text-blue-700">
+                            #{balcaoSucesso.inscricaoId.substring(0, 8).toUpperCase()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Benefícios contemplados */}
+                      {(balcaoSucesso.comHospedagem || balcaoSucesso.temBrinde) && (
+                        <div className="pt-2 border-t border-slate-200/60 flex flex-wrap gap-2">
+                          {balcaoSucesso.comHospedagem && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                              <Bed className="w-3 h-3" /> Hospedagem Solicitada
+                            </span>
+                          )}
+                          {balcaoSucesso.temBrinde && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-pink-50 text-pink-700 border border-pink-200">
+                              <Gift className="w-3 h-3" /> Brinde Garantido
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Total Box */}
+                      <div className="mt-3 bg-white rounded-xl p-3 border border-slate-200 flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-600">Valor Cobrado / Registrado</span>
+                        <span className="text-base font-black text-[#1d4ed8]">
+                          {balcaoSucesso.valorPago > 0
+                            ? `R$ ${balcaoSucesso.valorPago.toFixed(2).replace('.', ',')}`
+                            : 'R$ 0,00 (Gratuito / Cortesia)'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Botões do Sucesso */}
+                    <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleImprimirComprovanteBalcao}
+                        className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xs"
+                      >
+                        <Printer className="w-4 h-4" />
+                        <span>Imprimir Comprovante</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => abrirBalcao(balcaoEventoId)}
+                        className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-xs"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Novo Atendimento</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── FORMULÁRIO DE INSCRIÇÃO PRESENCIAL ── */
+                  <form
+                    onSubmit={e => {
+                      e.preventDefault();
+                      handleSalvarInscricaoBalcao();
+                    }}
+                    className="space-y-4.5"
+                  >
+                    {/* 1. SELEÇÃO DO EVENTO */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                        Evento *
+                      </label>
+                      <select
+                        value={balcaoEventoId}
+                        onChange={e => setBalcaoEventoId(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
+                      >
+                        <option value="">Selecione um evento...</option>
+                        {eventos.map(ev => (
+                          <option key={ev.id} value={ev.id}>
+                            {ev.titulo} — {new Date(ev.data_inicio).toLocaleDateString('pt-BR')} (
+                            {ev.evento_pago
+                              ? `R$ ${typeof ev.valor_inscricao === 'number' ? ev.valor_inscricao.toFixed(2).replace('.', ',') : ev.valor_inscricao}`
+                              : 'Gratuito'}
+                            )
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Card informativo do evento selecionado */}
+                      {(() => {
+                        const evSel = eventos.find(e => e.id === balcaoEventoId);
+                        if (!evSel) return null;
+                        const benfs = getBeneficiosLabels(evSel);
+                        return (
+                          <div className="mt-2 p-3 bg-blue-50/50 rounded-xl border border-blue-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${evSel.evento_pago ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}`}>
+                                {evSel.evento_pago ? `Valor: R$ ${typeof evSel.valor_inscricao === 'number' ? evSel.valor_inscricao.toFixed(2).replace('.', ',') : evSel.valor_inscricao}` : 'Evento Gratuito'}
+                              </span>
+                              {evSel.capacidade != null && (
+                                <span className="text-slate-500 font-medium">
+                                  Capacidade: {evSel.capacidade} vagas
+                                </span>
+                              )}
+                            </div>
+                            {benfs.length > 0 && (
+                              <div className="flex items-center gap-1.5 text-[11px] text-blue-700 font-semibold">
+                                <span>Benefícios:</span>
+                                <span>{benfs.join(', ')}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* 2. IDENTIFICAÇÃO DO PARTICIPANTE */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700">
+                          Participante *
+                        </label>
+                        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBalcaoTipoParticipante('membro');
+                              setBalcaoNome('');
+                            }}
+                            className={`px-3 py-1 rounded-md font-bold transition ${
+                              balcaoTipoParticipante === 'membro'
+                                ? 'bg-white text-slate-900 shadow-xs'
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                          >
+                            Membro da Igreja
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBalcaoTipoParticipante('externo');
+                              setBalcaoMembro(null);
+                              setBalcaoBuscaMembro('');
+                            }}
+                            className={`px-3 py-1 rounded-md font-bold transition ${
+                              balcaoTipoParticipante === 'externo'
+                                ? 'bg-white text-slate-900 shadow-xs'
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                          >
+                            Visitante / Externo
+                          </button>
+                        </div>
+                      </div>
+
+                      {balcaoTipoParticipante === 'membro' ? (
+                        <div className="space-y-2">
+                          {balcaoMembro ? (
+                            <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs">
+                              <div className="flex items-center gap-2 font-bold text-emerald-900">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                <span>{balcaoMembro.nome_completo}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBalcaoMembro(null);
+                                  setBalcaoBuscaMembro('');
+                                }}
+                                className="text-emerald-700 hover:text-emerald-900 font-semibold underline text-[11px]"
+                              >
+                                Trocar membro
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-1.5">
+                              <div className="relative">
+                                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                                <input
+                                  type="text"
+                                  value={balcaoBuscaMembro}
+                                  onChange={e => setBalcaoBuscaMembro(e.target.value)}
+                                  placeholder="Digite ao menos 3 letras para buscar pelo nome..."
+                                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
+                                />
+                              </div>
+                              {balcaoResultadosMembro.length > 0 && (
+                                <div className="border border-slate-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-slate-100 bg-white shadow-xs">
+                                  {balcaoResultadosMembro.map(m => (
+                                    <button
+                                      type="button"
+                                      key={m.id}
+                                      onClick={() => {
+                                        setBalcaoMembro(m);
+                                        setBalcaoBuscaMembro('');
+                                        setBalcaoResultadosMembro([]);
+                                      }}
+                                      className="w-full text-left px-3.5 py-2 hover:bg-blue-50 text-xs font-medium text-slate-800 transition flex items-center justify-between"
+                                    >
+                                      <span>{m.nome_completo}</span>
+                                      <span className="text-[10px] font-bold text-blue-600 uppercase">Selecionar</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              {balcaoBuscaMembro.length >= 3 && balcaoResultadosMembro.length === 0 && (
+                                <p className="text-[11px] text-slate-400 italic">Nenhum membro encontrado com esse nome.</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <div className="sm:col-span-2">
+                            <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                              Nome Completo *
+                            </label>
+                            <input
+                              type="text"
+                              value={balcaoNome}
+                              onChange={e => setBalcaoNome(e.target.value)}
+                              placeholder="Nome do participante"
+                              required
+                              className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                              E-mail
+                            </label>
+                            <input
+                              type="email"
+                              value={balcaoEmail}
+                              onChange={e => setBalcaoEmail(e.target.value)}
+                              placeholder="exemplo@email.com"
+                              className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                              Celular / WhatsApp
+                            </label>
+                            <input
+                              type="tel"
+                              value={balcaoTelefone}
+                              onChange={e => setBalcaoTelefone(e.target.value)}
+                              placeholder="(00) 00000-0000"
+                              className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 3. BENEFÍCIO DE HOSPEDAGEM (Se o evento permitir) */}
+                    {(() => {
+                      const ev = eventos.find(e => e.id === balcaoEventoId);
+                      if (!ev?.inclui_hospedagem) return null;
+                      return (
+                        <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={balcaoHospedagem}
+                              onChange={e => setBalcaoHospedagem(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-[#1d4ed8]"
+                            />
+                            <div>
+                              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                <Bed className="w-3.5 h-3.5 text-slate-500" />
+                                Incluir vaga de hospedagem
+                              </span>
+                              {ev.descricao_hospedagem && (
+                                <p className="text-[11px] text-slate-500 mt-0.5">{ev.descricao_hospedagem}</p>
+                              )}
+                            </div>
+                          </label>
+                        </div>
+                      );
+                    })()}
+
+                    {/* 4. FORMA DE PAGAMENTO PRESENCIAL (Se evento for pago) */}
+                    {(() => {
+                      const ev = eventos.find(e => e.id === balcaoEventoId);
+                      if (!ev?.evento_pago) return null;
+                      return (
+                        <div className="space-y-2.5">
+                          <label className="text-xs font-bold text-slate-700 block">
+                            Forma de Pagamento no Balcão *
+                          </label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {FORMAS_PAGAMENTO_BALCAO_OPTIONS.map(opt => {
+                              const selected = balcaoFormaPagamento === opt.value;
+                              return (
+                                <label
+                                  key={opt.value}
+                                  className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition select-none ${
+                                    selected
+                                      ? 'bg-emerald-50/80 border-emerald-400 ring-1 ring-emerald-400'
+                                      : 'bg-white border-slate-200 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="balcaoFormaPagamento"
+                                    value={opt.value}
+                                    checked={selected}
+                                    onChange={() => setBalcaoFormaPagamento(opt.value)}
+                                    className="mt-0.5 w-4 h-4 text-emerald-600 border-slate-300 focus:ring-emerald-500"
+                                  />
+                                  <div>
+                                    <span className="text-xs font-bold text-slate-900 block">{opt.label}</span>
+                                    <span className="text-[11px] text-slate-500 font-medium leading-relaxed block mt-0.5">
+                                      {opt.desc}
+                                    </span>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+
+                          {/* Justificativa / Observação */}
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                              {balcaoFormaPagamento === 'cortesia'
+                                ? 'Motivo / Autorização da Cortesia *'
+                                : 'Observações do Atendimento (Opcional)'}
+                            </label>
+                            <input
+                              type="text"
+                              value={balcaoJustificativa}
+                              onChange={e => setBalcaoJustificativa(e.target.value)}
+                              placeholder={
+                                balcaoFormaPagamento === 'cortesia'
+                                  ? 'Ex: Convidado da mesa, palestrante, isenção pastoral...'
+                                  : 'Ex: Pago em dinheiro no balcão da secretaria'
+                              }
+                              className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Resumo Final */}
+                    {(() => {
+                      const ev = eventos.find(e => e.id === balcaoEventoId);
+                      if (!ev) return null;
+                      const valorFinal = ev.evento_pago
+                        ? balcaoFormaPagamento === 'a_vista'
+                          ? typeof ev.valor_inscricao === 'number' ? ev.valor_inscricao : Number(ev.valor_inscricao) || 0
+                          : 0
+                        : 0;
+
+                      return (
+                        <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/90 flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-bold text-slate-800 block">Total a receber:</span>
+                            <span className="text-[11px] text-slate-500">
+                              {ev.evento_pago
+                                ? balcaoFormaPagamento === 'cortesia'
+                                  ? 'Cortesia autorizada (R$ 0,00)'
+                                  : 'Pagamento à vista presencial'
+                                : 'Inscrição gratuita'}
+                            </span>
+                          </div>
+                          <span className="text-lg font-black text-slate-900">
+                            R$ {valorFinal.toFixed(2).replace('.', ',')}
+                          </span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Footer Buttons */}
+                    <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setShowBalcaoModal(false)}
+                        className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={balcaoSalvando}
+                        className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-xs disabled:opacity-50 active:scale-95"
+                      >
+                        {balcaoSalvando ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Processando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4" />
+                            <span>Confirmar Inscrição no Balcão</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
