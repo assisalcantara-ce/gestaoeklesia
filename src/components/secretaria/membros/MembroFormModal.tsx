@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { createClient } from '@/lib/supabase-client';
 
 export interface MembroFormModalProps {
   showForm: boolean;
@@ -78,11 +79,108 @@ export default function MembroFormModal({
   isAdmin = false,
 }: MembroFormModalProps) {
   const [editandoMatricula, setEditandoMatricula] = React.useState(false);
+  const [buscandoConjuge, setBuscandoConjuge] = React.useState(false);
+  const [conjugeMsg, setConjugeMsg] = React.useState<{ tipo: 'sucesso' | 'info' | 'erro'; texto: string } | null>(null);
+  const ultimoCpfBuscadoRef = React.useRef<string>('');
 
   // Reseta estado de edição da matrícula ao abrir ou trocar de membro
   React.useEffect(() => {
     setEditandoMatricula(false);
+    setConjugeMsg(null);
+    ultimoCpfBuscadoRef.current = '';
   }, [showForm, membroEditando?.id]);
+
+  const normalizeDateForInput = (val: any): string => {
+    if (!val) return '';
+    const s = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      return s.slice(0, 10);
+    }
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+      const parts = s.split('/');
+      if (parts.length === 3) {
+        const [d, m, y] = parts;
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      }
+    }
+    return s;
+  };
+
+  const buscarConjugePorCpf = React.useCallback(async (cpfInput: string) => {
+    const cleanCpf = (cpfInput || '').replace(/\D/g, '');
+    if (cleanCpf.length !== 11) {
+      setConjugeMsg(null);
+      return;
+    }
+
+    setBuscandoConjuge(true);
+    setConjugeMsg(null);
+
+    try {
+      const supabase = createClient();
+      const formattedCpf = `${cleanCpf.slice(0, 3)}.${cleanCpf.slice(3, 6)}.${cleanCpf.slice(6, 9)}-${cleanCpf.slice(9)}`;
+
+      const { data, error } = await supabase
+        .from('members')
+        .select('id, name, data_nascimento, custom_fields')
+        .or(`cpf.eq.${cleanCpf},cpf.eq.${formattedCpf}`)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Erro ao buscar cônjuge por CPF:', error);
+        setConjugeMsg(null);
+        return;
+      }
+
+      if (data) {
+        const cf = (data.custom_fields || {}) as Record<string, any>;
+        const nomeEncontrado = data.name || cf.nome || cf.name || '';
+        const rawDate = data.data_nascimento || cf.dataNascimento || cf.data_nascimento || '';
+        const dataNascEncontrada = normalizeDateForInput(rawDate);
+
+        setDadosPessoais((prev: any) => ({
+          ...prev,
+          nomeConjuge: nomeEncontrado || prev.nomeConjuge,
+          dataNascimentoConjuge: dataNascEncontrada || prev.dataNascimentoConjuge,
+        }));
+
+        setConjugeMsg({
+          tipo: 'sucesso',
+          texto: `✓ Cônjuge localizado na base: ${nomeEncontrado}`,
+        });
+      } else {
+        setConjugeMsg({
+          tipo: 'info',
+          texto: 'ℹ CPF não localizado na base de membros (você pode preencher manualmente)',
+        });
+      }
+    } catch (err) {
+      console.error('Erro na busca de cônjuge por CPF:', err);
+    } finally {
+      setBuscandoConjuge(false);
+    }
+  }, [setDadosPessoais]);
+
+  const handleCpfConjugeChange = (val: string) => {
+    setDadosPessoais((prev: any) => ({ ...prev, cpfConjuge: val }));
+    const clean = val.replace(/\D/g, '');
+    if (clean.length !== 11) {
+      setConjugeMsg(null);
+      ultimoCpfBuscadoRef.current = '';
+    }
+  };
+
+  React.useEffect(() => {
+    const clean = (dadosPessoais.cpfConjuge || '').replace(/\D/g, '');
+    if (clean.length === 11 && clean !== ultimoCpfBuscadoRef.current) {
+      const timer = setTimeout(() => {
+        ultimoCpfBuscadoRef.current = clean;
+        buscarConjugePorCpf(clean);
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [dadosPessoais.cpfConjuge, buscarConjugePorCpf]);
 
   console.log('props recebidas', {
     supervisoesOptions,
@@ -345,8 +443,43 @@ export default function MembroFormModal({
               {/* Dados do Cônjuge - Aparecem apenas se casado */}
               {dadosPessoais.estadoCivil === 'casado' && (
                 <div className="bg-blue-50 border border-blue-200 p-3 rounded-md">
-                  <h4 className="text-xs font-semibold text-blue-800 mb-3">👥 Dados do Cônjuge</h4>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-semibold text-blue-800">👥 Dados do Cônjuge</h4>
+                    {buscandoConjuge && (
+                      <span className="text-xs text-blue-600 flex items-center gap-1 font-medium">
+                        <svg className="animate-spin h-3.5 w-3.5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                        Buscando cônjuge na base...
+                      </span>
+                    )}
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">CPF do Cônjuge</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Somente Números"
+                          value={dadosPessoais.cpfConjuge || ''}
+                          onChange={(e) => handleCpfConjugeChange(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent pr-8"
+                        />
+                        {buscandoConjuge ? (
+                          <span className="absolute right-2.5 top-2.5 text-xs text-blue-500" title="Buscando...">⏳</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => buscarConjugePorCpf(dadosPessoais.cpfConjuge || '')}
+                            title="Buscar na base de membros"
+                            className="absolute right-2 top-2 text-gray-400 hover:text-teal-600 text-xs px-1"
+                          >
+                            🔍
+                          </button>
+                        )}
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">Nome do Cônjuge</label>
                       <input
@@ -354,16 +487,6 @@ export default function MembroFormModal({
                         placeholder="Nome"
                         value={dadosPessoais.nomeConjuge || ''}
                         onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, nomeConjuge: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">CPF do Cônjuge</label>
-                      <input
-                        type="text"
-                        placeholder="Somente Números"
-                        value={dadosPessoais.cpfConjuge || ''}
-                        onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, cpfConjuge: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       />
                     </div>
@@ -377,6 +500,17 @@ export default function MembroFormModal({
                       />
                     </div>
                   </div>
+                  {conjugeMsg && (
+                    <div
+                      className={`mt-2.5 text-xs font-medium ${
+                        conjugeMsg.tipo === 'sucesso'
+                          ? 'text-emerald-800 bg-emerald-100/70 border border-emerald-300'
+                          : 'text-amber-800 bg-amber-100/70 border border-amber-300'
+                      } px-3 py-1.5 rounded-md transition-all`}
+                    >
+                      {conjugeMsg.texto}
+                    </div>
+                  )}
                 </div>
               )}
 

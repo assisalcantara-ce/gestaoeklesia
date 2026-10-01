@@ -149,6 +149,42 @@ const normalizeTipoCadastro = (value: any): Membro['tipoCadastro'] => {
   return 'ministro';
 };
 
+const normalizeEstadoCivil = (value: any): string => {
+  if (!value) return '';
+  const clean = String(value)
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s-]+/g, '_');
+
+  if (clean.startsWith('solteir')) return 'solteiro';
+  if (clean.startsWith('casad')) return 'casado';
+  if (clean.startsWith('divorc')) return 'divorciado';
+  if (clean.startsWith('viuv')) return 'viuvo';
+  if (clean.includes('uniao') || clean.includes('estavel')) return 'uniao_estavel';
+  if (clean.startsWith('separad')) return 'divorciado';
+  if (clean.startsWith('outr')) return 'outros';
+  return clean;
+};
+
+const normalizeEscolaridade = (value: any): string => {
+  if (!value) return '';
+  const clean = String(value)
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s-]+/g, '_');
+
+  if (clean.includes('sem_instrucao') || clean.includes('sem_instru')) return 'sem_instrucao';
+  if (clean.includes('fundamental')) return 'fundamental';
+  if (clean.includes('medio')) return 'medio';
+  if (clean.includes('superior') || (clean.includes('gradua') && !clean.includes('pos'))) return 'superior';
+  if (clean.includes('pos') || clean.includes('mestrado') || clean.includes('doutorado')) return 'posgraduacao';
+  return clean;
+};
+
 const dbStatusToUi = (status: any): Membro['status'] =>
   status === 'active' ? 'ativo' : 'inativo';
 
@@ -431,8 +467,8 @@ export function useMembros() {
       dataNascimento: String(member.data_nascimento || (cf as any).dataNascimento || ''),
       sexo: String(member.sexo || (cf as any).sexo || ''),
       tipoSanguineo: String(member.tipo_sanguineo || (cf as any).tipoSanguineo || ''),
-      escolaridade: String(member.escolaridade || (cf as any).escolaridade || ''),
-      estadoCivil: String(member.estado_civil || (cf as any).estadoCivil || ''),
+      escolaridade: normalizeEscolaridade(member.escolaridade || (cf as any).escolaridade || ''),
+      estadoCivil: normalizeEstadoCivil(member.estado_civil || (cf as any).estadoCivil || ''),
       nomeConjuge: String(member.nome_conjuge || (cf as any).nomeConjuge || ''),
       cpfConjuge: String(member.cpf_conjuge || (cf as any).cpfConjuge || ''),
       dataNascimentoConjuge: String(member.data_nascimento_conjuge || (cf as any).dataNascimentoConjuge || ''),
@@ -705,8 +741,8 @@ export function useMembros() {
       dataNascimento: membro.dataNascimento || '',
       sexo: membro.sexo || 'MASCULINO',
       tipoSanguineo: membro.tipoSanguineo || '',
-      escolaridade: membro.escolaridade || '',
-      estadoCivil: membro.estadoCivil || '',
+      escolaridade: normalizeEscolaridade(membro.escolaridade || ''),
+      estadoCivil: normalizeEstadoCivil(membro.estadoCivil || ''),
       nomeConjuge: membro.nomeConjuge || '',
       cpfConjuge: membro.cpfConjuge || '',
       dataNascimentoConjuge: membro.dataNascimentoConjuge || '',
@@ -822,8 +858,8 @@ export function useMembros() {
         dataNascimento: dadosPessoais.dataNascimento,
         sexo: dadosPessoais.sexo,
         tipoSanguineo: dadosPessoais.tipoSanguineo,
-        escolaridade: dadosPessoais.escolaridade,
-        estadoCivil: dadosPessoais.estadoCivil,
+        escolaridade: normalizeEscolaridade(dadosPessoais.escolaridade),
+        estadoCivil: normalizeEstadoCivil(dadosPessoais.estadoCivil),
         nomeConjuge: dadosPessoais.nomeConjuge,
         cpfConjuge: dadosPessoais.cpfConjuge,
         dataNascimentoConjuge: dadosPessoais.dataNascimentoConjuge,
@@ -876,8 +912,8 @@ export function useMembros() {
         data_nascimento: dadosPessoais.dataNascimento || null,
         sexo: u(dadosPessoais.sexo),
         tipo_sanguineo: u(dadosPessoais.tipoSanguineo),
-        escolaridade: u(dadosPessoais.escolaridade),
-        estado_civil: u(dadosPessoais.estadoCivil),
+        escolaridade: normalizeEscolaridade(dadosPessoais.escolaridade) || null,
+        estado_civil: normalizeEstadoCivil(dadosPessoais.estadoCivil) || null,
         nome_conjuge: u(dadosPessoais.nomeConjuge),
         cpf_conjuge: dadosPessoais.cpfConjuge ? onlyDigits(dadosPessoais.cpfConjuge) : null,
         data_nascimento_conjuge: dadosPessoais.dataNascimentoConjuge || null,
