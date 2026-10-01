@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
+import jsQR from 'jsqr';
 import {
   QrCode,
   Camera,
@@ -14,6 +15,9 @@ import {
   Calendar,
   Search,
   Check,
+  RefreshCw,
+  VideoOff,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface EventoPublicoCheckin {
@@ -58,6 +62,8 @@ type FeedbackResult =
       mensagem: string;
       detalhe?: string;
     };
+
+type CameraStatus = 'idle' | 'solicitando' | 'ativa' | 'erro';
 
 /**
  * Emite um pequeno sinal sonoro positivo ou de alerta usando Web Audio API
@@ -111,8 +117,8 @@ export default function CheckinPublicoPage() {
 
   // Modo de Leitura: 'camera' ou 'manual'
   const [modo, setModo] = useState<'camera' | 'manual'>('camera');
-  const [cameraAtiva, setCameraAtiva] = useState(false);
-  const [cameraErro, setCameraErro] = useState<string | null>(null);
+  const [cameraStatus, setCameraStatus] = useState<CameraStatus>('idle');
+  const [cameraErroMensagem, setCameraErroMensagem] = useState<string | null>(null);
   const [codigoManual, setCodigoManual] = useState('');
   const [processando, setProcessando] = useState(false);
 
@@ -121,7 +127,8 @@ export default function CheckinPublicoPage() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const animFrameRef = useRef<number | null>(null);
   const isScanningRef = useRef(false);
 
   // 1. Carregar dados do evento via Token
@@ -152,18 +159,27 @@ export default function CheckinPublicoPage() {
     carregarEvento();
   }, [carregarEvento]);
 
-  // 2. Parar stream de câmera
+  // 2. Parar stream de câmera e scanner
   const pararCamera = useCallback(() => {
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current);
-      scanIntervalRef.current = null;
+    isScanningRef.current = false;
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
     }
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch {
+          // ignore
+        }
+      });
       streamRef.current = null;
     }
-    setCameraAtiva(false);
-    isScanningRef.current = false;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraStatus('idle');
   }, []);
 
   // 3. Processar Check-in via API
@@ -200,7 +216,11 @@ export default function CheckinPublicoPage() {
             evento_titulo: data.evento_titulo,
           });
           if (data.total_presentes != null && data.total_confirmados != null) {
-            setEvento(prev => (prev ? { ...prev, total_presentes: data.total_presentes, total_confirmados: data.total_confirmados } : prev));
+            setEvento((prev) =>
+              prev
+                ? { ...prev, total_presentes: data.total_presentes, total_confirmados: data.total_confirmados }
+                : prev
+            );
           }
         } else {
           playAudioFeedback('sucesso');
@@ -212,7 +232,11 @@ export default function CheckinPublicoPage() {
             evento_titulo: data.evento_titulo,
           });
           if (data.total_presentes != null && data.total_confirmados != null) {
-            setEvento(prev => (prev ? { ...prev, total_presentes: data.total_presentes, total_confirmados: data.total_confirmados } : prev));
+            setEvento((prev) =>
+              prev
+                ? { ...prev, total_presentes: data.total_presentes, total_confirmados: data.total_confirmados }
+                : prev
+            );
           }
         }
       } catch (err: any) {
@@ -229,66 +253,156 @@ export default function CheckinPublicoPage() {
     [token, processando, pararCamera]
   );
 
-  // 4. Iniciar Leitor de Câmera
+  // 4. Scanner Loop usando jsQR
+  const startScanningLoop = useCallback(() => {
+    isScanningRef.current = true;
+
+    const scanFrame = () => {
+      if (!isScanningRef.current) return;
+
+      const video = videoRef.current;
+      if (video && video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+        if (!canvasRef.current) {
+          canvasRef.current = document.createElement('canvas');
+        }
+        const canvas = canvasRef.current;
+        const videoWidth = video.videoWidth || 640;
+        const videoHeight = video.videoHeight || 480;
+
+        if (canvas.width !== videoWidth || canvas.height !== videoHeight) {
+          canvas.width = videoWidth;
+          canvas.height = videoHeight;
+        }
+
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
+          try {
+            const imageData = ctx.getImageData(0, 0, videoWidth, videoHeight);
+            const qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: 'dontInvert',
+            });
+
+            if (qrCode && qrCode.data && qrCode.data.trim()) {
+              const qrValue = qrCode.data.trim();
+              if (isScanningRef.current) {
+                isScanningRef.current = false;
+                executarCheckin(qrValue);
+                return;
+              }
+            }
+          } catch {
+            // Ignora falhas de leitura em frames intermediários
+          }
+        }
+      }
+
+      if (isScanningRef.current) {
+        animFrameRef.current = requestAnimationFrame(scanFrame);
+      }
+    };
+
+    animFrameRef.current = requestAnimationFrame(scanFrame);
+  }, [executarCheckin]);
+
+  // 5. Iniciar Câmera acionado pelo usuário
   const iniciarCamera = useCallback(async () => {
-    setCameraErro(null);
+    setCameraErroMensagem(null);
     setResultado(null);
     setCodigoManual('');
+    setCameraStatus('solicitando');
 
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setCameraErro('Seu navegador não possui suporte a acesso de câmera.');
-      setModo('manual');
+    // Validação de contexto seguro e APIs
+    if (typeof window === 'undefined') return;
+
+    if (window.isSecureContext === false && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      setCameraErroMensagem('O acesso à câmera requer conexão segura (HTTPS).');
+      setCameraStatus('erro');
+      return;
+    }
+
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      setCameraErroMensagem('Seu navegador não possui suporte à API de câmera (getUserMedia).');
+      setCameraStatus('erro');
       return;
     }
 
     try {
-      pararCamera();
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      };
+      // Parar stream anterior se houver
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
+      let stream: MediaStream;
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraAtiva(true);
-        isScanningRef.current = true;
-
-        // Iniciar loop de leitura de QR Code
-        const BarcodeDetectorClass = (window as any).BarcodeDetector;
-
-        if (BarcodeDetectorClass) {
-          const barcodeDetector = new BarcodeDetectorClass({ formats: ['qr_code'] });
-          scanIntervalRef.current = setInterval(async () => {
-            if (!videoRef.current || !isScanningRef.current) return;
-            try {
-              const barcodes = await barcodeDetector.detect(videoRef.current);
-              if (barcodes && barcodes.length > 0) {
-                const qrValue = barcodes[0].rawValue;
-                if (qrValue && isScanningRef.current) {
-                  isScanningRef.current = false;
-                  executarCheckin(qrValue);
-                }
-              }
-            } catch {
-              // frame bypass
-            }
-          }, 250);
+      // Tentativa 1: câmera traseira ideal (environment)
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+      } catch (errFirst: any) {
+        // Fallback: solicitar vídeo sem constraints rígidas caso o dispositivo rejeite
+        if (errFirst?.name === 'OverconstrainedError' || errFirst?.name === 'ConstraintNotSatisfiedError') {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        } else {
+          throw errFirst;
         }
       }
+
+      streamRef.current = stream;
+
+      const video = videoRef.current;
+      if (!video) {
+        throw new Error('Elemento de vídeo não encontrado.');
+      }
+
+      video.srcObject = stream;
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('autoplay', 'true');
+      video.muted = true;
+
+      // Aguarda início da reprodução no Safari / Chrome
+      await video.play();
+
+      setCameraStatus('ativa');
+      startScanningLoop();
     } catch (err: any) {
-      console.warn('[CameraCheckin] Erro ao abrir câmera:', err);
-      setCameraErro('Permissão de câmera negada ou dispositivo indisponível. Use o modo manual.');
-      setCameraAtiva(false);
+      console.warn('[CheckinCamera] Erro ao obter câmera:', err);
+      setCameraStatus('erro');
+
+      const errName = err?.name || '';
+      if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+        setCameraErroMensagem(
+          'O acesso à câmera foi bloqueado. Permita o acesso à câmera nas configurações do navegador e tente novamente.'
+        );
+      } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
+        setCameraErroMensagem('Nenhuma câmera foi encontrada neste dispositivo.');
+      } else if (errName === 'NotReadableError' || errName === 'TrackStartError') {
+        setCameraErroMensagem(
+          'A câmera pode estar em uso por outro aplicativo ou temporariamente indisponível.'
+        );
+      } else if (errName === 'OverconstrainedError') {
+        setCameraErroMensagem('A configuração da câmera não é suportada pelo dispositivo.');
+      } else if (errName === 'SecurityError') {
+        setCameraErroMensagem('Acesso à câmera bloqueado por política de segurança.');
+      } else {
+        setCameraErroMensagem('Não foi possível acessar a câmera deste dispositivo. Use o modo manual.');
+      }
     }
-  }, [pararCamera, executarCheckin]);
+  }, [startScanningLoop]);
 
   // Limpeza ao desmontar
   useEffect(() => {
@@ -296,13 +410,6 @@ export default function CheckinPublicoPage() {
       pararCamera();
     };
   }, [pararCamera]);
-
-  // Se o modo mudar para câmera e não houver resultado em exibição, abre automaticamente
-  useEffect(() => {
-    if (modo === 'camera' && !resultado && !cameraAtiva && !cameraErro && evento) {
-      iniciarCamera();
-    }
-  }, [modo, resultado, cameraAtiva, cameraErro, evento, iniciarCamera]);
 
   const reiniciarParaProximaLeitura = () => {
     setResultado(null);
@@ -315,7 +422,7 @@ export default function CheckinPublicoPage() {
   // ── 1. TELA DE CARREGAMENTO ──
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4">
         <div className="w-10 h-10 border-3 border-emerald-400 border-t-transparent rounded-full animate-spin mb-3" />
         <p className="text-sm font-semibold text-slate-300">Conectando ao Check-in do Evento...</p>
       </div>
@@ -325,8 +432,8 @@ export default function CheckinPublicoPage() {
   // ── 2. TELA DE LINK EXPIRADO / INVÁLIDO ──
   if (linkExpirado || !evento) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-md bg-slate-800/90 border border-slate-700 rounded-3xl p-6 text-center shadow-2xl space-y-4">
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center shadow-2xl space-y-4">
           <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto">
             <XCircle className="w-9 h-9" />
           </div>
@@ -336,7 +443,7 @@ export default function CheckinPublicoPage() {
               {motivoExpiracao || 'Este link de check-in não está mais disponível ou expirou.'}
             </p>
           </div>
-          <div className="pt-3 border-t border-slate-700/60 text-xs text-slate-500">
+          <div className="pt-3 border-t border-slate-800 text-xs text-slate-500">
             Solicite um novo link à equipe organizadora do evento.
           </div>
         </div>
@@ -380,7 +487,10 @@ export default function CheckinPublicoPage() {
         <div className="bg-slate-900/80 rounded-2xl border border-slate-800/80 p-3.5 flex items-center justify-between text-xs text-slate-400">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-slate-500" />
-            <span>{new Date(evento.data_inicio).toLocaleDateString('pt-BR')} às {new Date(evento.data_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+            <span>
+              {new Date(evento.data_inicio).toLocaleDateString('pt-BR')} às{' '}
+              {new Date(evento.data_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </span>
           </div>
           {evento.local_nome && (
             <div className="flex items-center gap-1.5 truncate max-w-[150px]" title={evento.local_nome}>
@@ -437,35 +547,38 @@ export default function CheckinPublicoPage() {
                 </span>
 
                 <h2 className="text-xl font-black text-white pt-1">
-                  {resultado.type === 'erro'
-                    ? resultado.mensagem
-                    : resultado.participante.nome}
+                  {resultado.type === 'erro' ? resultado.mensagem : resultado.participante.nome}
                 </h2>
 
                 {resultado.type !== 'erro' && (
                   <p className="text-xs text-slate-300 font-medium">
                     {resultado.type === 'ja_realizado'
                       ? `Primeiro check-in registrado em ${new Date(resultado.checkin_em).toLocaleString('pt-BR')}`
-                      : `Check-in realizado às ${new Date(resultado.checkin_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`}
+                      : `Check-in realizado às ${new Date(resultado.checkin_em).toLocaleTimeString('pt-BR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                        })}`}
                   </p>
                 )}
               </div>
 
               {/* Benefícios contemplados se houver */}
-              {resultado.type !== 'erro' && (resultado.participante.tem_brinde || resultado.participante.com_hospedagem) && (
-                <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
-                  {resultado.participante.tem_brinde && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-pink-500/20 text-pink-300 border border-pink-500/30">
-                      <Gift className="w-3.5 h-3.5" /> Brinde Contemplado 🎁
-                    </span>
-                  )}
-                  {resultado.participante.com_hospedagem && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                      <Bed className="w-3.5 h-3.5" /> Hospedagem Inclusa 🛏️
-                    </span>
-                  )}
-                </div>
-              )}
+              {resultado.type !== 'erro' &&
+                (resultado.participante.tem_brinde || resultado.participante.com_hospedagem) && (
+                  <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+                    {resultado.participante.tem_brinde && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-pink-500/20 text-pink-300 border border-pink-500/30">
+                        <Gift className="w-3.5 h-3.5" /> Brinde Contemplado 🎁
+                      </span>
+                    )}
+                    {resultado.participante.com_hospedagem && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                        <Bed className="w-3.5 h-3.5" /> Hospedagem Inclusa 🛏️
+                      </span>
+                    )}
+                  </div>
+                )}
 
               {/* Botão de Ação Imediata */}
               <div className="pt-3">
@@ -483,50 +596,116 @@ export default function CheckinPublicoPage() {
             /* ── MODO CÂMERA AO VIVO ── */
             <div className="space-y-3">
               <div className="relative aspect-square w-full max-w-[320px] mx-auto bg-black rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex items-center justify-center">
-                {cameraAtiva ? (
-                  <>
-                    <video
-                      ref={videoRef}
-                      playsInline
-                      muted
-                      autoPlay
-                      className="w-full h-full object-cover"
-                    />
-                    {/* Alvo visual de mira do QR Code */}
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-8">
-                      <div className="w-48 h-48 border-2 border-emerald-400/80 rounded-2xl relative shadow-inner">
-                        {/* Linha de laser escaneadora */}
-                        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-bounce" />
-                        {/* Cantoneiras */}
-                        <div className="absolute -top-1 -left-1 w-4 h-4 border-t-4 border-l-4 border-emerald-400 rounded-tl-md" />
-                        <div className="absolute -top-1 -right-1 w-4 h-4 border-t-4 border-r-4 border-emerald-400 rounded-tr-md" />
-                        <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-emerald-400 rounded-bl-md" />
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-emerald-400 rounded-br-md" />
-                      </div>
+                {/* Elemento <video> sempre presente no DOM para vinculação correta do MediaStream no Safari/iOS */}
+                <video
+                  ref={videoRef}
+                  playsInline
+                  muted
+                  autoPlay
+                  className={`w-full h-full object-cover transition-opacity duration-300 ${
+                    cameraStatus === 'ativa' ? 'opacity-100' : 'opacity-0 absolute pointer-events-none'
+                  }`}
+                />
+
+                {/* Overlay da Mira do Scanner quando ativa */}
+                {cameraStatus === 'ativa' && (
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-8">
+                    <div className="w-48 h-48 border-2 border-emerald-400/80 rounded-2xl relative shadow-inner">
+                      {/* Linha animada de leitura */}
+                      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-bounce" />
+                      {/* Cantoneiras estilizadas */}
+                      <div className="absolute -top-1 -left-1 w-4 h-4 border-t-4 border-l-4 border-emerald-400 rounded-tl-md" />
+                      <div className="absolute -top-1 -right-1 w-4 h-4 border-t-4 border-r-4 border-emerald-400 rounded-tr-md" />
+                      <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-emerald-400 rounded-bl-md" />
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-emerald-400 rounded-br-md" />
                     </div>
-                  </>
-                ) : (
-                  <div className="p-6 text-center space-y-3">
-                    <div className="w-12 h-12 rounded-2xl bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
-                      <Camera className="w-6 h-6" />
+                  </div>
+                )}
+
+                {/* Botão flutuante para pausar câmera quando ativa */}
+                {cameraStatus === 'ativa' && (
+                  <div className="absolute top-3 right-3 z-10">
+                    <button
+                      type="button"
+                      onClick={pararCamera}
+                      title="Desativar câmera"
+                      className="p-2 rounded-xl bg-slate-900/80 backdrop-blur text-slate-300 hover:text-white border border-slate-700/80 transition"
+                    >
+                      <VideoOff className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Placeholder / Controle quando Câmera NÃO está ativa */}
+                {cameraStatus !== 'ativa' && (
+                  <div className="p-6 text-center space-y-3.5 z-10 max-w-[280px]">
+                    <div
+                      className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto ${
+                        cameraStatus === 'erro'
+                          ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
+                          : 'bg-slate-800 text-slate-300 border border-slate-700'
+                      }`}
+                    >
+                      {cameraStatus === 'erro' ? (
+                        <ShieldAlert className="w-7 h-7" />
+                      ) : cameraStatus === 'solicitando' ? (
+                        <RefreshCw className="w-7 h-7 animate-spin text-emerald-400" />
+                      ) : (
+                        <Camera className="w-7 h-7" />
+                      )}
                     </div>
-                    <p className="text-xs text-slate-400 font-medium">
-                      {cameraErro || 'Câmera desativada ou aguardando permissão.'}
-                    </p>
+
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-white">
+                        {cameraStatus === 'erro'
+                          ? 'Acesso à Câmera'
+                          : cameraStatus === 'solicitando'
+                          ? 'Iniciando Câmera...'
+                          : 'Leitor de QR Code'}
+                      </p>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        {cameraErroMensagem ||
+                          (cameraStatus === 'solicitando'
+                            ? 'Aguarde a liberação do acesso no navegador...'
+                            : 'Precisamos acessar a câmera para ler o QR Code do comprovante.')}
+                      </p>
+                    </div>
+
                     <button
                       type="button"
                       onClick={iniciarCamera}
-                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition"
+                      disabled={cameraStatus === 'solicitando'}
+                      className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-bold text-xs transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md"
                     >
-                      Ativar Câmera
+                      {cameraStatus === 'solicitando' ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Iniciando câmera...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="w-4 h-4" />
+                          <span>{cameraStatus === 'erro' ? 'Tentar Novamente' : 'Ativar Câmera'}</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 )}
               </div>
 
-              <p className="text-center text-xs text-slate-400 font-medium">
-                Aponte a câmera para o QR Code do comprovante
-              </p>
+              {/* Status footer da câmera */}
+              <div className="text-center space-y-1">
+                {cameraStatus === 'ativa' ? (
+                  <p className="text-xs font-medium text-emerald-400 flex items-center justify-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span>Câmera ativa • Aponte para o QR Code</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-400 font-medium">
+                    Toque em &quot;Ativar Câmera&quot; ou alterne para &quot;Digitar Código&quot;
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
             /* ── MODO DIGITAÇÃO MANUAL ── */
@@ -537,12 +716,12 @@ export default function CheckinPublicoPage() {
                 </div>
                 <h3 className="text-base font-black text-white">Validação Manual</h3>
                 <p className="text-xs text-slate-400">
-                  Informe o código de 8 dígitos da inscrição ou o nome do participante.
+                  Informe o código da inscrição ou o nome do participante.
                 </p>
               </div>
 
               <form
-                onSubmit={e => {
+                onSubmit={(e) => {
                   e.preventDefault();
                   if (codigoManual.trim()) {
                     executarCheckin(codigoManual.trim());
@@ -555,7 +734,7 @@ export default function CheckinPublicoPage() {
                   <input
                     type="text"
                     value={codigoManual}
-                    onChange={e => setCodigoManual(e.target.value.toUpperCase())}
+                    onChange={(e) => setCodigoManual(e.target.value.toUpperCase())}
                     placeholder="Ex: #A1B2C3D4 ou Nome"
                     autoFocus
                     className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase transition"
@@ -591,7 +770,9 @@ export default function CheckinPublicoPage() {
               type="button"
               onClick={() => {
                 setModo('camera');
-                iniciarCamera();
+                if (cameraStatus !== 'ativa' && cameraStatus !== 'solicitando') {
+                  iniciarCamera();
+                }
               }}
               className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
                 modo === 'camera'
@@ -600,7 +781,7 @@ export default function CheckinPublicoPage() {
               }`}
             >
               <Camera className="w-4 h-4" />
-              <span>Ler QR Code</span>
+              <span>{cameraStatus === 'ativa' ? 'Câmera Ativa' : 'Ler QR Code'}</span>
             </button>
             <button
               type="button"
