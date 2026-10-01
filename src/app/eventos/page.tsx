@@ -14,6 +14,7 @@ import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organi
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { substituirPlaceholdersCertificado } from '@/lib/certificados-utils';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   Award,
   Bed,
@@ -46,6 +47,7 @@ import {
   QrCode,
   RotateCcw,
   Search,
+  ShieldCheck,
   Store,
   Tag,
   Ticket,
@@ -282,8 +284,9 @@ const FORMAS_PAGAMENTO_OPTIONS: { value: FormaPagamento; label: string }[] = [
   { value: 'boleto',   label: 'Boleto' },
 ];
 
-const FORMAS_PAGAMENTO_BALCAO_OPTIONS: { value: 'a_vista' | 'cortesia'; label: string; desc: string }[] = [
-  { value: 'a_vista',  label: 'À vista', desc: 'Pagamento presencial recebido no ato' },
+const FORMAS_PAGAMENTO_BALCAO_OPTIONS: { value: 'a_vista' | 'pix' | 'cortesia'; label: string; desc: string }[] = [
+  { value: 'a_vista',  label: 'À vista',  desc: 'Pagamento presencial recebido no ato (dinheiro/cartão)' },
+  { value: 'pix',      label: 'PIX',      desc: 'PIX presencial com confirmação imediata no balcão' },
   { value: 'cortesia', label: 'Cortesia', desc: 'Isenção / cortesia autorizada (R$ 0,00)' },
 ];
 
@@ -603,7 +606,7 @@ export default function EventosPage() {
   const [balcaoEmail, setBalcaoEmail] = useState('');
   const [balcaoTelefone, setBalcaoTelefone] = useState('');
   const [balcaoHospedagem, setBalcaoHospedagem] = useState(false);
-  const [balcaoFormaPagamento, setBalcaoFormaPagamento] = useState<'a_vista' | 'cortesia'>('a_vista');
+  const [balcaoFormaPagamento, setBalcaoFormaPagamento] = useState<'a_vista' | 'pix' | 'cortesia'>('a_vista');
   const [balcaoJustificativa, setBalcaoJustificativa] = useState('');
   const [balcaoSalvando, setBalcaoSalvando] = useState(false);
   const [balcaoSucesso, setBalcaoSucesso] = useState<{
@@ -618,6 +621,13 @@ export default function EventosPage() {
     temBrinde?: boolean;
     dataHora: string;
   } | null>(null);
+
+  // ── Modal Link Público de Check-in ────────────────────────────────────────
+  const [showLinkCheckinModal, setShowLinkCheckinModal] = useState(false);
+  const [linkCheckinUrl, setLinkCheckinUrl] = useState('');
+  const [linkCheckinExpiraEm, setLinkCheckinExpiraEm] = useState<string | null>(null);
+  const [loadingLinkCheckin, setLoadingLinkCheckin] = useState(false);
+  const [linkCheckinCopiado, setLinkCheckinCopiado] = useState(false);
 
   // ── Fechar menu dropdown ao clicar fora ────────────────────────────────────
   useEffect(() => {
@@ -1357,6 +1367,8 @@ export default function EventosPage() {
       const formaTexto = evento.evento_pago
         ? balcaoFormaPagamento === 'cortesia'
           ? 'Cortesia'
+          : balcaoFormaPagamento === 'pix'
+          ? 'PIX'
           : 'À vista'
         : 'Gratuito';
 
@@ -1398,17 +1410,23 @@ export default function EventosPage() {
 
       // 4. Registrar transação se o evento for pago
       const valorCobrado = evento.evento_pago
-        ? balcaoFormaPagamento === 'a_vista'
-          ? (typeof evento.valor_inscricao === 'number' ? evento.valor_inscricao : Number(evento.valor_inscricao) || 0)
-          : 0
+        ? balcaoFormaPagamento === 'cortesia'
+          ? 0
+          : (typeof evento.valor_inscricao === 'number' ? evento.valor_inscricao : Number(evento.valor_inscricao) || 0)
         : 0;
 
       if (evento.evento_pago) {
+        const prefixoId = balcaoFormaPagamento === 'pix'
+          ? 'BALCAO-PIX'
+          : balcaoFormaPagamento === 'cortesia'
+          ? 'CORTESIA'
+          : 'BALCAO';
+
         const { error: pagError } = await supabase.from('eventos_pagamentos').insert({
           ministry_id: ministryId,
           inscricao_id: novaInsc.id,
           gateway: 'balcao',
-          gateway_charge_id: `BALCAO-${novaInsc.id.substring(0, 8).toUpperCase()}`,
+          gateway_charge_id: `${prefixoId}-${novaInsc.id.substring(0, 8).toUpperCase()}`,
           payment_method: balcaoFormaPagamento,
           valor: valorCobrado,
           status: 'pago',
@@ -1557,6 +1575,77 @@ export default function EventosPage() {
     win.document.write(html);
     win.document.close();
   };
+
+  // ── Ações do Link Público de Check-in ────────────────────────────────────
+  const abrirModalLinkCheckin = async () => {
+    if (!eventoSelecionado) return;
+    setShowLinkCheckinModal(true);
+    setLoadingLinkCheckin(true);
+    setLinkCheckinCopiado(false);
+
+    try {
+      const res = await fetch(`/api/v1/eventos/${eventoSelecionado.id}/checkin/token`);
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setLinkCheckinUrl(data.url);
+        setLinkCheckinExpiraEm(data.expira_em);
+      } else {
+        showModal('Erro ao obter link', data.error || 'Não foi possível gerar o link de check-in.', 'error');
+        setShowLinkCheckinModal(false);
+      }
+    } catch (err: any) {
+      showModal('Erro', err?.message || 'Falha na requisição do link de check-in.', 'error');
+      setShowLinkCheckinModal(false);
+    } finally {
+      setLoadingLinkCheckin(false);
+    }
+  };
+
+  const regerarLinkCheckin = async () => {
+    if (!eventoSelecionado) return;
+    if (!confirm('Deseja regerar o link de check-in? O link anterior deixará de funcionar imediatamente na entrada do evento.')) return;
+
+    setLoadingLinkCheckin(true);
+    setLinkCheckinCopiado(false);
+
+    try {
+      const res = await fetch(`/api/v1/eventos/${eventoSelecionado.id}/checkin/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'gerar' }),
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setLinkCheckinUrl(data.url);
+        setLinkCheckinExpiraEm(data.expira_em);
+        showModal('Link regerado', 'Novo link de check-in gerado com sucesso.', 'success');
+      } else {
+        showModal('Erro', data.error || 'Falha ao regerar link.', 'error');
+      }
+    } catch (err: any) {
+      showModal('Erro', err?.message || 'Falha ao regerar link.', 'error');
+    } finally {
+      setLoadingLinkCheckin(false);
+    }
+  };
+
+  const copiarLinkCheckin = () => {
+    if (!linkCheckinUrl) return;
+    navigator.clipboard.writeText(linkCheckinUrl).then(() => {
+      setLinkCheckinCopiado(true);
+      setTimeout(() => setLinkCheckinCopiado(false), 2500);
+    });
+  };
+
+  // Atualização em segundo plano na aba Check-in
+  useEffect(() => {
+    if (aba === 'checkin' && eventoSelecionado) {
+      const interval = setInterval(() => {
+        carregarInscricoes(eventoSelecionado.id);
+      }, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [aba, eventoSelecionado, carregarInscricoes]);
 
   const handleCheckin = async (insc: Inscricao) => {
     const presente = !insc.presente;
@@ -3930,7 +4019,7 @@ export default function EventosPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs flex gap-3">
+            <div className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
                 <input
@@ -3940,13 +4029,24 @@ export default function EventosPage() {
                   className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]"
                 />
               </div>
-              <button
-                onClick={() => carregarInscricoes(eventoSelecionado.id)}
-                title="Recarregar"
-                className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={abrirModalLinkCheckin}
+                  className="inline-flex items-center gap-2 bg-[#0f3460] hover:bg-[#162a47] text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs whitespace-nowrap active:scale-95"
+                  title="Gerar link público temporário com QR Code para leitura na entrada do evento"
+                >
+                  <QrCode className="w-4 h-4" />
+                  <span>Link público de Check-in</span>
+                </button>
+                <button
+                  onClick={() => carregarInscricoes(eventoSelecionado.id)}
+                  title="Recarregar lista"
+                  className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {loadingInsc ? (
@@ -4646,7 +4746,7 @@ export default function EventosPage() {
                           <label className="text-xs font-bold text-slate-700 block">
                             Forma de Pagamento no Balcão *
                           </label>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                             {FORMAS_PAGAMENTO_BALCAO_OPTIONS.map(opt => {
                               const selected = balcaoFormaPagamento === opt.value;
                               return (
@@ -4677,6 +4777,14 @@ export default function EventosPage() {
                             })}
                           </div>
 
+                          {/* Aviso explicativo para PIX */}
+                          {balcaoFormaPagamento === 'pix' && (
+                            <div className="p-2.5 bg-blue-50/70 border border-blue-200/70 rounded-xl flex items-center gap-2 text-xs text-blue-800 animate-in fade-in duration-150">
+                              <span className="font-bold shrink-0">Info:</span>
+                              <span>O pagamento será registrado como confirmado via PIX no ato do atendimento presencial.</span>
+                            </div>
+                          )}
+
                           {/* Justificativa / Observação */}
                           <div>
                             <label className="text-[11px] font-semibold text-slate-600 block mb-1">
@@ -4691,6 +4799,8 @@ export default function EventosPage() {
                               placeholder={
                                 balcaoFormaPagamento === 'cortesia'
                                   ? 'Ex: Convidado da mesa, palestrante, isenção pastoral...'
+                                  : balcaoFormaPagamento === 'pix'
+                                  ? 'Ex: Comprovante PIX conferido no balcão'
                                   : 'Ex: Pago em dinheiro no balcão da secretaria'
                               }
                               className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
@@ -4705,9 +4815,9 @@ export default function EventosPage() {
                       const ev = eventos.find(e => e.id === balcaoEventoId);
                       if (!ev) return null;
                       const valorFinal = ev.evento_pago
-                        ? balcaoFormaPagamento === 'a_vista'
-                          ? typeof ev.valor_inscricao === 'number' ? ev.valor_inscricao : Number(ev.valor_inscricao) || 0
-                          : 0
+                        ? balcaoFormaPagamento === 'cortesia'
+                          ? 0
+                          : typeof ev.valor_inscricao === 'number' ? ev.valor_inscricao : Number(ev.valor_inscricao) || 0
                         : 0;
 
                       return (
@@ -4718,6 +4828,8 @@ export default function EventosPage() {
                               {ev.evento_pago
                                 ? balcaoFormaPagamento === 'cortesia'
                                   ? 'Cortesia autorizada (R$ 0,00)'
+                                  : balcaoFormaPagamento === 'pix'
+                                  ? 'Pagamento via PIX presencial'
                                   : 'Pagamento à vista presencial'
                                 : 'Inscrição gratuita'}
                             </span>
@@ -4757,6 +4869,158 @@ export default function EventosPage() {
                       </button>
                     </div>
                   </form>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        {/* ══════════════════════════════════════════════════════════════════════
+            MODAL: LINK PÚBLICO DE CHECK-IN (QR CODE PORTARIA)
+        ══════════════════════════════════════════════════════════════════════ */}
+        {showLinkCheckinModal && eventoSelecionado && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-100 flex flex-col max-h-[92vh] overflow-hidden">
+              {/* Header */}
+              <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-blue-50/50 via-white to-white shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100/80 border border-blue-200 text-blue-700 flex items-center justify-center shrink-0">
+                    <QrCode className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 leading-tight">
+                      Link Público de Check-in
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Acesso rápido para equipe da portaria via smartphone
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowLinkCheckinModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 overflow-y-auto space-y-4.5 flex-1">
+                {loadingLinkCheckin ? (
+                  <div className="py-12 text-center space-y-3">
+                    <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+                    <p className="text-xs font-semibold text-slate-600">Gerando link seguro de check-in...</p>
+                  </div>
+                ) : linkCheckinUrl ? (
+                  <div className="space-y-4">
+                    {/* Identificação do Evento */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Evento</span>
+                        <span className="text-xs font-bold text-slate-800 truncate block">{eventoSelecionado.titulo}</span>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                        Ativo
+                      </span>
+                    </div>
+
+                    {/* QR Code do Link para a Equipe da Entrada */}
+                    <div className="p-5 bg-white border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center text-center space-y-3 shadow-xs">
+                      <div className="p-3 bg-white border border-slate-200/90 rounded-2xl shadow-sm">
+                        <QRCodeSVG
+                          value={linkCheckinUrl}
+                          size={180}
+                          level="M"
+                          includeMargin={false}
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-bold text-slate-800">
+                          Aponte a câmera do celular para abrir
+                        </p>
+                        <p className="text-[11px] text-slate-500 max-w-xs">
+                          A equipe da portaria pode escanear este QR Code para começar a validar a entrada dos participantes.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Input do Link e Botão Copiar */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-700 block">
+                        URL do Check-in
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={linkCheckinUrl}
+                          className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-700 select-all focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={copiarLinkCheckin}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 ${
+                            linkCheckinCopiado
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-900 hover:bg-slate-800 text-white'
+                          }`}
+                        >
+                          {linkCheckinCopiado ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Copiado!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copiar</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Avisos de Segurança e Expiração */}
+                    <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl text-[11px] text-slate-600 space-y-1">
+                      <p className="font-semibold text-blue-900 flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                        Acesso seguro e restrito
+                      </p>
+                      <p className="leading-relaxed text-slate-600">
+                        O link funciona sem login e expira automaticamente caso o evento seja encerrado ou cancelado.
+                        {linkCheckinExpiraEm && (
+                          <span className="block mt-0.5 text-slate-500 font-medium">
+                            Válido até {new Date(linkCheckinExpiraEm).toLocaleString('pt-BR')}.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Botões do Rodapé */}
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => window.open(linkCheckinUrl, '_blank')}
+                        className="flex-1 inline-flex items-center justify-center gap-2 bg-[#0f3460] hover:bg-[#162a47] text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xs"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>Abrir Leitor no Navegador</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={regerarLinkCheckin}
+                        className="inline-flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-xs font-semibold transition"
+                        title="Inativa o link atual e cria uma nova chave de acesso"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Regerar Chave</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-xs text-slate-500">
+                    Nenhum link ativo encontrado.
+                  </div>
                 )}
               </div>
             </div>
