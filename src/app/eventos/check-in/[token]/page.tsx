@@ -525,7 +525,7 @@ export default function CheckinPublicoPage() {
     <div
       className="min-h-[100dvh] text-slate-100 flex flex-col relative overflow-x-hidden selection:bg-emerald-500 selection:text-white"
       style={{
-        background: `linear-gradient(180deg, rgba(6, 11, 22, 0.40) 0%, rgba(6, 11, 22, 0.82) 48%, #050a14 100%), url('/img/bg_checkin1.png') center top / cover no-repeat, #050a14`,
+        background: `linear-gradient(180deg, rgba(6, 11, 22, 0.40) 0%, rgba(6, 11, 22, 0.82) 48%, #050a14 100%), url('/img/bg_checkin01.png') center top / cover no-repeat, #050a14`,
       }}
     >
       {/* Topo seguro para iOS / safe area */}
