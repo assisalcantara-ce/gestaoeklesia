@@ -49,7 +49,11 @@ export default function GlobalFinancialBanner() {
       pathname.startsWith('/membro') ||
       pathname.startsWith('/validar') ||
       pathname.startsWith('/app') ||
-      pathname.startsWith('/formularios')
+      pathname.startsWith('/formularios') ||
+      pathname.startsWith('/eventos/check-in') ||
+      pathname.startsWith('/eventos/e') ||
+      pathname.startsWith('/ebd/chamada-rapida') ||
+      pathname.startsWith('/reunioes/painel')
     ) return true;
     return false;
   }, [pathname]);

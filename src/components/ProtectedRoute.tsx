@@ -22,6 +22,9 @@ const PUBLIC_PREFIXES = [
   '/membro',
   '/validar',
   '/reunioes/painel',
+  '/eventos/check-in',
+  '/eventos/e',
+  '/ebd/chamada-rapida',
   // Apenas as rotas mobile públicas explícitas estão liberadas do ProtectedRoute global
   '/app/login',
   '/app/vincular',

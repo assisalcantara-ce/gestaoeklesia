@@ -23,6 +23,10 @@ const BYPASS_PATHS = [
   '/formularios',
   '/membro',
   '/validar',
+  '/reunioes/painel',
+  '/eventos/check-in',
+  '/eventos/e',
+  '/ebd/chamada-rapida',
   '/app',
 ]
 

@@ -30,11 +30,23 @@ const SIDEBAR_PREFIXES = [
   '/juridico/meu-contrato',
 ];
 
+const STANDALONE_PUBLIC_PREFIXES = [
+  '/reunioes/painel',
+  '/eventos/check-in',
+  '/eventos/e',
+  '/ebd/chamada-rapida',
+  '/formularios',
+  '/membro',
+  '/validar',
+];
+
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
-  // O Painel Informativo de Reuniões é uma página pública e standalone (TV / Projetor)
-  const isStandalone = pathname === '/reunioes/painel' || pathname.startsWith('/reunioes/painel/');
+  // Páginas públicas e standalone (Check-in, Inscrição Pública de Eventos, Painel TV, etc.)
+  const isStandalone = STANDALONE_PUBLIC_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(prefix + '/')
+  );
   if (isStandalone) {
     return <>{children}</>;
   }
