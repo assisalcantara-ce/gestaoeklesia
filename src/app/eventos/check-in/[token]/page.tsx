@@ -23,6 +23,7 @@ import {
   Flashlight,
   FlashlightOff,
   Sparkles,
+  X,
 } from 'lucide-react';
 
 interface EventoPublicoCheckin {
@@ -485,15 +486,14 @@ export default function CheckinPublicoPage() {
   // ── 1. TELA DE CARREGAMENTO ──
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#070c17] text-white flex flex-col items-center justify-center p-6">
+      <div className="min-h-[100dvh] bg-[#050a14] text-white flex flex-col items-center justify-center p-6 relative">
         <div className="relative mb-4">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.2)]">
             <QrCode className="w-7 h-7 text-emerald-400 animate-pulse" />
           </div>
-          <div className="absolute -inset-2 rounded-2xl bg-emerald-500/10 blur-md -z-10 animate-pulse" />
         </div>
         <p className="text-sm font-bold text-white tracking-wide">Conectando ao Check-in...</p>
-        <p className="text-xs text-slate-400 mt-1">Carregando informações do evento</p>
+        <p className="text-xs text-slate-400 mt-1">Carregando dados do evento</p>
       </div>
     );
   }
@@ -501,9 +501,9 @@ export default function CheckinPublicoPage() {
   // ── 2. TELA DE LINK EXPIRADO / INVÁLIDO ──
   if (linkExpirado || !evento) {
     return (
-      <div className="min-h-screen bg-[#070c17] text-white flex flex-col items-center justify-center p-5">
-        <div className="w-full max-w-sm bg-[#0d1627] border border-[#1b2b46] rounded-3xl p-6 text-center shadow-2xl space-y-4">
-          <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto shadow-[0_0_25px_rgba(244,63,94,0.2)]">
+      <div className="min-h-[100dvh] bg-[#050a14] text-white flex flex-col items-center justify-center p-5 relative">
+        <div className="w-full max-w-sm bg-[#091322]/90 border border-[#1b3152] rounded-[32px] p-6 text-center shadow-2xl space-y-4 backdrop-blur-xl">
+          <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(244,63,94,0.25)]">
             <XCircle className="w-8 h-8 stroke-[2.5]" />
           </div>
           <div className="space-y-1.5">
@@ -522,18 +522,23 @@ export default function CheckinPublicoPage() {
 
   // ── 3. TELA PRINCIPAL: CHECK-IN MOBILE-FIRST ──
   return (
-    <div className="min-h-screen bg-[#060a14] text-slate-100 flex flex-col relative overflow-x-hidden selection:bg-emerald-500 selection:text-white">
-      {/* Luz ambiente de fundo (Glow sutil) */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-72 bg-gradient-to-b from-blue-600/10 via-emerald-600/5 to-transparent blur-3xl pointer-events-none -z-10" />
+    <div
+      className="min-h-[100dvh] text-slate-100 flex flex-col relative overflow-x-hidden selection:bg-emerald-500 selection:text-white"
+      style={{
+        background: `linear-gradient(180deg, rgba(6, 11, 22, 0.40) 0%, rgba(6, 11, 22, 0.82) 48%, #050a14 100%), url('/img/bg_checkin1.png') center top / cover no-repeat, #050a14`,
+      }}
+    >
+      {/* Topo seguro para iOS / safe area */}
+      <div className="pt-[max(0.75rem,env(safe-area-inset-top))]" />
 
-      {/* Header Fixo Superior */}
-      <header className="bg-[#080e1c]/80 backdrop-blur-xl border-b border-[#142238] sticky top-0 z-30 px-4 py-3">
+      {/* Header Fixo / Superior Compacto */}
+      <header className="px-4 py-2 relative z-30">
         <div className="max-w-md mx-auto flex items-center justify-between gap-3">
           {/* Brand Logo & Name */}
           <div className="flex items-center gap-2.5">
             {/* Ícone estilizado Chama / Livro Gestão Eklésia */}
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 p-[1px] shadow-sm flex items-center justify-center shrink-0">
-              <div className="w-full h-full bg-[#0d1627] rounded-[11px] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 via-orange-500 to-amber-600 p-[1px] shadow-[0_0_15px_rgba(245,158,11,0.3)] flex items-center justify-center shrink-0">
+              <div className="w-full h-full bg-[#091222] rounded-[11px] flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-amber-400 fill-amber-400/20" />
               </div>
             </div>
@@ -547,95 +552,93 @@ export default function CheckinPublicoPage() {
             </div>
           </div>
 
-          {/* Badges do Header */}
-          <div className="flex items-center gap-2">
-            {/* Badge de Presentes em Tempo Real */}
-            <div className="bg-[#0e1a2f] border border-[#1b3156] rounded-xl px-2.5 py-1 flex items-center gap-1.5 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[11px] font-black text-emerald-400">
-                {evento.total_presentes}{' '}
-                <span className="text-slate-500 font-normal">/ {evento.total_confirmados}</span>
-              </span>
-            </div>
-
-            {/* Pill Check-in */}
-            <div className="bg-[#12223f] border border-[#1e3b6d] text-blue-300 rounded-xl px-2.5 py-1 text-[11px] font-bold flex items-center gap-1.5 shadow-sm">
-              <QrCode className="w-3.5 h-3.5 text-blue-400" />
-              <span>Check-in</span>
-            </div>
+          {/* Pill Badge Check-in */}
+          <div className="bg-[#102344]/80 backdrop-blur-md border border-[#204074] text-blue-200 rounded-2xl px-3.5 py-1.5 text-xs font-bold flex items-center gap-2 shadow-lg">
+            <QrCode className="w-4 h-4 text-blue-400" />
+            <span>Check-in</span>
           </div>
         </div>
       </header>
 
       {/* Conteúdo Central */}
-      <main className="flex-1 max-w-md w-full mx-auto p-4 flex flex-col justify-between space-y-4">
-        {/* ── CARD DO EVENTO (Sempre Visível) ── */}
-        <div className="bg-gradient-to-b from-[#0e192c]/90 to-[#091220]/90 border border-[#182b4a] rounded-3xl p-4 shadow-xl backdrop-blur-md relative overflow-hidden">
-          {/* Detalhe de iluminação sutil no card */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
-
-          <div className="space-y-2">
-            {/* Subtítulo da Igreja */}
-            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-emerald-400 block truncate">
-              {evento.igreja_nome}
-            </span>
-
-            {/* Título do Evento */}
-            <h1 className="text-base sm:text-lg font-black text-white leading-tight uppercase line-clamp-2">
-              {evento.titulo}
-            </h1>
-
-            {/* Linha Data e Hora */}
-            <div className="pt-1 space-y-1.5 text-xs text-slate-300">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="font-medium">{formatarDataHoraEvento(evento.data_inicio)}</span>
-              </div>
-
-              {/* Linha Local */}
-              {evento.local_nome && (
-                <div className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <div className="leading-tight">
-                    <span className="font-semibold text-slate-200 block truncate">{evento.local_nome}</span>
-                    {evento.local_endereco && (
-                      <span className="text-[11px] text-slate-400 block truncate">{evento.local_endereco}</span>
-                    )}
-                  </div>
-                </div>
-              )}
+      <main className="flex-1 max-w-md w-full mx-auto px-4 py-2 flex flex-col justify-between space-y-4 relative z-10">
+        {/* ── BLOCO DE INFORMAÇÕES DO EVENTO ── */}
+        <div className="space-y-3 pt-1">
+          {/* Linha Superior: Igreja + Contador Presentes */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400 block truncate drop-shadow-sm">
+                {evento.igreja_nome}
+              </span>
+              <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight uppercase line-clamp-2 drop-shadow-md">
+                {evento.titulo}
+              </h1>
             </div>
+
+            {/* Contador Presentes / Confirmados */}
+            <div className="bg-[#0b162a]/80 backdrop-blur-md border border-[#1b345a] rounded-2xl px-3 py-1.5 text-right shrink-0 shadow-lg flex flex-col items-end">
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-300">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#10b981]" />
+                <span>Presentes</span>
+              </div>
+              <div className="text-sm sm:text-base font-black text-emerald-400 leading-tight">
+                {evento.total_presentes}{' '}
+                <span className="text-slate-500 font-medium text-xs">/ {evento.total_confirmados}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Linhas de Metadados: Data, Horário e Local */}
+          <div className="space-y-2 text-xs sm:text-sm text-slate-200 drop-shadow-sm">
+            {/* Data e Hora */}
+            <div className="flex items-center gap-2.5">
+              <Calendar className="w-4 h-4 text-blue-400 shrink-0" />
+              <span className="font-medium">{formatarDataHoraEvento(evento.data_inicio)}</span>
+            </div>
+
+            {/* Local e Endereço */}
+            {evento.local_nome && (
+              <div className="flex items-start gap-2.5">
+                <MapPin className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                <div className="leading-tight min-w-0">
+                  <span className="font-semibold text-white block truncate">{evento.local_nome}</span>
+                  {evento.local_endereco && (
+                    <span className="text-xs text-slate-300 block truncate">{evento.local_endereco}</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ── ÁREA PRINCIPAL DINÂMICA (Conforme o estado) ── */}
+        {/* ── ÁREA PRINCIPAL DINÂMICA ── */}
         <div className="flex-1 flex flex-col justify-center my-auto">
           {resultado ? (
             /* ─────────────────────────────────────────────────────────────
                ESTADO DE FEEDBACK / RESULTADO DO CHECK-IN
             ───────────────────────────────────────────────────────────── */
             <div
-              className={`rounded-3xl border p-5 sm:p-6 text-center shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 ${
+              className={`rounded-[32px] border p-5 sm:p-6 text-center shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 backdrop-blur-2xl ${
                 resultado.type === 'sucesso'
-                  ? 'bg-gradient-to-b from-[#0b1e1d]/95 to-[#061413]/95 border-emerald-500/40 shadow-[0_0_40px_rgba(16,185,129,0.2)]'
+                  ? 'bg-gradient-to-b from-[#0b1e1d]/95 to-[#061413]/98 border-emerald-500/40 shadow-[0_0_50px_rgba(16,185,129,0.25)]'
                   : resultado.type === 'ja_realizado'
-                  ? 'bg-gradient-to-b from-[#1e170a]/95 to-[#130f06]/95 border-amber-500/40 shadow-[0_0_40px_rgba(245,158,11,0.2)]'
-                  : 'bg-gradient-to-b from-[#200c14]/95 to-[#14060b]/95 border-rose-500/40 shadow-[0_0_40px_rgba(244,63,94,0.2)]'
+                  ? 'bg-gradient-to-b from-[#1e170a]/95 to-[#130f06]/98 border-amber-500/40 shadow-[0_0_50px_rgba(245,158,11,0.25)]'
+                  : 'bg-gradient-to-b from-[#200c14]/95 to-[#14060b]/98 border-rose-500/40 shadow-[0_0_50px_rgba(244,63,94,0.25)]'
               }`}
             >
               {/* Ícone Redondo Iluminado */}
               <div
-                className={`w-18 h-18 rounded-full flex items-center justify-center mx-auto shadow-2xl ${
+                className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto shadow-2xl ${
                   resultado.type === 'sucesso'
-                    ? 'bg-emerald-500 text-slate-950 shadow-[0_0_30px_rgba(16,185,129,0.6)] ring-4 ring-emerald-500/30'
+                    ? 'bg-[#00d084] text-slate-950 shadow-[0_0_35px_rgba(0,208,132,0.6)] ring-4 ring-[#00d084]/20'
                     : resultado.type === 'ja_realizado'
-                    ? 'bg-amber-500 text-slate-950 shadow-[0_0_30px_rgba(245,158,11,0.6)] ring-4 ring-amber-500/30'
-                    : 'bg-rose-500 text-white shadow-[0_0_30px_rgba(244,63,94,0.6)] ring-4 ring-rose-500/30'
+                    ? 'bg-amber-500 text-slate-950 shadow-[0_0_35px_rgba(245,158,11,0.6)] ring-4 ring-amber-500/20'
+                    : 'bg-rose-500 text-white shadow-[0_0_35px_rgba(244,63,94,0.6)] ring-4 ring-rose-500/20'
                 }`}
               >
-                {resultado.type === 'sucesso' && <Check className="w-9 h-9 stroke-[3]" />}
-                {resultado.type === 'ja_realizado' && <AlertTriangle className="w-9 h-9 stroke-[2.5]" />}
-                {resultado.type === 'erro' && <XCircle className="w-9 h-9 stroke-[2.5]" />}
+                {resultado.type === 'sucesso' && <Check className="w-10 h-10 stroke-[3]" />}
+                {resultado.type === 'ja_realizado' && <AlertTriangle className="w-10 h-10 stroke-[2.5]" />}
+                {resultado.type === 'erro' && <X className="w-10 h-10 stroke-[2.5]" />}
               </div>
 
               {/* Título do Status */}
@@ -723,7 +726,7 @@ export default function CheckinPublicoPage() {
                 /* Card de Possíveis Causas no Erro */
                 <div className="bg-[#091222]/90 border border-[#162744] rounded-2xl p-4 text-left space-y-2 shadow-inner text-xs text-slate-300">
                   <span className="text-[11px] font-bold text-slate-200 block">Possíveis causas:</span>
-                  <ul className="space-y-1 text-slate-400">
+                  <ul className="space-y-1.5 text-slate-400">
                     <li className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
                       <span>Código inválido ou ilegível</span>
@@ -746,16 +749,16 @@ export default function CheckinPublicoPage() {
                   <button
                     type="button"
                     onClick={reiniciarParaProximaLeitura}
-                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 active:scale-[0.98] text-slate-950 font-black text-sm transition shadow-[0_0_25px_rgba(16,185,129,0.35)] flex items-center justify-center gap-2"
+                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#00d084] to-[#00a86b] hover:from-[#00e08f] hover:to-[#00b875] active:scale-[0.98] text-slate-950 font-black text-sm sm:text-base transition shadow-[0_4px_25px_rgba(0,208,132,0.4)] flex items-center justify-center gap-2"
                   >
-                    <QrCode className="w-5 h-5" />
+                    <QrCode className="w-5 h-5 text-slate-950" />
                     <span>Ler próximo QR Code</span>
                   </button>
                 ) : resultado.type === 'ja_realizado' ? (
                   <button
                     type="button"
                     onClick={reiniciarParaProximaLeitura}
-                    className="w-full py-4 rounded-2xl bg-[#122340] hover:bg-[#183058] active:scale-[0.98] border border-[#214275] text-white font-black text-sm transition shadow-lg flex items-center justify-center gap-2"
+                    className="w-full py-4 rounded-2xl bg-[#122340] hover:bg-[#183058] active:scale-[0.98] border border-[#214275] text-white font-black text-sm sm:text-base transition shadow-lg flex items-center justify-center gap-2"
                   >
                     <QrCode className="w-5 h-5 text-blue-400" />
                     <span>Ler outro QR Code</span>
@@ -764,7 +767,7 @@ export default function CheckinPublicoPage() {
                   <button
                     type="button"
                     onClick={reiniciarParaProximaLeitura}
-                    className="w-full py-4 rounded-2xl bg-[#122340] hover:bg-[#183058] active:scale-[0.98] border border-[#214275] text-white font-black text-sm transition shadow-lg flex items-center justify-center gap-2"
+                    className="w-full py-4 rounded-2xl bg-[#122340] hover:bg-[#183058] active:scale-[0.98] border border-[#214275] text-white font-black text-sm sm:text-base transition shadow-lg flex items-center justify-center gap-2"
                   >
                     <RefreshCw className="w-4 h-4 text-blue-400" />
                     <span>Tentar novamente</span>
@@ -785,7 +788,7 @@ export default function CheckinPublicoPage() {
                ESTADO CÂMERA ATIVA / SCANNER AO VIVO
             ───────────────────────────────────────────────────────────── */
             <div className="space-y-3">
-              <div className="relative aspect-square w-full max-w-[340px] mx-auto bg-black rounded-3xl overflow-hidden border-2 border-[#1c3356] shadow-[0_0_40px_rgba(0,0,0,0.8)] flex items-center justify-center">
+              <div className="relative aspect-square w-full max-w-[340px] mx-auto bg-black rounded-[32px] overflow-hidden border-2 border-[#1c3356] shadow-[0_0_50px_rgba(0,0,0,0.85)] flex items-center justify-center">
                 {/* Elemento de Vídeo Permanente no DOM */}
                 <video
                   ref={videoRef}
@@ -815,7 +818,7 @@ export default function CheckinPublicoPage() {
                 {/* Retículo Neon de Mira Escaneadora */}
                 {cameraStatus === 'ativa' && (
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-8 z-10">
-                    <div className="w-56 h-56 border-2 border-[#00f2a9]/90 rounded-2xl relative shadow-[0_0_25px_rgba(0,242,169,0.3)]">
+                    <div className="w-56 h-56 border-2 border-[#00f2a9]/90 rounded-2xl relative shadow-[0_0_25px_rgba(0,242,169,0.35)]">
                       {/* Laser animado de varredura */}
                       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-[#00f2a9] to-transparent shadow-[0_0_12px_#00f2a9] animate-bounce" />
                       {/* Cantoneiras neon luminosas */}
@@ -875,16 +878,16 @@ export default function CheckinPublicoPage() {
 
               {/* Status Pill abaixo da Câmera */}
               {cameraStatus === 'ativa' && (
-                <div className="bg-[#0e192c]/90 border border-[#1b3154] rounded-2xl p-3 flex items-center justify-between gap-3 shadow-lg backdrop-blur-md">
+                <div className="bg-[#0b172a]/90 border border-[#1b345a] rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-xl backdrop-blur-xl">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+                    <div className="w-7 h-7 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     </div>
                     <div className="min-w-0">
                       <span className="text-xs font-bold text-white block truncate">
                         Aguardando QR Code...
                       </span>
-                      <span className="text-[10px] text-slate-400 block truncate">
+                      <span className="text-[11px] text-slate-400 block truncate">
                         Posicione o código dentro da área de leitura
                       </span>
                     </div>
@@ -893,7 +896,7 @@ export default function CheckinPublicoPage() {
                   <button
                     type="button"
                     onClick={voltarParaMenuInicial}
-                    className="px-3 py-1.5 rounded-xl bg-[#162744] hover:bg-[#1d355c] text-slate-300 text-xs font-bold transition shrink-0"
+                    className="px-3 py-1.5 rounded-xl bg-[#12223c] hover:bg-[#1a3054] text-slate-300 text-xs font-bold transition shrink-0 border border-[#1f3b68]"
                   >
                     Cancelar
                   </button>
@@ -904,7 +907,7 @@ export default function CheckinPublicoPage() {
             /* ─────────────────────────────────────────────────────────────
                ESTADO DE DIGITAÇÃO MANUAL DO CÓDIGO
             ───────────────────────────────────────────────────────────── */
-            <div className="bg-gradient-to-b from-[#0e1a2f]/95 to-[#091220]/95 rounded-3xl border border-[#1b3154] p-6 space-y-4 shadow-2xl backdrop-blur-md">
+            <div className="bg-gradient-to-b from-[#0b172a]/95 via-[#071120]/95 to-[#050b16]/98 rounded-[32px] border border-[#1b345a] p-6 space-y-4 shadow-2xl backdrop-blur-2xl">
               <div className="text-center space-y-1">
                 <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center mx-auto mb-2 shadow-[0_0_20px_rgba(59,130,246,0.15)]">
                   <Keyboard className="w-6 h-6" />
@@ -932,14 +935,14 @@ export default function CheckinPublicoPage() {
                     onChange={(e) => setCodigoManual(e.target.value.toUpperCase())}
                     placeholder="Ex: #A1B2C3D4 ou Nome"
                     autoFocus
-                    className="w-full pl-10 pr-4 py-3.5 bg-[#070d18] border border-[#1b3154] rounded-2xl text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase transition shadow-inner"
+                    className="w-full pl-10 pr-4 py-3.5 bg-[#050b14] border border-[#1b345a] rounded-2xl text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase transition shadow-inner"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={!codigoManual.trim() || processando}
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 active:scale-[0.98] text-slate-950 font-black text-sm disabled:opacity-50 transition flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#00d084] to-[#00a86b] hover:from-[#00e08f] hover:to-[#00b875] active:scale-[0.98] text-slate-950 font-black text-sm disabled:opacity-50 transition flex items-center justify-center gap-2 shadow-[0_4px_25px_rgba(0,208,132,0.35)]"
                 >
                   {processando ? (
                     <>
@@ -965,22 +968,24 @@ export default function CheckinPublicoPage() {
             </div>
           ) : (
             /* ─────────────────────────────────────────────────────────────
-               ESTADO INICIAL (MENU PRINCIPAL / IDLE)
+               ESTADO INICIAL: CARD PRINCIPAL FLUTUANTE (MOCKUP EXACT MATCH)
             ───────────────────────────────────────────────────────────── */
-            <div className="bg-gradient-to-b from-[#0e192c]/95 to-[#08111f]/95 border border-[#1a2e4c] rounded-3xl p-6 shadow-2xl backdrop-blur-md text-center space-y-6">
-              {/* Ícone de Destaque QR Scanner */}
+            <div className="bg-gradient-to-b from-[#0b172a]/92 via-[#071120]/95 to-[#050b16]/98 border border-[#1b345a]/80 rounded-[32px] p-6 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.7)] backdrop-blur-2xl text-center space-y-5 relative overflow-hidden">
+              {/* Ícone de Destaque QR Scanner com Glow */}
               <div className="relative inline-block mx-auto">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-emerald-500/20 border border-blue-400/30 text-blue-400 flex items-center justify-center shadow-[0_0_30px_rgba(59,130,246,0.2)]">
-                  <QrCode className="w-8 h-8 text-blue-400" />
+                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-500/20 via-cyan-500/15 to-blue-500/10 border border-emerald-400/30 p-[1px] shadow-[0_0_35px_rgba(16,185,129,0.35)] flex items-center justify-center">
+                  <div className="w-full h-full bg-[#071324] rounded-[23px] flex items-center justify-center">
+                    <QrCode className="w-10 h-10 text-emerald-400" />
+                  </div>
                 </div>
               </div>
 
               {/* Textos de Chamada */}
               <div className="space-y-1.5 max-w-[280px] mx-auto">
-                <h2 className="text-lg sm:text-xl font-black text-white leading-tight">
+                <h2 className="text-xl sm:text-2xl font-black text-white leading-tight">
                   Faça o check-in do participante
                 </h2>
-                <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                <p className="text-xs sm:text-sm text-slate-300/90 leading-relaxed font-medium">
                   Aponte a câmera para o QR Code do comprovante de inscrição ou digite o código manualmente.
                 </p>
               </div>
@@ -991,7 +996,7 @@ export default function CheckinPublicoPage() {
                 <button
                   type="button"
                   onClick={iniciarCamera}
-                  className="w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 active:scale-[0.98] text-slate-950 font-black text-sm sm:text-base flex items-center justify-between shadow-[0_4px_25px_rgba(16,185,129,0.35)] transition group"
+                  className="w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-[#00d084] to-[#00a86b] hover:from-[#00e08f] hover:to-[#00b875] active:scale-[0.98] text-slate-950 font-black text-base flex items-center justify-between shadow-[0_6px_25px_rgba(0,208,132,0.4)] transition group"
                 >
                   <div className="flex items-center gap-3">
                     <Camera className="w-5 h-5 text-slate-950" />
@@ -1009,7 +1014,7 @@ export default function CheckinPublicoPage() {
                     pararCamera();
                     setModo('manual');
                   }}
-                  className="w-full py-4 px-5 rounded-2xl bg-[#0e1a2d] hover:bg-[#14233c] active:scale-[0.98] border border-[#1d3354] text-slate-200 font-bold text-sm sm:text-base flex items-center justify-between shadow-md transition group"
+                  className="w-full py-4 px-5 rounded-2xl bg-[#0d1c33]/85 hover:bg-[#132747] active:scale-[0.98] border border-[#1f3f6e] text-white font-bold text-base flex items-center justify-between shadow-lg transition group"
                 >
                   <div className="flex items-center gap-3">
                     <Keyboard className="w-5 h-5 text-blue-400" />
@@ -1025,10 +1030,13 @@ export default function CheckinPublicoPage() {
         </div>
 
         {/* ── FOOTER MINIMALISTA ── */}
-        <footer className="py-2 text-center text-[10px] text-slate-500">
+        <footer className="py-2 text-center text-[11px] text-slate-400/80 font-medium">
           Gestão Eklésia • Check-in Portaria
         </footer>
       </main>
+
+      {/* Fundo seguro para iOS / safe area */}
+      <div className="pb-[max(0.5rem,env(safe-area-inset-bottom))]" />
     </div>
   );
 }
