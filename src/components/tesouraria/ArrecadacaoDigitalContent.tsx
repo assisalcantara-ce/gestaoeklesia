@@ -192,6 +192,8 @@ export default function ArrecadacaoDigitalContent({
   const defaultMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [extratoMes, setExtratoMes] = useState<string>(defaultMes);
   const [extratoCong, setExtratoCong] = useState<string>('');
+  const [extratoDataInicio, setExtratoDataInicio] = useState<string>('');
+  const [extratoDataFim, setExtratoDataFim] = useState<string>('');
   const [extratoTipoMovimento, setExtratoTipoMovimento] = useState<'ambos' | 'entradas' | 'saidas'>('entradas');
   const [buscaExtrato, setBuscaExtrato] = useState('');
 
@@ -302,7 +304,9 @@ export default function ArrecadacaoDigitalContent({
       setLoadingCobrancas(true);
       const params = new URLSearchParams();
       params.set('pageSize', '100');
-      if (extratoMes) params.set('mes', extratoMes);
+      if (extratoDataInicio) params.set('data_inicio', extratoDataInicio);
+      if (extratoDataFim) params.set('data_fim', extratoDataFim);
+      if (!extratoDataInicio && !extratoDataFim && extratoMes) params.set('mes', extratoMes);
       if (extratoCong) params.set('congregacao_id', extratoCong);
 
       const res = await authenticatedFetch(`/api/v1/ministry/payment-charges?${params.toString()}`);
@@ -327,7 +331,7 @@ export default function ArrecadacaoDigitalContent({
     } finally {
       setLoadingCobrancas(false);
     }
-  }, [extratoMes, extratoCong]);
+  }, [extratoMes, extratoCong, extratoDataInicio, extratoDataFim]);
 
   useEffect(() => {
     loadDestinos();
@@ -430,13 +434,18 @@ export default function ArrecadacaoDigitalContent({
     }).length
   );
 
-  // Filtragem de Extrato (busca textual e tipo de movimento)
+  // Filtragem de Extrato (busca textual, tipo de movimento e período de datas)
   const cobrancasFiltradas = cobrancas.filter((c) => {
     // Filtro por tipo de movimento
     if (extratoTipoMovimento === 'saidas') {
       // Arrecadação PIX trata de entradas de ofertas
       return false;
     }
+
+    // Filtro por período de datas (data efetiva da oferta / criação do PIX)
+    const chargeDate = c.paid_at ? c.paid_at.split('T')[0] : c.created_at ? c.created_at.split('T')[0] : '';
+    if (extratoDataInicio && chargeDate && chargeDate < extratoDataInicio) return false;
+    if (extratoDataFim && chargeDate && chargeDate > extratoDataFim) return false;
 
     if (!buscaExtrato) return true;
     const term = buscaExtrato.toLowerCase();
@@ -974,17 +983,67 @@ export default function ArrecadacaoDigitalContent({
                 </select>
               </div>
 
+              {/* Data inicial */}
+              <div className="w-36 shrink-0">
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Data inicial</label>
+                <input
+                  type="date"
+                  value={extratoDataInicio}
+                  onChange={(e) => setExtratoDataInicio(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#123b63] h-[36px] bg-white font-medium text-slate-700"
+                />
+              </div>
+
+              {/* Data final */}
+              <div className="w-36 shrink-0">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Data final</label>
+                  {extratoDataInicio && extratoDataFim && extratoDataInicio > extratoDataFim && (
+                    <span className="text-[10px] text-red-500 font-bold mb-1">Inválida</span>
+                  )}
+                </div>
+                <input
+                  type="date"
+                  value={extratoDataFim}
+                  onChange={(e) => setExtratoDataFim(e.target.value)}
+                  className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#123b63] h-[36px] bg-white font-medium text-slate-700 ${
+                    extratoDataInicio && extratoDataFim && extratoDataInicio > extratoDataFim
+                      ? 'border-red-400 focus:border-red-500 bg-red-50/30'
+                      : 'border-gray-200'
+                  }`}
+                  title={
+                    extratoDataInicio && extratoDataFim && extratoDataInicio > extratoDataFim
+                      ? 'Data final deve ser maior ou igual à data inicial'
+                      : undefined
+                  }
+                />
+              </div>
+
               <div className="self-end">
                 <button
                   onClick={() => {
                     setExtratoCong('');
                     setExtratoTipoMovimento('entradas');
                     setExtratoMes(defaultMes);
+                    setExtratoDataInicio('');
+                    setExtratoDataFim('');
                     setBuscaExtrato('');
                   }}
-                  disabled={extratoCong === '' && extratoTipoMovimento === 'entradas' && extratoMes === defaultMes && buscaExtrato === ''}
+                  disabled={
+                    extratoCong === '' &&
+                    extratoTipoMovimento === 'entradas' &&
+                    extratoMes === defaultMes &&
+                    extratoDataInicio === '' &&
+                    extratoDataFim === '' &&
+                    buscaExtrato === ''
+                  }
                   className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs font-semibold transition h-[36px] ${
-                    extratoCong === '' && extratoTipoMovimento === 'entradas' && extratoMes === defaultMes && buscaExtrato === ''
+                    extratoCong === '' &&
+                    extratoTipoMovimento === 'entradas' &&
+                    extratoMes === defaultMes &&
+                    extratoDataInicio === '' &&
+                    extratoDataFim === '' &&
+                    buscaExtrato === ''
                       ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
                       : 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300'
                   }`}

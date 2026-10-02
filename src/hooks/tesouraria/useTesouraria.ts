@@ -396,6 +396,8 @@ export function useTesouraria() {
   const [filtroNomeDiz, setFiltroNomeDiz] = useState('');
   const [filtroStatusDiz, setFiltroStatusDiz] = useState<'' | 'pago' | 'pendente'>('');
   const [filtroCongDiz, setFiltroCongDiz] = useState('');
+  const [filtroDataInicioDiz, setFiltroDataInicioDiz] = useState('');
+  const [filtroDataFimDiz, setFiltroDataFimDiz] = useState('');
   const [showAddDizimistaModal, setShowAddDizimistaModal] = useState(false);
 
   // Filtros
@@ -405,6 +407,8 @@ export function useTesouraria() {
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroOrigem, setFiltroOrigem] = useState<'' | 'manual' | 'arrecadacao_digital'>( '');
   const [filtroMovimento, setFiltroMovimento] = useState<'' | 'entrada' | 'saida'>('');
+  const [filtroDataInicio, setFiltroDataInicio] = useState('');
+  const [filtroDataFim, setFiltroDataFim] = useState('');
   const [filtroMes, setFiltroMes] = useState(mesAtual());
   const [loadingMes, setLoadingMes] = useState(false);
   const [lancamentosMes, setLancamentosMes] = useState<Lancamento[]>([]);
@@ -625,16 +629,37 @@ export function useTesouraria() {
   }, []);
 
   // Carregar lançamentos do mês selecionado via Supabase Client
-  const loadLancamentosMes = useCallback(async (mes: string) => {
+  const loadLancamentosMes = useCallback(async (mes: string, dataInicio?: string, dataFim?: string) => {
     if (!ministryId) return;
     try {
       setLoadingMes(true);
       let q = supabase
         .from('tesouraria_lancamentos')
         .select('*, congregacoes(nome), departamentos(nome, sigla), members(id, name, cpf, matricula)')
-        .eq('ministry_id', ministryId)
-        .gte('data_lancamento', `${mes}-01`)
-        .lt('data_lancamento', `${mesProximo(mes)}-01`);
+        .eq('ministry_id', ministryId);
+
+      const dInicio = dataInicio !== undefined ? dataInicio : filtroDataInicio;
+      const dFim = dataFim !== undefined ? dataFim : filtroDataFim;
+
+      if (dInicio && dFim) {
+        q = q.gte('data_lancamento', dInicio).lte('data_lancamento', dFim);
+      } else if (dInicio) {
+        const limiteFim = `${mesProximo(mes)}-01`;
+        if (dInicio < limiteFim) {
+          q = q.gte('data_lancamento', dInicio).lt('data_lancamento', limiteFim);
+        } else {
+          q = q.gte('data_lancamento', dInicio);
+        }
+      } else if (dFim) {
+        const limiteInicio = `${mes}-01`;
+        if (dFim >= limiteInicio) {
+          q = q.gte('data_lancamento', limiteInicio).lte('data_lancamento', dFim);
+        } else {
+          q = q.lte('data_lancamento', dFim);
+        }
+      } else {
+        q = q.gte('data_lancamento', `${mes}-01`).lt('data_lancamento', `${mesProximo(mes)}-01`);
+      }
 
       if (scope.isFinanceiroLocal && scope.congregacaoId) {
         q = q.eq('congregacao_id', scope.congregacaoId);
@@ -659,13 +684,13 @@ export function useTesouraria() {
     } finally {
       setLoadingMes(false);
     }
-  }, [ministryId, scope, supabase, mesProximo]);
+  }, [ministryId, scope, supabase, mesProximo, filtroDataInicio, filtroDataFim]);
 
   useEffect(() => {
     if (ministryId) {
-      loadLancamentosMes(filtroMes);
+      loadLancamentosMes(filtroMes, filtroDataInicio, filtroDataFim);
     }
-  }, [filtroMes, ministryId, loadLancamentosMes]);
+  }, [filtroMes, filtroDataInicio, filtroDataFim, ministryId, loadLancamentosMes]);
 
   // Subscription em Tempo Real (Supabase Realtime) para a tabela `tesouraria_lancamentos`
   useEffect(() => {
@@ -768,9 +793,9 @@ export function useTesouraria() {
 
   useEffect(() => {
     if (ministryId && aba === 'dizimistas') {
-      loadLancamentosMes(abaDizimistaMes);
+      loadLancamentosMes(abaDizimistaMes, filtroDataInicioDiz, filtroDataFimDiz);
     }
-  }, [aba, abaDizimistaMes, ministryId, loadLancamentosMes]);
+  }, [aba, abaDizimistaMes, filtroDataInicioDiz, filtroDataFimDiz, ministryId, loadLancamentosMes]);
 
   // Cruzar membros dizimistas com os lançamentos de dízimo do mês selecionado (abaDizimistaMes)
   const dizimistasCompletos = useMemo(() => {
@@ -913,6 +938,10 @@ export function useTesouraria() {
       if (filtroCong && l.congregacao_id !== filtroCong) return false;
       if (filtroDept && l.departamento_id !== filtroDept) return false;
 
+      // Filtro de Período por Data
+      if (filtroDataInicio && l.data_lancamento < filtroDataInicio) return false;
+      if (filtroDataFim && l.data_lancamento > filtroDataFim) return false;
+
       // Filtro de Origem (Manual vs Arrecadação Digital PIX)
       if (filtroOrigem) {
         const isDigitalPix = l.origem_modulo === 'gateway' && l.forma_pagamento === 'pix';
@@ -922,7 +951,7 @@ export function useTesouraria() {
 
       return true;
     });
-  }, [lancamentosMes, filtroMovimento, filtroTipo, filtroCategoria, filtroCong, filtroDept, filtroOrigem]);
+  }, [lancamentosMes, filtroMovimento, filtroTipo, filtroCategoria, filtroCong, filtroDept, filtroOrigem, filtroDataInicio, filtroDataFim]);
 
   const entradasFiltradas = useMemo(() => {
     return lancsFiltrados.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
@@ -1445,6 +1474,10 @@ export function useTesouraria() {
     setFiltroStatusDiz,
     filtroCongDiz,
     setFiltroCongDiz,
+    filtroDataInicioDiz,
+    setFiltroDataInicioDiz,
+    filtroDataFimDiz,
+    setFiltroDataFimDiz,
     // Filtros & Lançamentos
     filtroCong,
     setFiltroCong,
@@ -1458,6 +1491,10 @@ export function useTesouraria() {
     setFiltroOrigem,
     filtroMovimento,
     setFiltroMovimento,
+    filtroDataInicio,
+    setFiltroDataInicio,
+    filtroDataFim,
+    setFiltroDataFim,
     filtroMes,
     setFiltroMes,
     loadingMes,

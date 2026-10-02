@@ -77,6 +77,8 @@ export async function GET(request: NextRequest) {
   const destinationParam = urlObj.searchParams.get('destination_id') || '';
   const congParam = urlObj.searchParams.get('congregacao_id') || '';
   const mesParam = urlObj.searchParams.get('mes') || ''; // Formato YYYY-MM
+  const dataInicioParam = urlObj.searchParams.get('data_inicio') || urlObj.searchParams.get('dataInicio') || urlObj.searchParams.get('start_date') || '';
+  const dataFimParam = urlObj.searchParams.get('data_fim') || urlObj.searchParams.get('dataFim') || urlObj.searchParams.get('end_date') || '';
 
   try {
     let query = ctx.admin
@@ -94,8 +96,14 @@ export async function GET(request: NextRequest) {
       )
       .eq('ministry_id', ctx.ministryId);
 
-    // Filtro por Mês de Referência (YYYY-MM)
-    if (mesParam && /^\d{4}-\d{2}$/.test(mesParam)) {
+    // Filtro por Período de Datas ou Mês de Referência (YYYY-MM)
+    if (dataInicioParam && dataFimParam) {
+      query = query.gte('created_at', `${dataInicioParam}T00:00:00.000Z`).lte('created_at', `${dataFimParam}T23:59:59.999Z`);
+    } else if (dataInicioParam) {
+      query = query.gte('created_at', `${dataInicioParam}T00:00:00.000Z`);
+    } else if (dataFimParam) {
+      query = query.lte('created_at', `${dataFimParam}T23:59:59.999Z`);
+    } else if (mesParam && /^\d{4}-\d{2}$/.test(mesParam)) {
       const [anoStr, mesStr] = mesParam.split('-');
       const ano = parseInt(anoStr, 10);
       const mes = parseInt(mesStr, 10);

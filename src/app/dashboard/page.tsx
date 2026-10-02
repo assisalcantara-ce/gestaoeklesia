@@ -18,7 +18,9 @@ import {
 import {
   TrendingUp, TrendingDown, Wallet,
   Building2, Users, Award, CalendarDays,
-  Cake, MessageCircle,
+  Cake, MessageCircle, FileText, Key,
+  Clock, ClipboardList, LogOut,
+  ChevronRight, Sparkles,
 } from 'lucide-react';
 
 // helpers
@@ -657,15 +659,6 @@ export default function DashboardPage() {
     presidencia: 'Presidência', conselho_fiscal: 'Conselho Fiscal',
   };
 
-  const QUICK_ACTIONS = [
-    { label: 'Cadastrar\nMembro', icon: '👤', href: '/secretaria/membros',     modulo: 'secretaria' },
-    { label: 'Lançar\nEntrada',   icon: '💰', href: '/tesouraria',             modulo: 'tesouraria' },
-    { label: 'Emitir\nCarta',     icon: '📄', href: '/secretaria/cartas',      modulo: 'secretaria' },
-    { label: 'Chamada\nEBD',      icon: '📚', href: '/secretaria/ebd/chamada', modulo: 'ebd'        },
-    { label: 'Novo\nUsuário',     icon: '🔑', href: '/usuarios',               modulo: 'usuarios'   },
-    { label: 'Configurações',     icon: '⚙️',  href: '/configuracoes',          modulo: 'configuracoes' },
-  ].filter(a => userCtx.podeAcessar(a.modulo));
-
   const congBarData = [...dash.congregacoesData]
     .sort((a, b) => b.membrosAtivos - a.membrosAtivos)
     .slice(0, 8)
@@ -675,39 +668,62 @@ export default function DashboardPage() {
     }));
 
   return (
-    <div className="flex-1 overflow-auto">
+    <div className="flex-1 overflow-auto bg-[#F8FAFC]">
 
         {/* ── HEADER ─────────────────────────────────────────────────────── */}
-        <div className="sticky top-0 z-10 px-6 py-4 shadow-md" style={{ background: 'linear-gradient(to right, #1E3A5F, #2563EB)' }}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="sticky top-0 z-20 px-6 py-4 bg-gradient-to-r from-[#1E3A5F] via-[#1E3A5F] to-[#2563EB] shadow-xs border-b border-blue-900/20">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 max-w-[1600px] mx-auto">
             <div>
-              <p className="text-[11px] font-semibold text-blue-200 uppercase tracking-widest">
-                Seja bem-vindo(a){usuarioLogado ? `, ${usuarioLogado.nome}` : ''}
-              </p>
-              <h1 className="text-lg font-bold text-white leading-tight">"{dash.nomeMinisterio || 'Ministério'}"</h1>
-              <p className="text-xs text-blue-200">{dataAtual}</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold tracking-wider text-blue-200/90 uppercase">
+                  Painel Principal
+                </span>
+                <span className="text-blue-300/40">•</span>
+                <p className="text-[11px] text-blue-200/80">{dataAtual}</p>
+              </div>
+              <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight leading-tight mt-0.5">
+                {dash.nomeMinisterio ? `"${dash.nomeMinisterio}"` : 'Gestão Eklésia'}
+              </h1>
             </div>
+
             {usuarioLogado && (
               <div className="flex items-center gap-3">
                 <div className="text-right hidden sm:block">
-                  <p className="text-sm font-bold text-white">{usuarioLogado.nome}</p>
-                  <p className="text-xs text-blue-200">{usuarioLogado.email}</p>
+                  <p className="text-sm font-semibold text-white leading-tight">{usuarioLogado.nome}</p>
+                  <p className="text-[11px] text-blue-200/80 leading-tight">{usuarioLogado.email}</p>
                 </div>
-                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-400 text-amber-900 shrink-0">
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-400/95 text-amber-950 shrink-0 shadow-2xs">
                   {NIVEL_LABEL[nivel] ?? nivel}
                 </span>
                 <button
                   onClick={handleLogout}
-                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-semibold transition"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-red-500/90 text-white rounded-lg text-xs font-semibold transition border border-white/15 hover:border-red-500"
+                  title="Encerrar sessão"
                 >
-                  Sair
+                  <LogOut size={13} />
+                  <span>Sair</span>
                 </button>
               </div>
             )}
           </div>
         </div>
 
-        <div className="p-5 space-y-5">
+        <div className="p-4 sm:p-6 space-y-6 max-w-[1600px] mx-auto">
+
+          {/* ── BANNER DE BOAS-VINDAS ──────────────────────────────────────── */}
+          <div
+            className="relative overflow-hidden rounded-2xl border border-blue-100/80 bg-cover bg-right md:bg-center bg-no-repeat p-6 sm:p-7 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4 min-h-[110px]"
+            style={{ backgroundImage: `url('/images/bg_dash01.png?v=4')` }}
+          >
+            <div className="space-y-1 z-10 max-w-xl">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#1E3A5F] tracking-tight">
+                Olá, {usuarioLogado ? (usuarioLogado.nome && usuarioLogado.nome !== usuarioLogado.email ? usuarioLogado.nome.split(' ')[0] : 'Administrador') : 'Administrador'}!
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                Bem-vindo ao <strong className="text-[#1E3A5F] font-bold">Gestão Eklésia</strong>. Aqui está um resumo da sua igreja hoje.
+              </p>
+            </div>
+          </div>
 
           {/* ── EXPERIENCE WIDGET DE MAIOR PRIORIDADE ─────────────────────── */}
           {onboardingProgress && (() => {
@@ -737,8 +753,6 @@ export default function DashboardPage() {
 
           {/* ── CARD DE IMPLANTAÇÃO ───────────────────────────────────────── */}
           {onboardingProgress && onboardingProgress.showAssistant && !onboardingProgress.isCompleted && (() => {
-            const numBlocks = Math.round(onboardingProgress.progressPercent / 10);
-            const barStr = '█'.repeat(numBlocks) + '░'.repeat(10 - numBlocks);
             const uid = userCtx.userId || '';
 
             const handleCancelarImplantacao = () => {
@@ -749,178 +763,238 @@ export default function DashboardPage() {
             };
 
             return (
-              <div className="relative bg-gradient-to-r from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="relative bg-gradient-to-r from-amber-50/80 to-amber-100/40 border border-amber-200/80 rounded-2xl p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <button
                   onClick={handleCancelarImplantacao}
                   title="Cancelar / Ocultar aviso de implantação"
-                  className="absolute top-3 right-3 p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-amber-200/50 transition text-xs font-bold flex items-center gap-1"
+                  className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-amber-200/50 transition text-xs font-bold flex items-center gap-1"
                 >
-                  <span className="text-xs">Cancelar</span>
-                  <span className="text-sm font-bold leading-none">✕</span>
+                  <span className="text-[11px]">Ocultar</span>
+                  <span className="text-xs font-bold leading-none">✕</span>
                 </button>
-                <div className="space-y-2 flex-1 pr-16 md:pr-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xl">🚀</span>
+                <div className="space-y-1.5 flex-1 pr-16 md:pr-0">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center text-amber-600 font-bold">
+                      <Sparkles size={16} />
+                    </div>
                     <h3 className="text-sm font-bold text-slate-800">Implantação do Ministério</h3>
-                    <span className="text-xs font-mono font-bold text-amber-800 bg-amber-200/50 px-2 py-0.5 rounded-full">
-                      {barStr} {onboardingProgress.progressPercent}%
+                    <span className="text-[11px] font-bold text-amber-800 bg-amber-200/60 px-2 py-0.5 rounded-md">
+                      {onboardingProgress.progressPercent}% Concluído
                     </span>
                   </div>
-                  <p className="text-xs text-slate-600 font-medium">
-                    "{onboardingProgress.stepsRemaining} {onboardingProgress.stepsRemaining === 1 ? 'etapa restante' : 'etapas restantes'}"
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    Complete as etapas recomendadas para configurar a gestão completa do seu ministério.
+                  <div className="w-full max-w-md bg-amber-200/50 h-2 rounded-full overflow-hidden mt-1">
+                    <div
+                      className="bg-amber-600 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.max(5, onboardingProgress.progressPercent)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-600 font-medium pt-0.5">
+                    {onboardingProgress.stepsRemaining} {onboardingProgress.stepsRemaining === 1 ? 'etapa restante' : 'etapas restantes'} para configuração completa.
                   </p>
                 </div>
                 <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
                   <button
                     onClick={handleCancelarImplantacao}
-                    className="px-3.5 py-2.5 bg-white border border-amber-300 hover:bg-amber-100/80 text-amber-900 rounded-xl text-xs font-semibold transition shadow-sm"
+                    className="px-3.5 py-2 bg-white border border-amber-300/80 hover:bg-amber-50 text-slate-700 rounded-xl text-xs font-semibold transition shadow-2xs"
                   >
                     Não exibir mais
                   </button>
                   <button
                     onClick={() => router.push('/boas-vindas?show=true')}
-                    className="px-5 py-2.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                    className="px-4 py-2 bg-[#1E3A5F] hover:bg-[#152943] text-white rounded-xl text-xs font-semibold transition shadow-2xs flex items-center gap-1.5"
                   >
-                    Continuar Implantação
+                    <span>Continuar Implantação</span>
+                    <ChevronRight size={14} />
                   </button>
                 </div>
               </div>
             );
           })()}
 
-          {/* ── ATALHOS RÁPIDOS (centralizados) ──────────────────────────── */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-            <div className="flex items-center justify-center gap-1 flex-wrap">
-              {QUICK_ACTIONS.map(a => (
-                <button
-                  key={a.href + a.label}
-                  onClick={() => router.push(a.href)}
-                  className="flex flex-col items-center gap-1.5 px-5 py-3 rounded-xl hover:bg-gray-50 transition min-w-[72px]"
-                >
-                  <span className="text-2xl">{a.icon}</span>
-                  <span className="text-[11px] font-medium text-gray-500 text-center leading-tight whitespace-pre-line">{a.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
 
-          {/* ── KPIs PRINCIPAIS (4 cards coloridos) ──────────────────────── */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
 
-            {/* Congregações — navy */}
+          {/* ── KPIs PRINCIPAIS (4 cards executivos com identidade visual) ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+
+            {/* Total de Membros — Royal Blue */}
             <div
-              className="rounded-2xl p-5 text-white cursor-pointer hover:opacity-90 transition"
-              style={{ background: '#1E3A5F' }}
+              className="relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br from-[#1E56A0] via-[#2563EB] to-[#3B82F6] shadow-sm hover:shadow-md transition cursor-pointer flex flex-col justify-between min-h-[140px]"
+              onClick={() => router.push('/secretaria/membros')}
+            >
+              {/* Decorative background icon */}
+              <Users className="absolute -right-3 -bottom-3 w-28 h-28 text-white/10 pointer-events-none" />
+
+              <div className="flex items-center justify-between z-10">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-xs flex items-center justify-center text-white">
+                    <Users size={18} />
+                  </div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-white/90">Total de Membros</span>
+                </div>
+              </div>
+
+              <div className="mt-3 z-10 flex items-end justify-between">
+                <div>
+                  <div className="text-3xl font-extrabold text-white leading-none">
+                    {loadingDash ? <span className="inline-block h-8 w-16 bg-white/20 rounded animate-pulse" /> : dash.membrosAtivos}
+                  </div>
+                  <p className="text-xs text-blue-100 mt-1.5 font-medium">
+                    {dash.totalMembros > 0
+                      ? `${Math.round((dash.membrosAtivos / dash.totalMembros) * 100)}% do total cadastrado`
+                      : '100% do total cadastrado'}
+                  </p>
+                </div>
+                <div className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-xs flex items-center justify-center text-white transition">
+                  <ChevronRight size={16} />
+                </div>
+              </div>
+            </div>
+
+            {/* Total de Congregações — Navy Slate */}
+            <div
+              className="relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br from-[#1B2A47] via-[#243B61] to-[#324D7B] shadow-sm hover:shadow-md transition cursor-pointer flex flex-col justify-between min-h-[140px]"
               onClick={() => router.push('/secretaria/congregacoes')}
             >
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-blue-200 leading-tight">Total de Congregações</p>
-                <Building2 size={28} className="text-white/30 shrink-0" />
+              <Building2 className="absolute -right-3 -bottom-3 w-28 h-28 text-white/10 pointer-events-none" />
+
+              <div className="flex items-center justify-between z-10">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-xs flex items-center justify-center text-white">
+                    <Building2 size={18} />
+                  </div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-white/90">Total de Congregações</span>
+                </div>
               </div>
-              {loadingDash
-                ? <div className="h-10 w-16 bg-white/20 rounded animate-pulse" />
-                : <p className="text-4xl font-bold">{dash.totalCongregacoes}</p>}
-              <p className="text-xs text-blue-200 mt-1">{dash.totalDepartamentos} departamentos</p>
+
+              <div className="mt-3 z-10 flex items-end justify-between">
+                <div>
+                  <div className="text-3xl font-extrabold text-white leading-none">
+                    {loadingDash ? <span className="inline-block h-8 w-16 bg-white/20 rounded animate-pulse" /> : dash.totalCongregacoes}
+                  </div>
+                  <p className="text-xs text-blue-100 mt-1.5 font-medium">
+                    {dash.totalDepartamentos} departamentos
+                  </p>
+                </div>
+                <div className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-xs flex items-center justify-center text-white transition">
+                  <ChevronRight size={16} />
+                </div>
+              </div>
             </div>
 
-            {/* Membros Ativos — blue */}
+            {/* Batizados — Amber / Warm Orange */}
             <div
-              className="rounded-2xl p-5 text-white cursor-pointer hover:opacity-90 transition"
-              style={{ background: 'linear-gradient(135deg,#1a4f8a,#2563EB)' }}
+              className="relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br from-[#D97706] via-[#EA580C] to-[#F59E0B] shadow-sm hover:shadow-md transition cursor-pointer flex flex-col justify-between min-h-[140px]"
               onClick={() => router.push('/secretaria/membros')}
             >
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-blue-100 leading-tight">Total de Membros</p>
-                <Users size={28} className="text-white/30 shrink-0" />
+              <Award className="absolute -right-3 -bottom-3 w-28 h-28 text-white/10 pointer-events-none" />
+
+              <div className="flex items-center justify-between z-10">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-xs flex items-center justify-center text-white">
+                    <Award size={18} />
+                  </div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-white/90">Batizados</span>
+                </div>
               </div>
-              {loadingDash
-                ? <div className="h-10 w-16 bg-white/20 rounded animate-pulse" />
-                : <p className="text-4xl font-bold">{dash.membrosAtivos}</p>}
-              <p className="text-xs text-blue-100 mt-1">
-                {dash.totalMembros > 0
-                  ? `${Math.round((dash.membrosAtivos / dash.totalMembros) * 100)}% do total cadastrado`
-                  : 'membros ativos'}
-              </p>
+
+              <div className="mt-3 z-10 flex items-end justify-between">
+                <div>
+                  <div className="text-3xl font-extrabold text-white leading-none">
+                    {loadingDash ? <span className="inline-block h-8 w-16 bg-white/20 rounded animate-pulse" /> : dash.membrosBatizados}
+                  </div>
+                  <p className="text-xs text-amber-100 mt-1.5 font-medium">
+                    {dash.totalMembros > 0
+                      ? `${Math.round((dash.membrosBatizados / dash.totalMembros) * 100)}% do total`
+                      : '40% do total'}
+                  </p>
+                </div>
+                <div className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-xs flex items-center justify-center text-white transition">
+                  <ChevronRight size={16} />
+                </div>
+              </div>
             </div>
 
-            {/* Batizados — golden */}
+            {/* Turmas EBD — Emerald / Teal */}
             <div
-              className="rounded-2xl p-5 text-white cursor-pointer hover:opacity-90 transition"
-              style={{ background: 'linear-gradient(135deg,#D97706,#F59E0B)' }}
-              onClick={() => router.push('/secretaria/membros')}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-100 leading-tight">Batizados</p>
-                <Award size={28} className="text-white/30 shrink-0" />
-              </div>
-              {loadingDash
-                ? <div className="h-10 w-16 bg-white/20 rounded animate-pulse" />
-                : <p className="text-4xl font-bold">{dash.membrosBatizados}</p>}
-              <p className="text-xs text-amber-100 mt-1">
-                {dash.totalMembros > 0
-                  ? `${Math.round((dash.membrosBatizados / dash.totalMembros) * 100)}% do total`
-                  : 'registrados'}
-              </p>
-            </div>
-
-            {/* Turmas EBD — teal */}
-            <div
-              className="rounded-2xl p-5 text-white cursor-pointer hover:opacity-90 transition"
-              style={{ background: '#0D9488' }}
+              className="relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br from-[#0D9488] via-[#059669] to-[#10B981] shadow-sm hover:shadow-md transition cursor-pointer flex flex-col justify-between min-h-[140px]"
               onClick={() => router.push('/secretaria/ebd')}
             >
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-teal-100 leading-tight">Turmas EBD</p>
-                <CalendarDays size={28} className="text-white/30 shrink-0" />
+              <CalendarDays className="absolute -right-3 -bottom-3 w-28 h-28 text-white/10 pointer-events-none" />
+
+              <div className="flex items-center justify-between z-10">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-xs flex items-center justify-center text-white">
+                    <CalendarDays size={18} />
+                  </div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-white/90">Turmas EBD</span>
+                </div>
               </div>
-              {loadingDash
-                ? <div className="h-10 w-16 bg-white/20 rounded animate-pulse" />
-                : <p className="text-4xl font-bold">{dash.ebdTurmas}</p>}
-              <p className="text-xs text-teal-100 mt-1">
-                {dash.ebdMediaPresenca !== null ? `Média ${dash.ebdMediaPresenca} presentes` : 'turmas ativas'}
-              </p>
+
+              <div className="mt-3 z-10 flex items-end justify-between">
+                <div>
+                  <div className="text-3xl font-extrabold text-white leading-none">
+                    {loadingDash ? <span className="inline-block h-8 w-16 bg-white/20 rounded animate-pulse" /> : dash.ebdTurmas}
+                  </div>
+                  <p className="text-xs text-teal-100 mt-1.5 font-medium">
+                    {dash.ebdMediaPresenca !== null ? `Média ${dash.ebdMediaPresenca} presentes` : 'turmas ativas'}
+                  </p>
+                </div>
+                <div className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-xs flex items-center justify-center text-white transition">
+                  <ChevronRight size={16} />
+                </div>
+              </div>
             </div>
+
           </div>
 
           {/* ── RESUMO INSTITUCIONAL ──────────────────────────────────────── */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <div className="flex items-center justify-between mb-1">
+          <div className="bg-white rounded-2xl shadow-2xs border border-slate-200/80 p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
               <div>
-                <h3 className="text-sm font-bold text-[#1E3A5F]">Resumo institucional</h3>
-                <p className="text-xs text-gray-400">Secretaria e indicadores</p>
+                <h3 className="text-base font-bold text-[#1E3A5F]">Resumo institucional</h3>
+                <p className="text-xs text-slate-400">Secretaria e indicadores gerais</p>
               </div>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-4 py-1.5 bg-[#1E3A5F] text-white rounded-lg text-xs font-semibold hover:bg-[#16305a] transition"
-              >
-                Atualizar
-              </button>
-            </div>
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mt-4 mb-3">
-              Secretaria · Indicadores institucionais
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {([
-                { label: 'Cartas emitidas',  value: dash.cartasEmitidas,         icon: '📄' },
-                { label: 'Fluxos pendentes', value: dash.fluxosPendentes,        icon: '⏳' },
-                { label: 'Pedidos carta',    value: dash.pendencias.cartasP,     icon: '📋' },
-                { label: 'Visitantes',       value: dash.membrosVisitantes,      icon: '👥' },
-                { label: 'Usuários ativos',  value: dash.totalUsuarios,          icon: '🔑' },
-                { label: 'Eventos próximos', value: dash.pendencias.eventosProx, icon: '📅' },
-              ] as const).map(item => (
-                <div key={item.label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide leading-tight">{item.label}</p>
-                    <span className="text-base">{item.icon}</span>
-                  </div>
-                  {loadingDash
-                    ? <div className="h-7 w-10 bg-gray-200 rounded animate-pulse mt-1" />
-                    : <p className="text-2xl font-bold text-[#1E3A5F] mt-0.5">{item.value}</p>}
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold">
+                  <CalendarDays size={14} className="text-slate-500" />
+                  <span>{new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^./, str => str.toUpperCase())}</span>
                 </div>
-              ))}
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-1.5 bg-[#1E3A5F] hover:bg-[#152943] text-white rounded-lg text-xs font-semibold transition shadow-2xs"
+                >
+                  Atualizar
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
+              {([
+                { label: 'Cartas emitidas',  sub: 'Neste mês',             value: dash.cartasEmitidas,         icon: FileText,      color: 'text-emerald-600 bg-emerald-50' },
+                { label: 'Fluxos pendentes', sub: 'Aguardando análise',    value: dash.fluxosPendentes,        icon: Clock,         color: 'text-amber-600 bg-amber-50' },
+                { label: 'Pedidos carta',    sub: 'Em processamento',      value: dash.pendencias.cartasP,     icon: ClipboardList, color: 'text-amber-600 bg-amber-50' },
+                { label: 'Visitantes',       sub: 'Neste mês',             value: dash.membrosVisitantes,      icon: Users,         color: 'text-blue-600 bg-blue-50' },
+                { label: 'Usuários ativos',  sub: 'Com acesso ao sistema', value: dash.totalUsuarios,          icon: Key,           color: 'text-amber-500 bg-amber-50' },
+                { label: 'Eventos próximos', sub: 'Nos próximos 30 dias',  value: dash.pendencias.eventosProx, icon: CalendarDays,  color: 'text-rose-500 bg-rose-50' },
+              ] as const).map(item => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.label} className="bg-slate-50/70 hover:bg-slate-50 rounded-2xl p-4 border border-slate-100/90 flex flex-col justify-between transition">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-slate-700 leading-tight">{item.label}</p>
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${item.color}`}>
+                        <Icon size={15} />
+                      </div>
+                    </div>
+                    <div>
+                      {loadingDash
+                        ? <div className="h-7 w-12 bg-slate-200 rounded animate-pulse" />
+                        : <p className="text-2xl font-bold text-slate-900">{item.value}</p>}
+                      <p className="text-[11px] text-slate-400 font-medium mt-0.5">{item.sub}</p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -928,31 +1002,31 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
             {/* Card: Aniversariantes do Dia */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col justify-between">
+            <div className="bg-white rounded-2xl shadow-2xs border border-slate-200/80 p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <div className="p-2 rounded-xl bg-teal-50 text-teal-600">
                       <Cake className="h-5 w-5" />
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-[#1E3A5F]">Aniversariantes do Dia</h3>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-slate-400">
                         {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
                       </p>
                     </div>
                   </div>
                   <Link
                     href="/secretaria/membros?view=aniversariantes"
-                    className="text-[11px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200/60 px-3 py-1.5 rounded-lg transition flex items-center gap-1 shrink-0"
+                    className="text-[11px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200/60 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 shrink-0"
                   >
-                    <span>Ver Módulo</span>
-                    <span>→</span>
+                    <span>Ver lista</span>
+                    <ChevronRight size={13} />
                   </Link>
                 </div>
 
                 {loadingDash ? (
-                  <div className="h-44 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
+                  <div className="h-44 flex items-center justify-center text-slate-300 text-sm">Carregando...</div>
                 ) : dash.aniversariantesHoje.length > 0 ? (
                   <div className="space-y-2.5 my-2 max-h-[190px] overflow-y-auto pr-1">
                     {dash.aniversariantesHoje.map((aniv) => {
@@ -965,24 +1039,24 @@ export default function DashboardPage() {
                       return (
                         <div
                           key={aniv.id}
-                          className="flex items-center justify-between p-2.5 rounded-xl bg-teal-50/50 border border-teal-100/60 hover:bg-teal-50 transition"
+                          className="flex items-center justify-between p-2.5 rounded-xl bg-teal-50/40 border border-teal-100/70 hover:bg-teal-50/80 transition"
                         >
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex items-center gap-2.5 min-w-0">
                             {aniv.foto_url ? (
                               <img
                                 src={aniv.foto_url}
                                 alt={aniv.nome}
-                                className="w-9 h-9 rounded-full object-cover border border-teal-300 shrink-0"
+                                className="w-8 h-8 rounded-full object-cover border border-teal-300 shrink-0"
                               />
                             ) : (
-                              <div className="w-9 h-9 rounded-full bg-teal-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                              <div className="w-8 h-8 rounded-full bg-teal-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0 shadow-2xs">
                                 {initials}
                               </div>
                             )}
                             <div className="min-w-0">
-                              <p className="text-xs font-bold text-gray-900 truncate">{aniv.nome}</p>
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded">
-                                <span>🎉</span> Hoje!
+                              <p className="text-xs font-bold text-slate-800 truncate">{aniv.nome}</p>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-teal-700 bg-teal-100/70 px-1.5 py-0.5 rounded">
+                                Hoje! 🎉
                               </span>
                             </div>
                           </div>
@@ -992,39 +1066,39 @@ export default function DashboardPage() {
                               href={waUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white text-[10px] font-bold rounded-lg transition flex items-center gap-1 shrink-0 shadow-2xs"
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition flex items-center gap-1 shrink-0 shadow-2xs"
                               title="Enviar parabéns pelo WhatsApp"
                             >
                               <MessageCircle className="h-3 w-3" />
                               <span>WhatsApp</span>
                             </a>
                           ) : (
-                            <span className="text-[10px] font-medium text-gray-400 italic shrink-0">Sem contato</span>
+                            <span className="text-[10px] font-medium text-slate-400 italic shrink-0">Sem contato</span>
                           )}
                         </div>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="h-44 flex flex-col items-center justify-center text-center p-3 my-1 bg-gray-50/60 rounded-xl border border-dashed border-gray-200">
-                    <div className="p-3 rounded-full bg-amber-50 text-amber-500 mb-2">
-                      <Cake className="h-6 w-6" />
+                  <div className="h-44 flex flex-col items-center justify-center text-center p-3 my-1 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                    <div className="p-2.5 rounded-full bg-amber-50 text-amber-500 mb-2">
+                      <Cake className="h-5 w-5" />
                     </div>
-                    <p className="text-xs font-bold text-gray-700">Nenhum aniversariante hoje</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5 max-w-[200px]">
+                    <p className="text-xs font-bold text-slate-700">Nenhum aniversariante hoje</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5 max-w-[200px]">
                       Nenhum membro faz aniversário neste dia. {dash.totalAniversariantesMes} comemoram neste mês.
                     </p>
                   </div>
                 )}
               </div>
 
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-                <span className="text-[11px] text-gray-500">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span className="text-[11px]">
                   Total este mês: <strong className="text-teal-700 font-bold">{dash.totalAniversariantesMes}</strong>
                 </span>
                 <Link
                   href="/secretaria/membros?view=aniversariantes"
-                  className="text-[11px] font-bold text-teal-600 hover:underline"
+                  className="text-[11px] font-semibold text-teal-600 hover:text-teal-800"
                 >
                   Abrir lista
                 </Link>
@@ -1032,45 +1106,63 @@ export default function DashboardPage() {
             </div>
 
             {/* Bar: Top Congregações por membros */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h3 className="text-sm font-bold text-[#1E3A5F]">Membros por congregação</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Top congregações</p>
-              {loadingDash ? (
-                <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
-              ) : congBarData.length === 0 ? (
-                <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Sem dados</div>
-              ) : (
-                <ResponsiveContainer width="100%" height={210}>
-                  <BarChart data={congBarData} margin={{ top: 4, right: 4, left: -20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="nome" tick={{ fontSize: 10, fill: '#9ca3af' }} textAnchor="middle" interval={0} />
-                    <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} />
-                    <Bar dataKey="total" fill="#1E3A5F" radius={[4, 4, 0, 0]} name="Membros" />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
+            <div className="bg-white rounded-2xl shadow-2xs border border-slate-200/80 p-5 flex flex-col justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#1E3A5F]">Membros por congregação</h3>
+                  <p className="text-xs text-slate-400">Top congregações</p>
+                </div>
+              </div>
+              <div className="mt-3">
+                {loadingDash ? (
+                  <div className="h-52 flex items-center justify-center text-slate-300 text-sm">Carregando...</div>
+                ) : congBarData.length === 0 ? (
+                  <div className="h-52 flex items-center justify-center text-slate-300 text-sm">Sem dados</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={210}>
+                    <BarChart data={congBarData} margin={{ top: 8, right: 4, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="nome" tick={{ fontSize: 10, fill: '#64748b' }} textAnchor="middle" interval={0} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={{ fontSize: 12, borderRadius: 10, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' }} />
+                      <Bar dataKey="total" fill="#1E3A5F" radius={[6, 6, 0, 0]} name="Membros" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
             </div>
 
             {/* Bar: Crescimento mensal */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h3 className="text-sm font-bold text-[#1E3A5F]">Crescimento mensal</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Últimos 12 meses</p>
-              {loadingDash ? (
-                <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
-              ) : dash.crescimentoMembros.length < 2 ? (
-                <div className="h-52 flex items-center justify-center text-gray-300 text-sm">Sem dados suficientes</div>
-              ) : (
-                <ResponsiveContainer width="100%" height={210}>
-                  <BarChart data={dash.crescimentoMembros} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="mes" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} />
-                    <Bar dataKey="total" fill="#2563EB" radius={[4, 4, 0, 0]} name="Membros" />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
+            <div className="bg-white rounded-2xl shadow-2xs border border-slate-200/80 p-5 flex flex-col justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                  <TrendingUp className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#1E3A5F]">Crescimento mensal</h3>
+                  <p className="text-xs text-slate-400">Últimos 12 meses</p>
+                </div>
+              </div>
+              <div className="mt-3">
+                {loadingDash ? (
+                  <div className="h-52 flex items-center justify-center text-slate-300 text-sm">Carregando...</div>
+                ) : dash.crescimentoMembros.length < 2 ? (
+                  <div className="h-52 flex items-center justify-center text-slate-300 text-sm">Sem dados suficientes</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={210}>
+                    <BarChart data={dash.crescimentoMembros} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="mes" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={{ fontSize: 12, borderRadius: 10, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' }} />
+                      <Bar dataKey="total" fill="#2563EB" radius={[6, 6, 0, 0]} name="Membros" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1080,51 +1172,51 @@ export default function DashboardPage() {
               {/* KPIs Financeiros */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                <div className="bg-white rounded-2xl shadow-2xs border border-slate-200/80 p-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Receita do Mês</p>
-                    <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center">
-                      <TrendingUp size={18} className="text-green-600" />
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Receita do Mês</p>
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <TrendingUp size={18} />
                     </div>
                   </div>
-                  {loadingDash ? <div className="h-8 w-28 bg-gray-100 rounded animate-pulse" /> : (
+                  {loadingDash ? <div className="h-8 w-28 bg-slate-100 rounded animate-pulse" /> : (
                     <>
-                      <p className="text-2xl font-bold text-green-600">{fmtBRL(dash.entradasMes)}</p>
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-2xl font-bold text-emerald-600">{fmtBRL(dash.entradasMes)}</p>
+                      <p className="text-xs text-slate-400 mt-1">
                         {dash.variacao >= 0 ? `▲ +${dash.variacao}%` : `▼ ${dash.variacao}%`} vs mês anterior
                       </p>
                     </>
                   )}
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                <div className="bg-white rounded-2xl shadow-2xs border border-slate-200/80 p-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Despesa do Mês</p>
-                    <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center">
-                      <TrendingDown size={18} className="text-red-500" />
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Despesa do Mês</p>
+                    <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                      <TrendingDown size={18} />
                     </div>
                   </div>
-                  {loadingDash ? <div className="h-8 w-28 bg-gray-100 rounded animate-pulse" /> : (
+                  {loadingDash ? <div className="h-8 w-28 bg-slate-100 rounded animate-pulse" /> : (
                     <>
-                      <p className="text-2xl font-bold text-red-500">{fmtBRL(dash.saidasMes)}</p>
-                      <p className="text-xs text-gray-400 mt-1">Registradas no mês</p>
+                      <p className="text-2xl font-bold text-rose-600">{fmtBRL(dash.saidasMes)}</p>
+                      <p className="text-xs text-slate-400 mt-1">Registradas no mês</p>
                     </>
                   )}
                 </div>
 
-                <div className={`bg-white rounded-2xl shadow-sm border p-5 ${dash.saldoMes >= 0 ? 'border-green-200' : 'border-red-200'}`}>
+                <div className={`bg-white rounded-2xl shadow-2xs border p-5 flex flex-col justify-between ${dash.saldoMes >= 0 ? 'border-emerald-200/80' : 'border-rose-200/80'}`}>
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Saldo do Mês</p>
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${dash.saldoMes >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-                      <Wallet size={18} className={dash.saldoMes >= 0 ? 'text-green-600' : 'text-red-500'} />
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Saldo do Mês</p>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${dash.saldoMes >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                      <Wallet size={18} />
                     </div>
                   </div>
-                  {loadingDash ? <div className="h-8 w-28 bg-gray-100 rounded animate-pulse" /> : (
+                  {loadingDash ? <div className="h-8 w-28 bg-slate-100 rounded animate-pulse" /> : (
                     <>
-                      <p className={`text-2xl font-bold ${dash.saldoMes >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      <p className={`text-2xl font-bold ${dash.saldoMes >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {fmtBRL(dash.saldoMes)}
                       </p>
-                      <span className={`text-xs font-semibold mt-1 inline-block px-2 py-0.5 rounded-full ${dash.saldoMes >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      <span className={`text-[11px] font-semibold mt-1 inline-block px-2 py-0.5 rounded-full w-fit ${dash.saldoMes >= 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-rose-50 text-rose-700 border border-rose-200/60'}`}>
                         {dash.saldoMes >= 0 ? '● Superávit' : '● Déficit'}
                       </span>
                     </>
@@ -1136,49 +1228,49 @@ export default function DashboardPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
                 {/* Bar grouped: Receitas × Despesas */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                <div className="bg-white rounded-2xl shadow-2xs border border-slate-200/80 p-5">
                   <h3 className="text-sm font-bold text-[#1E3A5F]">Receitas × Despesas</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Últimos 6 meses</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Últimos 6 meses</p>
                   {loadingDash ? (
-                    <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
+                    <div className="h-56 flex items-center justify-center text-slate-300 text-sm">Carregando...</div>
                   ) : dash.historico6m.every(m => m.entradas === 0 && m.saidas === 0) ? (
-                    <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Sem lançamentos</div>
+                    <div className="h-56 flex items-center justify-center text-slate-300 text-sm">Sem lançamentos</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={dash.historico6m} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                      <BarChart data={dash.historico6m} margin={{ top: 8, right: 4, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
                         <YAxis
-                          tick={{ fontSize: 10, fill: '#9ca3af' }}
+                          tick={{ fontSize: 10, fill: '#64748b' }}
                           axisLine={false}
                           tickLine={false}
                           tickFormatter={(v: number) => `R$${(v / 1000).toFixed(0)}k`}
                         />
                         <Tooltip
                           formatter={(v: number | undefined) => fmtBRL(v ?? 0)}
-                          contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                          contentStyle={{ fontSize: 12, borderRadius: 10, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' }}
                         />
                         <Legend
                           iconType="circle"
                           iconSize={8}
-                          wrapperStyle={{ fontSize: 11, color: '#6b7280' }}
+                          wrapperStyle={{ fontSize: 11, color: '#64748b' }}
                           formatter={(v: string) => v === 'entradas' ? 'Entradas' : 'Saídas'}
                         />
-                        <Bar dataKey="entradas" fill="#16A34A" radius={[3, 3, 0, 0]} name="entradas" />
-                        <Bar dataKey="saidas"   fill="#EF4444" radius={[3, 3, 0, 0]} name="saidas"   />
+                        <Bar dataKey="entradas" fill="#10B981" radius={[4, 4, 0, 0]} name="entradas" />
+                        <Bar dataKey="saidas"   fill="#F43F5E" radius={[4, 4, 0, 0]} name="saidas"   />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
                 </div>
 
                 {/* Pie: Arrecadação por tipo */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                  <h3 className="text-sm font-bold text-[#1E3A5F]">Arrecadação por tipo</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Entradas do mês atual</p>
+                <div className="bg-white rounded-2xl shadow-2xs border border-slate-200/80 p-5">
+                  <h3 className="text-sm font-bold text-[#1E3A5F]">Arrecadação por Tipo</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Entradas do mês atual</p>
                   {loadingDash ? (
-                    <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Carregando...</div>
+                    <div className="h-56 flex items-center justify-center text-slate-300 text-sm">Carregando...</div>
                   ) : dash.porTipo.length === 0 ? (
-                    <div className="h-56 flex items-center justify-center text-gray-300 text-sm">Sem lançamentos no mês</div>
+                    <div className="h-56 flex items-center justify-center text-slate-300 text-sm">Sem lançamentos no mês</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <PieChart>
@@ -1193,14 +1285,14 @@ export default function DashboardPage() {
                           paddingAngle={3}
                         >
                           {dash.porTipo.map((_, i) => (
-                            <Cell key={i} fill={['#1E3A5F','#2563EB','#D97706','#16A34A','#DC2626','#0D9488','#6B7280'][i % 7]} />
+                            <Cell key={i} fill={['#1E3A5F','#2563EB','#D97706','#10B981','#F43F5E','#0D9488','#64748B'][i % 7]} />
                           ))}
                         </Pie>
                         <Tooltip
                           formatter={(v: number | undefined) => fmtBRL(v ?? 0)}
-                          contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                          contentStyle={{ fontSize: 12, borderRadius: 10, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' }}
                         />
-                        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#6b7280' }} />
+                        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#64748b' }} />
                       </PieChart>
                     </ResponsiveContainer>
                   )}

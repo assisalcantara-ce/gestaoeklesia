@@ -1,5 +1,7 @@
 'use client';
 
+import { Edit3, Trash2 } from 'lucide-react';
+
 interface Divisao1 {
   id: string;
   codigo?: number | null;
@@ -99,14 +101,39 @@ export default function CongregacoesTable({
   onEditD3,
   onDeleteD3,
 }: CongregacoesTableProps) {
+  const renderCondicaoBadge = (status?: string | null) => {
+    if (status === 'PROPRIO') {
+      return (
+        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200/90 rounded-full text-xs font-bold">
+          Própria
+        </span>
+      );
+    }
+    if (status === 'ALUGADO') {
+      return (
+        <span className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200/90 rounded-full text-xs font-bold">
+          Alugada
+        </span>
+      );
+    }
+    if (status === 'CEDIDO') {
+      return (
+        <span className="px-2.5 py-1 bg-sky-50 text-sky-800 border border-sky-200/90 rounded-full text-xs font-bold">
+          Cedida
+        </span>
+      );
+    }
+    return <span className="text-slate-400 font-medium">—</span>;
+  };
+
   // TAB D1 (Congregações/Igrejas)
   if (activeTab === 'divisao1') {
     return (
-      <>
+      <div className="space-y-4">
         {/* Mobile Cards */}
-        <div className="md:hidden space-y-3 mb-6">
+        <div className="md:hidden space-y-3">
           {divisoes1.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-4 text-center text-gray-500">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center text-slate-500 font-medium">
               Nenhuma {nomeD1} cadastrada
             </div>
           ) : (
@@ -119,45 +146,40 @@ export default function CongregacoesTable({
                 : (!d2Enabled && cg.supervisao_id
                   ? divisoes1.find(s => s.id === cg.supervisao_id) || null
                   : null);
-              const statusImovel = cg.status_imovel === 'PROPRIO'
-                ? 'Própria'
-                : cg.status_imovel === 'ALUGADO'
-                  ? 'Alugada'
-                  : cg.status_imovel === 'CEDIDO'
-                    ? 'Cedida'
-                    : '-';
               const statusAtivo = cg.is_active ? 'Ativo' : 'Inativo';
               return (
-                <div key={cg.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm border-l-4 border-teal-500">
+                <div key={cg.id} className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-semibold text-gray-800 break-words">{cg.nome}</p>
-                      <p className="text-xs text-gray-500">{d2Enabled ? nomeD2 : (d3Enabled ? nomeD3 : 'Vínculo')}: {campo ? formatCampoLabel(campo) : (supervisao ? formatSupervisaoLabel(supervisao) : '-')}</p>
+                      <p className="font-bold text-slate-900 break-words text-sm">{cg.nome}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {d2Enabled ? nomeD2 : (d3Enabled ? nomeD3 : 'Vínculo')}: {campo ? formatCampoLabel(campo) : (supervisao ? formatSupervisaoLabel(supervisao) : '—')}
+                      </p>
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-bold flex-shrink-0 ${
-                      cg.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0 ${
+                      cg.is_active ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/80' : 'bg-rose-50 text-rose-700 border border-rose-200/80'
                     }`}>
                       {statusAtivo}
                     </span>
                   </div>
-                  <div className="mt-2 space-y-1 text-xs text-gray-600 break-words">
-                    <p><span className="font-semibold">Dirigente:</span> {String((cg as any).dirigente || '').trim() || '-'}</p>
-                    <p><span className="font-semibold">Campo:</span> {campo?.nome || '-'}</p>
-                    <p><span className="font-semibold">Supervisão:</span> {supervisao?.nome || '-'}</p>
-                    <p><span className="font-semibold">Status:</span> {statusImovel}</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50/80 p-3 rounded-xl border border-slate-100">
+                    <p><span className="font-semibold text-slate-800">Dirigente:</span> {String((cg as any).dirigente || '').trim() || '—'}</p>
+                    <p><span className="font-semibold text-slate-800">Condição:</span> {cg.status_imovel ? cg.status_imovel : '—'}</p>
                   </div>
-                  <div className="mt-3 flex gap-2 flex-wrap">
+                  <div className="flex gap-2 pt-1">
                     <button
                       onClick={() => onEditD3(cg as any)}
-                      className="flex-1 min-w-[90px] px-3 py-2 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition"
+                      className="flex-1 py-2 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                     >
-                      Editar
+                      <Edit3 className="w-3.5 h-3.5 text-teal-700" />
+                      <span>Editar</span>
                     </button>
                     <button
                       onClick={() => onDeleteD3(cg.id)}
-                      className="flex-1 min-w-[90px] px-3 py-2 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition"
+                      className="flex-1 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                     >
-                      Deletar
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Deletar</span>
                     </button>
                   </div>
                 </div>
@@ -167,24 +189,24 @@ export default function CongregacoesTable({
         </div>
 
         {/* Desktop Table */}
-        <div className="hidden md:block bg-white rounded-lg shadow-md p-6">
+        <div className="hidden md:block border border-slate-200/90 rounded-2xl overflow-hidden bg-white shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
-                <tr className="bg-gray-200 text-gray-800">
-                  <th className="px-4 py-3 text-left font-semibold">
+                <tr className="bg-slate-50/90 border-b border-slate-200/90 text-slate-600 text-[11px] font-bold uppercase tracking-wider">
+                  <th className="px-5 py-3.5 text-left">
                     {d2Enabled ? nomeD2.toUpperCase() : (d3Enabled ? nomeD3.toUpperCase() : 'VÍNCULO')}
                   </th>
-                  <th className="px-4 py-3 text-left font-semibold">NOME</th>
-                  <th className="px-4 py-3 text-left font-semibold">DIRIGENTE</th>
-                  <th className="px-4 py-3 text-left font-semibold">CONDIÇÃO</th>
-                  <th className="px-4 py-3 text-center font-semibold">AÇÕES</th>
+                  <th className="px-5 py-3.5 text-left">NOME</th>
+                  <th className="px-5 py-3.5 text-left">DIRIGENTE</th>
+                  <th className="px-5 py-3.5 text-left">CONDIÇÃO</th>
+                  <th className="px-5 py-3.5 text-center">AÇÕES</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {divisoes1.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
+                    <td colSpan={5} className="px-5 py-8 text-center text-slate-500 font-medium">
                       Nenhuma {nomeD1} cadastrada
                     </td>
                   </tr>
@@ -198,34 +220,32 @@ export default function CongregacoesTable({
                       : null;
 
                     return (
-                      <tr key={cg.id} className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-700">
-                          {campo ? formatCampoLabel(campo) : (sup ? formatSupervisaoLabel(sup) : '-')}
+                      <tr key={cg.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-5 py-4 text-slate-600 font-medium">
+                          {campo ? formatCampoLabel(campo) : (sup ? formatSupervisaoLabel(sup) : '—')}
                         </td>
-                        <td className="px-4 py-3 font-semibold text-gray-800">{cg.nome}</td>
-                        <td className="px-4 py-3 text-gray-700">{String((cg as any).dirigente || '').trim() || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">
-                          {cg.status_imovel === 'PROPRIO'
-                            ? 'Própria'
-                            : cg.status_imovel === 'ALUGADO'
-                              ? 'Alugada'
-                              : cg.status_imovel === 'CEDIDO'
-                                ? 'Cedida'
-                                : '-'}
+                        <td className="px-5 py-4 font-bold text-slate-900">{cg.nome}</td>
+                        <td className="px-5 py-4 text-slate-700 font-medium">{String((cg as any).dirigente || '').trim() || '—'}</td>
+                        <td className="px-5 py-4 text-slate-700">
+                          {renderCondicaoBadge(cg.status_imovel)}
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => onEditD3(cg as any)}
-                            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => onDeleteD3(cg.id)}
-                            className="ml-2 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs font-semibold"
-                          >
-                            Deletar
-                          </button>
+                        <td className="px-5 py-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => onEditD3(cg as any)}
+                              className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80 rounded-xl transition text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-teal-700" />
+                              <span>Editar</span>
+                            </button>
+                            <button
+                              onClick={() => onDeleteD3(cg.id)}
+                              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-xl transition text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Deletar</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -235,18 +255,18 @@ export default function CongregacoesTable({
             </table>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   // TAB D2 (Campos)
   if (activeTab === 'divisao2') {
     return (
-      <>
+      <div className="space-y-4">
         {/* Mobile Cards */}
-        <div className="md:hidden space-y-3 mb-6">
+        <div className="md:hidden space-y-3">
           {divisoes2.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-4 text-center text-gray-500">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center text-slate-500 font-medium">
               Nenhum {nomeD2} cadastrado
             </div>
           ) : (
@@ -256,36 +276,38 @@ export default function CongregacoesTable({
                 : null;
               const qtdCongregacoes = divisoes1.filter(cg => cg.campo_id === c.id).length;
               return (
-                <div key={c.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm border-l-4 border-blue-500">
+                <div key={c.id} className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-semibold text-gray-800 break-words">{c.nome}</p>
-                      {d3Enabled && <p className="text-xs text-gray-500">{nomeD3}: {sup ? formatSupervisaoLabel(sup) : '-'}</p>}
+                      <p className="font-bold text-slate-900 break-words text-sm">{c.nome}</p>
+                      {d3Enabled && <p className="text-xs text-slate-500 mt-0.5">{nomeD3}: {sup ? formatSupervisaoLabel(sup) : '—'}</p>}
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-bold flex-shrink-0 ${
-                      c.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0 ${
+                      c.is_active ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/80' : 'bg-rose-50 text-rose-700 border border-rose-200/80'
                     }`}>
                       {c.is_active ? 'Ativo' : 'Inativo'}
                     </span>
                   </div>
-                  <div className="mt-2 space-y-1 text-xs text-gray-600 break-words">
-                    <p><span className="font-semibold">Responsável:</span> {c.pastor_nome || '-'}</p>
-                    <p><span className="font-semibold">Município:</span> {c.municipio || '-'}</p>
-                    <p><span className="font-semibold">Qtd. {nomeD1}s:</span> {qtdCongregacoes}</p>
-                    <p><span className="font-semibold">Sede:</span> {c.is_sede ? 'Sim' : 'Não'}</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50/80 p-3 rounded-xl border border-slate-100">
+                    <p><span className="font-semibold text-slate-800">Responsável:</span> {c.pastor_nome || '—'}</p>
+                    <p><span className="font-semibold text-slate-800">Município:</span> {c.municipio || '—'}</p>
+                    <p><span className="font-semibold text-slate-800">Qtd. {nomeD1}s:</span> {qtdCongregacoes}</p>
+                    <p><span className="font-semibold text-slate-800">Sede:</span> {c.is_sede ? 'Sim' : 'Não'}</p>
                   </div>
-                  <div className="mt-3 flex gap-2 flex-wrap">
+                  <div className="flex gap-2 pt-1">
                     <button
                       onClick={() => onEditD2(c)}
-                      className="flex-1 min-w-[90px] px-3 py-2 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition"
+                      className="flex-1 py-2 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                     >
-                      Editar
+                      <Edit3 className="w-3.5 h-3.5 text-teal-700" />
+                      <span>Editar</span>
                     </button>
                     <button
                       onClick={() => onDeleteD2(c.id)}
-                      className="flex-1 min-w-[90px] px-3 py-2 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition"
+                      className="flex-1 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                     >
-                      Deletar
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Deletar</span>
                     </button>
                   </div>
                 </div>
@@ -295,27 +317,27 @@ export default function CongregacoesTable({
         </div>
 
         {/* Desktop Table */}
-        <div className="hidden md:block bg-white rounded-lg shadow-md p-6">
+        <div className="hidden md:block border border-slate-200/90 rounded-2xl overflow-hidden bg-white shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
-                <tr>
+                <tr className="bg-slate-50/90 border-b border-slate-200/90 text-slate-600 text-[11px] font-bold uppercase tracking-wider">
                   {d3Enabled && (
-                    <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">
+                    <th className="px-5 py-3.5 text-left">
                       {nomeD3.toUpperCase()}
                     </th>
                   )}
-                  <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">NOME</th>
-                  <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">PASTOR/SUPERVISOR</th>
-                  <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">MUNICÍPIO</th>
-                  <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">QTD. {`${nomeD1.toUpperCase()}S`}</th>
-                  <th className="px-4 py-3 text-center font-semibold bg-gray-200 text-gray-800">Ações</th>
+                  <th className="px-5 py-3.5 text-left">NOME</th>
+                  <th className="px-5 py-3.5 text-left">PASTOR/SUPERVISOR</th>
+                  <th className="px-5 py-3.5 text-left">MUNICÍPIO</th>
+                  <th className="px-5 py-3.5 text-left">QTD. {`${nomeD1.toUpperCase()}S`}</th>
+                  <th className="px-5 py-3.5 text-center">AÇÕES</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {divisoes2.length === 0 ? (
                   <tr>
-                    <td colSpan={d3Enabled ? 6 : 5} className="px-4 py-6 text-center text-gray-500">
+                    <td colSpan={d3Enabled ? 6 : 5} className="px-5 py-8 text-center text-slate-500 font-medium">
                       Nenhum {nomeD2} cadastrado
                     </td>
                   </tr>
@@ -326,27 +348,31 @@ export default function CongregacoesTable({
                       : null;
                     const qtdCongregacoes = divisoes1.filter(cg => cg.campo_id === c.id).length;
                     return (
-                      <tr key={c.id} className="border-b border-gray-200 hover:bg-gray-50">
+                      <tr key={c.id} className="hover:bg-slate-50/70 transition-colors">
                         {d3Enabled && (
-                          <td className="px-4 py-3 text-gray-700">{sup ? formatSupervisaoLabel(sup) : '-'}</td>
+                          <td className="px-5 py-4 text-slate-600 font-medium">{sup ? formatSupervisaoLabel(sup) : '—'}</td>
                         )}
-                        <td className="px-4 py-3 text-gray-700 font-semibold">{c.nome}</td>
-                        <td className="px-4 py-3 text-gray-700">{c.pastor_nome || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{c.municipio || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700 font-semibold">{qtdCongregacoes}</td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => onEditD2(c)}
-                            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => onDeleteD2(c.id)}
-                            className="ml-2 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs font-semibold"
-                          >
-                            Deletar
-                          </button>
+                        <td className="px-5 py-4 text-slate-900 font-bold">{c.nome}</td>
+                        <td className="px-5 py-4 text-slate-700 font-medium">{c.pastor_nome || '—'}</td>
+                        <td className="px-5 py-4 text-slate-700 font-medium">{c.municipio || '—'}</td>
+                        <td className="px-5 py-4 text-slate-900 font-bold">{qtdCongregacoes}</td>
+                        <td className="px-5 py-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => onEditD2(c)}
+                              className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80 rounded-xl transition text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-teal-700" />
+                              <span>Editar</span>
+                            </button>
+                            <button
+                              onClick={() => onDeleteD2(c.id)}
+                              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-xl transition text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Deletar</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -356,18 +382,18 @@ export default function CongregacoesTable({
             </table>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   // TAB D3 (Supervisões)
   if (activeTab === 'divisao3') {
     return (
-      <>
+      <div className="space-y-4">
         {/* Mobile Cards */}
-        <div className="md:hidden space-y-3 mb-6">
+        <div className="md:hidden space-y-3">
           {divisoes1.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-4 text-center text-gray-500">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center text-slate-500 font-medium">
               Nenhuma {nomeD3} cadastrada
             </div>
           ) : (
@@ -376,34 +402,36 @@ export default function CongregacoesTable({
               const camposIds = new Set(campos.map(c => c.id));
               const qtdCongregacoes = divisoes3.filter(cg => (cg.campo_id && camposIds.has(cg.campo_id)) || (!cg.campo_id && cg.supervisao_id === d.id)).length;
               return (
-                <div key={d.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm border-l-4 border-purple-500">
+                <div key={d.id} className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-semibold text-gray-800 break-words">{d.nome}</p>
-                      <p className="text-xs text-gray-500">Responsável: {d.supervisor_nome || '-'}</p>
+                      <p className="font-bold text-slate-900 break-words text-sm">{d.nome}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Responsável: {d.supervisor_nome || '—'}</p>
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-bold flex-shrink-0 ${
-                      d.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0 ${
+                      d.is_active ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/80' : 'bg-rose-50 text-rose-700 border border-rose-200/80'
                     }`}>
                       {d.is_active ? 'Ativo' : 'Inativo'}
                     </span>
                   </div>
-                  <div className="mt-2 space-y-1 text-xs text-gray-600 break-words">
-                    <p><span className="font-semibold">Campos:</span> {campos.length}</p>
-                    <p><span className="font-semibold">Congregações:</span> {qtdCongregacoes}</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50/80 p-3 rounded-xl border border-slate-100">
+                    <p><span className="font-semibold text-slate-800">Campos:</span> {campos.length}</p>
+                    <p><span className="font-semibold text-slate-800">Congregações:</span> {qtdCongregacoes}</p>
                   </div>
-                  <div className="mt-3 flex gap-2 flex-wrap">
+                  <div className="flex gap-2 pt-1">
                     <button
                       onClick={() => onEditD1(d)}
-                      className="flex-1 min-w-[90px] px-3 py-2 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition"
+                      className="flex-1 py-2 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                     >
-                      Editar
+                      <Edit3 className="w-3.5 h-3.5 text-teal-700" />
+                      <span>Editar</span>
                     </button>
                     <button
                       onClick={() => onDeleteD1(d.id)}
-                      className="flex-1 min-w-[90px] px-3 py-2 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition"
+                      className="flex-1 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                     >
-                      Deletar
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Deletar</span>
                     </button>
                   </div>
                 </div>
@@ -413,21 +441,21 @@ export default function CongregacoesTable({
         </div>
 
         {/* Desktop Table */}
-        <div className="hidden md:block bg-white rounded-lg shadow-md p-6">
+        <div className="hidden md:block border border-slate-200/90 rounded-2xl overflow-hidden bg-white shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[540px] text-sm">
               <thead>
-                <tr>
-                  <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">NOME</th>
-                  <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">PASTOR/SUPERVISOR</th>
-                  <th className="px-4 py-3 text-left font-semibold bg-gray-200 text-gray-800">QTD DE SETOR</th>
-                  <th className="px-4 py-3 text-center font-semibold bg-gray-200 text-gray-800">Ações</th>
+                <tr className="bg-slate-50/90 border-b border-slate-200/90 text-slate-600 text-[11px] font-bold uppercase tracking-wider">
+                  <th className="px-5 py-3.5 text-left">NOME</th>
+                  <th className="px-5 py-3.5 text-left">PASTOR/SUPERVISOR</th>
+                  <th className="px-5 py-3.5 text-left">QTD DE SETOR</th>
+                  <th className="px-5 py-3.5 text-center">AÇÕES</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {divisoes1.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
+                    <td colSpan={4} className="px-5 py-8 text-center text-slate-500 font-medium">
                       Nenhuma {nomeD3} cadastrada
                     </td>
                   </tr>
@@ -436,20 +464,27 @@ export default function CongregacoesTable({
                     const qtdSetor = divisoes2.filter(c => c.supervisao_id === d.id).length;
 
                     return (
-                      <tr key={d.id} className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-700 font-semibold">{d.nome}</td>
-                        <td className="px-4 py-3 text-gray-700">{d.supervisor_nome || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700 font-semibold">{qtdSetor}</td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => onEditD1(d)}
-                            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold"
-                          >
-                            Editar
-                          </button>
-                          <button onClick={() => onDeleteD1(d.id)} className="ml-2 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs font-semibold">
-                            Deletar
-                          </button>
+                      <tr key={d.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-5 py-4 text-slate-900 font-bold">{d.nome}</td>
+                        <td className="px-5 py-4 text-slate-700 font-medium">{d.supervisor_nome || '—'}</td>
+                        <td className="px-5 py-4 text-slate-900 font-bold">{qtdSetor}</td>
+                        <td className="px-5 py-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => onEditD1(d)}
+                              className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80 rounded-xl transition text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-teal-700" />
+                              <span>Editar</span>
+                            </button>
+                            <button
+                              onClick={() => onDeleteD1(d.id)}
+                              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-xl transition text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Deletar</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -459,7 +494,7 @@ export default function CongregacoesTable({
             </table>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 

@@ -176,6 +176,10 @@ export default function TesourariaPage() {
               setFiltroCong={t.setFiltroCong}
               filtroDept={t.filtroDept}
               setFiltroDept={t.setFiltroDept}
+              filtroDataInicio={t.filtroDataInicio}
+              setFiltroDataInicio={t.setFiltroDataInicio}
+              filtroDataFim={t.filtroDataFim}
+              setFiltroDataFim={t.setFiltroDataFim}
               scope={t.scope}
               congregacoes={t.congregacoes}
               departamentos={t.departamentos}
@@ -487,9 +491,11 @@ export default function TesourariaPage() {
         {/* ─── ABA: DIZIMISTAS ─── */}
         {t.aba === 'dizimistas' && (
           <div className="space-y-4">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                <div>
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+              {/* LINHA 1 — FILTROS */}
+              <div className="flex flex-wrap items-end gap-3 w-full">
+                {/* Mês de Referência */}
+                <div className="shrink-0">
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Mês de Referência</label>
                   <MonthPicker
                     value={t.abaDizimistaMes}
@@ -497,25 +503,29 @@ export default function TesourariaPage() {
                   />
                 </div>
 
-                <div>
+                {/* Buscar por Nome (MAIOR INPUT DA LINHA) */}
+                <div className="flex-1 min-w-[200px]">
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Buscar por Nome</label>
                   <input
                     type="text"
                     placeholder="Nome do dizimista..."
                     value={t.filtroNomeDiz}
                     onChange={(e) => t.setFiltroNomeDiz(e.target.value)}
-                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63] h-[36px]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63] h-[36px] bg-white"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Congregação</label>
+                {/* Congregação */}
+                <div className="w-36 sm:w-44 lg:w-48 shrink-0">
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    {t.nomenclaturas?.divisao1 || 'CONGREGAÇÃO'}
+                  </label>
                   <select
                     value={t.filtroCongDiz}
                     onChange={(e) => t.setFiltroCongDiz(e.target.value)}
-                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63] h-[36px] max-w-[180px]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63] h-[36px] bg-white font-medium text-slate-700"
                   >
-                    <option value="">Todas as Congregações</option>
+                    <option value="">Todas</option>
                     {t.congregacoes.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.nome}
@@ -524,21 +534,90 @@ export default function TesourariaPage() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Status de Adimplência</label>
+                {/* Status de Adimplência */}
+                <div className="w-32 sm:w-36 shrink-0">
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Status</label>
                   <select
                     value={t.filtroStatusDiz}
                     onChange={(e) => t.setFiltroStatusDiz(e.target.value as any)}
-                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63] h-[36px]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#123b63] h-[36px] bg-white font-medium text-slate-700"
                   >
-                    <option value="">Todos os Status</option>
-                    <option value="pago">Adimplentes (Pago)</option>
-                    <option value="pendente">Inadimplentes (Pendente)</option>
+                    <option value="">Todos</option>
+                    <option value="pago">Adimplentes</option>
+                    <option value="pendente">Inadimplentes</option>
                   </select>
+                </div>
+
+                {/* Data inicial */}
+                <div className="w-32 sm:w-36 shrink-0">
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Data inicial</label>
+                  <input
+                    type="date"
+                    value={t.filtroDataInicioDiz}
+                    onChange={(e) => t.setFiltroDataInicioDiz(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#123b63] h-[36px] bg-white font-medium text-slate-700"
+                  />
+                </div>
+
+                {/* Data final */}
+                <div className="w-32 sm:w-36 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Data final</label>
+                    {t.filtroDataInicioDiz && t.filtroDataFimDiz && t.filtroDataInicioDiz > t.filtroDataFimDiz && (
+                      <span className="text-[10px] text-red-500 font-bold mb-1">Inválida</span>
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    value={t.filtroDataFimDiz}
+                    onChange={(e) => t.setFiltroDataFimDiz(e.target.value)}
+                    className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#123b63] h-[36px] bg-white font-medium text-slate-700 ${
+                      t.filtroDataInicioDiz && t.filtroDataFimDiz && t.filtroDataInicioDiz > t.filtroDataFimDiz
+                        ? 'border-red-400 focus:border-red-500 bg-red-50/30'
+                        : 'border-gray-200'
+                    }`}
+                    title={
+                      t.filtroDataInicioDiz && t.filtroDataFimDiz && t.filtroDataInicioDiz > t.filtroDataFimDiz
+                        ? 'Data final deve ser maior ou igual à data inicial'
+                        : undefined
+                    }
+                  />
+                </div>
+
+                {/* Botão Limpar Filtros */}
+                <div className="shrink-0 self-end">
+                  <button
+                    onClick={() => {
+                      t.setFiltroNomeDiz('');
+                      t.setFiltroCongDiz('');
+                      t.setFiltroStatusDiz('');
+                      t.setFiltroDataInicioDiz('');
+                      t.setFiltroDataFimDiz('');
+                    }}
+                    disabled={
+                      !t.filtroNomeDiz &&
+                      !t.filtroCongDiz &&
+                      !t.filtroStatusDiz &&
+                      !t.filtroDataInicioDiz &&
+                      !t.filtroDataFimDiz
+                    }
+                    className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-semibold transition h-[36px] cursor-pointer ${
+                      !t.filtroNomeDiz &&
+                      !t.filtroCongDiz &&
+                      !t.filtroStatusDiz &&
+                      !t.filtroDataInicioDiz &&
+                      !t.filtroDataFimDiz
+                        ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                        : 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300'
+                    }`}
+                  >
+                    Limpar
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+              {/* LINHA 2 — AÇÕES (Alinhadas à direita) */}
+              <div className="flex flex-wrap items-center justify-end gap-2 w-full pt-1">
                 <button
                   onClick={() =>
                     t.exportarCSV(
@@ -553,14 +632,14 @@ export default function TesourariaPage() {
                       `relatorio_dizimistas_${t.abaDizimistaMes}`
                     )
                   }
-                  className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 font-medium transition h-[36px]"
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 font-medium transition h-[36px] cursor-pointer"
                 >
                   Exportar CSV
                 </button>
 
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 font-medium transition h-[36px]"
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 font-medium transition h-[36px] cursor-pointer"
                 >
                   <Printer className="h-4 w-4" /> Relatório
                 </button>
@@ -569,7 +648,7 @@ export default function TesourariaPage() {
                   <>
                     <button
                       onClick={() => t.setShowAddDizimistaModal(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-[#123b63] text-[#123b63] bg-[#123b63]/5 hover:bg-[#123b63]/10 rounded-lg text-sm font-semibold transition h-[36px]"
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-[#123b63] text-[#123b63] bg-[#123b63]/5 hover:bg-[#123b63]/10 rounded-lg text-sm font-semibold transition h-[36px] cursor-pointer whitespace-nowrap"
                     >
                       <UserPlus className="h-4 w-4" /> Adicionar Dizimista
                     </button>
@@ -588,7 +667,7 @@ export default function TesourariaPage() {
                           categoria_id: catDiz?.id || p.categoria_id,
                         }));
                       }}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition h-[36px]"
+                      className="flex items-center gap-1.5 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition h-[36px] cursor-pointer whitespace-nowrap"
                     >
                       <Plus className="h-4 w-4" /> Registrar Dízimo
                     </button>

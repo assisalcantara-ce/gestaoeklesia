@@ -17,6 +17,10 @@ export interface TesourariaToolbarProps {
   setFiltroCong: (val: string) => void;
   filtroDept: string;
   setFiltroDept: (val: string) => void;
+  filtroDataInicio?: string;
+  setFiltroDataInicio?: (val: string) => void;
+  filtroDataFim?: string;
+  setFiltroDataFim?: (val: string) => void;
   scope: {
     canWrite?: boolean;
     isFinanceiroLocal?: boolean;
@@ -52,6 +56,10 @@ export default function TesourariaToolbar({
   setFiltroCong,
   filtroDept,
   setFiltroDept,
+  filtroDataInicio = '',
+  setFiltroDataInicio,
+  filtroDataFim = '',
+  setFiltroDataFim,
   scope,
   congregacoes,
   departamentos,
@@ -68,8 +76,23 @@ export default function TesourariaToolbar({
   fmtBRL,
   loadingMes,
 }: TesourariaToolbarProps) {
+  const isIntervaloInvalido = Boolean(
+    filtroDataInicio && filtroDataFim && filtroDataFim < filtroDataInicio
+  );
+
+  const isLimparDisabled =
+    filtroMovimento === '' &&
+    filtroTipo === '' &&
+    filtroCategoria === '' &&
+    filtroOrigem === '' &&
+    filtroCong === '' &&
+    filtroDept === '' &&
+    !filtroDataInicio &&
+    !filtroDataFim;
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-md">
+      {/* Linha 1: Mês | Movimento | Tipo | Categoria | Origem | Caixa */}
       <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1">Mês</label>
@@ -111,7 +134,7 @@ export default function TesourariaToolbar({
           <select
             value={filtroTipo}
             onChange={(e) => setFiltroTipo(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
           >
             <option value="">Todos os tipos</option>
             {filtroMovimento === 'saida'
@@ -132,7 +155,7 @@ export default function TesourariaToolbar({
           <select
             value={filtroCategoria}
             onChange={(e) => setFiltroCategoria?.(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
           >
             <option value="">Todas as categorias</option>
             {finCategorias &&
@@ -151,7 +174,7 @@ export default function TesourariaToolbar({
           <select
             value={filtroOrigem}
             onChange={(e) => setFiltroOrigem?.(e.target.value as any)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white font-medium text-slate-800"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white h-[38px] font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
           >
             <option value="">Todas as origens</option>
             <option value="manual">Manual</option>
@@ -164,7 +187,7 @@ export default function TesourariaToolbar({
             <select
               value={filtroCong}
               onChange={(e) => setFiltroCong(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
             >
               <option value="">Todas as congregações</option>
               {congregacoes.map((c) => (
@@ -177,31 +200,65 @@ export default function TesourariaToolbar({
         )}
       </div>
 
-      {/* Linha 2: Departamento + Botões e Métricas */}
-      <div className="mt-3 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1">Departamento</label>
-          <select
-            value={filtroDept}
-            onChange={(e) => setFiltroDept(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            <option value="">Todos os departamentos</option>
-            {departamentos.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.sigla ? `${d.sigla} – ` : ''}
-                {d.nome}
-              </option>
-            ))}
-          </select>
-        </div>
+      {/* Linha 2: Departamento | Data inicial | Data final | Novo lançamento | Limpar | Totalizador */}
+      <div className="mt-3 flex flex-wrap lg:flex-nowrap items-end gap-3 justify-between">
+        <div className="flex flex-wrap items-end gap-3 flex-1 min-w-0">
+          {/* Departamento */}
+          <div className="w-full sm:w-44 lg:w-44 shrink-0">
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Departamento</label>
+            <select
+              value={filtroDept}
+              onChange={(e) => setFiltroDept(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+            >
+              <option value="">Todos os departamentos</option>
+              {departamentos.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.sigla ? `${d.sigla} – ` : ''}
+                  {d.nome}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div className="sm:col-span-3 flex flex-wrap gap-2 items-center justify-between">
-          <div className="flex gap-2">
+          {/* Data inicial */}
+          <div className="w-full sm:w-36 lg:w-36 shrink-0">
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Data inicial</label>
+            <input
+              type="date"
+              value={filtroDataInicio}
+              onChange={(e) => setFiltroDataInicio?.(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-xs sm:text-sm bg-white h-[38px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+            />
+          </div>
+
+          {/* Data final */}
+          <div className="w-full sm:w-36 lg:w-36 shrink-0">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Data final</label>
+              {isIntervaloInvalido && (
+                <span className="text-[10px] text-red-500 font-bold mb-1">Inválida</span>
+              )}
+            </div>
+            <input
+              type="date"
+              value={filtroDataFim}
+              onChange={(e) => setFiltroDataFim?.(e.target.value)}
+              className={`w-full border rounded-lg px-2.5 py-2 text-xs sm:text-sm bg-white h-[38px] text-slate-800 focus:outline-none focus:ring-2 ${
+                isIntervaloInvalido
+                  ? 'border-red-400 focus:ring-red-500/20 focus:border-red-500 bg-red-50/30'
+                  : 'border-gray-200 focus:ring-teal-500/20 focus:border-teal-600'
+              }`}
+              title={isIntervaloInvalido ? 'Data final deve ser maior ou igual à data inicial' : undefined}
+            />
+          </div>
+
+          {/* Botões de Ação */}
+          <div className="flex gap-2 items-center flex-wrap shrink-0">
             {scope.canWrite && (
               <button
                 onClick={onNovoClick}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition h-[38px] whitespace-nowrap"
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition h-[38px] whitespace-nowrap shadow-xs cursor-pointer"
               >
                 <Plus className="h-4 w-4" /> Novo lançamento
               </button>
@@ -209,7 +266,7 @@ export default function TesourariaToolbar({
             {lancamentosMesCount > 0 && (
               <button
                 onClick={onExportarCSV}
-                className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition h-[38px]"
+                className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition h-[38px] cursor-pointer"
                 title="Exportar lançamentos filtrados para CSV"
               >
                 <Download className="h-4 w-4" /> CSV
@@ -219,13 +276,16 @@ export default function TesourariaToolbar({
               onClick={() => {
                 setFiltroMovimento('');
                 setFiltroTipo('');
+                setFiltroCategoria?.('');
                 setFiltroOrigem?.('');
                 setFiltroCong('');
                 setFiltroDept('');
+                setFiltroDataInicio?.('');
+                setFiltroDataFim?.('');
               }}
-              disabled={filtroMovimento === '' && filtroTipo === '' && filtroOrigem === '' && filtroCong === '' && filtroDept === ''}
-              className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition h-[38px] ${
-                filtroMovimento === '' && filtroTipo === '' && filtroOrigem === '' && filtroCong === '' && filtroDept === ''
+              disabled={isLimparDisabled}
+              className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition h-[38px] whitespace-nowrap cursor-pointer ${
+                isLimparDisabled
                   ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
                   : 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300'
               }`}
@@ -233,20 +293,20 @@ export default function TesourariaToolbar({
               Limpar Filtros
             </button>
           </div>
+        </div>
 
-          {/* Totalizador */}
-          <div className="flex gap-3 flex-wrap text-sm items-center h-[38px]">
-            <span className="text-gray-400">{lancsFiltradosCount} reg.</span>
-            <span className="text-green-600 font-semibold">↑ {fmtBRL(entradasFiltradas)}</span>
-            <span className="text-red-500 font-semibold">↓ {fmtBRL(saidasFiltradas)}</span>
-            <span
-              className={`font-bold ${
-                entradasFiltradas - saidasFiltradas >= 0 ? 'text-[#123b63]' : 'text-red-600'
-              }`}
-            >
-              = {fmtBRL(entradasFiltradas - saidasFiltradas)}
-            </span>
-          </div>
+        {/* Totalizador */}
+        <div className="flex gap-3 flex-wrap text-sm items-center h-[38px] shrink-0 justify-end">
+          <span className="text-gray-400">{lancsFiltradosCount} reg.</span>
+          <span className="text-green-600 font-semibold">↑ {fmtBRL(entradasFiltradas)}</span>
+          <span className="text-red-500 font-semibold">↓ {fmtBRL(saidasFiltradas)}</span>
+          <span
+            className={`font-bold ${
+              entradasFiltradas - saidasFiltradas >= 0 ? 'text-[#123b63]' : 'text-red-600'
+            }`}
+          >
+            = {fmtBRL(entradasFiltradas - saidasFiltradas)}
+          </span>
         </div>
       </div>
 

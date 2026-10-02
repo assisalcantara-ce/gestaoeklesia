@@ -173,6 +173,26 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
   }
+
+  /* Custom thin and translucent scrollbar for modals */
+  .modal-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .modal-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .modal-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.35);
+    border-radius: 9999px;
+  }
+  .modal-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.55);
+  }
+  .modal-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+  }
 }
 
 @page {

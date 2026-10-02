@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { BRAND } from '@/config/brand';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { substituirPlaceholders } from '@/lib/cartoes-utils';
 import { createClient } from '@/lib/supabase-client';

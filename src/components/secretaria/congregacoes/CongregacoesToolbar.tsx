@@ -1,5 +1,7 @@
 'use client';
 
+import { Plus } from 'lucide-react';
+
 interface CongregacoesToolbarProps {
   activeTab: string;
   nomeD1: string;
@@ -38,66 +40,76 @@ export default function CongregacoesToolbar({
   if (activeTab === 'divisao1' && !showFormD3) {
     const isBlocked = planLimits.max_divisao3 === 0 || (planLimits.max_divisao3 > 0 && divisoes3Length >= planLimits.max_divisao3);
     return (
-      <button
-        onClick={onOpenNewD3}
-        disabled={isBlocked}
-        title={
-          planLimits.max_divisao3 === 0
-            ? `Plano atual não permite ${nomeD1}`
-            : planLimits.max_divisao3 > 0 && divisoes3Length >= planLimits.max_divisao3
-              ? `Limite do plano atingido (${planLimits.max_divisao3})`
-              : undefined
-        }
-        className={`mb-6 w-full px-6 py-3 font-bold rounded-lg transition shadow-md flex items-center justify-center gap-2 ${
-          isBlocked ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-teal-500 text-white hover:bg-teal-600'
-        }`}
-      >
-        <span className="md:hidden">+ {nomeD1}</span>
-        <span className="hidden md:inline">+ Adicionar {nomeD1}</span>
-        {planLimits.max_divisao3 > 0 && (
-          <span className="text-xs opacity-80">({divisoes3Length}/{planLimits.max_divisao3})</span>
-        )}
-        {planLimits.max_divisao3 === 0 && <span className="text-xs opacity-80">(bloqueado no plano)</span>}
-      </button>
+      <div className="mb-6 flex justify-end">
+        <button
+          onClick={onOpenNewD3}
+          disabled={isBlocked}
+          title={
+            planLimits.max_divisao3 === 0
+              ? `Plano atual não permite ${nomeD1}`
+              : planLimits.max_divisao3 > 0 && divisoes3Length >= planLimits.max_divisao3
+                ? `Limite do plano atingido (${planLimits.max_divisao3})`
+                : undefined
+          }
+          className={`w-full sm:w-auto px-5 py-2.5 font-bold rounded-xl text-xs sm:text-sm transition shadow-sm flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] ${
+            isBlocked
+              ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 border border-emerald-700'
+          }`}
+        >
+          <Plus className="w-4 h-4" />
+          <span>Adicionar {nomeD1}</span>
+          {planLimits.max_divisao3 > 0 && (
+            <span className="text-xs opacity-80">({divisoes3Length}/{planLimits.max_divisao3})</span>
+          )}
+          {planLimits.max_divisao3 === 0 && <span className="text-xs opacity-80">(bloqueado no plano)</span>}
+        </button>
+      </div>
     );
   }
 
   if (activeTab === 'divisao2' && !showFormD2) {
     const isBlocked = planLimits.max_divisao2 === 0 || (planLimits.max_divisao2 > 0 && divisoes2Length >= planLimits.max_divisao2);
     return (
-      <button
-        onClick={onOpenNewD2}
-        disabled={isBlocked}
-        title={
-          planLimits.max_divisao2 === 0
-            ? `Plano atual não permite ${nomeD2}`
-            : planLimits.max_divisao2 > 0 && divisoes2Length >= planLimits.max_divisao2
-              ? `Limite do plano atingido (${planLimits.max_divisao2})`
-              : undefined
-        }
-        className={`mb-6 w-full px-6 py-3 font-bold rounded-lg transition shadow-md flex items-center justify-center gap-2 ${
-          isBlocked ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-teal-500 text-white hover:bg-teal-600'
-        }`}
-      >
-        <span className="md:hidden">+ {nomeD2}</span>
-        <span className="hidden md:inline">+ Adicionar {nomeD2}</span>
-        {planLimits.max_divisao2 > 0 && (
-          <span className="text-xs opacity-80">({divisoes2Length}/{planLimits.max_divisao2})</span>
-        )}
-        {planLimits.max_divisao2 === 0 && <span className="text-xs opacity-80">(bloqueado no plano)</span>}
-      </button>
+      <div className="mb-6 flex justify-end">
+        <button
+          onClick={onOpenNewD2}
+          disabled={isBlocked}
+          title={
+            planLimits.max_divisao2 === 0
+              ? `Plano atual não permite ${nomeD2}`
+              : planLimits.max_divisao2 > 0 && divisoes2Length >= planLimits.max_divisao2
+                ? `Limite do plano atingido (${planLimits.max_divisao2})`
+                : undefined
+          }
+          className={`w-full sm:w-auto px-5 py-2.5 font-bold rounded-xl text-xs sm:text-sm transition shadow-sm flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] ${
+            isBlocked
+              ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 border border-emerald-700'
+          }`}
+        >
+          <Plus className="w-4 h-4" />
+          <span>Adicionar {nomeD2}</span>
+          {planLimits.max_divisao2 > 0 && (
+            <span className="text-xs opacity-80">({divisoes2Length}/{planLimits.max_divisao2})</span>
+          )}
+          {planLimits.max_divisao2 === 0 && <span className="text-xs opacity-80">(bloqueado no plano)</span>}
+        </button>
+      </div>
     );
   }
 
   if (activeTab === 'divisao3' && !showFormD1) {
     return (
-      <button
-        onClick={onOpenNewD1}
-        className="mb-6 w-full px-6 py-3 font-bold rounded-lg transition shadow-md flex items-center justify-center gap-2 bg-teal-500 text-white hover:bg-teal-600"
-      >
-        <span className="md:hidden">+ {nomeD3}</span>
-        <span className="hidden md:inline">+ Adicionar {nomeD3}</span>
-      </button>
+      <div className="mb-6 flex justify-end">
+        <button
+          onClick={onOpenNewD1}
+          className="w-full sm:w-auto px-5 py-2.5 font-bold rounded-xl text-xs sm:text-sm transition shadow-sm flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 border border-emerald-700 cursor-pointer active:scale-[0.98]"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Adicionar {nomeD3}</span>
+        </button>
+      </div>
     );
   }
 

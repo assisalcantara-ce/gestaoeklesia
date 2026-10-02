@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import { Copy, Check, Printer, Download, X, QrCode, Globe, Smartphone, Building2 } from 'lucide-react';
 
 interface PublicMemberQrModalProps {

@@ -1,5 +1,6 @@
 'use client';
 
+import { FileText, X } from 'lucide-react';
 import FichaMembro from '@/components/FichaMembro';
 import CartãoMembro from '@/components/CartãoMembro';
 import CartaoBatchPrinter from '@/components/CartaoBatchPrinter';
@@ -33,30 +34,52 @@ export default function MembroCarteirinhaModal({
 }: MembroCarteirinhaModalProps) {
   return (
     <>
-      {/* Modal de Impressão - Ficha do Ministro */}
+      {/* Modal de Impressão - Ficha do Membro */}
       {membroImprimindo && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full my-8 flex flex-col max-h-[90vh]">
-            {/* Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b-2 border-teal-500 bg-gradient-to-r from-teal-600 to-teal-700 flex-shrink-0">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <span>🖨️</span> Ficha do Membro
-              </h2>
-              <button onClick={() => setMembroImprimindo(null)} className="text-white hover:text-gray-100 text-2xl">
-                ✕
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4 md:p-6 overflow-y-auto modal-scrollbar animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-4xl lg:max-w-5xl w-full my-auto flex flex-col max-h-[94vh] overflow-hidden">
+            {/* Header Moderno */}
+            <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-11 h-11 rounded-xl bg-teal-50 text-teal-700 border border-teal-200/80 flex items-center justify-center shrink-0 shadow-xs">
+                  <FileText className="w-5 h-5 text-teal-700" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
+                    Ficha do Membro
+                  </h2>
+                  <p className="text-xs sm:text-sm font-semibold text-teal-700 truncate">
+                    {membroImprimindo.nome || 'Identificação Cadastral'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMembroImprimindo(null)}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                aria-label="Fechar modal"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Conteúdo da Ficha com scroll */}
-            <div className="flex-1 overflow-y-auto p-6">
+            {/* Conteúdo da Ficha com scroll fino e suave */}
+            <div className="flex-1 overflow-y-auto modal-scrollbar p-4 sm:p-6 bg-slate-50/50">
               <FichaMembro
                 membro={{
                   matricula: membroImprimindo.matricula,
                   id: membroImprimindo.id,
-                  uniqueId: membroImprimindo.uniqueId,
+                  uniqueId: membroImprimindo.uniqueId || membroImprimindo.unique_id || membroImprimindo.id,
                   nome: membroImprimindo.nome,
                   cpf: membroImprimindo.cpf,
-                  tipoCadastro: membroImprimindo.tipoCadastro,
+                  tipoCadastro: membroImprimindo.tipoCadastro || membroImprimindo.tipo_cadastro || 'membro',
+                  status: membroImprimindo.status || (membroImprimindo.is_active === false ? 'inativo' : 'ativo'),
+                  cargo: membroImprimindo.cargo || membroImprimindo.cargo_ministerial || membroImprimindo.dadosCargos?.cargo || '',
+                  dataConsagracao: membroImprimindo.dataConsagracao || membroImprimindo.data_consagracao || '',
+                  dataBatismo: membroImprimindo.dataBatismo || membroImprimindo.dataBatismoAguas || membroImprimindo.data_batismo || '',
+                  dataValidadeCredencial: membroImprimindo.dataValidadeCredencial || membroImprimindo.data_validade_credencial || membroImprimindo.validade || '',
+                  congregacao: membroImprimindo.congregacao || membroImprimindo.congregacaoNome || membroImprimindo.congregacoes?.nome || '',
                   dataNascimento: membroImprimindo.dataNascimento || '',
                   sexo: membroImprimindo.sexo || '',
                   tipoSanguineo: membroImprimindo.tipoSanguineo || '',
@@ -91,17 +114,8 @@ export default function MembroCarteirinhaModal({
                   logoUrl: configIgreja?.logo || undefined,
                 }}
                 fotoUrl={membroImprimindo.fotoUrl || undefined}
+                onClose={() => setMembroImprimindo(null)}
               />
-            </div>
-
-            {/* Botão de Fechar */}
-            <div className="flex gap-4 px-6 py-4 border-t border-gray-300 bg-gray-50 flex-shrink-0">
-              <button
-                onClick={() => setMembroImprimindo(null)}
-                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition font-semibold text-sm"
-              >
-                ✕ Fechar
-              </button>
             </div>
           </div>
         </div>

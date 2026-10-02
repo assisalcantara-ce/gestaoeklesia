@@ -85,7 +85,6 @@ export default function DepartamentosPage() {
   const { ctx, bloqueado } = useRequireModulo('secretaria_local');
   const supabase = useMemo(() => createClient(), []);
 
-
   const [activeTab, setActiveTab] = useState('lista');
   const [loadingData, setLoadingData] = useState(true);
   const [ministryId, setMinistryId] = useState<string | null>(null);
@@ -252,9 +251,9 @@ export default function DepartamentosPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (ctx.loading) return <div className="p-8 text-gray-500">Carregando...</div>;
+  if (ctx.loading) return <div className="p-8 text-slate-500 font-medium">Carregando...</div>;
   if (bloqueado) return null;
-  if (loadingData) return <div className="p-8 text-gray-500">Carregando...</div>;
+  if (loadingData) return <div className="p-8 text-slate-500 font-medium">Carregando...</div>;
 
   return (
     <PageLayout
@@ -262,82 +261,85 @@ export default function DepartamentosPage() {
       description="Gerencie os departamentos e suas equipes de coordenação."
       activeMenu="departamentos"
     >
-      <div className="max-w-4xl mx-auto space-y-4">
+      <div className="max-w-5xl mx-auto space-y-4">
         <Tabs tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab}>
 
         {/* ─── Lista ─────────────────────────────────────────────────────────── */}
         {activeTab === 'lista' && (
           <Section title="">
-            <div className="flex justify-end mb-4">
+            <div className="flex justify-end mb-5">
               <button
                 onClick={() => { setForm(emptyForm()); setEditId(null); setActiveTab('cadastro'); }}
-                className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition"
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition border border-emerald-700 cursor-pointer active:scale-[0.98]"
               >
                 <Plus className="h-4 w-4" /> Novo Departamento
               </button>
             </div>
 
             {departamentos.length === 0 ? (
-              <p className="text-center text-gray-400 py-12">Nenhum departamento cadastrado.</p>
+              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-10 text-center text-slate-500 font-medium">
+                Nenhum departamento cadastrado.
+              </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3.5">
                 {departamentos.map((dep) => (
                   <div
                     key={dep.id}
-                    className="flex items-start justify-between gap-4 p-4 border border-gray-200 rounded-lg bg-white hover:shadow-sm transition"
+                    className="p-4 sm:p-5 border border-slate-200/90 rounded-2xl bg-white hover:border-slate-300 shadow-xs hover:shadow-sm transition flex flex-col sm:flex-row items-start justify-between gap-4"
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-start gap-3.5 flex-1 min-w-0">
                       {dep.logo_url ? (
                         <img
                           src={dep.logo_url}
                           alt={dep.sigla}
-                          className="h-10 w-10 rounded-full object-cover border border-gray-200 shrink-0"
+                          className="h-12 w-12 rounded-2xl object-cover border border-slate-200 shadow-xs shrink-0"
                         />
                       ) : (
-                        <div className="h-10 w-10 rounded-full bg-[#123b63]/10 flex items-center justify-center shrink-0">
-                          <span className="text-[#123b63] text-xs font-bold">{dep.sigla.charAt(0)}</span>
+                        <div className="h-12 w-12 rounded-2xl bg-teal-50 text-teal-800 border border-teal-200/80 flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
+                          {dep.sigla.slice(0, 2).toUpperCase()}
                         </div>
                       )}
-                      <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-[#123b63]/10 text-[#123b63] text-xs font-bold tracking-wide">
-                          {dep.sigla}
-                        </span>
-                        <span className="font-semibold text-gray-800 text-sm">{dep.nome}</span>
-                        {!dep.ativo && (
-                          <span className="text-xs text-gray-400 italic">inativo</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-teal-50 text-teal-800 border border-teal-200/90 text-xs font-bold tracking-wide">
+                            {dep.sigla}
+                          </span>
+                          <span className="font-bold text-slate-900 text-sm sm:text-base">{dep.nome}</span>
+                          {!dep.ativo && (
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                              Inativo
+                            </span>
+                          )}
+                        </div>
+                        {dep.descricao && (
+                          <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">{dep.descricao}</p>
+                        )}
+                        {dep.coordenacao && dep.coordenacao.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {dep.coordenacao.map((c, i) => (
+                              <span key={i} className="text-xs bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1 text-slate-700 flex items-center gap-1">
+                                <span className="font-bold text-slate-900">{c.cargo}:</span>
+                                <span className="text-slate-600 font-medium">{c.nome}</span>
+                              </span>
+                            ))}
+                          </div>
                         )}
                       </div>
-                      {dep.descricao && (
-                        <p className="text-xs text-gray-500 mt-1">{dep.descricao}</p>
-                      )}
-                      {dep.coordenacao && dep.coordenacao.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {dep.coordenacao.map((c, i) => (
-                            <span key={i} className="text-xs bg-gray-100 rounded px-2 py-0.5 text-gray-600">
-                              <span className="font-semibold">{c.cargo}:</span> {c.nome}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      </div>
                     </div>
-                    </div>
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex gap-2 shrink-0 self-end sm:self-start">
                       <button
-                        title="Editar"
+                        title="Editar Departamento"
                         onClick={() => handleEdit(dep)}
-                        className="p-1.5 rounded hover:bg-blue-50 text-blue-600 transition"
+                        className="p-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80 transition cursor-pointer shadow-xs"
                       >
-                        <Pencil className="h-4 w-4" />
+                        <Pencil className="h-3.5 w-3.5 text-teal-700" />
                       </button>
                       <button
-                        title="Excluir"
+                        title="Excluir Departamento"
                         onClick={() => setConfirmDeleteId(dep.id)}
-                        className="p-1.5 rounded hover:bg-red-50 text-red-500 transition"
+                        className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 transition cursor-pointer shadow-xs"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5 text-rose-600" />
                       </button>
                     </div>
                   </div>
@@ -350,15 +352,15 @@ export default function DepartamentosPage() {
         {/* ─── Cadastro ──────────────────────────────────────────────────────── */}
         {activeTab === 'cadastro' && (
           <Section title={editId ? 'Editar Departamento' : 'Novo Departamento'}>
-            <div className="space-y-5">
+            <div className="space-y-6">
               {/* Sigla + Nome */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Sigla <span className="text-red-500">*</span>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Sigla <span className="text-rose-500">*</span>
                   </label>
                   <input
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm uppercase tracking-widest"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-bold uppercase tracking-widest text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition bg-white"
                     placeholder="Ex: UMADMI"
                     maxLength={20}
                     value={form.sigla}
@@ -366,12 +368,12 @@ export default function DepartamentosPage() {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Nome <span className="text-red-500">*</span>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Nome do Departamento <span className="text-rose-500">*</span>
                   </label>
                   <input
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                    placeholder="Ex: União de Mocidade da AD Missões"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition bg-white"
+                    placeholder="Ex: União de Mocidade da Assembleia de Deus"
                     value={form.nome}
                     onChange={(e) => handleNomeChange(e.target.value)}
                   />
@@ -381,23 +383,23 @@ export default function DepartamentosPage() {
               {/* Slug + Ordem */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Slug <span className="text-red-500">*</span>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Slug <span className="text-rose-500">*</span>
                   </label>
                   <input
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono text-gray-600"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-mono text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
                     placeholder="Ex: grupo-de-jovens"
                     value={form.slug}
                     onChange={(e) => setForm((p) => ({ ...p, slug: slugify(e.target.value) }))}
                   />
-                  <p className="text-xs text-gray-400 mt-1">Identificador único. Gerado automaticamente a partir do nome.</p>
+                  <p className="text-[11px] text-slate-400 font-medium mt-1">Identificador único no sistema, gerado automaticamente a partir do nome.</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Ordem</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Ordem de Exibição</label>
                   <input
                     type="number"
                     min={0}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
                     value={form.ordem}
                     onChange={(e) => setForm((p) => ({ ...p, ordem: Number(e.target.value) }))}
                   />
@@ -406,11 +408,11 @@ export default function DepartamentosPage() {
 
               {/* Descrição */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Descrição</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Descrição / Finalidade</label>
                 <textarea
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none"
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition resize-none bg-white"
                   rows={2}
-                  placeholder="Descrição opcional do departamento..."
+                  placeholder="Descrição opcional das atividades do departamento..."
                   value={form.descricao || ''}
                   onChange={(e) => setForm((p) => ({ ...p, descricao: e.target.value }))}
                 />
@@ -418,32 +420,32 @@ export default function DepartamentosPage() {
 
               {/* Logo */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Logo do Departamento</label>
-                <div className="flex items-center gap-4">
+                <label className="block text-xs font-semibold text-slate-700 mb-2">Logo do Departamento</label>
+                <div className="flex items-center gap-4 p-4 border border-slate-200 rounded-2xl bg-slate-50/60">
                   {logoPreview ? (
                     <div className="relative">
                       <img
                         src={logoPreview}
                         alt="Logo"
-                        className="h-16 w-16 rounded-full object-cover border border-gray-200"
+                        className="h-16 w-16 rounded-2xl object-cover border border-slate-200 shadow-xs"
                       />
                       <button
                         type="button"
                         onClick={handleLogoRemove}
-                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition"
+                        className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full p-1 hover:bg-rose-700 transition shadow-xs cursor-pointer"
                       >
                         <X className="h-3 w-3" />
                       </button>
                     </div>
                   ) : (
-                    <div className="h-16 w-16 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center">
-                      <span className="text-2xl text-gray-300">🏷️</span>
+                    <div className="h-16 w-16 rounded-2xl bg-white border-2 border-dashed border-slate-300 flex items-center justify-center shadow-xs">
+                      <span className="text-2xl text-slate-400">🏷️</span>
                     </div>
                   )}
                   <div>
                     <label
                       htmlFor="dep-logo"
-                      className="cursor-pointer px-3 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition"
+                      className="cursor-pointer px-4 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition shadow-xs inline-block"
                     >
                       {logoPreview ? 'Trocar imagem' : 'Selecionar imagem'}
                     </label>
@@ -454,7 +456,7 @@ export default function DepartamentosPage() {
                       className="hidden"
                       onChange={handleLogoChange}
                     />
-                    <p className="text-xs text-gray-400 mt-1">JPG, PNG ou WebP. Redimensionado para 200×200px.</p>
+                    <p className="text-[11px] text-slate-400 font-medium mt-1.5">JPG, PNG ou WebP (redimensionado automaticamente).</p>
                   </div>
                 </div>
               </div>
@@ -466,39 +468,44 @@ export default function DepartamentosPage() {
                   id="dep-ativo"
                   checked={form.ativo}
                   onChange={(e) => setForm((p) => ({ ...p, ativo: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300 text-[#123b63]"
+                  className="h-4.5 w-4.5 rounded-md border-slate-300 text-teal-700 focus:ring-teal-600 cursor-pointer"
                 />
-                <label htmlFor="dep-ativo" className="text-sm text-gray-700">Departamento ativo</label>
+                <label htmlFor="dep-ativo" className="text-xs sm:text-sm font-semibold text-slate-700 cursor-pointer select-none">
+                  Departamento ativo e visível na igreja
+                </label>
               </div>
 
               {/* Equipe de Coordenação */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-semibold text-gray-700">Equipe de Coordenação</label>
+              <div className="p-4 border border-slate-200 rounded-2xl bg-slate-50/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">Equipe de Coordenação</h3>
+                    <p className="text-[11px] text-slate-500 font-medium">Líderes, conselheiros e secretários responsáveis</p>
+                  </div>
                   <button
                     type="button"
                     onClick={handleCoordenacaoAdd}
-                    className="flex items-center gap-1 text-xs text-[#123b63] hover:underline font-semibold"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
                   >
-                    <Plus className="h-3.5 w-3.5" /> Adicionar cargo
+                    <Plus className="h-3.5 w-3.5 text-teal-700" /> Adicionar cargo
                   </button>
                 </div>
 
                 {form.coordenacao.length === 0 && (
-                  <p className="text-xs text-gray-400 italic">Nenhum cargo adicionado ainda.</p>
+                  <p className="text-xs text-slate-400 italic py-2">Nenhum cargo adicionado ainda.</p>
                 )}
 
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {form.coordenacao.map((item, i) => (
                     <div key={i} className="flex gap-2 items-center">
                       <input
-                        className="w-1/3 border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                        placeholder="Cargo (Ex: Líder)"
+                        className="w-1/3 px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-semibold text-slate-900 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                        placeholder="Cargo (Ex: Coordenador)"
                         value={item.cargo}
                         onChange={(e) => handleCoordenacaoChange(i, 'cargo', e.target.value)}
                       />
                       <input
-                        className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                        className="flex-1 px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
                         placeholder="Nome do responsável"
                         value={item.nome}
                         onChange={(e) => handleCoordenacaoChange(i, 'nome', e.target.value)}
@@ -506,7 +513,7 @@ export default function DepartamentosPage() {
                       <button
                         type="button"
                         onClick={() => handleCoordenacaoRemove(i)}
-                        className="p-1.5 text-red-400 hover:text-red-600 transition"
+                        className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition cursor-pointer"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -516,22 +523,22 @@ export default function DepartamentosPage() {
               </div>
 
               {/* Botões */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="px-6 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition disabled:opacity-50"
-                >
-                  {saving ? 'Salvando...' : editId ? 'Atualizar' : 'Cadastrar'}
-                </button>
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                 {editId && (
                   <button
                     onClick={handleCancelEdit}
-                    className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
+                    className="px-5 py-2.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-xl font-bold text-xs sm:text-sm transition shadow-xs cursor-pointer"
                   >
                     Cancelar
                   </button>
                 )}
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs sm:text-sm shadow-sm transition border border-emerald-700 cursor-pointer disabled:opacity-50 active:scale-[0.98]"
+                >
+                  {saving ? 'Salvando...' : editId ? 'Atualizar Departamento' : 'Cadastrar Departamento'}
+                </button>
               </div>
             </div>
           </Section>
@@ -539,31 +546,17 @@ export default function DepartamentosPage() {
         </Tabs>
       </div>
 
-      {/* ─── Confirm Delete ──────────────────────────────────────────────────── */}
-      {confirmDeleteId && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
-            <h3 className="text-base font-bold text-gray-800 mb-2">Excluir Departamento</h3>
-            <p className="text-sm text-gray-600 mb-5">
-              Tem certeza? Esta ação não pode ser desfeita.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => handleDelete(confirmDeleteId)}
-                className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition"
-              >
-                Excluir
-              </button>
-              <button
-                onClick={() => setConfirmDeleteId(null)}
-                className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ─── Modal de Confirmação de Exclusão ──────────────────────────────────── */}
+      <NotificationModal
+        isOpen={!!confirmDeleteId}
+        title="Excluir Departamento"
+        message="Tem certeza que deseja excluir este departamento? Esta ação não pode ser desfeita."
+        type="warning"
+        primaryLabel="Excluir"
+        secondaryLabel="Cancelar"
+        onClose={() => confirmDeleteId && handleDelete(confirmDeleteId)}
+        onSecondary={() => setConfirmDeleteId(null)}
+      />
 
       {/* ─── Notification Modal ───────────────────────────────────────────────── */}
       <NotificationModal

@@ -44,6 +44,8 @@ export default function MembrosPage() {
     setStatusFilter,
     cargoFilter,
     setCargoFilter,
+    congregacaoFilter,
+    setCongregacaoFilter,
     sortOrdemAlfabetica,
     setSortOrdemAlfabetica,
     currentPage,
@@ -54,6 +56,8 @@ export default function MembrosPage() {
     totalPages,
     startIndex,
     endIndex,
+    itemsPerPage,
+    setItemsPerPage,
 
     // Estado: seleção em lote
     membrosSelecionados,
@@ -293,40 +297,70 @@ export default function MembrosPage() {
         setNotification={setNotification}
       />
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="p-6 max-w-[96rem] mx-auto w-full">
-          {/* Navegação de Abas */}
-          <div className="bg-white rounded-lg shadow-md mb-6 border-b-4 border-teal-500">
-            <div className="flex flex-wrap items-center gap-4 p-4">
-              <button
-                onClick={() => setDashboardView('overview')}
-                className={`px-6 py-3 rounded-lg font-semibold transition ${
-                  dashboardView === 'overview' ? 'bg-teal-600 text-white shadow-lg' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                📊 Dashboard
-              </button>
-              <button
-                onClick={() => setDashboardView('list')}
-                className={`px-6 py-3 rounded-lg font-semibold transition ${
-                  dashboardView === 'list' ? 'bg-teal-600 text-white shadow-lg' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                👥 Dados de Membros
-              </button>
-              <button
-                onClick={() => setDashboardView('aniversariantes')}
-                className={`px-6 py-3 rounded-lg font-semibold transition ${
-                  dashboardView === 'aniversariantes' ? 'bg-teal-600 text-white shadow-lg' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                🎂 Aniversariantes
-              </button>
+      <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f4f7fa] min-h-screen">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-[96rem] mx-auto w-full">
+          {/* Header da Página */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-teal-700 text-white flex items-center justify-center border border-teal-800 shadow-sm flex-shrink-0">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Membros</h1>
+                <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
+                  Gerencie os membros da sua igreja, acompanhe informações e mantenha os dados atualizados.
+                </p>
+              </div>
             </div>
           </div>
 
+          {/* Navegação de Abas (Pills) */}
+          <div className="flex items-center gap-2.5 mb-6 overflow-x-auto pb-1">
+            <button
+              onClick={() => setDashboardView('overview')}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                dashboardView === 'overview'
+                  ? 'bg-teal-700 text-white shadow-sm border border-teal-800'
+                  : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span>Dashboard</span>
+            </button>
+
+            <button
+              onClick={() => setDashboardView('list')}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                dashboardView === 'list'
+                  ? 'bg-teal-700 text-white shadow-sm border border-teal-800'
+                  : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              <span>Listagem</span>
+            </button>
+
+            <button
+              onClick={() => setDashboardView('aniversariantes')}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                dashboardView === 'aniversariantes'
+                  ? 'bg-teal-700 text-white shadow-sm border border-teal-800'
+                  : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
+              }`}
+            >
+              <span>🎂</span>
+              <span>Aniversariantes</span>
+            </button>
+          </div>
+
           {membersError && (
-            <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 mb-6">
+            <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 mb-6">
               <p className="text-amber-900 font-semibold">{membersError}</p>
               {membersError === 'Usuário sem ministério associado' && (
                 <p className="text-amber-900 text-sm mt-1">
@@ -357,6 +391,9 @@ export default function MembrosPage() {
                 setCargoFilter={setCargoFilter}
                 statusFilter={statusFilter}
                 setStatusFilter={setStatusFilter}
+                congregacaoFilter={congregacaoFilter}
+                setCongregacaoFilter={setCongregacaoFilter}
+                congregacoesOptions={congregacoesOptions}
                 setCurrentPage={setCurrentPage}
                 setSortOrdemAlfabetica={setSortOrdemAlfabetica}
                 cargosMinisteriais={cargosMinisteriais as any}
@@ -398,16 +435,11 @@ export default function MembrosPage() {
                 currentPage={currentPage}
                 setCurrentPage={setCurrentPage}
                 totalPages={totalPages}
+                itemsPerPage={itemsPerPage}
+                setItemsPerPage={setItemsPerPage}
               />
 
-              {(() => {
-                console.log('props enviadas', {
-                  supervisoesOptions,
-                  camposOptions,
-                  congregacoesOptions
-                });
-                return null;
-              })()}
+
               <MembroFormModal
                 showForm={showForm}
                 setShowForm={setShowForm}

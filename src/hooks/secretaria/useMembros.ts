@@ -337,9 +337,10 @@ export function useMembros() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ATIVO');
   const [cargoFilter, setCargoFilter] = useState('TODOS');
+  const [congregacaoFilter, setCongregacaoFilter] = useState('TODAS');
   const [sortOrdemAlfabetica, setSortOrdemAlfabetica] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // ── Estado: seleção em lote ──────────────────────────────────────────────────
   const [membrosSelecionados, setMembrosSelecionados] = useState<Set<string>>(new Set());
@@ -533,6 +534,7 @@ export function useMembros() {
         search: searchTerm.trim() || undefined,
         status: statusFilter === 'TODOS' ? undefined : statusFilter,
         cargo: cargoFilter === 'TODOS' ? undefined : cargoFilter,
+        congregacaoId: congregacaoFilter === 'TODAS' ? undefined : congregacaoFilter,
         sort: sortOrdemAlfabetica ? 'name_asc' : 'matricula_asc',
       });
 
@@ -548,12 +550,12 @@ export function useMembros() {
       if (e instanceof Error && e.message === 'Não autenticado') return;
       console.error('Erro ao carregar membros (API):', e);
     }
-  }, [fetchMembers, currentPage, itemsPerPage, searchTerm, statusFilter, cargoFilter, sortOrdemAlfabetica]);
+  }, [fetchMembers, currentPage, itemsPerPage, searchTerm, statusFilter, cargoFilter, congregacaoFilter, sortOrdemAlfabetica]);
 
   // Resetar para primeira página ao alterar filtros ou busca
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, cargoFilter, sortOrdemAlfabetica]);
+  }, [searchTerm, statusFilter, cargoFilter, congregacaoFilter, sortOrdemAlfabetica, itemsPerPage]);
 
   // Debounce para recarregar a lista quando filtros/busca/página mudam
   useEffect(() => {
@@ -645,9 +647,9 @@ export function useMembros() {
         divisao3: labels.nomeDivisao3,
       });
 
-      setSupervisoes(div1);
+      setCongregacoes(div1);
       setCampos(div2);
-      setCongregacoes(div3);
+      setSupervisoes(div3);
     };
 
     loadEstruturaOptions().catch(() => null);
@@ -934,8 +936,10 @@ export function useMembros() {
         cidade: u(enderecoData.cidade),
         estado: u(dadosPessoais.uf),
         celular: dadosPessoais.celular || null,
-        whatsapp: dadosPessoais.whatsapp || null,
-        congregacao_id: congregacoes.find((cg) => cg.nome === dadosPessoais.supervisao)?.id || null,
+        congregacao_id:
+          congregacoes.find((cg) => cg.nome === dadosPessoais.supervisao || cg.nome === dadosPessoais.congregacao)?.id ||
+          congregacoes.find((cg) => cg.id === dadosPessoais.supervisao || cg.id === dadosPessoais.congregacao)?.id ||
+          null,
         latitude: Number.isFinite(latitudeNumber) ? latitudeNumber : null,
         longitude: Number.isFinite(longitudeNumber) ? longitudeNumber : null,
         profissao: u(dadosPessoais.profissao),
@@ -1400,6 +1404,8 @@ export function useMembros() {
     setStatusFilter,
     cargoFilter,
     setCargoFilter,
+    congregacaoFilter,
+    setCongregacaoFilter,
     sortOrdemAlfabetica,
     setSortOrdemAlfabetica,
     currentPage,
@@ -1412,6 +1418,7 @@ export function useMembros() {
     startIndex,
     endIndex,
     itemsPerPage,
+    setItemsPerPage,
 
     // Estado: seleção em lote
     membrosSelecionados,

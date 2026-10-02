@@ -3,8 +3,7 @@
 import { useEffect } from 'react';
 import Image from 'next/image';
 import { BRAND } from '@/config/brand';
-import PremiumButton from '@/components/ui/PremiumButton';
-import { TOKENS } from '@/config/tokens';
+import { Check, X, AlertTriangle, Info } from 'lucide-react';
 
 interface NotificationModalProps {
   title: string;
@@ -50,84 +49,67 @@ export default function NotificationModal({
   const canRequestClose = typeof onRequestClose === 'function';
 
   const handleBackdrop = () => {
-    if (canRequestClose) onRequestClose!();
+    if (canRequestClose) {
+      onRequestClose!();
+    } else {
+      onClose();
+    }
   };
 
   const handleKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
-    if (!canRequestClose) return;
-    if (e.key === 'Escape') onRequestClose!();
-  };
-
-  const getIcon = () => {
-    switch (type) {
-      case 'success':
-        return '✓';
-      case 'error':
-        return '✕';
-      case 'warning':
-        return '⚠️';
-      case 'info':
-        return 'ℹ️';
-      default:
-        return '✓';
+    if (e.key === 'Escape') {
+      if (canRequestClose) onRequestClose!();
+      else onClose();
     }
   };
 
-  const getColors = () => {
+  const renderIcon = () => {
     switch (type) {
       case 'success':
-        return {
-          bg: 'bg-green-50',
-          border: 'border-green-200',
-          title: 'text-green-900',
-          message: 'text-green-700',
-          button: 'bg-green-600 hover:bg-green-700',
-          icon: 'text-green-600'
-        };
+        return (
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-50 border border-emerald-200/90 text-emerald-600 flex items-center justify-center mx-auto mb-4 shadow-xs">
+            <Check className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-600 stroke-[2.5]" />
+          </div>
+        );
       case 'error':
-        return {
-          bg: 'bg-red-50',
-          border: 'border-red-200',
-          title: 'text-red-900',
-          message: 'text-red-700',
-          button: 'bg-red-600 hover:bg-red-700',
-          icon: 'text-red-600'
-        };
+        return (
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-rose-50 border border-rose-200/90 text-rose-600 flex items-center justify-center mx-auto mb-4 shadow-xs">
+            <X className="w-7 h-7 sm:w-8 sm:h-8 text-rose-600 stroke-[2.5]" />
+          </div>
+        );
       case 'warning':
-        return {
-          bg: 'bg-yellow-50',
-          border: 'border-yellow-200',
-          title: 'text-yellow-900',
-          message: 'text-yellow-700',
-          button: 'bg-yellow-600 hover:bg-yellow-700',
-          icon: 'text-yellow-600'
-        };
+        return (
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-amber-50 border border-amber-200/90 text-amber-600 flex items-center justify-center mx-auto mb-4 shadow-xs">
+            <AlertTriangle className="w-7 h-7 sm:w-8 sm:h-8 text-amber-600 stroke-[2.5]" />
+          </div>
+        );
       case 'info':
-        return {
-          bg: 'bg-blue-50',
-          border: 'border-blue-200',
-          title: 'text-blue-900',
-          message: 'text-blue-700',
-          button: 'bg-blue-600 hover:bg-blue-700',
-          icon: 'text-blue-600'
-        };
       default:
-        return {
-          bg: 'bg-green-50',
-          border: 'border-green-200',
-          title: 'text-green-900',
-          message: 'text-green-700',
-          button: 'bg-green-600 hover:bg-green-700',
-          icon: 'text-green-600'
-        };
+        return (
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-teal-50 border border-teal-200/90 text-teal-700 flex items-center justify-center mx-auto mb-4 shadow-xs">
+            <Info className="w-7 h-7 sm:w-8 sm:h-8 text-teal-700 stroke-[2.5]" />
+          </div>
+        );
     }
   };
 
-  const colors = getColors();
+  const getPrimaryButtonClass = () => {
+    switch (type) {
+      case 'success':
+        return 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 border border-emerald-700';
+      case 'error':
+        return 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20 border border-rose-700';
+      case 'warning':
+        return 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20 border border-amber-700';
+      case 'info':
+      default:
+        return 'bg-teal-700 hover:bg-teal-800 text-white shadow-teal-700/20 border border-teal-800';
+    }
+  };
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4"
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200"
       onClick={handleBackdrop}
       onKeyDown={handleKeyDown}
       role="dialog"
@@ -135,57 +117,64 @@ export default function NotificationModal({
       tabIndex={-1}
     >
       <div
-        className={`${colors.bg} ${colors.border} border shadow-2xl max-w-md w-full p-6 max-h-screen overflow-y-auto`}
-        style={{ borderRadius: TOKENS.radius.card }}
+        className="relative bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-sm sm:max-w-md w-full p-6 sm:p-7 overflow-hidden text-center animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Logo */}
-        <div className="flex justify-center mb-4">
+        {/* Botão Fechar no Topo Direito */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition cursor-pointer"
+          aria-label="Fechar"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        {/* Logo Institucional */}
+        <div className="flex justify-center mb-4 pt-1">
           <Image
             src={BRAND.logoHorizontal}
             alt="Gestão Eklésia"
-            width={220}
-            height={64}
+            width={180}
+            height={48}
             priority
-            sizes="220px"
-            className="h-[64px] w-auto object-contain"
+            sizes="180px"
+            className="h-10 w-auto object-contain"
           />
         </div>
 
-        {/* Icon */}
-        <div className={`text-5xl text-center mb-4 ${colors.icon}`}>
-          {getIcon()}
-        </div>
+        {/* Ícone de Status Moderno */}
+        {renderIcon()}
 
-        {/* Conteúdo */}
+        {/* Textos */}
         <div className="text-center mb-6">
-          <h2 className={`text-xl font-bold ${colors.title} mb-2`}>
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-1.5 tracking-tight">
             {title}
           </h2>
-          <p className={`text-sm ${colors.message}`}>
+          <p className="text-xs sm:text-sm font-medium text-slate-600 leading-relaxed max-w-xs sm:max-w-sm mx-auto">
             {message}
           </p>
         </div>
 
-        {/* Botão (Opcional) */}
+        {/* Botões de Ação */}
         {showButton && (
-          <div className={secondaryLabel ? 'flex gap-3' : 'w-full flex justify-center'}>
+          <div className={`flex items-center gap-3 ${secondaryLabel ? 'w-full' : 'w-full justify-center'}`}>
             {secondaryLabel && (
-              <PremiumButton
-                variant="secondary"
+              <button
+                type="button"
                 onClick={onSecondary}
-                className="w-full"
+                className="flex-1 py-2.5 sm:py-3 px-4 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl font-bold text-xs sm:text-sm transition shadow-xs active:scale-[0.98] cursor-pointer"
               >
                 {secondaryLabel}
-              </PremiumButton>
+              </button>
             )}
-            <PremiumButton
-              variant={type === 'error' ? 'danger' : type === 'success' ? 'success' : 'primary'}
+            <button
+              type="button"
               onClick={onClose}
-              className="w-full"
+              className={`flex-1 py-2.5 sm:py-3 px-4 ${getPrimaryButtonClass()} rounded-xl font-bold text-xs sm:text-sm transition shadow-md active:scale-[0.98] cursor-pointer`}
             >
               {primaryLabel}
-            </PremiumButton>
+            </button>
           </div>
         )}
       </div>

@@ -1,11 +1,23 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
+import {
+  FileText,
+  Printer,
+  Download,
+  User,
+  Users,
+  Church,
+  MapPin,
+  ShieldCheck,
+  Loader2,
+  Award,
+} from 'lucide-react';
 
-interface DadosMembro {
+export interface DadosMembroFicha {
   matricula: string;
   id: string;
   uniqueId: string;
@@ -39,9 +51,13 @@ interface DadosMembro {
   nomeMae?: string;
   qualFuncao?: string;
   setorDepartamento?: string;
+  dataConsagracao?: string;
+  dataBatismo?: string;
+  dataValidadeCredencial?: string;
+  congregacao?: string;
 }
 
-interface DadosIgreja {
+export interface DadosIgrejaFicha {
   nomeIgreja: string;
   endereco: string;
   telefone: string;
@@ -49,67 +65,160 @@ interface DadosIgreja {
   logoUrl?: string;
 }
 
-interface FichaMembroProps {
-  membro: DadosMembro;
-  dadosIgreja: DadosIgreja;
+export interface FichaMembroProps {
+  membro: DadosMembroFicha;
+  dadosIgreja: DadosIgrejaFicha;
   fotoUrl?: string;
+  onClose?: () => void;
+}
+
+function formatDateDisplay(val?: string | null): string {
+  if (!val) return '—';
+  const s = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const [y, m, d] = s.slice(0, 10).split('-');
+    return `${d}/${m}/${y}`;
+  }
+  return s;
 }
 
 export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembroProps) {
   const fichaRef = useRef<HTMLDivElement>(null);
-  const sectionTitleStyle: React.CSSProperties = {
-    background: 'transparent',
-    color: '#003d7a',
-    padding: '6px 10px',
-    fontWeight: 'bold',
-    fontSize: '12px',
-    border: '1px solid #003d7a',
-  };
+  const [gerandoPDF, setGerandoPDF] = useState(false);
+
+  // Geração da URL oficial de validação pública da credencial
+  const uniqueIdentifier = membro.uniqueId || membro.id || '';
+  const baseUrl =
+    typeof window !== 'undefined' && window.location.origin
+      ? window.location.origin
+      : (process.env.NEXT_PUBLIC_APP_URL || 'https://www.gestaoeklesia.com.br');
+  const qrValidationUrl = `${baseUrl}/validar/credencial/${encodeURIComponent(uniqueIdentifier)}`;
+
+  const isAtivo = (membro.status || 'ativo').toLowerCase() === 'ativo';
 
   const imprimirFicha = () => {
-    if (fichaRef.current) {
-      const printWindow = window.open('', '', 'height=1000,width=900');
-      if (printWindow) {
-        // Captura o outerHTML do div da ficha (preserva estilos inline do container)
-        const html = fichaRef.current.outerHTML;
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta charset="UTF-8">
-              <title>Ficha do Membro - ${membro.nome}</title>
-              <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                html, body {
-                  width: 210mm;
-                  background: white;
-                  font-family: Arial, sans-serif;
-                }
-                @page {
-                  size: A4 portrait;
-                  margin: 15mm 20mm;
-                }
-                @media print {
-                  html, body { width: 100%; }
-                }
-                /* Garante que grids e flexbox imprimem corretamente */
-                table { border-collapse: collapse; }
-                img { max-width: 100%; }
-              </style>
-            </head>
-            <body>
-              ${html}
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
-        setTimeout(() => {
-          printWindow.focus();
-          printWindow.print();
-          printWindow.close();
-        }, 400);
-      }
+    if (!fichaRef.current) return;
+    const printWindow = window.open('', '', 'height=1000,width=920');
+    if (printWindow) {
+      const html = fichaRef.current.innerHTML;
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Ficha do Membro - ${membro.nome}</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+              html, body {
+                width: 210mm;
+                background: white;
+                font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                color: #0f172a;
+              }
+              @page {
+                size: A4 portrait;
+                margin: 8mm 10mm;
+              }
+              @media print {
+                html, body { width: 100%; }
+                .no-print { display: none !important; }
+              }
+              img { max-width: 100%; }
+            </style>
+          </head>
+          <body class="p-4">
+            ${html}
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      }, 500);
     }
+  };
+
+  const sanitizeUnsupportedColorsInClone = (clonedDoc: Document, clonedRoot: HTMLElement) => {
+    // Helper to convert oklch/lab/lch/color(...) using canvas context
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+
+    const convertColorStr = (str: string): string => {
+      if (!str || typeof str !== 'string') return str;
+      if (!str.includes('oklch') && !str.includes('color(') && !str.includes('lab(') && !str.includes('lch(')) {
+        return str;
+      }
+      return str.replace(/(?:oklch|color|lab|lch)\([^)]+\)/gi, (match) => {
+        if (ctx) {
+          try {
+            ctx.fillStyle = '#000000';
+            ctx.fillStyle = match;
+            return ctx.fillStyle;
+          } catch {
+            return '#0f2a4a';
+          }
+        }
+        return '#0f2a4a';
+      });
+    };
+
+    // 1. Sanitize all <style> tags in clonedDoc
+    try {
+      const styleTags = clonedDoc.querySelectorAll('style');
+      styleTags.forEach((styleTag) => {
+        if (styleTag.textContent && (styleTag.textContent.includes('oklch') || styleTag.textContent.includes('color('))) {
+          styleTag.textContent = convertColorStr(styleTag.textContent);
+        }
+      });
+    } catch (e) {
+      console.warn('Error sanitizing style tags for PDF:', e);
+    }
+
+    // 2. Sanitize inline styles and computed color properties on cloned elements
+    const colorProps = [
+      'color',
+      'background-color',
+      'border-color',
+      'border-top-color',
+      'border-right-color',
+      'border-bottom-color',
+      'border-left-color',
+      'outline-color',
+      'box-shadow',
+      'fill',
+      'stroke',
+      'text-decoration-color',
+      'accent-color',
+      'caret-color',
+    ];
+
+    const elements = [clonedRoot, ...Array.from(clonedRoot.querySelectorAll('*'))] as HTMLElement[];
+    elements.forEach((el) => {
+      if (!el || !el.style) return;
+
+      // Sanitize style attribute if present
+      const rawStyle = el.getAttribute('style');
+      if (rawStyle && (rawStyle.includes('oklch') || rawStyle.includes('color('))) {
+        el.setAttribute('style', convertColorStr(rawStyle));
+      }
+
+      // Check computed styles and override if they contain oklch
+      try {
+        const computed = window.getComputedStyle(el);
+        colorProps.forEach((prop) => {
+          const val = computed.getPropertyValue(prop);
+          if (val && (val.includes('oklch') || val.includes('color(') || val.includes('lab(') || val.includes('lch('))) {
+            const converted = convertColorStr(val);
+            el.style.setProperty(prop, converted, 'important');
+          }
+        });
+      } catch {}
+    });
   };
 
   const gerarPDF = async () => {
@@ -119,7 +228,8 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
     }
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setGerandoPDF(true);
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       const canvas = await html2canvas(fichaRef.current, {
         scale: 2,
@@ -128,374 +238,408 @@ export default function FichaMembro({ membro, dadosIgreja, fotoUrl }: FichaMembr
         backgroundColor: '#ffffff',
         logging: false,
         windowHeight: fichaRef.current.scrollHeight,
-        windowWidth: fichaRef.current.scrollWidth
+        windowWidth: fichaRef.current.scrollWidth,
+        onclone: (clonedDoc, clonedElement) => {
+          sanitizeUnsupportedColorsInClone(clonedDoc, clonedElement);
+        },
       });
 
-      const imgWidth = 210;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      // Dimensões A4 em milímetros
+      const pdfPageWidth = 210;
+      const pdfPageHeight = 297;
+      const margin = 8; // Margem de segurança de 8mm
+
+      const usableWidth = pdfPageWidth - (2 * margin);
+      const usableHeight = pdfPageHeight - (2 * margin);
+
+      const canvasRatio = canvas.width / canvas.height;
+
+      // Cálculo proporcional (contain) para caber exatamente em 1 página
+      let renderWidth = usableWidth;
+      let renderHeight = renderWidth / canvasRatio;
+
+      if (renderHeight > usableHeight) {
+        renderHeight = usableHeight;
+        renderWidth = renderHeight * canvasRatio;
+      }
+
+      // Centralizar na página
+      const posX = (pdfPageWidth - renderWidth) / 2;
+      const posY = Math.max(margin, (pdfPageHeight - renderHeight) / 2);
+
       const imgData = canvas.toDataURL('image/png');
 
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4',
-        compress: true
+        compress: true,
       });
 
-      let heightLeft = imgHeight;
-      let position = 0;
-      const pageHeight = 297;
+      // Adicionar exatamente em uma única página A4 sem quebras
+      pdf.addImage(imgData, 'PNG', posX, posY, renderWidth, renderHeight, undefined, 'FAST');
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      const nomeArquivo = `Ficha_${membro.nome.replace(/\s+/g, '_')}_${membro.matricula}.pdf`;
+      const nomeArquivo = `Ficha_${membro.nome.replace(/\s+/g, '_')}_${membro.matricula || 'membro'}.pdf`;
       pdf.save(nomeArquivo);
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
+      console.error('Erro ao gerar PDF da ficha:', error);
       alert('Erro ao gerar PDF: ' + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setGerandoPDF(false);
     }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <button
-          onClick={gerarPDF}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#dc2626',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '14px'
-          }}
-        >
-          📥 Baixar PDF
-        </button>
-        <button
-          onClick={imprimirFicha}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#2563eb',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '14px'
-          }}
-        >
-          🖨️ Imprimir Ficha
-        </button>
+    <div className="space-y-4">
+      {/* Barra de Ações Superior */}
+      <div className="flex items-center justify-between bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+          <FileText className="w-4 h-4 text-teal-600" />
+          <span>Ficha de Registro Cadastral</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={gerarPDF}
+            disabled={gerandoPDF}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 hover:border-slate-400 text-slate-700 text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer disabled:opacity-50"
+            title="Download do documento em formato PDF"
+          >
+            {gerandoPDF ? <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-600" /> : <Download className="w-3.5 h-3.5 text-teal-600" />}
+            <span>{gerandoPDF ? 'Gerando...' : 'Baixar PDF'}</span>
+          </button>
+
+          <button
+            onClick={imprimirFicha}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0f2a4a] hover:bg-[#123b63] text-white text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer"
+            title="Imprimir documento em formato A4"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Imprimir Ficha</span>
+          </button>
+        </div>
       </div>
 
+      {/* Documento Imprimível (A4 Standard) */}
       <div
         ref={fichaRef}
-        style={{
-          width: '210mm',
-          height: '297mm',
-          margin: '0 auto',
-          padding: '15mm',
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '12px',
-          lineHeight: '1.4',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: '#fff',
-          color: '#333',
-          boxSizing: 'border-box'
-        }}
+        className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-xs max-w-[210mm] mx-auto text-slate-800 font-sans space-y-5"
       >
-        {/* ===== CABEÇALHO PROFISSIONAL ===== */}
-        <div style={{ marginBottom: '15px' }}>
-          {/* Linha 1: Logo + Nome da Igreja Centralizado */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '15px',
-            paddingBottom: '10px',
-            borderBottom: '3px solid #003d7a',
-            marginBottom: '12px'
-          }}>
-            {dadosIgreja.logoUrl && (
+        {/* ─── 1. CABEÇALHO INSTITUCIONAL ─── */}
+        <div className="border-b-2 border-teal-600 pb-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            {dadosIgreja.logoUrl ? (
               <img
                 src={dadosIgreja.logoUrl}
-                alt="Logo"
-                style={{ width: '70px', height: '70px', objectFit: 'contain' }}
+                alt="Logo da Igreja"
+                className="w-16 h-16 object-contain rounded-xl border border-slate-100 p-1 bg-white shrink-0"
               />
+            ) : (
+              <div className="w-14 h-14 rounded-xl bg-teal-50 text-teal-700 border border-teal-200 flex items-center justify-center shrink-0 shadow-xs">
+                <Church className="w-7 h-7" />
+              </div>
             )}
-            <div style={{ textAlign: 'center' }}>
-              <h1 style={{
-                fontSize: '20px',
-                fontWeight: 'bold',
-                color: '#003d7a',
-                margin: '0 0 4px 0',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}>
-                {dadosIgreja.nomeIgreja}
+            <div>
+              <h1 className="text-base sm:text-lg font-extrabold uppercase tracking-tight text-[#0f2a4a] leading-tight">
+                {dadosIgreja.nomeIgreja || 'Ministério / Igreja'}
               </h1>
-              <p style={{ margin: '2px 0', fontSize: '11px', color: '#666' }}>
-                {dadosIgreja.endereco}
-              </p>
-              <p style={{ margin: '2px 0', fontSize: '11px', color: '#666' }}>
-                Tel: {dadosIgreja.telefone} | Email: {dadosIgreja.email}
-              </p>
+              {dadosIgreja.endereco && <p className="text-xs text-slate-500 font-medium">{dadosIgreja.endereco}</p>}
+              {(dadosIgreja.telefone || dadosIgreja.email) && (
+                <p className="text-[11px] text-slate-400 font-medium">
+                  {dadosIgreja.telefone && `Tel: ${dadosIgreja.telefone}`}
+                  {dadosIgreja.telefone && dadosIgreja.email && ' • '}
+                  {dadosIgreja.email && `Email: ${dadosIgreja.email}`}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Linha 2: Matrícula/Nome + Foto/QR */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr auto',
-            gap: '15px',
-            alignItems: 'center'
-          }}>
-            {/* Matrícula e Nome em Caixa Horizontal */}
-            <div style={{
-              background: '#ffffff',
-              border: '1px solid #003d7a',
-              borderRadius: '8px',
-              padding: '12px 16px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                <div>
-                  <p style={{ margin: '0', fontSize: '10px', color: '#003d7a', fontWeight: '700' }}>
-                    MATRÍCULA
-                  </p>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '18px', color: '#1f2937', fontWeight: 'bold' }}>
-                    {membro.matricula}
-                  </p>
+          <div className="text-right shrink-0">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 bg-teal-50 text-teal-800 border border-teal-200 rounded-lg">
+              <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
+              Registro Oficial
+            </span>
+          </div>
+        </div>
+
+        {/* ─── 2. HERO CARD: IDENTIFICAÇÃO + FOTO + CARTEIRINHA DIGITAL ─── */}
+        <div className="bg-gradient-to-br from-slate-50 to-slate-100/60 border border-slate-200/90 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center sm:items-stretch justify-between gap-4 sm:gap-5">
+          {/* Foto e Informações Principais */}
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 flex-1 min-w-0">
+            {/* Foto 3x4 */}
+            <div className="w-[100px] h-[125px] sm:w-[108px] sm:h-[135px] rounded-xl overflow-hidden bg-slate-200 border-2 border-white shadow-md shrink-0 flex items-center justify-center">
+              {fotoUrl ? (
+                <img src={fotoUrl} alt={membro.nome} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-100">
+                  <User className="w-10 h-10 text-slate-300 mb-1" />
+                  <span className="text-[10px] font-semibold">Sem foto</span>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ margin: '0', fontSize: '10px', color: '#003d7a', fontWeight: '700' }}>
-                    NOME DO MINISTRO
-                  </p>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '16px', color: '#1f2937', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-                    {membro.nome}
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Foto e QR Code Lado a Lado */}
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              {/* Foto */}
-              <div style={{
-                width: '100px',
-                height: '120px',
-                border: '3px solid #003d7a',
-                background: '#f5f5f5',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                borderRadius: '4px'
-              }}>
-                {fotoUrl ? (
-                  <img src={fotoUrl} alt={membro.nome} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <span style={{ fontSize: '32px', color: '#999' }}>📷</span>
+            {/* Identificação Textual */}
+            <div className="space-y-2 text-center sm:text-left flex-1 min-w-0">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">Membro Cadastrado</p>
+                <h2 className="text-base sm:text-xl font-extrabold text-[#0f2a4a] leading-tight truncate">
+                  {membro.nome}
+                </h2>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 text-xs font-semibold">
+                <span className="px-2.5 py-0.5 bg-white border border-slate-200 rounded-md text-slate-700 shadow-2xs">
+                  Matrícula: <strong className="text-slate-900">{membro.matricula || '—'}</strong>
+                </span>
+                <span className="px-2.5 py-0.5 bg-teal-50 border border-teal-200 text-teal-800 rounded-md capitalize shadow-2xs">
+                  {membro.tipoCadastro || 'Membro'}
+                </span>
+                {membro.cargo && (
+                  <span className="px-2.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-md shadow-2xs">
+                    {membro.cargo}
+                  </span>
                 )}
               </div>
 
-              {/* QR Code */}
-              <div style={{
-                border: '2px solid #003d7a',
-                padding: '4px',
-                background: '#fff',
-                borderRadius: '4px'
-              }}>
-                <QRCode
-                  value={membro.uniqueId}
-                  size={80}
-                  level="L"
-                  includeMargin={false}
-                  fgColor="#003d7a"
-                  bgColor="#ffffff"
-                />
+              {/* Status Evidente */}
+              <div className="pt-1 flex items-center justify-center sm:justify-start gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${
+                    isAtivo
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                      : 'bg-rose-50 text-rose-700 border-rose-300'
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${isAtivo ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                  {isAtivo ? 'ATIVO' : 'INATIVO'}
+                </span>
+
+                {membro.congregacao && (
+                  <span className="text-xs text-slate-500 font-medium">
+                    Congregação: <strong className="text-slate-700">{membro.congregacao}</strong>
+                  </span>
+                )}
               </div>
+            </div>
+          </div>
+
+          {/* Card da Carteirinha Digital / QR Code de Validação Pública */}
+          <div className="w-full sm:w-[155px] bg-white border border-teal-200/80 rounded-xl p-3 text-center shadow-xs flex flex-col items-center justify-between gap-1.5 shrink-0">
+            <div className="flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider text-teal-800">
+              <Award className="w-3 h-3 text-teal-600" />
+              <span>Carteirinha Digital</span>
+            </div>
+
+            <div className="p-1.5 bg-white border border-slate-200 rounded-lg shadow-2xs">
+              <QRCode
+                value={qrValidationUrl}
+                size={74}
+                level="M"
+                includeMargin={false}
+                fgColor="#0f2a4a"
+                bgColor="#ffffff"
+              />
+            </div>
+
+            <div className="space-y-0.5">
+              <p className="text-[9px] font-semibold text-slate-500 leading-tight">Escaneie para validar</p>
+              <div className="flex items-center justify-center gap-1 text-[8.5px] font-bold text-emerald-700">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span>{isAtivo ? 'Documento válido' : 'Documento inativo'}</span>
+              </div>
+              {membro.dataValidadeCredencial && (
+                <p className="text-[8px] text-slate-400 font-medium">
+                  Válida até {formatDateDisplay(membro.dataValidadeCredencial)}
+                </p>
+              )}
             </div>
           </div>
         </div>
 
-        {/* ===== TABELA DE DADOS ===== */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '10px', fontSize: '11px' }}>
-          <tbody>
-            {/* DADOS PESSOAIS */}
-            <tr>
-              <td colSpan={4} style={sectionTitleStyle}>
-                DADOS PESSOAIS
-              </td>
-            </tr>
-            <tr>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', width: '15%', fontWeight: 'bold', background: '#f9f9f9' }}>CPF:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', width: '35%' }}>{membro.cpf}</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', width: '15%', fontWeight: 'bold', background: '#f9f9f9' }}>RG:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', width: '35%' }}>{membro.rg || '—'}</td>
-            </tr>
-            <tr>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Nascimento:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.dataNascimento || '—'}</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Sexo:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.sexo || '—'}</td>
-            </tr>
-            <tr>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Estado Civil:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.estadoCivil || '—'}</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Tipo Sanguíneo:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.tipoSanguineo || '—'}</td>
-            </tr>
-            <tr>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Nacionalidade:</td>
-              <td colSpan={3} style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.nacionalidade || '—'}</td>
-            </tr>
+        {/* ─── 3. SEÇÕES DE DADOS ESTRUTURADAS ─── */}
+        <div className="space-y-4 text-xs">
+          {/* SEÇÃO: DADOS PESSOAIS */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+            <div className="bg-slate-50 px-3.5 py-2 border-b border-slate-200 flex items-center gap-2 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+              <User className="w-3.5 h-3.5 text-teal-600" />
+              <span>Dados Pessoais</span>
+            </div>
+            <div className="p-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white">
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">CPF</span>
+                <span className="font-semibold text-slate-800">{membro.cpf || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">RG</span>
+                <span className="font-semibold text-slate-800">{membro.rg || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Nascimento</span>
+                <span className="font-semibold text-slate-800">{formatDateDisplay(membro.dataNascimento)}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Sexo</span>
+                <span className="font-semibold text-slate-800 capitalize">{membro.sexo || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Estado Civil</span>
+                <span className="font-semibold text-slate-800 capitalize">{membro.estadoCivil || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Tipo Sanguíneo</span>
+                <span className="font-semibold text-slate-800">{membro.tipoSanguineo || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Escolaridade</span>
+                <span className="font-semibold text-slate-800">{membro.escolaridade || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Nacionalidade / Naturalidade</span>
+                <span className="font-semibold text-slate-800">
+                  {membro.nacionalidade || 'Brasileira'}
+                  {membro.naturalidade && ` (${membro.naturalidade})`}
+                </span>
+              </div>
+            </div>
+          </div>
 
-            {/* DADOS FAMILIARES */}
-            {(membro.nomePai || membro.nomeMae || membro.nomeConjuge) && (
-              <>
-                <tr>
-                  <td colSpan={4} style={{ border: 'none', height: '8px', padding: 0 }}></td>
-                </tr>
-                <tr>
-                  <td colSpan={4} style={sectionTitleStyle}>
-                    DADOS FAMILIARES
-                  </td>
-                </tr>
+          {/* SEÇÃO: DADOS FAMILIARES */}
+          {(membro.nomePai || membro.nomeMae || membro.nomeConjuge) && (
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+              <div className="bg-slate-50 px-3.5 py-2 border-b border-slate-200 flex items-center gap-2 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+                <Users className="w-3.5 h-3.5 text-teal-600" />
+                <span>Dados Familiares</span>
+              </div>
+              <div className="p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white">
                 {membro.nomePai && (
-                  <tr>
-                    <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Pai:</td>
-                    <td colSpan={3} style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.nomePai}</td>
-                  </tr>
+                  <div>
+                    <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Nome do Pai</span>
+                    <span className="font-semibold text-slate-800">{membro.nomePai}</span>
+                  </div>
                 )}
                 {membro.nomeMae && (
-                  <tr>
-                    <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Mãe:</td>
-                    <td colSpan={3} style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.nomeMae}</td>
-                  </tr>
+                  <div>
+                    <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Nome da Mãe</span>
+                    <span className="font-semibold text-slate-800">{membro.nomeMae}</span>
+                  </div>
                 )}
                 {membro.nomeConjuge && (
-                  <tr>
-                    <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Cônjuge:</td>
-                    <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.nomeConjuge}</td>
-                    <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Nasc. Cônjuge:</td>
-                    <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.dataNascimentoConjuge || '—'}</td>
-                  </tr>
+                  <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-slate-100">
+                    <div className="sm:col-span-2">
+                      <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Nome do Cônjuge</span>
+                      <span className="font-semibold text-slate-800">{membro.nomeConjuge}</span>
+                    </div>
+                    {membro.dataNascimentoConjuge && (
+                      <div>
+                        <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Nascimento do Cônjuge</span>
+                        <span className="font-semibold text-slate-800">{formatDateDisplay(membro.dataNascimentoConjuge)}</span>
+                      </div>
+                    )}
+                  </div>
                 )}
-              </>
-            )}
+              </div>
+            </div>
+          )}
 
-            {/* DADOS MINISTERIAIS */}
-            {(membro.tipoCadastro === 'ministro' || membro.cargo) && (
-              <>
-                <tr>
-                  <td colSpan={4} style={{ border: 'none', height: '8px', padding: 0 }}></td>
-                </tr>
-                <tr>
-                  <td colSpan={4} style={sectionTitleStyle}>
-                    DADOS MINISTERIAIS
-                  </td>
-                </tr>
-                <tr>
-                  <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Tipo:</td>
-                  <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.tipoCadastro || '—'}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Cargo:</td>
-                  <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.cargo || '—'}</td>
-                </tr>
-                <tr>
-                  <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Status:</td>
-                  <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.status === 'ativo' ? 'ATIVO' : 'INATIVO'}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Função:</td>
-                  <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.qualFuncao || '—'}</td>
-                </tr>
-                {membro.setorDepartamento && (
-                  <tr>
-                    <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Setor:</td>
-                    <td colSpan={3} style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.setorDepartamento}</td>
-                  </tr>
-                )}
-              </>
-            )}
+          {/* SEÇÃO: DADOS ECLESIÁSTICOS / MINISTERIAIS */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+            <div className="bg-slate-50 px-3.5 py-2 border-b border-slate-200 flex items-center gap-2 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+              <Church className="w-3.5 h-3.5 text-teal-600" />
+              <span>Dados Eclesiásticos & Ministeriais</span>
+            </div>
+            <div className="p-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white">
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Tipo de Cadastro</span>
+                <span className="font-semibold text-slate-800 capitalize">{membro.tipoCadastro || 'Membro'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Cargo / Ministério</span>
+                <span className="font-semibold text-slate-800">{membro.cargo || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Função</span>
+                <span className="font-semibold text-slate-800">{membro.qualFuncao || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Setor / Departamento</span>
+                <span className="font-semibold text-slate-800">{membro.setorDepartamento || '—'}</span>
+              </div>
 
-            {/* ENDEREÇO */}
-            <tr>
-              <td colSpan={4} style={{ border: 'none', height: '8px', padding: 0 }}></td>
-            </tr>
-            <tr>
-              <td colSpan={4} style={sectionTitleStyle}>
-                ENDEREÇO
-              </td>
-            </tr>
-            <tr>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Logradouro:</td>
-              <td colSpan={3} style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.logradouro || '—'}</td>
-            </tr>
-            <tr>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Número:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.numero || '—'}</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Bairro:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.bairro || '—'}</td>
-            </tr>
-            <tr>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Complemento:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.complemento || '—'}</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>CEP:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.cep || '—'}</td>
-            </tr>
-            <tr>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Cidade:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.cidade || '—'}</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>UF:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.uf || '—'}</td>
-            </tr>
+              {membro.dataConsagracao && (
+                <div>
+                  <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Data de Consagração</span>
+                  <span className="font-semibold text-slate-800">{formatDateDisplay(membro.dataConsagracao)}</span>
+                </div>
+              )}
+              {membro.dataBatismo && (
+                <div>
+                  <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Data de Batismo</span>
+                  <span className="font-semibold text-slate-800">{formatDateDisplay(membro.dataBatismo)}</span>
+                </div>
+              )}
+              {membro.dataValidadeCredencial && (
+                <div>
+                  <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Validade da Credencial</span>
+                  <span className="font-semibold text-slate-800">{formatDateDisplay(membro.dataValidadeCredencial)}</span>
+                </div>
+              )}
+            </div>
+          </div>
 
-            {/* CONTATO */}
-            <tr>
-              <td colSpan={4} style={{ border: 'none', height: '8px', padding: 0 }}></td>
-            </tr>
-            <tr>
-              <td colSpan={4} style={sectionTitleStyle}>
-                CONTATO
-              </td>
-            </tr>
-            <tr>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Celular:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.celular || '—'}</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>WhatsApp:</td>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.whatsapp || '—'}</td>
-            </tr>
-            <tr>
-              <td style={{ border: '1px solid #ddd', padding: '5px 8px', fontWeight: 'bold', background: '#f9f9f9' }}>Email:</td>
-              <td colSpan={3} style={{ border: '1px solid #ddd', padding: '5px 8px' }}>{membro.email || '—'}</td>
-            </tr>
-          </tbody>
-        </table>
+          {/* SEÇÃO: ENDEREÇO E CONTATO */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+            <div className="bg-slate-50 px-3.5 py-2 border-b border-slate-200 flex items-center gap-2 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+              <MapPin className="w-3.5 h-3.5 text-teal-600" />
+              <span>Endereço & Contato</span>
+            </div>
+            <div className="p-3.5 grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white">
+              <div className="sm:col-span-2">
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Logradouro</span>
+                <span className="font-semibold text-slate-800">
+                  {membro.logradouro || '—'}
+                  {membro.numero && `, nº ${membro.numero}`}
+                  {membro.complemento && ` - ${membro.complemento}`}
+                </span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Bairro</span>
+                <span className="font-semibold text-slate-800">{membro.bairro || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Cidade / UF</span>
+                <span className="font-semibold text-slate-800">
+                  {membro.cidade || '—'}
+                  {membro.uf && ` / ${membro.uf}`}
+                </span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">CEP</span>
+                <span className="font-semibold text-slate-800">{membro.cep || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Celular / WhatsApp</span>
+                <span className="font-semibold text-slate-800">
+                  {membro.celular || membro.whatsapp || '—'}
+                </span>
+              </div>
+              {membro.email && (
+                <div className="sm:col-span-3 pt-1 border-t border-slate-100">
+                  <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">E-mail</span>
+                  <span className="font-semibold text-slate-800">{membro.email}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
-        {/* ===== ESPAÇO FLEXÍVEL ===== */}
-        <div style={{ flex: 1 }}></div>
-
-        {/* ===== RODAPÉ ===== */}
-        <div style={{
-          borderTop: '2px solid #003d7a',
-          paddingTop: '10px',
-          fontSize: '11px',
-          color: '#333',
-          textAlign: 'right'
-        }}>
-          <p style={{ margin: '0', color: '#666' }}>
-            Impresso em: {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+        {/* ─── 4. RODAPÉ INSTITUCIONAL ─── */}
+        <div className="border-t border-slate-200 pt-3 flex items-center justify-between text-[10px] text-slate-400 font-medium">
+          <p>
+            Documento gerado eletronicamente pelo <strong>Gestão Eklésia</strong>
+          </p>
+          <p>
+            Emitido em {new Date().toLocaleDateString('pt-BR')} às{' '}
+            {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
           </p>
         </div>
       </div>

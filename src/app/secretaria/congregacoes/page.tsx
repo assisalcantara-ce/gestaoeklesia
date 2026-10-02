@@ -7,6 +7,7 @@ import CongregacoesToolbar from '@/components/secretaria/congregacoes/Congregaco
 import CongregacoesTable from '@/components/secretaria/congregacoes/CongregacoesTable';
 import CongregacaoFormModal from '@/components/secretaria/congregacoes/CongregacaoFormModal';
 import { useCongregacoes } from '@/hooks/secretaria/useCongregacoes';
+import { Church, Building2, Network } from 'lucide-react';
 
 export default function CongregacoesPage() {
   const {
@@ -110,10 +111,15 @@ export default function CongregacoesPage() {
           {/* TAB: 1ª Divisão (Congregações / Igreja) */}
           {d1Enabled && activeTab === 'divisao1' && (
             <Section icon="1️⃣" title={`${nomeD1}s`}>
-              <div className="grid grid-cols-1 gap-4 mb-6">
-                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-                  <p className="text-gray-600 text-sm">Total de {nomeD1}s</p>
-                  <p className="text-2xl font-bold text-blue-600">{divisoes1.length}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <div className="bg-gradient-to-br from-white to-slate-50/80 p-5 rounded-2xl border border-slate-200/90 shadow-xs flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total de {nomeD1}s</p>
+                    <p className="text-3xl font-black text-slate-900 tracking-tight">{divisoes1.length}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-700 border border-teal-200/80 flex items-center justify-center shadow-xs">
+                    <Church className="w-6 h-6 text-teal-700" />
+                  </div>
                 </div>
               </div>
 
@@ -411,10 +417,15 @@ export default function CongregacoesPage() {
           {/* TAB: 2ª Divisão (Campo) */}
           {d2Enabled && activeTab === 'divisao2' && (
             <Section icon="2️⃣" title={`${nomeD2}s`}>
-              <div className="grid grid-cols-1 gap-4 mb-6">
-                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-                  <p className="text-gray-600 text-sm">Total de {nomeD2}s</p>
-                  <p className="text-2xl font-bold text-blue-600">{divisoes2.length}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <div className="bg-gradient-to-br from-white to-slate-50/80 p-5 rounded-2xl border border-slate-200/90 shadow-xs flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total de {nomeD2}s</p>
+                    <p className="text-3xl font-black text-slate-900 tracking-tight">{divisoes2.length}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-700 border border-teal-200/80 flex items-center justify-center shadow-xs">
+                    <Building2 className="w-6 h-6 text-teal-700" />
+                  </div>
                 </div>
               </div>
 
@@ -712,10 +723,15 @@ export default function CongregacoesPage() {
           {/* TAB: 3ª Divisão (Supervisão) */}
           {d3Enabled && activeTab === 'divisao3' && (
             <Section icon="3️⃣" title={`${nomeD3}s`}>
-              <div className="grid grid-cols-1 gap-4 mb-6">
-                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-                  <p className="text-gray-600 text-sm">Total de {nomeD3}s</p>
-                  <p className="text-2xl font-bold text-blue-600">{divisoes1.length}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <div className="bg-gradient-to-br from-white to-slate-50/80 p-5 rounded-2xl border border-slate-200/90 shadow-xs flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total de {nomeD3}s</p>
+                    <p className="text-3xl font-black text-slate-900 tracking-tight">{divisoes1.length}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-700 border border-teal-200/80 flex items-center justify-center shadow-xs">
+                    <Network className="w-6 h-6 text-teal-700" />
+                  </div>
                 </div>
               </div>
 
