@@ -121,11 +121,9 @@ export default function MembroCarteirinhaModal({
         </div>
       )}
 
-      {/* Modal de Impressão - Cartão do Membro */}
+      {/* Modal de Impressão - Cartão / Credencial do Membro */}
       {membroImprimindoCartao && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <CartãoMembro membro={membroImprimindoCartao} onClose={() => setMembroImprimindoCartao(null)} />
-        </div>
+        <CartãoMembro membro={membroImprimindoCartao} onClose={() => setMembroImprimindoCartao(null)} />
       )}
 
       {/* Modal de Impressão em Lote - Cartões */}

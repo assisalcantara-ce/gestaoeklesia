@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { CreditCard, Download, Loader2, X } from 'lucide-react';
 import { BRAND } from '@/config/brand';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 import html2canvas from 'html2canvas-pro';
@@ -96,7 +97,6 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
   const [orgNomenclaturas, setOrgNomenclaturas] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [gerandoPDF, setGerandoPDF] = useState(false);
-  const [mostraVerso, setMostraVerso] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   // Função auxiliar para obter dimensões CSS baseado na orientação
@@ -181,9 +181,10 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
 
   if (loading || !template) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-100 p-4">
-        <div className="bg-white p-6 rounded-lg shadow-lg">
-          <p className="text-gray-600">Carregando template do cartão...</p>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+        <div className="bg-white p-6 rounded-2xl shadow-xl flex items-center gap-3 text-slate-700">
+          <Loader2 className="w-5 h-5 animate-spin text-teal-600" />
+          <p className="text-sm font-semibold">Carregando credencial...</p>
         </div>
       </div>
     );
@@ -537,144 +538,170 @@ export default function CartãoMembro({ membro, onClose }: CartãoMembroProps) {
     }
   };
 
+  const tipoLabel = membro.tipoCadastro === 'ministro'
+    ? 'Credencial de Ministro'
+    : membro.tipoCadastro === 'funcionario'
+    ? 'Crachá de Funcionário'
+    : membro.tipoCadastro === 'crianca'
+    ? 'Cartão Infantil'
+    : 'Credencial de Membro';
+
   return (
-    <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100 p-4 gap-8">
-      {/* Seletor de Frente/Verso */}
-      <div className="flex gap-4 mt-4">
-        <button
-          onClick={() => setMostraVerso(false)}
-          className={`px-6 py-2 rounded-lg font-semibold transition ${!mostraVerso
-            ? 'bg-blue-600 text-white'
-            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-        >
-          📄 Frente
-        </button>
-        {/* Botão Verso sempre visível */}
-        <button
-          onClick={() => setMostraVerso(true)}
-          className={`px-6 py-2 rounded-lg font-semibold transition ${mostraVerso
-            ? 'bg-blue-600 text-white'
-            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-        >
-          📄 Verso
-        </button>
-      </div>
-
-      {/* Frente do cartão */}
-      {!mostraVerso && (
-        <div>
-          <h3 className="text-center text-sm font-semibold text-gray-700 mb-2">Frente</h3>
-          <div
-            id={`cartao-${membro.id}`}
-            className="bg-white shadow-2xl"
-            style={{
-              ...getDimensoesCSSCartao(template?.orientacao),
-              padding: '0',
-              fontFamily: 'Arial, sans-serif',
-              position: 'relative',
-              pageBreakAfter: 'always',
-              backgroundImage: template.backgroundUrl ? `url(${template.backgroundUrl})` : 'none',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              borderRadius: '16px',
-              boxShadow: '0 8px 16px rgba(100, 116, 139, 0.15)',
-              border: '1px solid rgba(0, 0, 0, 0.08)',
-            }}
-          >
-            {/* Renderizar elementos da frente */}
-            {template.elementos.map((elemento) => renderizarElemento(elemento, false))}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-2 sm:p-4 md:p-6 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
+        
+        {/* ── HEADER ────────────────────────────────────────────────────────── */}
+        <div className="px-6 py-4 bg-teal-700 border-b border-teal-800 flex items-center justify-between shrink-0 text-white shadow-xs">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0 shadow-2xs">
+              <CreditCard className="w-5 h-5 text-white" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold text-white tracking-tight truncate">
+                {tipoLabel}
+              </h2>
+              <p className="text-xs text-teal-100 font-medium truncate">
+                Modelo Ativo: {template.nome || 'Credencial Padrão — Modelo 01'}
+              </p>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Verso do cartão (se houver) */}
-      {mostraVerso && temVerso && (
-        <div>
-          <h3 className="text-center text-sm font-semibold text-gray-700 mb-2">Verso</h3>
-          <div
-            id={`cartao-verso-${membro.id}`}
-            className="bg-white shadow-2xl"
-            style={{
-              ...getDimensoesCSSCartao(template?.orientacao),
-              padding: '0',
-              fontFamily: 'Arial, sans-serif',
-              position: 'relative',
-              pageBreakAfter: 'always',
-              backgroundImage: template.backgroundUrlVerso ? `url(${template.backgroundUrlVerso})` : 'none',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              borderRadius: '16px',
-              boxShadow: '0 8px 16px rgba(100, 116, 139, 0.15)',
-              border: '1px solid rgba(0, 0, 0, 0.08)',
-            }}
-          >
-            {/* Renderizar elementos do verso */}
-            {template.elementosVerso?.map((elemento) => renderizarElemento(elemento, false))}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition cursor-pointer"
+              aria-label="Fechar modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+
+        {/* ── ÁREA DE VISUALIZAÇÃO (Lado a Lado / Empilhado) ──────────────── */}
+        <div className="flex-1 overflow-y-auto modal-scrollbar p-6 sm:p-8 bg-slate-50/60 flex flex-col items-center justify-center">
+          <div className="flex flex-col lg:flex-row items-center justify-center gap-6 sm:gap-8 w-full">
+            
+            {/* Frente do cartão */}
+            <div className="flex flex-col items-center">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
+                Frente da Credencial
+              </span>
+              <div
+                id={`cartao-${membro.id}`}
+                className="bg-white relative shadow-md transition-shadow hover:shadow-lg"
+                style={{
+                  ...getDimensoesCSSCartao(template?.orientacao),
+                  padding: '0',
+                  fontFamily: 'Arial, sans-serif',
+                  backgroundImage: template.backgroundUrl ? `url(${template.backgroundUrl})` : 'none',
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  borderRadius: '14px',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  overflow: 'hidden'
+                }}
+              >
+                {template.elementos.map((elemento) => renderizarElemento(elemento, false))}
+              </div>
+            </div>
+
+            {/* Verso do cartão */}
+            {temVerso && (
+              <div className="flex flex-col items-center">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
+                  Verso da Credencial
+                </span>
+                <div
+                  id={`cartao-verso-${membro.id}`}
+                  className="bg-white relative shadow-md transition-shadow hover:shadow-lg"
+                  style={{
+                    ...getDimensoesCSSCartao(template?.orientacao),
+                    padding: '0',
+                    fontFamily: 'Arial, sans-serif',
+                    backgroundImage: template.backgroundUrlVerso ? `url(${template.backgroundUrlVerso})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    borderRadius: '14px',
+                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {template.elementosVerso?.map((elemento) => renderizarElemento(elemento, false))}
+                </div>
+              </div>
+            )}
+
           </div>
+
+          <p className="text-xs text-slate-400 mt-6 text-center">
+            Gestão Eklésia • Documento oficial de identificação institucional
+          </p>
         </div>
-      )}
 
-      {/* Informações adicionais */}
-      <div className="text-xs text-gray-500 max-w-xs text-center mt-4">
-        <p>Gestão Eklésia - Sistema de Gerenciamento Eclesiástico</p>
-        <p>Este cartão é documento de identificação junto à instituição</p>
-      </div>
-
-      {/* Botões de ação */}
-      <div style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 1000, display: 'flex', gap: '10px' }}>
-        <button
-          onClick={gerarPDF}
-          disabled={gerandoPDF}
-          className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {gerandoPDF ? '⏳ Gerando...' : '📥 Baixar PDF'}
-        </button>
-
-
-
-        {onClose && (
+        {/* ── FOOTER ────────────────────────────────────────────────────────── */}
+        <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-end gap-3 shrink-0">
           <button
+            type="button"
             onClick={onClose}
-            className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded shadow cursor-pointer"
+            className="px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-slate-300 transition cursor-pointer"
           >
-            ✖️ Fechar
+            Fechar
           </button>
-        )}
-      </div>
 
-      {/* ÁREA DE IMPRESSÃO OCULTA PARA PDF (Fora da tela visual) */}
-      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }} ref={printRef}>
-        {/* FRENTE PARA PDF */}
-        <div id="print-frente" style={{
-          ...getDimensoesCSSCartao(template?.orientacao),
-          position: 'relative',
-          fontFamily: 'Arial, sans-serif',
-          backgroundImage: template.backgroundUrl ? `url(${template.backgroundUrl})` : 'none',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundColor: 'white',
-          overflow: 'hidden' // Garante que nada saia do card
-        }}>
-          {template.elementos.map((elemento) => renderizarElemento(elemento, true))}
+          <button
+            type="button"
+            onClick={gerarPDF}
+            disabled={gerandoPDF}
+            className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs flex items-center gap-2 transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {gerandoPDF ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Gerando PDF...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                <span>Baixar PDF</span>
+              </>
+            )}
+          </button>
         </div>
 
-        {/* VERSO PARA PDF */}
-        {temVerso && (
-          <div id="print-verso" style={{
+        {/* ÁREA DE IMPRESSÃO OCULTA PARA PDF (Inalterada) */}
+        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }} ref={printRef}>
+          {/* FRENTE PARA PDF */}
+          <div id="print-frente" style={{
             ...getDimensoesCSSCartao(template?.orientacao),
             position: 'relative',
             fontFamily: 'Arial, sans-serif',
-            backgroundImage: template.backgroundUrlVerso ? `url(${template.backgroundUrlVerso})` : 'none',
+            backgroundImage: template.backgroundUrl ? `url(${template.backgroundUrl})` : 'none',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundColor: 'white',
             overflow: 'hidden'
           }}>
-            {template.elementosVerso?.map((elemento) => renderizarElemento(elemento, true))}
+            {template.elementos.map((elemento) => renderizarElemento(elemento, true))}
           </div>
-        )}
+
+          {/* VERSO PARA PDF */}
+          {temVerso && (
+            <div id="print-verso" style={{
+              ...getDimensoesCSSCartao(template?.orientacao),
+              position: 'relative',
+              fontFamily: 'Arial, sans-serif',
+              backgroundImage: template.backgroundUrlVerso ? `url(${template.backgroundUrlVerso})` : 'none',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundColor: 'white',
+              overflow: 'hidden'
+            }}>
+              {template.elementosVerso?.map((elemento) => renderizarElemento(elemento, true))}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

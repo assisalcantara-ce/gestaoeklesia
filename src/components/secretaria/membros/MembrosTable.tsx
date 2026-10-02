@@ -132,7 +132,9 @@ export default function MembrosTable({
             Nenhum membro encontrado com os filtros atuais.
           </div>
         )}
-        {membrosPaginados.map((membro, index) => (
+        {membrosPaginados.map((membro, index) => {
+          const possuiFoto = temFotoValida(membro);
+          return (
           <div
             key={membro.id}
             className={`border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3 ${
@@ -208,6 +210,36 @@ export default function MembrosTable({
                 </button>
               )}
 
+              {/* Botão de Carteirinha / Credencial */}
+              {!isAuxiliar && (
+                <button
+                  onClick={async () => {
+                    if (!possuiFoto) return;
+                    const templatesBase = await ensureTemplatesSnapshot();
+                    if (!hasActiveTemplate(membro.tipoCadastro, templatesBase)) {
+                      setNotification({
+                        isOpen: true,
+                        title: 'Template Ausente',
+                        message: getMensagemSemTemplate(membro.tipoCadastro),
+                        type: 'warning',
+                      });
+                      return;
+                    }
+                    setMembroImprimindoCartao(membro);
+                  }}
+                  className={`p-2 rounded-xl transition border cursor-pointer ${
+                    possuiFoto
+                      ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-50 border-purple-200'
+                      : 'text-slate-300 border-slate-200 opacity-40 cursor-not-allowed'
+                  }`}
+                  title={possuiFoto ? 'Visualizar / Imprimir Credencial' : 'Credencial (requer foto)'}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                  </svg>
+                </button>
+              )}
+
               {!isSupervisor && !isAuxiliar && (
                 <button
                   onClick={() => abrirConfirmacaoDeletar(membro)}
@@ -221,7 +253,8 @@ export default function MembrosTable({
               )}
             </div>
           </div>
-        ))}
+        );
+        })}
       </div>
 
       {/* TABELA DESKTOP — visível apenas em telas md+ */}
@@ -405,15 +438,33 @@ export default function MembrosTable({
                         </button>
                       )}
 
-                      {/* Excluir (Vermelho) */}
-                      {!isSupervisor && !isAuxiliar && (
+                      {/* Imprimir Cartão / Credencial (Roxo / Teal) */}
+                      {!isAuxiliar && (
                         <button
-                          onClick={() => abrirConfirmacaoDeletar(membro)}
-                          className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-100/60 rounded-lg transition cursor-pointer"
-                          title="Excluir Membro"
+                          disabled={!possuiFoto}
+                          onClick={async () => {
+                            if (!possuiFoto) return;
+                            const templatesBase = await ensureTemplatesSnapshot();
+                            if (!hasActiveTemplate(membro.tipoCadastro, templatesBase)) {
+                              setNotification({
+                                isOpen: true,
+                                title: 'Template Ausente',
+                                message: getMensagemSemTemplate(membro.tipoCadastro),
+                                type: 'warning',
+                              });
+                              return;
+                            }
+                            setMembroImprimindoCartao(membro);
+                          }}
+                          className={`p-1.5 rounded-lg transition ${
+                            possuiFoto
+                              ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-100/60 cursor-pointer'
+                              : 'text-slate-300 opacity-40 cursor-not-allowed'
+                          }`}
+                          title={possuiFoto ? 'Visualizar / Imprimir Credencial' : 'Credencial (requer foto)'}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                           </svg>
                         </button>
                       )}
@@ -437,38 +488,6 @@ export default function MembrosTable({
                               onClick={() => setActiveMenuId(null)}
                             />
                             <div className="absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-30 animate-in fade-in zoom-in-95 text-left">
-                              {/* Imprimir Cartão */}
-                              {!isAuxiliar && (
-                                <button
-                                  disabled={!possuiFoto}
-                                  onClick={async () => {
-                                    setActiveMenuId(null);
-                                    if (!possuiFoto) return;
-                                    const templatesBase = await ensureTemplatesSnapshot();
-                                    if (!hasActiveTemplate(membro.tipoCadastro, templatesBase)) {
-                                      setNotification({
-                                        isOpen: true,
-                                        title: 'Template Ausente',
-                                        message: getMensagemSemTemplate(membro.tipoCadastro),
-                                        type: 'warning',
-                                      });
-                                      return;
-                                    }
-                                    setMembroImprimindoCartao(membro);
-                                  }}
-                                  className={`w-full px-3.5 py-2 text-xs font-semibold flex items-center gap-2 ${
-                                    possuiFoto
-                                      ? 'text-slate-700 hover:bg-purple-50 hover:text-purple-800 cursor-pointer'
-                                      : 'text-slate-300 opacity-50 cursor-not-allowed'
-                                  }`}
-                                >
-                                  <svg className="w-4 h-4 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-                                  </svg>
-                                  <span>{possuiFoto ? 'Imprimir Cartão' : 'Cartão (sem foto)'}</span>
-                                </button>
-                              )}
-
                               {/* Documentos */}
                               <button
                                 onClick={() => {
@@ -496,6 +515,22 @@ export default function MembrosTable({
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                                   </svg>
                                   <span>Histórico Completo</span>
+                                </button>
+                              )}
+
+                              {/* Excluir (Dentro do menu) */}
+                              {!isSupervisor && !isAuxiliar && (
+                                <button
+                                  onClick={() => {
+                                    setActiveMenuId(null);
+                                    abrirConfirmacaoDeletar(membro);
+                                  }}
+                                  className="w-full px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 flex items-center gap-2 cursor-pointer border-t border-slate-100"
+                                >
+                                  <svg className="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                  <span>Excluir Membro</span>
                                 </button>
                               )}
                             </div>
