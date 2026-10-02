@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
+import Image from 'next/image';
 import jsQR from 'jsqr';
 import {
   QrCode,
@@ -22,7 +23,6 @@ import {
   Clock,
   Flashlight,
   FlashlightOff,
-  Sparkles,
   X,
 } from 'lucide-react';
 
@@ -534,22 +534,16 @@ export default function CheckinPublicoPage() {
       {/* Header Fixo / Superior Compacto */}
       <header className="px-4 py-2 relative z-30">
         <div className="max-w-md mx-auto flex items-center justify-between gap-3">
-          {/* Brand Logo & Name */}
-          <div className="flex items-center gap-2.5">
-            {/* Ícone estilizado Chama / Livro Gestão Eklésia */}
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 via-orange-500 to-amber-600 p-[1px] shadow-[0_0_15px_rgba(245,158,11,0.3)] flex items-center justify-center shrink-0">
-              <div className="w-full h-full bg-[#091222] rounded-[11px] flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-amber-400 fill-amber-400/20" />
-              </div>
-            </div>
-            <div className="flex flex-col leading-none">
-              <span className="text-[9px] font-extrabold uppercase tracking-widest text-amber-400/90">
-                GESTÃO
-              </span>
-              <span className="text-xs font-black tracking-wider text-white">
-                EKLÉSIA
-              </span>
-            </div>
+          {/* Brand Logo */}
+          <div className="flex items-center">
+            <Image
+              src="/img/logo_eklesia_checkin.png"
+              alt="Gestão Eklésia"
+              width={160}
+              height={48}
+              className="h-9 sm:h-10 w-auto object-contain drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]"
+              priority
+            />
           </div>
 
           {/* Pill Badge Check-in */}
