@@ -16,16 +16,14 @@ import {
   MessageCircle,
   Users,
   FileText,
-  RotateCw,
   RotateCcw,
-  Trash2,
-  Upload,
   Building2,
   GraduationCap,
   Sparkles,
   ScrollText,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
+import EditorFotoMinisterial from './EditorFotoMinisterial';
 
 export interface MembroFormModalProps {
   showForm: boolean;
@@ -91,8 +89,8 @@ export default function MembroFormModal({
   fotoMembro,
   setFotoMembro,
   fileInputRef,
-  handleFotoUpload,
-  handleGirarFoto,
+  handleFotoUpload: _handleFotoUpload,
+  handleGirarFoto: _handleGirarFoto,
   salvarMembro,
   salvandoMembro = false,
   fecharFormulario,
@@ -1511,80 +1509,14 @@ export default function MembroFormModal({
           )}
 
           {/* ═══════════ ABA: FOTO ═══════════ */}
+          {/* ═══════════ ABA: FOTO ═══════════ */}
           {activeTab === 'foto' && (
             <div className="space-y-6">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-slate-800">
-                <ImageIcon className="w-4 h-4 text-teal-600" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Foto do Membro</h3>
-              </div>
-
-              <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center bg-slate-50/50 relative overflow-hidden flex flex-col items-center justify-center min-h-[300px] transition hover:border-teal-500">
-                {fotoMembro ? (
-                  <div className="relative group">
-                    <img
-                      src={fotoMembro}
-                      alt="Foto do Membro"
-                      className="max-h-64 rounded-2xl shadow-md border-2 border-teal-600 transition-opacity group-hover:opacity-75"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="bg-teal-700 hover:bg-teal-800 text-white p-3 rounded-full shadow-lg transition cursor-pointer"
-                        title="Alterar Foto"
-                      >
-                        <Edit3 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center max-w-sm">
-                    <div className="w-16 h-16 rounded-2xl bg-teal-50 text-teal-700 border border-teal-200/80 flex items-center justify-center mb-4 shadow-xs">
-                      <Upload className="w-8 h-8 text-teal-700" />
-                    </div>
-                    <h3 className="text-base font-bold text-slate-800 mb-1">Upload da Foto</h3>
-                    <p className="text-xs text-slate-500 mb-5">
-                      Envie uma imagem em formato JPG ou PNG (recomendado proporção 3:4)
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 text-white rounded-xl font-bold text-sm flex items-center gap-2 transition shadow-xs cursor-pointer"
-                    >
-                      <Upload className="w-4 h-4" />
-                      <span>Escolher Imagem</span>
-                    </button>
-                  </div>
-                )}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFotoUpload}
-                  accept="image/*"
-                  className="hidden"
-                />
-              </div>
-
-              {fotoMembro && (
-                <div className="flex gap-3 justify-center">
-                  <button
-                    type="button"
-                    onClick={handleGirarFoto}
-                    className="px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-sm flex items-center gap-2 transition shadow-xs cursor-pointer"
-                  >
-                    <RotateCw className="w-4 h-4 text-slate-600" />
-                    <span>Girar Imagem</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFotoMembro(null)}
-                    className="px-4 py-2.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 rounded-xl font-bold text-sm flex items-center gap-2 transition shadow-xs cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4 text-rose-500" />
-                    <span>Remover Foto</span>
-                  </button>
-                </div>
-              )}
+              <EditorFotoMinisterial
+                fotoMembro={fotoMembro}
+                onSaveComposicao={(resultado) => setFotoMembro(resultado)}
+                fileInputRef={fileInputRef}
+              />
             </div>
           )}
 
