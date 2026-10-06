@@ -91,50 +91,59 @@ export default function TesourariaToolbar({
     !filtroDataFim;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-md">
+    <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs space-y-4">
       {/* Linha 1: Mês | Movimento | Tipo | Categoria | Origem | Caixa */}
-      <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1">Mês</label>
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Mês Ref.
+          </label>
           <MonthPicker value={filtroMes} onChange={setFiltroMes} className="w-full" />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1">Movimento</label>
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm h-[38px]">
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Movimento
+          </label>
+          <div className="flex rounded-xl border border-slate-300 overflow-hidden text-sm h-[38px] p-0.5 bg-slate-50">
             {[
               { v: '' as const, label: 'Todos' },
               { v: 'entrada' as const, label: '↑ Entr.' },
               { v: 'saida' as const, label: '↓ Saída' },
-            ].map((opt) => (
-              <button
-                key={opt.v}
-                type="button"
-                onClick={() => {
-                  setFiltroMovimento(opt.v);
-                  setFiltroTipo('');
-                  setFiltroCategoria?.('');
-                }}
-                className={`flex-1 text-xs font-medium transition px-1 ${
-                  filtroMovimento === opt.v
-                    ? opt.v === 'entrada'
-                      ? 'bg-green-600 text-white'
-                      : opt.v === 'saida'
-                      ? 'bg-red-500 text-white'
-                      : 'bg-[#123b63] text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+            ].map((opt) => {
+              const isActive = filtroMovimento === opt.v;
+              let activeBg = 'bg-teal-700 text-white shadow-xs';
+              if (isActive && opt.v === 'entrada') activeBg = 'bg-[#16a34a] text-white shadow-xs';
+              if (isActive && opt.v === 'saida') activeBg = 'bg-[#e11d48] text-white shadow-xs';
+
+              return (
+                <button
+                  key={opt.v}
+                  type="button"
+                  onClick={() => {
+                    setFiltroMovimento(opt.v);
+                    setFiltroTipo('');
+                    setFiltroCategoria?.('');
+                  }}
+                  className={`flex-1 text-xs font-bold rounded-lg transition-all duration-150 px-1 cursor-pointer ${
+                    isActive
+                      ? activeBg
+                      : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo</label>
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Tipo
+          </label>
           <select
             value={filtroTipo}
             onChange={(e) => setFiltroTipo(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+            className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white font-medium text-slate-800 h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer"
           >
             <option value="">Todos os tipos</option>
             {filtroMovimento === 'saida'
@@ -151,11 +160,13 @@ export default function TesourariaToolbar({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1">Categoria Financeira</label>
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Categoria Financeira
+          </label>
           <select
             value={filtroCategoria}
             onChange={(e) => setFiltroCategoria?.(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+            className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white font-medium text-slate-800 h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer"
           >
             <option value="">Todas as categorias</option>
             {finCategorias &&
@@ -170,11 +181,13 @@ export default function TesourariaToolbar({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1">Origem</label>
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Origem
+          </label>
           <select
             value={filtroOrigem}
             onChange={(e) => setFiltroOrigem?.(e.target.value as any)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white h-[38px] font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+            className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white font-medium text-slate-800 h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer"
           >
             <option value="">Todas as origens</option>
             <option value="manual">Manual</option>
@@ -183,11 +196,13 @@ export default function TesourariaToolbar({
         </div>
         {!scope.isFinanceiroLocal && (
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Caixa</label>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Caixa / Congregação
+            </label>
             <select
               value={filtroCong}
               onChange={(e) => setFiltroCong(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white font-medium text-slate-800 h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer"
             >
               <option value="">Todas as congregações</option>
               {congregacoes.map((c) => (
@@ -201,15 +216,17 @@ export default function TesourariaToolbar({
       </div>
 
       {/* Linha 2: Departamento | Data inicial | Data final | Novo lançamento | Limpar | Totalizador */}
-      <div className="mt-3 flex flex-wrap lg:flex-nowrap items-end gap-3 justify-between">
+      <div className="pt-2 border-t border-slate-100 flex flex-wrap lg:flex-nowrap items-end gap-3 justify-between">
         <div className="flex flex-wrap items-end gap-3 flex-1 min-w-0">
           {/* Departamento */}
           <div className="w-full sm:w-44 lg:w-44 shrink-0">
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Departamento</label>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Departamento
+            </label>
             <select
               value={filtroDept}
               onChange={(e) => setFiltroDept(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white font-medium text-slate-800 h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer"
             >
               <option value="">Todos os departamentos</option>
               {departamentos.map((d) => (
@@ -223,31 +240,35 @@ export default function TesourariaToolbar({
 
           {/* Data inicial */}
           <div className="w-full sm:w-36 lg:w-36 shrink-0">
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Data inicial</label>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Data inicial
+            </label>
             <input
               type="date"
               value={filtroDataInicio}
               onChange={(e) => setFiltroDataInicio?.(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-xs sm:text-sm bg-white h-[38px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+              className="w-full border border-slate-300 rounded-xl px-2.5 py-2 text-xs sm:text-sm bg-white font-medium text-slate-800 h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
             />
           </div>
 
           {/* Data final */}
           <div className="w-full sm:w-36 lg:w-36 shrink-0">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Data final</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Data final
+              </label>
               {isIntervaloInvalido && (
-                <span className="text-[10px] text-red-500 font-bold mb-1">Inválida</span>
+                <span className="text-[10px] text-rose-600 font-bold bg-rose-50 px-1 rounded">Inválida</span>
               )}
             </div>
             <input
               type="date"
               value={filtroDataFim}
               onChange={(e) => setFiltroDataFim?.(e.target.value)}
-              className={`w-full border rounded-lg px-2.5 py-2 text-xs sm:text-sm bg-white h-[38px] text-slate-800 focus:outline-none focus:ring-2 ${
+              className={`w-full border rounded-xl px-2.5 py-2 text-xs sm:text-sm bg-white font-medium text-slate-800 h-[38px] focus:outline-none focus:ring-2 transition ${
                 isIntervaloInvalido
-                  ? 'border-red-400 focus:ring-red-500/20 focus:border-red-500 bg-red-50/30'
-                  : 'border-gray-200 focus:ring-teal-500/20 focus:border-teal-600'
+                  ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/40 text-rose-900'
+                  : 'border-slate-300 focus:ring-teal-600/20 focus:border-teal-600'
               }`}
               title={isIntervaloInvalido ? 'Data final deve ser maior ou igual à data inicial' : undefined}
             />
@@ -258,7 +279,7 @@ export default function TesourariaToolbar({
             {scope.canWrite && (
               <button
                 onClick={onNovoClick}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition h-[38px] whitespace-nowrap shadow-xs cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white rounded-xl text-sm font-bold hover:bg-teal-800 transition h-[38px] whitespace-nowrap shadow-xs cursor-pointer border border-teal-800"
               >
                 <Plus className="h-4 w-4" /> Novo lançamento
               </button>
@@ -266,10 +287,10 @@ export default function TesourariaToolbar({
             {lancamentosMesCount > 0 && (
               <button
                 onClick={onExportarCSV}
-                className="flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition h-[38px] cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-300 bg-white text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 hover:text-slate-900 transition h-[38px] cursor-pointer shadow-2xs"
                 title="Exportar lançamentos filtrados para CSV"
               >
-                <Download className="h-4 w-4" /> CSV
+                <Download className="h-4 w-4 text-slate-500" /> CSV
               </button>
             )}
             <button
@@ -284,10 +305,10 @@ export default function TesourariaToolbar({
                 setFiltroDataFim?.('');
               }}
               disabled={isLimparDisabled}
-              className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition h-[38px] whitespace-nowrap cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition h-[38px] whitespace-nowrap cursor-pointer ${
                 isLimparDisabled
-                  ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
-                  : 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300'
+                  ? 'border border-slate-200 text-slate-400 bg-slate-50 cursor-not-allowed'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-xs'
               }`}
             >
               Limpar Filtros
@@ -295,14 +316,16 @@ export default function TesourariaToolbar({
           </div>
         </div>
 
-        {/* Totalizador */}
-        <div className="flex gap-3 flex-wrap text-sm items-center h-[38px] shrink-0 justify-end">
-          <span className="text-gray-400">{lancsFiltradosCount} reg.</span>
-          <span className="text-green-600 font-semibold">↑ {fmtBRL(entradasFiltradas)}</span>
-          <span className="text-red-500 font-semibold">↓ {fmtBRL(saidasFiltradas)}</span>
+        {/* Totalizador de Alto Contraste */}
+        <div className="flex gap-2.5 flex-wrap text-xs sm:text-sm items-center h-[38px] shrink-0 justify-end bg-slate-50/90 px-3.5 py-1.5 rounded-2xl border border-slate-200">
+          <span className="font-semibold text-slate-500">{lancsFiltradosCount} reg.</span>
+          <span className="text-slate-300">|</span>
+          <span className="text-[#15803d] font-bold">↑ {fmtBRL(entradasFiltradas)}</span>
+          <span className="text-[#be123c] font-bold">↓ {fmtBRL(saidasFiltradas)}</span>
+          <span className="text-slate-300">|</span>
           <span
-            className={`font-bold ${
-              entradasFiltradas - saidasFiltradas >= 0 ? 'text-[#123b63]' : 'text-red-600'
+            className={`font-extrabold ${
+              entradasFiltradas - saidasFiltradas >= 0 ? 'text-[#1e3a8a]' : 'text-[#881337]'
             }`}
           >
             = {fmtBRL(entradasFiltradas - saidasFiltradas)}
@@ -312,7 +335,7 @@ export default function TesourariaToolbar({
 
       {/* Loading do mês */}
       {loadingMes && (
-        <p className="text-xs text-gray-400 mt-2 text-center">Buscando lançamentos do mês...</p>
+        <p className="text-xs text-slate-500 font-medium mt-2 text-center">Buscando lançamentos do mês...</p>
       )}
     </div>
   );

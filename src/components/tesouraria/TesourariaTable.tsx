@@ -132,7 +132,7 @@ export default function TesourariaTable({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden flex flex-col">
+    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden flex flex-col">
       {sortedLancs.length === 0 ? (
         <div className="text-center py-16 px-4">
           <p className="text-slate-400 text-sm font-medium">Nenhum lançamento encontrado para os filtros aplicados.</p>
@@ -140,181 +140,188 @@ export default function TesourariaTable({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm border-collapse">
               {/* Barra de Título / Cabeçalho Destacado */}
-              <thead className="bg-slate-100/95 border-b-2 border-slate-300">
+              <thead className="bg-slate-100/90 border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-800">
                     Data
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-800">
                     Caixa / Congregação
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-slate-700">
-                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none group">
-                      <input
-                        type="checkbox"
-                        checked={sortColumn === 'categoria'}
-                        onChange={() => setSortColumn(sortColumn === 'categoria' ? '' : 'categoria')}
-                        className="w-3.5 h-3.5 text-[#123b63] rounded border-slate-300 focus:ring-[#123b63] cursor-pointer"
-                        title="Classificar de A a Z (crescente)"
-                      />
-                      <span className={`group-hover:text-[#123b63] transition ${sortColumn === 'categoria' ? 'text-[#123b63] font-extrabold' : ''}`}>
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setSortColumn(sortColumn === 'categoria' ? '' : 'categoria')}
+                      className="inline-flex items-center gap-1.5 cursor-pointer select-none group text-left"
+                      title="Clique para ordenar por Categoria (A-Z)"
+                    >
+                      <span className={`group-hover:text-teal-700 transition ${sortColumn === 'categoria' ? 'text-teal-800 font-extrabold' : ''}`}>
                         {mostrarCategoria ? 'Categoria Financeira' : 'Departamento'}
                       </span>
-                      {sortColumn === 'categoria' && (
-                        <span className="text-[10px] font-bold text-[#123b63] bg-blue-100 border border-blue-200 px-1 rounded">
-                          A-Z
+                      {sortColumn === 'categoria' ? (
+                        <span className="text-[10px] font-bold text-teal-800 bg-teal-100 border border-teal-200 px-1.5 py-0.5 rounded-md">
+                          A-Z ↑
                         </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 group-hover:text-slate-600">↕</span>
                       )}
-                    </label>
+                    </button>
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-slate-700">
-                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none group">
-                      <input
-                        type="checkbox"
-                        checked={sortColumn === 'tipo'}
-                        onChange={() => setSortColumn(sortColumn === 'tipo' ? '' : 'tipo')}
-                        className="w-3.5 h-3.5 text-[#123b63] rounded border-slate-300 focus:ring-[#123b63] cursor-pointer"
-                        title="Classificar de A a Z (crescente)"
-                      />
-                      <span className={`group-hover:text-[#123b63] transition ${sortColumn === 'tipo' ? 'text-[#123b63] font-extrabold' : ''}`}>
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setSortColumn(sortColumn === 'tipo' ? '' : 'tipo')}
+                      className="inline-flex items-center gap-1.5 cursor-pointer select-none group text-left"
+                      title="Clique para ordenar por Tipo (A-Z)"
+                    >
+                      <span className={`group-hover:text-teal-700 transition ${sortColumn === 'tipo' ? 'text-teal-800 font-extrabold' : ''}`}>
                         Tipo
                       </span>
-                      {sortColumn === 'tipo' && (
-                        <span className="text-[10px] font-bold text-[#123b63] bg-blue-100 border border-blue-200 px-1 rounded">
-                          A-Z
+                      {sortColumn === 'tipo' ? (
+                        <span className="text-[10px] font-bold text-teal-800 bg-teal-100 border border-teal-200 px-1.5 py-0.5 rounded-md">
+                          A-Z ↑
                         </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 group-hover:text-slate-600">↕</span>
                       )}
-                    </label>
+                    </button>
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-800">
                     Descrição / Ref.
                   </th>
-                  <th className="px-4 py-3.5 text-right text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <th className="px-4 py-3.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-800">
                     <div className="flex justify-end">
-                      <label className="inline-flex items-center gap-1.5 cursor-pointer select-none group">
-                        <input
-                          type="checkbox"
-                          checked={sortColumn === 'valor'}
-                          onChange={() => setSortColumn(sortColumn === 'valor' ? '' : 'valor')}
-                          className="w-3.5 h-3.5 text-[#123b63] rounded border-slate-300 focus:ring-[#123b63] cursor-pointer"
-                          title="Classificar por Valor crescente (menor para maior)"
-                        />
-                        <span className={`group-hover:text-[#123b63] transition ${sortColumn === 'valor' ? 'text-[#123b63] font-extrabold' : ''}`}>
+                      <button
+                        type="button"
+                        onClick={() => setSortColumn(sortColumn === 'valor' ? '' : 'valor')}
+                        className="inline-flex items-center gap-1.5 cursor-pointer select-none group"
+                        title="Clique para ordenar por Valor (menor para maior)"
+                      >
+                        <span className={`group-hover:text-teal-700 transition ${sortColumn === 'valor' ? 'text-teal-800 font-extrabold' : ''}`}>
                           Valor
                         </span>
-                        {sortColumn === 'valor' && (
-                          <span className="text-[10px] font-bold text-[#123b63] bg-blue-100 border border-blue-200 px-1 rounded">
-                            0-9
+                        {sortColumn === 'valor' ? (
+                          <span className="text-[10px] font-bold text-teal-800 bg-teal-100 border border-teal-200 px-1.5 py-0.5 rounded-md">
+                            0-9 ↑
                           </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 group-hover:text-slate-600">↕</span>
                         )}
-                      </label>
+                      </button>
                     </div>
                   </th>
-                  <th className="px-4 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <th className="px-4 py-3.5 text-center text-[11px] font-bold uppercase tracking-wider text-slate-800">
                     Ações
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginatedLancs.map((l) => {
+                {paginatedLancs.map((l, idx) => {
                   const isDigitalPix = l.origem_modulo === 'gateway' || l.forma_pagamento === 'pix';
+                  const isSaida = l.tipo_movimento === 'saida';
 
                   return (
                     <tr
                       key={l.id}
-                      className={`hover:bg-slate-50 transition ${l.tipo_movimento === 'saida' ? 'bg-red-50/40' : ''}`}
+                      className={`hover:bg-slate-50/80 transition ${
+                        isSaida ? 'bg-rose-50/20' : idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white'
+                      }`}
                     >
-                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap font-medium">
+                      <td className="px-4 py-3.5 text-slate-700 whitespace-nowrap font-medium text-xs sm:text-sm">
                         {fmtDate(l.data_lancamento)}
                       </td>
-                      <td className="px-4 py-3 text-slate-800 font-medium">{l.congregacao_nome}</td>
-                      <td className="px-4 py-3 text-slate-600 text-xs">
+                      <td className="px-4 py-3.5 text-slate-900 font-semibold text-xs sm:text-sm">{l.congregacao_nome}</td>
+                      <td className="px-4 py-3.5 text-slate-700 text-xs font-medium">
                         {mostrarCategoria ? (
                           (() => {
                             const cat = finCategorias.find((c) => c.id === l.categoria_id);
                             if (cat) {
                               return (
-                                <span className="inline-flex items-center gap-1 font-medium text-slate-700">
+                                <span className="inline-flex items-center gap-1.5 font-medium text-slate-800 bg-slate-100/80 px-2 py-0.5 rounded-lg border border-slate-200">
                                   {cat.icone && <span>{cat.icone}</span>}
                                   <span>{cat.nome}</span>
                                 </span>
                               );
                             }
-                            return l.categoria_nome || '—';
+                            return l.categoria_nome ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-slate-100 text-slate-800 border border-slate-200">
+                                {l.categoria_nome}
+                              </span>
+                            ) : '—';
                           })()
                         ) : (
                           l.departamento_nome || '—'
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1">
+                      <td className="px-4 py-3.5">
+                        <div className="flex flex-col gap-1.5">
                           <span
-                            className={`px-2 py-0.5 rounded text-xs font-semibold w-fit ${
-                              l.tipo_movimento === 'saida'
-                                ? TIPOS_SAIDA.find((t) => t.value === l.tipo_recebimento)?.cor ?? 'bg-red-100 text-red-800'
-                                : tipoCor(l.tipo_recebimento)
+                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide w-fit border shadow-2xs ${
+                              isSaida
+                                ? TIPOS_SAIDA.find((t) => t.value === l.tipo_recebimento)?.cor ?? 'bg-rose-50 text-rose-800 border-rose-200'
+                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                             }`}
                           >
-                            {l.tipo_movimento === 'saida'
+                            {isSaida
                               ? TIPOS_SAIDA.find((t) => t.value === l.tipo_recebimento)?.label ?? l.tipo_recebimento
                               : tipoLabel(l.tipo_recebimento)}
                           </span>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {l.codigo_registro && (
                               <span
-                                className="font-mono text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.2 rounded"
+                                className="font-mono text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md"
                                 title="Código / ID do Registro"
                               >
                                 ID: {l.codigo_registro}
                               </span>
                             )}
                             <span
-                              className={`text-xs font-semibold ${
-                                l.tipo_movimento === 'saida' ? 'text-red-500' : 'text-green-600'
+                              className={`text-[11px] font-bold ${
+                                isSaida ? 'text-[#e11d48]' : 'text-[#16a34a]'
                               }`}
                             >
-                              {l.tipo_movimento === 'saida' ? '↓ Saída' : '↑ Entrada'}
+                              {isSaida ? '↓ Saída' : '↑ Entrada'}
                             </span>
                             {isDigitalPix && (
                               <button
                                 type="button"
                                 onClick={() => handleOpenDetails(l)}
-                                className="inline-flex items-center gap-1 text-[10px] font-bold bg-[#123b63]/10 text-[#123b63] border border-[#123b63]/20 px-2 py-0.5 rounded-full hover:bg-[#123b63]/20 transition"
+                                className="inline-flex items-center gap-1 text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200 px-2 py-0.5 rounded-full hover:bg-teal-100 transition shadow-2xs cursor-pointer"
                                 title="Clique para ver detalhes do recebimento PIX"
                               >
-                                <QrCode className="h-3 w-3" /> Arrecadação Digital PIX
+                                <QrCode className="h-3 w-3 text-teal-600" /> PIX Digital
                               </button>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-slate-600 max-w-[200px] truncate">
+                      <td className="px-4 py-3.5 text-slate-700 max-w-[220px] truncate text-xs sm:text-sm font-medium">
                         {l.referencia || l.observacoes || l.descricao || '—'}
                       </td>
                       <td
-                        className={`px-4 py-3 text-right font-bold whitespace-nowrap ${
-                          l.tipo_movimento === 'saida' ? 'text-red-600' : 'text-[#123b63]'
+                        className={`px-4 py-3.5 text-right font-extrabold whitespace-nowrap text-sm tracking-tight ${
+                          isSaida ? 'text-[#be123c]' : 'text-[#1e3a8a]'
                         }`}
                       >
-                        {l.tipo_movimento === 'saida' ? '- ' : ''}
+                        {isSaida ? '- ' : ''}
                         {fmtBRL(Number(l.valor))}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-1.5">
-                          {/* Botão 1: 👁 Visualizar Detalhes (Sempre visível para leitura segura) */}
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center justify-center gap-1">
+                          {/* Botão 1: 👁 Visualizar Detalhes */}
                           <button
                             type="button"
                             onClick={() => handleOpenDetails(l)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-[#123b63] hover:bg-slate-100 transition cursor-pointer"
+                            className="p-1.5 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition cursor-pointer"
                             title="Visualizar Detalhes"
                             aria-label="Visualizar Detalhes do Lançamento"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
 
-                          {/* Botão 2: Editar / Reclassificar (Disponível para todos os lançamentos com permissão de escrita) */}
+                          {/* Botão 2: Editar / Reclassificar */}
                           {scope.canWrite && (handleEdit || handleEditClassificacao) && (
                             <button
                               type="button"
@@ -325,7 +332,7 @@ export default function TesourariaTable({
                                   handleEdit(l);
                                 }
                               }}
-                              className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition cursor-pointer"
+                              className="p-1.5 rounded-xl hover:bg-blue-50 text-blue-600 hover:text-blue-800 border border-transparent hover:border-blue-200 transition cursor-pointer"
                               title={isDigitalPix ? 'Reclassificar Lançamento / Dizimista' : 'Editar Lançamento'}
                               aria-label={isDigitalPix ? 'Reclassificar Lançamento / Dizimista' : 'Editar Lançamento'}
                             >
@@ -333,12 +340,12 @@ export default function TesourariaTable({
                             </button>
                           )}
 
-                          {/* Botão 3: Excluir (Apenas para quem tem permissão e não é PIX imutável) */}
+                          {/* Botão 3: Excluir */}
                           {!isDigitalPix && scope.canDelete && setConfirmDel && (
                             <button
                               type="button"
                               onClick={() => setConfirmDel(l.id)}
-                              className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition cursor-pointer"
+                              className="p-1.5 rounded-xl hover:bg-rose-50 text-rose-500 hover:text-rose-700 border border-transparent hover:border-rose-200 transition cursor-pointer"
                               title="Excluir Lançamento"
                               aria-label="Excluir Lançamento"
                             >
@@ -352,11 +359,11 @@ export default function TesourariaTable({
                 })}
               </tbody>
               <tfoot>
-                <tr className="bg-slate-50 border-t border-slate-200">
-                  <td colSpan={5} className="px-4 py-3 text-xs font-bold text-slate-600 text-right uppercase tracking-wider">
+                <tr className="bg-slate-100/80 border-t-2 border-slate-200">
+                  <td colSpan={5} className="px-4 py-3.5 text-xs font-extrabold text-slate-700 text-right uppercase tracking-wider">
                     Total do Período Filtrado
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-[#123b63] text-sm">
+                  <td className="px-4 py-3.5 text-right font-extrabold text-[#123b63] text-base tracking-tight">
                     {fmtBRL(totalFiltrado)}
                   </td>
                   <td />
@@ -366,17 +373,17 @@ export default function TesourariaTable({
           </div>
 
           {/* Barra de Paginação */}
-          <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div className="px-5 py-3.5 bg-slate-50/90 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
             {/* Lado Esquerdo: Contadores e seletor de itens por página */}
             <div className="flex items-center flex-wrap gap-3 text-slate-600">
               <span>
-                Exibindo <strong className="text-slate-800">{totalRecords === 0 ? 0 : startIndex + 1}</strong> a{' '}
-                <strong className="text-slate-800">{endIndex}</strong> de{' '}
-                <strong className="text-slate-800">{totalRecords}</strong> registros
+                Exibindo <strong className="text-slate-900 font-bold">{totalRecords === 0 ? 0 : startIndex + 1}</strong> a{' '}
+                <strong className="text-slate-900 font-bold">{endIndex}</strong> de{' '}
+                <strong className="text-slate-900 font-bold">{totalRecords}</strong> registros
               </span>
 
               <div className="flex items-center gap-1.5">
-                <label htmlFor="pageSizeSelect" className="text-slate-500">
+                <label htmlFor="pageSizeSelect" className="text-slate-500 font-medium">
                   Exibir:
                 </label>
                 <select
@@ -387,13 +394,13 @@ export default function TesourariaTable({
                     setPageSize(newSize);
                     setCurrentPage(1);
                   }}
-                  className="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#123b63]"
+                  className="bg-white border border-slate-300 rounded-xl px-2.5 py-1 text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 cursor-pointer"
                 >
                   <option value={20}>20</option>
                   <option value={30}>30</option>
                   <option value={60}>60</option>
                 </select>
-                <span className="text-slate-500">por página</span>
+                <span className="text-slate-500 font-medium">por página</span>
               </div>
             </div>
 
@@ -405,7 +412,7 @@ export default function TesourariaTable({
                   type="button"
                   onClick={() => setCurrentPage(1)}
                   disabled={safeCurrentPage === 1}
-                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition"
+                  className="p-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-white disabled:cursor-not-allowed transition cursor-pointer shadow-2xs"
                   title="Primeira Página"
                 >
                   <ChevronsLeft className="w-4 h-4" />
@@ -416,7 +423,7 @@ export default function TesourariaTable({
                   type="button"
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={safeCurrentPage === 1}
-                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition"
+                  className="p-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-white disabled:cursor-not-allowed transition cursor-pointer shadow-2xs"
                   title="Página Anterior"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -440,9 +447,9 @@ export default function TesourariaTable({
                           <button
                             type="button"
                             onClick={() => setCurrentPage(page)}
-                            className={`min-w-[28px] h-7 px-2 rounded-lg text-xs font-semibold transition ${
+                            className={`min-w-[28px] h-7 px-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                               safeCurrentPage === page
-                                ? 'bg-[#123b63] text-white shadow-xs'
+                                ? 'bg-teal-700 text-white shadow-xs border border-teal-800'
                                 : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
                             }`}
                           >
@@ -458,7 +465,7 @@ export default function TesourariaTable({
                   type="button"
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={safeCurrentPage === totalPages}
-                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition"
+                  className="p-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-white disabled:cursor-not-allowed transition cursor-pointer shadow-2xs"
                   title="Próxima Página"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -469,7 +476,7 @@ export default function TesourariaTable({
                   type="button"
                   onClick={() => setCurrentPage(totalPages)}
                   disabled={safeCurrentPage === totalPages}
-                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition"
+                  className="p-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-white disabled:cursor-not-allowed transition cursor-pointer shadow-2xs"
                   title="Última Página"
                 >
                   <ChevronsRight className="w-4 h-4" />

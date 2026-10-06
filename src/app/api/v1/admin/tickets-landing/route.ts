@@ -143,3 +143,30 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const result = await requireAdmin(request)
+    if (!result.ok) return result.response
+    const { supabaseAdmin } = result.ctx
+    const searchParams = request.nextUrl.searchParams
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'id é obrigatório' }, { status: 400 })
+    }
+
+    const { error } = await supabaseAdmin
+      .from('support_tickets_landing')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    return NextResponse.json({ success: true, message: 'Ticket excluído com sucesso' })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}

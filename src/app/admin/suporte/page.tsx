@@ -12,7 +12,7 @@ import type { SupportTicket, SupportTicketMessage, SupportTicketLanding } from '
 import { temAcessoAdmin } from '@/lib/access-control'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
 import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState'
-import { LifeBuoy, Clock, MessageSquare, AlertTriangle, CheckCircle2, Search, Plus, MoreVertical, X, Send } from 'lucide-react'
+import { LifeBuoy, Clock, MessageSquare, AlertTriangle, CheckCircle2, Search, Plus, MoreVertical, X, Send, Trash2 } from 'lucide-react'
 
 export default function SuportePage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
@@ -42,6 +42,13 @@ export default function SuportePage() {
   const [replyStatus, setReplyStatus] = useState<SupportTicket['status']>('waiting_customer')
   const [closingTicketId, setClosingTicketId] = useState<string | null>(null)
   const [closingTicket, setClosingTicket] = useState<SupportTicket | null>(null)
+  const [ticketToDelete, setTicketToDelete] = useState<{
+    id: string
+    type: 'tenant' | 'landing'
+    number?: string
+    subject?: string
+  } | null>(null)
+  const [deletingTicket, setDeletingTicket] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [openMenuTicketId, setOpenMenuTicketId] = useState<string | null>(null)
   const [menuCoords, setMenuCoords] = useState<{ top: number; left: number } | null>(null)
@@ -399,6 +406,49 @@ export default function SuportePage() {
     } finally {
       setClosingTicketId(null)
       setClosingTicket(null)
+    }
+  }
+
+  const handleDeleteTicket = async () => {
+    if (!ticketToDelete) return
+    try {
+      setDeletingTicket(true)
+      setError('')
+      setSuccess('')
+
+      const endpoint =
+        ticketToDelete.type === 'landing'
+          ? `/api/v1/admin/tickets-landing?id=${ticketToDelete.id}`
+          : `/api/v1/admin/tickets?id=${ticketToDelete.id}`
+
+      const response = await authenticatedFetch(endpoint, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const payload = await response.json()
+        throw new Error(payload.error || 'Erro ao excluir ticket')
+      }
+
+      setSuccess('Ticket excluído com sucesso!')
+
+      if (ticketToDelete.type === 'landing') {
+        setLandingTickets((prev) => prev.filter((t) => t.id !== ticketToDelete.id))
+        if (selectedLandingTicket?.id === ticketToDelete.id) {
+          setSelectedLandingTicket(null)
+        }
+      } else {
+        setTickets((prev) => prev.filter((t) => t.id !== ticketToDelete.id))
+        if (selectedTicket?.id === ticketToDelete.id) {
+          setSelectedTicket(null)
+        }
+      }
+
+      setTicketToDelete(null)
+    } catch (err: any) {
+      setError(err.message || 'Erro ao excluir ticket')
+    } finally {
+      setDeletingTicket(false)
     }
   }
 
@@ -987,6 +1037,24 @@ export default function SuportePage() {
                                           🔓 Reabrir Ticket
                                         </button>
                                       )}
+
+                                      <div className="border-t border-gray-800 my-1" />
+
+                                      <button
+                                        onClick={() => {
+                                          setOpenMenuTicketId(null)
+                                          setTicketToDelete({
+                                            id: t.id,
+                                            type: 'tenant',
+                                            number: t.ticket_number || t.id,
+                                            subject: t.subject,
+                                          })
+                                        }}
+                                        className="w-full px-4 py-2 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/50 flex items-center gap-2 transition cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                                        Excluir Ticket
+                                      </button>
                                     </div>,
                                     document.body
                                   )}
@@ -1124,9 +1192,27 @@ export default function SuportePage() {
                                           setSelectedLandingTicket(t)
                                           setOpenMenuTicketId(null)
                                         }}
-                                        className="w-full px-4 py-2 text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-2 transition"
+                                        className="w-full px-4 py-2 text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-2 transition cursor-pointer"
                                       >
                                         👁️ Ver Detalhes
+                                      </button>
+
+                                      <div className="border-t border-gray-800 my-1" />
+
+                                      <button
+                                        onClick={() => {
+                                          setOpenMenuTicketId(null)
+                                          setTicketToDelete({
+                                            id: t.id,
+                                            type: 'landing',
+                                            number: t.ticket_number || t.id,
+                                            subject: t.institution_name || t.contact_name,
+                                          })
+                                        }}
+                                        className="w-full px-4 py-2 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/50 flex items-center gap-2 transition cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                                        Excluir Ticket
                                       </button>
                                     </div>,
                                     document.body
@@ -1218,17 +1304,35 @@ export default function SuportePage() {
                   </p>
                 </div>
 
-                <button
-                  onClick={() => {
-                    setSelectedTicket(null)
-                    setMessages([])
-                    setReplyText('')
-                    setError('')
-                  }}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setTicketToDelete({
+                        id: selectedTicket.id,
+                        type: 'tenant',
+                        number: selectedTicket.ticket_number || selectedTicket.id,
+                        subject: selectedTicket.subject,
+                      })
+                    }}
+                    className="p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-950/50 rounded-lg transition cursor-pointer"
+                    title="Excluir Ticket"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setSelectedTicket(null)
+                      setMessages([])
+                      setReplyText('')
+                      setError('')
+                    }}
+                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition cursor-pointer"
+                    title="Fechar"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Corpo do Drawer com Histórico em Formato Chat */}
@@ -1385,6 +1489,59 @@ export default function SuportePage() {
         </div>
       )}
 
+      {/* Modal de Confirmação de Exclusão de Ticket */}
+      {ticketToDelete && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 z-[999999] animate-in fade-in duration-150">
+          <div className="bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-6 border-b border-gray-800 flex items-start gap-4">
+              <div className="w-11 h-11 rounded-xl bg-rose-950/70 border border-rose-800/60 flex items-center justify-center text-rose-400 shrink-0">
+                <Trash2 className="w-5 h-5 text-rose-400" />
+              </div>
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <h3 className="text-base font-bold text-white">Excluir Ticket</h3>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  Tem certeza de que deseja excluir permanentemente o ticket{' '}
+                  <span className="text-rose-400 font-mono font-bold">
+                    #{ticketToDelete.number}
+                  </span>
+                  {ticketToDelete.subject ? (
+                    <>
+                      {' '}— <span className="text-gray-200 font-medium truncate">{ticketToDelete.subject}</span>
+                    </>
+                  ) : ''}
+                  ? Esta ação é irreversível e apagará o histórico e registros associados.
+                </p>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-950/60 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setTicketToDelete(null)}
+                disabled={deletingTicket}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white transition cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteTicket}
+                disabled={deletingTicket}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition cursor-pointer flex items-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                {deletingTicket ? (
+                  <span>Excluindo...</span>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Excluir Definitivamente</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Drawer Lateral Slide-Over: Ticket do Site / Landing (Suporte 2.0) */}
       {ticketView === 'landing' && selectedLandingTicket && (
         <div className="fixed inset-0 z-50 overflow-hidden">
@@ -1416,12 +1573,30 @@ export default function SuportePage() {
                   </p>
                 </div>
 
-                <button
-                  onClick={() => setSelectedLandingTicket(null)}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setTicketToDelete({
+                        id: selectedLandingTicket.id,
+                        type: 'landing',
+                        number: selectedLandingTicket.ticket_number || selectedLandingTicket.id,
+                        subject: selectedLandingTicket.institution_name || selectedLandingTicket.contact_name,
+                      })
+                    }}
+                    className="p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-950/50 rounded-lg transition cursor-pointer"
+                    title="Excluir Ticket"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedLandingTicket(null)}
+                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition cursor-pointer"
+                    title="Fechar"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Corpo do Drawer com Informações e Notas */}

@@ -83,22 +83,22 @@ export default function FechamentoCaixaTable({
   }, [historicoModalCong, fechamentos]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Barra de Busca e Filtros de Status */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs">
         <div className="relative flex-1 w-full max-w-md">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
           <input
             type="text"
             placeholder="Buscar unidade / congregação..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#123b63]"
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs h-[36px]">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <div className="flex rounded-xl border border-slate-300 overflow-hidden text-xs h-[38px] p-0.5 bg-slate-50">
             {[
               { v: '' as const, label: 'Todas' },
               { v: 'aberto' as const, label: 'Abertos' },
@@ -108,10 +108,10 @@ export default function FechamentoCaixaTable({
                 key={st.v}
                 type="button"
                 onClick={() => setFiltroStatus(st.v)}
-                className={`px-3 font-medium transition ${
+                className={`px-3.5 font-bold rounded-lg transition-all duration-150 cursor-pointer ${
                   filtroStatus === st.v
-                    ? 'bg-[#123b63] text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                    ? 'bg-teal-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                 }`}
               >
                 {st.label}
@@ -119,83 +119,91 @@ export default function FechamentoCaixaTable({
             ))}
           </div>
 
-          <span className="text-xs text-gray-400 hidden md:inline ml-2">
+          <span className="text-xs font-semibold text-slate-500 hidden md:inline ml-2 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
             {listaFiltrada.length} de {congregacoes.length} unidades
           </span>
         </div>
       </div>
 
       {/* Tabela de Unidades */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <div className="bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm border-collapse">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                <th className="py-3 px-4">Unidade / Congregação</th>
-                <th className="py-3 px-4">Status ({filtroMes})</th>
-                <th className="py-3 px-4">Último Fechamento</th>
-                <th className="py-3 px-4 text-right">Ações</th>
+              <tr className="bg-slate-100/90 border-b border-slate-200 text-[11px] font-bold text-slate-800 uppercase tracking-wider">
+                <th className="py-3.5 px-5">Unidade / Congregação</th>
+                <th className="py-3.5 px-5">Status ({filtroMes})</th>
+                <th className="py-3.5 px-5">Último Fechamento</th>
+                <th className="py-3.5 px-5 text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-100">
               {listaFiltrada.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-gray-400 text-sm">
+                  <td colSpan={4} className="py-12 text-center text-slate-400 text-sm font-medium">
                     Nenhuma congregação encontrada para os critérios selecionados.
                   </td>
                 </tr>
               ) : (
-                listaFiltrada.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/80 transition">
+                listaFiltrada.map((item, idx) => (
+                  <tr
+                    key={item.id}
+                    className={`hover:bg-slate-50/80 transition ${
+                      idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white'
+                    }`}
+                  >
                     {/* Coluna 1: Nome da Congregação */}
-                    <td className="py-3 px-4">
-                      <div className="font-bold text-gray-800 flex items-center gap-2">
+                    <td className="py-3.5 px-5">
+                      <div className="font-bold text-slate-900 flex items-center gap-2">
                         {item.nome}
                         {item.isSede && (
-                          <span className="text-[10px] bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] bg-teal-50 text-teal-800 border border-teal-200 font-bold px-2 py-0.5 rounded-full shadow-2xs">
                             Sede
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-400">Unidade Local</p>
+                      <p className="text-xs text-slate-400 font-medium">Unidade Local</p>
                     </td>
 
                     {/* Coluna 2: Status do Mês Selecionado */}
-                    <td className="py-3 px-4">
+                    <td className="py-3.5 px-5">
                       {item.isFechado ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full">
-                          <Lock className="h-3 w-3" /> Fechado
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full shadow-2xs">
+                          <Lock className="h-3 w-3 text-amber-700" /> Fechado
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-green-800 bg-green-100 px-2.5 py-1 rounded-full">
-                          <CheckCircle className="h-3 w-3" /> Aberto
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-900 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shadow-2xs">
+                          <CheckCircle className="h-3 w-3 text-emerald-700" /> Aberto
                         </span>
                       )}
                     </td>
 
                     {/* Coluna 3: Histórico do Último Fechamento */}
-                    <td className="py-3 px-4 text-xs">
+                    <td className="py-3.5 px-5 text-xs">
                       {item.ultFechamento ? (
                         <div>
-                          <p className="font-semibold text-gray-700">
+                          <p className="font-bold text-slate-800">
                             {item.ultFechamento.mes_referencia}
                           </p>
-                          <p className="text-gray-400">
-                            Saldo Final: <span className="font-semibold text-[#123b63]">{fmtBRL(item.ultFechamento.saldo_final)}</span>
+                          <p className="text-slate-500 font-medium mt-0.5">
+                            Saldo Final:{' '}
+                            <span className="font-extrabold text-[#1e3a8a]">
+                              {fmtBRL(item.ultFechamento.saldo_final)}
+                            </span>
                           </p>
                         </div>
                       ) : (
-                        <span className="text-gray-400 italic">Sem fechamento anterior</span>
+                        <span className="text-slate-400 italic">Sem fechamento anterior</span>
                       )}
                     </td>
 
                     {/* Coluna 4: Botões de Ações */}
-                    <td className="py-3 px-4 text-right">
+                    <td className="py-3.5 px-5 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {/* Botão Fechar Caixa */}
                         <button
                           onClick={() => onAbrirModalFechamento(item.id)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-[#123b63] text-white rounded-lg text-xs font-semibold hover:bg-[#0f2a45] transition"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-bold transition shadow-xs border border-teal-800 cursor-pointer"
                           title="Realizar Fechamento do Caixa"
                         >
                           <Lock className="h-3.5 w-3.5" /> Fechar
@@ -205,20 +213,20 @@ export default function FechamentoCaixaTable({
                         {item.ultFechamento && (
                           <button
                             onClick={() => onImprimirFechamento(item.ultFechamento, item.nome)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg text-xs font-medium transition"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs"
                             title="Imprimir Relatório de Fechamento"
                           >
-                            <Printer className="h-3.5 w-3.5" /> Imprimir
+                            <Printer className="h-3.5 w-3.5 text-slate-500" /> Imprimir
                           </button>
                         )}
 
                         {/* Botão Ver Histórico Completo */}
                         <button
                           onClick={() => setHistoricoModalCong({ id: item.id, nome: item.nome })}
-                          className="flex items-center gap-1 px-2.5 py-1.5 border border-slate-200 text-gray-600 hover:bg-slate-100 rounded-lg text-xs font-medium transition"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-800 rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs"
                           title="Ver Histórico de Fechamentos"
                         >
-                          <History className="h-3.5 w-3.5 text-gray-500" /> Histórico
+                          <History className="h-3.5 w-3.5 text-slate-500" /> Histórico
                         </button>
                       </div>
                     </td>
@@ -233,14 +241,22 @@ export default function FechamentoCaixaTable({
       {/* Modal Gaveta de Histórico de Fechamentos por Congregação */}
       {historicoModalCong && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 w-full max-w-2xl space-y-4 max-h-[85vh] flex flex-col">
-            <div className="flex justify-between items-center border-b pb-3 border-gray-100">
-              <div>
-                <h3 className="text-base font-bold text-[#123b63]">Histórico de Fechamentos</h3>
-                <p className="text-xs text-gray-500">{historicoModalCong.nome}</p>
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 w-full max-w-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex justify-between items-center border-b pb-3.5 border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 border border-teal-200 flex items-center justify-center font-bold">
+                  <History className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Histórico de Fechamentos</h3>
+                  <p className="text-xs text-slate-500 font-medium">{historicoModalCong.nome}</p>
+                </div>
               </div>
-              <button onClick={() => setHistoricoModalCong(null)}>
-                <X className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              <button
+                onClick={() => setHistoricoModalCong(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
               </button>
             </div>
 
@@ -252,29 +268,29 @@ export default function FechamentoCaixaTable({
               ) : (
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase">
-                      <th className="py-2.5 px-3">Mês/Ano</th>
-                      <th className="py-2.5 px-3">Saldo Inicial</th>
-                      <th className="py-2.5 px-3">Entradas</th>
-                      <th className="py-2.5 px-3">Saídas</th>
-                      <th className="py-2.5 px-3 text-right">Saldo Final</th>
-                      <th className="py-2.5 px-3 text-center">Ações</th>
+                    <tr className="bg-slate-100/90 border-b border-slate-200 text-slate-800 font-bold uppercase tracking-wider text-[11px]">
+                      <th className="py-3 px-3.5">Mês/Ano</th>
+                      <th className="py-3 px-3.5">Saldo Inicial</th>
+                      <th className="py-3 px-3.5">Entradas</th>
+                      <th className="py-3 px-3.5">Saídas</th>
+                      <th className="py-3 px-3.5 text-right">Saldo Final</th>
+                      <th className="py-3 px-3.5 text-center">Ações</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {historicoCong.map((h) => (
-                      <tr key={h.id} className="hover:bg-gray-50">
-                        <td className="py-2.5 px-3 font-bold text-gray-800">{h.mes_referencia}</td>
-                        <td className="py-2.5 px-3 text-gray-500">{fmtBRL(h.saldo_inicial)}</td>
-                        <td className="py-2.5 px-3 text-green-600 font-medium">+{fmtBRL(h.entradas)}</td>
-                        <td className="py-2.5 px-3 text-red-500 font-medium">-{fmtBRL(h.saidas)}</td>
-                        <td className="py-2.5 px-3 text-right font-bold text-[#123b63]">
+                  <tbody className="divide-y divide-slate-100">
+                    {historicoCong.map((h, idx) => (
+                      <tr key={h.id} className={`hover:bg-slate-50 transition ${idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}`}>
+                        <td className="py-2.5 px-3.5 font-bold text-slate-900">{h.mes_referencia}</td>
+                        <td className="py-2.5 px-3.5 text-slate-500 font-medium">{fmtBRL(h.saldo_inicial)}</td>
+                        <td className="py-2.5 px-3.5 text-[#15803d] font-bold">+{fmtBRL(h.entradas)}</td>
+                        <td className="py-2.5 px-3.5 text-[#be123c] font-bold">-{fmtBRL(h.saidas)}</td>
+                        <td className="py-2.5 px-3.5 text-right font-extrabold text-[#1e3a8a]">
                           {fmtBRL(h.saldo_final)}
                         </td>
-                        <td className="py-2.5 px-3 text-center">
+                        <td className="py-2.5 px-3.5 text-center">
                           <button
                             onClick={() => onImprimirFechamento(h, historicoModalCong.nome)}
-                            className="p-1 text-gray-600 hover:text-[#123b63] transition"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
                             title="Imprimir comprovante"
                           >
                             <Printer className="h-4 w-4 mx-auto" />
