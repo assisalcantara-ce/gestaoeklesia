@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-guard'
+import { BillingService } from '@/lib/platform/billing/service'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,51 +45,113 @@ export async function POST(request: NextRequest) {
 
       const { data: pendingInvoices } = await supabase
         .from('platform_billing_invoices')
-        .select('id')
+        .select('id, ministry_id, status, asaas_payment_id, amount, due_date')
         .eq('ministry_id', ministry_id)
         .in('status', ['pending', 'PENDING', 'overdue', 'OVERDUE', 'vencido', 'pendente'])
 
       if (!pendingInvoices || pendingInvoices.length === 0) {
-        return NextResponse.json({ message: 'Nenhuma cobrança pendente encontrada para cancelar.' })
+        return NextResponse.json({
+          success: true,
+          message: 'Nenhuma cobrança pendente encontrada para cancelar.',
+          summary: {
+            totalSelected: 0,
+            canceledAsaas: 0,
+            canceledLocally: 0,
+            ignoredBlocked: 0,
+            failed: 0,
+            failures: [],
+          },
+        })
       }
 
-      const invoiceIds = pendingInvoices.map((i) => i.id)
+      const billingService = new BillingService()
+      const summary = {
+        totalSelected: pendingInvoices.length,
+        canceledAsaas: 0,
+        canceledLocally: 0,
+        ignoredBlocked: 0,
+        failed: 0,
+        failures: [] as Array<{ invoiceId: string; asaasPaymentId: string | null; reason: string }>,
+      }
 
-      const { error: updateErr } = await supabase
-        .from('platform_billing_invoices')
-        .update({
-          status: 'canceled',
-          updated_at: new Date().toISOString(),
-        } as any)
-        .in('id', invoiceIds)
+      for (const inv of pendingInvoices) {
+        try {
+          const res = await billingService.cancelOrDeleteInvoiceSynchronized(
+            supabase,
+            inv,
+            {
+              reason: cancel_reason,
+              adminEmail: user.email,
+            }
+          )
 
-      if (updateErr) {
-        return NextResponse.json({ error: updateErr.message }, { status: 400 })
+          if (res.success) {
+            if (res.asaasAction === 'deleted') summary.canceledAsaas++
+            if (res.localAction === 'canceled') summary.canceledLocally++
+          } else {
+            if (res.asaasAction === 'blocked') {
+              summary.ignoredBlocked++
+            } else {
+              summary.failed++
+            }
+            summary.failures.push({
+              invoiceId: inv.id,
+              asaasPaymentId: inv.asaas_payment_id || null,
+              reason: res.error || 'Erro ao cancelar cobrança',
+            })
+          }
+        } catch (itemErr: any) {
+          summary.failed++
+          summary.failures.push({
+            invoiceId: inv.id,
+            asaasPaymentId: inv.asaas_payment_id || null,
+            reason: itemErr?.message || 'Exceção não tratada ao cancelar fatura',
+          })
+        }
       }
 
       // Auditoria
       try {
-        await supabase.from('admin_audit_logs').insert([
+        await supabase.from('audit_logs').insert([
           {
-            action: 'batch_cancel_invoices',
-            entity_type: 'platform_billing_invoices',
-            entity_id: ministry_id,
+            ministry_id,
+            usuario_id: user.id,
+            usuario_email: user.email,
+            action: 'CANCEL',
+            acao: 'deletar',
+            resource_type: 'platform_billing_invoices',
+            modulo: 'financeiro',
+            area: 'pagamentos',
+            tabela_afetada: 'platform_billing_invoices',
+            resource_id: ministry_id,
+            registro_id: ministry_id,
+            descricao: `Cancelamento em lote de ${summary.canceledLocally} fatura(s) sincronizado com ASAAS para o cliente ${ministry.name}`,
             changes: {
               ministry_name: ministry.name,
-              canceled_count: invoiceIds.length,
-              invoice_ids: invoiceIds,
+              total_selected: summary.totalSelected,
+              canceled_asaas: summary.canceledAsaas,
+              canceled_locally: summary.canceledLocally,
+              ignored_blocked: summary.ignoredBlocked,
+              failed_count: summary.failed,
+              failures: summary.failures,
               cancel_reason,
               by_admin: user.email,
-              timestamp: new Date().toISOString(),
             },
-            status: 'success',
+            status: summary.failed === 0 ? 'sucesso' : 'parcial',
+            status_code: summary.failed === 0 ? 200 : 207,
+            ip_address: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || '127.0.0.1',
+            user_agent: request.headers.get('user-agent') || 'desconhecido',
           },
         ])
       } catch {
         // Ignora erro se auditoria indisponível
       }
 
-      return NextResponse.json({ success: true, count: invoiceIds.length })
+      return NextResponse.json({
+        success: summary.failed === 0,
+        count: summary.canceledLocally,
+        summary,
+      })
     }
 
     // 2. AÇÃO: Excluir todas as pendentes (Super Admin exclusivo)
@@ -109,47 +172,116 @@ export async function POST(request: NextRequest) {
 
       const { data: pendingInvoices } = await supabase
         .from('platform_billing_invoices')
-        .select('id')
+        .select('id, ministry_id, status, asaas_payment_id, amount, due_date')
         .eq('ministry_id', ministry_id)
         .in('status', ['pending', 'PENDING', 'overdue', 'OVERDUE', 'vencido', 'pendente'])
 
       if (!pendingInvoices || pendingInvoices.length === 0) {
-        return NextResponse.json({ message: 'Nenhuma cobrança pendente encontrada para excluir.' })
+        return NextResponse.json({
+          success: true,
+          message: 'Nenhuma cobrança pendente encontrada para excluir.',
+          summary: {
+            totalSelected: 0,
+            canceledAsaas: 0,
+            canceledLocally: 0,
+            ignoredBlocked: 0,
+            failed: 0,
+            failures: [],
+          },
+        })
       }
 
-      const invoiceIds = pendingInvoices.map((i) => i.id)
-
-      const { error: delErr } = await supabase
-        .from('platform_billing_invoices')
-        .delete()
-        .in('id', invoiceIds)
-
-      if (delErr) {
-        return NextResponse.json({ error: delErr.message }, { status: 400 })
+      const billingService = new BillingService()
+      const summary = {
+        totalSelected: pendingInvoices.length,
+        canceledAsaas: 0,
+        canceledLocally: 0,
+        ignoredBlocked: 0,
+        failed: 0,
+        failures: [] as Array<{ invoiceId: string; asaasPaymentId: string | null; reason: string }>,
       }
 
-      // Auditoria
+      const processedIds: string[] = []
+
+      // Processar individualmente para não gerar falha em cascata
+      for (const inv of pendingInvoices) {
+        try {
+          const res = await billingService.cancelOrDeleteInvoiceSynchronized(
+            supabase,
+            inv,
+            {
+              reason: 'Exclusão em lote de pendentes pelo Super Admin',
+              adminEmail: user.email,
+            }
+          )
+
+          if (res.success) {
+            processedIds.push(inv.id)
+            if (res.asaasAction === 'deleted') summary.canceledAsaas++
+            if (res.localAction === 'canceled') summary.canceledLocally++
+          } else {
+            if (res.asaasAction === 'blocked') {
+              summary.ignoredBlocked++
+            } else {
+              summary.failed++
+            }
+            summary.failures.push({
+              invoiceId: inv.id,
+              asaasPaymentId: inv.asaas_payment_id || null,
+              reason: res.error || 'Erro desconhecido ao processar cobrança',
+            })
+          }
+        } catch (itemErr: any) {
+          summary.failed++
+          summary.failures.push({
+            invoiceId: inv.id,
+            asaasPaymentId: inv.asaas_payment_id || null,
+            reason: itemErr?.message || 'Exceção não tratada ao processar fatura',
+          })
+        }
+      }
+
+      // Auditoria com detalhes seguros da operação
       try {
-        await supabase.from('admin_audit_logs').insert([
+        await supabase.from('audit_logs').insert([
           {
-            action: 'batch_delete_invoices',
-            entity_type: 'platform_billing_invoices',
-            entity_id: ministry_id,
+            ministry_id,
+            usuario_id: user.id,
+            usuario_email: user.email,
+            action: 'DELETE',
+            acao: 'deletar',
+            resource_type: 'platform_billing_invoices',
+            modulo: 'financeiro',
+            area: 'pagamentos',
+            tabela_afetada: 'platform_billing_invoices',
+            resource_id: ministry_id,
+            registro_id: ministry_id,
+            descricao: `Exclusão em lote (soft delete) de ${summary.canceledLocally} fatura(s) sincronizada com ASAAS para o cliente ${ministry.name}`,
             changes: {
               ministry_name: ministry.name,
-              deleted_count: invoiceIds.length,
-              invoice_ids: invoiceIds,
+              total_selected: summary.totalSelected,
+              canceled_asaas: summary.canceledAsaas,
+              canceled_locally: summary.canceledLocally,
+              ignored_blocked: summary.ignoredBlocked,
+              failed_count: summary.failed,
+              failures: summary.failures,
               by_admin: user.email,
-              timestamp: new Date().toISOString(),
             },
-            status: 'success',
+            status: summary.failed === 0 ? 'sucesso' : 'parcial',
+            status_code: summary.failed === 0 ? 200 : 207,
+            ip_address: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || '127.0.0.1',
+            user_agent: request.headers.get('user-agent') || 'desconhecido',
           },
         ])
       } catch {
         // Ignora erro se auditoria indisponível
       }
 
-      return NextResponse.json({ success: true, count: invoiceIds.length })
+      return NextResponse.json({
+        success: summary.failed === 0,
+        count: summary.canceledLocally,
+        summary,
+      })
     }
 
     // 3. AÇÃO: Regenerar Cobranças
@@ -167,23 +299,29 @@ export async function POST(request: NextRequest) {
       // 3.1 Tratar cobranças pendentes existentes (sem alterar nenhuma fatura paga)
       const { data: existingPending } = await supabase
         .from('platform_billing_invoices')
-        .select('id')
+        .select('id, ministry_id, status, asaas_payment_id')
         .eq('ministry_id', ministry_id)
         .in('status', ['pending', 'PENDING', 'overdue', 'OVERDUE', 'vencido', 'pendente'])
 
-      const existingIds = existingPending ? existingPending.map((i) => i.id) : []
+      const billingService = new BillingService()
+      const existingInvoices = existingPending || []
+      const existingIds = existingInvoices.map((i) => i.id)
 
-      if (existingIds.length > 0) {
-        if (pending_action === 'delete') {
-          await supabase.from('platform_billing_invoices').delete().in('id', existingIds)
-        } else {
+      for (const inv of existingInvoices) {
+        try {
+          await billingService.cancelOrDeleteInvoiceSynchronized(supabase, inv, {
+            reason: `Regeneração de cronograma (${pending_action || 'cancel'})`,
+            adminEmail: user.email,
+          })
+        } catch {
+          // Garante fallback local mantendo status canceled se a API externa oscilar
           await supabase
             .from('platform_billing_invoices')
             .update({
               status: 'canceled',
               updated_at: new Date().toISOString(),
-            } as any)
-            .in('id', existingIds)
+            })
+            .eq('id', inv.id)
         }
       }
 
@@ -240,11 +378,20 @@ export async function POST(request: NextRequest) {
 
       // Auditoria da operação de regeneração
       try {
-        await supabase.from('admin_audit_logs').insert([
+        await supabase.from('audit_logs').insert([
           {
-            action: 'batch_regenerate_invoices',
-            entity_type: 'platform_billing_invoices',
-            entity_id: ministry_id,
+            ministry_id,
+            usuario_id: user.id,
+            usuario_email: user.email,
+            action: 'UPDATE',
+            acao: 'editar',
+            resource_type: 'platform_billing_invoices',
+            modulo: 'financeiro',
+            area: 'pagamentos',
+            tabela_afetada: 'platform_billing_invoices',
+            resource_id: ministry_id,
+            registro_id: ministry_id,
+            descricao: `Regeneração de parcelas para o cliente ${ministry.name}: ${existingIds.length} pendência(s) tratada(s), ${installmentCount} nova(s) parcela(s) gerada(s)`,
             changes: {
               ministry_name: ministry.name,
               pending_action_taken: pending_action,
@@ -253,9 +400,11 @@ export async function POST(request: NextRequest) {
               new_due_day,
               amount_per_installment: amountVal,
               by_admin: user.email,
-              timestamp: new Date().toISOString(),
             },
-            status: 'success',
+            status: 'sucesso',
+            status_code: 200,
+            ip_address: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || '127.0.0.1',
+            user_agent: request.headers.get('user-agent') || 'desconhecido',
           },
         ])
       } catch {

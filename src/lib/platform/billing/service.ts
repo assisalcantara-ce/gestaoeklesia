@@ -1,7 +1,31 @@
 import { SupabaseClient } from '@supabase/supabase-js'
-import { ensureAsaasCustomer, createAsaasPayment } from '@/lib/asaas'
+import { ensureAsaasCustomer, createAsaasPayment, getAsaasPayment, deleteAsaasPayment } from '@/lib/asaas'
 import { Invoice, CreateInvoiceInput, GenerateInvoiceInput, GenerateInvoiceResult } from './types'
 import { INVOICE_DUE_DAYS } from './constants'
+
+export const NON_CANCELABLE_ASAAS_STATUSES = [
+  'RECEIVED',
+  'CONFIRMED',
+  'RECEIVED_IN_CASH',
+  'REFUNDED',
+  'REFUND_REQUESTED',
+  'CHARGEBACK_REQUESTED',
+  'CHARGEBACK_DISPUTE',
+  'AWAITING_CHARGEBACK_REVERSAL',
+  'DUNNING_REQUESTED',
+  'DUNNING_RECEIVED',
+  'AWAITING_RISK_ANALYSIS',
+] as const
+
+export interface CancelInvoiceResult {
+  success: boolean
+  invoiceId: string
+  asaasPaymentId: string | null
+  asaasAction: 'deleted' | 'already_canceled' | 'not_linked' | 'failed' | 'blocked'
+  localAction: 'canceled' | 'already_canceled' | 'unmodified'
+  error?: string
+  asaasStatus?: string
+}
 
 export class BillingService {
   async getInvoiceByPaymentId(
@@ -197,4 +221,150 @@ export class BillingService {
 
     return data.id
   }
+
+  /**
+   * Cancela ou exclui com segurança uma fatura da plataforma,
+   * sincronizando com o Asaas antes de atualizar o status local para 'canceled'.
+   * 
+   * NUNCA executa DELETE físico na tabela platform_billing_invoices.
+   * NUNCA cancela cobranças que já foram pagas ou que estão em disputa/estorno.
+   */
+  async cancelOrDeleteInvoiceSynchronized(
+    supabaseAdmin: SupabaseClient,
+    invoice: {
+      id: string
+      ministry_id?: string
+      status: string
+      asaas_payment_id?: string | null
+    },
+    options?: {
+      reason?: string
+      adminEmail?: string
+    }
+  ): Promise<CancelInvoiceResult> {
+    const invoiceId = invoice.id
+    const asaasPaymentId = invoice.asaas_payment_id || null
+
+    if (process.env.NODE_ENV !== 'production' && options?.reason) {
+      console.log(`[BillingService] Cancelando fatura ${invoiceId} - Motivo: ${options.reason}`);
+    }
+
+    // 1. Verificação local prévia
+    const currentLocalStatus = String(invoice.status || '').toLowerCase()
+    if (['paid', 'pago', 'paga'].includes(currentLocalStatus)) {
+      return {
+        success: false,
+        invoiceId,
+        asaasPaymentId,
+        asaasAction: 'blocked',
+        localAction: 'unmodified',
+        error: 'Cobrança já consta como paga localmente e não pode ser cancelada.',
+      }
+    }
+
+    let asaasAction: CancelInvoiceResult['asaasAction'] = 'not_linked'
+    let asaasStatusFound: string | undefined
+
+    // 2. Se houver vínculo com Asaas, consultar estado atual no gateway
+    if (asaasPaymentId) {
+      try {
+        const asaasPayment = await getAsaasPayment(asaasPaymentId)
+        asaasStatusFound = asaasPayment?.status ? String(asaasPayment.status).toUpperCase() : undefined
+        const isDeletedOnAsaas = Boolean(asaasPayment?.deleted)
+
+        // Validar se o status do Asaas é proibido para exclusão
+        if (asaasStatusFound && (NON_CANCELABLE_ASAAS_STATUSES as readonly string[]).includes(asaasStatusFound)) {
+          return {
+            success: false,
+            invoiceId,
+            asaasPaymentId,
+            asaasAction: 'blocked',
+            localAction: 'unmodified',
+            asaasStatus: asaasStatusFound,
+            error: `Cobrança possui status irreversível no ASAAS (${asaasStatusFound}) e não pode ser cancelada.`,
+          }
+        }
+
+        // Se já constar como deleted no ASAAS, é idempotente
+        if (isDeletedOnAsaas) {
+          asaasAction = 'already_canceled'
+        } else {
+          // Tentar exclusão / cancelamento no ASAAS
+          try {
+            await deleteAsaasPayment(asaasPaymentId)
+            asaasAction = 'deleted'
+          } catch (delError: any) {
+            const errorMsg = delError?.message || 'Erro ao cancelar cobrança no ASAAS'
+            return {
+              success: false,
+              invoiceId,
+              asaasPaymentId,
+              asaasAction: 'failed',
+              localAction: 'unmodified',
+              asaasStatus: asaasStatusFound,
+              error: `Falha ao remover cobrança no ASAAS: ${errorMsg}`,
+            }
+          }
+        }
+      } catch (getErr: any) {
+        // Se a cobrança não foi encontrada no ASAAS (404), trata com segurança idempotente
+        const errorMsg = getErr?.message || ''
+        if (errorMsg.includes('não encontrada') || errorMsg.includes('not found') || errorMsg.includes('404')) {
+          asaasAction = 'already_canceled'
+        } else {
+          return {
+            success: false,
+            invoiceId,
+            asaasPaymentId,
+            asaasAction: 'failed',
+            localAction: 'unmodified',
+            error: `Falha ao consultar estado da cobrança no ASAAS: ${errorMsg}`,
+          }
+        }
+      }
+    }
+
+    // 3. Atualização local: Somente se o ASAAS confirmou sucesso (ou já estava cancelado / sem vínculo)
+    // Preserva rigorosamente o registro local mudando apenas status para 'canceled' (soft delete)
+    if (currentLocalStatus === 'canceled' || currentLocalStatus === 'cancelada') {
+      return {
+        success: true,
+        invoiceId,
+        asaasPaymentId,
+        asaasAction,
+        localAction: 'already_canceled',
+        asaasStatus: asaasStatusFound,
+      }
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('platform_billing_invoices')
+      .update({
+        status: 'canceled',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', invoiceId)
+
+    if (updateError) {
+      return {
+        success: false,
+        invoiceId,
+        asaasPaymentId,
+        asaasAction,
+        localAction: 'unmodified',
+        asaasStatus: asaasStatusFound,
+        error: `ASAAS processado (${asaasAction}), mas ocorreu erro ao atualizar status local: ${updateError.message}`,
+      }
+    }
+
+    return {
+      success: true,
+      invoiceId,
+      asaasPaymentId,
+      asaasAction,
+      localAction: 'canceled',
+      asaasStatus: asaasStatusFound,
+    }
+  }
 }
+

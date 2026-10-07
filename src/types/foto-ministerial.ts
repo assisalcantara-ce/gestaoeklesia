@@ -23,7 +23,13 @@ export interface ComposicaoFotoCamadas {
     zoom: number; // 1x a 3x
     posX: number; // deslocamento horizontal (-150px a +150px)
     posY: number; // deslocamento vertical (-150px a +150px)
-    rotacao: number; // 0, 90, 180, 270 graus
+    rotacao: number; // -90 a +90 graus
+  };
+  /** Transformações independentes e proporcionais da camada do traje */
+  trajeTransform?: {
+    escala: number; // 0.6x a 1.6x (padrão 1.0)
+    posX: number; // deslocamento horizontal em px
+    posY: number; // deslocamento vertical em px
   };
   /** Composição final rasterizada resultante para preview / upload */
   fotoCompostaPreview: string | null;

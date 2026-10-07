@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-guard'
+import { BillingService } from '@/lib/platform/billing/service'
 
 export const dynamic = 'force-dynamic';
 
@@ -286,35 +287,68 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Fatura não encontrada' }, { status: 404 })
     }
 
-    const { error: deleteError } = await supabase
-      .from('platform_billing_invoices')
-      .delete()
-      .eq('id', invoiceId)
+    const billingService = new BillingService()
+    const resultSync = await billingService.cancelOrDeleteInvoiceSynchronized(
+      supabase,
+      invoice,
+      {
+        reason: 'Exclusão unitária solicitada pelo Super Admin',
+        adminEmail: user.email,
+      }
+    )
 
-    if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 400 })
+    if (!resultSync.success) {
+      return NextResponse.json(
+        {
+          error: resultSync.error || 'Não foi possível cancelar/excluir a cobrança.',
+          details: resultSync,
+        },
+        { status: 400 },
+      )
     }
 
-    // Auditoria
+    // Auditoria segura
     try {
-      await supabase.from('admin_audit_logs').insert([
+      await supabase.from('audit_logs').insert([
         {
-          action: 'delete_billing_invoice',
-          entity_type: 'platform_billing_invoices',
-          entity_id: invoiceId,
+          ministry_id: invoice.ministry_id,
+          usuario_id: user.id,
+          usuario_email: user.email,
+          action: 'CANCEL',
+          acao: 'deletar',
+          resource_type: 'platform_billing_invoices',
+          modulo: 'financeiro',
+          area: 'pagamentos',
+          tabela_afetada: 'platform_billing_invoices',
+          resource_id: invoiceId,
+          registro_id: invoiceId,
+          descricao: `Cobrança de R$ ${(invoice.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} cancelada e sincronizada com ASAAS`,
           changes: {
-            deleted_invoice: invoice,
+            invoice_id: invoiceId,
+            ministry_id: invoice.ministry_id,
+            amount: invoice.amount,
+            due_date: invoice.due_date,
+            asaas_payment_id: invoice.asaas_payment_id,
+            asaas_action: resultSync.asaasAction,
+            local_action: resultSync.localAction,
+            asaas_status: resultSync.asaasStatus,
             by_admin: user.email,
-            timestamp: new Date().toISOString(),
           },
-          status: 'success',
+          status: 'sucesso',
+          status_code: 200,
+          ip_address: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || '127.0.0.1',
+          user_agent: request.headers.get('user-agent') || 'desconhecido',
         },
       ])
     } catch {
       // Ignora erro se auditoria indisponível
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({
+      success: true,
+      message: 'Cobrança cancelada com sucesso.',
+      details: resultSync,
+    })
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Erro interno do servidor' }, { status: 500 })
   }

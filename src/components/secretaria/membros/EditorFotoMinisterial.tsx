@@ -18,6 +18,13 @@ import {
   Wand2,
   Loader2,
   Undo2,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowDown,
+  Move,
+  Minus,
+  Plus,
 } from 'lucide-react';
 import {
   TRAJES_MINISTERIAIS_PRESET,
@@ -56,14 +63,20 @@ export default function EditorFotoMinisterial({
   // ── 2. Camada de Traje Ministerial ──────────────────────────────────────────
   const [trajeSelecionado, setTrajeSelecionado] = useState<string>('nenhum');
 
-  // ── 3. Transformações de enquadramento (Zoom, PosX, PosY, Rotação) ─────────
+  // Transformações independentes e proporcionais da camada do traje (Camada 2)
+  const [trajeEscala, setTrajeEscala] = useState<number>(1.0); // 0.6x a 1.6x (100% padrão)
+  const [trajePosX, setTrajePosX] = useState<number>(0); // Deslocamento horizontal em px (-100 a +100)
+  const [trajePosY, setTrajePosY] = useState<number>(0); // Deslocamento vertical em px (-100 a +100)
+
+  // ── 3. Transformações de enquadramento da Fotografia (Camada 1) ─────────────
   const [zoom, setZoom] = useState<number>(1);
   const [posX, setPosX] = useState<number>(0);
   const [posY, setPosY] = useState<number>(0);
   const [rotacao, setRotacao] = useState<number>(0);
 
-  // ── 4. Estados de interação do mouse (Arrastar / Drag) ───────────────────────
+  // ── 4. Estados de interação do mouse (Arrastar / Drag independente) ──────────
   const [isDragging, setIsDragging] = useState(false);
+  const [dragMode, setDragMode] = useState<'foto' | 'traje'>('foto');
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // ── 5. Refs para Canvas e Elementos ──────────────────────────────────────────
@@ -82,12 +95,17 @@ export default function EditorFotoMinisterial({
     }
   }, [fotoMembro]);
 
-  // ── Resetar enquadramento mantendo a foto original ──────────────────────────
+  // ── Resetar enquadramento mantendo a foto e o traje selecionado ─────────────
   const resetarEnquadramento = useCallback(() => {
+    // Restaura enquadramento da fotografia
     setZoom(1);
     setPosX(0);
     setPosY(0);
     setRotacao(0);
+    // Restaura posição e escala padrão do traje (mantendo o traje selecionado)
+    setTrajeEscala(1.0);
+    setTrajePosX(0);
+    setTrajePosY(0);
   }, []);
 
   // ── Remover foto ────────────────────────────────────────────────────────────
@@ -212,10 +230,11 @@ export default function EditorFotoMinisterial({
   const girarHorario = () => setRotacao((prev) => Math.min(90, prev + 5));
   const resetarRotacao = () => setRotacao(0);
 
-  // ── Interação de Arrastar (Pan/Drag) ─────────────────────────────────────────
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // ── Interação de Arrastar (Pan/Drag independente de Foto e Traje) ───────────
+  const handleMouseDown = (e: React.MouseEvent, mode: 'foto' | 'traje' = 'foto') => {
     if (!fotoOriginal) return;
     setIsDragging(true);
+    setDragMode(mode);
     setDragStart({ x: e.clientX, y: e.clientY });
   };
 
@@ -223,8 +242,16 @@ export default function EditorFotoMinisterial({
     if (!isDragging || !fotoOriginal) return;
     const deltaX = e.clientX - dragStart.x;
     const deltaY = e.clientY - dragStart.y;
-    setPosX((prev) => Math.max(-150, Math.min(150, prev + deltaX)));
-    setPosY((prev) => Math.max(-150, Math.min(150, prev + deltaY)));
+
+    if (dragMode === 'traje') {
+      // Arraste independente da camada do traje
+      setTrajePosX((prev) => Math.max(-120, Math.min(120, prev + deltaX)));
+      setTrajePosY((prev) => Math.max(-120, Math.min(120, prev + deltaY)));
+    } else {
+      // Arraste independente da fotografia
+      setPosX((prev) => Math.max(-150, Math.min(150, prev + deltaX)));
+      setPosY((prev) => Math.max(-150, Math.min(150, prev + deltaY)));
+    }
     setDragStart({ x: e.clientX, y: e.clientY });
   };
 
@@ -263,10 +290,13 @@ export default function EditorFotoMinisterial({
       const centerX = targetWidth / 2;
       const centerY = targetHeight / 2;
 
+      const previewWidth = 240;
+      const ratio = targetWidth / previewWidth; // 1.25
+
       ctx.translate(centerX, centerY);
       ctx.rotate((rotacao * Math.PI) / 180);
       ctx.scale(zoom, zoom);
-      ctx.translate(posX, posY);
+      ctx.translate(posX * ratio, posY * ratio);
       ctx.translate(-centerX, -centerY);
 
       // Enquadramento proporcional cover
@@ -289,22 +319,32 @@ export default function EditorFotoMinisterial({
       ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
       ctx.restore();
 
-      // ── CAMADA 2: Traje Ministerial (Overlay PNG sobreposto) ─────────────────
+      // ── CAMADA 2: Traje Ministerial PNG (Camada Independente - Idêntica ao Preview) ──
       const traje = TRAJES_MINISTERIAIS_PRESET.find((t) => t.id === trajeSelecionado);
       if (traje && traje.overlay) {
         const overlayImg = new Image();
         overlayImg.crossOrigin = 'anonymous';
         overlayImg.onload = () => {
-          // O traje cobre os ombros e tronco da foto na parte inferior
-          // Largura total proporcional aos ombros (108%)
-          // Deslocado para baixo (+17% da altura) para liberar espaço para o pescoço e rosto
+          // Escala exata entre canvas (300x400) e preview (240x320): ratio = 300/240 = 1.25
+          const previewWidth = 240;
+          const ratio = targetWidth / previewWidth; // 1.25
+
+          // No preview:
+          // container do traje: absolute inset-0 flex flex-col justify-end items-center
+          // img: width: `${108 * trajeEscala}%` (de previewWidth)
+          // transform: `translate(${trajePosX}px, calc(17.5% + ${trajePosY}px))`
+          // onde 17.5% no CSS transform de translateY(17.5%) é relativo à altura da própria imagem (overlayH)
           const suitAspect = overlayImg.width / overlayImg.height;
-          const overlayW = targetWidth * 1.08;
+          const overlayW = targetWidth * 1.08 * trajeEscala;
           const overlayH = overlayW / suitAspect;
-          const overlayX = (targetWidth - overlayW) / 2;
-          // Desce o terno em ~17.5% da altura total (70px) para liberar pescoço e queixo
-          const verticalOffset = targetHeight * 0.175;
-          const overlayY = targetHeight - overlayH + verticalOffset;
+
+          // Posição X: centralizado horizontalmente no canvas + deslocamento escalado
+          const overlayX = (targetWidth - overlayW) / 2 + (trajePosX * ratio);
+
+          // Posição Y: alinhado à base inferior do canvas (targetHeight - overlayH)
+          // + deslocamento translateY(17.5% de overlayH) + deslocamento manual escalado (trajePosY * ratio)
+          const baseOffsetTranslateY = overlayH * 0.175;
+          const overlayY = (targetHeight - overlayH) + baseOffsetTranslateY + (trajePosY * ratio);
 
           ctx.drawImage(overlayImg, overlayX, overlayY, overlayW, overlayH);
           const dataUrlComposta = canvas.toDataURL('image/jpeg', 0.92);
@@ -319,7 +359,28 @@ export default function EditorFotoMinisterial({
     };
     const fotoAtiva = fotoSemFundo || fotoOriginal;
     img.src = fotoAtiva;
-  }, [fotoOriginal, fotoSemFundo, trajeSelecionado, zoom, posX, posY, rotacao, onSaveComposicao]);
+  }, [
+    fotoOriginal,
+    fotoSemFundo,
+    trajeSelecionado,
+    trajeEscala,
+    trajePosX,
+    trajePosY,
+    zoom,
+    posX,
+    posY,
+    rotacao,
+    onSaveComposicao,
+  ]);
+
+  // Atualiza composição quando os controles são alterados (com debounce suave)
+  useEffect(() => {
+    if (!fotoOriginal) return;
+    const timer = setTimeout(() => {
+      renderizarComposicao();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [renderizarComposicao, fotoOriginal, fotoSemFundo, trajeEscala, trajePosX, trajePosY]);
 
   // Atualiza composição quando os controles são alterados (com debounce suave)
   useEffect(() => {
@@ -469,26 +530,34 @@ export default function EditorFotoMinisterial({
                     </div>
                   )}
 
-                  {/* CAMADA 2: OVERLAY VISUAL DE TRAJE MINISTERIAL (PNG Transparente Real) */}
+                  {/* CAMADA 2: OVERLAY VISUAL DE TRAJE MINISTERIAL (Camada Independente) */}
                   {trajeSelecionado !== 'nenhum' && (() => {
                     const traje = TRAJES_MINISTERIAIS_PRESET.find((t) => t.id === trajeSelecionado);
                     if (!traje?.overlay) return null;
                     return (
-                      <div className="absolute inset-0 pointer-events-none flex flex-col justify-end items-center z-10 overflow-hidden">
-                        {/* Imagem do traje posicionada na base inferior do enquadramento cobrindo o tronco com offset de 17.5% */}
+                      <div
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          handleMouseDown(e, 'traje');
+                        }}
+                        className="absolute inset-0 flex flex-col justify-end items-center z-10 overflow-hidden cursor-grab active:cursor-grabbing"
+                        title="Arraste para posicionar o traje"
+                      >
+                        {/* Imagem do traje com escala proporcional e posição X / Y manuais */}
                         <img
                           src={traje.overlay}
                           alt={traje.nome}
                           draggable={false}
-                          className="w-[108%] max-w-none object-contain select-none pointer-events-none drop-shadow-sm transition-transform duration-150"
+                          className="max-w-none object-contain select-none pointer-events-none drop-shadow-sm transition-transform duration-75"
                           style={{
-                            transform: 'translateY(17.5%)',
+                            width: `${108 * trajeEscala}%`,
+                            transform: `translate(${trajePosX}px, calc(17.5% + ${trajePosY}px))`,
                           }}
                         />
 
                         {/* Badge indicador da camada ativa */}
-                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-xs text-[10px] font-bold text-white border border-white/20">
-                          {traje.nome}
+                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-xs text-[10px] font-bold text-white border border-white/20 pointer-events-none">
+                          {traje.nome} • {Math.round(trajeEscala * 100)}%
                         </div>
                       </div>
                     );
@@ -718,18 +787,127 @@ export default function EditorFotoMinisterial({
                     })}
                   </div>
 
-                  {/* Ação clara de Remoção de Traje */}
+                  {/* ── Controles de Tamanho e Posição do Traje (quando ativo) ── */}
                   {trajeSelecionado !== 'nenhum' && (
-                    <div className="flex justify-start pt-1">
-                      <button
-                        type="button"
-                        onClick={() => setTrajeSelecionado('nenhum')}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-600 hover:text-slate-800 text-xs font-semibold transition cursor-pointer shadow-2xs"
-                        title="Remover traje ministerial aplicado"
-                      >
-                        <span className="text-slate-400 text-sm leading-none">✕</span>
-                        <span>Remover traje</span>
-                      </button>
+                    <div className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200/90 space-y-3.5 mt-2">
+                      {/* Tamanho do traje */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                            <Move className="w-3.5 h-3.5 text-purple-600" />
+                            Tamanho do traje
+                          </span>
+                          <span className="font-extrabold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                            {Math.round(trajeEscala * 100)}%
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setTrajeEscala((prev) =>
+                                Math.max(0.6, parseFloat((prev - 0.05).toFixed(2)))
+                              )
+                            }
+                            className="p-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-600 transition shadow-2xs"
+                            title="Diminuir tamanho do traje"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <input
+                            type="range"
+                            min="0.6"
+                            max="1.6"
+                            step="0.02"
+                            value={trajeEscala}
+                            onChange={(e) => setTrajeEscala(parseFloat(e.target.value))}
+                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setTrajeEscala((prev) =>
+                                Math.min(1.6, parseFloat((prev + 0.05).toFixed(2)))
+                              )
+                            }
+                            className="p-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-600 transition shadow-2xs"
+                            title="Aumentar tamanho do traje"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Posição do traje */}
+                      <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="text-xs font-semibold text-slate-700 block">
+                            Posição do traje
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            Ajuste fino ou arraste no preview
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setTrajePosX((prev) => Math.max(-120, prev - 4))}
+                            className="p-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition shadow-2xs cursor-pointer"
+                            title="Mover traje para a esquerda"
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTrajePosY((prev) => Math.max(-120, prev - 4))}
+                            className="p-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition shadow-2xs cursor-pointer"
+                            title="Mover traje para cima"
+                          >
+                            <ArrowUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTrajePosY((prev) => Math.min(120, prev + 4))}
+                            className="p-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition shadow-2xs cursor-pointer"
+                            title="Mover traje para baixo"
+                          >
+                            <ArrowDown className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTrajePosX((prev) => Math.min(120, prev + 4))}
+                            className="p-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition shadow-2xs cursor-pointer"
+                            title="Mover traje para a direita"
+                          >
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Ação clara de Remoção de Traje */}
+                      <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTrajeEscala(1.0);
+                            setTrajePosX(0);
+                            setTrajePosY(0);
+                          }}
+                          className="text-[11px] font-semibold text-purple-700 hover:underline cursor-pointer"
+                        >
+                          Restaurar posição padrão do traje
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTrajeSelecionado('nenhum')}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-600 hover:text-slate-800 text-xs font-semibold transition cursor-pointer shadow-2xs"
+                          title="Remover traje ministerial aplicado"
+                        >
+                          <span className="text-slate-400 text-sm leading-none">✕</span>
+                          <span>Remover traje</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
