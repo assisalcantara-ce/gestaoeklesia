@@ -143,6 +143,23 @@ export async function GET(request: NextRequest) {
           meta: { page: 1, pageSize, totalCount: 0, totalPages: 1 },
         });
       }
+    } else if (congParam === 'none') {
+      const { data: noCongDests } = await ctx.admin
+        .from('fin_payment_destinations')
+        .select('id')
+        .eq('ministry_id', ctx.ministryId)
+        .is('congregacao_id', null);
+
+      const noCongDestIds = (noCongDests ?? []).map((d: any) => d.id);
+      if (noCongDestIds.length > 0) {
+        query = query.in('destination_id', noCongDestIds);
+      } else {
+        return NextResponse.json({
+          data: [],
+          summary: { totalArrecadado: 0, transacoesPagas: 0 },
+          meta: { page: 1, pageSize, totalCount: 0, totalPages: 1 },
+        });
+      }
     } else if (congParam) {
       const { data: congDests } = await ctx.admin
         .from('fin_payment_destinations')

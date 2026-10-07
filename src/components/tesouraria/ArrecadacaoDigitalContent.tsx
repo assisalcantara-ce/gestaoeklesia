@@ -735,6 +735,7 @@ export default function ArrecadacaoDigitalContent({
                 className="border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 font-semibold outline-none"
               >
                 <option value="">Todas as Congregações</option>
+                <option value="none">Sem Congregação / Sem Vínculo</option>
                 {congregacoes.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nome}
@@ -960,7 +961,8 @@ export default function ArrecadacaoDigitalContent({
                     onChange={(e) => setExtratoCong(e.target.value)}
                     className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#123b63] h-[36px] bg-white font-medium text-slate-700"
                   >
-                    <option value="">Todas as unidades</option>
+                    <option value="">Todas as Congregações</option>
+                    <option value="none">Sem Congregação / Sem Vínculo</option>
                     {congregacoes.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.nome}
@@ -1231,7 +1233,9 @@ export default function ArrecadacaoDigitalContent({
               <p>
                 Congregação:{' '}
                 <span className="font-bold text-gray-800">
-                  {extratoCong
+                  {extratoCong === 'none'
+                    ? 'Sem Congregação / Sem Vínculo'
+                    : extratoCong
                     ? congregacoes.find((c) => c.id === extratoCong)?.nome ||
                       (congNome ? congNome(extratoCong) : 'Congregação Selecionada')
                     : 'Todas as Congregações / Unidades'}

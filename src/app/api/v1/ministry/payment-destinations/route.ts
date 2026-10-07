@@ -113,7 +113,9 @@ export async function GET(request: NextRequest) {
   }
 
   // Filtro por congregação
-  if (congParam) {
+  if (congParam === 'none') {
+    query = query.is('congregacao_id', null);
+  } else if (congParam) {
     query = query.eq('congregacao_id', congParam);
   }
 
