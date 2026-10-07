@@ -187,11 +187,14 @@ export default function ArrecadacaoDigitalContent({
   const [tipoFiltro, setTipoFiltro] = useState('');
   const [congFiltro, setCongFiltro] = useState('');
 
+  const [allDestinos, setAllDestinos] = useState<{ id: string; label: string; congregacao_id?: string | null }[]>([]);
+
   // Filtros da barra de Extrato de Ofertas PIX
   const now = new Date();
   const defaultMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [extratoMes, setExtratoMes] = useState<string>(defaultMes);
   const [extratoCong, setExtratoCong] = useState<string>('');
+  const [extratoDestino, setExtratoDestino] = useState<string>('');
   const [extratoDataInicio, setExtratoDataInicio] = useState<string>('');
   const [extratoDataFim, setExtratoDataFim] = useState<string>('');
   const [extratoTipoMovimento, setExtratoTipoMovimento] = useState<'ambos' | 'entradas' | 'saidas'>('entradas');
@@ -298,6 +301,41 @@ export default function ArrecadacaoDigitalContent({
     }
   }, [page, pageSize, statusFiltro, buscaTexto, tipoFiltro, congFiltro, showModal]);
 
+  // Carregar todos os destinos do ministério para alimentar o filtro do Extrato
+  useEffect(() => {
+    authenticatedFetch('/api/v1/ministry/payment-destinations?pageSize=100')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.data) {
+          setAllDestinos(
+            json.data.map((d: any) => ({
+              id: d.id,
+              label: d.label,
+              congregacao_id: d.congregacao_id ?? null,
+            }))
+          );
+        }
+      })
+      .catch((err) => {
+        console.error('Erro ao carregar lista de destinos para filtro:', err);
+      });
+  }, [destinosUpdatedKey]);
+
+  // Handler para troca de congregação no Extrato com reset de destino inconsistente
+  const handleExtratoCongChange = (novaCong: string) => {
+    setExtratoCong(novaCong);
+    if (extratoDestino) {
+      const destAtual = allDestinos.find((d) => d.id === extratoDestino);
+      if (destAtual) {
+        if (novaCong === 'none' && destAtual.congregacao_id !== null) {
+          setExtratoDestino('');
+        } else if (novaCong !== '' && novaCong !== 'none' && destAtual.congregacao_id !== novaCong) {
+          setExtratoDestino('');
+        }
+      }
+    }
+  };
+
   // 3. Carregar Cobranças / Extrato PIX via API autenticada segura
   const loadCobrancas = useCallback(async () => {
     try {
@@ -308,6 +346,7 @@ export default function ArrecadacaoDigitalContent({
       if (extratoDataFim) params.set('data_fim', extratoDataFim);
       if (!extratoDataInicio && !extratoDataFim && extratoMes) params.set('mes', extratoMes);
       if (extratoCong) params.set('congregacao_id', extratoCong);
+      if (extratoDestino) params.set('destination_id', extratoDestino);
 
       const res = await authenticatedFetch(`/api/v1/ministry/payment-charges?${params.toString()}`);
       if (!res.ok) throw new Error('Erro ao carregar extrato de ofertas.');
@@ -331,7 +370,7 @@ export default function ArrecadacaoDigitalContent({
     } finally {
       setLoadingCobrancas(false);
     }
-  }, [extratoMes, extratoCong, extratoDataInicio, extratoDataFim]);
+  }, [extratoMes, extratoCong, extratoDestino, extratoDataInicio, extratoDataFim]);
 
   useEffect(() => {
     loadDestinos();
@@ -958,7 +997,7 @@ export default function ArrecadacaoDigitalContent({
                   </label>
                   <select
                     value={extratoCong}
-                    onChange={(e) => setExtratoCong(e.target.value)}
+                    onChange={(e) => handleExtratoCongChange(e.target.value)}
                     className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#123b63] h-[36px] bg-white font-medium text-slate-700"
                   >
                     <option value="">Todas as Congregações</option>
@@ -971,6 +1010,32 @@ export default function ArrecadacaoDigitalContent({
                   </select>
                 </div>
               )}
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">QR CODE / DESTINO</label>
+                <select
+                  value={extratoDestino}
+                  onChange={(e) => setExtratoDestino(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#123b63] h-[36px] bg-white font-medium text-slate-700 max-w-[220px]"
+                >
+                  <option value="">Todos os QR Codes</option>
+                  {allDestinos
+                    .filter((d) => {
+                      if (extratoCong === 'none') {
+                        return d.congregacao_id === null;
+                      }
+                      if (extratoCong) {
+                        return d.congregacao_id === extratoCong;
+                      }
+                      return true;
+                    })
+                    .map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.label}
+                      </option>
+                    ))}
+                </select>
+              </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo de Movimento</label>
@@ -1025,6 +1090,7 @@ export default function ArrecadacaoDigitalContent({
                 <button
                   onClick={() => {
                     setExtratoCong('');
+                    setExtratoDestino('');
                     setExtratoTipoMovimento('entradas');
                     setExtratoMes(defaultMes);
                     setExtratoDataInicio('');
@@ -1033,6 +1099,7 @@ export default function ArrecadacaoDigitalContent({
                   }}
                   disabled={
                     extratoCong === '' &&
+                    extratoDestino === '' &&
                     extratoTipoMovimento === 'entradas' &&
                     extratoMes === defaultMes &&
                     extratoDataInicio === '' &&
@@ -1041,6 +1108,7 @@ export default function ArrecadacaoDigitalContent({
                   }
                   className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs font-semibold transition h-[36px] ${
                     extratoCong === '' &&
+                    extratoDestino === '' &&
                     extratoTipoMovimento === 'entradas' &&
                     extratoMes === defaultMes &&
                     extratoDataInicio === '' &&
@@ -1241,6 +1309,14 @@ export default function ArrecadacaoDigitalContent({
                     : 'Todas as Congregações / Unidades'}
                 </span>
               </p>
+              {extratoDestino && (
+                <p>
+                  QR Code / Destino:{' '}
+                  <span className="font-bold text-gray-800">
+                    {allDestinos.find((d) => d.id === extratoDestino)?.label || 'Destino Selecionado'}
+                  </span>
+                </p>
+              )}
               <p>
                 Tipo de Movimento:{' '}
                 <span className="font-bold text-gray-800">

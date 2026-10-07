@@ -134,7 +134,15 @@ export async function GET(request: NextRequest) {
         .eq('congregacao_id', ctx.congregacaoId);
 
       const localDestIds = (localDests ?? []).map((d: any) => d.id);
-      if (localDestIds.length > 0) {
+      if (destinationParam) {
+        if (!localDestIds.includes(destinationParam)) {
+          return NextResponse.json({
+            data: [],
+            summary: { totalArrecadado: 0, transacoesPagas: 0 },
+            meta: { page: 1, pageSize, totalCount: 0, totalPages: 1 },
+          });
+        }
+      } else if (localDestIds.length > 0) {
         query = query.in('destination_id', localDestIds);
       } else {
         return NextResponse.json({
@@ -151,7 +159,15 @@ export async function GET(request: NextRequest) {
         .is('congregacao_id', null);
 
       const noCongDestIds = (noCongDests ?? []).map((d: any) => d.id);
-      if (noCongDestIds.length > 0) {
+      if (destinationParam) {
+        if (!noCongDestIds.includes(destinationParam)) {
+          return NextResponse.json({
+            data: [],
+            summary: { totalArrecadado: 0, transacoesPagas: 0 },
+            meta: { page: 1, pageSize, totalCount: 0, totalPages: 1 },
+          });
+        }
+      } else if (noCongDestIds.length > 0) {
         query = query.in('destination_id', noCongDestIds);
       } else {
         return NextResponse.json({
@@ -168,7 +184,15 @@ export async function GET(request: NextRequest) {
         .eq('congregacao_id', congParam);
 
       const congDestIds = (congDests ?? []).map((d: any) => d.id);
-      if (congDestIds.length > 0) {
+      if (destinationParam) {
+        if (!congDestIds.includes(destinationParam)) {
+          return NextResponse.json({
+            data: [],
+            summary: { totalArrecadado: 0, transacoesPagas: 0 },
+            meta: { page: 1, pageSize, totalCount: 0, totalPages: 1 },
+          });
+        }
+      } else if (congDestIds.length > 0) {
         query = query.in('destination_id', congDestIds);
       } else {
         return NextResponse.json({
