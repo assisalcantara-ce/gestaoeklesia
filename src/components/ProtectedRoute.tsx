@@ -47,15 +47,12 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   const isPublic = isPublicPath(pathname)
 
   useEffect(() => {
-    console.log('[PROTECTED_ROUTE] authLoading:', authLoading, 'user.id:', user?.id || null);
-
     if (isPublic) return
 
     // 1. Redirecionamento por falta de autenticação
     if (!authLoading && !user) {
       const isMobile = pathname.startsWith('/app/') || pathname === '/app'
       const redirectTarget = isMobile ? '/app/login' : '/login'
-      console.log('[PROTECTED_ROUTE] motivo do redirect: Usuário não autenticado após término do carregamento de auth. Destino:', redirectTarget);
       router.replace(redirectTarget)
       return
     }
@@ -64,7 +61,6 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     if (!authLoading && !contextLoading && user && pathname.startsWith('/app/presidencia')) {
       const temNivelPresidencia = nivel === 'presidencia' || nivel === 'administrador'
       if (!temNivelPresidencia) {
-        console.log('[PROTECTED_ROUTE] motivo do redirect: Nível de permissão insuficiente para /app/presidencia');
         router.replace('/acesso-negado')
       }
     }

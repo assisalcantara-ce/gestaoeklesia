@@ -49,18 +49,13 @@ export function useUserContext(): UserContext {
     let cancelled = false;
 
     const fetchUserContext = async () => {
-      console.log('[DEBUG_USER_CONTEXT] 1. fetchUserContext() iniciado');
-      console.log('[DEBUG_USER_CONTEXT] 2. user.id:', user?.id || null);
-
       if (!user) {
         if (!cancelled) {
-          console.log('[DEBUG_USER_CONTEXT] user is null, setNivel(null)');
           setNivel(null);
           setCongregacaoId(null);
           setSupervisaoId(null);
           setMinistryId(null);
           setUserId(null);
-          console.log('[DEBUG_USER_CONTEXT] setLoading(false) sem user');
           setLoading(false);
         }
         lastFetchedUserId.current = null;
@@ -68,9 +63,7 @@ export function useUserContext(): UserContext {
       }
 
       if (lastFetchedUserId.current === user.id) {
-        console.log('[DEBUG_USER_CONTEXT] user.id ja processado:', user.id);
         if (!cancelled) {
-          console.log('[DEBUG_USER_CONTEXT] setLoading(false) cache id');
           setLoading(false);
         }
         return;
@@ -81,21 +74,17 @@ export function useUserContext(): UserContext {
         setUserId(user.id);
 
         // Busca perfil em ministry_users
-        const { data: mu, error: muErr } = await supabase
+        const { data: mu } = await supabase
           .from('ministry_users')
           .select('role, permissions, congregacao_id, supervisao_id, ministry_id')
           .eq('user_id', user.id)
           .maybeSingle();
-
-        console.log('[DEBUG_USER_CONTEXT] 3. Resultado de mu:', mu, '| Error:', muErr);
 
         if (cancelled) return;
 
         if (mu) {
           const perms: string[] = Array.isArray(mu.permissions) ? mu.permissions : [];
           const nivelCalculado = resolveNivel(mu.role, perms);
-          console.log('[DEBUG_USER_CONTEXT] 4. Resultado de resolveNivel(mu.role, perms):', nivelCalculado, '(role:', mu.role, '| perms:', perms, ')');
-          console.log('[DEBUG_USER_CONTEXT] 5. Chamando setNivel():', nivelCalculado);
           setNivel(nivelCalculado);
           setCongregacaoId(mu.congregacao_id ?? null);
           setSupervisaoId(mu.supervisao_id ?? null);
@@ -108,18 +97,14 @@ export function useUserContext(): UserContext {
             .eq('user_id', user.id)
             .maybeSingle();
 
-          console.log('[DEBUG_USER_CONTEXT] 3b. Fallback ministry owner:', ministry);
-
           if (cancelled) return;
 
           if (ministry) {
-            console.log('[DEBUG_USER_CONTEXT] 5. Chamando setNivel("administrador") via ministry owner');
             setNivel('administrador');
             setCongregacaoId(null);
             setSupervisaoId(null);
             setMinistryId(ministry.id);
           } else {
-            console.log('[DEBUG_USER_CONTEXT] 5. Chamando setNivel(null) - nenhum registro em mu nem ministry');
             setNivel(null);
           }
         }
@@ -127,7 +112,6 @@ export function useUserContext(): UserContext {
         lastFetchedUserId.current = user.id;
       } finally {
         if (!cancelled) {
-          console.log('[DEBUG_USER_CONTEXT] 6. setLoading(false) finalizado');
           setLoading(false);
         }
       }

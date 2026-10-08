@@ -282,8 +282,8 @@ export default function DashboardPage() {
             : Promise.resolve({ data: [] })
         ),
         safeQuery(supabase.from('ebd_turmas').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('ativo', true)),
-        safeQuery(supabase.from('ebd_aulas').select('presentes_count, matriculados_count').eq('ministry_id', ministryId).gte('data_aula', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).limit(100)),
-        safeQuery(supabase.from('ministry_users').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('status', 'ativo')),
+        safeQuery(supabase.from('ebd_aulas').select('total_presentes').eq('ministry_id', ministryId).gte('data_aula', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).limit(100)),
+        safeQuery(supabase.from('ministry_users').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('is_active', true)),
         safeQuery(supabase.from('members').select('id').eq('ministry_id', ministryId).eq('role', 'visitante')),
         safeQuery(
           scopeCongId
@@ -427,7 +427,7 @@ export default function DashboardPage() {
       // EBD
       const chamadas = ebdChamadasRes.data ?? [];
       const ebdMediaPresenca = chamadas.length > 0
-        ? Math.round(chamadas.reduce((s: number, c: any) => s + Number(c.presentes_count ?? c.presentes ?? 0), 0) / chamadas.length)
+        ? Math.round(chamadas.reduce((s: number, c: any) => s + Number(c.total_presentes ?? c.presentes_count ?? c.presentes ?? 0), 0) / chamadas.length)
         : null;
 
       // ── DASHBOARD 2.0 — novas queries ──────────────────────────────────────
@@ -453,15 +453,13 @@ export default function DashboardPage() {
         safeQuery(Promise.resolve({ count: 0 })),
       ]);
 
-      // PIX vencidos (best-effort — campo status pode não existir)
+      // PIX vencidos (consulta fin_payment_charges por cobranças PIX vencidas/expiradas)
       let pixVencidos = 0;
       try {
-        const r = await (supabase as any).from('tesouraria_lancamentos')
+        const r = await supabase.from('fin_payment_charges')
           .select('id', { count: 'exact', head: true })
           .eq('ministry_id', ministryId)
-          .eq('forma_pagamento', 'pix')
-          .eq('tipo_movimento', 'entrada')
-          .eq('status', 'vencido');
+          .in('status', ['overdue', 'vencido', 'vencida', 'expirado', 'expirada']);
         pixVencidos = r.count ?? 0;
       } catch { /* silent */ }
 
