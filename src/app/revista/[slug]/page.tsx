@@ -511,9 +511,15 @@ function RevistaContent() {
               >
                 {/* ─── PÁGINA: CAPA ───────────────────────────────────── */}
                 {paginaCorrente.tipo === 'capa' && (
-                  <div className="relative overflow-hidden bg-gradient-to-br from-teal-900 via-teal-800 to-slate-950 text-white p-6 sm:p-12 lg:p-14 min-h-[520px] flex flex-col justify-between">
-                    <div className="absolute -right-24 -top-24 w-80 h-80 bg-teal-500/20 rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute -left-24 -bottom-24 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="relative overflow-hidden bg-slate-950 text-white p-6 sm:p-12 lg:p-14 min-h-[520px] flex flex-col justify-between">
+                    {/* Imagem de Fundo Oficial da Capa */}
+                    <div
+                      className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
+                      style={{ backgroundImage: "url('/img/bg_agenda.png')" }}
+                    />
+                    {/* Camada de Gradiente / Overlay para Contraste e Legibilidade */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/75 to-transparent pointer-events-none" />
+                    <div className="absolute inset-0 bg-teal-950/20 mix-blend-multiply pointer-events-none" />
 
                     <div className="relative z-10 space-y-6">
                       <div className="flex items-center justify-between gap-4">
@@ -671,12 +677,14 @@ function RevistaContent() {
                             { id: 'todos', label: 'Todos' },
                             { id: 'oficial', label: 'Oficiais' },
                             { id: 'culto', label: 'Cultos' },
+                            { id: 'reuniao', label: 'Reuniões' },
                             { id: 'evento', label: 'Eventos' },
+                            { id: 'departamento', label: 'Departamentos' },
                           ].map((f) => (
                             <button
                               key={f.id}
                               onClick={() => setFiltroCategoria(f.id)}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
                                 filtroCategoria === f.id
                                   ? 'bg-teal-700 text-white shadow-xs'
                                   : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
@@ -834,9 +842,18 @@ function RevistaContent() {
             {/* CAPA INSTITUCIONAL COMPACTA */}
             <section
               id="capa"
-              className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-teal-900 via-teal-800 to-slate-950 text-white shadow-xl p-6 sm:p-10"
+              className="relative overflow-hidden rounded-3xl bg-slate-950 text-white shadow-xl p-6 sm:p-10"
             >
-              <div className="space-y-4">
+              {/* Imagem de Fundo Oficial da Capa */}
+              <div
+                className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
+                style={{ backgroundImage: "url('/img/bg_agenda.png')" }}
+              />
+              {/* Camada de Gradiente / Overlay para Contraste e Legibilidade */}
+              <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/75 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-teal-950/20 mix-blend-multiply pointer-events-none" />
+
+              <div className="relative z-10 space-y-4">
                 <div className="flex items-center gap-3">
                   {instituicao.logo_url && !logoImgError ? (
                     <div className="w-11 h-11 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 p-1.5 flex items-center justify-center shrink-0 shadow-md">
@@ -930,14 +947,37 @@ function RevistaContent() {
                               <span className="text-sm leading-none">{dia}</span>
                               <span className="text-[9px] uppercase mt-0.5">{mes}</span>
                             </div>
-                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                {ev.tipo?.nome && (
+                                  <span
+                                    className="text-[9px] font-bold px-2 py-0.5 rounded-md text-white"
+                                    style={{ backgroundColor: ev.tipo.cor || '#0f766e' }}
+                                  >
+                                    {ev.tipo.nome}
+                                  </span>
+                                )}
+                                {ev.calendario_oficial && (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                                    <Award className="w-2.5 h-2.5 text-amber-600" /> Oficial
+                                  </span>
+                                )}
+                              </div>
                               <h4 className="text-sm font-bold text-slate-900">{ev.titulo}</h4>
                               {ev.descricao && <p className="text-xs text-slate-600 mt-0.5">{ev.descricao}</p>}
                               <div className="flex flex-wrap gap-x-3 text-[11px] text-slate-500 mt-1">
-                                {horario && <span>{horario}</span>}
-                                {ev.local && <span>{ev.local}</span>}
+                                {horario && (
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                                    {horario}
+                                  </span>
+                                )}
+                                {ev.local && (
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span>{ev.local}</span>
+                                  </span>
+                                )}
                               </div>
-                            </div>
                           </article>
                         );
                       })}
