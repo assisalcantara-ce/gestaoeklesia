@@ -16,6 +16,7 @@ import AgendaCalendar from '@/components/agenda/AgendaCalendar';
 import AgendaTimeline from '@/components/agenda/AgendaTimeline';
 import EventoFormModal from '@/components/agenda/EventoFormModal';
 import ConfirmDeleteModal from '@/components/agenda/ConfirmDeleteModal';
+import RevistaPublicaButton from '@/components/agenda/RevistaPublicaButton';
 
 export default function AgendaPage() {
   const {
@@ -161,8 +162,10 @@ export default function AgendaPage() {
               </div>
             </div>
 
-            {isEscritaPermitida && (
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <RevistaPublicaButton ministryId={ctx?.ministryId} />
+
+              {isEscritaPermitida && (
                 <button
                   onClick={() => openForm(null)}
                   className="bg-teal-700 hover:bg-teal-800 text-white rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold shadow-sm border border-teal-800 transition-all flex items-center gap-2 cursor-pointer"
@@ -170,8 +173,8 @@ export default function AgendaPage() {
                   <Plus className="h-4 w-4" />
                   + Novo evento
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Navegação de Abas (Pills) */}
