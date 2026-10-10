@@ -1,12 +1,7 @@
 'use client';
 
-import DashboardContainer from '@/components/dashboard/DashboardContainer';
-import DashboardHeader from '@/components/dashboard/DashboardHeader';
-import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
-import DashboardContent from '@/components/dashboard/DashboardContent';
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
 import DashboardSection from '@/components/dashboard/DashboardSection';
-import DashboardActions from '@/components/dashboard/DashboardActions';
 import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState';
 import {
   Plus, Calendar as CalendarIcon,
@@ -29,7 +24,6 @@ export default function AgendaPage() {
     planFeatures,
     activeTab,
     setActiveTab,
-    currentDateFormatted,
     daysLeftInMonth,
     currentYear,
     currentMonth,
@@ -106,6 +100,7 @@ export default function AgendaPage() {
     handleDeletarTipo,
     handlePublishPlanning,
     handleArchivePlanning,
+    handleCriarPlanejamento,
     handleDecidirSolicitacao,
     getEscopoLabel,
   } = useAgenda();
@@ -116,19 +111,19 @@ export default function AgendaPage() {
 
   if (bloqueado || !planFeatures.has_modulo_agenda || !planFeatures.hasFeature('agenda_module')) {
     return (
-      <DashboardContainer>
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center max-w-2xl mx-auto space-y-5 my-10">
-          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto text-blue-600 shadow-sm border border-blue-200/60">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f4f7fa] min-h-screen p-4 sm:p-6 lg:p-8 flex items-center justify-center">
+        <div className="bg-white rounded-3xl border border-slate-200/90 p-8 sm:p-10 shadow-sm text-center max-w-2xl mx-auto space-y-5 my-10">
+          <div className="w-16 h-16 bg-teal-50 rounded-2xl flex items-center justify-center mx-auto text-teal-700 shadow-xs border border-teal-100">
             <CalendarIcon className="h-8 w-8" />
           </div>
           <div>
-            <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full mb-3">
+            <span className="inline-block px-3 py-1 bg-teal-100 text-teal-800 text-xs font-bold rounded-full mb-3">
               Recurso do Plano Starter
             </span>
-            <h2 className="text-xl font-bold text-slate-800">Módulo Agenda Indisponível no seu Plano</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Módulo Agenda Indisponível no seu Plano</h2>
           </div>
 
-          <p className="text-slate-600 text-base font-semibold leading-relaxed max-w-lg mx-auto">
+          <p className="text-slate-600 text-sm sm:text-base font-semibold leading-relaxed max-w-lg mx-auto">
             A funcionalidade Agenda do Ministério está disponível a partir do Plano Starter.
           </p>
 
@@ -139,64 +134,51 @@ export default function AgendaPage() {
           <div className="pt-3">
             <a
               href="/configuracoes"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-[#123b63] text-white text-sm font-semibold rounded-xl hover:bg-[#1a4f85] transition shadow-md hover:shadow-lg"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-teal-700 text-white text-xs sm:text-sm font-bold rounded-xl hover:bg-teal-800 transition shadow-sm hover:shadow border border-teal-800"
             >
               Fazer Upgrade / Conhecer Planos
             </a>
           </div>
         </div>
-      </DashboardContainer>
+      </div>
     );
   }
 
   return (
-    <DashboardContainer>
-      <DashboardHeader
-        title="Agenda Ministerial"
-        description="Planejamento e coordenação de datas e agendas integradas"
-        contextSubtitle="Planejamento Ministerial"
-        greeting="Gestão Ministerial"
-        currentDate={currentDateFormatted}
-        centerContent={
-          <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500">
-            <span className="text-slate-600 font-extrabold uppercase">
-              {MESES_PT[currentMonth - 1].toUpperCase()} DE {currentYear}
-            </span>
-            <span className="text-slate-300">·</span>
-            <span className="text-slate-400 font-semibold">
-              <span className="font-bold text-slate-500">{eventos.length}</span> COMPROMISSOS
-            </span>
-            <span className="text-slate-300">·</span>
-            <span className="text-slate-400 font-semibold">
-              <span className="font-bold text-slate-500">{totalCultos}</span> CULTOS
-            </span>
-            <span className="text-slate-300">·</span>
-            <span className="text-slate-400 font-semibold">
-              <span className="font-bold text-slate-500">{totalReunioes}</span> REUNIÕES
-            </span>
-            <span className="text-slate-300">·</span>
-            <span className="text-slate-400 font-semibold">
-              <span className="font-bold text-slate-500">{totalEventosSincronizados}</span> SINCRONIZAÇÕES
-            </span>
+      <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f4f7fa] min-h-screen">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-[96rem] mx-auto w-full space-y-6">
+          {/* Header da Página */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-teal-700 text-white flex items-center justify-center border border-teal-800 shadow-sm flex-shrink-0">
+                <CalendarIcon className="w-6 h-6" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Agenda Ministerial</h1>
+                <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
+                  Planejamento e coordenação de datas, cultos, reuniões e eventos integrados.
+                </p>
+              </div>
+            </div>
+
+            {isEscritaPermitida && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openForm(null)}
+                  className="bg-teal-700 hover:bg-teal-800 text-white rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold shadow-sm border border-teal-800 transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" />
+                  + Novo evento
+                </button>
+              </div>
+            )}
           </div>
-        }
-        actions={
-          isEscritaPermitida ? (
-            <DashboardActions>
-              <button
-                onClick={() => openForm(null)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Novo Compromisso
-              </button>
-            </DashboardActions>
-          ) : undefined
-        }
-        extra={
-          <div className="flex gap-1">
+
+          {/* Navegação de Abas (Pills) */}
+          <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
             {TABS.map(tab => {
               const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
@@ -204,55 +186,113 @@ export default function AgendaPage() {
                     setActiveTab(tab.id as any);
                     setSelectedDate(null);
                   }}
-                  className={`flex items-center gap-1.5 px-4 py-2.5 font-bold text-xs tracking-wide uppercase transition border-b-2 ${
-                    activeTab === tab.id
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                    isActive
+                      ? 'bg-teal-700 text-white shadow-sm border border-teal-800'
+                      : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
                   }`}
                 >
-                  <Icon className="h-3.5 w-3.5" />
-                  {tab.label}
+                  <Icon className="h-4 w-4" />
+                  <span>{tab.label}</span>
                 </button>
               );
             })}
           </div>
-        }
-      />
 
-      <DashboardContent>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <ExecutiveMetricCard
-            title="Oficiais"
-            value={totalEventosOficiais}
-            icon={ShieldCheck}
-            color="indigo"
-            subtitle="Calendário Oficial da Igreja"
-          />
+          {/* CARDS PRINCIPAIS — KPIs COLORIDOS (PADRÃO MEMBROS) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 1. Calendário Oficial (Azul) */}
+            <div className="bg-[#ebf5ff] border border-[#d0e6ff] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+              <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                <div className="w-13 h-13 rounded-2xl bg-white text-[#2563eb] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dbeafe]">
+                  <ShieldCheck className="w-7 h-7" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-slate-800 block truncate">
+                    Eventos Oficiais
+                  </span>
+                  <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                    {totalEventosOficiais}
+                  </p>
+                  <p className="text-[11px] font-bold text-teal-700 mt-1 truncate">
+                    Calendário Geral da Igreja
+                  </p>
+                </div>
+              </div>
+              <div className="w-8 h-8 rounded-xl bg-[#dbeafe] text-[#2563eb] flex items-center justify-center flex-shrink-0 self-start">
+                <CalendarIcon className="w-4 h-4" />
+              </div>
+            </div>
 
-          <ExecutiveMetricCard
-            title="Compromissos"
-            value={eventos.length}
-            icon={Calendar}
-            color="slate"
-            subtitle="Agendados para este mês"
-          />
+            {/* 2. Total de Compromissos (Verde) */}
+            <div className="bg-[#ecfdf3] border border-[#cff7de] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+              <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                <div className="w-13 h-13 rounded-2xl bg-white text-[#16a34a] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dcfce7]">
+                  <Calendar className="w-7 h-7" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-slate-800 block truncate">
+                    Compromissos
+                  </span>
+                  <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                    {eventos.length}
+                  </p>
+                  <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                    {MESES_PT[currentMonth - 1]} de {currentYear}
+                  </p>
+                </div>
+              </div>
+              <div className="w-8 h-8 rounded-xl bg-[#dcfce7] text-[#16a34a] flex items-center justify-center flex-shrink-0 self-start">
+                <Clock className="w-4 h-4" />
+              </div>
+            </div>
 
-          <ExecutiveMetricCard
-            title="Cultos & Reuniões"
-            value={totalCultos + totalReunioes}
-            icon={Flame}
-            color="emerald"
-            subtitle={`${totalCultos} Cultos e ${totalReunioes} Reuniões`}
-          />
+            {/* 3. Cultos & Reuniões (Âmbar/Laranja) */}
+            <div className="bg-[#fff6ea] border border-[#fde4c4] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+              <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                <div className="w-13 h-13 rounded-2xl bg-white text-[#ea580c] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ffedd5]">
+                  <Flame className="w-7 h-7" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-slate-800 block truncate">
+                    Cultos & Reuniões
+                  </span>
+                  <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                    {totalCultos + totalReunioes}
+                  </p>
+                  <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                    {totalCultos} Cultos e {totalReunioes} Reuniões
+                  </p>
+                </div>
+              </div>
+              <div className="w-8 h-8 rounded-xl bg-[#ffedd5] text-[#ea580c] flex items-center justify-center flex-shrink-0 self-start">
+                <Flame className="w-4 h-4" />
+              </div>
+            </div>
 
-          <ExecutiveMetricCard
-            title="Sincronizados"
-            value={totalEventosSincronizados}
-            icon={Lock}
-            color="rose"
-            subtitle="Integrados de outros módulos"
-          />
-        </div>
+            {/* 4. Sincronizados (Roxo/Violeta) */}
+            <div className="bg-[#f3f0ff] border border-[#e3dbff] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+              <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                <div className="w-13 h-13 rounded-2xl bg-white text-[#7c3aed] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ede9fe]">
+                  <Lock className="w-7 h-7" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-slate-800 block truncate">
+                    Sincronizados
+                  </span>
+                  <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                    {totalEventosSincronizados}
+                  </p>
+                  <p className="text-[11px] font-bold text-[#7c3aed] mt-1 truncate">
+                    Integrados de outros módulos
+                  </p>
+                </div>
+              </div>
+              <div className="w-8 h-8 rounded-xl bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center flex-shrink-0 self-start">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
 
         <AgendaToolbar
           activeTab={activeTab}
@@ -294,6 +334,8 @@ export default function AgendaPage() {
               eventosPorDia={eventosPorDia}
               selectedDate={selectedDate}
               onSelectDate={setSelectedDate}
+              isEscritaPermitida={isEscritaPermitida}
+              onOpenForm={openForm}
             />
 
             <DashboardSidebar className="w-full lg:w-[320px] lg:border-l lg:border-slate-200/50 lg:pl-5">
@@ -412,9 +454,18 @@ export default function AgendaPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-10 text-slate-400 text-xs gap-2">
+                <div className="flex flex-col items-center justify-center py-10 text-slate-400 text-xs gap-3">
                   <CalendarIcon className="h-8 w-8 text-slate-300" />
                   <p className="text-xs font-bold text-slate-500">Nenhum planejamento inicializado para o ano {currentYear}.</p>
+                  {isEscritaPermitida && (
+                    <button
+                      onClick={() => handleCriarPlanejamento(currentYear)}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm hover:shadow border border-teal-800 transition-all cursor-pointer"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Inicializar Planejamento {currentYear}
+                    </button>
+                  )}
                 </div>
               )}
             </DashboardSection>
@@ -423,14 +474,15 @@ export default function AgendaPage() {
               <DashboardSection
                 title="Ações Estratégicas Anuais"
                 icon={BookOpen}
-                className="!p-5"
+                iconClassName="text-teal-700"
+                className="!p-5 rounded-2xl border border-slate-200/90 shadow-sm"
               >
                 {activePlanning ? (
                   <div className="space-y-3">
                     {activePlanning.status === 'rascunho' && (
                       <button
                         onClick={handlePublishPlanning}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-xs rounded-xl shadow-sm hover:shadow-md border border-blue-700 transition duration-200"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm hover:shadow border border-teal-800 transition cursor-pointer"
                       >
                         <Check className="h-4 w-4" />
                         Publicar Planejamento
@@ -439,7 +491,7 @@ export default function AgendaPage() {
                     {activePlanning.status !== 'arquivado' && (
                       <button
                         onClick={handleArchivePlanning}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-55 text-slate-700 font-extrabold text-xs rounded-xl shadow-xs hover:shadow border border-slate-200 hover:border-slate-300 transition duration-200"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm rounded-xl shadow-xs hover:shadow border border-slate-300 transition cursor-pointer"
                       >
                         <Archive className="h-4 w-4" />
                         Arquivar Planejamento
@@ -455,9 +507,18 @@ export default function AgendaPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-10 text-slate-400 text-xs gap-2">
+                  <div className="flex flex-col items-center justify-center py-6 text-slate-400 text-xs gap-3">
                     <CalendarIcon className="h-8 w-8 text-slate-300" />
-                    <p className="text-xs font-bold text-slate-550">Nenhum rascunho ativo.</p>
+                    <p className="text-xs font-bold text-slate-500">Nenhum rascunho ativo.</p>
+                    {isEscritaPermitida && (
+                      <button
+                        onClick={() => handleCriarPlanejamento(currentYear)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm hover:shadow border border-teal-800 transition cursor-pointer"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Criar Planejamento Anual
+                      </button>
+                    )}
                   </div>
                 )}
               </DashboardSection>
@@ -465,16 +526,17 @@ export default function AgendaPage() {
               <DashboardSection
                 title="Configurações de Tipos"
                 icon={Filter}
-                className="!p-5 mt-4"
+                iconClassName="text-teal-700"
+                className="!p-5 mt-4 rounded-2xl border border-slate-200/90 shadow-sm"
               >
-                <p className="text-[11px] text-slate-550 font-bold mb-3 leading-relaxed">
+                <p className="text-xs text-slate-500 font-medium mb-3 leading-relaxed">
                   Personalize as cores, regras de bloqueio e categorias dos compromissos da igreja.
                 </p>
                 <button
                   onClick={() => setShowTiposModal(true)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-750 font-extrabold text-xs rounded-xl shadow-xs border border-slate-200 hover:border-slate-300 transition duration-200"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm rounded-xl shadow-xs border border-slate-300 hover:border-slate-400 transition cursor-pointer"
                 >
-                  <Plus className="h-3.5 w-3.5 text-slate-500" />
+                  <Plus className="h-4 w-4 text-slate-600" />
                   Gerenciar Tipos
                 </button>
               </DashboardSection>
@@ -487,7 +549,8 @@ export default function AgendaPage() {
             <DashboardSection
               title="Solicitações de Exceção de Datas"
               icon={Gavel}
-              className="flex-1 min-w-0"
+              iconClassName="text-teal-700"
+              className="flex-1 min-w-0 rounded-2xl border border-slate-200/90 shadow-sm !p-5"
             >
               {loadingSols ? (
                 <div className="text-center py-6 text-slate-400 text-xs">Carregando solicitações...</div>
@@ -554,7 +617,8 @@ export default function AgendaPage() {
               <DashboardSection
                 title="Políticas de Aprovação"
                 icon={ShieldCheck}
-                className="!p-5"
+                iconClassName="text-teal-700"
+                className="!p-5 rounded-2xl border border-slate-200/90 shadow-sm"
               >
                 <div className="space-y-4 text-xs text-slate-600">
                   <div className="bg-amber-50 border border-amber-255 text-amber-850 p-3 rounded-xl">
@@ -628,7 +692,7 @@ export default function AgendaPage() {
           onConfirm={confirmDeleteAction}
           onCancel={() => setDeleteConfirmTarget(null)}
         />
-      </DashboardContent>
-    </DashboardContainer>
+      </div>
+    </div>
   );
 }

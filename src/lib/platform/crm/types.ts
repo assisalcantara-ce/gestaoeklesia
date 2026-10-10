@@ -77,6 +77,18 @@ export interface CrmNextAction {
   lifecycle: LifecycleResult;
   descricao?: string;
   dataPrevista?: string;
+  responsavel?: string;
+  email?: string;
+  telefone?: string;
+  origem?: string;
+  ultimaInteracao?: string | null;
+  diasSemContato?: number;
+  usageStats?: {
+    totalMembros: number;
+    totalCongregacoes: number;
+    maxMembros?: number;
+    maxCongregacoes?: number;
+  };
 }
 
 export interface CrmInteractionDraft {
@@ -90,6 +102,7 @@ export interface CrmInteractionDraft {
 export interface CrmSummary {
   totalLeads: number;
   totalTrials: number;
+  totalTrialsExpirados: number;
   totalClientesAtivos: number;
   totalRenovacoes: number;
   totalCobrancasPendentes: number;

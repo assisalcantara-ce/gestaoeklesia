@@ -15,11 +15,50 @@ export class CommercialBuilder {
     opportunities: any[];
     opportunitiesHistory: any[];
     configurations: any[];
+    crmInteractions?: any[];
+    members?: any[];
+    congregacoes?: any[];
   }): ComercialViewModel[] {
-    const { ministries, preRegs, invoices, opportunities, opportunitiesHistory, configurations } = params;
+    const {
+      ministries,
+      preRegs,
+      invoices,
+      opportunities,
+      opportunitiesHistory,
+      configurations,
+      crmInteractions = [],
+      members = [],
+      congregacoes = []
+    } = params;
 
     const list: ComercialViewModel[] = [];
     const processedUserIds = new Set<string>();
+
+    // Mapear contagem de membros por ministry_id
+    const membersCountByMinMap = new Map<string, number>();
+    members.forEach(m => {
+      if (m.ministry_id) {
+        membersCountByMinMap.set(m.ministry_id, (membersCountByMinMap.get(m.ministry_id) || 0) + 1);
+      }
+    });
+
+    // Mapear contagem de congregações por ministry_id
+    const congCountByMinMap = new Map<string, number>();
+    congregacoes.forEach(c => {
+      if (c.ministry_id) {
+        congCountByMinMap.set(c.ministry_id, (congCountByMinMap.get(c.ministry_id) || 0) + 1);
+      }
+    });
+
+    // Mapear interações do CRM por ministry_id
+    const interactionsByMinMap = new Map<string, any[]>();
+    crmInteractions.forEach(it => {
+      if (it.ministry_id) {
+        const arr = interactionsByMinMap.get(it.ministry_id) || [];
+        arr.push(it);
+        interactionsByMinMap.set(it.ministry_id, arr);
+      }
+    });
 
     // Mapear relacionamentos
     const preRegMap = new Map<string, any>();
@@ -84,26 +123,37 @@ export class CommercialBuilder {
         created_at: h.created_at
       }));
 
+      // Interações reais registradas no CRM
+      const minInteractions = interactionsByMinMap.get(m.id) || [];
+      const latestInteraction = minInteractions[0] || null;
+
       list.push({
         id: m.id,
         origem: 'ministries',
         nome: m.name || 'Ministério Sem Nome',
         responsavel: churchProfile.responsavel || 'Não Informado',
-        email: m.email_admin || '',
-        telefone: m.phone || churchProfile.telefone || '',
+        email: m.email_admin || preReg?.email || '',
+        telefone: m.phone || churchProfile.telefone || preReg?.phone || preReg?.whatsapp || '',
         lifecycle: lifecycleResult,
         plano: m.plan || 'basic',
         statusFinanceiro,
-        ultimaInteracao: opt?.updated_at || m.updated_at || null,
-        proximaAcao: opt?.observacao_interna || null,
+        ultimaInteracao: latestInteraction?.created_at || opt?.updated_at || m.updated_at || null,
+        proximaAcao: latestInteraction?.proxima_acao || opt?.observacao_interna || null,
         daysRemaining: lifecycleResult.daysRemaining,
+        dataExpiracao: m.subscription_end_date || preReg?.trial_expires_at || null,
         reason: lifecycleResult.reason,
+        usageStats: {
+          totalMembros: membersCountByMinMap.get(m.id) || 0,
+          totalCongregacoes: congCountByMinMap.get(m.id) || 0,
+          maxMembros: m.quantity_members || undefined,
+          maxCongregacoes: m.quantity_temples || undefined
+        },
 
         // Mapeamento Legado
         ministry_name: m.name || 'Ministério Sem Nome',
         plano_solicitado: opt?.plano_solicitado || m.plan || 'basic',
         observacao: opt?.observacao || null,
-        observacao_interna: opt?.observacao_interna || null,
+        observacao_interna: latestInteraction?.descricao || opt?.observacao_interna || null,
         created_at: opt?.created_at || m.created_at,
         status: opt?.status || 'Novo',
         historico
@@ -133,6 +183,10 @@ export class CommercialBuilder {
         created_at: h.created_at
       }));
 
+      // Interações reais registradas no CRM (buscando por id do pre_reg ou email)
+      const preInteractions = interactionsByMinMap.get(p.id) || [];
+      const latestInteraction = preInteractions[0] || null;
+
       list.push({
         id: p.id,
         origem: 'pre_registrations',
@@ -143,16 +197,21 @@ export class CommercialBuilder {
         lifecycle: lifecycleResult,
         plano: p.plan || 'starter',
         statusFinanceiro: 'none',
-        ultimaInteracao: opt?.updated_at || p.created_at || null,
-        proximaAcao: opt?.observacao_interna || null,
+        ultimaInteracao: latestInteraction?.created_at || opt?.updated_at || p.created_at || null,
+        proximaAcao: latestInteraction?.proxima_acao || opt?.observacao_interna || null,
         daysRemaining: lifecycleResult.daysRemaining,
+        dataExpiracao: p.trial_expires_at || null,
         reason: lifecycleResult.reason,
+        usageStats: {
+          totalMembros: 0,
+          totalCongregacoes: 0
+        },
 
         // Mapeamento Legado
         ministry_name: p.ministry_name || 'Novo Lead',
         plano_solicitado: opt?.plano_solicitado || p.plan || 'starter',
         observacao: opt?.observacao || null,
-        observacao_interna: opt?.observacao_interna || null,
+        observacao_interna: latestInteraction?.descricao || opt?.observacao_interna || null,
         created_at: opt?.created_at || p.created_at,
         status: opt?.status || 'Novo',
         historico

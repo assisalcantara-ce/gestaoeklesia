@@ -7,23 +7,14 @@ import { useRouter } from 'next/navigation'
 import { authenticatedFetch } from '@/lib/api-client'
 import { useAdminAuth } from '@/providers/AdminAuthProvider'
 import AdminSidebar from '@/components/AdminSidebar'
-import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
-import CrmMyDayCard from '@/components/crm/CrmMyDayCard'
 import CrmSummaryCards from '@/components/crm/CrmSummaryCards'
 import CrmNextActions from '@/components/crm/CrmNextActions'
-import CrmTimeline from '@/components/crm/CrmTimeline'
-import CrmActivities from '@/components/crm/CrmActivities'
 import { ComercialViewModel } from '@/lib/platform/commercial/types'
 import {
   Briefcase,
   TrendingUp,
-  DollarSign,
-  Clock,
-  Building2,
   RefreshCw,
-  Activity,
-  ArrowRight,
-  ShieldAlert
+  ArrowRight
 } from 'lucide-react'
 
 
@@ -58,35 +49,6 @@ export default function ComercialDashboardPage() {
     }
   }
 
-  // --- CÁLCULOS DOS KPIS ---
-  const kpis = useMemo(() => {
-    const counts = {
-      lead: 0,
-      trial: 0,
-      trial_expiring: 0,
-      negotiation: 0,
-      payment_pending: 0,
-      active: 0,
-      renewal: 0,
-      canceled: 0
-    }
-
-    oportunidades.forEach((opt) => {
-      const status = (opt.lifecycle?.status || opt.status || '').toUpperCase().trim()
-      if (status === 'LEAD') counts.lead++
-      else if (status === 'TRIAL') counts.trial++
-      else if (status === 'TRIAL_EXPIRING') counts.trial_expiring++
-      else if (status === 'NEGOTIATION') counts.negotiation++
-      else if (status === 'PAYMENT_PENDING') counts.payment_pending++
-      else if (status === 'ACTIVE' || status === 'CONVERTIDO') counts.active++
-      else if (status === 'RENEWAL') counts.renewal++
-      else if (status === 'CANCELED' || status === 'TRIAL_EXPIRED' || status === 'CANCELLED') counts.canceled++
-      else counts.lead++
-    })
-
-    return counts
-  }, [oportunidades])
-
   // --- HELPER: PREÇO ESTIMADO POR PLANO ---
   const getPlanoPrice = (slug: string) => {
     const plan = String(slug).toLowerCase()
@@ -99,7 +61,8 @@ export default function ComercialDashboardPage() {
   const pipelineStages = useMemo(() => {
     const stages = [
       { key: 'LEAD',            label: 'Leads',          desc: 'Pré-cadastros sem ação', statusMatch: ['LEAD'],                             accent: '#6366f1', bg: 'rgba(99,102,241,0.08)',  border: 'rgba(99,102,241,0.3)'  },
-      { key: 'TRIAL',           label: 'Trial',          desc: 'Em teste gratuito',     statusMatch: ['TRIAL', 'TRIAL_EXPIRING'],          accent: '#3b82f6', bg: 'rgba(59,130,246,0.08)',  border: 'rgba(59,130,246,0.3)'  },
+      { key: 'TRIAL',           label: 'Trial Ativo',    desc: 'Em teste gratuito',     statusMatch: ['TRIAL', 'TRIAL_EXPIRING'],          accent: '#3b82f6', bg: 'rgba(59,130,246,0.08)',  border: 'rgba(59,130,246,0.3)'  },
+      { key: 'TRIAL_EXPIRED',   label: 'Trial Expirado', desc: 'Aguardando conversão',  statusMatch: ['TRIAL_EXPIRED'],                    accent: '#f43f5e', bg: 'rgba(244,63,94,0.08)',   border: 'rgba(244,63,94,0.3)'   },
       { key: 'NEGOTIATION',     label: 'Negociação',     desc: 'Alinhando contrato',    statusMatch: ['NEGOTIATION'],                      accent: '#06b6d4', bg: 'rgba(6,182,212,0.08)',   border: 'rgba(6,182,212,0.3)'   },
       { key: 'PAYMENT_PENDING', label: 'Pagamento',      desc: 'Aguardando ASAAS',      statusMatch: ['PAYMENT_PENDING'],                  accent: '#ec4899', bg: 'rgba(236,72,153,0.08)',  border: 'rgba(236,72,153,0.3)'  },
       { key: 'ACTIVE',          label: 'Ativos',         desc: 'Clientes operacionais', statusMatch: ['ACTIVE', 'CONVERTIDO'],             accent: '#10b981', bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.3)'  },
@@ -123,79 +86,6 @@ export default function ComercialDashboardPage() {
       percentual: totalCount > 0 ? Math.round((stage.count / totalCount) * 100) : 0
     }))
   }, [oportunidades])
-
-  // --- CÁLCULOS DOS INDICADORES COMERCIAIS ---
-  const indicadores = useMemo(() => {
-    const convertidas = kpis.active
-    const perdidas = kpis.canceled
-
-    // Taxa de conversão: convertidos / (convertidos + perdidos) ou do total
-    const decididas = convertidas + perdidas
-    const taxaConversao = decididas > 0 ? (convertidas / decididas) * 100 : 0
-
-    // Mapeamento de receitas estimadas mensais por plano
-    const getPlanoValue = (slug: string) => {
-      const plan = String(slug).toLowerCase()
-      if (plan.includes('profis')) return 299.90
-      if (plan.includes('inter')) return 149.90
-      return 49.90
-    }
-
-    let receitaConvertida = 0
-    let receitaPrevista = 0
-    let tempoTotalConversao = 0
-    let contConversõesComTempo = 0
-
-    oportunidades.forEach((opt) => {
-      const price = getPlanoValue(opt.plano_solicitado || opt.plano)
-      const status = (opt.lifecycle?.status || opt.status || '').toUpperCase().trim()
-
-      if (status === 'ACTIVE' || status === 'CONVERTIDO') {
-        receitaConvertida += price
-        
-        // Calcula tempo de conversão (se houver histórico de mudança)
-        if (opt.historico && opt.historico.length > 0) {
-          const convEvent = opt.historico.find(h => {
-            const sn = h.status_novo.toUpperCase().trim()
-            return sn === 'ACTIVE' || sn === 'CONVERTIDO'
-          })
-          if (convEvent) {
-            const start = new Date(opt.created_at).getTime()
-            const end = new Date(convEvent.created_at).getTime()
-            const diffDays = Math.max(0.1, (end - start) / (1000 * 60 * 60 * 24))
-            tempoTotalConversao += diffDays
-            contConversõesComTempo++
-          }
-        }
-      } else if (status !== 'CANCELED' && status !== 'TRIAL_EXPIRED' && status !== 'CANCELLED') {
-        // Receita prevista de oportunidades ativas ponderada de forma simples
-        receitaPrevista += price
-      }
-    })
-
-    const tempoMedio = contConversõesComTempo > 0 ? tempoTotalConversao / contConversõesComTempo : 2.5
-
-    return {
-      taxaConversao: taxaConversao.toFixed(1) + '%',
-      receitaConvertida: 'R$ ' + receitaConvertida.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      receitaPrevista: 'R$ ' + (receitaConvertida + receitaPrevista).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      tempoMedio: tempoMedio.toFixed(1) + ' dias'
-    }
-  }, [oportunidades, kpis])
-
-  // --- AÇÕES PENDENTES ---
-  const acoesPendentes = useMemo(() => {
-    const expirados = oportunidades.filter(o => (o.lifecycle?.status || o.status || '').toUpperCase() === 'TRIAL_EXPIRED').length
-    const expirando = oportunidades.filter(o => (o.lifecycle?.status || o.status || '').toUpperCase() === 'TRIAL_EXPIRING').length
-
-    return {
-      trialsExpirando: expirando,
-      trialsExpirados: expirados,
-      cobrancasPendentes: kpis.payment_pending,
-      renovacoesProximas: kpis.renewal,
-      webhooksErro: 0
-    }
-  }, [oportunidades, kpis])
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -243,118 +133,12 @@ export default function ComercialDashboardPage() {
         {/* Content Area */}
         <div className="p-6 space-y-8">
           
-          {/* O Card "Meu Dia" como primeiro elemento visual */}
-          <CrmMyDayCard />
+          {/* 1. Indicadores Executivos Oficiais (Topo da Página) */}
           <CrmSummaryCards />
-          <CrmNextActions />
-          <CrmTimeline />
-          <CrmActivities />
-          
-          {/* MENU COMERCIAL */}
-          <nav aria-label="Menu comercial" className="flex flex-wrap gap-2 border-b border-[#0E4D43] pb-4">
-            <button
-              aria-current="page"
-              className="px-4 py-2 bg-[#059669] text-white rounded-xl text-xs font-semibold transition shadow-sm"
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => router.push('/admin/comercial/oportunidades')}
-              className="px-4 py-2 bg-[#073B34] hover:bg-[#0B453B] border border-[#0E4D43] text-[#A7C4BC] hover:text-white rounded-xl text-xs font-semibold transition cursor-pointer"
-            >
-              Oportunidades
-            </button>
-            <button
-              disabled
-              title="Disponível em breve"
-              className="px-4 py-2 bg-gray-800 text-gray-500 rounded-lg text-sm font-semibold cursor-not-allowed opacity-50 select-none"
-            >
-              Cobranças
-            </button>
-            <button
-              disabled
-              title="Disponível em breve"
-              className="px-4 py-2 bg-gray-800 text-gray-500 rounded-lg text-sm font-semibold cursor-not-allowed opacity-50 select-none"
-            >
-              Renovações
-            </button>
-            <button
-              disabled
-              title="Disponível em breve"
-              className="px-4 py-2 bg-gray-800 text-gray-500 rounded-lg text-sm font-semibold cursor-not-allowed opacity-50 select-none"
-            >
-              Relatórios
-            </button>
-          </nav>
 
-          {/* INDICADORES COMERCIAIS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <ExecutiveMetricCard
-              title="Taxa de Conversão"
-              value={indicadores.taxaConversao}
-              subtitle="Decididas no funil comercial"
-              icon={TrendingUp}
-              color="indigo"
-            />
-            <ExecutiveMetricCard
-              title="Receita Convertida"
-              value={indicadores.receitaConvertida}
-              subtitle="Assinaturas comercializadas"
-              icon={DollarSign}
-              color="emerald"
-            />
-            <ExecutiveMetricCard
-              title="Receita Prevista"
-              value={indicadores.receitaPrevista}
-              subtitle="LTV comercial + Ativos"
-              icon={TrendingUp}
-              color="blue"
-            />
-            <ExecutiveMetricCard
-              title="Tempo Médio"
-              value={indicadores.tempoMedio}
-              subtitle="Até a conversão final"
-              icon={Clock}
-              color="slate"
-            />
-          </div>
+          {/* 2. Prioridade Operacional: Fila de Trabalho Comercial */}
+          <CrmNextActions onRefresh={fetchOportunidades} />
 
-          {/* KPIS DE FUNIL */}
-          <div className="bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-800 bg-gray-900/40 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-950/60 border border-blue-900/60 rounded-xl text-blue-400">
-                  <Activity className="h-4 w-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Volume de Oportunidades por Status</h3>
-                  <p className="text-[11px] text-gray-400">Distribuição de todas as negociações no funil</p>
-                </div>
-              </div>
-              <span className="text-[11px] bg-gray-900 text-gray-400 border border-gray-800 font-semibold px-3 py-1 rounded-full">
-                {oportunidades.length} total
-              </span>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-                {[
-                  { label: 'Leads',           count: kpis.lead,            color: 'border-indigo-500/20 text-indigo-400 bg-indigo-950/20' },
-                  { label: 'Trial Ativo',     count: kpis.trial,           color: 'border-blue-500/20 text-blue-400 bg-blue-950/20' },
-                  { label: 'Trial Expirando', count: kpis.trial_expiring,  color: 'border-amber-500/20 text-amber-400 bg-amber-950/20' },
-                  { label: 'Negociação',      count: kpis.negotiation,     color: 'border-cyan-500/20 text-cyan-400 bg-cyan-950/20' },
-                  { label: 'Ag. Pgto',        count: kpis.payment_pending, color: 'border-pink-500/20 text-pink-400 bg-pink-950/20' },
-                  { label: 'Ativos',          count: kpis.active,          color: 'border-emerald-500/20 text-emerald-400 bg-emerald-950/20' },
-                  { label: 'Renovação',       count: kpis.renewal,         color: 'border-sky-500/20 text-sky-400 bg-sky-950/20' },
-                  { label: 'Cancelados',      count: kpis.canceled,        color: 'border-slate-500/20 text-slate-400 bg-slate-950/20' }
-                ].map((k) => (
-                  <div key={k.label} className={`border p-4 rounded-xl text-center space-y-1.5 ${k.color}`}>
-                    <p className="text-[10px] font-bold uppercase tracking-wider opacity-70 leading-tight">{k.label}</p>
-                    <p className="text-2xl font-black">{k.count}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
 
           {/* PIPELINE / FUNIL COMERCIAL — Painel Executivo */}
           <div className="bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
@@ -453,49 +237,6 @@ export default function ComercialDashboardPage() {
                 ))}
               </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            {/* AÇÕES PENDENTES — coluna lateral */}
-            <div className="lg:col-span-1 bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden shadow-sm">
-              <div className="px-5 py-4 border-b border-gray-800 bg-gray-900/40 flex items-center gap-3">
-                <div className="p-2 bg-rose-950/60 border border-rose-900/60 rounded-xl text-rose-400">
-                  <ShieldAlert className="h-4 w-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Ações Pendentes</h3>
-                  <p className="text-[11px] text-gray-400">Alertas comerciais ativos</p>
-                </div>
-              </div>
-              <div className="p-4 space-y-2.5">
-                {[
-                  { label: 'Trials Expirando',    desc: 'Nos próximos 3 dias',     value: acoesPendentes.trialsExpirando,   badge: 'bg-amber-950/40 text-amber-400 border-amber-900/30' },
-                  { label: 'Trials Expirados',    desc: 'Sem assinatura ativa',     value: acoesPendentes.trialsExpirados,   badge: 'bg-red-950/40 text-red-400 border-red-900/30' },
-                  { label: 'Cobranças Pendentes', desc: 'Boletos aguardando pgto',  value: acoesPendentes.cobrancasPendentes, badge: 'bg-purple-950/40 text-purple-400 border-purple-900/30' },
-                  { label: 'Renovações Próximas', desc: 'Contratos a vencer',       value: acoesPendentes.renovacoesProximas, badge: 'bg-blue-950/40 text-blue-400 border-blue-900/30' },
-                  { label: 'Webhooks com Erro',   desc: 'Falhas de gateway',        value: acoesPendentes.webhooksErro,      badge: 'bg-slate-950/40 text-slate-400 border-slate-900/30' },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between p-3 bg-gray-900/60 border border-gray-800 rounded-xl">
-                    <div className="space-y-0.5">
-                      <p className="text-xs font-bold text-white">{item.label}</p>
-                      <p className="text-[10px] text-gray-500">{item.desc}</p>
-                    </div>
-                    <span className={`px-2.5 py-1 rounded-lg border text-xs font-black ${item.badge}`}>
-                      {item.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* COLUNA RESERVADA — futura expansão CRM 2.0 */}
-            <div className="lg:col-span-2 bg-gray-950 border border-gray-800 border-dashed rounded-2xl flex flex-col items-center justify-center gap-3 p-10 text-center opacity-40">
-              <Building2 className="h-8 w-8 text-gray-600" />
-              <p className="text-xs font-bold text-gray-500">Área reservada</p>
-              <p className="text-[11px] text-gray-600">Painel de relatórios avançados — CRM 2.0</p>
-            </div>
-
           </div>
 
         </div>

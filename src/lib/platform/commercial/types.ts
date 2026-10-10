@@ -13,7 +13,14 @@ export interface ComercialViewModel {
   ultimaInteracao: string | null;
   proximaAcao: string | null;
   daysRemaining?: number;
+  dataExpiracao?: string | null;
   reason: string;
+  usageStats?: {
+    totalMembros: number;
+    totalCongregacoes: number;
+    maxMembros?: number;
+    maxCongregacoes?: number;
+  };
   
   // -- Propriedades Legadas de Retrocompatibilidade para a Interface --
   ministry_name: string;

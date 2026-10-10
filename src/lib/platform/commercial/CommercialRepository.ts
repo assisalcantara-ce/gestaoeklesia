@@ -75,12 +75,51 @@ export class CommercialRepository {
    * Consulta as configurações de ministérios.
    */
   async getConfigurations(supabase: SupabaseClient): Promise<any[]> {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('configurations')
       .select('ministry_id, church_profile');
+    return data || [];
+  }
+
+  /**
+   * Consulta as interações reais registradas no CRM.
+   */
+  async getCrmInteractions(supabase: SupabaseClient): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('crm_interactions')
+      .select('*')
+      .order('created_at', { ascending: false });
     if (error) {
       if (error.code === 'PGRST205' || error.code === '42P01') return [];
       throw error;
+    }
+    return data || [];
+  }
+
+  /**
+   * Consulta a listagem de membros para cômputo de engajamento/uso por ministério.
+   */
+  async getMembers(supabase: SupabaseClient): Promise<Array<{ id: string; ministry_id: string }>> {
+    const { data, error } = await supabase
+      .from('members')
+      .select('id, ministry_id');
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') return [];
+      return [];
+    }
+    return data || [];
+  }
+
+  /**
+   * Consulta a listagem de congregações para cômputo de engajamento/uso por ministério.
+   */
+  async getCongregacoes(supabase: SupabaseClient): Promise<Array<{ id: string; ministry_id: string }>> {
+    const { data, error } = await supabase
+      .from('congregacoes')
+      .select('id, ministry_id');
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') return [];
+      return [];
     }
     return data || [];
   }

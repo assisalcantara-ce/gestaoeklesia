@@ -16,7 +16,7 @@ interface AgendaTimelineProps {
   MESES_PT?: string[];
   getEscopoLabel?: (escopoVal: string) => string;
   onClearSelectedDate?: () => void;
-  onOpenForm?: (evento: AgendaEvento | null) => void;
+  onOpenForm?: (evento: AgendaEvento | null, defaultDateStr?: string | null) => void;
   onDeleteEvento?: (evento: AgendaEvento) => void;
 }
 
@@ -40,13 +40,25 @@ export default function AgendaTimeline({
         <DashboardSection
           title={selectedDate ? `Eventos de ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR')}` : 'Compromissos do Mês'}
           icon={CalendarRange}
-          iconClassName="text-slate-400"
-          className="!p-5"
+          iconClassName="text-teal-700"
+          className="!p-5 rounded-2xl border border-slate-200/90 shadow-sm"
           actions={
             selectedDate ? (
-              <button onClick={onClearSelectedDate} className="text-[10px] text-blue-600 hover:text-blue-700 font-extrabold hover:underline">
-                Ver todos
-              </button>
+              <div className="flex items-center gap-2">
+                {isEscritaPermitida && onOpenForm && (
+                  <button
+                    onClick={() => onOpenForm(null, selectedDate)}
+                    className="p-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 font-bold text-xs flex items-center gap-1 transition cursor-pointer"
+                    title="Adicionar evento nesta data"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Novo</span>
+                  </button>
+                )}
+                <button onClick={onClearSelectedDate} className="text-xs text-teal-700 hover:text-teal-800 font-bold hover:underline cursor-pointer">
+                  Ver todos
+                </button>
+              </div>
             ) : undefined
           }
         >
@@ -190,7 +202,8 @@ export default function AgendaTimeline({
     <DashboardSection
       title="Linha do Tempo Ministerial"
       icon={TrendingUp}
-      className="flex-1 min-w-0"
+      iconClassName="text-teal-700"
+      className="flex-1 min-w-0 rounded-2xl border border-slate-200/90 shadow-sm !p-5"
     >
       {proximosEventos.length === 0 ? (
         <DashboardEmptyState

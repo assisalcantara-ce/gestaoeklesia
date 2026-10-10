@@ -21,13 +21,16 @@ export class CommercialService {
 
     // 2. Se não estiver no cache (cache miss), registra a consulta e faz o carregamento
     this.cache.recordQuery();
-    const [ministries, preRegs, invoices, opportunities, opportunitiesHistory, configurations] = await Promise.all([
+    const [ministries, preRegs, invoices, opportunities, opportunitiesHistory, configurations, crmInteractions, members, congregacoes] = await Promise.all([
       this.repository.getMinistries(supabase),
       this.repository.getPreRegistrations(supabase),
       this.repository.getBillingInvoices(supabase),
       this.repository.getOpportunities(supabase),
       this.repository.getOpportunityHistory(supabase),
-      this.repository.getConfigurations(supabase)
+      this.repository.getConfigurations(supabase),
+      this.repository.getCrmInteractions(supabase),
+      this.repository.getMembers(supabase),
+      this.repository.getCongregacoes(supabase)
     ]);
 
     // 3. Executa o builder e registra métrica
@@ -38,7 +41,10 @@ export class CommercialService {
       invoices,
       opportunities,
       opportunitiesHistory,
-      configurations
+      configurations,
+      crmInteractions,
+      members,
+      congregacoes
     });
 
     // 4. Salva o resultado no cache e retorna

@@ -6,7 +6,6 @@ import {
   Users, 
   Flame, 
   CheckCircle2, 
-  RefreshCw, 
   Clock, 
   Briefcase, 
   XCircle 
@@ -34,21 +33,7 @@ export default function CrmSummaryCards() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
-      <ExecutiveMetricCard
-        value={data.totalLeads}
-        title="Leads"
-        subtitle="Pré-cadastros sem negociação"
-        color="indigo"
-        icon={Users}
-      />
-      <ExecutiveMetricCard
-        value={data.totalTrials}
-        title="Trials"
-        subtitle="Período experimental ativo"
-        color="blue"
-        icon={Flame}
-      />
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
       <ExecutiveMetricCard
         value={data.totalClientesAtivos}
         title="Clientes Ativos"
@@ -57,17 +42,31 @@ export default function CrmSummaryCards() {
         icon={CheckCircle2}
       />
       <ExecutiveMetricCard
+        value={data.totalTrials}
+        title="Trials Ativos"
+        subtitle="Período experimental em vigor"
+        color="blue"
+        icon={Flame}
+      />
+      <ExecutiveMetricCard
+        value={data.totalTrialsExpirados}
+        title="Trials Expirados"
+        subtitle="Avaliação vencida aguardando fechamento"
+        color="rose"
+        icon={Clock}
+      />
+      <ExecutiveMetricCard
         value={data.totalRenovacoes}
-        title="Renovações"
+        title="Clientes Expirando"
         subtitle="Vencimento nos próximos 30 dias"
         color="amber"
-        icon={RefreshCw}
+        icon={Clock}
       />
       <ExecutiveMetricCard
         value={data.totalCobrancasPendentes}
         title="Cobranças Pendentes"
-        subtitle="Faturas in aberto"
-        color="rose"
+        subtitle="Clientes com faturas em aberto"
+        color="amber"
         icon={Clock}
       />
       <ExecutiveMetricCard
@@ -78,9 +77,16 @@ export default function CrmSummaryCards() {
         icon={Briefcase}
       />
       <ExecutiveMetricCard
+        value={data.totalLeads}
+        title="Leads"
+        subtitle="Pré-cadastros sem negociação"
+        color="indigo"
+        icon={Users}
+      />
+      <ExecutiveMetricCard
         value={data.totalCancelados}
-        title="Cancelados / Expirados"
-        subtitle="Trials encerrados ou assinaturas canceladas"
+        title="Cancelados"
+        subtitle="Assinaturas desativadas definitivamente"
         color="slate"
         icon={XCircle}
       />

@@ -180,6 +180,43 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // 1. Obter dados do lead antes da exclusão para verificar user_id vinculado
+    const { data: lead } = await supabase
+      .from('pre_registrations')
+      .select('id, user_id, ministry_name')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (lead?.user_id) {
+      // 2. Se houver ministério provisionado para esse user_id, remover em cascata
+      const { data: linkedMinistry } = await supabase
+        .from('ministries')
+        .select('id')
+        .eq('user_id', lead.user_id)
+        .maybeSingle();
+
+      if (linkedMinistry?.id) {
+        // Remover dependências sem foreign key cascade
+        await supabase.from('admin_impersonation_sessions').delete().eq('tenant_id', linkedMinistry.id);
+        await supabase.from('technical_access_grants').delete().eq('ministry_id', linkedMinistry.id);
+        await supabase.from('technical_access_secrets').delete().eq('ministry_id', linkedMinistry.id);
+        await supabase.from('tesouraria_fechamentos').delete().eq('ministry_id', linkedMinistry.id);
+        await supabase.from('crm_interactions').delete().eq('ministry_id', linkedMinistry.id);
+        await supabase.from('ministry_users').delete().eq('ministry_id', linkedMinistry.id);
+        await supabase.from('support_tickets').delete().eq('ministry_id', linkedMinistry.id);
+
+        await supabase.from('ministries').delete().eq('id', linkedMinistry.id);
+      }
+
+      // Remover conta Auth se aplicável
+      try {
+        await supabase.auth.admin.deleteUser(lead.user_id);
+      } catch {
+        // best-effort
+      }
+    }
+
+    // 3. Excluir o pré-cadastro
     const { error } = await supabase
       .from('pre_registrations')
       .delete()

@@ -27,6 +27,16 @@ export async function requireFlowAuth(request: NextRequest): Promise<FlowAuthCon
 
 async function ensureTrialAccess(userId: string) {
   const admin = createServerClient();
+
+  // Se for conta de suporte técnico, não bloqueia por trial expirado
+  const { data: userAuth } = await admin.auth.admin.getUserById(userId);
+  const isTechUser =
+    userAuth?.user?.app_metadata?.is_technical_user === true ||
+    userAuth?.user?.user_metadata?.is_technical_user === true ||
+    (userAuth?.user?.email && userAuth.user.email.toLowerCase().startsWith('tech.suporte.'));
+
+  if (isTechUser) return;
+
   const { data, error } = await admin
     .from('pre_registrations')
     .select('id, trial_expires_at, status')

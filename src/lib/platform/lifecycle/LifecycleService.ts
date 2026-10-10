@@ -44,7 +44,16 @@ export class LifecycleService {
 
           // Se a data de fim do contrato foi ultrapassada
           if (diffDays <= 0) {
-            // Deixa continuar para avaliar se tem negociação ou cobrança pendente
+            if (ministry.subscription_status === 'trial') {
+              return {
+                status: 'TRIAL_EXPIRED',
+                reason: `Período experimental encerrado em ${endDate.toLocaleDateString('pt-BR')}.`,
+                daysRemaining: diffDays,
+                calculatedAt,
+                isTrial: true
+              };
+            }
+            // Para contratos normais com fim ultrapassado, continua para avaliar cobranças
           } else if (diffDays <= LifecycleRules.RenewalWindow) {
             return {
               status: 'RENEWAL',

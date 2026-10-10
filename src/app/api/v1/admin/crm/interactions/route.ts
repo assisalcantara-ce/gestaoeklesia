@@ -115,6 +115,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: insertRes.error.message }, { status: 500 });
     }
 
+    // Invalida cache comercial imediatamente para refletir na fila em tempo real
+    try {
+      const { CommercialCache } = await import('@/lib/platform/commercial-cache/CommercialCache');
+      CommercialCache.getInstance().clear();
+    } catch (cacheErr) {
+      console.warn('[CRM Interactions] Erro ao invalidar cache comercial:', cacheErr);
+    }
+
     return NextResponse.json({
       success: true,
       interaction: insertRes.data

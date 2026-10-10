@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { BRAND } from '@/config/brand'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useRef } from 'react'
 import {
@@ -37,13 +36,16 @@ export default function AdminSidebar() {
   useEffect(() => {
     const fetchNewCount = async () => {
       try {
-        const response = await authenticatedFetch('/api/v1/admin/oportunidades')
+        const response = await authenticatedFetch('/api/v1/admin/crm/summary')
         if (response.ok) {
           const data = await response.json()
-          setNewCount(data.new_count || 0)
+          // Contabilizar apenas trials expirados e renovações próximas
+          const trialsExpirados = Number(data.totalTrialsExpirados) || 0
+          const renovacoes = Number(data.totalRenovacoes) || 0
+          setNewCount(trialsExpirados + renovacoes)
         }
       } catch (err) {
-        console.error('Erro ao buscar contagem de oportunidades:', err)
+        console.error('Erro ao buscar contagem de alertas comerciais:', err)
       }
     }
     
@@ -70,7 +72,7 @@ export default function AdminSidebar() {
     { label: 'Dashboard', href: '/admin/dashboard', icon: Home },
     ...(temAcessoAdmin(role, 'ministerios') ? [
       { label: 'Clientes', href: '/admin/ministerios', icon: Building2 },
-      { label: `Comercial ${newCount > 0 ? `(${newCount})` : ''}`, href: '/admin/comercial', icon: Briefcase, badge: newCount }
+      { label: 'Comercial', href: '/admin/comercial', icon: Briefcase, badge: newCount }
     ] : []),
 
     ...(temAcessoAdmin(role, 'pagamentos') ? [{ label: 'Financeiro', href: '/admin/pagamentos', icon: CreditCard }] : []),
@@ -100,18 +102,18 @@ export default function AdminSidebar() {
           isOpen ? 'w-64' : 'w-20'
         } border-r border-[#0E4D43]/60 flex flex-col`}
       >
-        <div className="flex items-center justify-center p-4 border-b border-[#0E4D43]/60 bg-[#032C28]/60">
-          <div className="bg-white/95 px-3 py-1.5 rounded-xl shadow-sm">
+        <div className="flex items-center justify-center px-4 py-5 border-b border-[#0E4D43]/60 bg-[#032C28]/60">
+          <Link href="/admin/dashboard" className="flex items-center justify-center transition hover:opacity-90 w-full">
             <Image
-              src={BRAND.logoHorizontal}
+              src="/icon/logob.png"
               alt="Gestão Eklésia"
-              width={140}
-              height={38}
+              width={220}
+              height={60}
               priority
-              sizes="140px"
-              className="h-[36px] w-auto object-contain"
+              sizes="220px"
+              className="h-[52px] max-w-[210px] w-auto object-contain"
             />
-          </div>
+          </Link>
         </div>
 
         {/* Menu Items */}

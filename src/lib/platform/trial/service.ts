@@ -114,6 +114,23 @@ export class TrialService {
       }
     }
 
+    // 4.1. Edge case: Conta de suporte técnico autorizada (is_technical_user / tech.suporte.*)
+    // Permite que analistas de suporte operem o tenant mesmo após expiração comercial
+    const { data: userAuth } = await supabaseAdmin.auth.admin.getUserById(userId)
+    const isTechUser =
+      userAuth?.user?.app_metadata?.is_technical_user === true ||
+      userAuth?.user?.user_metadata?.is_technical_user === true ||
+      (userAuth?.user?.email && userAuth.user.email.toLowerCase().startsWith('tech.suporte.'))
+
+    if (isTechUser) {
+      return {
+        expired: false,
+        status: 'technical_access',
+        trial_expires_at: preReg.trial_expires_at,
+        trial_days: preReg.trial_days ?? null,
+      }
+    }
+
     // 5. Calcular expiração pela data
     const { isExpired } = this.calculateExpiration(preReg.trial_expires_at, preReg.status)
 

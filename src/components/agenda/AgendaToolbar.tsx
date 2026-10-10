@@ -65,26 +65,34 @@ export default function AgendaToolbar({
   if (activeTab !== 'calendario') return null;
 
   return (
-    <div className="space-y-3 mb-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
-        {/* Navegação de Mês/Ano compacta */}
-        <div className="flex items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-200/70 shadow-xs">
-          <button onClick={onPrevMonth} className="px-2 py-1 hover:bg-slate-50 rounded text-slate-700 text-xs font-black transition">
-            <ChevronLeft className="h-3.5 w-3.5" />
+    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Navegação de Mês/Ano */}
+        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-xl p-1 shadow-xs">
+          <button
+            onClick={onPrevMonth}
+            className="p-1.5 hover:bg-white rounded-lg text-slate-700 hover:text-slate-900 transition cursor-pointer"
+            title="Mês anterior"
+          >
+            <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="text-xs font-black text-slate-800 px-1.5 min-w-[110px] text-center">
+          <span className="text-xs sm:text-sm font-black text-slate-900 px-2 min-w-[130px] text-center tracking-tight">
             {MESES_PT[currentMonth - 1].toUpperCase()} {currentYear}
           </span>
-          <button onClick={onNextMonth} className="px-2 py-1 hover:bg-slate-50 rounded text-slate-700 text-xs font-black transition">
-            <ChevronRight className="h-3.5 w-3.5" />
+          <button
+            onClick={onNextMonth}
+            className="p-1.5 hover:bg-white rounded-lg text-slate-700 hover:text-slate-900 transition cursor-pointer"
+            title="Próximo mês"
+          >
+            <ChevronRight className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Filtros Rápidos (Pills compactos) */}
-        <div className="flex items-center gap-1 overflow-x-auto">
+        {/* Filtros Rápidos (Pills) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
           <button
             onClick={onGoToToday}
-            className="px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/70 rounded-lg text-xs font-bold transition shrink-0 shadow-xs"
+            className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition shrink-0 shadow-xs cursor-pointer"
           >
             Hoje
           </button>
@@ -93,45 +101,50 @@ export default function AgendaToolbar({
             { key: 'oficiais', label: '🔵 Oficiais' },
             { key: 'locais', label: '🟢 Locais' },
             { key: 'bloqueados', label: '🔴 Gerenciados' },
-          ] as { key: QuickFilter; label: string }[]).map(f => (
-            <button
-              key={f.key}
-              onClick={() => onQuickFilterChange(f.key)}
-              className={`px-3 py-1 rounded-lg text-xs font-bold border transition shrink-0 ${
-                quickFilter === f.key
-                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                  : 'bg-white text-slate-600 border-slate-200/70 hover:border-slate-300 shadow-xs'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+          ] as { key: QuickFilter; label: string }[]).map(f => {
+            const isSelected = quickFilter === f.key;
+            return (
+              <button
+                key={f.key}
+                onClick={() => onQuickFilterChange(f.key)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition shrink-0 cursor-pointer ${
+                  isSelected
+                    ? 'bg-teal-700 text-white border-teal-800 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
+                }`}
+              >
+                {f.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Trigger Filtros Avançados */}
         <button
           onClick={onToggleAdvancedFilters}
-          className={`flex items-center gap-1.5 px-3 py-1 border rounded-lg text-xs font-bold transition ${
+          className={`flex items-center gap-1.5 px-3.5 py-2 border rounded-xl text-xs font-bold transition shadow-xs cursor-pointer ${
             showAdvancedFilters || filtroTipoId || filtroCongregacao || filtroVisibilidade
-              ? 'border-blue-200 text-blue-600 bg-blue-50'
-              : 'border-slate-200/70 text-slate-500 bg-white hover:bg-slate-50 shadow-xs'
+              ? 'border-teal-700 text-teal-800 bg-teal-50'
+              : 'border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
           }`}
         >
-          <Filter className="h-3.5 w-3.5" />
-          Filtros
-          {showAdvancedFilters ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          <Filter className="h-4 w-4" />
+          <span>Filtros avançados</span>
+          {showAdvancedFilters ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
         </button>
       </div>
 
       {/* Filtros Avançados Recolhíveis */}
       {showAdvancedFilters && (
-        <div className="bg-white p-4 rounded-xl border border-slate-200/60 shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="pt-4 border-t border-slate-200/80 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tipo de Compromisso</label>
+            <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
+              Tipo de Compromisso
+            </label>
             <select
               value={filtroTipoId}
               onChange={(e) => onFiltroTipoChange(e.target.value)}
-              className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none text-slate-700 bg-white"
+              className="w-full px-3 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
             >
               <option value="">Todos</option>
               {Object.entries(tiposAgrupados).map(([categoria, lista]) => {
@@ -147,13 +160,13 @@ export default function AgendaToolbar({
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+            <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
               {orgHelper ? orgHelper.label('divisao1') : 'Congregação'}
             </label>
             <select
               value={filtroCongregacao}
               onChange={(e) => onFiltroCongregacaoChange(e.target.value)}
-              className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none text-slate-700 bg-white"
+              className="w-full px-3 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
             >
               <option value="">Todas</option>
               {congregacoes.map((c) => (
@@ -162,11 +175,13 @@ export default function AgendaToolbar({
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Visibilidade</label>
+            <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
+              Visibilidade
+            </label>
             <select
               value={filtroVisibilidade}
               onChange={(e) => onFiltroVisibilidadeChange(e.target.value)}
-              className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none text-slate-700 bg-white"
+              className="w-full px-3 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
             >
               <option value="">Todas</option>
               <option value="privado">Privado</option>

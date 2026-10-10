@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Trash2 } from 'lucide-react';
+import { X, Trash2, Check } from 'lucide-react';
 import { AgendaEvento } from './AgendaCalendar';
 import { AgendaTipo } from './AgendaToolbar';
 
@@ -287,15 +287,16 @@ export default function EventoFormModal({
                 <button
                   type="button"
                   onClick={onCloseModal}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-white transition text-xs"
+                  className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-white transition text-xs cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-xs transition text-xs disabled:opacity-60"
+                  className="px-5 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold rounded-xl shadow-xs transition text-xs disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
                 >
+                  <Check className="h-4 w-4" />
                   {saving ? 'Salvando...' : 'Confirmar'}
                 </button>
               </div>

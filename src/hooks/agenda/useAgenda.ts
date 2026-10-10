@@ -241,22 +241,33 @@ export function useAgenda() {
     setTimeout(() => setMsg(null), 4000);
   };
 
-  const userRole = (ctx as any)?.role || '';
-  const userIsMaster = (ctx as any)?.isMaster || false;
+  const userRole = (ctx as any)?.nivel || (ctx as any)?.role || '';
+  const userIsMaster = (ctx as any)?.isAdmin || (ctx as any)?.isMaster || false;
 
   const isPresidenciaOrAdmin = useMemo(() => {
+    if (userIsMaster) return true;
     if (!userRole) return false;
     const r = String(userRole).toLowerCase();
-    return r.includes('admin') || r.includes('presid') || r.includes('pastor_presidente') || r.includes('pastor presidente') || r.includes('superintendente');
-  }, [userRole]);
+    return (
+      r === 'administrador' ||
+      r === 'presidencia' ||
+      r.includes('admin') ||
+      r.includes('presid') ||
+      r.includes('pastor_presidente') ||
+      r.includes('pastor presidente') ||
+      r.includes('superintendente')
+    );
+  }, [userIsMaster, userRole]);
 
   const isEscritaPermitida = useMemo(() => {
-    if (userIsMaster || userRole === 'admin' || userRole === 'editor' || isPresidenciaOrAdmin) return true;
+    if (userIsMaster) return true;
+    if (ctx?.podeEscrever && ctx.podeEscrever('agenda')) return true;
+    if (userRole === 'admin' || userRole === 'editor' || userRole === 'administrador' || isPresidenciaOrAdmin) return true;
     return false;
-  }, [userIsMaster, userRole, isPresidenciaOrAdmin]);
+  }, [userIsMaster, ctx, userRole, isPresidenciaOrAdmin]);
 
   const isAdmin = useMemo(() => {
-    return userIsMaster || userRole === 'admin' || isPresidenciaOrAdmin;
+    return userIsMaster || userRole === 'admin' || userRole === 'administrador' || isPresidenciaOrAdmin;
   }, [userIsMaster, userRole, isPresidenciaOrAdmin]);
 
   const currentYear = useMemo(() => {
@@ -391,12 +402,12 @@ export function useAgenda() {
         .from('agenda_eventos')
         .select(`
           *,
-          agenda_tipos!agenda_eventos_tipo_id_fkey (*),
-          agenda_planejamentos!agenda_eventos_planejamento_id_fkey (*)
+          agenda_tipos (*),
+          agenda_planejamentos (*)
         `)
         .eq('ministry_id', mId)
-        .gte('data_inicio', startOfMonth)
         .lte('data_inicio', endOfMonth)
+        .or(`data_fim.gte.${startOfMonth},and(data_fim.is.null,data_inicio.gte.${startOfMonth})`)
         .order('data_inicio');
 
       if (filtroTipoId) {
@@ -420,21 +431,50 @@ export function useAgenda() {
     }
   }, [supabase, filtroMes, filtroTipoId, filtroCongregacao, filtroVisibilidade]);
 
+  const triggerSyncPublicMagazine = useCallback(async () => {
+    try {
+      await fetch('/api/v1/agenda/sync-public', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (err) {
+      // Falha silenciosa de sincronização de cache em segundo plano para não bloquear a UI do operador
+      console.warn('[useAgenda] Sincronização pública em segundo plano:', err);
+    }
+  }, []);
+
   const loadSolicitacoes = useCallback(async (mId: string) => {
     if (!isPresidenciaOrAdmin) return;
     setLoadingSols(true);
     try {
       const { data, error } = await supabase
         .from('agenda_solicitacoes')
-        .select(`
-          *,
-          conflito_evento:agenda_eventos!agenda_solicitacoes_conflito_id_fkey(titulo)
-        `)
+        .select('*')
         .eq('ministry_id', mId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setSolicitacoes(data || []);
+
+      const solicitacoesComConflito = await Promise.all(
+        (data || []).map(async (sol: any) => {
+          if (!sol.conflito_id) return sol;
+          try {
+            const { data: confEvt } = await supabase
+              .from('agenda_eventos')
+              .select('titulo')
+              .eq('id', sol.conflito_id)
+              .maybeSingle();
+            return {
+              ...sol,
+              conflito_evento: confEvt ? { titulo: confEvt.titulo } : null,
+            };
+          } catch {
+            return sol;
+          }
+        })
+      );
+
+      setSolicitacoes(solicitacoesComConflito);
     } catch (err) {
       console.error(err);
     } finally {
@@ -452,7 +492,7 @@ export function useAgenda() {
     }
   }, [ministryId, currentYear, loadCongregacoes, loadTipos, loadEventos, loadPlanningInfo, loadSolicitacoes]);
 
-  const openForm = (evento: AgendaEvento | null = null) => {
+  const openForm = (evento: AgendaEvento | null = null, defaultDateStr?: string | null) => {
     if (evento) {
       setEditEvento(evento);
       setForm({
@@ -473,8 +513,9 @@ export function useAgenda() {
       setShowAdvancedFormFields(!!(evento.descricao || evento.regra_posicionamento || evento.calendario_oficial || evento.gera_bloqueio));
     } else {
       setEditEvento(null);
-      const defaultStart = selectedDate 
-        ? `${selectedDate}T09:00` 
+      const targetDate = defaultDateStr || selectedDate;
+      const defaultStart = targetDate 
+        ? `${targetDate}T09:00` 
         : `${new Date().toISOString().slice(0, 10)}T09:00`;
 
       setForm({
@@ -597,6 +638,9 @@ export function useAgenda() {
       setShowModal(false);
       loadEventos(ministryId);
       if (activePlanning) loadPlanningInfo(ministryId, currentYear);
+
+      // Sincronizar cache público caso seja evento público ou altere a agenda pública
+      triggerSyncPublicMagazine();
     } catch (err) {
       console.error(err);
       flash('erro', 'Falha ao salvar o compromisso.');
@@ -625,6 +669,9 @@ export function useAgenda() {
       flash('ok', 'Compromisso excluído com sucesso.');
       loadEventos(ministryId);
       if (activePlanning) loadPlanningInfo(ministryId, currentYear);
+
+      // Sincronizar cache público caso o evento excluído fosse público
+      triggerSyncPublicMagazine();
     } catch (err) {
       console.error(err);
       flash('erro', 'Erro ao excluir o compromisso.');
@@ -714,9 +761,58 @@ export function useAgenda() {
       await registrarAcao({ acao: 'atualizar_status', modulo: 'agenda', tabela_afetada: 'agenda_planejamentos', registro_id: activePlanning.id });
       flash('ok', 'Planejamento publicado com sucesso!');
       loadPlanningInfo(ministryId, currentYear);
+
+      // Sincronizar tema anual na Revista Pública
+      triggerSyncPublicMagazine();
     } catch (err) {
       console.error(err);
       flash('erro', 'Erro ao publicar planejamento.');
+    }
+  };
+
+  const handleCriarPlanejamento = async (ano?: number) => {
+    const targetAno = ano || currentYear;
+    if (!ministryId) return;
+
+    try {
+      const { data: existing } = await supabase
+        .from('agenda_planejamentos')
+        .select('id')
+        .eq('ministry_id', ministryId)
+        .eq('ano', targetAno)
+        .maybeSingle();
+
+      if (existing) {
+        flash('ok', `Planejamento para o ano ${targetAno} já existe.`);
+        loadPlanningInfo(ministryId, targetAno);
+        return;
+      }
+
+      const { data: newPlan, error } = await supabase
+        .from('agenda_planejamentos')
+        .insert({
+          ministry_id: ministryId,
+          ano: targetAno,
+          nome: `Planejamento Anual ${targetAno}`,
+          status: 'rascunho',
+          created_by: user?.id || null,
+        })
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      await registrarAcao({
+        acao: 'criar',
+        modulo: 'agenda',
+        tabela_afetada: 'agenda_planejamentos',
+        registro_id: newPlan.id,
+      });
+
+      flash('ok', `Planejamento de ${targetAno} inicializado com sucesso!`);
+      loadPlanningInfo(ministryId, targetAno);
+    } catch (err: any) {
+      console.error(err);
+      flash('erro', err?.message || 'Erro ao inicializar planejamento.');
     }
   };
 
@@ -744,6 +840,9 @@ export function useAgenda() {
       await registrarAcao({ acao: 'atualizar_status', modulo: 'agenda', tabela_afetada: 'agenda_planejamentos', registro_id: activePlanning.id });
       flash('ok', 'Planejamento arquivado.');
       loadPlanningInfo(ministryId, currentYear);
+
+      // Sincronizar tema anual na Revista Pública
+      triggerSyncPublicMagazine();
     } catch (err) {
       console.error(err);
       flash('erro', 'Erro ao arquivar planejamento.');
@@ -848,19 +947,47 @@ export function useAgenda() {
 
   const eventosPorDia = useMemo(() => {
     const mapa: Record<string, AgendaEvento[]> = {};
+    const [yearStr, monthStr] = filtroMes.split('-');
+    const currentMonthPrefix = `${yearStr}-${monthStr.padStart(2, '0')}`;
+
     eventos.forEach(e => {
-      const dayStr = e.data_inicio.split('T')[0];
-      if (!mapa[dayStr]) mapa[dayStr] = [];
-      mapa[dayStr].push(e);
+      const startDayStr = e.data_inicio.split('T')[0];
+      const endDayStr = e.data_fim ? e.data_fim.split('T')[0] : startDayStr;
+
+      // Se não há data_fim ou as datas são iguais, mapeia diretamente no dia de início
+      if (!e.data_fim || startDayStr === endDayStr) {
+        if (!mapa[startDayStr]) mapa[startDayStr] = [];
+        mapa[startDayStr].push(e);
+        return;
+      }
+
+      // Para eventos com intervalo de múltiplos dias, mapear os dias pertinentes
+      const startDate = new Date(`${startDayStr}T00:00:00`);
+      const endDate = new Date(`${endDayStr}T00:00:00`);
+
+      const cur = new Date(startDate);
+      while (cur <= endDate) {
+        const curStr = cur.toISOString().split('T')[0];
+        // Otimização: registrar nos dias do mês consultado
+        if (curStr.startsWith(currentMonthPrefix)) {
+          if (!mapa[curStr]) mapa[curStr] = [];
+          mapa[curStr].push(e);
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
     });
     return mapa;
-  }, [eventos]);
+  }, [eventos, filtroMes]);
 
   const eventosColunaDireita = useMemo(() => {
     if (selectedDate) {
-      return eventos.filter(e => e.data_inicio.startsWith(selectedDate));
+      return eventos.filter(e => {
+        const startDay = e.data_inicio.split('T')[0];
+        const endDay = e.data_fim ? e.data_fim.split('T')[0] : startDay;
+        return selectedDate >= startDay && selectedDate <= endDay;
+      });
     }
-    return eventos.sort((a, b) => new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime());
+    return [...eventos].sort((a, b) => new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime());
   }, [eventos, selectedDate]);
 
   const TABS = useMemo(() => {
@@ -958,6 +1085,7 @@ export function useAgenda() {
     handleDeletarTipo,
     handlePublishPlanning,
     handleArchivePlanning,
+    handleCriarPlanejamento,
     handleDecidirSolicitacao,
     getEscopoLabel,
   };

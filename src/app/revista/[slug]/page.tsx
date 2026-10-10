@@ -143,7 +143,7 @@ function RevistaContent() {
     const queryStr = anoParam ? `?ano=${encodeURIComponent(anoParam)}` : '';
     const url = `/api/v1/public/agenda/${encodeURIComponent(slug)}${queryStr}`;
 
-    fetch(url)
+    fetch(url, { cache: 'no-cache' })
       .then(async (res) => {
         if (!res.ok) {
           if (res.status === 404) {

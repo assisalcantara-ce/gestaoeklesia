@@ -28,6 +28,8 @@ export interface ResolvedOpportunity {
 export class CrmService {
   /**
    * Retorna o resumo consolidado de métricas do CRM com base no CommercialService.
+   * Garante categorização rigorosa: TRIAL_EXPIRED separado de CANCELED,
+   * clientes com cobranças pendentes oficiais e sem duplicação de entidades.
    */
   async getSummary(supabase: SupabaseClient): Promise<CrmSummary> {
     const commercialService = new CommercialService();
@@ -35,6 +37,7 @@ export class CrmService {
 
     let totalLeads = 0;
     let totalTrials = 0;
+    let totalTrialsExpirados = 0;
     let totalClientesAtivos = 0;
     let totalRenovacoes = 0;
     let totalCobrancasPendentes = 0;
@@ -44,29 +47,47 @@ export class CrmService {
     list.forEach(item => {
       const status = item.lifecycle.status;
 
-      // Comercial 2.0.1: Registros RENEWAL originados de trial (pre_registrations, subscription_status === 'trial' ou menção a trial)
-      // também devem ser contabilizados no KPI de totalTrials sem alterar as renovações.
-      const isTrialInRenewal = status === 'RENEWAL' && (
-        item.lifecycle?.isTrial ||
-        item.origem === 'pre_registrations' ||
-        (item.reason && item.reason.toLowerCase().includes('trial'))
-      );
-
-      if (status === 'TRIAL' || status === 'TRIAL_EXPIRING' || isTrialInRenewal) {
+      // 1. Leads
+      if (status === 'LEAD') {
+        totalLeads++;
+      }
+      // 2. Trials Ativos (TRIAL ou TRIAL_EXPIRING)
+      else if (status === 'TRIAL' || status === 'TRIAL_EXPIRING') {
         totalTrials++;
       }
+      // 3. Trials Expirados (separado estritamente de cancelamentos definitivos)
+      else if (status === 'TRIAL_EXPIRED') {
+        totalTrialsExpirados++;
+      }
+      // 4. Clientes Ativos operacionais
+      else if (status === 'ACTIVE') {
+        totalClientesAtivos++;
+      }
+      // 5. Renovações (próximos a vencer)
+      else if (status === 'RENEWAL') {
+        totalRenovacoes++;
+      }
+      // 6. Negociações em andamento
+      else if (status === 'NEGOTIATION') {
+        totalNegociacoes++;
+      }
+      // 7. Cancelamentos definitivos
+      else if (status === 'CANCELED') {
+        totalCancelados++;
+      }
 
-      if (status === 'LEAD') totalLeads++;
-      else if (status === 'ACTIVE') totalClientesAtivos++;
-      else if (status === 'RENEWAL') totalRenovacoes++;
-      else if (status === 'PAYMENT_PENDING') totalCobrancasPendentes++;
-      else if (status === 'NEGOTIATION') totalNegociacoes++;
-      else if (status === 'CANCELED' || status === 'TRIAL_EXPIRED') totalCancelados++;
+      // Cobranças pendentes oficiais baseadas no faturamento real (platform_billing_invoices)
+      // Um cliente possui pendência financeira se tiver fatura com status 'pending' ou 'overdue'
+      // ou estiver com status de ciclo de vida PAYMENT_PENDING
+      if (item.statusFinanceiro === 'pending' || item.statusFinanceiro === 'overdue' || status === 'PAYMENT_PENDING') {
+        totalCobrancasPendentes++;
+      }
     });
 
     return {
       totalLeads,
       totalTrials,
+      totalTrialsExpirados,
       totalClientesAtivos,
       totalRenovacoes,
       totalCobrancasPendentes,
@@ -409,73 +430,81 @@ export class CrmService {
 
 
   /**
-   * Retorna a lista de oportunidades abertas (Novo, Em Atendimento, Aguardando Pagamento) mapeadas como atividades.
+   * Retorna a lista de oportunidades e contas em ciclo comercial ativo mapeadas como atividades.
+   * Não depende da tabela legada `oportunidades_comerciais`. Deriva diretamente de `CommercialService`.
    */
   async getActivities(supabase: SupabaseClient, id?: string): Promise<CrmActivity[]> {
-    // 1. Carregar oportunidades comerciais do banco filtrando pelos status abertos informados
-    const { data, error } = await supabase
-      .from('oportunidades_comerciais')
-      .select('*')
-      .in('status', ['Novo', 'Em Atendimento', 'Em Negociação', 'Aguardando Pagamento']);
-
-    if (error) {
-      console.error('[CrmService.getActivities] Erro:', error.message);
-      return [];
-    }
-
-    let list = data || [];
-
-    // 2. Se um id de filtro for fornecido, filtra as ocorrências associadas
-    if (id) {
-      list = list.filter(o => o.id === id || o.ministry_id === id);
-    }
-
-    // 3. Obter os ComercialViewModels via CommercialService (que usa cache)
+    // 1. Obter os ComercialViewModels via CommercialService (que usa cache e unificação desduplicada)
     const commercialService = new CommercialService();
     const commercialList = await commercialService.list(supabase);
     const allNextActions = await this.getNextActions(supabase);
 
-    // 4. Mapear para DTO CrmActivity enriquecido com lifecycle e nextAction
-    return list.map((opt: any) => {
-      // Prioridade heurística baseada no tempo de expiração ou criação
-      let prioridade = 'média';
-      const diffTime = Math.abs(Date.now() - new Date(opt.created_at).getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      if (diffDays > 15) {
-        prioridade = 'alta';
-      } else if (diffDays < 3) {
-        prioridade = 'baixa';
+    // 2. Se um id de filtro for fornecido, filtra as ocorrências associadas
+    let list = commercialList;
+    if (id) {
+      list = list.filter(item => item.id === id);
+    } else {
+      // Filtrar apenas contas que estão no funil / ciclo comercial ativo
+      // (exclui ACTIVE e CANCELED puros, a menos que haja ação pendente)
+      const pipelineStatuses = new Set([
+        'LEAD',
+        'TRIAL',
+        'TRIAL_EXPIRING',
+        'TRIAL_EXPIRED',
+        'NEGOTIATION',
+        'PAYMENT_PENDING',
+        'RENEWAL'
+      ]);
+      list = list.filter(item => pipelineStatuses.has(item.lifecycle.status));
+    }
+
+    // 3. Mapear cada ComercialViewModel para o DTO CrmActivity
+    return list.map(item => {
+      const actionItem = allNextActions.find(a => a.oportunidadeId === item.id || (item.origem === 'ministries' && a.ministryId === item.id));
+
+      // Prioridade heurística
+      let prioridade = actionItem?.prioridade || 'media';
+      if (!actionItem) {
+        if (item.lifecycle.status === 'TRIAL_EXPIRED' || item.lifecycle.status === 'PAYMENT_PENDING') {
+          prioridade = 'alta';
+        } else {
+          const diffTime = Math.abs(Date.now() - new Date(item.created_at).getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays > 15) {
+            prioridade = 'alta';
+          } else if (diffDays < 3) {
+            prioridade = 'baixa';
+          }
+        }
       }
 
-      // Procurar o ComercialViewModel correspondente
-      const vm = commercialList.find(c => c.id === opt.id || (opt.ministry_id && c.id === opt.ministry_id));
-      const actionItem = allNextActions.find(a => a.oportunidadeId === opt.id || (opt.ministry_id && a.ministryId === opt.ministry_id));
+      const ministryId = item.origem === 'ministries' ? item.id : null;
 
       return {
-        id: opt.id,
-        oportunidadeId: opt.id,
-        ministryId: opt.ministry_id || null,
-        nome: opt.ministry_name || 'Negociação Comercial',
-        responsavel: opt.responsavel || 'Não Informado',
-        email: opt.email || vm?.email || undefined,
-        telefone: opt.telefone || vm?.telefone || undefined,
-        origem: vm?.origem === 'ministries' ? 'Ministério' : 'Lead',
-        status: opt.status,
+        id: item.id,
+        oportunidadeId: item.id,
+        ministryId,
+        nome: item.nome || item.ministry_name || 'Negociação Comercial',
+        responsavel: item.responsavel || 'Não Informado',
+        email: item.email || undefined,
+        telefone: item.telefone || undefined,
+        origem: item.origem === 'ministries' ? 'Ministério' : 'Lead',
+        status: item.status || item.lifecycle.status,
         prioridade,
-        dataCriacao: opt.created_at,
-        ultimaAtualizacao: opt.updated_at || opt.created_at,
+        dataCriacao: item.created_at,
+        ultimaAtualizacao: item.ultimaInteracao || item.created_at,
         nextAction: actionItem ? {
           acao: actionItem.acao,
           prioridade: actionItem.prioridade,
           vencimento: actionItem.vencimento
         } : undefined,
-        lifecycle: vm ? {
-          status: vm.lifecycle.status,
-          plano: vm.plano || 'Nenhum',
-          statusFinanceiro: vm.statusFinanceiro || 'Sem faturamento',
-          daysRemaining: vm.daysRemaining,
-          reason: vm.lifecycle.reason
-        } : undefined
+        lifecycle: {
+          status: item.lifecycle.status,
+          plano: item.plano || 'Nenhum',
+          statusFinanceiro: item.statusFinanceiro || 'Sem faturamento',
+          daysRemaining: item.daysRemaining,
+          reason: item.lifecycle.reason
+        }
       };
     });
   }
@@ -526,9 +555,54 @@ export class CrmService {
         prioridade = 'media';
         const lastRef = new Date(item.created_at);
         vencimentoDate = new Date(lastRef.getTime() + 1 * 24 * 60 * 60 * 1000);
+      } else if (status === 'TRIAL_EXPIRED') {
+        prioridade = 'alta';
+        // Verificar se houve interação recente (crm_interactions)
+        if (item.ultimaInteracao) {
+          const lastIntDate = new Date(item.ultimaInteracao);
+          const diasDesdeContato = Math.ceil((Date.now() - lastIntDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (diasDesdeContato <= 3) {
+            // Contato feito muito recentemente: programar follow-up em 4 dias úteis
+            acao = 'Acompanhar proposta pós-trial';
+            prioridade = 'media';
+            vencimentoDate = new Date(lastIntDate.getTime() + 4 * 24 * 60 * 60 * 1000);
+          } else {
+            // Contato antigo (> 3 dias): follow-up urgente de recuperação
+            acao = 'Realizar follow-up de recuperação pós-trial';
+            vencimentoDate = new Date(lastIntDate.getTime() + 3 * 24 * 60 * 60 * 1000);
+          }
+        } else {
+          // Sem contato registrado: prioridade máxima de fechamento
+          acao = 'Contatar trial expirado para fechamento';
+          vencimentoDate = new Date(); // Vence hoje / pendente imediato
+        }
       } else {
-        // Ignora status que não exigem ações comerciais pendentes (ACTIVE, CANCELED, TRIAL_EXPIRED)
+        // Ignora status que não exigem ações comerciais pendentes (ACTIVE, CANCELED)
         return;
+      }
+
+      let diasSemContato: number | undefined = undefined;
+      const dataExpiracaoDate = item.dataExpiracao ? new Date(item.dataExpiracao) : null;
+      const lastIntDate = item.ultimaInteracao ? new Date(item.ultimaInteracao) : null;
+
+      if (status === 'TRIAL_EXPIRED') {
+        // Se houve interação registrada e ela ocorreu após ou junto com a expiração do trial:
+        if (lastIntDate && dataExpiracaoDate && lastIntDate.getTime() > dataExpiracaoDate.getTime()) {
+          diasSemContato = Math.max(0, Math.floor((Date.now() - lastIntDate.getTime()) / (1000 * 60 * 60 * 24)));
+        } else if (dataExpiracaoDate) {
+          // Sem interação pós-término: calcula exatamente os dias decorridos desde a data de encerramento do trial
+          diasSemContato = Math.max(0, Math.floor((Date.now() - dataExpiracaoDate.getTime()) / (1000 * 60 * 60 * 24)));
+        } else if (item.lifecycle.daysRemaining !== undefined && item.lifecycle.daysRemaining <= 0) {
+          diasSemContato = Math.abs(item.lifecycle.daysRemaining);
+        } else if (lastIntDate) {
+          diasSemContato = Math.max(0, Math.floor((Date.now() - lastIntDate.getTime()) / (1000 * 60 * 60 * 24)));
+        }
+      } else if (lastIntDate) {
+        diasSemContato = Math.max(0, Math.floor((Date.now() - lastIntDate.getTime()) / (1000 * 60 * 60 * 24)));
+      } else if (item.created_at) {
+        const createDate = new Date(item.created_at);
+        diasSemContato = Math.max(0, Math.floor((Date.now() - createDate.getTime()) / (1000 * 60 * 60 * 24)));
       }
 
       actions.push({
@@ -541,14 +615,22 @@ export class CrmService {
         vencimento: vencimentoDate.toISOString(),
         lifecycle: item.lifecycle,
         descricao: `${acao} para o cliente ${item.nome}.`,
-        dataPrevista: vencimentoDate.toISOString()
+        dataPrevista: vencimentoDate.toISOString(),
+        responsavel: item.responsavel,
+        email: item.email,
+        telefone: item.telefone,
+        origem: item.origem === 'ministries' ? 'Ministério' : 'Lead',
+        ultimaInteracao: item.ultimaInteracao,
+        diasSemContato,
+        usageStats: item.usageStats
       });
     });
 
     // Ordenação:
     // 1. Prioridade (Alta primeiro)
-    // 2. Data de Vencimento (Mais próxima/antiga primeiro)
-    // 3. Nome (Alfabético)
+    // 2. Para Trials Expirados: expirados mais recentes primeiro (menor tempo decorrido desde a expiração)
+    // 3. Data de Vencimento da Ação (Mais próxima primeiro)
+    // 4. Nome (Alfabético)
     return actions.sort((a, b) => {
       // Prioridade weight
       const weightA = a.prioridade === 'alta' ? 3 : a.prioridade === 'media' ? 2 : 1;
@@ -558,7 +640,20 @@ export class CrmService {
         return weightB - weightA;
       }
 
-      // Vencimento
+      // Regra de ordenação: Trials Expirados mais recentes primeiro
+      const isExpiredA = a.lifecycle.status === 'TRIAL_EXPIRED';
+      const isExpiredB = b.lifecycle.status === 'TRIAL_EXPIRED';
+
+      if (isExpiredA && isExpiredB) {
+        // daysRemaining para expirados é <= 0 (ex: -1 é mais recente que -100)
+        const daysA = a.lifecycle.daysRemaining ?? (a.diasSemContato !== undefined ? -a.diasSemContato : -9999);
+        const daysB = b.lifecycle.daysRemaining ?? (b.diasSemContato !== undefined ? -b.diasSemContato : -9999);
+        if (daysA !== daysB) {
+          return daysB - daysA; // maior daysRemaining (ex: -1 > -100) vem primeiro
+        }
+      }
+
+      // Vencimento da tarefa
       const timeA = new Date(a.vencimento).getTime();
       const timeB = new Date(b.vencimento).getTime();
       if (timeA !== timeB) {

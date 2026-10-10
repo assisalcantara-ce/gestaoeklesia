@@ -6,6 +6,7 @@ import { authenticatedFetch } from '@/lib/api-client';
 export interface CrmSummaryData {
   totalLeads: number;
   totalTrials: number;
+  totalTrialsExpirados: number;
   totalClientesAtivos: number;
   totalRenovacoes: number;
   totalCobrancasPendentes: number;
