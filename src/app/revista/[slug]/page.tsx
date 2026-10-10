@@ -132,6 +132,9 @@ function RevistaContent() {
   // Filtro de categoria de eventos
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todos');
 
+  // Controle de falha ao carregar logo
+  const [logoImgError, setLogoImgError] = useState<boolean>(false);
+
   // Carregar dados públicos do endpoint existente
   useEffect(() => {
     if (!slug) return;
@@ -513,10 +516,28 @@ function RevistaContent() {
                     <div className="absolute -left-24 -bottom-24 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
                     <div className="relative z-10 space-y-6">
-                      <div className="flex items-center justify-between">
-                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-teal-200 uppercase tracking-widest">
-                          <Sparkles className="w-3.5 h-3.5 text-teal-300" /> Edição Anual {ano}
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          {instituicao.logo_url && !logoImgError ? (
+                            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 p-2 flex items-center justify-center shrink-0 shadow-lg">
+                              <img
+                                src={instituicao.logo_url}
+                                alt={instituicao.nome}
+                                onError={() => setLogoImgError(true)}
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shrink-0 shadow-lg text-teal-200">
+                              <Church className="w-6 h-6 sm:w-7 sm:h-7" />
+                            </div>
+                          )}
+
+                          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-teal-200 uppercase tracking-widest shadow-xs">
+                            <Sparkles className="w-3.5 h-3.5 text-teal-300" /> Edição Anual {ano}
+                          </div>
                         </div>
+
                         <div className="text-right">
                           <span className="text-xs font-mono text-teal-200/80 uppercase tracking-wider">
                             Revista Oficial
@@ -816,8 +837,25 @@ function RevistaContent() {
               className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-teal-900 via-teal-800 to-slate-950 text-white shadow-xl p-6 sm:p-10"
             >
               <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs font-bold text-teal-200 uppercase tracking-widest">
-                  <Sparkles className="w-3.5 h-3.5 text-teal-300" /> Edição Anual {ano}
+                <div className="flex items-center gap-3">
+                  {instituicao.logo_url && !logoImgError ? (
+                    <div className="w-11 h-11 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 p-1.5 flex items-center justify-center shrink-0 shadow-md">
+                      <img
+                        src={instituicao.logo_url}
+                        alt={instituicao.nome}
+                        onError={() => setLogoImgError(true)}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-11 h-11 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shrink-0 shadow-md text-teal-200">
+                      <Church className="w-5 h-5" />
+                    </div>
+                  )}
+
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs font-bold text-teal-200 uppercase tracking-widest">
+                    <Sparkles className="w-3.5 h-3.5 text-teal-300" /> Edição Anual {ano}
+                  </div>
                 </div>
                 <h2 className="text-3xl sm:text-4xl font-black text-white">{tema_anual?.tema || instituicao.nome}</h2>
                 {tema_anual?.descricao && (

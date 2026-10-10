@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  * - Rate limit preventivo para requisições anônimas.
  * - Resolução segura do ministério via slug único indexado.
  * - Filtro rigoroso por ministry_id em todas as consultas.
- * - Somente eventos com visibilidade = 'publico' e status != 'cancelado'.
+ * - Eventos com visibilidade pública ('publico', 'ministerio', 'igreja') e status != 'cancelado' (exclui estritamente 'privado' e 'lideranca').
  * - Sanitização estrita do DTO de resposta: IDs internos de banco (UUIDs de
  *   infraestrutura, ministry_id, created_by, tokens, financeiro, regras de
  *   bloqueio) NUNCA são expostos.
@@ -142,7 +142,7 @@ export async function GET(
         )
       `)
       .eq('ministry_id', ministryId)
-      .eq('visibilidade', 'publico')
+      .in('visibilidade', ['publico', 'ministerio', 'igreja'])
       .neq('status', 'cancelado')
       .order('data_inicio', { ascending: true });
 
