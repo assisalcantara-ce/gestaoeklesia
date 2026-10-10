@@ -27,6 +27,7 @@ const BYPASS_PATHS = [
   '/eventos/check-in',
   '/eventos/e',
   '/ebd/chamada-rapida',
+  '/revista',
   '/app',
 ]
 
