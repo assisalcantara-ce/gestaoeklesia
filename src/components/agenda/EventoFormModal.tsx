@@ -168,72 +168,7 @@ export default function EventoFormModal({
                 </div>
               </div>
 
-              {/* Se for evento único ('nenhuma'), exibe Data Início e Fim normais */}
-              {form.recorrencia_tipo === 'nenhuma' ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Início *</label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={form.data_inicio}
-                      onChange={(e) => onFormChange({ data_inicio: e.target.value })}
-                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Fim</label>
-                    <input
-                      type="datetime-local"
-                      value={form.data_fim}
-                      onChange={(e) => onFormChange({ data_fim: e.target.value })}
-                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
-                    />
-                  </div>
-                </div>
-              ) : (
-                /* Para série recorrente: Horário de Início e Duração separados das datas */
-                <div className="grid grid-cols-2 gap-3 bg-slate-50/70 p-2.5 rounded-xl border border-slate-200">
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-600 uppercase mb-1">Horário do Evento *</label>
-                    <input
-                      type="time"
-                      required
-                      value={form.hora_inicio || (form.data_inicio ? form.data_inicio.slice(11, 16) : '19:30')}
-                      onChange={(e) => onFormChange({ hora_inicio: e.target.value })}
-                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white font-semibold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-600 uppercase mb-1">Duração</label>
-                    <select
-                      value={form.duracao_minutos !== undefined ? form.duracao_minutos : 120}
-                      onChange={(e) => onFormChange({ duracao_minutos: parseInt(e.target.value, 10) })}
-                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white font-medium"
-                    >
-                      <option value="60">1 hora</option>
-                      <option value="90">1h 30min</option>
-                      <option value="120">2 horas</option>
-                      <option value="150">2h 30min</option>
-                      <option value="180">3 horas</option>
-                      <option value="240">4 horas</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Local</label>
-                <input
-                  type="text"
-                  placeholder="Templo Central, Sala 3..."
-                  value={form.local}
-                  onChange={(e) => onFormChange({ local: e.target.value })}
-                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Recorrência */}
+              {/* 3. Bloco completo de Recorrência do Evento */}
               <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="block text-[10px] font-black text-slate-700 uppercase tracking-wider">
@@ -373,6 +308,71 @@ export default function EventoFormModal({
                     />
                   </div>
                 )}
+              </div>
+
+              {/* 4. Horário e Duração (ou Início e Fim para eventos únicos) */}
+              {form.recorrencia_tipo === 'nenhuma' ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Início *</label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={form.data_inicio}
+                      onChange={(e) => onFormChange({ data_inicio: e.target.value })}
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Fim</label>
+                    <input
+                      type="datetime-local"
+                      value={form.data_fim}
+                      onChange={(e) => onFormChange({ data_fim: e.target.value })}
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 bg-slate-50/70 p-2.5 rounded-xl border border-slate-200">
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-600 uppercase mb-1">Horário do Evento *</label>
+                    <input
+                      type="time"
+                      required
+                      value={form.hora_inicio || (form.data_inicio ? form.data_inicio.slice(11, 16) : '19:30')}
+                      onChange={(e) => onFormChange({ hora_inicio: e.target.value })}
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-600 uppercase mb-1">Duração</label>
+                    <select
+                      value={form.duracao_minutos !== undefined ? form.duracao_minutos : 120}
+                      onChange={(e) => onFormChange({ duracao_minutos: parseInt(e.target.value, 10) })}
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white font-medium"
+                    >
+                      <option value="60">1 hora</option>
+                      <option value="90">1h 30min</option>
+                      <option value="120">2 horas</option>
+                      <option value="150">2h 30min</option>
+                      <option value="180">3 horas</option>
+                      <option value="240">4 horas</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* 5. Local */}
+              <div>
+                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Local</label>
+                <input
+                  type="text"
+                  placeholder="Templo Central, Sala 3..."
+                  value={form.local}
+                  onChange={(e) => onFormChange({ local: e.target.value })}
+                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
               </div>
 
               <button
