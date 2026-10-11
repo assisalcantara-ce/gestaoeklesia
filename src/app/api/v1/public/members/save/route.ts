@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { MemberMatriculaService } from '@/lib/services/member-matricula-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -266,9 +267,12 @@ export async function POST(request: NextRequest) {
     ? body.cargo_ministerial.toUpperCase().trim()
     : null;
 
+  const matricula = await MemberMatriculaService.alocarProximaMatricula(admin, ministryId);
+
   const insertPayload: Record<string, any> = {
     ministry_id: ministryId,
     congregacao_id: congregacao_id.trim(),
+    matricula: matricula,
     name: normalizedBody.name.trim(),
     cpf: cleanCpf,
     nome_pai: normalizedBody.nome_pai.trim(),

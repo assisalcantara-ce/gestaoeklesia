@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase-client';
 import { ArrowLeft, Download, UploadCloud, AlertTriangle, CheckCircle2, FileText, AlertCircle, Info, Settings, Image, FileImage, ShieldAlert, Play, RefreshCw } from 'lucide-react';
 
 import { useUserContext } from '@/hooks/useUserContext';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 
 interface RowError {
@@ -27,6 +28,7 @@ interface ParsedRow {
 
 export default function ImportarMembrosPage() {
   const userCtx = useUserContext();
+  const { registrarAcao } = useAuditLog();
   const supabase = createClient();
   const [nomeMinisterio, setNomeMinisterio] = useState<string>('Ministério');
   const [file, setFile] = useState<File | null>(null);
@@ -742,10 +744,34 @@ export default function ImportarMembrosPage() {
         duplicates: duplicateDbCount,
       });
 
+      await registrarAcao({
+        acao: 'importar',
+        modulo: 'membros',
+        area: 'importacao_lote',
+        tabela_afetada: 'members',
+        descricao: `Importação em lote concluída: ${importedCount} importados, ${duplicateDbCount} duplicados ignorados, ${dbErrorCount} falhas de banco.`,
+        dados_novos: {
+          arquivo: file?.name,
+          importados: importedCount,
+          duplicados: duplicateDbCount,
+          erros_banco: dbErrorCount,
+        },
+        status: dbErrorCount > 0 ? 'aviso' : 'sucesso',
+      });
+
       await fetchPendingPhotosCount();
 
     } catch (err: any) {
       console.error("[Audit Import] Erro capturado no catch:", err);
+      await registrarAcao({
+        acao: 'importar',
+        modulo: 'membros',
+        area: 'importacao_lote',
+        tabela_afetada: 'members',
+        descricao: `Falha geral na importação em lote do arquivo ${file?.name || 'desconhecido'}`,
+        status: 'erro',
+        mensagem_erro: err?.message,
+      });
       setErrorMessage(err.message || 'Ocorreu um erro durante a importação.');
     } finally {
       setImporting(false);

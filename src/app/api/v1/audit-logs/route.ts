@@ -18,13 +18,52 @@ const actionMap: Record<string, string> = {
   deletar: 'DELETE',
   visualizar: 'READ',
   exportar: 'EXPORT',
-  importar: 'EXPORT',
+  importar: 'IMPORT',
   responder: 'UPDATE',
   login: 'LOGIN',
   logout: 'LOGOUT',
+  atualizar_status: 'UPDATE',
+  atualizar_permissoes: 'UPDATE',
+  reclassificar: 'UPDATE',
   download: 'DOWNLOAD',
-  upload: 'UPDATE',
+  upload: 'UPLOAD',
   outro: 'READ',
+}
+
+const SENSITIVE_KEYS = new Set([
+  'password',
+  'senha',
+  'token',
+  'access_token',
+  'refresh_token',
+  'secret',
+  'hash',
+  'api_key',
+  'apikey',
+  'auth_token',
+  'jwt',
+])
+
+function sanitizeAuditData(data: any): any {
+  if (!data || typeof data !== 'object') return data
+  if (Array.isArray(data)) return data.map(sanitizeAuditData)
+  const sanitized: Record<string, any> = {}
+  for (const [key, value] of Object.entries(data)) {
+    const lowerKey = key.toLowerCase()
+    if (
+      SENSITIVE_KEYS.has(lowerKey) ||
+      lowerKey.includes('password') ||
+      lowerKey.includes('senha') ||
+      lowerKey.includes('token')
+    ) {
+      sanitized[key] = '[REDACTED]'
+    } else if (value && typeof value === 'object') {
+      sanitized[key] = sanitizeAuditData(value)
+    } else {
+      sanitized[key] = value
+    }
+  }
+  return sanitized
 }
 
 export async function POST(request: NextRequest) {
@@ -38,6 +77,9 @@ export async function POST(request: NextRequest) {
     const statusCode = status === 'erro' ? 500 : status === 'aviso' ? 400 : 200
     const mappedAction = actionMap[body.acao] || 'READ'
 
+    const cleanDadosAnteriores = sanitizeAuditData(body.dados_anteriores) || null
+    const cleanDadosNovos = sanitizeAuditData(body.dados_novos) || null
+
     const tryInsert = async (payload: Record<string, any>) => {
       const { error } = await admin.from('audit_logs').insert(payload)
       return error || null
@@ -45,15 +87,26 @@ export async function POST(request: NextRequest) {
 
     let error = await tryInsert({
       ministry_id: ministryId,
+      usuario_id: userId,
+      usuario_email: body.usuario_email || null,
+      acao: body.acao,
+      modulo: body.modulo,
+      area: body.area || null,
+      tabela_afetada: body.tabela_afetada || null,
+      registro_id: body.registro_id || null,
+      descricao: body.descricao || null,
+      dados_anteriores: cleanDadosAnteriores,
+      dados_novos: cleanDadosNovos,
+      ip_address: ip,
+      user_agent: userAgent,
+      status,
+      mensagem_erro: body.mensagem_erro || null,
       user_id: userId,
       action: mappedAction,
       resource_type: body.modulo || body.tabela_afetada || 'geral',
       resource_id: body.registro_id || null,
-      old_data: body.dados_anteriores || null,
-      new_data: body.dados_novos || null,
-      changes: null,
-      ip_address: ip,
-      user_agent: userAgent,
+      old_data: cleanDadosAnteriores,
+      new_data: cleanDadosNovos,
       status_code: statusCode,
       error_message: body.mensagem_erro || null,
     })
@@ -72,8 +125,8 @@ export async function POST(request: NextRequest) {
       tabela_afetada: body.tabela_afetada,
       registro_id: body.registro_id,
       descricao: body.descricao,
-      dados_anteriores: body.dados_anteriores,
-      dados_novos: body.dados_novos,
+      dados_anteriores: cleanDadosAnteriores,
+      dados_novos: cleanDadosNovos,
       ip_address: ip,
       user_agent: userAgent,
       status,
@@ -122,10 +175,9 @@ export async function GET(request: NextRequest) {
     let query = admin
       .from('audit_logs')
       .select('*')
+      .eq('ministry_id', ministryId)
 
-    if (context.nivel === 'administrador') {
-      query = query.eq('ministry_id', ministryId)
-    } else {
+    if (context.nivel !== 'administrador' && context.nivel !== 'presidencia' && context.nivel !== 'conselho_fiscal') {
       query = query.eq('usuario_id', userId)
     }
 
@@ -144,10 +196,9 @@ export async function GET(request: NextRequest) {
       let fallbackQuery = admin
         .from('audit_logs')
         .select('*')
+        .eq('ministry_id', ministryId)
 
-      if (context.nivel === 'administrador') {
-        fallbackQuery = fallbackQuery.eq('ministry_id', ministryId)
-      } else {
+      if (context.nivel !== 'administrador' && context.nivel !== 'presidencia' && context.nivel !== 'conselho_fiscal') {
         fallbackQuery = fallbackQuery.eq('user_id', userId)
       }
 

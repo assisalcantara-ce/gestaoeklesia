@@ -6,6 +6,7 @@ import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
@@ -293,6 +294,7 @@ function imprimirFichaPatrimonio(opts: {
 
 export default function PatrimonioPage() {
   const { ctx, bloqueado } = useRequireModulo('patrimonio');
+  const { registrarAcao } = useAuditLog();
   const supabase = useMemo(() => createClient(), []);
 
   const [activeTab, setActiveTab] = useState('inventario');
@@ -460,14 +462,79 @@ export default function PatrimonioPage() {
     };
 
     if (editingId) {
+      const itemAnterior = itens.find((i) => i.id === editingId);
       const { data, error } = await supabase.from('patrimonio_itens').update(payload).eq('id', editingId).select('*').single();
-      if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
+      if (error) {
+        await registrarAcao({
+          acao: 'editar',
+          modulo: 'patrimonio',
+          area: 'inventario',
+          tabela_afetada: 'patrimonio_itens',
+          registro_id: editingId,
+          descricao: `Falha ao atualizar bem patrimonial: ${formData.descricao}`,
+          status: 'erro',
+          mensagem_erro: error.message,
+        });
+        showNotif('error', 'Erro', error.message, undefined);
+        return;
+      }
+      await registrarAcao({
+        acao: 'editar',
+        modulo: 'patrimonio',
+        area: 'inventario',
+        tabela_afetada: 'patrimonio_itens',
+        registro_id: editingId,
+        descricao: `Bem patrimonial atualizado: ${data.descricao} (Tombamento: ${data.numero_tombamento || '-'})`,
+        dados_anteriores: itemAnterior ? {
+          descricao: itemAnterior.descricao,
+          categoria: itemAnterior.categoria,
+          estado_conservacao: itemAnterior.estado_conservacao,
+          status: itemAnterior.status,
+          numero_tombamento: itemAnterior.numero_tombamento,
+        } : null,
+        dados_novos: {
+          descricao: data.descricao,
+          categoria: data.categoria,
+          estado_conservacao: data.estado_conservacao,
+          status: data.status,
+          numero_tombamento: data.numero_tombamento,
+        },
+        status: 'sucesso',
+      });
       setItens((prev) => prev.map((i) => (i.id === editingId ? (data as PatrimonioItem) : i)));
       showNotif('success', 'Atualizado', 'Bem atualizado com sucesso.', 3000);
     } else {
       const { data, error } = await supabase
         .from('patrimonio_itens').insert({ ...payload, created_at: new Date().toISOString() }).select('*').single();
-      if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
+      if (error) {
+        await registrarAcao({
+          acao: 'criar',
+          modulo: 'patrimonio',
+          area: 'inventario',
+          tabela_afetada: 'patrimonio_itens',
+          descricao: `Falha ao cadastrar bem patrimonial: ${formData.descricao}`,
+          status: 'erro',
+          mensagem_erro: error.message,
+        });
+        showNotif('error', 'Erro', error.message, undefined);
+        return;
+      }
+      await registrarAcao({
+        acao: 'criar',
+        modulo: 'patrimonio',
+        area: 'inventario',
+        tabela_afetada: 'patrimonio_itens',
+        registro_id: data.id,
+        descricao: `Novo bem patrimonial cadastrado: ${data.descricao} (Tombamento: ${data.numero_tombamento || '-'})`,
+        dados_novos: {
+          descricao: data.descricao,
+          categoria: data.categoria,
+          estado_conservacao: data.estado_conservacao,
+          status: data.status,
+          numero_tombamento: data.numero_tombamento,
+        },
+        status: 'sucesso',
+      });
       setItens((prev) => [data as PatrimonioItem, ...prev]);
       showNotif('success', 'Cadastrado', 'Bem registrado com sucesso.', 3000);
     }
@@ -506,8 +573,36 @@ export default function PatrimonioPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir este bem do patrimônio?')) return;
+    const itemRemovido = itens.find((i) => i.id === id);
     const { error } = await supabase.from('patrimonio_itens').delete().eq('id', id);
-    if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
+    if (error) {
+      await registrarAcao({
+        acao: 'deletar',
+        modulo: 'patrimonio',
+        area: 'inventario',
+        tabela_afetada: 'patrimonio_itens',
+        registro_id: id,
+        descricao: `Falha ao excluir bem patrimonial: ${itemRemovido?.descricao || id}`,
+        status: 'erro',
+        mensagem_erro: error.message,
+      });
+      showNotif('error', 'Erro', error.message, undefined);
+      return;
+    }
+    await registrarAcao({
+      acao: 'deletar',
+      modulo: 'patrimonio',
+      area: 'inventario',
+      tabela_afetada: 'patrimonio_itens',
+      registro_id: id,
+      descricao: `Bem removido do patrimônio: ${itemRemovido?.descricao || id} (Tombamento: ${itemRemovido?.numero_tombamento || '-'})`,
+      dados_anteriores: itemRemovido ? {
+        descricao: itemRemovido.descricao,
+        categoria: itemRemovido.categoria,
+        numero_tombamento: itemRemovido.numero_tombamento,
+      } : null,
+      status: 'sucesso',
+    });
     setItens((prev) => prev.filter((i) => i.id !== id));
     showNotif('success', 'Excluído', 'Bem removido do patrimônio.', 3000);
   };

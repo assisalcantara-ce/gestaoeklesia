@@ -11,6 +11,8 @@
 import { resolveTenantAuth } from '@/lib/tenant-auth'
 import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer'
 import { authTenantErrorResponse } from '@/lib/api-errors'
+import { MemberMatriculaService } from '@/lib/services/member-matricula-service'
+import { logServerAudit } from '@/lib/audit-logger'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -319,6 +321,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Resolver matrícula com garantia de unicidade, padding e fallback sequencial seguro
+    const matriculaFinal = await MemberMatriculaService.resolverMatriculaParaCadastro(
+      supabase,
+      ministryId,
+      { matriculaInformada: normalizedBody.matricula }
+    );
+
     // Inserir membro
     const { data, error } = await supabase
       .from('members')
@@ -333,10 +342,7 @@ export async function POST(request: NextRequest) {
           data_emissao: normalizedBody.data_emissao || null,
           data_validade_credencial: normalizedBody.data_validade_credencial || null,
           // Aba Dados
-          matricula:
-            normalizedBody.matricula && /^\d+$/.test(String(normalizedBody.matricula).trim())
-              ? String(normalizedBody.matricula).trim().padStart(3, '0')
-              : (normalizedBody.matricula || null),
+          matricula: matriculaFinal,
           unique_id: normalizedBody.unique_id || null,
           tipo_cadastro: normalizedBody.tipo_cadastro || 'ministro',
           data_nascimento: normalizedBody.data_nascimento || null,
@@ -401,10 +407,44 @@ export async function POST(request: NextRequest) {
       .select()
 
     if (error) {
+      await logServerAudit(context.admin, {
+        ministryId,
+        userId: context.userId,
+        acao: 'criar',
+        modulo: 'membros',
+        area: 'cadastro',
+        tabelaAfetada: 'members',
+        descricao: `Falha ao cadastrar membro: ${normalizedBody.name || 'Sem nome'}`,
+        status: 'erro',
+        mensagemErro: error.message,
+      })
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json(data[0], { status: 201 })
+    const createdMember = data[0]
+
+    await logServerAudit(context.admin, {
+      ministryId,
+      userId: context.userId,
+      acao: 'criar',
+      modulo: 'membros',
+      area: 'cadastro',
+      tabelaAfetada: 'members',
+      registroId: createdMember?.id,
+      descricao: `Novo membro cadastrado: ${createdMember?.name || 'Membro'} (Matrícula: ${createdMember?.matricula || '-'})`,
+      dadosNovos: {
+        id: createdMember?.id,
+        nome: createdMember?.name,
+        matricula: createdMember?.matricula,
+        cargo_ministerial: createdMember?.cargo_ministerial,
+        tipo_cadastro: createdMember?.tipo_cadastro,
+        status: createdMember?.status,
+        congregacao_id: createdMember?.congregacao_id,
+      },
+      status: 'sucesso',
+    })
+
+    return NextResponse.json(createdMember, { status: 201 })
   } catch (error) {
     const authResponse = authTenantErrorResponse(error)
     if (authResponse) return authResponse

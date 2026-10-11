@@ -19,6 +19,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/api-client';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import ReportPrintHeader from './ReportPrintHeader';
 
 interface CustomReportBuilderTabProps {
@@ -182,6 +183,7 @@ export default function CustomReportBuilderTab({
   congregacaoId,
   congregacaoNome,
 }: CustomReportBuilderTabProps) {
+  const { registrarAcao } = useAuditLog();
   // ─── ESTADO: PRESET SELECIONADO & TÍTULO DO RELATÓRIO ────────────────────────
   const [activePresetId, setActivePresetId] = useState<string>('relacao_geral');
   const [reportTitle, setReportTitle] = useState<string>('Relação Geral de Membros');
@@ -414,7 +416,30 @@ export default function CustomReportBuilderTab({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+
+      await registrarAcao({
+        acao: 'exportar',
+        modulo: 'secretaria',
+        area: 'relatorios_personalizados',
+        tabela_afetada: 'members',
+        descricao: `Exportação de relatório CSV '${reportTitle}': ${allRecords.length} registros exportados`,
+        dados_novos: {
+          titulo: reportTitle,
+          total_registros: allRecords.length,
+          colunas: activeColumnsList.map((c) => c.label),
+        },
+        status: 'sucesso',
+      });
     } catch (err: any) {
+      await registrarAcao({
+        acao: 'exportar',
+        modulo: 'secretaria',
+        area: 'relatorios_personalizados',
+        tabela_afetada: 'members',
+        descricao: `Falha na exportação de relatório CSV '${reportTitle}'`,
+        status: 'erro',
+        mensagem_erro: err?.message,
+      });
       alert(`Erro na exportação CSV: ${err.message}`);
     } finally {
       setExporting(false);

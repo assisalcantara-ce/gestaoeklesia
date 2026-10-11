@@ -12,10 +12,46 @@ interface RegistrarAcaoParams {
   tabela_afetada?: string
   registro_id?: string
   descricao?: string
-  dados_anteriores?: Record<string, any>
-  dados_novos?: Record<string, any>
+  dados_anteriores?: Record<string, any> | null
+  dados_novos?: Record<string, any> | null
   status?: StatusAuditoria
   mensagem_erro?: string
+}
+
+const SENSITIVE_KEYS = new Set([
+  'password',
+  'senha',
+  'token',
+  'access_token',
+  'refresh_token',
+  'secret',
+  'hash',
+  'api_key',
+  'apikey',
+  'auth_token',
+  'jwt',
+])
+
+function sanitizeAuditData(data: any): any {
+  if (!data || typeof data !== 'object') return data
+  if (Array.isArray(data)) return data.map(sanitizeAuditData)
+  const sanitized: Record<string, any> = {}
+  for (const [key, value] of Object.entries(data)) {
+    const lowerKey = key.toLowerCase()
+    if (
+      SENSITIVE_KEYS.has(lowerKey) ||
+      lowerKey.includes('password') ||
+      lowerKey.includes('senha') ||
+      lowerKey.includes('token')
+    ) {
+      sanitized[key] = '[REDACTED]'
+    } else if (value && typeof value === 'object') {
+      sanitized[key] = sanitizeAuditData(value)
+    } else {
+      sanitized[key] = value
+    }
+  }
+  return sanitized
 }
 
 export function useAuditLog() {
@@ -47,8 +83,8 @@ export function useAuditLog() {
           tabela_afetada: params.tabela_afetada || null,
           registro_id: params.registro_id || null,
           descricao: params.descricao || null,
-          dados_anteriores: params.dados_anteriores || null,
-          dados_novos: params.dados_novos || null,
+          dados_anteriores: sanitizeAuditData(params.dados_anteriores) || null,
+          dados_novos: sanitizeAuditData(params.dados_novos) || null,
           usuario_email: user.email,
           status: params.status || 'sucesso',
           mensagem_erro: params.mensagem_erro || null,

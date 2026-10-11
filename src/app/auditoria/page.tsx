@@ -37,8 +37,30 @@ export default function AuditoriaPage() {
   const [filtroUsuario, setFiltroUsuario] = useState('')
 
   // Opções de filtro
-  const acoes = ['criar', 'editar', 'deletar', 'visualizar', 'exportar', 'importar', 'responder', 'login', 'logout']
-  const modulos = ['suporte', 'usuarios', 'ministerios', 'financeiro', 'membros', 'configuracoes']
+  const acoes = [
+    'criar',
+    'editar',
+    'deletar',
+    'visualizar',
+    'exportar',
+    'importar',
+    'responder',
+    'reclassificar',
+    'atualizar_status',
+    'atualizar_permissoes',
+    'login',
+    'logout',
+  ]
+  const modulos = [
+    'usuarios',
+    'configuracoes',
+    'membros',
+    'secretaria',
+    'financeiro',
+    'patrimonio',
+    'ministerios',
+    'suporte',
+  ]
   const statuses = ['sucesso', 'erro', 'aviso']
 
   // Carregar logs
@@ -160,6 +182,9 @@ export default function AuditoriaPage() {
       exportar: '📤',
       importar: '📥',
       responder: '💬',
+      reclassificar: '🔄',
+      atualizar_status: '⚡',
+      atualizar_permissoes: '🛡️',
       login: '🔓',
       logout: '🔒',
     }

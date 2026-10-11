@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
 import { TesourariaService } from '@/services/TesourariaService';
+import { logServerAudit } from '@/lib/audit-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -123,6 +124,28 @@ export async function POST(request: NextRequest) {
       permitir_duplicidade: Boolean(body.permitir_duplicidade),
     });
 
+    await logServerAudit(admin, {
+      ministryId,
+      userId: context.userId,
+      acao: 'criar',
+      modulo: 'financeiro',
+      area: 'tesouraria',
+      tabelaAfetada: 'tesouraria_lancamentos',
+      registroId: lancamento.id,
+      descricao: `Novo lançamento [${lancamento.tipo_movimento?.toUpperCase()}]: R$ ${lancamento.valor} (${lancamento.tipo_recebimento}) - Código: ${lancamento.codigo_registro || '-'}`,
+      dadosNovos: {
+        id: lancamento.id,
+        tipo_movimento: lancamento.tipo_movimento,
+        tipo_recebimento: lancamento.tipo_recebimento,
+        valor: lancamento.valor,
+        data_lancamento: lancamento.data_lancamento,
+        codigo_registro: lancamento.codigo_registro,
+        conta_id: lancamento.conta_id,
+        categoria_id: lancamento.categoria_id,
+      },
+      status: 'sucesso',
+    });
+
     return NextResponse.json(
       { success: true, data: lancamento },
       { status: 201 }
@@ -132,6 +155,19 @@ export async function POST(request: NextRequest) {
     const isDuplicate = err?.message?.includes('Já existe um lançamento registrado com este Código/ID') ||
                         err?.code === '23505' ||
                         err?.message?.includes('idx_tesouraria_lancamentos_codigo_registro');
+
+    await logServerAudit(admin, {
+      ministryId,
+      userId: context.userId,
+      acao: 'criar',
+      modulo: 'financeiro',
+      area: 'tesouraria',
+      tabelaAfetada: 'tesouraria_lancamentos',
+      descricao: `Falha ao cadastrar lançamento financeiro: ${err?.message || 'Erro desconhecido'}`,
+      status: 'erro',
+      mensagemErro: err?.message,
+    });
+
     if (isDuplicate) {
       return NextResponse.json(
         {
@@ -245,12 +281,45 @@ export async function PUT(request: NextRequest) {
       permitir_duplicidade: Boolean(body.permitir_duplicidade),
     });
 
+    await logServerAudit(admin, {
+      ministryId,
+      userId: context.userId,
+      acao: 'editar',
+      modulo: 'financeiro',
+      area: 'tesouraria',
+      tabelaAfetada: 'tesouraria_lancamentos',
+      registroId: id,
+      descricao: `Lançamento atualizado: [${lancamento.tipo_movimento?.toUpperCase()}] R$ ${lancamento.valor} (${lancamento.tipo_recebimento}) - Código: ${lancamento.codigo_registro || '-'}`,
+      dadosNovos: {
+        id: lancamento.id,
+        tipo_movimento: lancamento.tipo_movimento,
+        tipo_recebimento: lancamento.tipo_recebimento,
+        valor: lancamento.valor,
+        data_lancamento: lancamento.data_lancamento,
+        codigo_registro: lancamento.codigo_registro,
+      },
+      status: 'sucesso',
+    });
+
     return NextResponse.json({ success: true, data: lancamento });
   } catch (err: any) {
     console.error('[PUT /api/v1/tesouraria/lancamentos]', err);
     const isDuplicate = err?.message?.includes('Já existe um lançamento registrado com este Código/ID') ||
                         err?.code === '23505' ||
                         err?.message?.includes('idx_tesouraria_lancamentos_codigo_registro');
+
+    await logServerAudit(admin, {
+      ministryId,
+      userId: context.userId,
+      acao: 'editar',
+      modulo: 'financeiro',
+      area: 'tesouraria',
+      tabelaAfetada: 'tesouraria_lancamentos',
+      registroId: id,
+      descricao: `Falha ao atualizar lançamento financeiro: ${err?.message || 'Erro desconhecido'}`,
+      status: 'erro',
+      mensagemErro: err?.message,
+    });
     if (isDuplicate) {
       return NextResponse.json(
         {

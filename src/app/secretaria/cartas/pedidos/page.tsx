@@ -10,6 +10,7 @@ import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useUserContext } from '@/hooks/useUserContext';
 import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import { createClient } from '@/lib/supabase-client';
 import { CheckCircle, Clock, FileText, Printer, Send, XCircle } from 'lucide-react';
 
@@ -85,6 +86,7 @@ function CartaParaImprimir({ pedido, ministerioNome }: { pedido: CartaPedido; mi
 export default function CartaPedidosPage() {
   const { loading } = useRequireSupabaseAuth();
   const { bloqueado } = useRequireModulo('secretaria_local');
+  const { registrarAcao } = useAuditLog();
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const userCtx = useUserContext();
@@ -179,7 +181,7 @@ export default function CartaPedidosPage() {
     const semAutorizacao = tipoCarta === 'transito' || tipoCarta === 'recomendacao';
     setSubmitting(true);
     try {
-      const { error } = await supabase.from('carta_pedidos').insert({
+      const { data, error } = await supabase.from('carta_pedidos').insert({
         ministry_id: userCtx.ministryId,
         congregacao_id: (userCtx as any).congregacaoId ?? null,
         solicitante_id: userCtx.userId,
@@ -192,8 +194,25 @@ export default function CartaPedidosPage() {
         status: semAutorizacao ? 'autorizado' : 'pendente',
         autorizador_id: semAutorizacao ? userCtx.userId : null,
         data_autorizacao: semAutorizacao ? new Date().toISOString() : null,
-      });
+      }).select('id').single();
       if (error) throw error;
+
+      await registrarAcao({
+        acao: 'criar',
+        modulo: 'secretaria',
+        area: 'cartas',
+        tabela_afetada: 'carta_pedidos',
+        registro_id: data?.id,
+        descricao: `Pedido de ${TIPO_LABELS[tipoCarta]} registrado para ${membroNome.trim()}${semAutorizacao ? ' (emissão direta)' : ' (aguardando autorização)'}`,
+        dados_novos: {
+          tipo_carta: tipoCarta,
+          membro_nome: membroNome.trim(),
+          destino: destino.trim() || null,
+          status: semAutorizacao ? 'autorizado' : 'pendente',
+        },
+        status: 'sucesso',
+      });
+
       if (semAutorizacao) {
         showNotif('success', 'Carta disponível!', 'A carta foi gerada e está disponível para impressão.');
       } else {
@@ -203,7 +222,16 @@ export default function CartaPedidosPage() {
       setTipoCarta('mudanca'); setDestino(''); setObservacoes('');
       loadData();
       setActiveTab('meus');
-    } catch {
+    } catch (err: any) {
+      await registrarAcao({
+        acao: 'criar',
+        modulo: 'secretaria',
+        area: 'cartas',
+        tabela_afetada: 'carta_pedidos',
+        descricao: `Falha ao solicitar ${TIPO_LABELS[tipoCarta]} para ${membroNome.trim()}`,
+        status: 'erro',
+        mensagem_erro: err?.message,
+      });
       showNotif('error', 'Erro', 'Não foi possível enviar o pedido. Tente novamente.');
     } finally {
       setSubmitting(false);
@@ -220,10 +248,32 @@ export default function CartaPedidosPage() {
         data_autorizacao: new Date().toISOString(),
       }).eq('id', pedidoParaAutorizar.id);
       if (error) throw error;
+
+      await registrarAcao({
+        acao: 'atualizar_status',
+        modulo: 'secretaria',
+        area: 'cartas',
+        tabela_afetada: 'carta_pedidos',
+        registro_id: pedidoParaAutorizar.id,
+        descricao: `Pedido de ${TIPO_LABELS[pedidoParaAutorizar.tipo_carta]} autorizado para ${pedidoParaAutorizar.membro_nome}`,
+        dados_novos: { status: 'autorizado', autorizador_id: userCtx.userId },
+        status: 'sucesso',
+      });
+
       showNotif('success', 'Autorizado', 'A carta está disponível para impressão.');
       setPedidoParaAutorizar(null);
       loadData();
-    } catch {
+    } catch (err: any) {
+      await registrarAcao({
+        acao: 'atualizar_status',
+        modulo: 'secretaria',
+        area: 'cartas',
+        tabela_afetada: 'carta_pedidos',
+        registro_id: pedidoParaAutorizar.id,
+        descricao: `Falha ao autorizar pedido de carta para ${pedidoParaAutorizar.membro_nome}`,
+        status: 'erro',
+        mensagem_erro: err?.message,
+      });
       showNotif('error', 'Erro', 'Não foi possível autorizar o pedido.');
     } finally {
       setAutorizando(false);
@@ -242,11 +292,33 @@ export default function CartaPedidosPage() {
         data_autorizacao: new Date().toISOString(),
       }).eq('id', pedidoParaAutorizar.id);
       if (error) throw error;
+
+      await registrarAcao({
+        acao: 'atualizar_status',
+        modulo: 'secretaria',
+        area: 'cartas',
+        tabela_afetada: 'carta_pedidos',
+        registro_id: pedidoParaAutorizar.id,
+        descricao: `Pedido de ${TIPO_LABELS[pedidoParaAutorizar.tipo_carta]} rejeitado para ${pedidoParaAutorizar.membro_nome}. Motivo: ${motivoRejeicao.trim()}`,
+        dados_novos: { status: 'rejeitado', motivo_rejeicao: motivoRejeicao.trim(), autorizador_id: userCtx.userId },
+        status: 'sucesso',
+      });
+
       showNotif('warning', 'Rejeitado', 'O pedido foi rejeitado.');
       setPedidoParaAutorizar(null);
       setMotivoRejeicao('');
       loadData();
-    } catch {
+    } catch (err: any) {
+      await registrarAcao({
+        acao: 'atualizar_status',
+        modulo: 'secretaria',
+        area: 'cartas',
+        tabela_afetada: 'carta_pedidos',
+        registro_id: pedidoParaAutorizar.id,
+        descricao: `Falha ao rejeitar pedido de carta para ${pedidoParaAutorizar.membro_nome}`,
+        status: 'erro',
+        mensagem_erro: err?.message,
+      });
       showNotif('error', 'Erro', 'Não foi possível rejeitar o pedido.');
     } finally {
       setAutorizando(false);

@@ -1,6 +1,7 @@
 import { getAccessibleCongregacaoIds, resolveTenantAuth } from '@/lib/tenant-auth'
 import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer'
 import { authTenantErrorResponse } from '@/lib/api-errors'
+import { logServerAudit } from '@/lib/audit-logger'
 import { NextRequest, NextResponse } from 'next/server'
 
 function buildMemberPayload(normalizedBody: Record<string, any>) {
@@ -160,7 +161,7 @@ export async function PUT(
 
     let existingQuery = supabase
       .from('members')
-      .select('id')
+      .select('id, name, matricula, cargo_ministerial, tipo_cadastro, status, congregacao_id')
       .eq('id', id)
       .eq('ministry_id', ministryId)
 
@@ -181,6 +182,18 @@ export async function PUT(
     const { data, error } = await updateQuery.select()
 
     if (error) {
+      await logServerAudit(context.admin, {
+        ministryId,
+        userId: context.userId,
+        acao: 'editar',
+        modulo: 'membros',
+        area: 'cadastro',
+        tabelaAfetada: 'members',
+        registroId: id,
+        descricao: `Falha ao editar membro: ${existing.name || id}`,
+        status: 'erro',
+        mensagemErro: error.message,
+      })
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
@@ -188,7 +201,35 @@ export async function PUT(
       return NextResponse.json({ error: 'Nenhuma linha atualizada' }, { status: 404 })
     }
 
-    return NextResponse.json(data[0])
+    const updated = data[0]
+
+    await logServerAudit(context.admin, {
+      ministryId,
+      userId: context.userId,
+      acao: 'editar',
+      modulo: 'membros',
+      area: 'cadastro',
+      tabelaAfetada: 'members',
+      registroId: id,
+      descricao: `Membro atualizado: ${updated.name || existing.name} (Matrícula: ${updated.matricula || existing.matricula || '-'})`,
+      dadosAnteriores: {
+        nome: existing.name,
+        matricula: existing.matricula,
+        cargo_ministerial: existing.cargo_ministerial,
+        tipo_cadastro: existing.tipo_cadastro,
+        status: existing.status,
+      },
+      dadosNovos: {
+        nome: updated.name,
+        matricula: updated.matricula,
+        cargo_ministerial: updated.cargo_ministerial,
+        tipo_cadastro: updated.tipo_cadastro,
+        status: updated.status,
+      },
+      status: 'sucesso',
+    })
+
+    return NextResponse.json(updated)
   } catch (error) {
     const authResponse = authTenantErrorResponse(error)
     if (authResponse) return authResponse
@@ -212,7 +253,7 @@ export async function DELETE(
 
     let existingQuery = supabase
       .from('members')
-      .select('id')
+      .select('id, name, matricula, cargo_ministerial, tipo_cadastro, status, congregacao_id')
       .eq('id', id)
       .eq('ministry_id', ministryId)
 
@@ -233,8 +274,39 @@ export async function DELETE(
     const { error } = await deleteQuery
 
     if (error) {
+      await logServerAudit(context.admin, {
+        ministryId,
+        userId: context.userId,
+        acao: 'deletar',
+        modulo: 'membros',
+        area: 'cadastro',
+        tabelaAfetada: 'members',
+        registroId: id,
+        descricao: `Falha ao excluir membro: ${existing.name || id}`,
+        status: 'erro',
+        mensagemErro: error.message,
+      })
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
+
+    await logServerAudit(context.admin, {
+      ministryId,
+      userId: context.userId,
+      acao: 'deletar',
+      modulo: 'membros',
+      area: 'cadastro',
+      tabelaAfetada: 'members',
+      registroId: id,
+      descricao: `Membro excluído: ${existing.name || 'Sem nome'} (Matrícula: ${existing.matricula || '-'})`,
+      dadosAnteriores: {
+        nome: existing.name,
+        matricula: existing.matricula,
+        cargo_ministerial: existing.cargo_ministerial,
+        tipo_cadastro: existing.tipo_cadastro,
+        status: existing.status,
+      },
+      status: 'sucesso',
+    })
 
     return NextResponse.json({ success: true, deleted_id: id })
   } catch (error) {
