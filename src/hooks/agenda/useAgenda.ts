@@ -84,6 +84,7 @@ export interface AgendaEvento {
 export interface Congregacao {
   id: string;
   nome: string;
+  is_sede?: boolean;
 }
 
 export interface SolicitacaoExcecao {
@@ -184,6 +185,8 @@ export function useAgenda() {
 
   const [ministryId, setMinistryId] = useState<string | null>(null);
   const [congregacoes, setCongregacoes] = useState<Congregacao[]>([]);
+  const [loadingCongregacoes, setLoadingCongregacoes] = useState(false);
+  const [erroCongregacoes, setErroCongregacoes] = useState<string | null>(null);
   const [tipos, setTipos] = useState<AgendaTipo[]>([]);
   const [eventos, setEventos] = useState<AgendaEvento[]>([]);
   const [loading, setLoading] = useState(false);
@@ -341,12 +344,31 @@ export function useAgenda() {
   }, [user, supabase]);
 
   const loadCongregacoes = useCallback(async (mId: string) => {
+    setLoadingCongregacoes(true);
+    setErroCongregacoes(null);
     try {
       const orgService = await obterEstruturaOrganizacionalService(mId, supabase);
-      const div1Options = orgService.getOptionsFormatadas(1);
-      setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
-    } catch {
+      const div1 = orgService.getDivisao1().filter((u) => u.isActive !== false);
+      const lista: Congregacao[] = div1.map((u) => ({
+        id: u.id,
+        nome: u.nome ? u.nome.trim() : '',
+        is_sede: !!u.isSede,
+      })).filter((c) => c.nome.length > 0);
+
+      // Sede primeiro, depois alfabética
+      lista.sort((a, b) => {
+        if (a.is_sede && !b.is_sede) return -1;
+        if (!a.is_sede && b.is_sede) return 1;
+        return a.nome.localeCompare(b.nome);
+      });
+
+      setCongregacoes(lista);
+    } catch (err: any) {
+      console.error('Erro ao carregar congregações da agenda:', err);
       setCongregacoes([]);
+      setErroCongregacoes('Erro ao carregar congregações.');
+    } finally {
+      setLoadingCongregacoes(false);
     }
   }, [supabase]);
 
@@ -509,6 +531,23 @@ export function useAgenda() {
   const openForm = (evento: AgendaEvento | null = null, defaultDateStr?: string | null) => {
     if (evento) {
       setEditEvento(evento);
+      let resolvedChurchId = evento.church_id || '';
+      let resolvedLocal = evento.local || '';
+      if (!resolvedChurchId && resolvedLocal) {
+        const match = congregacoes.find(
+          c => c.nome.trim().toLowerCase() === resolvedLocal.trim().toLowerCase()
+        );
+        if (match) {
+          resolvedChurchId = match.id;
+          resolvedLocal = match.nome;
+        }
+      } else if (resolvedChurchId && !resolvedLocal) {
+        const match = congregacoes.find(c => c.id === resolvedChurchId);
+        if (match) {
+          resolvedLocal = match.nome;
+        }
+      }
+
       setForm({
         titulo: evento.titulo || '',
         descricao: evento.descricao || '',
@@ -519,9 +558,9 @@ export function useAgenda() {
         duracao_minutos: evento.data_inicio && evento.data_fim 
           ? Math.max(30, Math.round((new Date(evento.data_fim).getTime() - new Date(evento.data_inicio).getTime()) / 60000))
           : 120,
-        local: evento.local || '',
+        local: resolvedLocal,
         visibilidade: evento.visibilidade || 'ministerio',
-        church_id: evento.church_id || '',
+        church_id: resolvedChurchId,
         status: evento.status || 'agendado',
         escopo: evento.escopo || 'divisao1',
         calendario_oficial: evento.calendario_oficial ?? false,
@@ -543,6 +582,8 @@ export function useAgenda() {
         ? `${targetDate}T09:00` 
         : `${new Date().toISOString().slice(0, 10)}T09:00`;
 
+      const defaultChurch = filtroCongregacao ? congregacoes.find(c => c.id === filtroCongregacao) : null;
+
       setForm({
         titulo: '',
         descricao: '',
@@ -551,9 +592,9 @@ export function useAgenda() {
         data_fim: '',
         hora_inicio: '19:30',
         duracao_minutos: 120,
-        local: '',
+        local: defaultChurch ? defaultChurch.nome : 'Sede Geral',
         visibilidade: 'ministerio',
-        church_id: '',
+        church_id: defaultChurch ? defaultChurch.id : '',
         status: 'agendado',
         escopo: 'divisao1',
         calendario_oficial: false,
@@ -1166,6 +1207,8 @@ export function useAgenda() {
     STATUS_PLAN_INFO,
     TIPO_SOLICITACAO_LABEL,
     congregacoes,
+    loadingCongregacoes,
+    erroCongregacoes,
     orgHelper,
     eventos,
     loading,

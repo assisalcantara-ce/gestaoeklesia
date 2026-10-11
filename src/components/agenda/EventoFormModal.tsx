@@ -38,6 +38,9 @@ interface EventoFormModalProps {
   tiposAgrupados: Record<string, AgendaTipo[]>;
   CATEGORIAS_LABEL: Record<string, string>;
   orgHelper: any;
+  congregacoes?: { id: string; nome: string; is_sede?: boolean }[];
+  loadingCongregacoes?: boolean;
+  erroCongregacoes?: string | null;
   isAdmin: boolean;
   onCloseModal: () => void;
   onSave: (e: React.FormEvent) => void;
@@ -71,6 +74,9 @@ export default function EventoFormModal({
   tiposAgrupados,
   CATEGORIAS_LABEL,
   orgHelper,
+  congregacoes = [],
+  loadingCongregacoes = false,
+  erroCongregacoes = null,
   isAdmin,
   onCloseModal,
   onSave,
@@ -363,16 +369,65 @@ export default function EventoFormModal({
                 </div>
               )}
 
-              {/* 5. Local */}
+              {/* 5. Local (1ª Divisão da Estrutura Hierárquica) */}
               <div>
-                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Local</label>
-                <input
-                  type="text"
-                  placeholder="Templo Central, Sala 3..."
-                  value={form.local}
-                  onChange={(e) => onFormChange({ local: e.target.value })}
-                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[9px] font-bold text-slate-500 uppercase">
+                    Local ({orgHelper ? orgHelper.label('divisao1') : 'Congregação'})
+                  </label>
+                  {loadingCongregacoes && (
+                    <span className="text-[10px] text-teal-600 font-medium animate-pulse">
+                      Carregando...
+                    </span>
+                  )}
+                </div>
+
+                {erroCongregacoes ? (
+                  <div className="p-2 border border-red-200 bg-red-50 rounded-lg text-xs text-red-600">
+                    {erroCongregacoes}
+                  </div>
+                ) : (
+                  <select
+                    value={form.church_id || ''}
+                    disabled={loadingCongregacoes || saving}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      const selectedCong = (congregacoes || []).find((c) => c.id === selectedId);
+                      onFormChange({
+                        church_id: selectedId,
+                        local: selectedCong ? selectedCong.nome : (selectedId === '' ? 'Sede Geral' : ''),
+                      });
+                    }}
+                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
+                  >
+                    <option value="">Sede Geral (Sem Congregação Específica)</option>
+                    {congregacoes && congregacoes.length > 0 ? (
+                      congregacoes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nome}{c.is_sede ? ' (Sede)' : ''}
+                        </option>
+                      ))
+                    ) : (
+                      !loadingCongregacoes && (
+                        <option value="" disabled>
+                          Nenhuma congregação cadastrada
+                        </option>
+                      )
+                    )}
+                    {/* Preserva exibição de unidade já vinculada se ela não estiver na lista ativa atual */}
+                    {form.church_id && !congregacoes?.some((c) => c.id === form.church_id) && (
+                      <option value={form.church_id}>
+                        {form.local ? `${form.local} (Unidade vinculada)` : 'Unidade vinculada'}
+                      </option>
+                    )}
+                  </select>
+                )}
+
+                {!loadingCongregacoes && !erroCongregacoes && (!congregacoes || congregacoes.length === 0) && (
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    Nenhuma congregação encontrada na estrutura hierárquica.
+                  </p>
+                )}
               </div>
 
               <button

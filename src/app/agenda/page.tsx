@@ -46,6 +46,8 @@ export default function AgendaPage() {
     STATUS_PLAN_INFO,
     TIPO_SOLICITACAO_LABEL,
     congregacoes,
+    loadingCongregacoes,
+    erroCongregacoes,
     orgHelper,
     eventos,
     loading,
@@ -663,6 +665,9 @@ export default function AgendaPage() {
           tiposAgrupados={tiposAgrupados}
           CATEGORIAS_LABEL={CATEGORIAS_LABEL}
           orgHelper={orgHelper}
+          congregacoes={congregacoes}
+          loadingCongregacoes={loadingCongregacoes}
+          erroCongregacoes={erroCongregacoes}
           isAdmin={isAdmin}
           onCloseModal={() => setShowModal(false)}
           onSave={handleSave}
