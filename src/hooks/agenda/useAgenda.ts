@@ -633,6 +633,25 @@ export function useAgenda() {
       const selectedTipo = tipos.find(t => t.id === form.tipo_id);
       const tipoCalculado = selectedTipo?.categoria || (editEvento?.tipo || 'outro');
 
+      // Se for recorrente e estiver criando um novo evento, pré-calculamos as ocorrências para alinhar a 1ª ocorrência com o evento pai
+      let ocorrenciasGeradas: ReturnType<typeof AgendaRecorrenciaService.gerarOcorrencias> = [];
+      let dataInicioEfetiva = new Date(form.data_inicio).toISOString();
+      let dataFimEfetiva = form.data_fim ? new Date(form.data_fim).toISOString() : null;
+
+      if (!editEvento && form.recorrencia_tipo !== 'nenhuma') {
+        ocorrenciasGeradas = AgendaRecorrenciaService.gerarOcorrencias({
+          dataInicio: form.data_inicio,
+          dataFim: form.data_fim || null,
+          config: recorrenciaConfig,
+          limiteMaximo: 60,
+        });
+
+        if (ocorrenciasGeradas.length > 0) {
+          dataInicioEfetiva = ocorrenciasGeradas[0].dataInicio;
+          dataFimEfetiva = ocorrenciasGeradas[0].dataFim;
+        }
+      }
+
       const payload = {
         ministry_id: ministryId,
         planejamento_id: activePlanning?.id || null,
@@ -641,8 +660,8 @@ export function useAgenda() {
         tipo: tipoCalculado,
         origem: 'manual',
         tipo_id: form.tipo_id || null,
-        data_inicio: new Date(form.data_inicio).toISOString(),
-        data_fim: form.data_fim ? new Date(form.data_fim).toISOString() : null,
+        data_inicio: dataInicioEfetiva,
+        data_fim: dataFimEfetiva,
         local: form.local.trim() || null,
         visibilidade: form.visibilidade,
         church_id: form.church_id || null,
@@ -674,17 +693,10 @@ export function useAgenda() {
         if (error) throw error;
         await registrarAcao({ acao: 'criar', modulo: 'agenda', tabela_afetada: 'agenda_eventos', registro_id: newEvt.id });
 
-        // Se for recorrente, gerar instâncias reais no calendário vinculadas ao pai
-        if (form.recorrencia_tipo !== 'nenhuma' && newEvt?.id) {
-          const ocorrencias = AgendaRecorrenciaService.gerarOcorrencias({
-            dataInicio: form.data_inicio,
-            dataFim: form.data_fim || null,
-            config: recorrenciaConfig,
-            limiteMaximo: 60
-          });
-
+        // Se for recorrente, gerar instâncias reais filhas no calendário vinculadas ao pai
+        if (form.recorrencia_tipo !== 'nenhuma' && newEvt?.id && ocorrenciasGeradas.length > 1) {
           // Pula a 1ª ocorrência pois ela já é o evento pai gerado acima
-          const filhas = ocorrencias.slice(1).map(oc => ({
+          const filhas = ocorrenciasGeradas.slice(1).map(oc => ({
             ministry_id: ministryId,
             planejamento_id: activePlanning?.id || null,
             titulo: form.titulo.trim(),
@@ -707,9 +719,7 @@ export function useAgenda() {
             created_by: user?.id || null,
           }));
 
-          if (filhas.length > 0) {
-            await supabase.from('agenda_eventos').insert(filhas);
-          }
+          await supabase.from('agenda_eventos').insert(filhas);
         }
 
         flash('ok', 'Compromisso agendado com sucesso!');

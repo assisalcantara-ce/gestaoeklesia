@@ -275,4 +275,38 @@ describe('Motor de Recorrência da Agenda Oficial (AgendaRecorrenciaService)', (
     assert.strictEqual(cultoVinculado.status, 'Encerrado');
     assert.strictEqual(cultoVinculado.agenda_evento_id, 'ev-1');
   });
+
+  it('11. Cenário Específico: Culto de Santa Ceia — Segundo sábado de cada mês', () => {
+    // Configuração simulando o formulário EventoFormModal:
+    // Começando em 2026-10-01 às 19:30, segundo sábado de cada mês até o final do ano
+    const params = {
+      dataInicio: '2026-10-01T19:30:00.000Z',
+      dataFim: '2026-10-01T21:30:00.000Z',
+      config: {
+        frequencia: 'mensal_ordinal' as const,
+        ordinal: 'segundo' as const,
+        diaSemanaOrdinal: 6, // Sábado
+        dataFimRecorrencia: '2026-12-31',
+      },
+    };
+
+    const res = AgendaRecorrenciaService.gerarOcorrencias(params);
+    // Outubro: 10/10/2026
+    // Novembro: 14/11/2026
+    // Dezembro: 12/12/2026
+    assert.strictEqual(res.length, 3);
+    assert.strictEqual(res[0].dataBaseStr, '2026-10-10');
+    assert.strictEqual(res[1].dataBaseStr, '2026-11-14');
+    assert.strictEqual(res[2].dataBaseStr, '2026-12-12');
+
+    // Verifica preservação do horário (19:30 UTC) e duração (2 horas)
+    res.forEach(item => {
+      const dtInicio = new Date(item.dataInicio);
+      const dtFim = new Date(item.dataFim!);
+      assert.strictEqual(dtInicio.getUTCHours(), 19);
+      assert.strictEqual(dtInicio.getUTCMinutes(), 30);
+      assert.strictEqual(dtInicio.getUTCDay(), 6); // Sábado
+      assert.strictEqual(dtFim.getTime() - dtInicio.getTime(), 2 * 60 * 60 * 1000);
+    });
+  });
 });

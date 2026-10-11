@@ -198,6 +198,135 @@ export default function EventoFormModal({
                 />
               </div>
 
+              {/* Recorrência */}
+              <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[10px] font-black text-slate-700 uppercase tracking-wider">
+                    🔁 Recorrência do Evento
+                  </label>
+                  <span className="text-[9px] text-slate-500 font-medium">Geração de datas no calendário</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Frequência</label>
+                    <select
+                      value={form.recorrencia_tipo}
+                      onChange={(e) => onFormChange({ recorrencia_tipo: e.target.value as any })}
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white font-medium"
+                    >
+                      <option value="nenhuma">Sem recorrência</option>
+                      <option value="semanal">Semanal</option>
+                      <option value="mensal_ordinal">Mensal por posição (ordinal)</option>
+                      <option value="mensal_dia">Mensal por dia do mês</option>
+                      <option value="anual">Anual</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Repetir Até</label>
+                    <input
+                      type="date"
+                      value={form.recorrencia_data_fim || ''}
+                      disabled={form.recorrencia_tipo === 'nenhuma'}
+                      onChange={(e) => onFormChange({ recorrencia_data_fim: e.target.value })}
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white disabled:bg-slate-100 disabled:opacity-60"
+                    />
+                  </div>
+                </div>
+
+                {/* Opções Semanais: Dias da Semana */}
+                {form.recorrencia_tipo === 'semanal' && (
+                  <div className="pt-2 border-t border-slate-100">
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1.5">
+                      Dias da Semana (Repetir em):
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { d: 0, label: 'Dom' },
+                        { d: 1, label: 'Seg' },
+                        { d: 2, label: 'Ter' },
+                        { d: 3, label: 'Qua' },
+                        { d: 4, label: 'Qui' },
+                        { d: 5, label: 'Sex' },
+                        { d: 6, label: 'Sáb' },
+                      ].map((dia) => {
+                        const ativo = (form.recorrencia_dias_semana || []).includes(dia.d);
+                        return (
+                          <button
+                            key={dia.d}
+                            type="button"
+                            onClick={() => {
+                              const list = form.recorrencia_dias_semana || [];
+                              const novo = ativo ? list.filter(item => item !== dia.d) : [...list, dia.d];
+                              onFormChange({ recorrencia_dias_semana: novo.length > 0 ? novo : [dia.d] });
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition cursor-pointer border ${
+                              ativo
+                                ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
+                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {dia.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Opções Mensal por Posição Ordinal */}
+                {form.recorrencia_tipo === 'mensal_ordinal' && (
+                  <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Posição</label>
+                      <select
+                        value={form.recorrencia_ordinal || 'primeiro'}
+                        onChange={(e) => onFormChange({ recorrencia_ordinal: e.target.value as any })}
+                        className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      >
+                        <option value="primeiro">Primeiro</option>
+                        <option value="segundo">Segundo</option>
+                        <option value="terceiro">Terceiro</option>
+                        <option value="quarto">Quarto</option>
+                        <option value="ultimo">Último</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Dia da semana</label>
+                      <select
+                        value={form.recorrencia_dia_semana_ordinal !== undefined ? form.recorrencia_dia_semana_ordinal : 6}
+                        onChange={(e) => onFormChange({ recorrencia_dia_semana_ordinal: parseInt(e.target.value, 10) })}
+                        className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      >
+                        <option value="0">Domingo</option>
+                        <option value="1">Segunda-feira</option>
+                        <option value="2">Terça-feira</option>
+                        <option value="3">Quarta-feira</option>
+                        <option value="4">Quinta-feira</option>
+                        <option value="5">Sexta-feira</option>
+                        <option value="6">Sábado</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Opções Mensal por Dia do Mês */}
+                {form.recorrencia_tipo === 'mensal_dia' && (
+                  <div className="pt-2 border-t border-slate-100">
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Dia do mês (1 a 31)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={form.recorrencia_dia_mes || 1}
+                      onChange={(e) => onFormChange({ recorrencia_dia_mes: parseInt(e.target.value, 10) || 1 })}
+                      className="w-28 px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={onToggleAdvancedFields}
@@ -248,135 +377,6 @@ export default function EventoFormModal({
                         <option value="publico">Público</option>
                       </select>
                     </div>
-                  </div>
-
-                  {/* Recorrência Avançada */}
-                  <div className="p-3 bg-white border border-slate-250 rounded-xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-[10px] font-black text-slate-700 uppercase tracking-wider">
-                        🔁 Recorrência do Evento
-                      </label>
-                      <span className="text-[9px] text-slate-650 font-medium">Geração de datas no calendário</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Frequência</label>
-                        <select
-                          value={form.recorrencia_tipo}
-                          onChange={(e) => onFormChange({ recorrencia_tipo: e.target.value as any })}
-                          className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white font-medium"
-                        >
-                          <option value="nenhuma">Nenhuma (Evento Único)</option>
-                          <option value="semanal">Semanal (dias fixos da semana)</option>
-                          <option value="mensal_ordinal">Mensal por Posição (Ex: 1º Sábado)</option>
-                          <option value="mensal_dia">Mensal por Dia Fixo (Ex: todo dia 15)</option>
-                          <option value="anual">Anual</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Repetir Até</label>
-                        <input
-                          type="date"
-                          value={form.recorrencia_data_fim || ''}
-                          disabled={form.recorrencia_tipo === 'nenhuma'}
-                          onChange={(e) => onFormChange({ recorrencia_data_fim: e.target.value })}
-                          className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white disabled:bg-slate-100 disabled:opacity-60"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Opções Semanais: Dias da Semana */}
-                    {form.recorrencia_tipo === 'semanal' && (
-                      <div className="pt-2 border-t border-slate-100">
-                        <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1.5">
-                          Dias da Semana (Repetir em):
-                        </label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {[
-                            { d: 0, label: 'Dom' },
-                            { d: 1, label: 'Seg' },
-                            { d: 2, label: 'Ter' },
-                            { d: 3, label: 'Qua' },
-                            { d: 4, label: 'Qui' },
-                            { d: 5, label: 'Sex' },
-                            { d: 6, label: 'Sáb' },
-                          ].map((dia) => {
-                            const ativo = (form.recorrencia_dias_semana || []).includes(dia.d);
-                            return (
-                              <button
-                                key={dia.d}
-                                type="button"
-                                onClick={() => {
-                                  const list = form.recorrencia_dias_semana || [];
-                                  const novo = ativo ? list.filter(item => item !== dia.d) : [...list, dia.d];
-                                  onFormChange({ recorrencia_dias_semana: novo.length > 0 ? novo : [dia.d] });
-                                }}
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition cursor-pointer border ${
-                                  ativo
-                                    ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
-                                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                                }`}
-                              >
-                                {dia.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Opções Mensal por Posição Ordinal */}
-                    {form.recorrencia_tipo === 'mensal_ordinal' && (
-                      <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Posição / Ordem</label>
-                          <select
-                            value={form.recorrencia_ordinal || 'primeiro'}
-                            onChange={(e) => onFormChange({ recorrencia_ordinal: e.target.value as any })}
-                            className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white"
-                          >
-                            <option value="primeiro">1º (Primeiro)</option>
-                            <option value="segundo">2º (Segundo)</option>
-                            <option value="terceiro">3º (Terceiro)</option>
-                            <option value="quarto">4º (Quarto)</option>
-                            <option value="ultimo">Último</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Dia da Semana</label>
-                          <select
-                            value={form.recorrencia_dia_semana_ordinal !== undefined ? form.recorrencia_dia_semana_ordinal : 6}
-                            onChange={(e) => onFormChange({ recorrencia_dia_semana_ordinal: parseInt(e.target.value, 10) })}
-                            className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white"
-                          >
-                            <option value="0">Domingo</option>
-                            <option value="1">Segunda-feira</option>
-                            <option value="2">Terça-feira</option>
-                            <option value="3">Quarta-feira</option>
-                            <option value="4">Quinta-feira</option>
-                            <option value="5">Sexta-feira</option>
-                            <option value="6">Sábado</option>
-                          </select>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Opções Mensal por Dia Fixo */}
-                    {form.recorrencia_tipo === 'mensal_dia' && (
-                      <div className="pt-2 border-t border-slate-100">
-                        <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Dia do Mês (1 a 31)</label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="31"
-                          value={form.recorrencia_dia_mes || 1}
-                          onChange={(e) => onFormChange({ recorrencia_dia_mes: parseInt(e.target.value, 10) || 1 })}
-                          className="w-24 px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white"
-                        />
-                      </div>
-                    )}
                   </div>
 
                   <div className="flex items-center gap-4 pt-1">
