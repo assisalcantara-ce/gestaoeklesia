@@ -18,6 +18,10 @@ export interface AgendaEvento {
   visibilidade: 'privado' | 'lideranca' | 'igreja' | 'ministerio' | 'publico';
   status: 'agendado' | 'cancelado' | 'concluido';
   recorrente: boolean;
+  recorrencia_tipo?: string | null;
+  recorrencia_config?: any;
+  recorrencia_pai_id?: string | null;
+  excecao_datas?: any;
   escopo: 'organizacao' | 'divisao1' | 'divisao2' | 'divisao3';
   prioridade: number;
   calendario_oficial: boolean;

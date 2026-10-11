@@ -43,6 +43,8 @@ interface CultoRegistro {
   encerrado_por: string | null;
   // Referencia ao relatorio espiritual gerado (anti-duplicidade)
   relatorio_espiritual_id: string | null;
+  // Vinculo com a Agenda Oficial
+  agenda_evento_id?: string | null;
   created_at: string;
   updated_at: string;
   congregacoes?: {
@@ -76,7 +78,8 @@ const EMPTY_FORM = {
   pregador: '',
   observacoes: '',
   status: 'Aberto' as 'Aberto' | 'Encerrado' | 'Consolidado',
-  congregacao_id: ''
+  congregacao_id: '',
+  agenda_evento_id: ''
 };
 
 const TABS = [
@@ -134,6 +137,16 @@ export default function CultosPage() {
     cargo_ministerial: 'Pastor',
     observacoes: ''
   });
+
+  // Eventos oficiais da Agenda disponíveis para vinculação
+  const [agendaEventosDisponiveis, setAgendaEventosDisponiveis] = useState<{
+    id: string;
+    titulo: string;
+    data_inicio: string;
+    data_fim: string | null;
+    local: string | null;
+    church_id: string | null;
+  }[]>([]);
 
   // Estados do Link da Recepção (token público por culto)
   const [cultoLink, setCultoLink] = useState<CultoRegistro | null>(null);
@@ -310,6 +323,33 @@ export default function CultosPage() {
     }
     setTiposCulto(prev => prev.filter(t => t !== tipo));
     setFormData(prev => ({ ...prev, tipo_culto: TIPO_CULTO_OPTIONS[0] }));
+  };
+
+  const loadAgendaEventos = async () => {
+    if (!ctx?.ministryId) return;
+    try {
+      let query = supabase
+        .from('agenda_eventos')
+        .select('id, titulo, data_inicio, data_fim, local, church_id')
+        .eq('ministry_id', ctx.ministryId)
+        .eq('tipo', 'culto')
+        .neq('status', 'cancelado');
+
+      // Se for operador local, exibe apenas os cultos da sua congregação ou de âmbito geral da sede
+      if (isLocalUser && ctx?.congregacaoId) {
+        query = query.or(`church_id.eq.${ctx.congregacaoId},church_id.is.null`);
+      }
+
+      const { data, error } = await query
+        .order('data_inicio', { ascending: false })
+        .limit(50);
+
+      if (!error && data) {
+        setAgendaEventosDisponiveis(data);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar cultos da Agenda Oficial:', err);
+    }
   };
 
   const loadCategorias = async () => {
@@ -520,6 +560,7 @@ export default function CultosPage() {
     if (!ctx?.loading && ctx?.ministryId) {
       loadRegistros();
       loadCategorias();
+      loadAgendaEventos();
     }
   }, [ctx?.loading, ctx?.ministryId, ctx?.congregacaoId, isLocalUser]);
 
@@ -579,6 +620,7 @@ export default function CultosPage() {
         pregador: formData.pregador.trim() || null,
         observacoes: formData.observacoes.trim() || null,
         status: formData.status,
+        agenda_evento_id: formData.agenda_evento_id || null,
         usuario_responsavel: ctx?.userId
       };
 
@@ -624,7 +666,8 @@ export default function CultosPage() {
       pregador: reg.pregador || '',
       observacoes: reg.observacoes || '',
       status: reg.status,
-      congregacao_id: reg.congregacao_id
+      congregacao_id: reg.congregacao_id,
+      agenda_evento_id: reg.agenda_evento_id || ''
     });
     setActiveTab('cadastro');
   };
@@ -946,6 +989,79 @@ export default function CultosPage() {
             <Section title={editingId ? 'Editar Culto' : 'Novo Registro de Culto'}>
               <form onSubmit={handleSave} className="space-y-6 max-w-3xl">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Vínculo com a Agenda Oficial */}
+                  <div className="sm:col-span-2 p-3 bg-teal-50/60 border border-teal-200/80 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-black text-teal-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <Calendar className="h-4 w-4 text-teal-700" />
+                        Vincular a Culto Programado na Agenda Oficial (Opcional)
+                      </label>
+                      {formData.agenda_evento_id && (
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, agenda_evento_id: '' }))}
+                          className="text-[11px] text-teal-700 hover:text-teal-900 font-bold hover:underline cursor-pointer"
+                        >
+                          Desvincular
+                        </button>
+                      )}
+                    </div>
+                    <select
+                      value={formData.agenda_evento_id || ''}
+                      onChange={e => {
+                        const evId = e.target.value;
+                        if (!evId) {
+                          setFormData(prev => ({ ...prev, agenda_evento_id: '' }));
+                          return;
+                        }
+                        const evento = agendaEventosDisponiveis.find(ev => ev.id === evId);
+                        if (evento) {
+                          const dataInicio = new Date(evento.data_inicio);
+                          const y = dataInicio.getFullYear();
+                          const m = String(dataInicio.getMonth() + 1).padStart(2, '0');
+                          const d = String(dataInicio.getDate()).padStart(2, '0');
+                          const hh = String(dataInicio.getHours()).padStart(2, '0');
+                          const mm = String(dataInicio.getMinutes()).padStart(2, '0');
+                          setFormData(prev => ({
+                            ...prev,
+                            agenda_evento_id: evento.id,
+                            data_culto: `${y}-${m}-${d}`,
+                            horario_culto: `${hh}:${mm}`,
+                            tipo_culto: evento.titulo.includes('Doutrina')
+                              ? 'Culto de Doutrina'
+                              : evento.titulo.includes('Ensino')
+                              ? 'Culto de Ensino'
+                              : evento.titulo.includes('Jovens')
+                              ? 'Culto de Jovens'
+                              : evento.titulo.includes('Senhoras')
+                              ? 'Culto de Senhoras'
+                              : evento.titulo.includes('Oração')
+                              ? 'Culto de Oração'
+                              : evento.titulo.includes('Ceia')
+                              ? 'Santa Ceia'
+                              : evento.titulo.includes('Evangelismo')
+                              ? 'Culto de Evangelismo'
+                              : prev.tipo_culto,
+                            congregacao_id: (!isLocalUser && evento.church_id) ? evento.church_id : prev.congregacao_id
+                          }));
+                        }
+                      }}
+                      className="w-full border border-teal-300 rounded-xl px-3 py-2 text-xs bg-white text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+                    >
+                      <option value="">Nenhum (Culto Avulso / Extraordinário)</option>
+                      {agendaEventosDisponiveis.map(ev => {
+                        const dt = new Date(ev.data_inicio);
+                        const dataFmt = dt.toLocaleDateString('pt-BR');
+                        const horaFmt = dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                        return (
+                          <option key={ev.id} value={ev.id}>
+                            📅 {dataFmt} às {horaFmt} — {ev.titulo} {ev.local ? `(${ev.local})` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
                   {/* Congregação (Bloqueado para local) */}
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Congregação / Unidade *</label>
@@ -1239,7 +1355,14 @@ export default function CultosPage() {
                               {reg.congregacoes?.nome || 'Unidade Geral'}
                             </td>
                           )}
-                          <td className="p-3.5 font-bold text-[#062E6F]">{reg.tipo_culto}</td>
+                          <td className="p-3.5">
+                            <span className="font-bold text-[#062E6F] block">{reg.tipo_culto}</span>
+                            {reg.agenda_evento_id && (
+                              <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-teal-50 text-teal-800 border border-teal-250">
+                                📅 Agenda Oficial
+                              </span>
+                            )}
+                          </td>
                           <td className="p-3.5">
                             <div className="flex flex-col text-xs">
                               <span className="font-medium text-slate-800">Dirigente: {reg.dirigente}</span>

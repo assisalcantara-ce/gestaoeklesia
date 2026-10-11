@@ -28,6 +28,7 @@ export type OrigemModulo =
   | 'juridico';
 
 export type OrigemTipo =
+  | 'culto'
   | 'batismo'
   | 'apresentacao_criancas'
   | 'ordenacao'

@@ -12,6 +12,7 @@ import { OrganizationalService, getOrgHelpers, OrgStructure } from '@/lib/organi
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { PlanningConflictService } from '@/lib/planning-conflict-service';
+import { AgendaRecorrenciaService, RecorrenciaConfig } from '@/lib/agenda-recorrencia-service';
 import { Calendar as CalendarIcon, LayoutDashboard, BookOpen, Gavel } from 'lucide-react';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
@@ -60,6 +61,10 @@ export interface AgendaEvento {
   visibilidade: 'privado' | 'lideranca' | 'igreja' | 'ministerio' | 'publico';
   status: 'agendado' | 'cancelado' | 'concluido';
   recorrente: boolean;
+  recorrencia_tipo?: string | null;
+  recorrencia_config?: any;
+  recorrencia_pai_id?: string | null;
+  excecao_datas?: any;
   escopo: 'organizacao' | 'divisao1' | 'divisao2' | 'divisao3';
   prioridade: number;
   calendario_oficial: boolean;
@@ -221,6 +226,12 @@ export function useAgenda() {
     calendario_oficial: false,
     gera_bloqueio: false,
     regra_posicionamento: '' as string,
+    recorrencia_tipo: 'nenhuma' as 'nenhuma' | 'semanal' | 'mensal_ordinal' | 'mensal_dia' | 'anual',
+    recorrencia_dias_semana: [] as number[],
+    recorrencia_ordinal: 'primeiro' as 'primeiro' | 'segundo' | 'terceiro' | 'quarto' | 'ultimo',
+    recorrencia_dia_semana_ordinal: 6,
+    recorrencia_dia_mes: 1,
+    recorrencia_data_fim: '',
   });
 
   const [showTiposModal, setShowTiposModal] = useState(false);
@@ -509,8 +520,14 @@ export function useAgenda() {
         calendario_oficial: evento.calendario_oficial ?? false,
         gera_bloqueio: evento.gera_bloqueio ?? false,
         regra_posicionamento: evento.regra_posicionamento || '',
+        recorrencia_tipo: (evento.recorrencia_tipo as any) || (evento.recorrente ? 'semanal' : 'nenhuma'),
+        recorrencia_dias_semana: evento.recorrencia_config?.diasSemana || [],
+        recorrencia_ordinal: evento.recorrencia_config?.ordinal || 'primeiro',
+        recorrencia_dia_semana_ordinal: evento.recorrencia_config?.diaSemanaOrdinal !== undefined ? evento.recorrencia_config?.diaSemanaOrdinal : 6,
+        recorrencia_dia_mes: evento.recorrencia_config?.diaDoMes || 1,
+        recorrencia_data_fim: evento.recorrencia_config?.dataFimRecorrencia || '',
       });
-      setShowAdvancedFormFields(!!(evento.descricao || evento.regra_posicionamento || evento.calendario_oficial || evento.gera_bloqueio));
+      setShowAdvancedFormFields(!!(evento.descricao || evento.regra_posicionamento || evento.calendario_oficial || evento.gera_bloqueio || evento.recorrente || (evento.recorrencia_tipo && evento.recorrencia_tipo !== 'nenhuma')));
     } else {
       setEditEvento(null);
       const targetDate = defaultDateStr || selectedDate;
@@ -532,6 +549,12 @@ export function useAgenda() {
         calendario_oficial: false,
         gera_bloqueio: false,
         regra_posicionamento: '',
+        recorrencia_tipo: 'nenhuma',
+        recorrencia_dias_semana: [],
+        recorrencia_ordinal: 'primeiro',
+        recorrencia_dia_semana_ordinal: 6,
+        recorrencia_dia_mes: 1,
+        recorrencia_data_fim: '',
       });
       setShowAdvancedFormFields(false);
     }
@@ -597,11 +620,26 @@ export function useAgenda() {
         }
       }
 
+      const recorrenciaConfig: RecorrenciaConfig = {
+        frequencia: form.recorrencia_tipo,
+        diasSemana: form.recorrencia_dias_semana.length > 0 ? form.recorrencia_dias_semana : [new Date(form.data_inicio).getDay()],
+        ordinal: form.recorrencia_ordinal,
+        diaSemanaOrdinal: form.recorrencia_dia_semana_ordinal,
+        diaDoMes: form.recorrencia_dia_mes,
+        dataFimRecorrencia: form.recorrencia_data_fim || undefined,
+        anoLimite: currentYear,
+      };
+
+      const selectedTipo = tipos.find(t => t.id === form.tipo_id);
+      const tipoCalculado = selectedTipo?.categoria || (editEvento?.tipo || 'outro');
+
       const payload = {
         ministry_id: ministryId,
         planejamento_id: activePlanning?.id || null,
         titulo: form.titulo.trim(),
         descricao: form.descricao.trim() || null,
+        tipo: tipoCalculado,
+        origem: 'manual',
         tipo_id: form.tipo_id || null,
         data_inicio: new Date(form.data_inicio).toISOString(),
         data_fim: form.data_fim ? new Date(form.data_fim).toISOString() : null,
@@ -613,6 +651,9 @@ export function useAgenda() {
         calendario_oficial: form.calendario_oficial,
         gera_bloqueio: form.gera_bloqueio,
         regra_posicionamento: form.regra_posicionamento || null,
+        recorrente: form.recorrencia_tipo !== 'nenhuma',
+        recorrencia_tipo: form.recorrencia_tipo,
+        recorrencia_config: form.recorrencia_tipo !== 'nenhuma' ? recorrenciaConfig : null,
         updated_at: new Date().toISOString(),
       };
 
@@ -632,6 +673,45 @@ export function useAgenda() {
           .single();
         if (error) throw error;
         await registrarAcao({ acao: 'criar', modulo: 'agenda', tabela_afetada: 'agenda_eventos', registro_id: newEvt.id });
+
+        // Se for recorrente, gerar instâncias reais no calendário vinculadas ao pai
+        if (form.recorrencia_tipo !== 'nenhuma' && newEvt?.id) {
+          const ocorrencias = AgendaRecorrenciaService.gerarOcorrencias({
+            dataInicio: form.data_inicio,
+            dataFim: form.data_fim || null,
+            config: recorrenciaConfig,
+            limiteMaximo: 60
+          });
+
+          // Pula a 1ª ocorrência pois ela já é o evento pai gerado acima
+          const filhas = ocorrencias.slice(1).map(oc => ({
+            ministry_id: ministryId,
+            planejamento_id: activePlanning?.id || null,
+            titulo: form.titulo.trim(),
+            descricao: form.descricao.trim() || null,
+            tipo: tipoCalculado,
+            origem: 'manual',
+            tipo_id: form.tipo_id || null,
+            data_inicio: oc.dataInicio,
+            data_fim: oc.dataFim,
+            local: form.local.trim() || null,
+            visibilidade: form.visibilidade,
+            church_id: form.church_id || null,
+            status: form.status,
+            escopo: form.escopo,
+            calendario_oficial: form.calendario_oficial,
+            gera_bloqueio: form.gera_bloqueio,
+            recorrente: true,
+            recorrencia_tipo: form.recorrencia_tipo,
+            recorrencia_pai_id: newEvt.id,
+            created_by: user?.id || null,
+          }));
+
+          if (filhas.length > 0) {
+            await supabase.from('agenda_eventos').insert(filhas);
+          }
+        }
+
         flash('ok', 'Compromisso agendado com sucesso!');
       }
 
