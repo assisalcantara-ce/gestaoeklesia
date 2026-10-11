@@ -218,6 +218,8 @@ export function useAgenda() {
     tipo_id: '',
     data_inicio: '',
     data_fim: '',
+    hora_inicio: '19:30',
+    duracao_minutos: 120,
     local: '',
     visibilidade: 'ministerio' as AgendaEvento['visibilidade'],
     church_id: '',
@@ -231,6 +233,7 @@ export function useAgenda() {
     recorrencia_ordinal: 'primeiro' as 'primeiro' | 'segundo' | 'terceiro' | 'quarto' | 'ultimo',
     recorrencia_dia_semana_ordinal: 6,
     recorrencia_dia_mes: 1,
+    recorrencia_ano_referencia: new Date().getFullYear(),
     recorrencia_data_fim: '',
   });
 
@@ -512,6 +515,10 @@ export function useAgenda() {
         tipo_id: evento.tipo_id || '',
         data_inicio: evento.data_inicio ? evento.data_inicio.slice(0, 16) : '',
         data_fim: evento.data_fim ? evento.data_fim.slice(0, 16) : '',
+        hora_inicio: evento.data_inicio ? evento.data_inicio.slice(11, 16) : '19:30',
+        duracao_minutos: evento.data_inicio && evento.data_fim 
+          ? Math.max(30, Math.round((new Date(evento.data_fim).getTime() - new Date(evento.data_inicio).getTime()) / 60000))
+          : 120,
         local: evento.local || '',
         visibilidade: evento.visibilidade || 'ministerio',
         church_id: evento.church_id || '',
@@ -525,6 +532,7 @@ export function useAgenda() {
         recorrencia_ordinal: evento.recorrencia_config?.ordinal || 'primeiro',
         recorrencia_dia_semana_ordinal: evento.recorrencia_config?.diaSemanaOrdinal !== undefined ? evento.recorrencia_config?.diaSemanaOrdinal : 6,
         recorrencia_dia_mes: evento.recorrencia_config?.diaDoMes || 1,
+        recorrencia_ano_referencia: evento.recorrencia_config?.anoReferencia || (evento.data_inicio ? new Date(evento.data_inicio).getFullYear() : currentYear),
         recorrencia_data_fim: evento.recorrencia_config?.dataFimRecorrencia || '',
       });
       setShowAdvancedFormFields(!!(evento.descricao || evento.regra_posicionamento || evento.calendario_oficial || evento.gera_bloqueio || evento.recorrente || (evento.recorrencia_tipo && evento.recorrencia_tipo !== 'nenhuma')));
@@ -541,6 +549,8 @@ export function useAgenda() {
         tipo_id: tipos.length > 0 ? tipos[0].id : '',
         data_inicio: defaultStart,
         data_fim: '',
+        hora_inicio: '19:30',
+        duracao_minutos: 120,
         local: '',
         visibilidade: 'ministerio',
         church_id: '',
@@ -554,6 +564,7 @@ export function useAgenda() {
         recorrencia_ordinal: 'primeiro',
         recorrencia_dia_semana_ordinal: 6,
         recorrencia_dia_mes: 1,
+        recorrencia_ano_referencia: currentYear,
         recorrencia_data_fim: '',
       });
       setShowAdvancedFormFields(false);
@@ -574,20 +585,84 @@ export function useAgenda() {
     e.preventDefault();
     if (!ministryId) return;
 
-    if (!form.titulo.trim() || !form.data_inicio) {
+    const isRecorrente = form.recorrencia_tipo !== 'nenhuma';
+
+    // Para eventos únicos, valida título e data_inicio obrigatória
+    if (!isRecorrente && (!form.titulo.trim() || !form.data_inicio)) {
       flash('erro', 'Preencha o título e a data/hora de início.');
+      return;
+    }
+
+    // Para eventos recorrentes, valida título e dias/regra
+    if (isRecorrente && !form.titulo.trim()) {
+      flash('erro', 'Preencha o título do evento.');
       return;
     }
 
     setSaving(true);
     try {
+      // Extrai hora e minuto para séries recorrentes
+      const horaStr = form.hora_inicio || (form.data_inicio ? form.data_inicio.slice(11, 16) : '19:30');
+      const [hPart, mPart] = horaStr.split(':').map(v => parseInt(v, 10) || 0);
+      const anoRef = form.recorrencia_ano_referencia || (form.data_inicio ? new Date(form.data_inicio).getFullYear() : currentYear);
+      const duracaoMin = form.duracao_minutos !== undefined ? form.duracao_minutos : 120;
+      const duracaoMs = duracaoMin * 60 * 1000;
+
+      const recorrenciaConfig: RecorrenciaConfig = {
+        frequencia: form.recorrencia_tipo,
+        diasSemana: form.recorrencia_dias_semana.length > 0 ? form.recorrencia_dias_semana : [new Date(form.data_inicio || `${anoRef}-01-01T${horaStr}`).getDay()],
+        ordinal: form.recorrencia_ordinal,
+        diaSemanaOrdinal: form.recorrencia_dia_semana_ordinal,
+        diaDoMes: form.recorrencia_dia_mes,
+        anoReferencia: anoRef,
+        dataFimRecorrencia: form.recorrencia_data_fim || undefined,
+        anoLimite: anoRef,
+      };
+
+      // Se for recorrente e estiver criando novo evento, calcula a primeira ocorrência real do ano
+      let ocorrenciasGeradas: ReturnType<typeof AgendaRecorrenciaService.gerarOcorrencias> = [];
+      let dataInicioEfetiva: string;
+      let dataFimEfetiva: string | null;
+
+      if (isRecorrente && !editEvento) {
+        // Encontra a 1ª ocorrência automática do ano de referência
+        const primeiraData = AgendaRecorrenciaService.calcularPrimeiraOcorrencia({
+          ano: anoRef,
+          config: recorrenciaConfig,
+          hora: hPart,
+          minuto: mPart,
+        }) || new Date(anoRef, 0, 1, hPart, mPart, 0);
+
+        const dataInicioBaseStr = primeiraData.toISOString();
+        const dataFimBaseStr = new Date(primeiraData.getTime() + duracaoMs).toISOString();
+
+        ocorrenciasGeradas = AgendaRecorrenciaService.gerarOcorrencias({
+          dataInicio: dataInicioBaseStr,
+          dataFim: dataFimBaseStr,
+          config: recorrenciaConfig,
+          limiteMaximo: 120,
+        });
+
+        if (ocorrenciasGeradas.length > 0) {
+          dataInicioEfetiva = ocorrenciasGeradas[0].dataInicio;
+          dataFimEfetiva = ocorrenciasGeradas[0].dataFim;
+        } else {
+          dataInicioEfetiva = dataInicioBaseStr;
+          dataFimEfetiva = dataFimBaseStr;
+        }
+      } else {
+        // Evento único ou edição de evento existente
+        dataInicioEfetiva = new Date(form.data_inicio).toISOString();
+        dataFimEfetiva = form.data_fim ? new Date(form.data_fim).toISOString() : null;
+      }
+
       if (form.gera_bloqueio || form.calendario_oficial) {
         const conflict = await PlanningConflictService.verificarConflito(
           supabase,
           {
             titulo: form.titulo.trim(),
-            data_inicio: form.data_inicio,
-            data_fim: form.data_fim || null,
+            data_inicio: dataInicioEfetiva,
+            data_fim: dataFimEfetiva,
             planejamento_id: activePlanning?.id || '',
             tipo_id: form.tipo_id,
             escopo: form.escopo,
@@ -620,37 +695,8 @@ export function useAgenda() {
         }
       }
 
-      const recorrenciaConfig: RecorrenciaConfig = {
-        frequencia: form.recorrencia_tipo,
-        diasSemana: form.recorrencia_dias_semana.length > 0 ? form.recorrencia_dias_semana : [new Date(form.data_inicio).getDay()],
-        ordinal: form.recorrencia_ordinal,
-        diaSemanaOrdinal: form.recorrencia_dia_semana_ordinal,
-        diaDoMes: form.recorrencia_dia_mes,
-        dataFimRecorrencia: form.recorrencia_data_fim || undefined,
-        anoLimite: currentYear,
-      };
-
       const selectedTipo = tipos.find(t => t.id === form.tipo_id);
       const tipoCalculado = selectedTipo?.categoria || (editEvento?.tipo || 'outro');
-
-      // Se for recorrente e estiver criando um novo evento, pré-calculamos as ocorrências para alinhar a 1ª ocorrência com o evento pai
-      let ocorrenciasGeradas: ReturnType<typeof AgendaRecorrenciaService.gerarOcorrencias> = [];
-      let dataInicioEfetiva = new Date(form.data_inicio).toISOString();
-      let dataFimEfetiva = form.data_fim ? new Date(form.data_fim).toISOString() : null;
-
-      if (!editEvento && form.recorrencia_tipo !== 'nenhuma') {
-        ocorrenciasGeradas = AgendaRecorrenciaService.gerarOcorrencias({
-          dataInicio: form.data_inicio,
-          dataFim: form.data_fim || null,
-          config: recorrenciaConfig,
-          limiteMaximo: 60,
-        });
-
-        if (ocorrenciasGeradas.length > 0) {
-          dataInicioEfetiva = ocorrenciasGeradas[0].dataInicio;
-          dataFimEfetiva = ocorrenciasGeradas[0].dataFim;
-        }
-      }
 
       const payload = {
         ministry_id: ministryId,

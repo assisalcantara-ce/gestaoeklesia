@@ -10,6 +10,8 @@ export interface EventoFormState {
   tipo_id: string;
   data_inicio: string;
   data_fim: string;
+  hora_inicio?: string;
+  duracao_minutos?: number;
   local: string;
   visibilidade: AgendaEvento['visibilidade'];
   church_id: string;
@@ -23,6 +25,7 @@ export interface EventoFormState {
   recorrencia_ordinal: 'primeiro' | 'segundo' | 'terceiro' | 'quarto' | 'ultimo';
   recorrencia_dia_semana_ordinal: number; // 0 a 6
   recorrencia_dia_mes: number; // 1 a 31
+  recorrencia_ano_referencia?: number; // Ano de referência para geração completa
   recorrencia_data_fim: string; // YYYY-MM-DD
 }
 
@@ -165,27 +168,59 @@ export default function EventoFormModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Início *</label>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={form.data_inicio}
-                    onChange={(e) => onFormChange({ data_inicio: e.target.value })}
-                    className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
-                  />
+              {/* Se for evento único ('nenhuma'), exibe Data Início e Fim normais */}
+              {form.recorrencia_tipo === 'nenhuma' ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Início *</label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={form.data_inicio}
+                      onChange={(e) => onFormChange({ data_inicio: e.target.value })}
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Fim</label>
+                    <input
+                      type="datetime-local"
+                      value={form.data_fim}
+                      onChange={(e) => onFormChange({ data_fim: e.target.value })}
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Fim</label>
-                  <input
-                    type="datetime-local"
-                    value={form.data_fim}
-                    onChange={(e) => onFormChange({ data_fim: e.target.value })}
-                    className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
-                  />
+              ) : (
+                /* Para série recorrente: Horário de Início e Duração separados das datas */
+                <div className="grid grid-cols-2 gap-3 bg-slate-50/70 p-2.5 rounded-xl border border-slate-200">
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-600 uppercase mb-1">Horário do Evento *</label>
+                    <input
+                      type="time"
+                      required
+                      value={form.hora_inicio || (form.data_inicio ? form.data_inicio.slice(11, 16) : '19:30')}
+                      onChange={(e) => onFormChange({ hora_inicio: e.target.value })}
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-600 uppercase mb-1">Duração</label>
+                    <select
+                      value={form.duracao_minutos !== undefined ? form.duracao_minutos : 120}
+                      onChange={(e) => onFormChange({ duracao_minutos: parseInt(e.target.value, 10) })}
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white font-medium"
+                    >
+                      <option value="60">1 hora</option>
+                      <option value="90">1h 30min</option>
+                      <option value="120">2 horas</option>
+                      <option value="150">2h 30min</option>
+                      <option value="180">3 horas</option>
+                      <option value="240">4 horas</option>
+                    </select>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Local</label>
@@ -204,7 +239,7 @@ export default function EventoFormModal({
                   <label className="block text-[10px] font-black text-slate-700 uppercase tracking-wider">
                     🔁 Recorrência do Evento
                   </label>
-                  <span className="text-[9px] text-slate-500 font-medium">Geração de datas no calendário</span>
+                  <span className="text-[9px] text-slate-500 font-medium">Geração automática no calendário</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -215,7 +250,7 @@ export default function EventoFormModal({
                       onChange={(e) => onFormChange({ recorrencia_tipo: e.target.value as any })}
                       className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white font-medium"
                     >
-                      <option value="nenhuma">Sem recorrência</option>
+                      <option value="nenhuma">Sem recorrência (Evento Único)</option>
                       <option value="semanal">Semanal</option>
                       <option value="mensal_ordinal">Mensal por posição (ordinal)</option>
                       <option value="mensal_dia">Mensal por dia do mês</option>
@@ -223,16 +258,29 @@ export default function EventoFormModal({
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Repetir Até</label>
-                    <input
-                      type="date"
-                      value={form.recorrencia_data_fim || ''}
-                      disabled={form.recorrencia_tipo === 'nenhuma'}
-                      onChange={(e) => onFormChange({ recorrencia_data_fim: e.target.value })}
-                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white disabled:bg-slate-100 disabled:opacity-60"
-                    />
-                  </div>
+                  {form.recorrencia_tipo !== 'nenhuma' ? (
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Ano de Referência</label>
+                      <input
+                        type="number"
+                        min="2020"
+                        max="2040"
+                        value={form.recorrencia_ano_referencia || new Date().getFullYear()}
+                        onChange={(e) => onFormChange({ recorrencia_ano_referencia: parseInt(e.target.value, 10) || new Date().getFullYear() })}
+                        className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white font-bold text-blue-700"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Repetir Até</label>
+                      <input
+                        type="date"
+                        disabled
+                        value=""
+                        className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-400 bg-slate-50 cursor-not-allowed"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Opções Semanais: Dias da Semana */}
@@ -283,7 +331,7 @@ export default function EventoFormModal({
                       <select
                         value={form.recorrencia_ordinal || 'primeiro'}
                         onChange={(e) => onFormChange({ recorrencia_ordinal: e.target.value as any })}
-                        className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none font-medium"
                       >
                         <option value="primeiro">Primeiro</option>
                         <option value="segundo">Segundo</option>
@@ -297,7 +345,7 @@ export default function EventoFormModal({
                       <select
                         value={form.recorrencia_dia_semana_ordinal !== undefined ? form.recorrencia_dia_semana_ordinal : 6}
                         onChange={(e) => onFormChange({ recorrencia_dia_semana_ordinal: parseInt(e.target.value, 10) })}
-                        className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none font-medium"
                       >
                         <option value="0">Domingo</option>
                         <option value="1">Segunda-feira</option>
@@ -321,7 +369,7 @@ export default function EventoFormModal({
                       max="31"
                       value={form.recorrencia_dia_mes || 1}
                       onChange={(e) => onFormChange({ recorrencia_dia_mes: parseInt(e.target.value, 10) || 1 })}
-                      className="w-28 px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      className="w-28 px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none font-medium"
                     />
                   </div>
                 )}

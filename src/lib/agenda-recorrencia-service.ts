@@ -31,6 +31,8 @@ export interface RecorrenciaConfig {
   diaSemanaOrdinal?: number;
   // Para mensal por dia: dia do mês (1 a 31)
   diaDoMes?: number;
+  // Ano de referência da série (ex: 2026). Quando fornecido, gera todas as ocorrências do ano escolhido (jan a dez).
+  anoReferencia?: number;
   // Limite da recorrência (YYYY-MM-DD)
   dataFimRecorrencia?: string;
   // Ou limite por ano
@@ -118,6 +120,48 @@ export class AgendaRecorrenciaService {
   }
 
   /**
+   * Calcula automaticamente a primeira data real de ocorrência no ano/regra especificada.
+   * Não depende da data atual nem exige preenchimento manual da data de início.
+   */
+  public static calcularPrimeiraOcorrencia(params: {
+    ano: number;
+    config: RecorrenciaConfig;
+    hora: number;
+    minuto: number;
+  }): Date | null {
+    const { ano, config, hora, minuto } = params;
+
+    if (config.frequencia === 'semanal') {
+      const dias = config.diasSemana && config.diasSemana.length > 0 ? config.diasSemana : [0];
+      const cursor = new Date(ano, 0, 1, hora, minuto, 0, 0);
+      while (cursor.getFullYear() === ano) {
+        if (dias.includes(cursor.getDay())) {
+          return new Date(cursor);
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    } else if (config.frequencia === 'mensal_ordinal') {
+      const ordinal = config.ordinal || 'primeiro';
+      const diaSemana = config.diaSemanaOrdinal !== undefined ? config.diaSemanaOrdinal : 6;
+      for (let mes = 0; mes < 12; mes++) {
+        const dt = this.calcularDataOrdinalNoMes(ano, mes, ordinal, diaSemana);
+        if (dt) {
+          dt.setHours(hora, minuto, 0, 0);
+          return dt;
+        }
+      }
+    } else if (config.frequencia === 'mensal_dia') {
+      const dia = config.diaDoMes || 1;
+      const dt = new Date(ano, 0, dia, hora, minuto, 0, 0);
+      return dt;
+    } else if (config.frequencia === 'anual') {
+      return new Date(ano, 0, 1, hora, minuto, 0, 0);
+    }
+
+    return null;
+  }
+
+  /**
    * Gera as datas reais de ocorrências no calendário a partir da configuração de recorrência
    */
   public static gerarOcorrencias(params: GerarOcorrenciasParams): OcorrenciaGerada[] {
@@ -158,7 +202,9 @@ export class AgendaRecorrenciaService {
       ];
     }
 
-    // Determina limite final da geração
+    // Determina o ano base e limite final da geração
+    const anoBase = config.anoReferencia || dataInicialObj.getFullYear();
+
     let dataLimiteFinal: Date;
     if (config.dataFimRecorrencia) {
       const p = config.dataFimRecorrencia.split('-');
@@ -166,8 +212,7 @@ export class AgendaRecorrenciaService {
     } else if (config.anoLimite) {
       dataLimiteFinal = new Date(config.anoLimite, 11, 31, 23, 59, 59);
     } else {
-      // Default: até o final do ano da data de início (ou 1 ano adiante se no fim do ano)
-      const anoBase = dataInicialObj.getFullYear();
+      // Default: até 31 de dezembro do ano de referência
       dataLimiteFinal = new Date(anoBase, 11, 31, 23, 59, 59);
     }
 
@@ -182,13 +227,19 @@ export class AgendaRecorrenciaService {
       return `${y}-${m}-${d}`;
     };
 
+    // Ponto de início: se anoReferencia for definido, inicia desde 01 de janeiro do ano escolhido
+    // Caso contrário, respeita a data inicial fornecida
+    const dataPontoDePartida = config.anoReferencia
+      ? new Date(config.anoReferencia, 0, 1, horaInicial, minutoInicial, segundoInicial)
+      : dataInicialObj;
+
     // 1. RECORRÊNCIA SEMANAL
     if (config.frequencia === 'semanal') {
       const diasSemanaAlvo = config.diasSemana && config.diasSemana.length > 0
         ? config.diasSemana
         : [dataInicialObj.getDay()];
 
-      let cursor = new Date(dataInicialObj.getFullYear(), dataInicialObj.getMonth(), dataInicialObj.getDate());
+      let cursor = new Date(dataPontoDePartida.getFullYear(), dataPontoDePartida.getMonth(), dataPontoDePartida.getDate());
 
       while (cursor.getTime() <= dataLimiteFinal.getTime() && ocorrencias.length < maxItems) {
         if (diasSemanaAlvo.includes(cursor.getDay())) {
@@ -213,15 +264,15 @@ export class AgendaRecorrenciaService {
       const ordinal = config.ordinal || 'primeiro';
       const diaSemana = config.diaSemanaOrdinal !== undefined ? config.diaSemanaOrdinal : dataInicialObj.getDay();
 
-      let anoCursor = dataInicialObj.getFullYear();
-      let mesCursor = dataInicialObj.getMonth();
+      let anoCursor = dataPontoDePartida.getFullYear();
+      let mesCursor = dataPontoDePartida.getMonth();
 
       while (ocorrencias.length < maxItems) {
         const dataOrdinal = this.calcularDataOrdinalNoMes(anoCursor, mesCursor, ordinal, diaSemana);
         if (dataOrdinal) {
           dataOrdinal.setHours(horaInicial, minutoInicial, segundoInicial, 0);
 
-          if (dataOrdinal.getTime() >= dataInicialObj.getTime()) {
+          if (dataOrdinal.getTime() >= dataPontoDePartida.getTime()) {
             if (dataOrdinal.getTime() > dataLimiteFinal.getTime()) {
               break;
             }

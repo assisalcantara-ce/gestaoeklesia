@@ -309,4 +309,105 @@ describe('Motor de Recorrência da Agenda Oficial (AgendaRecorrenciaService)', (
       assert.strictEqual(dtFim.getTime() - dtInicio.getTime(), 2 * 60 * 60 * 1000);
     });
   });
+
+  it('12. Geração Automática Anual: Segundo sábado de cada mês para o ano inteiro (12 ocorrências)', () => {
+    // Cadastro sem data manual de início/fim: apenas ano de referência 2026, horário e regra
+    const config: RecorrenciaConfig = {
+      frequencia: 'mensal_ordinal',
+      ordinal: 'segundo',
+      diaSemanaOrdinal: 6, // Sábado
+      anoReferencia: 2026,
+    };
+
+    // 1. Calcula primeira ocorrência automaticamente (deve ser janeiro/2026)
+    const primeiraData = AgendaRecorrenciaService.calcularPrimeiraOcorrencia({
+      ano: 2026,
+      config,
+      hora: 19,
+      minuto: 30,
+    });
+    assert.ok(primeiraData);
+    assert.strictEqual(primeiraData.getFullYear(), 2026);
+    assert.strictEqual(primeiraData.getMonth(), 0); // Janeiro
+    assert.strictEqual(primeiraData.getDate(), 10); // 10/01/2026 é o 2º sábado de janeiro
+    assert.strictEqual(primeiraData.getDay(), 6); // Sábado
+
+    // 2. Gera todas as ocorrências de janeiro a dezembro
+    const duracaoMs = 120 * 60 * 1000;
+    const res = AgendaRecorrenciaService.gerarOcorrencias({
+      dataInicio: primeiraData.toISOString(),
+      dataFim: new Date(primeiraData.getTime() + duracaoMs).toISOString(),
+      config,
+    });
+
+    // Devem existir exatamente 12 ocorrências (uma por mês)
+    assert.strictEqual(res.length, 12);
+
+    // Conferência exata de cada segundo sábado de 2026:
+    const datasEsperadas = [
+      '2026-01-10', // Jan
+      '2026-02-14', // Fev
+      '2026-03-14', // Mar
+      '2026-04-11', // Abr
+      '2026-05-09', // Mai
+      '2026-06-13', // Jun
+      '2026-07-11', // Jul
+      '2026-08-08', // Ago
+      '2026-09-12', // Set
+      '2026-10-10', // Out
+      '2026-11-14', // Nov
+      '2026-12-12', // Dez
+    ];
+
+    res.forEach((oc, idx) => {
+      assert.strictEqual(oc.dataBaseStr, datasEsperadas[idx]);
+      const dt = new Date(oc.dataInicio);
+      assert.strictEqual(dt.getDay(), 6); // Todo segundo sábado
+      assert.strictEqual(dt.getMonth(), idx); // Um para cada mês
+      assert.strictEqual(oc.numeroOcorrencia, idx + 1);
+    });
+  });
+
+  it('13. Geração Automática Anual: Todas as quartas-feiras de um ano completo (2026)', () => {
+    // Configuração para ano 2026, toda quarta-feira às 19:30
+    const config: RecorrenciaConfig = {
+      frequencia: 'semanal',
+      diasSemana: [3], // Quarta-feira
+      anoReferencia: 2026,
+    };
+
+    // 1. Calcula primeira quarta-feira do ano automaticamente (07/01/2026)
+    const primeiraData = AgendaRecorrenciaService.calcularPrimeiraOcorrencia({
+      ano: 2026,
+      config,
+      hora: 19,
+      minuto: 30,
+    });
+    assert.ok(primeiraData);
+    assert.strictEqual(primeiraData.getFullYear(), 2026);
+    assert.strictEqual(primeiraData.getMonth(), 0); // Janeiro
+    assert.strictEqual(primeiraData.getDate(), 7); // 07/01/2026 é a 1ª quarta-feira do ano
+    assert.strictEqual(primeiraData.getDay(), 3); // Quarta-feira
+
+    // 2. Gera todas as ocorrências de janeiro a dezembro
+    const duracaoMs = 90 * 60 * 1000;
+    const res = AgendaRecorrenciaService.gerarOcorrencias({
+      dataInicio: primeiraData.toISOString(),
+      dataFim: new Date(primeiraData.getTime() + duracaoMs).toISOString(),
+      config,
+      limiteMaximo: 100,
+    });
+
+    // O ano de 2026 possui exatamente 52 quartas-feiras (começa em 07/01 e termina em 30/12)
+    assert.strictEqual(res.length, 52);
+    assert.strictEqual(res[0].dataBaseStr, '2026-01-07');
+    assert.strictEqual(res[res.length - 1].dataBaseStr, '2026-12-30');
+
+    // Todas devem ser quarta-feira (getDay() === 3)
+    res.forEach(oc => {
+      const dt = new Date(oc.dataInicio);
+      assert.strictEqual(dt.getDay(), 3);
+      assert.strictEqual(dt.getFullYear(), 2026);
+    });
+  });
 });
