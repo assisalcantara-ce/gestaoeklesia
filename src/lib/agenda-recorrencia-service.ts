@@ -17,6 +17,59 @@
  *   - Preservação de fuso e horário local
  */
 
+export const TIPOS_VALIDOS_AGENDA_EVENTOS = ['culto', 'reuniao', 'aula', 'evento', 'tarefa', 'outro'] as const;
+export type TipoAgendaEventoValido = typeof TIPOS_VALIDOS_AGENDA_EVENTOS[number];
+
+/**
+ * Normaliza qualquer valor bruto de tipo/categoria (inclusive os de agenda_tipos como 'departamento', 'missoes', 'administrativo', 'ebd')
+ * para um dos valores estritamente aceitos pela constraint "agenda_eventos_tipo" do banco de dados:
+ * ('culto', 'reuniao', 'aula', 'evento', 'tarefa', 'outro').
+ */
+export function normalizarTipoAgendaEvento(
+  rawTipo?: string | null,
+  rawCategoria?: string | null,
+  nomeOuCodigo?: string | null
+): TipoAgendaEventoValido {
+  const t = (rawTipo || '').toLowerCase().trim();
+  const c = (rawCategoria || '').toLowerCase().trim();
+  const n = (nomeOuCodigo || '').toLowerCase().trim();
+
+  // Se já for um tipo canônico válido
+  if (TIPOS_VALIDOS_AGENDA_EVENTOS.includes(t as TipoAgendaEventoValido)) {
+    return t as TipoAgendaEventoValido;
+  }
+  if (TIPOS_VALIDOS_AGENDA_EVENTOS.includes(c as TipoAgendaEventoValido)) {
+    return c as TipoAgendaEventoValido;
+  }
+
+  // Mapeamentos específicos por categoria ou semântica
+  if (c === 'departamento' || t === 'departamento') {
+    // EBD, Escola Bíblica, discipulado ou ensino -> 'aula'
+    if (n.includes('ebd') || n.includes('escola') || n.includes('ensino') || n.includes('biblic')) {
+      return 'aula';
+    }
+    // Reuniões departamentais ou ensaios -> 'reuniao'
+    return 'reuniao';
+  }
+
+  if (c === 'missoes' || t === 'missoes') {
+    return 'evento';
+  }
+
+  if (c === 'administrativo' || t === 'administrativo') {
+    if (n.includes('atendimento') || n.includes('visita')) {
+      return 'tarefa';
+    }
+    return 'reuniao';
+  }
+
+  if (t === 'ebd' || c === 'ebd' || n.includes('ebd')) {
+    return 'aula';
+  }
+
+  return 'outro';
+}
+
 export type RecorrenciaFrequencia = 'nenhuma' | 'semanal' | 'mensal_ordinal' | 'mensal_dia' | 'anual';
 
 export type OrdinalSemana = 'primeiro' | 'segundo' | 'terceiro' | 'quarto' | 'ultimo';

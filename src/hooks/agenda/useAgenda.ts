@@ -12,7 +12,7 @@ import { OrganizationalService, getOrgHelpers, OrgStructure } from '@/lib/organi
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { PlanningConflictService } from '@/lib/planning-conflict-service';
-import { AgendaRecorrenciaService, RecorrenciaConfig } from '@/lib/agenda-recorrencia-service';
+import { AgendaRecorrenciaService, RecorrenciaConfig, normalizarTipoAgendaEvento } from '@/lib/agenda-recorrencia-service';
 import { Calendar as CalendarIcon, LayoutDashboard, BookOpen, Gavel } from 'lucide-react';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
@@ -827,7 +827,11 @@ export function useAgenda() {
       }
 
       const selectedTipo = tipos.find(t => t.id === form.tipo_id);
-      const tipoCalculado = selectedTipo?.categoria || (editEvento?.tipo || 'outro');
+      const tipoCalculado = normalizarTipoAgendaEvento(
+        selectedTipo?.categoria,
+        editEvento?.tipo,
+        selectedTipo?.nome || form.titulo
+      );
 
       const payload = {
         ministry_id: ministryId,

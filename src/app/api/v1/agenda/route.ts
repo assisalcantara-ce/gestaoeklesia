@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
 import { isFeatureAllowedForTenant } from '@/lib/plan-permissions';
 import { PlanningConflictService } from '@/lib/planning-conflict-service';
+import { normalizarTipoAgendaEvento } from '@/lib/agenda-recorrencia-service';
 import { temAcessoEscrita } from '@/lib/access-control';
 
 export const dynamic = 'force-dynamic';
@@ -196,12 +197,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const tipoSanitizado = normalizarTipoAgendaEvento(tipo, undefined, titulo);
+
     const payload = {
       ministry_id: ctx.ministryId,
       planejamento_id: planejamento_id || null,
       titulo: String(titulo).trim(),
       descricao: descricao ? String(descricao).trim() : null,
-      tipo: tipo || 'outro',
+      tipo: tipoSanitizado,
       origem: 'manual',
       tipo_id: tipo_id || null,
       data_inicio,
@@ -239,7 +242,7 @@ export async function POST(request: NextRequest) {
         planejamento_id: planejamento_id || null,
         titulo: String(titulo).trim(),
         descricao: descricao ? String(descricao).trim() : null,
-        tipo: tipo || 'outro',
+        tipo: tipoSanitizado,
         origem: 'manual',
         tipo_id: tipo_id || null,
         data_inicio: f.dataInicio || f.data_inicio,
@@ -385,6 +388,9 @@ export async function PUT(request: NextRequest) {
       calendario_oficial: targetCalendarioOficial,
       updated_at: new Date().toISOString(),
     };
+    if (updates.tipo !== undefined) {
+      payloadAtualizacao.tipo = normalizarTipoAgendaEvento(updates.tipo, undefined, updates.titulo || existing.titulo);
+    }
     delete payloadAtualizacao.id;
     delete payloadAtualizacao.ministry_id;
     delete payloadAtualizacao.created_at;
