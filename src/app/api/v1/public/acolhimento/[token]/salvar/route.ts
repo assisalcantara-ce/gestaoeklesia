@@ -152,24 +152,30 @@ export async function POST(
     }
     const cleanNome = rawNome.trim().slice(0, 255);
 
-    // Validação do Telefone (se informado)
-    let normalizedTelefone: string | null = null;
-    let searchVariants: string[] = [];
-
-    if (body.telefone && typeof body.telefone === 'string' && body.telefone.trim()) {
-      const phoneNorm = normalizeBrazilianPhone(body.telefone);
-      if (!phoneNorm.valid) {
-        return NextResponse.json(
-          {
-            error: phoneNorm.error || 'Telefone/WhatsApp inválido. Forneça o número com DDD válido.',
-            code: phoneNorm.ambiguous ? 'TELEFONE_AMBIGUO' : 'TELEFONE_INVALIDO',
-          },
-          { status: 400 }
-        );
-      }
-      normalizedTelefone = phoneNorm.formatted;
-      searchVariants = getPhoneSearchVariants(phoneNorm.digits);
+    // Validação do Telefone (OBRIGATÓRIO)
+    const rawTelefone = body.telefone;
+    if (!rawTelefone || typeof rawTelefone !== 'string' || !rawTelefone.trim()) {
+      return NextResponse.json(
+        {
+          error: 'O número de telefone/WhatsApp com DDD é obrigatório para registrar seu acolhimento.',
+          code: 'TELEFONE_OBRIGATORIO',
+        },
+        { status: 400 }
+      );
     }
+
+    const phoneNorm = normalizeBrazilianPhone(rawTelefone);
+    if (!phoneNorm.valid) {
+      return NextResponse.json(
+        {
+          error: phoneNorm.error || 'Telefone/WhatsApp inválido. Forneça o número com DDD válido.',
+          code: phoneNorm.ambiguous ? 'TELEFONE_AMBIGUO' : 'TELEFONE_INVALIDO',
+        },
+        { status: 400 }
+      );
+    }
+    const normalizedTelefone = phoneNorm.formatted;
+    const searchVariants = getPhoneSearchVariants(phoneNorm.digits);
 
     // Bairro
     const cleanBairro =
@@ -186,52 +192,83 @@ export async function POST(
         ? body.pedido_oracao.trim().slice(0, 2000)
         : null;
 
-    // 4. Prevenção de duplicidade no mesmo culto
+    const observacoesTexto = cleanOracao
+      ? `[Acolhimento Inteligente] Pedido de oração: ${cleanOracao}`
+      : '[Acolhimento Inteligente]';
+
+    // 4. Prevenção e Idempotência no mesmo culto
+    // Se o visitante já registrou sua presença neste culto, atualizamos suavemente o pedido de oração se houver,
+    // e retornamos sucesso idempotente sem apresentar erro fatal 409 ao visitante.
     if (normalizedTelefone && searchVariants.length > 0) {
       const { data: dupPhone } = await admin
         .from('culto_visitantes')
-        .select('id, nome')
+        .select('id, nome, bairro, observacoes')
         .eq('culto_id', tokenRecord.culto_id)
         .in('telefone', searchVariants)
         .maybeSingle();
 
       if (dupPhone) {
-        return NextResponse.json(
-          {
-            error: `Já encontramos um visitante registrado com este número de telefone neste culto (${dupPhone.nome}).`,
-            code: 'VISITANTE_DUPLICADO',
-            ja_registrado: true,
-          },
-          { status: 409 }
-        );
-      }
-    } else {
-      const { data: dupNome } = await admin
-        .from('culto_visitantes')
-        .select('id, nome')
-        .eq('culto_id', tokenRecord.culto_id)
-        .ilike('nome', cleanNome)
-        .maybeSingle();
+        const mesmoNome = dupPhone.nome.trim().toLowerCase() === cleanNome.toLowerCase();
 
-      if (dupNome) {
-        return NextResponse.json(
-          {
-            error: `Já existe um visitante cadastrado com o nome "${dupNome.nome}" neste culto.`,
-            code: 'VISITANTE_DUPLICADO',
-            ja_registrado: true,
-          },
-          { status: 409 }
-        );
+        if (mesmoNome) {
+          if (cleanOracao) {
+            await admin
+              .from('culto_visitantes')
+              .update({
+                observacoes: observacoesTexto,
+                bairro: cleanBairro || dupPhone.bairro,
+              })
+              .eq('id', dupPhone.id);
+          }
+
+          return NextResponse.json(
+            {
+              success: true,
+              mensagem: 'Sua presença já estava registrada com carinho neste culto!',
+              ja_registrado: true,
+              visitante_id: dupPhone.id,
+            },
+            { status: 200 }
+          );
+        }
+        // Se o nome for diferente, é outro membro da família compartilhando o mesmo telefone.
+        // Segue para criação normal do novo registro da pessoa.
       }
+    }
+
+    const { data: dupNome } = await admin
+      .from('culto_visitantes')
+      .select('id, nome, bairro, observacoes')
+      .eq('culto_id', tokenRecord.culto_id)
+      .ilike('nome', cleanNome)
+      .maybeSingle();
+
+    if (dupNome) {
+      if (cleanOracao) {
+        await admin
+          .from('culto_visitantes')
+          .update({
+            observacoes: observacoesTexto,
+            telefone: normalizedTelefone,
+            bairro: cleanBairro || dupNome.bairro,
+          })
+          .eq('id', dupNome.id);
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          mensagem: 'Sua presença já estava registrada com carinho neste culto!',
+          ja_registrado: true,
+          visitante_id: dupNome.id,
+        },
+        { status: 200 }
+      );
     }
 
     // 5. Persistência segura em culto_visitantes
     // ATENÇÃO: ministry_id, congregacao_id e culto_id são obtidos EXCLUSIVAMENTE
     // do tokenRecord validado pelo servidor, impedindo manipulação de tenant pelo cliente.
-    const observacoesTexto = cleanOracao
-      ? `[Acolhimento Inteligente] Pedido de oração: ${cleanOracao}`
-      : '[Acolhimento Inteligente]';
-
     const insertPayload = {
       culto_id: tokenRecord.culto_id,
       ministry_id: tokenRecord.ministry_id,

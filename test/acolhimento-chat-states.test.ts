@@ -53,10 +53,18 @@ describe('Agente Inteligente de Acolhimento - Máquina de Estados Pura', () => {
       assert.equal(valido.value, 'Gabriel Ferreira');
     });
 
-    it('4. validatePhone: aceita números válidos (10 ou 11 dígitos), DDI 55 ou comandos de pular', () => {
+    it('4. validatePhone: aceita números válidos (10 ou 11 dígitos), DDI 55 e rejeita comandos de pular ou vazio', () => {
       const pulado = validatePhone('pular');
-      assert.equal(pulado.valid, true);
-      assert.equal(pulado.value, null);
+      assert.equal(pulado.valid, false);
+      assert.match(pulado.error || '', /obrigatório/i);
+
+      const naoQuero = validatePhone('não quero informar');
+      assert.equal(naoQuero.valid, false);
+      assert.match(naoQuero.error || '', /obrigatório/i);
+
+      const vazio = validatePhone('');
+      assert.equal(vazio.valid, false);
+      assert.match(vazio.error || '', /obrigatório/i);
 
       const celular11 = validatePhone('11987654321');
       assert.equal(celular11.valid, true);
@@ -205,15 +213,27 @@ describe('Agente Inteligente de Acolhimento - Máquina de Estados Pura', () => {
       assert.match(state.messages[state.messages.length - 1].text, /Glória a Deus! Tudo confirmado com sucesso/);
     });
 
-    it('10. Fluxo com pulo de todos os campos opcionais (telefone, bairro, oração)', () => {
+    it('10. Fluxo com pulo de campos opcionais (bairro e oração) com telefone obrigatório', () => {
       let state = createInitialChatState();
       assert.equal(state.currentStep, 'TELEFONE');
 
-      // Passo 1: Pular telefone -> vai direto para NOME
+      // Tentativa de pular telefone deve ser rejeitada, mantendo no step TELEFONE
       let stepResult = processChatAction(state, { type: 'QUICK_REPLY', value: 'pular' });
+      assert.equal(stepResult.nextState.currentStep, 'TELEFONE');
+      assert.match(stepResult.error || '', /obrigatório/i);
+
+      // Passo 1: Informa telefone válido
+      stepResult = processChatAction(state, { type: 'INPUT', value: '11999998888' });
+      state = stepResult.nextState;
+      assert.equal(state.data.telefone, '(11) 99999-8888');
+
+      // Backend retorna novo visitante
+      stepResult = processChatAction(state, {
+        type: 'IDENTIFIED_VISITANTE',
+        payload: { encontrado: false, recorrente: false },
+      });
       state = stepResult.nextState;
       assert.equal(state.currentStep, 'NOME');
-      assert.equal(state.data.telefone, null);
 
       // Passo 2: Nome
       stepResult = processChatAction(state, { type: 'INPUT', value: 'Marcos Paulo' });

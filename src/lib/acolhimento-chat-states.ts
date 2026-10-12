@@ -129,19 +129,25 @@ export function isSkipCommand(value: string): boolean {
 }
 
 /**
- * Validação de Telefone / WhatsApp usando normalização brasileira.
+ * Validação de Telefone / WhatsApp usando normalização brasileira (Obrigatório).
  */
-export function validatePhone(raw: string): { valid: boolean; error?: string; value?: string | null; ambiguous?: boolean } {
-  const clean = raw.trim();
-  if (!clean || isSkipCommand(clean)) {
-    return { valid: true, value: null };
+export function validatePhone(raw: string): { valid: boolean; error?: string; value?: string; ambiguous?: boolean } {
+  const clean = (raw || '').trim();
+  if (!clean || isSkipCommand(clean) || /não\s*quero/i.test(clean)) {
+    return {
+      valid: false,
+      error: 'O número de celular ou WhatsApp com DDD é obrigatório para que nossa equipe pastoral possa acolher você com carinho!',
+    };
   }
 
   const norm = normalizeBrazilianPhone(clean);
   if (!norm.valid) {
+    const errorMsg = norm.error && !/nenhum dígito/i.test(norm.error)
+      ? norm.error
+      : 'O número de celular ou WhatsApp com DDD é obrigatório para continuarmos seu acolhimento (ex: 11 98765-4321).';
     return {
       valid: false,
-      error: norm.error || 'Por favor, informe um WhatsApp válido com DDD (ex: 11 98765-4321) ou clique em "Pular".',
+      error: errorMsg,
       ambiguous: norm.ambiguous,
     };
   }
@@ -268,7 +274,7 @@ export function getWelcomeMessage(context: ChatCultoContext = {}): string {
   }
 
   const saudacao = partes.join(' ') + '! 🙏✨';
-  return `${saudacao}\n\nPara iniciarmos seu acolhimento de forma rápida, qual é o seu número de WhatsApp com DDD?\n(Se preferir não informar agora, basta clicar no botão abaixo).`;
+  return `${saudacao}\n\nPara iniciarmos seu acolhimento de forma rápida, qual é o seu número de WhatsApp com DDD?`;
 }
 
 /**
@@ -324,7 +330,6 @@ export function createInitialChatState(context: ChatCultoContext = {}): ChatStat
     sender: 'bot',
     text: welcomeText,
     stepId: 'TELEFONE',
-    quickReplies: [{ id: 'skip_tel', label: 'Pular este passo ⏭️', value: 'pular' }],
     timestamp: Date.now(),
   };
 
@@ -485,7 +490,7 @@ export function processChatAction(
   switch (state.currentStep) {
     case 'TELEFONE': {
       const result = validatePhone(rawInput);
-      if (!result.valid) {
+      if (!result.valid || !result.value) {
         return {
           nextState: { ...state, error: result.error },
           error: result.error,
@@ -494,35 +499,12 @@ export function processChatAction(
 
       const updatedData: AcolhimentoData = {
         ...state.data,
-        telefone: result.value ?? null,
+        telefone: result.value,
       };
 
-      const displayText = result.value ? result.value : 'Passo pulado';
-      userMsg.text = displayText;
+      userMsg.text = result.value;
 
-      // Se o usuário pulou o telefone, não há como fazer busca no banco -> vai direto para o Nome
-      if (!result.value) {
-        const botMsg: ChatMessage = {
-          id: createMessageId(),
-          sender: 'bot',
-          text: `Sem problemas! Para que possamos lhe conhecer melhor, qual é o seu nome completo?`,
-          stepId: 'NOME',
-          timestamp: Date.now(),
-        };
-
-        return {
-          nextState: {
-            ...state,
-            currentStep: 'NOME',
-            data: updatedData,
-            messages: [...state.messages, userMsg, botMsg],
-            error: null,
-          },
-        };
-      }
-
-      // Se o usuário informou o telefone, a UI chamará a API /identificar
-      // A máquina de estados registra o número e aguarda a resposta da API ou avança provisoriamente
+      // Se o usuário informou o telefone válido, a UI chamará a API /identificar
       return {
         nextState: {
           ...state,

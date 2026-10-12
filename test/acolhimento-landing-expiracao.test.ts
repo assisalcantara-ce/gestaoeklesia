@@ -238,4 +238,43 @@ describe('Agente Inteligente de Acolhimento - Landing, Recorrente e Expiração'
       assert.equal(isPublicAcolhimentoPath('/secretaria/cultos'), false);
     });
   });
+
+  describe('6. Idempotência, Telefone Obrigatório e Conclusão sem Erro Fatal', () => {
+    it('transiciona para FINALIZADO após SUBMIT_SUCCESS com mensagem acolhedora', () => {
+      const s0 = createInitialChatState({
+        tipoCulto: 'Culto de Adoração',
+        congregacaoNome: 'Sede Regional',
+        appUrl: 'https://app.gestaoeklesia.com.br',
+      });
+
+      // Simula estado de confirmação
+      const sConfirmacao = {
+        ...s0,
+        currentStep: 'CONFIRMACAO' as const,
+        data: {
+          ...s0.data,
+          nome: 'Juliana Costa',
+          telefone: '(11) 97777-6666',
+        },
+      };
+
+      // Dispara sucesso de submissão (idempotente ou novo)
+      const res = processChatAction(sConfirmacao, { type: 'SUBMIT_SUCCESS' });
+      assert.equal(res.nextState.currentStep, 'FINALIZADO');
+      assert.match(res.nextState.messages[res.nextState.messages.length - 1].text, /Tudo confirmado com sucesso/);
+    });
+
+    it('impede inputs arbitrários no estado FINALIZADO', () => {
+      const sFinalizado = {
+        ...createInitialChatState(),
+        currentStep: 'FINALIZADO' as const,
+      };
+
+      const res = processChatAction(sFinalizado, { type: 'INPUT', value: 'Olá novamente' });
+      assert.equal(res.nextState.currentStep, 'FINALIZADO');
+      // Não adiciona novas mensagens de usuário após finalizado
+      assert.equal(res.nextState.messages.length, sFinalizado.messages.length);
+    });
+  });
 });
+

@@ -61,7 +61,7 @@ describe('Agente Inteligente de Acolhimento - Evolução 1 & 2', () => {
   });
 
   describe('2. Fluxo Conversacional Iniciando por Telefone', () => {
-    it('inicia no estado TELEFONE com mensagem de boas-vindas adequada', () => {
+    it('inicia no estado TELEFONE com mensagem de boas-vindas adequada e sem opção de pular', () => {
       const state = createInitialChatState({
         tipoCulto: 'Culto de Celebração',
         congregacaoNome: 'Templo Central',
@@ -70,7 +70,7 @@ describe('Agente Inteligente de Acolhimento - Evolução 1 & 2', () => {
       assert.equal(state.currentStep, 'TELEFONE');
       assert.match(state.messages[0].text, /WhatsApp com DDD/i);
       assert.match(state.messages[0].text, /Templo Central/i);
-      assert.equal(state.messages[0].quickReplies?.[0].value, 'pular');
+      assert.equal(state.messages[0].quickReplies, undefined);
     });
 
     it('fluxo para visitante NOVO: telefone -> nome -> bairro -> primeira visita -> oração -> confirmação', () => {
@@ -174,12 +174,13 @@ describe('Agente Inteligente de Acolhimento - Evolução 1 & 2', () => {
       assert.match(state.messages[state.messages.length - 1].text, /mais de uma pessoa/i);
     });
 
-    it('fluxo com TELEFONE PULADO avança com segurança diretamente para Nome', () => {
+    it('tentativa de pular telefone é rejeitada, mantendo no passo TELEFONE e exigindo número com DDD', () => {
       let state = createInitialChatState();
 
-      state = processChatAction(state, { type: 'QUICK_REPLY', value: 'pular' }).nextState;
-      assert.equal(state.currentStep, 'NOME');
-      assert.equal(state.data.telefone, null);
+      const result = processChatAction(state, { type: 'QUICK_REPLY', value: 'pular' });
+      assert.equal(result.nextState.currentStep, 'TELEFONE');
+      assert.equal(result.nextState.data.telefone, null);
+      assert.match(result.error || '', /obrigatório/i);
     });
   });
 
