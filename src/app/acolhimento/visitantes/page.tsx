@@ -1,13 +1,10 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import PageLayout from '@/components/PageLayout';
+import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
-import DashboardContainer from '@/components/dashboard/DashboardContainer';
-import DashboardHeader from '@/components/dashboard/DashboardHeader';
-import DashboardContent from '@/components/dashboard/DashboardContent';
-import DashboardSection from '@/components/dashboard/DashboardSection';
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
-import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { OrgNomenclaturasState, getDefaultOrgNomenclaturas } from '@/lib/org-nomenclaturas';
@@ -22,7 +19,13 @@ import {
   History,
   Clock,
   Sparkles,
-  MessageSquare
+  MessageSquare,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Flame,
+  AlertCircle
 } from 'lucide-react';
 
 interface VisitanteOriginal {
@@ -83,17 +86,24 @@ interface CongregacaoOption {
   nome: string;
 }
 
+const formatDate = (value?: string | null) => {
+  if (!value) return '';
+  const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : value;
+};
+
 export default function VisitantesPage() {
-  const { ctx } = useRequireModulo('secretaria');
+  const { ctx, bloqueado } = useRequireModulo('secretaria_local');
   const supabase = useMemo(() => createClient(), []);
 
-  // Nomenclaturas
+  // Nomenclaturas e Congregações
   const [nomenclaturas, setNomenclaturas] = useState<OrgNomenclaturasState>(getDefaultOrgNomenclaturas());
   const [congregacoes, setCongregacoes] = useState<CongregacaoOption[]>([]);
 
   // Visitantes e carregamento
   const [visitantesOriginais, setVisitantesOriginais] = useState<VisitanteOriginal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [queryError, setQueryError] = useState<string | null>(null);
 
   // Visitante selecionado para visualização de histórico
   const [selectedVisitante, setSelectedVisitante] = useState<VisitanteConsolidado | null>(null);
@@ -107,7 +117,11 @@ export default function VisitantesPage() {
   const [filterMinistro, setFilterMinistro] = useState('TODOS');
   const [filterCargo, setFilterCargo] = useState('TODOS');
 
-  // Controle de notificações
+  // Paginação: 10 registros por página (mesmo padrão de Cultos)
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const ITENS_POR_PAGINA = 10;
+
+  // Notificações
   const [modalNotify, setModalNotify] = useState({
     isOpen: false,
     title: '',
@@ -140,7 +154,7 @@ export default function VisitantesPage() {
         const div1Options = orgService.getOptionsFormatadas(1);
         setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
       } catch (err) {
-        console.error(err);
+        console.error('Erro ao carregar estrutura organizacional:', err);
       }
     };
     if (!ctx?.loading && ctx?.ministryId) {
@@ -152,6 +166,7 @@ export default function VisitantesPage() {
   const loadVisitantes = async () => {
     if (!ctx?.ministryId) return;
     setLoading(true);
+    setQueryError(null);
     try {
       let query = supabase
         .from('culto_visitantes')
@@ -169,7 +184,7 @@ export default function VisitantesPage() {
         `)
         .eq('ministry_id', ctx.ministryId);
 
-      // Regra de escopo: Usuário local só visualiza da congregação dele
+      // Usuário local só visualiza da própria congregação
       if (isLocalUser && ctx.congregacaoId) {
         query = query.eq('congregacao_id', ctx.congregacaoId);
       }
@@ -183,7 +198,9 @@ export default function VisitantesPage() {
       }
     } catch (err: any) {
       console.error(err);
-      showNotification('error', 'Erro', 'Não foi possível carregar a lista de visitantes: ' + (err.message || 'Tente novamente.'));
+      const errMsg = err?.message || 'Erro ao carregar lista de visitantes.';
+      setQueryError(errMsg);
+      showNotification('error', 'Erro', 'Não foi possível carregar a lista de visitantes: ' + errMsg);
     } finally {
       setLoading(false);
     }
@@ -200,7 +217,6 @@ export default function VisitantesPage() {
     const grupos: Record<string, VisitanteOriginal[]> = {};
 
     visitantesOriginais.forEach(v => {
-      // Regra de agrupamento: por telefone (limpo) ou por nome (normalizado)
       const telLimpo = v.telefone ? v.telefone.replace(/\D/g, '') : '';
       const key = telLimpo || v.nome.trim().toLowerCase();
 
@@ -211,7 +227,6 @@ export default function VisitantesPage() {
     });
 
     return Object.entries(grupos).map(([key, list]): VisitanteConsolidado => {
-      // Ordenar a lista da visita mais antiga para a mais recente
       const sortedList = [...list].sort((a, b) => {
         const dateA = a.culto_registros?.data_culto || a.created_at;
         const dateB = b.culto_registros?.data_culto || b.created_at;
@@ -229,13 +244,13 @@ export default function VisitantesPage() {
         igreja_origem: v.igreja_origem,
         cargo_ministerial: v.cargo_ministerial,
         observacoes: v.observacoes
-      })).reverse(); // Mais recentes primeiro na timeline do modal
+      })).reverse();
 
       const total_visitas = sortedList.length;
 
       return {
         key,
-        nome: ultimo.nome, // exibe nome do cadastro mais recente
+        nome: ultimo.nome,
         telefone: ultimo.telefone,
         congregacao_origem: primeiro.congregacoes?.nome || 'Geral',
         data_primeira_visita: primeiro.culto_registros?.data_culto || primeiro.created_at,
@@ -255,7 +270,7 @@ export default function VisitantesPage() {
   // Filtragem local sobre os consolidados
   const filteredVisitantes = useMemo(() => {
     return visitantesConsolidados.filter(v => {
-      // 1. Congregação (Se não for usuário local e houver filtro selecionado)
+      // 1. Congregação
       if (!isLocalUser && selectedCongregacao !== 'TODAS') {
         const pertence = v.historico.some(h => {
           const original = visitantesOriginais.find(orig => orig.id === h.id);
@@ -289,7 +304,7 @@ export default function VisitantesPage() {
         return false;
       }
 
-      // 6. Período (com base na data de primeira ou última visita)
+      // 6. Período
       if (dateStart) {
         const start = new Date(dateStart);
         const dataUlt = new Date(v.data_ultima_visita.substring(0, 10));
@@ -305,10 +320,26 @@ export default function VisitantesPage() {
     });
   }, [visitantesConsolidados, visitantesOriginais, searchQuery, selectedCongregacao, dateStart, dateEnd, filterPrimeiraVisita, filterMinistro, filterCargo, isLocalUser]);
 
-  // Métricas
+  // Resetar página ao mudar filtros
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [searchQuery, selectedCongregacao, dateStart, dateEnd, filterPrimeiraVisita, filterMinistro, filterCargo]);
+
+  // Paginação calculada
+  const totalPaginas = Math.max(1, Math.ceil(filteredVisitantes.length / ITENS_POR_PAGINA));
+  const paginaValida = Math.min(Math.max(1, paginaAtual), totalPaginas);
+
+  const visitantesPaginados = useMemo(() => {
+    const inicio = (paginaValida - 1) * ITENS_POR_PAGINA;
+    return filteredVisitantes.slice(inicio, inicio + ITENS_POR_PAGINA);
+  }, [filteredVisitantes, paginaValida]);
+
+  // KPIs
   const totalGeral = filteredVisitantes.length;
   const primeiraVisitaCount = filteredVisitantes.filter(v => v.status === 'Primeira Visita').length;
   const retornandoCount = filteredVisitantes.filter(v => v.status === 'Retornando').length;
+  const ministrosCount = filteredVisitantes.filter(v => v.is_ministro).length;
+  const comTelefoneCount = filteredVisitantes.filter(v => !!v.telefone).length;
 
   const cargoOptions = useMemo(() => {
     const cargos = new Set<string>();
@@ -337,68 +368,81 @@ export default function VisitantesPage() {
 
   const labelDivPrincipal = nomenclaturas.divisaoPrincipal.opcao1 || 'CONGREGAÇÃO';
 
-  return (
-    <DashboardContainer>
-      <DashboardHeader
-        title="Visitantes"
-        description="Consolidação e listagem do histórico de visitantes registrados nos cultos realizados"
-        contextSubtitle="Acolhimento Ministerial"
-      />
+  if (bloqueado) {
+    return (
+      <PageLayout title="Acesso Negado" description="Módulo Visitantes">
+        <div className="p-8 text-center">
+          <p className="text-red-500 font-bold">Você não tem permissão para acessar este módulo.</p>
+        </div>
+      </PageLayout>
+    );
+  }
 
-      <DashboardContent>
-        {/* Indicadores */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <ExecutiveMetricCard
-            title="Total Consolidados"
-            value={totalGeral}
-            icon={Users}
-          />
-          <ExecutiveMetricCard
-            title="Primeira Visita"
-            value={primeiraVisitaCount}
-            icon={UserCheck}
-            color="emerald"
-          />
-          <ExecutiveMetricCard
-            title="Retornando"
-            value={retornandoCount}
-            icon={RefreshCw}
-            color="blue"
-          />
+  if (ctx?.loading) {
+    return (
+      <PageLayout title="Visitantes" description="Carregando dados...">
+        <div className="min-h-[50vh] flex items-center justify-center">
+          <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+        </div>
+      </PageLayout>
+    );
+  }
+
+  return (
+    <PageLayout title="Visitantes" description="Consolidação e histórico de acolhimento dos visitantes dos cultos">
+      <div className="p-6 max-w-7xl mx-auto">
+        {/* Cabeçalho da Operação */}
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-4xl">👥</span>
+              <h1 className="text-3xl font-bold text-slate-800">Operação de Visitantes</h1>
+            </div>
+            <p className="text-slate-600">Registro histórico e acompanhamento pastoral dos visitantes da igreja</p>
+          </div>
         </div>
 
-        {/* Filtros e Busca */}
-        <DashboardSection title="Filtros de Busca">
-          <div className="bg-white rounded-2xl p-5 border border-slate-100/80 shadow-sm space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              
-              {/* Nome / Telefone */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                  Nome ou Telefone
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Buscar por nome ou celular..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:bg-white transition"
-                  />
-                </div>
-              </div>
+        {/* KPIs (Grid de 5 cards seguindo exatamente o padrão de Operação de Cultos) */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+          <ExecutiveMetricCard title="Total Registrados" value={totalGeral} color="blue" icon={Users} />
+          <ExecutiveMetricCard title="Primeira Visita" value={primeiraVisitaCount} color="emerald" icon={UserCheck} />
+          <ExecutiveMetricCard title="Retornando" value={retornandoCount} color="indigo" icon={RefreshCw} />
+          <ExecutiveMetricCard title="Ministros / Obreiros" value={ministrosCount} color="slate" icon={Flame} />
+          <ExecutiveMetricCard title="Com Telefone" value={comTelefoneCount} color="blue" icon={Phone} />
+        </div>
 
+        {queryError && (
+          <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between text-rose-800 text-sm">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-rose-600 shrink-0" />
+              <span>{queryError}</span>
+            </div>
+            <button
+              onClick={() => loadVisitantes()}
+              className="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-900 rounded-xl font-bold text-xs transition flex items-center gap-1 cursor-pointer"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Tentar Novamente
+            </button>
+          </div>
+        )}
+
+        {/* Seção Principal de Visitantes */}
+        <Section title="Histórico e Acompanhamento de Visitantes">
+          {/* Caixa de Filtros no mesmo padrão refinado */}
+          <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-2xl mb-6 space-y-3">
+            {/* Linha 1: Filtros de Seleção */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
               {/* Congregação */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
+                <label className="block text-[11px] font-black text-slate-550 uppercase mb-1">
                   {labelDivPrincipal}
                 </label>
                 <select
                   disabled={isLocalUser}
                   value={isLocalUser ? (ctx?.congregacaoId || '') : selectedCongregacao}
                   onChange={e => setSelectedCongregacao(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:bg-white transition disabled:opacity-75"
+                  className="w-full border border-slate-250 rounded-lg px-2.5 py-1.5 text-xs bg-white disabled:opacity-75"
                 >
                   {isLocalUser ? (
                     <option value={ctx?.congregacaoId || ''}>
@@ -406,7 +450,7 @@ export default function VisitantesPage() {
                     </option>
                   ) : (
                     <>
-                      <option value="TODAS">Todas as congregações</option>
+                      <option value="TODAS">Todas</option>
                       {congregacoes.map(c => (
                         <option key={c.id} value={c.id}>{c.nome}</option>
                       ))}
@@ -415,35 +459,27 @@ export default function VisitantesPage() {
                 </select>
               </div>
 
-              {/* Primeira Visita */}
+              {/* Status de Visita */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                  Primeira Visita?
-                </label>
+                <label className="block text-[11px] font-black text-slate-550 uppercase mb-1">Status</label>
                 <select
                   value={filterPrimeiraVisita}
                   onChange={e => setFilterPrimeiraVisita(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:bg-white transition"
+                  className="w-full border border-slate-250 rounded-lg px-2.5 py-1.5 text-xs bg-white"
                 >
                   <option value="TODOS">Todos</option>
-                  <option value="SIM">Sim</option>
-                  <option value="NAO">Não</option>
+                  <option value="SIM">Primeira Visita</option>
+                  <option value="NAO">Retornando</option>
                 </select>
               </div>
 
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              
-              {/* Obreiro / Ministro */}
+              {/* Ministro / Obreiro */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                  É Ministro / Obreiro?
-                </label>
+                <label className="block text-[11px] font-black text-slate-550 uppercase mb-1">Ministro / Obreiro</label>
                 <select
                   value={filterMinistro}
                   onChange={e => setFilterMinistro(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:bg-white transition"
+                  className="w-full border border-slate-250 rounded-lg px-2.5 py-1.5 text-xs bg-white"
                 >
                   <option value="TODOS">Todos</option>
                   <option value="SIM">Sim</option>
@@ -451,15 +487,57 @@ export default function VisitantesPage() {
                 </select>
               </div>
 
-              {/* Cargo Ministerial */}
+              {/* Data Início */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
+                <label className="block text-[11px] font-black text-slate-550 uppercase mb-1">Data Início</label>
+                <input
+                  type="date"
+                  value={dateStart}
+                  onChange={e => setDateStart(e.target.value)}
+                  className="w-full border border-slate-250 rounded-lg px-2.5 py-1.5 text-xs bg-white"
+                />
+              </div>
+
+              {/* Data Fim */}
+              <div>
+                <label className="block text-[11px] font-black text-slate-550 uppercase mb-1">Data Fim</label>
+                <input
+                  type="date"
+                  value={dateEnd}
+                  onChange={e => setDateEnd(e.target.value)}
+                  className="w-full border border-slate-250 rounded-lg px-2.5 py-1.5 text-xs bg-white"
+                />
+              </div>
+            </div>
+
+            {/* Linha 2: Busca por Nome/Telefone + Cargo + Botões de Ação */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 pt-1 border-t border-slate-200/50 items-end">
+              {/* Campo de Busca */}
+              <div className="md:col-span-6">
+                <label className="block text-[11px] font-black text-slate-550 uppercase mb-1">
+                  Buscar Visitante
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Digite o nome ou telefone celular..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="w-full pl-8 border border-slate-250 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Filtro de Cargo Ministerial */}
+              <div className="md:col-span-3">
+                <label className="block text-[11px] font-black text-slate-550 uppercase mb-1">
                   Cargo Ministerial
                 </label>
                 <select
                   value={filterCargo}
                   onChange={e => setFilterCargo(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:bg-white transition"
+                  className="w-full border border-slate-250 rounded-lg px-2.5 py-1.5 text-xs bg-white"
                 >
                   <option value="TODOS">Todos os cargos</option>
                   {cargoOptions.map(c => (
@@ -468,213 +546,236 @@ export default function VisitantesPage() {
                 </select>
               </div>
 
-              {/* Data Inicial */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                  Período de
-                </label>
-                <input
-                  type="date"
-                  value={dateStart}
-                  onChange={e => setDateStart(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:bg-white transition"
-                />
+              {/* Ações: Limpar e Atualizar */}
+              <div className="md:col-span-3 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={cleanFilters}
+                  className="px-3 py-1.5 border border-slate-250 hover:bg-white text-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  title="Limpar todos os filtros"
+                >
+                  <X className="h-3.5 w-3.5 text-slate-500" />
+                  Limpar
+                </button>
+                <button
+                  type="button"
+                  onClick={loadVisitantes}
+                  disabled={loading}
+                  className="px-3.5 py-1.5 bg-[#062E6F] hover:bg-[#154A92] text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                  title="Atualizar lista de visitantes"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                  Atualizar
+                </button>
               </div>
-
-              {/* Data Final */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                  Até
-                </label>
-                <input
-                  type="date"
-                  value={dateEnd}
-                  onChange={e => setDateEnd(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:bg-white transition"
-                />
-              </div>
-
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={cleanFilters}
-                className="px-4 py-2 border border-slate-300 hover:border-slate-400 bg-white text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <X className="h-3.5 w-3.5" />
-                Limpar Filtros
-              </button>
-              <button
-                onClick={loadVisitantes}
-                disabled={loading}
-                className="px-4 py-2 bg-[#062E6F] hover:bg-[#154A92] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-                Atualizar
-              </button>
             </div>
           </div>
-        </DashboardSection>
 
-        {/* Tabela de Visitantes */}
-        <DashboardSection title="Painel de Acompanhamento Pastoral">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="h-8 w-8 text-slate-400 animate-spin" />
-            </div>
-          ) : filteredVisitantes.length === 0 ? (
-            <DashboardEmptyState
-              icon={Users}
-              title="Nenhum visitante encontrado"
-              description="Não encontramos registros de visitantes consolidados com base nos critérios aplicados."
-            />
-          ) : (
-            <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-100 text-slate-650 uppercase font-bold tracking-wider">
-                      <th className="px-5 py-3.5">Visitante</th>
-                      <th className="px-5 py-3.5">Contato</th>
-                      <th className="px-5 py-3.5">{labelDivPrincipal} Origem</th>
-                      <th className="px-5 py-3.5">Primeira Visita</th>
-                      <th className="px-5 py-3.5">Última Visita</th>
-                      <th className="px-5 py-3.5 text-center">Total de Visitas</th>
-                      <th className="px-5 py-3.5">Status</th>
-                      <th className="px-5 py-3.5 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredVisitantes.map(v => (
-                      <tr key={v.key} className="hover:bg-slate-50/50 transition">
-                        
-                        {/* Visitante */}
-                        <td className="px-5 py-4">
-                          <div className="font-extrabold text-slate-800 text-sm">{v.nome}</div>
-                          {v.is_ministro && (
-                            <div className="text-[10px] text-blue-600 font-semibold mt-0.5">
-                              👑 Ministro {v.cargo_ministerial ? `— ${v.cargo_ministerial}` : ''}
-                              {v.igreja_origem ? ` (Origem: ${v.igreja_origem})` : ''}
-                            </div>
-                          )}
-                        </td>
+          {/* Tabela de Dados no Padrão Visual Consolidado */}
+          <div className="overflow-x-auto border border-slate-100 rounded-2xl shadow-sm bg-white">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-xs">
+                  <th className="p-3.5">Visitante</th>
+                  <th className="p-3.5">Contato</th>
+                  {!isLocalUser && <th className="p-3.5">{labelDivPrincipal} Origem</th>}
+                  <th className="p-3.5">Primeira Visita</th>
+                  <th className="p-3.5">Última Visita</th>
+                  <th className="p-3.5 text-center">Total de Visitas</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading ? (
+                  <tr>
+                    <td colSpan={isLocalUser ? 7 : 8} className="p-12 text-center text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <RefreshCw className="h-6 w-6 text-[#062E6F] animate-spin" />
+                        <span className="font-semibold text-xs text-slate-600">Carregando visitantes...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredVisitantes.length === 0 ? (
+                  <tr>
+                    <td colSpan={isLocalUser ? 7 : 8} className="p-8 text-center text-slate-400 text-xs italic">
+                      Nenhum visitante encontrado com os filtros selecionados.
+                    </td>
+                  </tr>
+                ) : (
+                  visitantesPaginados.map(v => (
+                    <tr key={v.key} className="hover:bg-slate-50/50 transition">
+                      {/* Visitante */}
+                      <td className="p-3.5">
+                        <div className="font-extrabold text-slate-800 text-sm">{v.nome}</div>
+                        {v.is_ministro && (
+                          <div className="inline-flex items-center gap-1 text-[10px] text-blue-700 font-semibold mt-0.5">
+                            👑 Ministro {v.cargo_ministerial ? `(${v.cargo_ministerial})` : ''}
+                            {v.igreja_origem ? ` • ${v.igreja_origem}` : ''}
+                          </div>
+                        )}
+                      </td>
 
-                        {/* Contato */}
-                        <td className="px-5 py-4 text-slate-600 whitespace-nowrap">
-                          {v.telefone ? (
-                            <div className="flex items-center gap-1.5 font-medium">
-                              <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                              {v.telefone}
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 italic font-medium">Sem telefone</span>
-                          )}
-                        </td>
+                      {/* Contato */}
+                      <td className="p-3.5 whitespace-nowrap">
+                        {v.telefone ? (
+                          <div className="flex items-center gap-1.5 font-medium text-slate-700">
+                            <Phone className="h-3 w-3 text-slate-400 shrink-0" />
+                            {v.telefone}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">Sem telefone</span>
+                        )}
+                      </td>
 
-                        {/* Congregação de Origem */}
-                        <td className="px-5 py-4 whitespace-nowrap font-semibold text-slate-700">
+                      {/* Congregação de Origem */}
+                      {!isLocalUser && (
+                        <td className="p-3.5 font-medium text-slate-700 whitespace-nowrap">
                           {v.congregacao_origem}
                         </td>
+                      )}
 
-                        {/* Primeira Visita */}
-                        <td className="px-5 py-4 whitespace-nowrap font-semibold text-slate-600">
-                          {new Date(v.data_primeira_visita).toLocaleDateString('pt-BR')}
-                        </td>
+                      {/* Primeira Visita */}
+                      <td className="p-3.5 whitespace-nowrap">
+                        <span className="font-medium text-slate-600 flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-slate-400" />
+                          {formatDate(v.data_primeira_visita)}
+                        </span>
+                      </td>
 
-                        {/* Última Visita */}
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <div className="font-semibold text-slate-750">
-                            {new Date(v.data_ultima_visita).toLocaleDateString('pt-BR')}
-                          </div>
-                          <div className="text-[10px] text-slate-500 font-medium mt-0.5">
-                            {v.ultimo_culto}
-                          </div>
-                        </td>
-
-                        {/* Total de Visitas */}
-                        <td className="px-5 py-4 text-center whitespace-nowrap">
-                          <span className="inline-flex items-center justify-center bg-slate-100 text-slate-800 font-black text-xs px-2.5 py-1 rounded-lg">
-                            {v.total_visitas}
+                      {/* Última Visita */}
+                      <td className="p-3.5 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-800 flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-slate-400" />
+                            {formatDate(v.data_ultima_visita)}
                           </span>
-                        </td>
+                          <span className="text-[10px] text-slate-400 mt-0.5">
+                            {v.ultimo_culto}
+                          </span>
+                        </div>
+                      </td>
 
-                        {/* Status */}
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          {v.status === 'Primeira Visita' ? (
-                            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2.5 py-0.5 font-bold text-[9px] uppercase tracking-wide">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              Primeira Visita
-                            </span>
+                      {/* Total de Visitas */}
+                      <td className="p-3.5 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center justify-center bg-slate-100 text-slate-800 font-black text-xs px-2.5 py-1 rounded-lg">
+                          {v.total_visitas}
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="p-3.5 whitespace-nowrap">
+                        {v.status === 'Primeira Visita' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Primeira Visita
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                            Retornando
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Ações */}
+                      <td className="p-3.5 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Botão WhatsApp */}
+                          {v.telefone ? (
+                            <a
+                              href={getWhatsappLink(v.nome, v.telefone)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                              title="Enviar mensagem pelo WhatsApp"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              WhatsApp
+                            </a>
                           ) : (
-                            <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-750 border border-blue-100 rounded-full px-2.5 py-0.5 font-bold text-[9px] uppercase tracking-wide">
-                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                              Retornando
+                            <span
+                              className="px-2.5 py-1 bg-slate-50 text-slate-300 rounded-lg text-xs font-bold flex items-center gap-1 cursor-not-allowed"
+                              title="Visitante sem telefone registrado"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              WhatsApp
                             </span>
                           )}
-                        </td>
 
-                        {/* Ações */}
-                        <td className="px-5 py-4 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
-                            
-                            {/* WhatsApp */}
-                            {v.telefone ? (
-                              <a
-                                href={getWhatsappLink(v.nome, v.telefone)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="Enviar mensagem no WhatsApp"
-                                className="inline-flex items-center justify-center p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl transition border border-emerald-200/50 cursor-pointer"
-                              >
-                                <MessageSquare className="h-4 w-4" />
-                              </a>
-                            ) : (
-                              <button
-                                disabled
-                                title="Sem telefone para WhatsApp"
-                                className="inline-flex items-center justify-center p-2 bg-slate-50 text-slate-300 rounded-xl border border-slate-200/50 cursor-not-allowed opacity-60"
-                              >
-                                <MessageSquare className="h-4 w-4" />
-                              </button>
-                            )}
+                          {/* Botão Histórico */}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedVisitante(v)}
+                            className="px-2.5 py-1 bg-[#062E6F]/10 hover:bg-[#062E6F]/20 text-[#062E6F] rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                            title="Visualizar histórico completo de visitas"
+                          >
+                            <History className="h-3.5 w-3.5" />
+                            Histórico
+                          </button>
 
-                            {/* Histórico */}
-                            <button
-                              onClick={() => setSelectedVisitante(v)}
-                              title="Visualizar histórico"
-                              className="inline-flex items-center justify-center p-2 bg-[#062E6F]/5 hover:bg-[#062E6F]/10 text-[#062E6F] rounded-xl transition border border-blue-200/30 cursor-pointer"
-                            >
-                              <History className="h-4 w-4" />
-                            </button>
+                          {/* Botão Acompanhamento Pastoral */}
+                          <button
+                            type="button"
+                            onClick={() => showNotification('info', 'Acompanhamento Pastoral', `Registro de contato com ${v.nome} será integrado às tarefas da equipe pastoral.`)}
+                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                            title="Acompanhamento pastoral"
+                          >
+                            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-                            {/* Contato Realizado */}
-                            <button
-                              onClick={() => showNotification('info', 'Acompanhamento Pastoral', 'Função de acompanhamento pastoral será ativada em breve.')}
-                              title="Registrar Contato Realizado"
-                              className="inline-flex items-center justify-center p-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition border border-slate-205 cursor-pointer"
-                            >
-                              <Sparkles className="h-4 w-4" />
-                            </button>
+          {/* Barra de Paginação Real (Idêntica à de Cultos) */}
+          {filteredVisitantes.length > 0 && (
+            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 px-2 py-3 bg-white border border-slate-200/80 rounded-2xl">
+              <div className="text-xs text-slate-500 font-medium">
+                Mostrando <span className="font-bold text-slate-800">{((paginaValida - 1) * ITENS_POR_PAGINA) + 1}</span> a <span className="font-bold text-slate-800">{Math.min(paginaValida * ITENS_POR_PAGINA, filteredVisitantes.length)}</span> de <span className="font-bold text-slate-800">{filteredVisitantes.length}</span> visitantes
+              </div>
 
-                          </div>
-                        </td>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaginaAtual(p => Math.max(1, p - 1))}
+                  disabled={paginaValida <= 1}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                  title="Página Anterior"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </button>
 
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <span className="text-xs font-bold text-slate-700 px-2">
+                  Página {paginaValida} de {totalPaginas}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setPaginaAtual(p => Math.min(totalPaginas, p + 1))}
+                  disabled={paginaValida >= totalPaginas}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                  title="Próxima Página"
+                >
+                  Próxima
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
             </div>
           )}
-        </DashboardSection>
-      </DashboardContent>
+        </Section>
+      </div>
 
       {/* Modal: Histórico do Visitante */}
       {selectedVisitante && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden border border-slate-100 max-h-[85vh] animate-fade-in">
-            
-            {/* Header */}
+            {/* Header com Gradiente Oficial */}
             <div className="p-5 bg-gradient-to-r from-[#062E6F] to-[#154A92] flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white/10 rounded-xl">
@@ -693,14 +794,14 @@ export default function VisitantesPage() {
                 type="button"
                 onClick={() => setSelectedVisitante(null)}
                 className="p-1 rounded-lg text-blue-200 hover:bg-white/15 transition cursor-pointer"
+                title="Fechar histórico"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Corpo / Timeline */}
+            {/* Corpo / Resumo e Timeline */}
             <div className="p-5 overflow-y-auto space-y-6 flex-1 min-h-[250px]">
-              
               {/* Resumo do Perfil */}
               <div className="grid grid-cols-2 gap-3 bg-slate-50 border border-slate-150 rounded-xl p-3.5 text-xs font-semibold text-slate-700">
                 <div>
@@ -713,11 +814,11 @@ export default function VisitantesPage() {
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Primeira Visita</span>
-                  <span className="text-slate-800 font-bold">{new Date(selectedVisitante.data_primeira_visita).toLocaleDateString('pt-BR')}</span>
+                  <span className="text-slate-800 font-bold">{formatDate(selectedVisitante.data_primeira_visita)}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Última Visita</span>
-                  <span className="text-slate-800 font-bold">{new Date(selectedVisitante.data_ultima_visita).toLocaleDateString('pt-BR')}</span>
+                  <span className="text-slate-800 font-bold">{formatDate(selectedVisitante.data_ultima_visita)}</span>
                 </div>
               </div>
 
@@ -743,7 +844,7 @@ export default function VisitantesPage() {
                             {h.tipo_culto}
                           </span>
                           <span className="text-[10px] font-bold text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded-md">
-                            {new Date(h.data).toLocaleDateString('pt-BR')}
+                            {formatDate(h.data)}
                           </span>
                         </div>
 
@@ -775,12 +876,10 @@ export default function VisitantesPage() {
                           </div>
                         )}
                       </div>
-
                     </div>
                   ))}
                 </div>
               </div>
-
             </div>
 
             {/* Footer */}
@@ -793,11 +892,11 @@ export default function VisitantesPage() {
                 Fechar Histórico
               </button>
             </div>
-
           </div>
         </div>
       )}
 
+      {/* Modal de Notificações */}
       <NotificationModal
         isOpen={modalNotify.isOpen}
         title={modalNotify.title}
@@ -805,6 +904,6 @@ export default function VisitantesPage() {
         type={modalNotify.type}
         onClose={() => setModalNotify(prev => ({ ...prev, isOpen: false }))}
       />
-    </DashboardContainer>
+    </PageLayout>
   );
 }
