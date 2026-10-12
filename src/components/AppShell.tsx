@@ -6,6 +6,7 @@ import TechnicalAccessBanner from '@/components/admin/technical/TechnicalAccessB
 import GlobalFinancialBanner from '@/components/financeiro/GlobalFinancialBanner';
 import GlobalJuridicoGuard from '@/components/juridico/GlobalJuridicoGuard';
 import { ReactNode } from 'react';
+import { isPublicAcolhimentoPath } from '@/lib/public-routes';
 
 // Prefixos de rota que exibem o Sidebar
 const SIDEBAR_PREFIXES = [
@@ -44,10 +45,12 @@ const STANDALONE_PUBLIC_PREFIXES = [
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
-  // Páginas públicas e standalone (Check-in, Inscrição Pública de Eventos, Painel TV, etc.)
-  const isStandalone = STANDALONE_PUBLIC_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(prefix + '/')
-  );
+  // Páginas públicas e standalone (Check-in, Inscrição Pública de Eventos, Painel TV, Acolhimento Público, etc.)
+  const isStandalone =
+    STANDALONE_PUBLIC_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(prefix + '/')
+    ) || isPublicAcolhimentoPath(pathname);
+
   if (isStandalone) {
     return <>{children}</>;
   }

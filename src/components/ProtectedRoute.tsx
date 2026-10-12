@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { GRADIENTS } from '@/config/tokens'
 import { useAuth } from '@/providers/AuthProvider'
 import { useUserContext } from '@/hooks/useUserContext'
+import { isPublicAcolhimentoPath } from '@/lib/public-routes'
 
 const PUBLIC_PREFIXES = [
   '/',
@@ -34,6 +35,7 @@ const PUBLIC_PREFIXES = [
 function isPublicPath(pathname: string): boolean {
   if (pathname === '/') return true
   if (pathname === '/app' || pathname.startsWith('/app/')) return true // Rotas mobile são gerenciadas exclusivamente pelo MobileMemberProvider
+  if (isPublicAcolhimentoPath(pathname)) return true
   return PUBLIC_PREFIXES.some(prefix => 
     prefix !== '/' && (pathname === prefix || pathname.startsWith(prefix + '/'))
   )

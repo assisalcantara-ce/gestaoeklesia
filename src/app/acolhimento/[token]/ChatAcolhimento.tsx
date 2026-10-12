@@ -270,9 +270,9 @@ export default function ChatAcolhimento({ token, context }: ChatAcolhimentoProps
     chatState.currentStep !== 'FINALIZADO';
 
   return (
-    <div className="flex flex-col h-[100dvh] max-w-lg mx-auto bg-slate-50 shadow-2xl relative overflow-hidden border-x border-slate-200">
+    <div className="flex flex-col h-[100dvh] max-w-lg mx-auto bg-slate-900/40 backdrop-blur-md shadow-2xl relative overflow-hidden border-x border-white/10">
       {/* Top Header */}
-      <header className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 text-white px-4 py-3 shadow-md flex items-center justify-between z-10">
+      <header className="bg-gradient-to-r from-[#0A2E63] via-[#0D3B82] to-[#124B9E] text-white px-4 py-3 shadow-md flex items-center justify-between z-10 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="relative">
             {context.logoUrl ? (
@@ -314,7 +314,7 @@ export default function ChatAcolhimento({ token, context }: ChatAcolhimentoProps
       </header>
 
       {/* Área Central de Conversa (Chat Messages) */}
-      <main className="flex-1 overflow-y-auto p-4 space-y-3.5 scroll-smooth">
+      <main className="flex-1 overflow-y-auto p-4 space-y-3.5 scroll-smooth bg-slate-50/90 backdrop-blur-md">
         {chatState.messages.map((msg) => {
           const isBot = msg.sender === 'bot';
           return (

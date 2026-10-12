@@ -5,6 +5,7 @@ import {
   processChatAction,
 } from '../src/lib/acolhimento-chat-states';
 import { isCultoAbertoHoje, getLocalDateStr } from '../src/lib/timezone-utils';
+import { isPublicAcolhimentoPath } from '../src/lib/public-routes';
 
 describe('Agente Inteligente de Acolhimento - Landing, Recorrente e Expiração', () => {
   describe('1. Validação de Janela de Culto e Fuso Horário Local (GMT-3)', () => {
@@ -211,6 +212,30 @@ describe('Agente Inteligente de Acolhimento - Landing, Recorrente e Expiração'
       assert.equal(s.context.appUrl, 'https://app.igreja.com.br');
       assert.equal(s.context.congregacaoNome, 'Congregação Betel');
       assert.equal(s.context.tipoCulto, 'Culto de Doutrina');
+    });
+  });
+
+  describe('5. Isolamento de Layout da Rota Pública de Acolhimento', () => {
+    it('reconhece /acolhimento/[token] como rota pública autônoma (standalone)', () => {
+      assert.equal(isPublicAcolhimentoPath('/acolhimento/token-publico-123'), true);
+      assert.equal(isPublicAcolhimentoPath('/acolhimento/culto-domingo-noite'), true);
+      assert.equal(isPublicAcolhimentoPath('/acolhimento/abcDEF123456'), true);
+    });
+
+    it('preserva rotas administrativas /acolhimento/visitantes e /acolhimento/relatorios com Sidebar', () => {
+      assert.equal(isPublicAcolhimentoPath('/acolhimento/visitantes'), false);
+      assert.equal(isPublicAcolhimentoPath('/acolhimento/visitantes/novo'), false);
+      assert.equal(isPublicAcolhimentoPath('/acolhimento/relatorios'), false);
+      assert.equal(isPublicAcolhimentoPath('/acolhimento/relatorios/espiritual'), false);
+      assert.equal(isPublicAcolhimentoPath('/acolhimento'), false);
+    });
+
+    it('rejeita com segurança valores vazios, nulos ou outras rotas', () => {
+      assert.equal(isPublicAcolhimentoPath(null), false);
+      assert.equal(isPublicAcolhimentoPath(undefined), false);
+      assert.equal(isPublicAcolhimentoPath(''), false);
+      assert.equal(isPublicAcolhimentoPath('/dashboard'), false);
+      assert.equal(isPublicAcolhimentoPath('/secretaria/cultos'), false);
     });
   });
 });

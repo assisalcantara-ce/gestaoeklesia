@@ -17,5 +17,9 @@ export default function AcolhimentoLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <div className="min-h-[100dvh] bg-slate-100">{children}</div>;
+  return (
+    <div className="min-h-[100dvh] w-full bg-[#0A2E63] bg-[url('/img/BG_acolhimento.png')] bg-cover bg-top bg-no-repeat overflow-x-hidden selection:bg-sky-500 selection:text-white">
+      {children}
+    </div>
+  );
 }

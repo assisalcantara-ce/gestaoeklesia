@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/providers/AuthProvider'
 import { createClient } from '@/lib/supabase-client'
+import { isPublicAcolhimentoPath } from '@/lib/public-routes'
 
 /**
  * Rotas acessíveis mesmo com trial expirado ou sem autenticação.
@@ -36,6 +37,7 @@ const POLL_INTERVAL_MS = 5 * 60 * 1_000
 
 function isBypassPath(pathname: string): boolean {
   if (pathname.startsWith('/api/')) return true
+  if (isPublicAcolhimentoPath(pathname)) return true
   return BYPASS_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
 }
 

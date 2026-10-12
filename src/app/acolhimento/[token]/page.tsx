@@ -3,17 +3,15 @@
 import { use, useEffect, useState } from 'react';
 import {
   Loader2,
-  AlertCircle,
   Church,
   RefreshCw,
   Calendar,
   Clock,
-  MapPin,
-  Heart,
   MessageCircle,
+  ChevronRight,
   Smartphone,
   ExternalLink,
-  ShieldCheck,
+  Lock,
 } from 'lucide-react';
 import ChatAcolhimento from './ChatAcolhimento';
 import { ChatCultoContext } from '@/lib/acolhimento-chat-states';
@@ -138,10 +136,10 @@ export default function PublicAcolhimentoChatPage({
   // 1. Estado de Carregamento
   if (loading) {
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-br from-[#062E6F] via-[#0A4499] to-[#1565C0] flex items-center justify-center p-4">
-        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center shadow-inner">
-            <Loader2 className="w-8 h-8 text-white animate-spin" />
+      <div className="min-h-[100dvh] w-full flex items-center justify-center p-4 bg-[#0A2E63] bg-[url('/img/BG_acolhimento.png')] bg-cover bg-top bg-no-repeat">
+        <div className="bg-slate-900/60 backdrop-blur-md border border-white/20 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center shadow-inner">
+            <Loader2 className="w-8 h-8 text-sky-400 animate-spin" />
           </div>
           <div>
             <h2 className="text-white font-semibold text-lg">Iniciando Acolhimento...</h2>
@@ -165,8 +163,8 @@ export default function PublicAcolhimentoChatPage({
     const logoUrl = errorInfo?.logoUrl;
 
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4 sm:p-6">
-        <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center border border-slate-200">
+      <div className="min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-6 bg-[#0A2E63] bg-[url('/img/BG_acolhimento.png')] bg-cover bg-top bg-no-repeat">
+        <div className="bg-white/95 backdrop-blur-md rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center border border-slate-100">
           {/* Logo da Igreja se disponível */}
           {logoUrl ? (
             <img
@@ -175,16 +173,14 @@ export default function PublicAcolhimentoChatPage({
               className="w-16 h-16 rounded-2xl object-cover mx-auto mb-4 border border-slate-200 shadow-md bg-slate-50"
             />
           ) : (
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 border ${
-              isEncerradoOuPassado
-                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                : 'bg-amber-50 text-amber-600 border-amber-200'
-            }`}>
-              {isEncerradoOuPassado ? <Church className="w-7 h-7" /> : <AlertCircle className="w-7 h-7" />}
-            </div>
+            <img
+              src="/img/logoh.png"
+              alt="Gestão Eklésia"
+              className="h-12 w-auto object-contain mx-auto mb-4 drop-shadow-sm"
+            />
           )}
 
-          <p className="text-xs uppercase tracking-wider font-semibold text-blue-700 mb-1">
+          <p className="text-[11px] uppercase tracking-wider font-extrabold text-[#062E6F] mb-1">
             {igrejaNome}
           </p>
 
@@ -212,7 +208,7 @@ export default function PublicAcolhimentoChatPage({
                 href={appUrl.trim()}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-3 px-4 bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 text-white rounded-xl font-medium text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-98"
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-[#0066FF] to-[#0052CC] hover:from-[#005AE6] hover:to-[#0047B3] text-white rounded-xl font-medium text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-98"
               >
                 <Smartphone className="w-4 h-4 text-blue-200" />
                 <span>Acessar Aplicativo Oficial</span>
@@ -242,93 +238,134 @@ export default function PublicAcolhimentoChatPage({
     );
   }
 
-  // 3. Landing Pública de Apresentação (antes de iniciar o chat)
+  // 3. Landing Pública de Apresentação (com o fundo oficial e layout fiel à referência)
   if (!chatIniciado) {
     const dataFormatada = formatarDataExtenso(cultoContext.dataCulto);
 
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-br from-slate-900 via-[#0A2E63] to-slate-950 flex flex-col justify-between p-4 sm:p-6 text-slate-100">
-        {/* Topo / Identidade Visual */}
-        <header className="max-w-md w-full mx-auto pt-4 sm:pt-8 text-center flex flex-col items-center">
-          {cultoContext.logoUrl ? (
-            <img
-              src={cultoContext.logoUrl}
-              alt={cultoContext.igrejaNome || 'Logo'}
-              className="w-20 h-20 rounded-3xl object-cover mb-4 shadow-xl border-2 border-white/20 bg-white/10 backdrop-blur-md"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-3xl bg-blue-600/30 border border-blue-400/40 backdrop-blur-md flex items-center justify-center mb-4 shadow-xl text-blue-200">
-              <Church className="w-8 h-8" />
-            </div>
-          )}
-
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-300/90 bg-blue-950/60 border border-blue-800/60 px-3 py-1 rounded-full mb-2">
-            Canal Oficial de Acolhimento
-          </span>
-
-          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            {cultoContext.igrejaNome || 'Gestão Eklésia'}
-          </h1>
-          <p className="text-xs sm:text-sm text-blue-200/80 mt-1 flex items-center justify-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            {cultoContext.congregacaoNome || 'Congregação Local'}
-          </p>
-        </header>
-
-        {/* Card Central com Informações do Culto */}
-        <main className="max-w-md w-full mx-auto my-6 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-6 sm:p-7 shadow-2xl text-center">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-4 text-white shadow-lg shadow-blue-500/20">
-            <Heart className="w-6 h-6 fill-white/20" />
-          </div>
-
-          <h2 className="text-lg sm:text-xl font-bold text-white mb-2">
-            Seja muito bem-vindo(a)!
-          </h2>
-
-          <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed mb-6">
-            Preparamos este espaço exclusivo para receber você com todo o amor da nossa igreja.
-            É uma honra enorme ter você conosco!
-          </p>
-
-          {/* Detalhes do Culto de Hoje */}
-          <div className="bg-black/25 border border-white/10 rounded-2xl p-4 text-left space-y-2.5 mb-6">
-            <div className="flex items-center gap-2.5 text-xs text-blue-100">
-              <Church className="w-4 h-4 text-blue-300 shrink-0" />
-              <span className="font-semibold text-white">{cultoContext.tipoCulto || 'Culto de Celebração'}</span>
-            </div>
-
-            {dataFormatada && (
-              <div className="flex items-center gap-2.5 text-xs text-blue-200/90 capitalize">
-                <Calendar className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>{dataFormatada}</span>
-              </div>
+      <div className="min-h-[100dvh] w-full flex flex-col justify-between bg-[#0A2E63] bg-[url('/img/BG_acolhimento.png')] bg-cover bg-top bg-no-repeat overflow-x-hidden">
+        <div className="max-w-md w-full mx-auto px-4 py-4 sm:py-6 flex flex-col min-h-[100dvh] justify-between">
+          {/* Topo / Identidade Visual */}
+          <header className="pt-2 sm:pt-4 text-center flex flex-col items-center">
+            {cultoContext.logoUrl ? (
+              <img
+                src={cultoContext.logoUrl}
+                alt={cultoContext.igrejaNome || 'Logo'}
+                className="h-12 sm:h-14 w-auto object-contain max-w-[200px] mb-1 drop-shadow-sm"
+              />
+            ) : (
+              <img
+                src="/img/logoh.png"
+                alt="Gestão Eklésia"
+                className="h-11 sm:h-13 w-auto object-contain max-w-[190px] mb-1 drop-shadow-sm"
+              />
             )}
 
-            {cultoContext.horarioCulto && (
-              <div className="flex items-center gap-2.5 text-xs text-blue-200/90">
-                <Clock className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>Horário: {cultoContext.horarioCulto}</span>
+            <h2 className="text-[#062E6F] text-[11px] sm:text-xs font-black tracking-wider uppercase leading-tight max-w-[290px]">
+              {cultoContext.igrejaNome || 'IEADMI - ASSEMBLEIA DE DEUS DE MISSÕES'}
+            </h2>
+            <p className="text-[#062E6F]/80 text-[10px] sm:text-[11px] font-bold tracking-widest uppercase mt-0.5">
+              {cultoContext.congregacaoNome || 'TEMPLO CENTRAL'}
+            </p>
+          </header>
+
+          {/* Espaço flexível para visualização harmoniosa dos rostos da família na foto */}
+          <div className="h-28 sm:h-36 md:h-40 pointer-events-none" aria-hidden="true" />
+
+          {/* Bloco Central: Seja muito bem-vindo(a)! */}
+          <main className="flex flex-col text-center">
+            <div className="px-2 mb-4 sm:mb-6">
+              <h1 className="text-3xl sm:text-[38px] font-black text-white tracking-tight leading-[1.1] drop-shadow-md">
+                Seja muito<br />
+                <span className="text-[#38BDF8]">bem-vindo(a)!</span>
+              </h1>
+
+              {/* Traço decorativo dourado */}
+              <div className="w-12 h-1 bg-amber-400 rounded-full mx-auto my-2.5 shadow-sm" />
+
+              <p className="text-white font-bold text-sm sm:text-base leading-snug drop-shadow-sm">
+                É uma alegria receber você em nossa casa.
+              </p>
+              <p className="text-blue-100/90 text-[11px] sm:text-xs mt-1 max-w-[270px] sm:max-w-xs mx-auto leading-relaxed drop-shadow-sm">
+                Queremos conhecer você e tornar sua visita ainda mais especial.
+              </p>
+            </div>
+
+            {/* Card Branco com Informações do Culto */}
+            <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-2xl border border-white/70 space-y-3 mb-3 text-left">
+              {/* CULTO */}
+              <div className="flex items-center gap-3.5 pb-2.5 border-b border-slate-100">
+                <div className="w-11 h-11 rounded-2xl bg-[#E0F2FE] text-[#0284C7] flex items-center justify-center shrink-0">
+                  <Church className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                    CULTO
+                  </span>
+                  <span className="text-slate-900 font-extrabold text-sm sm:text-base leading-tight block truncate">
+                    {cultoContext.tipoCulto || 'Culto de Celebração'}
+                  </span>
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Botão de Iniciar Acolhimento */}
-          <button
-            onClick={() => setChatIniciado(true)}
-            className="w-full py-4 px-6 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 active:scale-98 text-white rounded-2xl font-bold text-sm sm:text-base shadow-xl shadow-blue-500/25 transition-all flex items-center justify-center gap-2.5 cursor-pointer group"
-          >
-            <MessageCircle className="w-5 h-5 text-blue-200 group-hover:scale-110 transition-transform" />
-            <span>Iniciar meu acolhimento</span>
-          </button>
-        </main>
+              {/* DATA */}
+              <div className={`flex items-center gap-3.5 ${cultoContext.horarioCulto ? 'pb-2.5 border-b border-slate-100' : ''}`}>
+                <div className="w-11 h-11 rounded-2xl bg-[#E0F2FE] text-[#0284C7] flex items-center justify-center shrink-0">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                    DATA
+                  </span>
+                  <span className="text-slate-900 font-extrabold text-sm sm:text-base leading-tight block capitalize truncate">
+                    {dataFormatada}
+                  </span>
+                </div>
+              </div>
 
-        {/* Rodapé Seguro LGPD */}
-        <footer className="max-w-md w-full mx-auto pb-4 text-center">
-          <p className="text-[11px] text-blue-200/60 flex items-center justify-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-            Seus dados são protegidos e tratados em conformidade com a LGPD
-          </p>
-        </footer>
+              {/* HORÁRIO (se disponível) */}
+              {cultoContext.horarioCulto && (
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-[#E0F2FE] text-[#0284C7] flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                      HORÁRIO
+                    </span>
+                    <span className="text-slate-900 font-extrabold text-sm sm:text-base leading-tight block">
+                      {cultoContext.horarioCulto}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Botão de Ação: Iniciar meu acolhimento */}
+            <button
+              onClick={() => setChatIniciado(true)}
+              className="w-full py-4 px-5 bg-gradient-to-r from-[#0066FF] to-[#0052CC] hover:from-[#005AE6] hover:to-[#0047B3] active:scale-[0.98] text-white rounded-2xl font-bold text-sm sm:text-base shadow-xl shadow-blue-600/30 transition-all flex items-center justify-between cursor-pointer group mb-3"
+            >
+              <div className="flex items-center gap-2.5">
+                <MessageCircle className="w-5 h-5 text-white/90 group-hover:scale-110 transition-transform" />
+                <span>Iniciar meu acolhimento</span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-white/90 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          </main>
+
+          {/* Rodapé Seguro LGPD */}
+          <footer className="pb-2 text-center">
+            <div className="flex items-center justify-center gap-2.5 py-1 text-slate-500 text-left max-w-xs mx-auto">
+              <div className="w-7 h-7 rounded-lg bg-blue-100/70 text-blue-700 flex items-center justify-center shrink-0">
+                <Lock className="w-3.5 h-3.5" />
+              </div>
+              <p className="text-[11px] leading-tight text-slate-600 font-medium">
+                Seus dados são protegidos e tratados em conformidade com a LGPD.
+              </p>
+            </div>
+          </footer>
+        </div>
       </div>
     );
   }
