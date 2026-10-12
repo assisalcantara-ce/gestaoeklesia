@@ -1204,25 +1204,43 @@ export function useAgenda() {
     const [yearStr, monthStr] = filtroMes.split('-');
     const currentMonthPrefix = `${yearStr}-${monthStr.padStart(2, '0')}`;
 
-    eventos.forEach(e => {
-      const startDayStr = e.data_inicio.split('T')[0];
-      const endDayStr = e.data_fim ? e.data_fim.split('T')[0] : startDayStr;
+    const getLocalDateStr = (val: string): string => {
+      if (!val) return '';
+      // Se for formato local 'YYYY-MM-DD...', extrai os 10 primeiros caracteres diretamente
+      if (!val.includes('Z') && !val.includes('+') && !val.slice(11).includes('-')) {
+        return val.slice(0, 10);
+      }
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return val.split('T')[0];
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
 
-      // Se não há data_fim ou as datas são iguais, mapeia diretamente no dia de início
+    eventos.forEach(e => {
+      const startDayStr = getLocalDateStr(e.data_inicio);
+      const endDayStr = e.data_fim ? getLocalDateStr(e.data_fim) : startDayStr;
+
+      // Se não há data_fim ou as datas são iguais no calendário local, mapeia diretamente no dia de início
       if (!e.data_fim || startDayStr === endDayStr) {
         if (!mapa[startDayStr]) mapa[startDayStr] = [];
         mapa[startDayStr].push(e);
         return;
       }
 
-      // Para eventos com intervalo de múltiplos dias, mapear os dias pertinentes
-      const startDate = new Date(`${startDayStr}T00:00:00`);
-      const endDate = new Date(`${endDayStr}T00:00:00`);
+      // Para eventos com intervalo de múltiplos dias, mapear os dias pertinentes no fuso local
+      const [sy, sm, sd] = startDayStr.split('-').map(Number);
+      const [ey, em, ed] = endDayStr.split('-').map(Number);
+      const cur = new Date(sy, sm - 1, sd);
+      const endLimit = new Date(ey, em - 1, ed);
 
-      const cur = new Date(startDate);
-      while (cur <= endDate) {
-        const curStr = cur.toISOString().split('T')[0];
-        // Otimização: registrar nos dias do mês consultado
+      while (cur <= endLimit) {
+        const y = cur.getFullYear();
+        const m = String(cur.getMonth() + 1).padStart(2, '0');
+        const d = String(cur.getDate()).padStart(2, '0');
+        const curStr = `${y}-${m}-${d}`;
+        // Registrar nos dias do mês consultado
         if (curStr.startsWith(currentMonthPrefix)) {
           if (!mapa[curStr]) mapa[curStr] = [];
           mapa[curStr].push(e);
@@ -1234,10 +1252,23 @@ export function useAgenda() {
   }, [eventos, filtroMes]);
 
   const eventosColunaDireita = useMemo(() => {
+    const getLocalDateStr = (val: string): string => {
+      if (!val) return '';
+      if (!val.includes('Z') && !val.includes('+') && !val.slice(11).includes('-')) {
+        return val.slice(0, 10);
+      }
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return val.split('T')[0];
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
     if (selectedDate) {
       return eventos.filter(e => {
-        const startDay = e.data_inicio.split('T')[0];
-        const endDay = e.data_fim ? e.data_fim.split('T')[0] : startDay;
+        const startDay = getLocalDateStr(e.data_inicio);
+        const endDay = e.data_fim ? getLocalDateStr(e.data_fim) : startDay;
         return selectedDate >= startDay && selectedDate <= endDay;
       });
     }

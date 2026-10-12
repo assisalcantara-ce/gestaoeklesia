@@ -89,7 +89,9 @@ export default function AgendaCalendar({
           const diaEventos = eventosPorDia[dateStr] ?? [];
           const hasEvents = diaEventos.length > 0;
           const isSelected = selectedDate === dateStr;
-          const isToday = new Date().toISOString().split('T')[0] === dateStr;
+          const today = new Date();
+          const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+          const isToday = todayStr === dateStr;
 
           const handleCellClick = () => {
             // Seleciona o dia no calendário para filtrar e exibir a lista lateral

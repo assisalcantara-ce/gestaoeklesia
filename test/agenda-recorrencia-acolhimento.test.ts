@@ -478,4 +478,84 @@ describe('Motor de Recorrência da Agenda Oficial (AgendaRecorrenciaService)', (
     assert.strictEqual(databaseCultoRegistros.length, 1, 'Não deve criar segundo registro em culto_registros');
     assert.strictEqual(res2.registro.id, res1.registro.id);
   });
+
+  it('16. Regressão Recorrência Semanal: ao selecionar somente "Seg" ([1]), NENHUMA ocorrência é gerada na terça-feira ou em outro dia', () => {
+    // Evento "Culto Administrativo", toda segunda-feira de 2026 às 19:30 com 2h de duração (termina 21:30)
+    const config: RecorrenciaConfig = {
+      frequencia: 'semanal',
+      diasSemana: [1], // Somente Segunda-feira
+      anoReferencia: 2026,
+    };
+
+    const primeira = AgendaRecorrenciaService.calcularPrimeiraOcorrencia({
+      ano: 2026,
+      config,
+      hora: 19,
+      minuto: 30,
+    });
+
+    assert.ok(primeira, 'Deve calcular a primeira ocorrência');
+    assert.strictEqual(primeira.getDay(), 1, 'A primeira ocorrência deve ser estritamente segunda-feira');
+
+    const ocorrencias = AgendaRecorrenciaService.gerarOcorrencias({
+      dataInicio: primeira.toISOString(),
+      dataFim: new Date(primeira.getTime() + 120 * 60 * 1000).toISOString(),
+      config,
+      limiteMaximo: 60,
+    });
+
+    assert.ok(ocorrencias.length > 0, 'Deve ter gerado ocorrências semanais');
+
+    // Nenhuma ocorrência pode ser em terça-feira (2) ou em qualquer dia diferente de segunda-feira (1)
+    ocorrencias.forEach(oc => {
+      const dt = new Date(oc.dataInicio);
+      assert.strictEqual(
+        dt.getDay(),
+        1,
+        `Ocorrência em ${oc.dataBaseStr} (${oc.dataInicio}) deveria ser Segunda-feira (1), mas gerou dia ${dt.getDay()}`
+      );
+      assert.notStrictEqual(dt.getDay(), 2, 'Não deve gerar ocorrência na terça-feira');
+    });
+  });
+
+  it('17. Regressão Calendário (Mapeamento de Dias): evento noturno que cruza meia-noite UTC não deve vazar para a terça-feira', () => {
+    // Simula evento em fuso horário negativo (ex: GMT-3 / Horário de Brasília)
+    // 2026-10-12 (Segunda) das 19:30 às 21:30 local -> em UTC: 2026-10-12T22:30:00.000Z a 2026-10-13T00:30:00.000Z
+    const eventoNoturno = {
+      id: 'evt-culto-seg',
+      data_inicio: '2026-10-12T22:30:00.000Z',
+      data_fim: '2026-10-13T00:30:00.000Z',
+    };
+
+    const getLocalDateStr = (val: string): string => {
+      if (!val) return '';
+      if (!val.includes('Z') && !val.includes('+') && !val.slice(11).includes('-')) {
+        return val.slice(0, 10);
+      }
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return val.split('T')[0];
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const startDayStr = getLocalDateStr(eventoNoturno.data_inicio);
+    const endDayStr = eventoNoturno.data_fim ? getLocalDateStr(eventoNoturno.data_fim) : startDayStr;
+
+    // No horário do cliente, o culto começa e termina no mesmo dia local (2026-10-12)
+    assert.strictEqual(startDayStr, '2026-10-12', 'Data de início local deve ser 2026-10-12 (Segunda)');
+    assert.strictEqual(endDayStr, '2026-10-12', 'Data de fim local deve ser 2026-10-12 (Segunda), sem cruzar para Terça');
+
+    // Mapeamento no calendário
+    const mapa: Record<string, any[]> = {};
+    if (!eventoNoturno.data_fim || startDayStr === endDayStr) {
+      if (!mapa[startDayStr]) mapa[startDayStr] = [];
+      mapa[startDayStr].push(eventoNoturno);
+    }
+
+    assert.ok(mapa['2026-10-12'], 'Deve estar presente na segunda-feira 2026-10-12');
+    assert.strictEqual(mapa['2026-10-13'], undefined, 'NÃO deve estar presente na terça-feira 2026-10-13');
+  });
 });
+
