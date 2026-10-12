@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
     let targetChurchId = church_id || null;
     let targetGeraBloqueio = Boolean(gera_bloqueio);
     let targetCalendarioOficial = Boolean(calendario_oficial);
-    let targetEscopo = escopo || 'divisao1';
+    let targetEscopo = targetChurchId ? (escopo || 'divisao1') : 'organizacao';
 
     if (isLocalSecretary) {
       if (!ctx.congregacaoId) {
@@ -306,9 +306,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Compromisso não encontrado no ministério.', code: 'NOT_FOUND' }, { status: 404 });
     }
 
-    let targetChurchId = updates.church_id !== undefined ? updates.church_id : existing.church_id;
+    let targetChurchId = updates.church_id !== undefined ? (updates.church_id || null) : existing.church_id;
     let targetGeraBloqueio = updates.gera_bloqueio !== undefined ? Boolean(updates.gera_bloqueio) : existing.gera_bloqueio;
     let targetCalendarioOficial = updates.calendario_oficial !== undefined ? Boolean(updates.calendario_oficial) : existing.calendario_oficial;
+    let targetEscopo = updates.escopo !== undefined ? updates.escopo : (targetChurchId ? (existing.escopo || 'divisao1') : 'organizacao');
 
     if (isLocalSecretary) {
       // Secretário local só pode alterar eventos de sua própria congregação
@@ -334,6 +335,7 @@ export async function PUT(request: NextRequest) {
       }
       targetGeraBloqueio = false;
       targetCalendarioOficial = false;
+      targetEscopo = 'divisao1';
     }
 
     const dataInicioEfetiva = updates.data_inicio || existing.data_inicio;
@@ -350,8 +352,8 @@ export async function PUT(request: NextRequest) {
         ministry_id: ctx.ministryId,
         church_id: targetChurchId,
         tipo_id: updates.tipo_id || existing.tipo_id,
-        escopo: updates.escopo || existing.escopo,
-        prioridade: existing.prioridade || 4,
+        escopo: targetEscopo,
+        prioridade: targetEscopo === 'organizacao' ? 1 : 4,
         calendario_oficial: targetCalendarioOficial,
         gera_bloqueio: targetGeraBloqueio,
       },
@@ -369,9 +371,16 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    let finalLocal = updates.local !== undefined ? updates.local : existing.local;
+    if (!targetChurchId && (!finalLocal || finalLocal === 'Sede Geral')) {
+      finalLocal = 'Todo o Campo (Todas as Congregações)';
+    }
+
     const payloadAtualizacao: any = {
       ...updates,
+      local: finalLocal ? String(finalLocal).trim() : null,
       church_id: targetChurchId,
+      escopo: targetEscopo,
       gera_bloqueio: targetGeraBloqueio,
       calendario_oficial: targetCalendarioOficial,
       updated_at: new Date().toISOString(),

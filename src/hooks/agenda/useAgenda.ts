@@ -501,7 +501,7 @@ export function useAgenda() {
         // Exibe os eventos da própria unidade + eventos gerais/bloqueios do ministério
         query = query.or(`church_id.eq.${agendaVisualizada},church_id.is.null`);
       } else if (filtroCongregacao) {
-        query = query.eq('church_id', filtroCongregacao);
+        query = query.or(`church_id.eq.${filtroCongregacao},church_id.is.null`);
       }
 
       const { data, error } = await query;
@@ -605,6 +605,12 @@ export function useAgenda() {
         }
       }
 
+      if (!resolvedChurchId) {
+        if (!resolvedLocal || resolvedLocal === 'Sede Geral') {
+          resolvedLocal = 'Todo o Campo (Todas as Congregações)';
+        }
+      }
+
       setForm({
         titulo: evento.titulo || '',
         descricao: evento.descricao || '',
@@ -619,7 +625,7 @@ export function useAgenda() {
         visibilidade: evento.visibilidade || 'ministerio',
         church_id: resolvedChurchId,
         status: evento.status || 'agendado',
-        escopo: evento.escopo || 'divisao1',
+        escopo: evento.escopo || (resolvedChurchId ? 'divisao1' : 'organizacao'),
         calendario_oficial: evento.calendario_oficial ?? false,
         gera_bloqueio: evento.gera_bloqueio ?? false,
         regra_posicionamento: evento.regra_posicionamento || '',
@@ -641,7 +647,7 @@ export function useAgenda() {
 
       // Destino do evento separado da agenda visualizada:
       let initialChurchId = '';
-      let initialLocal = 'Sede Geral';
+      let initialLocal = 'Todo o Campo (Todas as Congregações)';
 
       if (isSecretarioLocal && userCongregacaoId) {
         const userChurch = congregacoes.find(c => c.id === userCongregacaoId);
@@ -777,7 +783,8 @@ export function useAgenda() {
       const finalChurchId = isSecretarioLocal && userCongregacaoId ? userCongregacaoId : (form.church_id || null);
       const finalGeraBloqueio = isSecretarioLocal ? false : form.gera_bloqueio;
       const finalCalendarioOficial = isSecretarioLocal ? false : form.calendario_oficial;
-      const finalEscopo = isSecretarioLocal ? 'divisao1' : (finalChurchId ? form.escopo : 'organizacao');
+      const finalEscopo = isSecretarioLocal ? 'divisao1' : (finalChurchId ? (form.escopo || 'divisao1') : 'organizacao');
+      const finalLocal = finalChurchId ? form.local : (form.local || 'Todo o Campo (Todas as Congregações)');
 
       // Pré-validação de Conflitos e Bloqueios Oficiais no cliente
       const conflict = await PlanningConflictService.verificarConflito(
@@ -832,7 +839,7 @@ export function useAgenda() {
         tipo_id: form.tipo_id || null,
         data_inicio: dataInicioEfetiva,
         data_fim: dataFimEfetiva,
-        local: form.local.trim() || null,
+        local: finalLocal.trim() || null,
         visibilidade: form.visibilidade,
         church_id: finalChurchId,
         status: form.status,

@@ -407,18 +407,23 @@ export default function EventoFormModal({
                       const selectedCong = (congregacoes || []).find((c) => c.id === selectedId);
                       onFormChange({
                         church_id: selectedId,
-                        local: selectedCong ? selectedCong.nome : (selectedId === '' ? 'Sede Geral' : ''),
+                        local: selectedCong ? selectedCong.nome : (selectedId === '' ? 'Todo o Campo (Todas as Congregações)' : ''),
+                        escopo: selectedId === '' ? 'organizacao' : 'divisao1',
                       });
                     }}
                     className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
                   >
-                    <option value="">Sede Geral (Sem Congregação Específica)</option>
+                    <option value="" className="font-bold text-[#062E6F]">
+                      🌐 Todo o Campo (Todas as Congregações)
+                    </option>
                     {congregacoes && congregacoes.length > 0 ? (
-                      congregacoes.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.nome}{c.is_sede ? ' (Sede)' : ''}
-                        </option>
-                      ))
+                      <optgroup label="Congregações Individuais">
+                        {congregacoes.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.nome}{c.is_sede ? ' (Sede)' : ''}
+                          </option>
+                        ))}
+                      </optgroup>
                     ) : (
                       !loadingCongregacoes && (
                         <option value="" disabled>
