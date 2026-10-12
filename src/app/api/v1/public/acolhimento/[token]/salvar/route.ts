@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { normalizeBrazilianPhone, getPhoneSearchVariants } from '@/lib/telefone-utils';
+import { isCultoAbertoHoje } from '@/lib/timezone-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,14 +97,36 @@ export async function POST(
       );
     }
 
-    if (culto.status !== 'Aberto') {
-      return NextResponse.json(
-        {
-          error: `O culto já se encontra ${culto.status.toLowerCase()} e não aceita mais cadastros de acolhimento.`,
-          code: 'CULTO_ENCERRADO',
-        },
-        { status: 410 }
-      );
+    // Validação estrita de expiração e janela do culto no servidor
+    const validacaoJanela = isCultoAbertoHoje(culto.data_culto, culto.status);
+    if (!validacaoJanela.elegivel) {
+      if (validacaoJanela.motivo === 'CULTO_ENCERRADO') {
+        return NextResponse.json(
+          {
+            error: `O culto já se encontra ${culto.status.toLowerCase()} e não aceita mais cadastros de acolhimento.`,
+            code: 'CULTO_ENCERRADO',
+          },
+          { status: 410 }
+        );
+      }
+      if (validacaoJanela.motivo === 'CULTO_PASSADO') {
+        return NextResponse.json(
+          {
+            error: 'A janela de acolhimento para este culto já foi encerrada.',
+            code: 'CULTO_PASSADO',
+          },
+          { status: 410 }
+        );
+      }
+      if (validacaoJanela.motivo === 'CULTO_FUTURO') {
+        return NextResponse.json(
+          {
+            error: 'Este culto está programado para uma data futura. O acolhimento só pode ser registrado na data do culto.',
+            code: 'CULTO_FUTURO',
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // 3. Validação do Body e Consentimento LGPD

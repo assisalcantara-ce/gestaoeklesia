@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { normalizeBrazilianPhone, getPhoneSearchVariants } from '@/lib/telefone-utils';
+import { isCultoAbertoHoje } from '@/lib/timezone-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,10 +52,22 @@ export async function POST(
 
     const admin = createServerClient();
 
-    // 2. Validar token e obter ministry_id
+    // 2. Validar token, obter ministry_id e checar elegibilidade do culto
     const { data: tokenRecord, error: tokenErr } = await admin
       .from('culto_tokens')
-      .select('id, token, is_active, expires_at, ministry_id, culto_id')
+      .select(`
+        id,
+        token,
+        is_active,
+        expires_at,
+        ministry_id,
+        culto_id,
+        culto_registros (
+          id,
+          data_culto,
+          status
+        )
+      `)
       .eq('token', rawToken.trim())
       .maybeSingle();
 
@@ -68,6 +81,25 @@ export async function POST(
     if (tokenRecord.expires_at && new Date(tokenRecord.expires_at) <= new Date()) {
       return NextResponse.json(
         { error: 'Link de acolhimento expirado.', code: 'TOKEN_EXPIRADO' },
+        { status: 410 }
+      );
+    }
+
+    const culto = tokenRecord.culto_registros as any;
+    if (!culto) {
+      return NextResponse.json(
+        { error: 'Culto vinculado não localizado.', code: 'CULTO_NAO_ENCONTRADO' },
+        { status: 404 }
+      );
+    }
+
+    const validacaoJanela = isCultoAbertoHoje(culto.data_culto, culto.status);
+    if (!validacaoJanela.elegivel) {
+      return NextResponse.json(
+        {
+          error: 'A janela de acolhimento para este culto não está aberta.',
+          code: validacaoJanela.motivo || 'CULTO_ENCERRADO',
+        },
         { status: 410 }
       );
     }

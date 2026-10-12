@@ -31,6 +31,7 @@ export default function ChatAcolhimento({ token, context }: ChatAcolhimentoProps
   const [chatState, setChatState] = useState<ChatState>(() => createInitialChatState(context));
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isSearchingPhone, setIsSearchingPhone] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -110,6 +111,7 @@ export default function ChatAcolhimento({ token, context }: ChatAcolhimentoProps
   // Identificação assíncrona por telefone no backend
   const consultarIdentificacaoTelefone = async (stateComTelefone: ChatState, rawTelefone: string) => {
     setIsTyping(true);
+    setIsSearchingPhone(true);
     try {
       const res = await fetch(`/api/v1/public/acolhimento/${encodeURIComponent(token)}/identificar`, {
         method: 'POST',
@@ -154,6 +156,7 @@ export default function ChatAcolhimento({ token, context }: ChatAcolhimentoProps
       setChatState(nextState);
     } finally {
       setIsTyping(false);
+      setIsSearchingPhone(false);
     }
   };
 
@@ -272,9 +275,17 @@ export default function ChatAcolhimento({ token, context }: ChatAcolhimentoProps
       <header className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 text-white px-4 py-3 shadow-md flex items-center justify-between z-10">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20 shadow-inner">
-              <Church className="w-5 h-5 text-blue-200" />
-            </div>
+            {context.logoUrl ? (
+              <img
+                src={context.logoUrl}
+                alt={context.igrejaNome || 'Logo'}
+                className="w-10 h-10 rounded-full object-cover border border-white/20 shadow-inner bg-white/10"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20 shadow-inner">
+                <Church className="w-5 h-5 text-blue-200" />
+              </div>
+            )}
             <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-blue-900 rounded-full animate-pulse" />
           </div>
           <div>
@@ -329,13 +340,17 @@ export default function ChatAcolhimento({ token, context }: ChatAcolhimentoProps
           );
         })}
 
-        {/* Indicador de Digitação do Bot */}
+        {/* Indicador de Digitação do Bot ou Consulta de Telefone */}
         {isTyping && (
           <div className="flex items-center gap-2 text-slate-400 text-xs py-1 animate-pulse">
             <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
               <Sparkles className="w-3.5 h-3.5 text-blue-600" />
             </div>
-            <span className="italic text-[11px] text-slate-500">Anfitrião digitando...</span>
+            <span className="italic text-[11px] text-slate-500">
+              {isSearchingPhone
+                ? 'Consultando cadastro com carinho... 🔍'
+                : 'Anfitrião digitando...'}
+            </span>
           </div>
         )}
 

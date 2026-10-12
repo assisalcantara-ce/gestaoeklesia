@@ -23,6 +23,7 @@ export interface ChatCultoContext {
   horarioCulto?: string;
   congregacaoNome?: string;
   igrejaNome?: string;
+  logoUrl?: string | null;
   appUrl?: string | null;
 }
 
@@ -439,6 +440,7 @@ export function processChatAction(
         nextState: {
           ...state,
           currentStep: 'NOME',
+          identificacaoTemp: { ambiguo: true },
           data: {
             ...state.data,
             primeira_visita: false,
@@ -607,6 +609,34 @@ export function processChatAction(
         ...state.data,
         nome: result.value,
       };
+
+      // Se o usuário veio de um telefone compartilhado (ambíguo), agora que ele se identificou pelo nome,
+      // pulamos bairro e primeira visita, indo diretamente para o pedido de oração.
+      if (state.identificacaoTemp?.ambiguo) {
+        const primeiroNome = result.value.split(' ')[0];
+        const botMsg: ChatMessage = {
+          id: createMessageId(),
+          sender: 'bot',
+          text: `Que bênção ter você conosco hoje, ${primeiroNome}! 🥰\n\nNossa equipe pastoral intercede por você e por sua família! Você gostaria de deixar algum pedido de oração especial ou motivo de gratidão para este culto?`,
+          stepId: 'PEDIDO_ORACAO',
+          quickReplies: [{ id: 'skip_oracao', label: 'Não tenho pedidos (Pular) ⏭️', value: 'pular' }],
+          timestamp: Date.now(),
+        };
+
+        return {
+          nextState: {
+            ...state,
+            currentStep: 'PEDIDO_ORACAO',
+            data: {
+              ...updatedData,
+              primeira_visita: false,
+              isRecorrente: true,
+            },
+            messages: [...state.messages, userMsg, botMsg],
+            error: null,
+          },
+        };
+      }
 
       const botMsg: ChatMessage = {
         id: createMessageId(),

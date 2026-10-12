@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
+import { isCultoAbertoHoje } from '@/lib/timezone-utils';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/v1/public/acolhimento/[token]
  * Valida o token público de acolhimento e retorna os dados seguros do culto sem expor IDs sensíveis.
+ * Aplica validação server-side de expiração: data local de hoje, status operacional e janela do culto.
  */
 export async function GET(
   _request: NextRequest,
@@ -23,7 +25,7 @@ export async function GET(
 
     const admin = createServerClient();
 
-    // 1. Buscar registro do token com join no culto e congregação
+    // 1. Buscar registro do token com join no culto, congregação e ministério
     const { data: tokenRecord, error: tokenErr } = await admin
       .from('culto_tokens')
       .select(`
@@ -44,7 +46,8 @@ export async function GET(
             nome
           ),
           ministries (
-            name
+            name,
+            logo_url
           )
         )
       `)
@@ -58,47 +61,11 @@ export async function GET(
       );
     }
 
-    // 2. Verificar se está ativo
-    if (!tokenRecord.is_active) {
-      return NextResponse.json(
-        { error: 'Este link de acolhimento foi desativado.', code: 'TOKEN_INATIVO' },
-        { status: 410 }
-      );
-    }
-
-    // 3. Verificar expiração
-    if (tokenRecord.expires_at && new Date(tokenRecord.expires_at) <= new Date()) {
-      return NextResponse.json(
-        { error: 'Este link de acolhimento expirou.', code: 'TOKEN_EXPIRADO' },
-        { status: 410 }
-      );
-    }
-
-    // 4. Verificar existência e status do culto
-    const culto = tokenRecord.culto_registros as any;
-    if (!culto) {
-      return NextResponse.json(
-        { error: 'Culto vinculado a este link não foi encontrado.', code: 'CULTO_NAO_ENCONTRADO' },
-        { status: 404 }
-      );
-    }
-
-    if (culto.status !== 'Aberto') {
-      const statusLabel = culto.status ? culto.status.toLowerCase() : 'finalizado';
-      return NextResponse.json(
-        {
-          error: `O culto já foi ${statusLabel} e não está mais aceitando novos registros de acolhimento.`,
-          code: 'CULTO_ENCERRADO',
-        },
-        { status: 410 }
-      );
-    }
-
-    // 5. Buscar nome da igreja e configurações do ministério (church_profile)
-    let igrejaNome = 'Gestão Eklésia';
+    // 2. Buscar configurações do ministério (church_profile) para logo e app_url
     let appUrl: string | null = null;
+    let logoUrl: string | null = null;
+    let igrejaNome = 'Gestão Eklésia';
 
-    // Busca dados em configurations (church_profile)
     const { data: configRow } = await admin
       .from('configurations')
       .select('church_profile')
@@ -112,14 +79,102 @@ export async function GET(
       appUrl = churchProfile.aplicativo_url.trim();
     }
 
-    // Fallback de nome da igreja
+    const culto = tokenRecord.culto_registros as any;
+
+    if (churchProfile.logo && typeof churchProfile.logo === 'string' && churchProfile.logo.trim()) {
+      logoUrl = churchProfile.logo.trim();
+    } else if (culto?.ministries?.logo_url) {
+      logoUrl = culto.ministries.logo_url;
+    }
+
     if (churchProfile.nome && typeof churchProfile.nome === 'string' && churchProfile.nome.trim()) {
       igrejaNome = churchProfile.nome.trim();
-    } else if (culto.ministries?.name) {
+    } else if (culto?.ministries?.name) {
       igrejaNome = culto.ministries.name;
     }
 
-    // 6. Retornar APENAS dados públicos seguros (sem IDs internos de ministry, congregacao ou culto)
+    // 3. Verificar se o token está ativo
+    if (!tokenRecord.is_active) {
+      return NextResponse.json(
+        {
+          error: 'Este link de acolhimento foi desativado.',
+          code: 'TOKEN_INATIVO',
+          app_url: appUrl,
+          igreja_nome: igrejaNome,
+          logo_url: logoUrl,
+        },
+        { status: 410 }
+      );
+    }
+
+    // 4. Verificar expiração do token (timestamp)
+    if (tokenRecord.expires_at && new Date(tokenRecord.expires_at) <= new Date()) {
+      return NextResponse.json(
+        {
+          error: 'Este link de acolhimento expirou.',
+          code: 'TOKEN_EXPIRADO',
+          app_url: appUrl,
+          igreja_nome: igrejaNome,
+          logo_url: logoUrl,
+        },
+        { status: 410 }
+      );
+    }
+
+    // 5. Verificar existência e dados do culto
+    if (!culto) {
+      return NextResponse.json(
+        { error: 'Culto vinculado a este link não foi encontrado.', code: 'CULTO_NAO_ENCONTRADO' },
+        { status: 404 }
+      );
+    }
+
+    // 6. Validação estrita de janela do culto (Data local de hoje e Status)
+    const validacaoJanela = isCultoAbertoHoje(culto.data_culto, culto.status);
+
+    if (!validacaoJanela.elegivel) {
+      if (validacaoJanela.motivo === 'CULTO_ENCERRADO') {
+        const statusLabel = culto.status ? culto.status.toLowerCase() : 'finalizado';
+        return NextResponse.json(
+          {
+            error: `O culto já foi ${statusLabel} e não está mais aceitando novos registros de acolhimento.`,
+            code: 'CULTO_ENCERRADO',
+            app_url: appUrl,
+            igreja_nome: igrejaNome,
+            logo_url: logoUrl,
+          },
+          { status: 410 }
+        );
+      }
+
+      if (validacaoJanela.motivo === 'CULTO_PASSADO') {
+        return NextResponse.json(
+          {
+            error: 'A janela de acolhimento para este culto já foi encerrada.',
+            code: 'CULTO_PASSADO',
+            app_url: appUrl,
+            igreja_nome: igrejaNome,
+            logo_url: logoUrl,
+          },
+          { status: 410 }
+        );
+      }
+
+      if (validacaoJanela.motivo === 'CULTO_FUTURO') {
+        return NextResponse.json(
+          {
+            error: 'Este culto está programado para uma data futura. O acolhimento será aberto na data do culto.',
+            code: 'CULTO_FUTURO',
+            app_url: appUrl,
+            igreja_nome: igrejaNome,
+            logo_url: logoUrl,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    // 7. Retornar APENAS dados públicos seguros (sem expor IDs de tenants ou PKs)
     return NextResponse.json({
       valido: true,
       culto: {
@@ -128,6 +183,7 @@ export async function GET(
         horario_culto: culto.horario_culto,
         congregacao_nome: culto.congregacoes?.nome || 'Congregação Local',
         igreja_nome: igrejaNome,
+        logo_url: logoUrl,
         app_url: appUrl,
       },
     });
