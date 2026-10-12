@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 import {
   createInitialChatState,
   processChatAction,
+  normalizeAppUrl,
+  isValidAppUrl,
 } from '../src/lib/acolhimento-chat-states';
 import { isCultoAbertoHoje, getLocalDateStr } from '../src/lib/timezone-utils';
 import { isPublicAcolhimentoPath } from '../src/lib/public-routes';
@@ -276,5 +278,50 @@ describe('Agente Inteligente de Acolhimento - Landing, Recorrente e Expiração'
       assert.equal(res.nextState.messages.length, sFinalizado.messages.length);
     });
   });
+
+  describe('7. Propagação e Visibilidade Condicional do Botão do Aplicativo', () => {
+    it('propaga app_url e appUrl a partir da resposta da API com formato snake_case ou camelCase', () => {
+      // Simula resposta da API contendo culto.app_url
+      const apiResponse = {
+        valido: true,
+        app_url: 'https://app.gestaoeklesia.com.br/download',
+        culto: {
+          tipo_culto: 'Culto de Celebração',
+          app_url: 'https://app.gestaoeklesia.com.br/download',
+        },
+      };
+
+      const resolvedAppUrl = apiResponse.culto.app_url || apiResponse.app_url;
+      const context = {
+        appUrl: resolvedAppUrl,
+        app_url: resolvedAppUrl,
+      };
+
+      const targetUrl = normalizeAppUrl(context.appUrl || context.app_url);
+      assert.equal(targetUrl, 'https://app.gestaoeklesia.com.br/download');
+      assert.equal(isValidAppUrl(targetUrl), true);
+    });
+
+    it('quando a URL está ausente ou vazia no church_profile, o botão é ocultado e a mensagem permanece', () => {
+      const contextSemUrl = {
+        appUrl: null,
+        app_url: null,
+      };
+
+      const targetUrl = normalizeAppUrl(contextSemUrl.appUrl || contextSemUrl.app_url);
+      assert.equal(targetUrl, null);
+      assert.equal(isValidAppUrl(targetUrl), false);
+    });
+
+    it('normaliza URLs sem protocolo informadas pelo usuário para https:// seguro', () => {
+      const contextSemProtocolo = {
+        app_url: 'app.minhaigreja.org.br',
+      };
+
+      const targetUrl = normalizeAppUrl(contextSemProtocolo.app_url);
+      assert.equal(targetUrl, 'https://app.minhaigreja.org.br');
+    });
+  });
 });
+
 

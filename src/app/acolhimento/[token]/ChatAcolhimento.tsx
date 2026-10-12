@@ -18,7 +18,7 @@ import {
   createInitialChatState,
   processChatAction,
   QuickReply,
-  isValidAppUrl,
+  normalizeAppUrl,
 } from '@/lib/acolhimento-chat-states';
 import { formatPhone } from '@/lib/mascaras';
 
@@ -255,9 +255,21 @@ export default function ChatAcolhimento({ token, context }: ChatAcolhimentoProps
 
   // 1. Tela Final Dedicada de Acolhimento Concluído
   if (chatState.currentStep === 'FINALIZADO' || submitSuccess) {
-    const hasValidAppUrl = isValidAppUrl(context.appUrl);
+    const rawAppUrl = context.appUrl || context.app_url;
+    const targetAppUrl = normalizeAppUrl(rawAppUrl);
     const igrejaNomeExibicao = context.igrejaNome || 'IEADMI — ASSEMBLEIA DE DEUS DE MISSÕES';
     const congregacaoNomeExibicao = context.congregacaoNome || 'TEMPLO CENTRAL';
+
+    const handleOpenApp = (e: React.MouseEvent<HTMLAnchorElement>) => {
+      if (targetAppUrl) {
+        e.preventDefault();
+        try {
+          window.open(targetAppUrl, '_blank', 'noopener,noreferrer');
+        } catch {
+          window.location.href = targetAppUrl;
+        }
+      }
+    };
 
     return (
       <div className="min-h-[100dvh] w-full flex flex-col justify-between bg-[#0A2E63] bg-[url('/img/BG_acolhimento.png')] bg-cover bg-top bg-no-repeat overflow-x-hidden selection:bg-sky-500 selection:text-white">
@@ -312,9 +324,25 @@ export default function ChatAcolhimento({ token, context }: ChatAcolhimentoProps
             {/* Traço decorativo dourado */}
             <div className="w-12 h-1 bg-amber-400 rounded-full mx-auto my-3 shadow-xs" />
 
+            {/* Mensagem de agradecimento */}
             <p className="text-slate-700 text-xs sm:text-sm leading-relaxed mb-4">
               Agradecemos de coração pela sua visita hoje, <strong className="font-bold text-slate-900">{chatState.data.nome}</strong>! Que este culto seja um canal de grandes bênçãos na sua vida e na sua família.
             </p>
+
+            {/* Botão Destacado do Aplicativo Oficial (abaixo da mensagem de agradecimento e antes das boas-vindas) */}
+            {targetAppUrl && (
+              <a
+                href={targetAppUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={handleOpenApp}
+                className="w-full py-3.5 px-4 my-3 bg-gradient-to-r from-[#0066FF] to-[#0052CC] hover:from-[#005AE6] hover:to-[#0047B3] text-white rounded-2xl font-bold text-xs sm:text-sm shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer border border-blue-400/30"
+              >
+                <span>📱</span>
+                <span>Acessar Aplicativo da Igreja</span>
+                <ExternalLink className="w-3.5 h-3.5 text-white/80 shrink-0" />
+              </a>
+            )}
 
             {/* Card Institucional */}
             <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-2xl text-left flex items-start gap-3 mb-4">
@@ -324,20 +352,7 @@ export default function ChatAcolhimento({ token, context }: ChatAcolhimentoProps
               </p>
             </div>
 
-            {/* Botão Destacado do Aplicativo Oficial (exibido exclusivamente quando URL configurada e validada) */}
-            {hasValidAppUrl && (
-              <a
-                href={context.appUrl!.trim()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-3.5 px-4 bg-gradient-to-r from-[#0066FF] to-[#0052CC] hover:from-[#005AE6] hover:to-[#0047B3] text-white rounded-2xl font-bold text-xs sm:text-sm shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer mb-4"
-              >
-                <span>📱</span>
-                <span>Acessar Aplicativo da Igreja</span>
-                <ExternalLink className="w-3.5 h-3.5 text-white/80" />
-              </a>
-            )}
-
+            {/* Mensagem de boas-vindas final */}
             <div className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-semibold bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-200/60">
               <Heart className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" />
               Você é sempre bem-vindo(a)!

@@ -109,6 +109,8 @@ export default function PublicAcolhimentoChatPage({
         return;
       }
 
+      const resolvedAppUrl = data.culto.app_url || data.app_url || null;
+
       setCultoContext({
         tipoCulto: data.culto.tipo_culto,
         dataCulto: data.culto.data_culto,
@@ -116,7 +118,8 @@ export default function PublicAcolhimentoChatPage({
         congregacaoNome: data.culto.congregacao_nome,
         igrejaNome: data.culto.igreja_nome,
         logoUrl: data.culto.logo_url || null,
-        appUrl: data.culto.app_url || null,
+        appUrl: resolvedAppUrl,
+        app_url: resolvedAppUrl,
       });
     } catch (err) {
       console.error('[PublicAcolhimento] Erro ao carregar dados:', err);

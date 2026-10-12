@@ -25,6 +25,7 @@ export interface ChatCultoContext {
   igrejaNome?: string;
   logoUrl?: string | null;
   appUrl?: string | null;
+  app_url?: string | null;
 }
 
 export interface AcolhimentoData {
@@ -278,18 +279,42 @@ export function getWelcomeMessage(context: ChatCultoContext = {}): string {
 }
 
 /**
- * Valida se a URL fornecida para o aplicativo da igreja é válida e possui protocolo http/https.
+ * Normaliza e valida a URL do aplicativo da igreja, garantindo protocolo navegável http:// ou https://.
+ */
+export function normalizeAppUrl(raw?: string | null): string | null {
+  if (!raw || typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  // Se já possui protocolo http ou https
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      new URL(trimmed);
+      return trimmed;
+    } catch {
+      return null;
+    }
+  }
+
+  // Se for um domínio sem protocolo explícito (ex: app.gestaoeklesia.com.br ou site.org/app)
+  if (/^[a-zA-Z0-9][a-zA-Z0-9-_.]+\.[a-zA-Z]{2,}(\/.*)?$/i.test(trimmed)) {
+    const withHttps = `https://${trimmed}`;
+    try {
+      new URL(withHttps);
+      return withHttps;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Valida se a URL fornecida para o aplicativo da igreja é válida e pode ser acessada.
  */
 export function isValidAppUrl(url?: string | null): url is string {
-  if (!url || typeof url !== 'string') return false;
-  const trimmed = url.trim();
-  if (!trimmed) return false;
-  try {
-    const parsed = new URL(trimmed);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-  } catch {
-    return false;
-  }
+  return normalizeAppUrl(url) !== null;
 }
 
 /**
@@ -298,7 +323,8 @@ export function isValidAppUrl(url?: string | null): url is string {
 export function getSuccessMessage(nome: string, context: ChatCultoContext = {}): string {
   let msg = `Glória a Deus! Tudo confirmado com sucesso, ${nome}! 🎉\n\nNossa congregação se alegra grandemente em ter você conosco hoje. Sinta-se em casa e que o Senhor fale profundamente ao seu coração durante esta ministração! 🙏💙`;
 
-  if (isValidAppUrl(context.appUrl)) {
+  const appUrl = context.appUrl || context.app_url;
+  if (isValidAppUrl(appUrl)) {
     msg += `\n\n📱 Baixe ou acesse também o aplicativo oficial da nossa igreja para acompanhar programações, estudos e avisos!`;
   }
 

@@ -177,6 +177,9 @@ export async function GET(
     // 7. Retornar APENAS dados públicos seguros (sem expor IDs de tenants ou PKs)
     return NextResponse.json({
       valido: true,
+      app_url: appUrl,
+      igreja_nome: igrejaNome,
+      logo_url: logoUrl,
       culto: {
         tipo_culto: culto.tipo_culto,
         data_culto: culto.data_culto,
