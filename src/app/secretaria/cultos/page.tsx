@@ -337,7 +337,7 @@ export default function CultosPage() {
       }
 
       if (tokenValue) {
-        const url = `${window.location.origin}/formularios/cultos/${tokenValue}`;
+        const url = `${window.location.origin}/acolhimento/${tokenValue}`;
         setLinkUrl(url);
       }
     } catch (err) {
