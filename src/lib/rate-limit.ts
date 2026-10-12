@@ -8,7 +8,7 @@ interface RateLimitStore {
 const ipRequestMap = new Map<string, RateLimitStore>();
 
 // Limpar registros antigos da memória a cada 5 minutos
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [ip, record] of ipRequestMap.entries()) {
     if (now > record.resetAt) {
@@ -16,6 +16,9 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000);
+if (typeof cleanupInterval.unref === 'function') {
+  cleanupInterval.unref();
+}
 
 export function getClientIp(req: NextRequest): string {
   const xForwardedFor = req.headers.get('x-forwarded-for');
