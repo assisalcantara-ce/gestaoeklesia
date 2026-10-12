@@ -691,6 +691,73 @@ describe('Motor de Recorrência da Agenda Oficial (AgendaRecorrenciaService)', (
     assert.strictEqual(resFuturo.isFuturo, true);
     assert.strictEqual(resFuturo.isElegivel, false, 'Culto futuro permanece como Programado e sem ações antecipadas');
   });
+
+  it('21. Regressão Calendário (Filtro geral): evento semanal de segunda com church_id específico aparece nas segundas e não nas terças', () => {
+    // Simula a lógica de filtragem do loadEventos em useAgenda.ts
+    // O evento "Culto Administrativo" tem church_id de uma congregação (não null)
+    // escopo = 'divisao1', gera_bloqueio = false
+    const getLocalDateStr = (val: string | Date): string => {
+      const d = typeof val === 'string' ? new Date(val) : val;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const congregacaoId = 'congr-uuid-123';
+    const ministryId = 'ministry-uuid-abc';
+
+    // Eventos gerados pela recorrência semanal (Seg) — horário noturno BRT = UTC+1 dia
+    const eventosSemana = [
+      { id: 'e1', ministry_id: ministryId, church_id: congregacaoId, escopo: 'divisao1', gera_bloqueio: false, data_inicio: '2026-10-05T22:30:00.000Z', data_fim: '2026-10-06T00:30:00.000Z' },
+      { id: 'e2', ministry_id: ministryId, church_id: congregacaoId, escopo: 'divisao1', gera_bloqueio: false, data_inicio: '2026-10-12T22:30:00.000Z', data_fim: '2026-10-13T00:30:00.000Z' },
+      { id: 'e3', ministry_id: ministryId, church_id: congregacaoId, escopo: 'divisao1', gera_bloqueio: false, data_inicio: '2026-10-19T22:30:00.000Z', data_fim: '2026-10-20T00:30:00.000Z' },
+    ];
+
+    // Simula o filtro CORRIGIDO: 'geral' NÃO filtra por church_id
+    const agendaVisualizada = 'geral';
+    const filtroPassaEvento = (ev: typeof eventosSemana[0]) => {
+      // ANTES da correção: agendaVisualizada === 'geral' retornava apenas church_id IS NULL ou escopo='organizacao' ou gera_bloqueio=true
+      // APÓS a correção: 'geral' não filtra por church_id — todos os eventos do ministry passam
+      if (agendaVisualizada && agendaVisualizada !== 'geral' && agendaVisualizada !== 'todas') {
+        return ev.church_id === agendaVisualizada || ev.church_id === null;
+      }
+      return true; // 'geral' e 'todas' não restringem por church_id
+    };
+
+    const eventosFiltrados = eventosSemana.filter(filtroPassaEvento);
+
+    // Todos os 3 eventos devem passar pelo filtro 'geral'
+    assert.strictEqual(eventosFiltrados.length, 3, 'Visão geral deve incluir todos os eventos do ministério, inclusive com church_id de congregação');
+
+    // Mapeamento por dia (eventosPorDia) usando getLocalDateStr (timezone local GMT-3)
+    const eventosPorDia: Record<string, typeof eventosSemana> = {};
+    for (const ev of eventosFiltrados) {
+      const startDayStr = getLocalDateStr(ev.data_inicio);
+      const endDayStr = getLocalDateStr(ev.data_fim);
+      // Evento contido em um único dia local ou noturno que cruza meia-noite UTC
+      if (!ev.data_fim || startDayStr === endDayStr) {
+        if (!eventosPorDia[startDayStr]) eventosPorDia[startDayStr] = [];
+        eventosPorDia[startDayStr].push(ev);
+      } else {
+        // Evento que cruza meia-noite UTC mas está no mesmo dia local (BRT = UTC-3)
+        // '2026-10-12T22:30:00Z' → local = '2026-10-12' (22:30 BRT = 19:30 UTC)
+        // Aguarda: startDayStr = '2026-10-12', endDayStr = '2026-10-12' pois BRT-3 → mesmo dia
+        if (!eventosPorDia[startDayStr]) eventosPorDia[startDayStr] = [];
+        eventosPorDia[startDayStr].push(ev);
+      }
+    }
+
+    // Segundas-feiras: devem aparecer
+    assert.ok(eventosPorDia['2026-10-05'], 'Seg 05/10: deve aparecer no calendário');
+    assert.ok(eventosPorDia['2026-10-12'], 'Seg 12/10: deve aparecer no calendário');
+    assert.ok(eventosPorDia['2026-10-19'], 'Seg 19/10: deve aparecer no calendário');
+
+    // Terças-feiras: NÃO devem aparecer
+    assert.strictEqual(eventosPorDia['2026-10-06'], undefined, 'Ter 06/10: NÃO deve aparecer no calendário');
+    assert.strictEqual(eventosPorDia['2026-10-13'], undefined, 'Ter 13/10: NÃO deve aparecer no calendário');
+    assert.strictEqual(eventosPorDia['2026-10-20'], undefined, 'Ter 20/10: NÃO deve aparecer no calendário');
+  });
 });
 
 

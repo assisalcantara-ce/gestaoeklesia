@@ -493,9 +493,10 @@ export function useAgenda() {
       }
 
       // Seletor Superior: Visualizar Agenda
-      if (agendaVisualizada === 'geral') {
-        query = query.or('church_id.is.null,escopo.eq.organizacao,gera_bloqueio.eq.true');
-      } else if (agendaVisualizada && agendaVisualizada !== 'todas') {
+      // NOTA: 'geral' e 'todas' não filtram por church_id — o ministry_id já garante
+      // isolamento de tenant. Filtrar por escopo/gera_bloqueio na visão 'geral' causava
+      // o desaparecimento de cultos criados com church_id de congregação específica.
+      if (agendaVisualizada && agendaVisualizada !== 'geral' && agendaVisualizada !== 'todas') {
         // Congregação específica ou Sede:
         // Exibe os eventos da própria unidade + eventos gerais/bloqueios do ministério
         query = query.or(`church_id.eq.${agendaVisualizada},church_id.is.null`);
