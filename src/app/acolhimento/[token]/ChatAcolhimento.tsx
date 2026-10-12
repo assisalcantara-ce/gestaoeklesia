@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   Heart,
   Church,
-  Smartphone,
   ExternalLink,
 } from 'lucide-react';
 import {
@@ -19,6 +18,7 @@ import {
   createInitialChatState,
   processChatAction,
   QuickReply,
+  isValidAppUrl,
 } from '@/lib/acolhimento-chat-states';
 import { formatPhone } from '@/lib/mascaras';
 
@@ -255,41 +255,53 @@ export default function ChatAcolhimento({ token, context }: ChatAcolhimentoProps
 
   // 1. Tela Final Dedicada de Acolhimento Concluído
   if (chatState.currentStep === 'FINALIZADO' || submitSuccess) {
+    const hasValidAppUrl = isValidAppUrl(context.appUrl);
+    const igrejaNomeExibicao = context.igrejaNome || 'IEADMI — ASSEMBLEIA DE DEUS DE MISSÕES';
+    const congregacaoNomeExibicao = context.congregacaoNome || 'TEMPLO CENTRAL';
+
     return (
       <div className="min-h-[100dvh] w-full flex flex-col justify-between bg-[#0A2E63] bg-[url('/img/BG_acolhimento.png')] bg-cover bg-top bg-no-repeat overflow-x-hidden selection:bg-sky-500 selection:text-white">
-        <div className="max-w-md w-full mx-auto px-4 py-4 sm:py-6 flex flex-col min-h-[100dvh] justify-between">
-          {/* Topo / Identidade Visual */}
-          <header className="pt-2 sm:pt-4 text-center flex flex-col items-center">
-            {context.logoUrl ? (
-              <img
-                src={context.logoUrl}
-                alt={context.igrejaNome || 'Logo'}
-                className="h-12 sm:h-14 w-auto object-contain max-w-[200px] mb-1 drop-shadow-sm"
-              />
-            ) : (
-              <img
-                src="/img/logoh.png"
-                alt="Gestão Eklésia"
-                className="h-11 sm:h-13 w-auto object-contain max-w-[190px] mb-1 drop-shadow-sm"
-              />
-            )}
+        <div className="max-w-md w-full mx-auto px-4 py-3 sm:py-5 flex flex-col min-h-[100dvh] justify-between">
+          {/* Topo / Cabeçalho Institucional Reorganizado */}
+          <header className="pt-2 sm:pt-3 w-full shrink-0">
+            <div className="bg-white/90 backdrop-blur-md px-3.5 py-2.5 rounded-2xl shadow-md border border-white/80 flex items-center gap-3">
+              {/* Logomarca da igreja à esquerda */}
+              <div className="shrink-0 flex items-center justify-center">
+                {context.logoUrl ? (
+                  <img
+                    src={context.logoUrl}
+                    alt={igrejaNomeExibicao}
+                    className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl object-contain bg-white border border-slate-200/80 shadow-xs"
+                  />
+                ) : (
+                  <img
+                    src="/img/logoh.png"
+                    alt="Gestão Eklésia"
+                    className="h-9 sm:h-10 w-auto object-contain max-w-[85px] drop-shadow-xs"
+                  />
+                )}
+              </div>
 
-            <h2 className="text-[#062E6F] text-[11px] sm:text-xs font-black tracking-wider uppercase leading-tight max-w-[290px]">
-              {context.igrejaNome || 'IEADMI - ASSEMBLEIA DE DEUS DE MISSÕES'}
-            </h2>
-            <p className="text-[#062E6F]/80 text-[10px] sm:text-[11px] font-bold tracking-widest uppercase mt-0.5">
-              {context.congregacaoNome || 'TEMPLO CENTRAL'}
-            </p>
+              {/* Nome do Ministério e Congregação ao lado */}
+              <div className="flex flex-col min-w-0 flex-1 text-left">
+                <h2 className="text-[#062E6F] text-xs sm:text-[13px] font-black tracking-tight uppercase leading-snug truncate">
+                  {igrejaNomeExibicao}
+                </h2>
+                <p className="text-[#0066FF] text-[10px] sm:text-[11px] font-extrabold tracking-wider uppercase mt-0.5 truncate">
+                  {congregacaoNomeExibicao}
+                </p>
+              </div>
+            </div>
           </header>
 
-          {/* Espaço flexível */}
-          <div className="h-16 sm:h-24 pointer-events-none" aria-hidden="true" />
+          {/* Espaço livre superior para valorizar a fotografia */}
+          <div className="h-6 sm:h-10 pointer-events-none" aria-hidden="true" />
 
           {/* Card Central de Sucesso Dedicado */}
-          <main className="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-white/80 text-center my-auto">
+          <main className="bg-white rounded-3xl p-5 sm:p-7 shadow-2xl border border-white/80 text-center my-auto">
             {/* Ícone de Sucesso */}
-            <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-500 text-white rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/25">
-              <CheckCircle2 className="w-9 h-9" />
+            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-emerald-400 to-teal-500 text-white rounded-3xl flex items-center justify-center mx-auto mb-3 sm:mb-4 shadow-lg shadow-emerald-500/25">
+              <CheckCircle2 className="w-8 h-8 sm:w-9 sm:h-9" />
             </div>
 
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight mb-2">
@@ -304,36 +316,26 @@ export default function ChatAcolhimento({ token, context }: ChatAcolhimentoProps
               Agradecemos de coração pela sua visita hoje, <strong className="font-bold text-slate-900">{chatState.data.nome}</strong>! Que este culto seja um canal de grandes bênçãos na sua vida e na sua família.
             </p>
 
-            {/* Convite para o Aplicativo Oficial (apenas quando appUrl configurado) */}
-            {context.appUrl && context.appUrl.trim() ? (
-              <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl text-left mb-4 shadow-xs">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Smartphone className="w-4 h-4 text-[#0066FF]" />
-                  <h3 className="text-xs font-bold text-slate-900">
-                    Fique conectado(a) com a nossa igreja
-                  </h3>
-                </div>
-                <p className="text-[11px] text-slate-600 leading-relaxed mb-3">
-                  Acompanhe programações semanais, estudos, avisos e envie novos pedidos de oração a qualquer momento pelo nosso app oficial!
-                </p>
-                <a
-                  href={context.appUrl.trim()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-[#0066FF] to-[#0052CC] hover:from-[#005AE6] hover:to-[#0047B3] text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 active:scale-98"
-                >
-                  <Smartphone className="w-4 h-4 text-white/90" />
-                  <span>Acessar Aplicativo da Igreja</span>
-                  <ExternalLink className="w-3.5 h-3.5 text-white/80" />
-                </a>
-              </div>
-            ) : (
-              <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-2xl text-left flex items-start gap-3 mb-4">
-                <Church className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-900 leading-relaxed">
-                  Nossa congregação está de braços abertos para você e sua família. Sinta-se em casa em todos os nossos cultos!
-                </p>
-              </div>
+            {/* Card Institucional */}
+            <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-2xl text-left flex items-start gap-3 mb-4">
+              <Church className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-900 leading-relaxed">
+                Nossa congregação está de braços abertos para você e sua família. Sinta-se em casa em todos os nossos cultos!
+              </p>
+            </div>
+
+            {/* Botão Destacado do Aplicativo Oficial (exibido exclusivamente quando URL configurada e validada) */}
+            {hasValidAppUrl && (
+              <a
+                href={context.appUrl!.trim()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-[#0066FF] to-[#0052CC] hover:from-[#005AE6] hover:to-[#0047B3] text-white rounded-2xl font-bold text-xs sm:text-sm shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer mb-4"
+              >
+                <span>📱</span>
+                <span>Acessar Aplicativo da Igreja</span>
+                <ExternalLink className="w-3.5 h-3.5 text-white/80" />
+              </a>
             )}
 
             <div className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-semibold bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-200/60">
@@ -343,8 +345,8 @@ export default function ChatAcolhimento({ token, context }: ChatAcolhimentoProps
           </main>
 
           {/* Rodapé Seguro LGPD */}
-          <footer className="pb-2 text-center">
-            <p className="text-[11px] text-blue-200/70 flex items-center justify-center gap-1.5 font-medium">
+          <footer className="pb-1 sm:pb-2 text-center shrink-0">
+            <p className="text-[11px] text-blue-200/80 flex items-center justify-center gap-1.5 font-medium drop-shadow-xs">
               <ShieldCheck className="w-3.5 h-3.5 text-blue-300" />
               Seus dados são protegidos e tratados em conformidade com a LGPD
             </p>

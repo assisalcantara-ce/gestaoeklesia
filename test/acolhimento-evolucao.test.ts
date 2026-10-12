@@ -4,6 +4,7 @@ import {
   createInitialChatState,
   processChatAction,
   getSuccessMessage,
+  isValidAppUrl,
 } from '../src/lib/acolhimento-chat-states';
 import { normalizeBrazilianPhone, getPhoneSearchVariants } from '../src/lib/telefone-utils';
 
@@ -185,7 +186,22 @@ describe('Agente Inteligente de Acolhimento - Evolução 1 & 2', () => {
   });
 
   describe('3. Mensagem Final e Link do Aplicativo', () => {
-    it('gera mensagem final com link do aplicativo quando appUrl está configurado', () => {
+    it('isValidAppUrl: valida exclusivamente URLs completas com protocolo HTTP ou HTTPS', () => {
+      assert.equal(isValidAppUrl('https://app.gestaoeklesia.com.br'), true);
+      assert.equal(isValidAppUrl('http://app.igreja.com.br/download'), true);
+      assert.equal(isValidAppUrl('https://play.google.com/store/apps/details?id=com.gestaoeklesia'), true);
+
+      // Rejeita valores inválidos, nulos ou sem protocolo
+      assert.equal(isValidAppUrl(null), false);
+      assert.equal(isValidAppUrl(undefined), false);
+      assert.equal(isValidAppUrl(''), false);
+      assert.equal(isValidAppUrl('   '), false);
+      assert.equal(isValidAppUrl('app.gestaoeklesia.com.br'), false);
+      assert.equal(isValidAppUrl('javascript:alert(1)'), false);
+      assert.equal(isValidAppUrl('data:text/html,<html></html>'), false);
+    });
+
+    it('gera mensagem final com link do aplicativo quando appUrl está configurado e válido', () => {
       const msgComApp = getSuccessMessage('Carlos Eduardo', {
         appUrl: 'https://app.gestaoeklesia.com.br',
       });
@@ -194,14 +210,16 @@ describe('Agente Inteligente de Acolhimento - Evolução 1 & 2', () => {
       assert.match(msgComApp, /aplicativo oficial da nossa igreja/i);
     });
 
-    it('gera mensagem final limpa sem menção de aplicativo quando appUrl está nulo ou vazio', () => {
+    it('gera mensagem final limpa sem menção de aplicativo quando appUrl está nulo, vazio ou inválido', () => {
       const msgSemApp1 = getSuccessMessage('Ana Paula', {});
       const msgSemApp2 = getSuccessMessage('Ana Paula', { appUrl: null });
       const msgSemApp3 = getSuccessMessage('Ana Paula', { appUrl: '   ' });
+      const msgSemApp4 = getSuccessMessage('Ana Paula', { appUrl: 'invalido-sem-protocolo' });
 
       assert.doesNotMatch(msgSemApp1, /aplicativo oficial/i);
       assert.doesNotMatch(msgSemApp2, /aplicativo oficial/i);
       assert.doesNotMatch(msgSemApp3, /aplicativo oficial/i);
+      assert.doesNotMatch(msgSemApp4, /aplicativo oficial/i);
       assert.match(msgSemApp1, /Ana Paula/);
     });
   });

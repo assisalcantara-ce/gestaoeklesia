@@ -278,12 +278,27 @@ export function getWelcomeMessage(context: ChatCultoContext = {}): string {
 }
 
 /**
+ * Valida se a URL fornecida para o aplicativo da igreja é válida e possui protocolo http/https.
+ */
+export function isValidAppUrl(url?: string | null): url is string {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Gera mensagem de sucesso final personalizada e agradecimento, com convite ao aplicativo.
  */
 export function getSuccessMessage(nome: string, context: ChatCultoContext = {}): string {
   let msg = `Glória a Deus! Tudo confirmado com sucesso, ${nome}! 🎉\n\nNossa congregação se alegra grandemente em ter você conosco hoje. Sinta-se em casa e que o Senhor fale profundamente ao seu coração durante esta ministração! 🙏💙`;
 
-  if (context.appUrl && context.appUrl.trim()) {
+  if (isValidAppUrl(context.appUrl)) {
     msg += `\n\n📱 Baixe ou acesse também o aplicativo oficial da nossa igreja para acompanhar programações, estudos e avisos!`;
   }
 

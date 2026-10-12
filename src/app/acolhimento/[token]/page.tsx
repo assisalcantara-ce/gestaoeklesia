@@ -14,7 +14,7 @@ import {
   Lock,
 } from 'lucide-react';
 import ChatAcolhimento from './ChatAcolhimento';
-import { ChatCultoContext } from '@/lib/acolhimento-chat-states';
+import { ChatCultoContext, isValidAppUrl } from '@/lib/acolhimento-chat-states';
 
 interface PublicCultoResponse {
   valido: boolean;
@@ -192,8 +192,8 @@ export default function PublicAcolhimentoChatPage({
             {errorInfo?.message || 'A janela de acolhimento para este culto já foi encerrada.'}
           </p>
 
-          {/* Convite para o Aplicativo Oficial quando configurado */}
-          {appUrl && appUrl.trim() ? (
+          {/* Convite para o Aplicativo Oficial quando configurado e validado */}
+          {isValidAppUrl(appUrl) ? (
             <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl mb-6 text-left">
               <div className="flex items-center gap-2 mb-2">
                 <Smartphone className="w-5 h-5 text-blue-700" />
@@ -241,36 +241,46 @@ export default function PublicAcolhimentoChatPage({
   // 3. Landing Pública de Apresentação (com o fundo oficial e layout fiel à referência)
   if (!chatIniciado) {
     const dataFormatada = formatarDataExtenso(cultoContext.dataCulto);
+    const igrejaNomeExibicao = cultoContext.igrejaNome || 'IEADMI — ASSEMBLEIA DE DEUS DE MISSÕES';
+    const congregacaoNomeExibicao = cultoContext.congregacaoNome || 'TEMPLO CENTRAL';
 
     return (
       <div className="min-h-[100dvh] w-full flex flex-col justify-between bg-[#0A2E63] bg-[url('/img/BG_acolhimento.png')] bg-cover bg-top bg-no-repeat overflow-x-hidden">
-        <div className="max-w-md w-full mx-auto px-4 py-4 sm:py-6 flex flex-col min-h-[100dvh] justify-between">
-          {/* Topo / Identidade Visual */}
-          <header className="pt-2 sm:pt-4 text-center flex flex-col items-center">
-            {cultoContext.logoUrl ? (
-              <img
-                src={cultoContext.logoUrl}
-                alt={cultoContext.igrejaNome || 'Logo'}
-                className="h-12 sm:h-14 w-auto object-contain max-w-[200px] mb-1 drop-shadow-sm"
-              />
-            ) : (
-              <img
-                src="/img/logoh.png"
-                alt="Gestão Eklésia"
-                className="h-11 sm:h-13 w-auto object-contain max-w-[190px] mb-1 drop-shadow-sm"
-              />
-            )}
+        <div className="max-w-md w-full mx-auto px-4 py-3 sm:py-5 flex flex-col min-h-[100dvh] justify-between">
+          {/* Topo / Cabeçalho Institucional Reorganizado */}
+          <header className="pt-2 sm:pt-3 w-full shrink-0">
+            <div className="bg-white/90 backdrop-blur-md px-3.5 py-2.5 rounded-2xl shadow-md border border-white/80 flex items-center gap-3">
+              {/* Logomarca da igreja à esquerda */}
+              <div className="shrink-0 flex items-center justify-center">
+                {cultoContext.logoUrl ? (
+                  <img
+                    src={cultoContext.logoUrl}
+                    alt={igrejaNomeExibicao}
+                    className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl object-contain bg-white border border-slate-200/80 shadow-xs"
+                  />
+                ) : (
+                  <img
+                    src="/img/logoh.png"
+                    alt="Gestão Eklésia"
+                    className="h-9 sm:h-10 w-auto object-contain max-w-[85px] drop-shadow-xs"
+                  />
+                )}
+              </div>
 
-            <h2 className="text-[#062E6F] text-[11px] sm:text-xs font-black tracking-wider uppercase leading-tight max-w-[290px]">
-              {cultoContext.igrejaNome || 'IEADMI - ASSEMBLEIA DE DEUS DE MISSÕES'}
-            </h2>
-            <p className="text-[#062E6F]/80 text-[10px] sm:text-[11px] font-bold tracking-widest uppercase mt-0.5">
-              {cultoContext.congregacaoNome || 'TEMPLO CENTRAL'}
-            </p>
+              {/* Nome do Ministério e Congregação ao lado */}
+              <div className="flex flex-col min-w-0 flex-1 text-left">
+                <h2 className="text-[#062E6F] text-xs sm:text-[13px] font-black tracking-tight uppercase leading-snug truncate">
+                  {igrejaNomeExibicao}
+                </h2>
+                <p className="text-[#0066FF] text-[10px] sm:text-[11px] font-extrabold tracking-wider uppercase mt-0.5 truncate">
+                  {congregacaoNomeExibicao}
+                </p>
+              </div>
+            </div>
           </header>
 
-          {/* Espaço flexível para visualização harmoniosa dos rostos da família na foto */}
-          <div className="h-28 sm:h-36 md:h-40 pointer-events-none" aria-hidden="true" />
+          {/* Espaço flexível para valorizar a fotografia */}
+          <div className="h-20 sm:h-28 md:h-32 pointer-events-none" aria-hidden="true" />
 
           {/* Bloco Central: Seja muito bem-vindo(a)! */}
           <main className="flex flex-col text-center">
