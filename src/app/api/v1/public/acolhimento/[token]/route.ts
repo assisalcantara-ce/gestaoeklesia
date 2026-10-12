@@ -94,16 +94,27 @@ export async function GET(
       );
     }
 
-    // 5. Buscar nome da igreja
+    // 5. Buscar nome da igreja e configurações do ministério (church_profile)
     let igrejaNome = 'Gestão Eklésia';
-    const { data: configIgreja } = await admin
-      .from('configuracoes_igreja')
-      .select('nome_igreja')
+    let appUrl: string | null = null;
+
+    // Busca dados em configurations (church_profile)
+    const { data: configRow } = await admin
+      .from('configurations')
+      .select('church_profile')
       .eq('ministry_id', tokenRecord.ministry_id)
       .maybeSingle();
 
-    if (configIgreja?.nome_igreja) {
-      igrejaNome = configIgreja.nome_igreja;
+    const churchProfile = (configRow as any)?.church_profile || {};
+    if (churchProfile.app_url && typeof churchProfile.app_url === 'string' && churchProfile.app_url.trim()) {
+      appUrl = churchProfile.app_url.trim();
+    } else if (churchProfile.aplicativo_url && typeof churchProfile.aplicativo_url === 'string' && churchProfile.aplicativo_url.trim()) {
+      appUrl = churchProfile.aplicativo_url.trim();
+    }
+
+    // Fallback de nome da igreja
+    if (churchProfile.nome && typeof churchProfile.nome === 'string' && churchProfile.nome.trim()) {
+      igrejaNome = churchProfile.nome.trim();
     } else if (culto.ministries?.name) {
       igrejaNome = culto.ministries.name;
     }
@@ -117,6 +128,7 @@ export async function GET(
         horario_culto: culto.horario_culto,
         congregacao_nome: culto.congregacoes?.nome || 'Congregação Local',
         igreja_nome: igrejaNome,
+        app_url: appUrl,
       },
     });
   } catch (err: any) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
-import { formatPhone, onlyDigits } from '@/lib/mascaras';
+import { normalizeBrazilianPhone, getPhoneSearchVariants } from '@/lib/telefone-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -131,22 +131,21 @@ export async function POST(
 
     // Validação do Telefone (se informado)
     let normalizedTelefone: string | null = null;
-    if (body.telefone && typeof body.telefone === 'string' && body.telefone.trim()) {
-      let digits = onlyDigits(body.telefone);
-      if ((digits.length === 12 || digits.length === 13) && digits.startsWith('55')) {
-        digits = digits.slice(2);
-      }
-      if (digits.startsWith('0')) {
-        digits = digits.slice(1);
-      }
+    let searchVariants: string[] = [];
 
-      if (digits.length < 10 || digits.length > 11) {
+    if (body.telefone && typeof body.telefone === 'string' && body.telefone.trim()) {
+      const phoneNorm = normalizeBrazilianPhone(body.telefone);
+      if (!phoneNorm.valid) {
         return NextResponse.json(
-          { error: 'Telefone/WhatsApp inválido. Forneça o número com DDD (10 ou 11 dígitos).', code: 'TELEFONE_INVALIDO' },
+          {
+            error: phoneNorm.error || 'Telefone/WhatsApp inválido. Forneça o número com DDD válido.',
+            code: phoneNorm.ambiguous ? 'TELEFONE_AMBIGUO' : 'TELEFONE_INVALIDO',
+          },
           { status: 400 }
         );
       }
-      normalizedTelefone = formatPhone(digits);
+      normalizedTelefone = phoneNorm.formatted;
+      searchVariants = getPhoneSearchVariants(phoneNorm.digits);
     }
 
     // Bairro
@@ -165,12 +164,12 @@ export async function POST(
         : null;
 
     // 4. Prevenção de duplicidade no mesmo culto
-    if (normalizedTelefone) {
+    if (normalizedTelefone && searchVariants.length > 0) {
       const { data: dupPhone } = await admin
         .from('culto_visitantes')
         .select('id, nome')
         .eq('culto_id', tokenRecord.culto_id)
-        .eq('telefone', normalizedTelefone)
+        .in('telefone', searchVariants)
         .maybeSingle();
 
       if (dupPhone) {

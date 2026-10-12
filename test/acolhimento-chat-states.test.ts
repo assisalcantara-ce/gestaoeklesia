@@ -72,7 +72,7 @@ describe('Agente Inteligente de Acolhimento - Máquina de Estados Pura', () => {
 
       const invalidoCurto = validatePhone('123456');
       assert.equal(invalidoCurto.valid, false);
-      assert.match(invalidoCurto.error || '', /WhatsApp válido/i);
+      assert.match(invalidoCurto.error || '', /incompleto ou inválido/i);
     });
 
     it('5. validateBairro: aceita texto, trunca acima de 100 caracteres ou aceita pular', () => {
@@ -135,39 +135,46 @@ describe('Agente Inteligente de Acolhimento - Máquina de Estados Pura', () => {
   });
 
   describe('Transições e Fluxo Conversacional Completo', () => {
-    it('9. Fluxo completo passo a passo com preenchimento total de dados', () => {
+    it('9. Fluxo completo passo a passo com preenchimento total de dados (começando com TELEFONE)', () => {
       let state = createInitialChatState({
         tipoCulto: 'Culto de Celebração',
         congregacaoNome: 'Sede Central',
         igrejaNome: 'Igreja Batista Fonte',
       });
 
-      assert.equal(state.currentStep, 'NOME');
+      // Passo 0: Início é TELEFONE
+      assert.equal(state.currentStep, 'TELEFONE');
       assert.equal(state.messages.length, 1);
       assert.match(state.messages[0].text, /Sede Central/);
 
-      // Passo 1: Informa Nome
-      let stepResult = processChatAction(state, { type: 'INPUT', value: 'ana beatriz' });
+      // Passo 1: Informa Telefone
+      let stepResult = processChatAction(state, { type: 'INPUT', value: '11 97777-8888' });
       assert.equal(stepResult.error, undefined);
       state = stepResult.nextState;
-      assert.equal(state.currentStep, 'TELEFONE');
-      assert.equal(state.data.nome, 'Ana Beatriz');
+      assert.equal(state.data.telefone, '(11) 97777-8888');
 
-      // Passo 2: Informa Telefone
-      stepResult = processChatAction(state, { type: 'INPUT', value: '11977778888' });
+      // Backend identifica como novo visitante -> avança para NOME
+      state = processChatAction(state, {
+        type: 'IDENTIFIED_VISITANTE',
+        payload: { encontrado: false, recorrente: false },
+      }).nextState;
+      assert.equal(state.currentStep, 'NOME');
+
+      // Passo 2: Informa Nome
+      stepResult = processChatAction(state, { type: 'INPUT', value: 'ana beatriz' });
       assert.equal(stepResult.error, undefined);
       state = stepResult.nextState;
       assert.equal(state.currentStep, 'BAIRRO');
-      assert.equal(state.data.telefone, '(11) 97777-8888');
+      assert.equal(state.data.nome, 'Ana Beatriz');
 
       // Passo 3: Informa Bairro
-      stepResult = processChatAction(state, { type: 'INPUT', value: 'Vila Mariana' });
+      stepResult = processChatAction(state, { type: 'INPUT', value: 'Jardins' });
       assert.equal(stepResult.error, undefined);
       state = stepResult.nextState;
       assert.equal(state.currentStep, 'PRIMEIRA_VISITA');
-      assert.equal(state.data.bairro, 'Vila Mariana');
+      assert.equal(state.data.bairro, 'Jardins');
 
-      // Passo 4: Responde Primeira Visita (Sim)
+      // Passo 4: Informa Primeira Visita
       stepResult = processChatAction(state, { type: 'QUICK_REPLY', value: 'sim' });
       assert.equal(stepResult.error, undefined);
       state = stepResult.nextState;
@@ -177,21 +184,22 @@ describe('Agente Inteligente de Acolhimento - Máquina de Estados Pura', () => {
       // Passo 5: Informa Pedido de Oração
       stepResult = processChatAction(state, {
         type: 'INPUT',
-        value: 'Pela saúde da minha mãe e emprego para o meu irmão',
+        value: 'Agradecimento por uma vitória profissional',
       });
       assert.equal(stepResult.error, undefined);
       state = stepResult.nextState;
       assert.equal(state.currentStep, 'CONFIRMACAO');
-      assert.equal(state.data.pedido_oracao, 'Pela saúde da minha mãe e emprego para o meu irmão');
+      assert.equal(state.data.pedido_oracao, 'Agradecimento por uma vitória profissional');
 
-      // Passo 6: Confirmação com consentimento LGPD
+      // Passo 6: Confirmação e LGPD
       stepResult = processChatAction(state, { type: 'QUICK_REPLY', value: 'confirmar' });
       assert.equal(stepResult.error, undefined);
       state = stepResult.nextState;
       assert.equal(state.data.consentimento_lgpd, true);
 
-      // Finalização da submissão com sucesso
+      // Passo 7: Encerramento com Sucesso
       stepResult = processChatAction(state, { type: 'SUBMIT_SUCCESS' });
+      assert.equal(stepResult.error, undefined);
       state = stepResult.nextState;
       assert.equal(state.currentStep, 'FINALIZADO');
       assert.match(state.messages[state.messages.length - 1].text, /Glória a Deus! Tudo confirmado com sucesso/);
@@ -199,17 +207,19 @@ describe('Agente Inteligente de Acolhimento - Máquina de Estados Pura', () => {
 
     it('10. Fluxo com pulo de todos os campos opcionais (telefone, bairro, oração)', () => {
       let state = createInitialChatState();
-
-      // Passo 1: Nome
-      let stepResult = processChatAction(state, { type: 'INPUT', value: 'Marcos Paulo' });
-      state = stepResult.nextState;
       assert.equal(state.currentStep, 'TELEFONE');
 
-      // Passo 2: Pular telefone
-      stepResult = processChatAction(state, { type: 'QUICK_REPLY', value: 'pular' });
+      // Passo 1: Pular telefone -> vai direto para NOME
+      let stepResult = processChatAction(state, { type: 'QUICK_REPLY', value: 'pular' });
+      state = stepResult.nextState;
+      assert.equal(state.currentStep, 'NOME');
+      assert.equal(state.data.telefone, null);
+
+      // Passo 2: Nome
+      stepResult = processChatAction(state, { type: 'INPUT', value: 'Marcos Paulo' });
       state = stepResult.nextState;
       assert.equal(state.currentStep, 'BAIRRO');
-      assert.equal(state.data.telefone, null);
+      assert.equal(state.data.nome, 'Marcos Paulo');
 
       // Passo 3: Pular bairro
       stepResult = processChatAction(state, { type: 'QUICK_REPLY', value: 'pular' });
@@ -237,23 +247,23 @@ describe('Agente Inteligente de Acolhimento - Máquina de Estados Pura', () => {
 
     it('11. Tratamento de input inválido não deve alterar estado e deve retornar erro', () => {
       const state = createInitialChatState();
+      assert.equal(state.currentStep, 'TELEFONE');
 
-      // Nome com apenas 1 letra
-      const resultado = processChatAction(state, { type: 'INPUT', value: 'Z' });
-      assert.equal(resultado.nextState.currentStep, 'NOME');
+      // Telefone com formato inválido
+      const resultado = processChatAction(state, { type: 'INPUT', value: '123' });
+      assert.equal(resultado.nextState.currentStep, 'TELEFONE');
       assert.notEqual(resultado.error, undefined);
     });
 
     it('12. Ação de recomeçar reinicia o estado preservando o contexto do culto', () => {
       let state = createInitialChatState({ congregacaoNome: 'Congregação Norte' });
-      let stepResult = processChatAction(state, { type: 'INPUT', value: 'Renato' });
+      let stepResult = processChatAction(state, { type: 'INPUT', value: '11 98888-7777' });
       state = stepResult.nextState;
-      assert.equal(state.currentStep, 'TELEFONE');
 
       // Usuário decide reiniciar
       stepResult = processChatAction(state, { type: 'RESTART' });
       state = stepResult.nextState;
-      assert.equal(state.currentStep, 'NOME');
+      assert.equal(state.currentStep, 'TELEFONE');
       assert.equal(state.data.nome, '');
       assert.equal(state.context.congregacaoNome, 'Congregação Norte');
     });

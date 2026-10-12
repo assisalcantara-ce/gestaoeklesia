@@ -5,11 +5,12 @@
  * Arquivo: src/lib/acolhimento-chat-states.ts
  */
 
-import { formatPhone, onlyDigits } from './mascaras';
+import { normalizeBrazilianPhone } from './telefone-utils';
 
 export type StepId =
-  | 'NOME'
   | 'TELEFONE'
+  | 'CONFIRMAR_RECORRENTE'
+  | 'NOME'
   | 'BAIRRO'
   | 'PRIMEIRA_VISITA'
   | 'PEDIDO_ORACAO'
@@ -22,6 +23,7 @@ export interface ChatCultoContext {
   horarioCulto?: string;
   congregacaoNome?: string;
   igrejaNome?: string;
+  appUrl?: string | null;
 }
 
 export interface AcolhimentoData {
@@ -31,6 +33,7 @@ export interface AcolhimentoData {
   primeira_visita: boolean;
   pedido_oracao: string | null;
   consentimento_lgpd: boolean;
+  isRecorrente?: boolean;
 }
 
 export interface QuickReply {
@@ -55,6 +58,12 @@ export interface ChatState {
   context: ChatCultoContext;
   isSubmitting?: boolean;
   error?: string | null;
+  // Metadados temporários para condução segura de identificação
+  identificacaoTemp?: {
+    nomeEncontrado?: string;
+    bairroEncontrado?: string | null;
+    ambiguo?: boolean;
+  };
 }
 
 export type UserAction =
@@ -63,6 +72,7 @@ export type UserAction =
   | { type: 'START_SUBMIT' }
   | { type: 'SUBMIT_SUCCESS' }
   | { type: 'SUBMIT_ERROR'; error: string }
+  | { type: 'IDENTIFIED_VISITANTE'; payload: { encontrado: boolean; recorrente: boolean; nome?: string; bairro?: string | null; ambiguo?: boolean } }
   | { type: 'RESTART' };
 
 let messageCounter = 0;
@@ -118,6 +128,27 @@ export function isSkipCommand(value: string): boolean {
 }
 
 /**
+ * Validação de Telefone / WhatsApp usando normalização brasileira.
+ */
+export function validatePhone(raw: string): { valid: boolean; error?: string; value?: string | null; ambiguous?: boolean } {
+  const clean = raw.trim();
+  if (!clean || isSkipCommand(clean)) {
+    return { valid: true, value: null };
+  }
+
+  const norm = normalizeBrazilianPhone(clean);
+  if (!norm.valid) {
+    return {
+      valid: false,
+      error: norm.error || 'Por favor, informe um WhatsApp válido com DDD (ex: 11 98765-4321) ou clique em "Pular".',
+      ambiguous: norm.ambiguous,
+    };
+  }
+
+  return { valid: true, value: norm.formatted, ambiguous: false };
+}
+
+/**
  * Validação de Nome (Obrigatório, min 2 caracteres).
  */
 export function validateName(raw: string): { valid: boolean; error?: string; value?: string } {
@@ -135,44 +166,6 @@ export function validateName(raw: string): { valid: boolean; error?: string; val
     return { valid: false, error: 'Por favor, digite um nome válido com pelo menos 2 letras.' };
   }
   return { valid: true, value: formatNome(clean) };
-}
-
-/**
- * Validação de Telefone / WhatsApp (Opcional).
- */
-export function validatePhone(raw: string): { valid: boolean; error?: string; value?: string | null } {
-  const clean = raw.trim();
-  if (!clean || isSkipCommand(clean)) {
-    return { valid: true, value: null };
-  }
-
-  // Remove caracteres não-dígitos
-  let digits = onlyDigits(clean);
-
-  // Se começou com 55 (DDI Brasil) e tem 12 ou 13 dígitos, remove o 55 inicial
-  if ((digits.length === 12 || digits.length === 13) && digits.startsWith('55')) {
-    digits = digits.slice(2);
-  }
-
-  if (digits.length < 10 || digits.length > 11) {
-    return {
-      valid: false,
-      error: 'Por favor, informe um WhatsApp válido com DDD (ex: 11 98765-4321) ou clique em "Pular".',
-    };
-  }
-
-  // Não permitir DDD iniciado por 0
-  if (digits.startsWith('0')) {
-    digits = digits.slice(1);
-    if (digits.length < 10 || digits.length > 11) {
-      return {
-        valid: false,
-        error: 'Por favor, informe um número de telefone com DDD válido ou clique em "Pular".',
-      };
-    }
-  }
-
-  return { valid: true, value: formatPhone(digits) };
 }
 
 /**
@@ -258,7 +251,7 @@ export function parsePedidoOracao(raw: string): { valid: boolean; error?: string
 }
 
 /**
- * Retorna mensagem de acolhimento inicial com base no contexto do culto.
+ * Retorna mensagem de acolhimento inicial perguntando o celular primeiro.
  */
 export function getWelcomeMessage(context: ChatCultoContext = {}): string {
   const partes: string[] = ['Graça e Paz! Seja muito bem-vindo(a)'];
@@ -274,7 +267,20 @@ export function getWelcomeMessage(context: ChatCultoContext = {}): string {
   }
 
   const saudacao = partes.join(' ') + '! 🙏✨';
-  return `${saudacao}\n\nÉ uma alegria imensa ter você aqui conosco hoje. Para que possamos acolher você com todo carinho, como você gostaria de ser chamado(a)?`;
+  return `${saudacao}\n\nPara iniciarmos seu acolhimento de forma rápida, qual é o seu número de WhatsApp com DDD?\n(Se preferir não informar agora, basta clicar no botão abaixo).`;
+}
+
+/**
+ * Gera mensagem de sucesso final personalizada e agradecimento, com convite ao aplicativo.
+ */
+export function getSuccessMessage(nome: string, context: ChatCultoContext = {}): string {
+  let msg = `Glória a Deus! Tudo confirmado com sucesso, ${nome}! 🎉\n\nNossa congregação se alegra grandemente em ter você conosco hoje. Sinta-se em casa e que o Senhor fale profundamente ao seu coração durante esta ministração! 🙏💙`;
+
+  if (context.appUrl && context.appUrl.trim()) {
+    msg += `\n\n📱 Baixe ou acesse também o aplicativo oficial da nossa igreja para acompanhar programações, estudos e avisos!`;
+  }
+
+  return msg;
 }
 
 /**
@@ -297,7 +303,7 @@ export function generateConfirmationSummary(data: AcolhimentoData): string {
 }
 
 /**
- * Cria o estado inicial da máquina de estados do chat.
+ * Cria o estado inicial da máquina de estados do chat (começando com TELEFONE).
  */
 export function createInitialChatState(context: ChatCultoContext = {}): ChatState {
   const initialData: AcolhimentoData = {
@@ -307,6 +313,7 @@ export function createInitialChatState(context: ChatCultoContext = {}): ChatStat
     primeira_visita: true,
     pedido_oracao: null,
     consentimento_lgpd: false,
+    isRecorrente: false,
   };
 
   const welcomeText = getWelcomeMessage(context);
@@ -315,12 +322,13 @@ export function createInitialChatState(context: ChatCultoContext = {}): ChatStat
     id: createMessageId(),
     sender: 'bot',
     text: welcomeText,
-    stepId: 'NOME',
+    stepId: 'TELEFONE',
+    quickReplies: [{ id: 'skip_tel', label: 'Pular este passo ⏭️', value: 'pular' }],
     timestamp: Date.now(),
   };
 
   return {
-    currentStep: 'NOME',
+    currentStep: 'TELEFONE',
     data: initialData,
     messages: [initialMessage],
     context,
@@ -359,7 +367,7 @@ export function processChatAction(
     const successMsg: ChatMessage = {
       id: createMessageId(),
       sender: 'bot',
-      text: `Glória a Deus! Tudo confirmado com sucesso, ${state.data.nome}! 🎉\n\nNossa congregação se alegra grandemente em ter você conosco hoje. Sinta-se em casa e que o Senhor fale profundamente ao seu coração durante esta ministração! 🙏💙`,
+      text: getSuccessMessage(state.data.nome, state.context),
       stepId: 'FINALIZADO',
       timestamp: Date.now(),
     };
@@ -387,6 +395,83 @@ export function processChatAction(
     };
   }
 
+  // Resposta assíncrona da identificação por telefone do backend
+  if (action.type === 'IDENTIFIED_VISITANTE') {
+    const { encontrado, recorrente, nome, bairro, ambiguo } = action.payload;
+
+    if (encontrado && recorrente && nome && !ambiguo) {
+      // Visitante recorrente identificado com clareza
+      const primeiroNome = nome.split(' ')[0];
+      const botMsg: ChatMessage = {
+        id: createMessageId(),
+        sender: 'bot',
+        text: `Que bom ter você de volta conosco, ${primeiroNome}! 🤗 É uma alegria reencontrar você!\n\nIdentificamos seu cadastro como ${nome}.\nVocê confirma que é você?`,
+        stepId: 'CONFIRMAR_RECORRENTE',
+        quickReplies: [
+          { id: 'rec_sim', label: `Sim, sou eu (${primeiroNome})! ✅`, value: 'sim' },
+          { id: 'rec_nao', label: 'Não, sou outra pessoa ✏️', value: 'nao' },
+        ],
+        timestamp: Date.now(),
+      };
+
+      return {
+        nextState: {
+          ...state,
+          currentStep: 'CONFIRMAR_RECORRENTE',
+          identificacaoTemp: { nomeEncontrado: nome, bairroEncontrado: bairro },
+          messages: [...state.messages, botMsg],
+          error: null,
+        },
+      };
+    }
+
+    if (ambiguo) {
+      // Telefone compartilhado/ambíguo: solicita nome com gentileza
+      const botMsg: ChatMessage = {
+        id: createMessageId(),
+        sender: 'bot',
+        text: `Identificamos que este número é utilizado por mais de uma pessoa querida na nossa congregação! 👨‍👩‍👧‍👦\n\nPara que possamos acolher você certinho hoje, como você se chama?`,
+        stepId: 'NOME',
+        timestamp: Date.now(),
+      };
+
+      return {
+        nextState: {
+          ...state,
+          currentStep: 'NOME',
+          data: {
+            ...state.data,
+            primeira_visita: false,
+          },
+          messages: [...state.messages, botMsg],
+          error: null,
+        },
+      };
+    }
+
+    // Não encontrado: visitante novo
+    const botMsg: ChatMessage = {
+      id: createMessageId(),
+      sender: 'bot',
+      text: `Excelente! Como é a sua primeira vez conosco ou não encontramos seu cadastro anterior, como gostaria de ser chamado(a)?`,
+      stepId: 'NOME',
+      timestamp: Date.now(),
+    };
+
+    return {
+      nextState: {
+        ...state,
+        currentStep: 'NOME',
+        data: {
+          ...state.data,
+          primeira_visita: true,
+        },
+        messages: [...state.messages, botMsg],
+        error: null,
+      },
+    };
+  }
+
   const rawInput = action.value;
   const userMsg: ChatMessage = {
     id: createMessageId(),
@@ -396,40 +481,6 @@ export function processChatAction(
   };
 
   switch (state.currentStep) {
-    case 'NOME': {
-      const result = validateName(rawInput);
-      if (!result.valid || !result.value) {
-        return {
-          nextState: { ...state, error: result.error },
-          error: result.error,
-        };
-      }
-
-      const updatedData: AcolhimentoData = {
-        ...state.data,
-        nome: result.value,
-      };
-
-      const botMsg: ChatMessage = {
-        id: createMessageId(),
-        sender: 'bot',
-        text: `Muito prazer, ${result.value}! 🤝\n\nSe você desejar receber uma mensagem de acolhimento e avisos especiais da congregação no seu WhatsApp, digite o seu número com DDD.\n\n(Se preferir não informar agora, basta clicar no botão abaixo).`,
-        stepId: 'TELEFONE',
-        quickReplies: [{ id: 'skip_tel', label: 'Pular este passo ⏭️', value: 'pular' }],
-        timestamp: Date.now(),
-      };
-
-      return {
-        nextState: {
-          ...state,
-          currentStep: 'TELEFONE',
-          data: updatedData,
-          messages: [...state.messages, userMsg, botMsg],
-          error: null,
-        },
-      };
-    }
-
     case 'TELEFONE': {
       const result = validatePhone(rawInput);
       if (!result.valid) {
@@ -447,10 +498,120 @@ export function processChatAction(
       const displayText = result.value ? result.value : 'Passo pulado';
       userMsg.text = displayText;
 
+      // Se o usuário pulou o telefone, não há como fazer busca no banco -> vai direto para o Nome
+      if (!result.value) {
+        const botMsg: ChatMessage = {
+          id: createMessageId(),
+          sender: 'bot',
+          text: `Sem problemas! Para que possamos lhe conhecer melhor, qual é o seu nome completo?`,
+          stepId: 'NOME',
+          timestamp: Date.now(),
+        };
+
+        return {
+          nextState: {
+            ...state,
+            currentStep: 'NOME',
+            data: updatedData,
+            messages: [...state.messages, userMsg, botMsg],
+            error: null,
+          },
+        };
+      }
+
+      // Se o usuário informou o telefone, a UI chamará a API /identificar
+      // A máquina de estados registra o número e aguarda a resposta da API ou avança provisoriamente
+      return {
+        nextState: {
+          ...state,
+          data: updatedData,
+          messages: [...state.messages, userMsg],
+          error: null,
+        },
+      };
+    }
+
+    case 'CONFIRMAR_RECORRENTE': {
+      const clean = rawInput.trim().toLowerCase();
+
+      if (['sim', 's', 'sou eu', 'correto', 'confirmar'].some((k) => clean.includes(k))) {
+        // Usuário confirmou identidade do cadastro existente!
+        // Pula Nome, Bairro e Primeira Visita -> vai direto para Pedido de Oração
+        const nomeConfirmado = state.identificacaoTemp?.nomeEncontrado || state.data.nome;
+        const bairroConfirmado = state.identificacaoTemp?.bairroEncontrado || state.data.bairro;
+
+        const updatedData: AcolhimentoData = {
+          ...state.data,
+          nome: nomeConfirmado,
+          bairro: bairroConfirmado,
+          primeira_visita: false,
+          isRecorrente: true,
+        };
+
+        userMsg.text = `Sim, sou eu (${nomeConfirmado})!`;
+
+        const botMsg: ChatMessage = {
+          id: createMessageId(),
+          sender: 'bot',
+          text: `Maravilha! Nossa equipe pastoral tem um carinho imenso por você e está sempre intercedendo por suas vitórias! 🙏\n\nVocê gostaria de registrar algum pedido de oração especial para este culto hoje?`,
+          stepId: 'PEDIDO_ORACAO',
+          quickReplies: [{ id: 'skip_oracao', label: 'Não tenho pedidos (Pular) ⏭️', value: 'pular' }],
+          timestamp: Date.now(),
+        };
+
+        return {
+          nextState: {
+            ...state,
+            currentStep: 'PEDIDO_ORACAO',
+            data: updatedData,
+            messages: [...state.messages, userMsg, botMsg],
+            error: null,
+          },
+        };
+      }
+
+      // Se disse que é outra pessoa
+      userMsg.text = 'Sou outra pessoa / Corrigir nome';
       const botMsg: ChatMessage = {
         id: createMessageId(),
         sender: 'bot',
-        text: `Que bênção! Em qual bairro você mora? 🏘️\nIsso nos ajuda a saber se você é nosso vizinho ou veio de outra localidade!\n\n(Ou você pode clicar em pular caso prefira).`,
+        text: `Compreendido! Sem problemas. Como você se chama?`,
+        stepId: 'NOME',
+        timestamp: Date.now(),
+      };
+
+      return {
+        nextState: {
+          ...state,
+          currentStep: 'NOME',
+          data: {
+            ...state.data,
+            isRecorrente: false,
+          },
+          messages: [...state.messages, userMsg, botMsg],
+          error: null,
+        },
+      };
+    }
+
+    case 'NOME': {
+      const result = validateName(rawInput);
+      if (!result.valid || !result.value) {
+        return {
+          nextState: { ...state, error: result.error },
+          error: result.error,
+        };
+      }
+
+      const updatedData: AcolhimentoData = {
+        ...state.data,
+        nome: result.value,
+      };
+
+      const botMsg: ChatMessage = {
+        id: createMessageId(),
+        sender: 'bot',
+        text: `Muito prazer, ${result.value}! 🤝\n\nEm qual bairro você mora? 🏘️\nIsso nos ajuda a saber se você mora pertinho ou veio de outra localidade!\n\n(Ou você pode clicar em pular caso prefira).`,
         stepId: 'BAIRRO',
         quickReplies: [{ id: 'skip_bairro', label: 'Pular este passo ⏭️', value: 'pular' }],
         timestamp: Date.now(),

@@ -13,6 +13,7 @@ interface PublicCultoResponse {
     horario_culto: string;
     congregacao_nome: string;
     igreja_nome: string;
+    app_url?: string | null;
   };
   error?: string;
   code?: string;
@@ -67,6 +68,7 @@ export default function PublicAcolhimentoChatPage({
         horarioCulto: data.culto.horario_culto,
         congregacaoNome: data.culto.congregacao_nome,
         igrejaNome: data.culto.igreja_nome,
+        appUrl: data.culto.app_url || null,
       });
     } catch (err) {
       console.error('[PublicAcolhimento] Erro ao carregar dados:', err);
