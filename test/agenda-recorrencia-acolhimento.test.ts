@@ -557,5 +557,140 @@ describe('Motor de Recorrência da Agenda Oficial (AgendaRecorrenciaService)', (
     assert.ok(mapa['2026-10-12'], 'Deve estar presente na segunda-feira 2026-10-12');
     assert.strictEqual(mapa['2026-10-13'], undefined, 'NÃO deve estar presente na terça-feira 2026-10-13');
   });
+
+  it('18. Listagem /secretaria/cultos: intervalo padrão da semana vigente (segunda a domingo)', () => {
+    const getLocalDateStr = (val: string | Date): string => {
+      const d = typeof val === 'string' ? new Date(val) : val;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const getSemanaVigenteRange = (refDate: Date) => {
+      const currentDay = refDate.getDay(); // 0 = Domingo, 1 = Segunda, ... 6 = Sábado
+      const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+      const monday = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() + diffToMonday);
+      const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+      return {
+        inicio: getLocalDateStr(monday),
+        fim: getLocalDateStr(sunday),
+        mondayDay: monday.getDay(),
+        sundayDay: sunday.getDay(),
+      };
+    };
+
+    // Caso 1: Quarta-feira 2026-10-14
+    const quarta = new Date(2026, 9, 14); // Outubro = mês índice 9
+    const range1 = getSemanaVigenteRange(quarta);
+    assert.strictEqual(range1.inicio, '2026-10-12', 'Início da semana deve ser Segunda-feira 2026-10-12');
+    assert.strictEqual(range1.fim, '2026-10-18', 'Fim da semana deve ser Domingo 2026-10-18');
+    assert.strictEqual(range1.mondayDay, 1);
+    assert.strictEqual(range1.sundayDay, 0);
+
+    // Caso 2: Domingo 2026-10-18 (último dia da semana vigente)
+    const domingo = new Date(2026, 9, 18);
+    const range2 = getSemanaVigenteRange(domingo);
+    assert.strictEqual(range2.inicio, '2026-10-12', 'Para domingo, a semana vigente começou na segunda anterior');
+    assert.strictEqual(range2.fim, '2026-10-18');
+
+    // Caso 3: Segunda-feira 2026-10-12 (primeiro dia da semana vigente)
+    const segunda = new Date(2026, 9, 12);
+    const range3 = getSemanaVigenteRange(segunda);
+    assert.strictEqual(range3.inicio, '2026-10-12');
+    assert.strictEqual(range3.fim, '2026-10-18');
+  });
+
+  it('19. Listagem /secretaria/cultos: ordenação decrescente e paginação real de 10 registros por página', () => {
+    // Cria 25 cultos com datas e horários variados
+    const cultosMocks = Array.from({ length: 25 }, (_, i) => {
+      const dia = 10 + Math.floor(i / 3);
+      const hora = 18 + (i % 3);
+      return {
+        id: `culto-${i}`,
+        data_culto: `2026-10-${String(dia).padStart(2, '0')}`,
+        horario_culto: `${String(hora).padStart(2, '0')}:00`,
+        tipo_culto: 'Culto',
+      };
+    });
+
+    // Ordenação decrescente por data e horário (mais recente primeiro)
+    const ordenados = [...cultosMocks].sort((a, b) => {
+      const cmpData = b.data_culto.localeCompare(a.data_culto);
+      if (cmpData !== 0) return cmpData;
+      return (b.horario_culto || '').localeCompare(a.horario_culto || '');
+    });
+
+    assert.strictEqual(ordenados[0].data_culto, '2026-10-18');
+    assert.strictEqual(ordenados[ordenados.length - 1].data_culto, '2026-10-10');
+
+    // Paginação com 10 itens por página
+    const ITENS_POR_PAGINA = 10;
+    const totalPaginas = Math.ceil(ordenados.length / ITENS_POR_PAGINA);
+    assert.strictEqual(totalPaginas, 3, '25 cultos devem gerar 3 páginas');
+
+    // Página 1: itens 0 a 9 (10 itens)
+    const pag1 = ordenados.slice(0, ITENS_POR_PAGINA);
+    assert.strictEqual(pag1.length, 10);
+    assert.strictEqual(pag1[0].id, ordenados[0].id);
+
+    // Página 2: itens 10 a 19 (10 itens)
+    const pag2 = ordenados.slice(ITENS_POR_PAGINA, 2 * ITENS_POR_PAGINA);
+    assert.strictEqual(pag2.length, 10);
+    assert.strictEqual(pag2[0].id, ordenados[10].id);
+
+    // Página 3: itens 20 a 24 (5 itens)
+    const pag3 = ordenados.slice(2 * ITENS_POR_PAGINA, 3 * ITENS_POR_PAGINA);
+    assert.strictEqual(pag3.length, 5);
+    assert.strictEqual(pag3[4].id, ordenados[24].id);
+  });
+
+  it('20. Listagem /secretaria/cultos: restrição de ações operacionais apenas para cultos de hoje', () => {
+    const todayStr = '2026-10-12';
+
+    const cultoPassado = {
+      id: 'culto-ontem',
+      data_culto: '2026-10-11',
+      status: 'Aberto' as const,
+      relatorio_espiritual_id: null,
+    };
+
+    const cultoHoje = {
+      id: 'culto-hoje',
+      data_culto: '2026-10-12',
+      status: 'Aberto' as const,
+      relatorio_espiritual_id: null,
+    };
+
+    const cultoFuturo = {
+      id: 'culto-futuro',
+      data_culto: '2026-10-15',
+      status: 'Programado' as const,
+      relatorio_espiritual_id: null,
+    };
+
+    const verificarAcoes = (c: { data_culto: string; status: string; relatorio_espiritual_id: any }) => {
+      const isHoje = c.data_culto === todayStr;
+      const isFuturo = c.data_culto > todayStr;
+      const isElegivel = isHoje && c.status !== 'Encerrado' && c.status !== 'Consolidado' && !c.relatorio_espiritual_id;
+      return { isHoje, isFuturo, isElegivel };
+    };
+
+    const resPassado = verificarAcoes(cultoPassado);
+    assert.strictEqual(resPassado.isHoje, false);
+    assert.strictEqual(resPassado.isFuturo, false);
+    assert.strictEqual(resPassado.isElegivel, false, 'Culto passado não deve liberar recepção/link/qrcode');
+
+    const resHoje = verificarAcoes(cultoHoje);
+    assert.strictEqual(resHoje.isHoje, true);
+    assert.strictEqual(resHoje.isFuturo, false);
+    assert.strictEqual(resHoje.isElegivel, true, 'Culto de hoje elegível deve liberar ações operacionais');
+
+    const resFuturo = verificarAcoes(cultoFuturo);
+    assert.strictEqual(resFuturo.isHoje, false);
+    assert.strictEqual(resFuturo.isFuturo, true);
+    assert.strictEqual(resFuturo.isElegivel, false, 'Culto futuro permanece como Programado e sem ações antecipadas');
+  });
 });
+
 

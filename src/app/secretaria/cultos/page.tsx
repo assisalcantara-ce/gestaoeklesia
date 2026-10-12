@@ -7,7 +7,7 @@ import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { createClient } from '@/lib/supabase-client';
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
-import { Pencil, Trash2, Loader2, Church, Home, Flame, Calendar, Clock, CheckCircle2, Users, X, Link, Copy, Check, RefreshCw, QrCode, ClipboardList, BookCheck, AlertCircle } from 'lucide-react';
+import { Pencil, Trash2, Loader2, Church, Home, Flame, Calendar, Clock, CheckCircle2, Users, X, Link, Copy, Check, RefreshCw, QrCode, ClipboardList, BookCheck, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 
@@ -76,6 +76,34 @@ const formatDate = (value?: string | null) => {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : value;
 };
 
+// Converte string de data UTC ou local para YYYY-MM-DD no fuso horário local
+const getLocalDateStr = (val: string | Date): string => {
+  if (!val) return '';
+  if (typeof val === 'string' && !val.includes('Z') && !val.includes('+') && !val.slice(11).includes('-')) {
+    return val.slice(0, 10);
+  }
+  const d = typeof val === 'string' ? new Date(val) : val;
+  if (isNaN(d.getTime())) return typeof val === 'string' ? val.split('T')[0] : '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+// Retorna intervalo da semana vigente (segunda-feira a domingo) no fuso local
+const getSemanaVigenteRange = () => {
+  const now = new Date();
+  const currentDay = now.getDay(); // 0 = Domingo, 1 = Segunda, ... 6 = Sábado
+  // Diferença em dias até a segunda-feira da semana vigente
+  const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+  return {
+    inicio: getLocalDateStr(monday),
+    fim: getLocalDateStr(sunday),
+  };
+};
+
 export default function CultosPage() {
   const { ctx, bloqueado } = useRequireModulo('gestao');
   const supabase = useMemo(() => createClient(), []);
@@ -85,12 +113,17 @@ export default function CultosPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [queryError, setQueryError] = useState<string | null>(null);
 
-  // Filtros de listagem
+  // Filtros de listagem: por padrão, semana vigente (segunda a domingo)
+  const defaultRange = useMemo(() => getSemanaVigenteRange(), []);
   const [filtroCongregacao, setFiltroCongregacao] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
-  const [filtroDataInicio, setFiltroDataInicio] = useState('');
-  const [filtroDataFim, setFiltroDataFim] = useState('');
+  const [filtroDataInicio, setFiltroDataInicio] = useState(defaultRange.inicio);
+  const [filtroDataFim, setFiltroDataFim] = useState(defaultRange.fim);
+
+  // Paginação: 10 registros por página
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const ITENS_POR_PAGINA = 10;
 
   // Categorias de culto disponíveis
   const [tiposCulto, setTiposCulto] = useState<string[]>(TIPO_CULTO_OPTIONS);
@@ -427,16 +460,17 @@ export default function CultosPage() {
         }
       });
 
-      const today = new Date();
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const todayStr = getLocalDateStr(new Date());
 
       const mergedList: CultoRegistro[] = [];
 
       // Processar cada evento da Agenda
       for (const ev of rawAgenda) {
         const evDate = new Date(ev.data_inicio);
-        const evDateStr = `${evDate.getFullYear()}-${String(evDate.getMonth() + 1).padStart(2, '0')}-${String(evDate.getDate()).padStart(2, '0')}`;
-        const evTimeStr = `${String(evDate.getHours()).padStart(2, '0')}:${String(evDate.getMinutes()).padStart(2, '0')}`;
+        const evDateStr = getLocalDateStr(ev.data_inicio);
+        const evTimeStr = isNaN(evDate.getTime())
+          ? '19:30'
+          : `${String(evDate.getHours()).padStart(2, '0')}:${String(evDate.getMinutes()).padStart(2, '0')}`;
 
         const existingReg = registrosPorAgendaId.get(ev.id);
 
@@ -599,7 +633,7 @@ export default function CultosPage() {
     }
   };
 
-  // Filtragem local de registros
+  // Filtragem local de registros (ordenados decrescentes por data e horário)
   const registrosFiltrados = useMemo(() => {
     return registros.filter(r => {
       if (filtroCongregacao && r.congregacao_id !== filtroCongregacao) return false;
@@ -610,6 +644,20 @@ export default function CultosPage() {
       return true;
     });
   }, [registros, filtroCongregacao, filtroTipo, filtroStatus, filtroDataInicio, filtroDataFim]);
+
+  // Ao alterar qualquer filtro, reseta a página atual para a primeira
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [filtroCongregacao, filtroTipo, filtroStatus, filtroDataInicio, filtroDataFim]);
+
+  // Cálculo da paginação real (10 itens por página)
+  const totalPaginas = Math.max(1, Math.ceil(registrosFiltrados.length / ITENS_POR_PAGINA));
+  const paginaValida = Math.min(Math.max(1, paginaAtual), totalPaginas);
+
+  const registrosPaginados = useMemo(() => {
+    const inicio = (paginaValida - 1) * ITENS_POR_PAGINA;
+    return registrosFiltrados.slice(inicio, inicio + ITENS_POR_PAGINA);
+  }, [registrosFiltrados, paginaValida]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -1046,9 +1094,8 @@ export default function CultosPage() {
                         </td>
                       </tr>
                     ) : (
-                      registrosFiltrados.map(reg => {
-                        const today = new Date();
-                        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                      registrosPaginados.map(reg => {
+                        const todayStr = getLocalDateStr(new Date());
                         const isHoje = reg.data_culto === todayStr;
                         const isFuturo = reg.data_culto > todayStr;
                         const isElegivelAcolhimento = isHoje && reg.status !== 'Encerrado' && reg.status !== 'Consolidado' && !reg.relatorio_espiritual_id;
@@ -1126,7 +1173,7 @@ export default function CultosPage() {
                                             if (synchronized) setSelectedCultoRecepcao(synchronized);
                                           }}
                                           className="px-2.5 py-1 bg-[#062E6F]/10 hover:bg-[#062E6F]/20 text-[#062E6F] rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                                          title="Recepção de Visitantes"
+                                          title="Abrir Recepção de Visitantes"
                                         >
                                           <Users className="h-3.5 w-3.5" />
                                           Recepção
@@ -1137,10 +1184,21 @@ export default function CultosPage() {
                                             if (synchronized) setCultoLink(synchronized);
                                           }}
                                           className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                                          title="Link Público da Recepção"
+                                          title="Copiar Link da Recepção"
                                         >
                                           <Link className="h-3.5 w-3.5" />
                                           Link
+                                        </button>
+                                        <button
+                                          onClick={async () => {
+                                            const synchronized = await ensureCultoRegistro(reg);
+                                            if (synchronized) setCultoLink(synchronized);
+                                          }}
+                                          className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                                          title="Visualizar QR Code da Recepção"
+                                        >
+                                          <QrCode className="h-3.5 w-3.5" />
+                                          QR Code
                                         </button>
                                         {isEscritaPermitida && (
                                           <button
@@ -1189,6 +1247,43 @@ export default function CultosPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Barra de Paginação Real */}
+              {registrosFiltrados.length > 0 && (
+                <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 px-2 py-3 bg-white border border-slate-200/80 rounded-2xl">
+                  <div className="text-xs text-slate-500 font-medium">
+                    Mostrando <span className="font-bold text-slate-800">{((paginaValida - 1) * ITENS_POR_PAGINA) + 1}</span> a <span className="font-bold text-slate-800">{Math.min(paginaValida * ITENS_POR_PAGINA, registrosFiltrados.length)}</span> de <span className="font-bold text-slate-800">{registrosFiltrados.length}</span> cultos
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPaginaAtual(p => Math.max(1, p - 1))}
+                      disabled={paginaValida <= 1}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                      title="Página Anterior"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Anterior
+                    </button>
+
+                    <span className="text-xs font-bold text-slate-700 px-2">
+                      Página {paginaValida} de {totalPaginas}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaginaAtual(p => Math.min(totalPaginas, p + 1))}
+                      disabled={paginaValida >= totalPaginas}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                      title="Próxima Página"
+                    >
+                      Próxima
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
         </Section>
       </div>
 
