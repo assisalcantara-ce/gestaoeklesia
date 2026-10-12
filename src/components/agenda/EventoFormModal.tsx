@@ -42,6 +42,9 @@ interface EventoFormModalProps {
   loadingCongregacoes?: boolean;
   erroCongregacoes?: string | null;
   isAdmin: boolean;
+  isSecretarioLocal?: boolean;
+  userCongregacaoId?: string | null;
+  canEdit?: boolean;
   onCloseModal: () => void;
   onSave: (e: React.FormEvent) => void;
   onFormChange: (fields: Partial<EventoFormState>) => void;
@@ -78,6 +81,9 @@ export default function EventoFormModal({
   loadingCongregacoes = false,
   erroCongregacoes = null,
   isAdmin,
+  isSecretarioLocal = false,
+  userCongregacaoId: _userCongregacaoId = null,
+  canEdit = true,
   onCloseModal,
   onSave,
   onFormChange,
@@ -116,6 +122,11 @@ export default function EventoFormModal({
             </div>
 
             <form onSubmit={onSave} className="flex-1 overflow-y-auto p-4 space-y-3">
+              {editEvento && !canEdit && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-medium">
+                  ⚠️ <strong>Modo Apenas Consulta:</strong> Este compromisso pertence à Agenda Geral do Ministério ou a outra congregação e não pode ser alterado pela Secretaria Local.
+                </div>
+              )}
               <div>
                 <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Título *</label>
                 <input
@@ -389,8 +400,9 @@ export default function EventoFormModal({
                 ) : (
                   <select
                     value={form.church_id || ''}
-                    disabled={loadingCongregacoes || saving}
+                    disabled={isSecretarioLocal || loadingCongregacoes || saving || !canEdit}
                     onChange={(e) => {
+                      if (isSecretarioLocal) return;
                       const selectedId = e.target.value;
                       const selectedCong = (congregacoes || []).find((c) => c.id === selectedId);
                       onFormChange({
@@ -421,6 +433,12 @@ export default function EventoFormModal({
                       </option>
                     )}
                   </select>
+                )}
+
+                {isSecretarioLocal && (
+                  <p className="mt-1 text-[10px] text-teal-700 font-bold">
+                    🔒 Destino fixado na sua congregação oficial
+                  </p>
                 )}
 
                 {!loadingCongregacoes && !erroCongregacoes && (!congregacoes || congregacoes.length === 0) && (
@@ -482,27 +500,34 @@ export default function EventoFormModal({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 pt-1">
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600 font-bold cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={form.calendario_oficial}
-                        onChange={(e) => onFormChange({ calendario_oficial: e.target.checked })}
-                        className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 border-slate-300"
-                      />
-                      Oficial
-                    </label>
-                    <label className={`flex items-center gap-1.5 text-xs font-bold ${isAdmin ? 'text-slate-600 cursor-pointer' : 'text-slate-350 cursor-not-allowed select-none'}`}>
-                      <input
-                        type="checkbox"
-                        disabled={!isAdmin}
-                        checked={form.gera_bloqueio}
-                        onChange={(e) => onFormChange({ gera_bloqueio: e.target.checked })}
-                        className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 border-slate-300 disabled:opacity-40"
-                      />
-                      Gera Bloqueio
-                    </label>
-                  </div>
+                  {!isSecretarioLocal ? (
+                    <div className="flex items-center gap-4 pt-1">
+                      <label className="flex items-center gap-1.5 text-xs text-slate-600 font-bold cursor-pointer">
+                        <input
+                          type="checkbox"
+                          disabled={!canEdit}
+                          checked={form.calendario_oficial}
+                          onChange={(e) => onFormChange({ calendario_oficial: e.target.checked })}
+                          className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 border-slate-300"
+                        />
+                        Oficial
+                      </label>
+                      <label className={`flex items-center gap-1.5 text-xs font-bold ${isAdmin && canEdit ? 'text-slate-600 cursor-pointer' : 'text-slate-350 cursor-not-allowed select-none'}`}>
+                        <input
+                          type="checkbox"
+                          disabled={!isAdmin || !canEdit}
+                          checked={form.gera_bloqueio}
+                          onChange={(e) => onFormChange({ gera_bloqueio: e.target.checked })}
+                          className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 border-slate-300 disabled:opacity-40"
+                        />
+                        Gera Bloqueio
+                      </label>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 font-medium pt-1">
+                      ℹ️ Bloqueios oficiais e calendário geral são administrados pela Secretaria Geral.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -512,16 +537,18 @@ export default function EventoFormModal({
                   onClick={onCloseModal}
                   className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-white transition text-xs cursor-pointer"
                 >
-                  Cancelar
+                  {canEdit ? 'Cancelar' : 'Fechar'}
                 </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-5 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold rounded-xl shadow-xs transition text-xs disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
-                >
-                  <Check className="h-4 w-4" />
-                  {saving ? 'Salvando...' : 'Confirmar'}
-                </button>
+                {canEdit && (
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-5 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold rounded-xl shadow-xs transition text-xs disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Check className="h-4 w-4" />
+                    {saving ? 'Salvando...' : 'Confirmar'}
+                  </button>
+                )}
               </div>
             </form>
           </div>

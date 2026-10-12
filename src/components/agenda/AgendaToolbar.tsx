@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, Filter, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, ChevronDown, ChevronUp, Calendar as CalendarIcon } from 'lucide-react';
 
 export type QuickFilter = 'todos' | 'oficiais' | 'locais' | 'bloqueados';
 
@@ -13,6 +13,7 @@ export interface AgendaTipo {
 export interface Congregacao {
   id: string;
   nome: string;
+  is_sede?: boolean;
 }
 
 interface AgendaToolbarProps {
@@ -22,6 +23,10 @@ interface AgendaToolbarProps {
   MESES_PT: string[];
   quickFilter: QuickFilter;
   showAdvancedFilters: boolean;
+  agendaVisualizada: string;
+  onAgendaVisualizadaChange: (val: string) => void;
+  congregacoesAutorizadas?: Congregacao[];
+  isSecretarioGeral?: boolean;
   filtroTipoId: string;
   filtroCongregacao: string;
   filtroVisibilidade: string;
@@ -46,6 +51,10 @@ export default function AgendaToolbar({
   MESES_PT,
   quickFilter,
   showAdvancedFilters,
+  agendaVisualizada,
+  onAgendaVisualizadaChange,
+  congregacoesAutorizadas,
+  isSecretarioGeral = false,
   filtroTipoId,
   filtroCongregacao,
   filtroVisibilidade,
@@ -64,8 +73,45 @@ export default function AgendaToolbar({
 }: AgendaToolbarProps) {
   if (activeTab !== 'calendario') return null;
 
+  const listaCongregacoes = congregacoesAutorizadas || congregacoes;
+
   return (
     <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-4">
+      {/* Seletor Superior: Visualizar Agenda (Ministerial, Sede e Congregações) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50/80 rounded-xl border border-slate-200">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center shrink-0">
+            <CalendarIcon className="h-4 w-4" />
+          </div>
+          <div>
+            <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+              Visualizar agenda
+            </span>
+            <span className="text-xs text-slate-700 font-semibold">
+              Selecione a perspectiva da agenda ministerial ou local
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <select
+            value={agendaVisualizada}
+            onChange={(e) => onAgendaVisualizadaChange(e.target.value)}
+            className="w-full sm:w-auto min-w-[240px] bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition shadow-xs cursor-pointer"
+          >
+            <option value="geral">🌐 Agenda Geral do Ministério (Eventos Globais)</option>
+            {isSecretarioGeral && (
+              <option value="todas">👁️ Visão Consolidada (Todas as Agendas)</option>
+            )}
+            {listaCongregacoes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.is_sede ? `🏛️ Sede (${c.nome})` : `📍 ${c.nome}`}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Navegação de Mês/Ano */}
         <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-xl p-1 shadow-xs">

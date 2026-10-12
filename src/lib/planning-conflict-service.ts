@@ -11,58 +11,56 @@ export interface ConflictResult {
  * PlanningConflictService
  * Centraliza a inteligência e a matriz de validação de conflitos de datas do Planejamento Ministerial.
  */
+export interface EventoParaConflito {
+  id?: string;
+  titulo: string;
+  data_inicio: string;
+  data_fim: string | null;
+  planejamento_id?: string | null;
+  ministry_id?: string;
+  church_id?: string | null;
+  tipo_id?: string | null;
+  tipo?: string;
+  escopo?: 'organizacao' | 'divisao1' | 'divisao2' | 'divisao3' | string;
+  prioridade?: number;
+  calendario_oficial?: boolean;
+  gera_bloqueio?: boolean;
+  agenda_tipos?: { categoria?: string } | null;
+}
+
+/**
+ * PlanningConflictService
+ * Centraliza a inteligência e a matriz de validação de conflitos de datas da Agenda.
+ *
+ * REGRA CANÔNICA:
+ * - calendario_oficial indica oficialidade;
+ * - SOMENTE gera_bloqueio, quando verdadeiro e aplicável ao escopo, cria impedimento de agendamento (BLOQUEIO).
+ * - Bloqueio geral (church_id nulo ou escopo 'organizacao') aplica-se a todas as congregações.
+ * - Bloqueio local aplica-se apenas à mesma congregação.
+ */
 export const PlanningConflictService = {
   /**
-   * Valida se existe conflito entre o payload do evento que está sendo salvo e os eventos do mesmo ano/planejamento.
+   * Avalia conflitos em memória contra uma lista de eventos existentes.
    */
-  async verificarConflito(
-    supabase: any,
-    eventPayload: {
-      titulo: string;
-      data_inicio: string;
-      data_fim: string | null;
-      planejamento_id: string;
-      tipo_id: string;
-      escopo: 'organizacao' | 'divisao1' | 'divisao2' | 'divisao3';
-      prioridade: number;
-      calendario_oficial: boolean;
-      gera_bloqueio: boolean;
-    },
-    currentEventId: string | null
-  ): Promise<ConflictResult> {
-    // 1. Buscar todos os eventos do mesmo planejamento (incluindo tipo para checagem da matriz)
-    let query = supabase
-      .from('agenda_eventos')
-      .select('*, agenda_tipos(*)')
-      .eq('planejamento_id', eventPayload.planejamento_id);
-
-    if (currentEventId) {
-      query = query.neq('id', currentEventId);
-    }
-
-    const { data: existingEvents, error } = await query;
-    if (error || !existingEvents) {
-      return { status: 'SEM_CONFLITO', motivo: null, regra_aplicada: null, conflito: null };
-    }
-
-    // Datas do evento que está sendo salvo
+  avaliarConflitosEmMemoria(
+    existingEvents: EventoParaConflito[],
+    eventPayload: EventoParaConflito,
+    currentEventId: string | null = null,
+    currentCategory: string = 'outro'
+  ): ConflictResult {
     const newStart = new Date(eventPayload.data_inicio).getTime();
-    // Fallback de 2 horas se a data_fim for nula
     const newEnd = eventPayload.data_fim 
       ? new Date(eventPayload.data_fim).getTime()
       : newStart + (2 * 60 * 60 * 1000);
 
-    // Buscar tipo de agenda do evento sendo salvo
-    const { data: currentType } = await supabase
-      .from('agenda_tipos')
-      .select('*')
-      .eq('id', eventPayload.tipo_id)
-      .maybeSingle();
+    const formatDateTime = (isoStr: string) => {
+      const d = new Date(isoStr);
+      return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    };
 
-    const currentCategory = currentType?.categoria || 'outro';
-
-    // 2. Iterar sobre todos os eventos para encontrar interseção e avaliar regras
     for (const evt of existingEvents) {
+      if (currentEventId && evt.id === currentEventId) continue;
+
       const extStart = new Date(evt.data_inicio).getTime();
       const extEnd = evt.data_fim 
         ? new Date(evt.data_fim).getTime()
@@ -72,55 +70,112 @@ export const PlanningConflictService = {
       const overlaps = newStart < extEnd && newEnd > extStart;
       if (!overlaps) continue;
 
-      // Filtro de relevância: Apenas eventos de Calendário Oficial ou que geram bloqueio
-      const isRelevant = 
-        evt.calendario_oficial || 
-        evt.gera_bloqueio || 
-        eventPayload.calendario_oficial || 
-        eventPayload.gera_bloqueio;
+      const extCategory = evt.agenda_tipos?.categoria || evt.tipo || 'outro';
 
-      if (!isRelevant) continue;
-
-      // Matriz de Regras Iniciais
-      const extCategory = evt.agenda_tipos?.categoria || 'outro';
-
-      // Regra 1: Coexistência para Tarefas e Administrativos
+      // Regra 1: Coexistência permitida para fins administrativos ou tarefas gerais
       if (
         currentCategory === 'administrativo' || 
         extCategory === 'administrativo' ||
-        evt.tipo === 'tarefa'
+        evt.tipo === 'tarefa' ||
+        eventPayload.tipo === 'tarefa'
       ) {
-        // Coexistência permitida para fins administrativos ou tarefas gerais
         continue;
       }
 
-      const formatDateTime = (isoStr: string) => {
-        const d = new Date(isoStr);
-        return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-      };
+      // Escopo de aplicabilidade geográfica/organizacional:
+      // Se evt é bloqueio geral ministerial (church_id é nulo/vazio ou escopo é 'organizacao'):
+      // Bloqueia TODAS as congregações do ministério.
+      const isEvtGeneral = !evt.church_id || evt.escopo === 'organizacao';
+      const isPayloadGeneral = !eventPayload.church_id || eventPayload.escopo === 'organizacao';
+      const isSameChurch = evt.church_id && eventPayload.church_id && evt.church_id === eventPayload.church_id;
 
-      // Regra 2: Conflitos Críticos (Eventos de maior prioridade bloqueiam os de menor prioridade)
-      // Nota: Menores números de prioridade indicam maior relevância (Ex: organizacao = 1, divisao1 = 4)
-      if (evt.prioridade < eventPayload.prioridade) {
+      // Eventos de congregações diferentes sem vínculo geral não colidem
+      const isScopeApplicable = isEvtGeneral || isPayloadGeneral || isSameChurch;
+      if (!isScopeApplicable) {
+        continue;
+      }
+
+      // REGRA OBRIGATÓRIA: Somente gera_bloqueio cria impedimento de agendamento (status: BLOQUEIO)
+      if (evt.gera_bloqueio) {
+        const motivo = isEvtGeneral
+          ? `Data bloqueada pelo evento oficial geral "${evt.titulo}" em ${formatDateTime(evt.data_inicio)}. Bloqueios gerais do ministério impedem agendamentos em todas as congregações neste período.`
+          : `Data bloqueada pelo evento "${evt.titulo}" em ${formatDateTime(evt.data_inicio)} nesta congregação.`;
+
         return {
           status: 'BLOQUEIO',
-          regra_aplicada: 'BLOQUEIO_PRIORIDADE_SUPERIOR',
+          regra_aplicada: isEvtGeneral ? 'BLOQUEIO_GERAL_MINISTERIAL' : 'BLOQUEIO_LOCAL_CONGREGACAO',
           conflito: evt,
-          motivo: `Esta data está reservada pelo Planejamento Oficial. O evento "${evt.titulo}" em ${formatDateTime(evt.data_inicio)} pertence ao escopo superior (${evt.escopo}) e bloqueia novos agendamentos neste período.`,
+          motivo,
         };
       }
 
-      // Regra 3: Conflitos de Escopo Coexistente (Mesmo escopo gera aviso para revisão)
-      if (evt.prioridade === eventPayload.prioridade) {
+      // Se o novo evento tenta ativar gera_bloqueio, ele não pode colidir com nenhum evento existente no mesmo escopo
+      if (eventPayload.gera_bloqueio) {
         return {
-          status: 'AVISO',
-          regra_aplicada: 'AVISO_MESMO_ESCOPO',
+          status: 'BLOQUEIO',
+          regra_aplicada: 'BLOQUEIO_NOVO_EVENTO',
           conflito: evt,
-          motivo: `Aviso de duplicidade de agenda no escopo. Já existe o evento oficial "${evt.titulo}" em ${formatDateTime(evt.data_inicio)} no mesmo nível organizacional. Deseja prosseguir assim mesmo?`,
+          motivo: `Não é possível ativar bloqueio oficial neste horário pois já existe o compromisso "${evt.titulo}" em ${formatDateTime(evt.data_inicio)} no escopo abrangido.`,
         };
+      }
+
+      // Se nenhum gera bloqueio, mas ambos são do calendário oficial no mesmo escopo/congregação: aviso consultivo
+      if (evt.calendario_oficial && eventPayload.calendario_oficial) {
+        if (isSameChurch || (isEvtGeneral && isPayloadGeneral)) {
+          return {
+            status: 'AVISO',
+            regra_aplicada: 'AVISO_EVENTOS_OFICIAIS_COEXISTENTES',
+            conflito: evt,
+            motivo: `Aviso: Já existe o compromisso oficial "${evt.titulo}" em ${formatDateTime(evt.data_inicio)} neste mesmo horário.`,
+          };
+        }
       }
     }
 
     return { status: 'SEM_CONFLITO', motivo: null, regra_aplicada: null, conflito: null };
+  },
+
+  /**
+   * Valida se existe conflito consultando o banco de dados via cliente Supabase.
+   */
+  async verificarConflito(
+    supabase: any,
+    eventPayload: EventoParaConflito,
+    currentEventId: string | null
+  ): Promise<ConflictResult> {
+    try {
+      let query = supabase
+        .from('agenda_eventos')
+        .select('*, agenda_tipos(*)');
+
+      if (eventPayload.planejamento_id) {
+        query = query.eq('planejamento_id', eventPayload.planejamento_id);
+      } else if (eventPayload.ministry_id) {
+        query = query.eq('ministry_id', eventPayload.ministry_id);
+      }
+
+      if (currentEventId) {
+        query = query.neq('id', currentEventId);
+      }
+
+      const { data: existingEvents, error } = await query;
+      if (error || !existingEvents) {
+        return { status: 'SEM_CONFLITO', motivo: null, regra_aplicada: null, conflito: null };
+      }
+
+      let currentCategory = 'outro';
+      if (eventPayload.tipo_id) {
+        const { data: currentType } = await supabase
+          .from('agenda_tipos')
+          .select('categoria')
+          .eq('id', eventPayload.tipo_id)
+          .maybeSingle();
+        currentCategory = currentType?.categoria || 'outro';
+      }
+
+      return this.avaliarConflitosEmMemoria(existingEvents, eventPayload, currentEventId, currentCategory);
+    } catch {
+      return { status: 'SEM_CONFLITO', motivo: null, regra_aplicada: null, conflito: null };
+    }
   },
 };

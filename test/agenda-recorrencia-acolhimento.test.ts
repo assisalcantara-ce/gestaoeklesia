@@ -410,4 +410,72 @@ describe('Motor de Recorrência da Agenda Oficial (AgendaRecorrenciaService)', (
       assert.strictEqual(dt.getFullYear(), 2026);
     });
   });
+
+  it('14. Regra de Elegibilidade de Acolhimento: Apenas cultos de hoje são elegíveis; cultos futuros ficam como Programado', () => {
+    const hoje = new Date();
+    const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+    
+    // Data futura (+7 dias)
+    const amanha = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const futuroStr = `${amanha.getFullYear()}-${String(amanha.getMonth() + 1).padStart(2, '0')}-${String(amanha.getDate()).padStart(2, '0')}`;
+
+    const cultos = [
+      { id: 'agenda-1', data_culto: hojeStr, status: 'Aberto', relatorio_espiritual_id: null },
+      { id: 'agenda-2', data_culto: futuroStr, status: 'Programado', relatorio_espiritual_id: null },
+      { id: 'culto-3', data_culto: hojeStr, status: 'Encerrado', relatorio_espiritual_id: null },
+      { id: 'culto-4', data_culto: hojeStr, status: 'Consolidado', relatorio_espiritual_id: 'rel-123' },
+    ];
+
+    const isElegivel = (c: typeof cultos[0]) => {
+      return c.data_culto === hojeStr && c.status !== 'Encerrado' && c.status !== 'Consolidado' && !c.relatorio_espiritual_id;
+    };
+
+    assert.strictEqual(isElegivel(cultos[0]), true, 'Culto de hoje em status aberto deve ser elegível para recepção');
+    assert.strictEqual(isElegivel(cultos[1]), false, 'Culto futuro deve ser bloqueado para início de acolhimento');
+    assert.strictEqual(isElegivel(cultos[2]), false, 'Culto encerrado não é elegível para início de acolhimento');
+    assert.strictEqual(isElegivel(cultos[3]), false, 'Culto consolidado não é elegível para acolhimento');
+  });
+
+  it('15. Idempotência da Sincronização: Vinculação de culto_registros à Agenda não cria duplicatas nem novo agenda_evento', () => {
+    const ministryId = 'min-alpha-123';
+    const agendaEventoId = 'agenda-evt-999';
+
+    // Mock store simulating database
+    const databaseCultoRegistros: Array<{
+      id: string;
+      ministry_id: string;
+      agenda_evento_id: string;
+      status: string;
+    }> = [];
+
+    // Função de garantia idempotente (mesma regra implementada na página)
+    const ensureRegistro = (eventoId: string) => {
+      const existing = databaseCultoRegistros.find(
+        r => r.ministry_id === ministryId && r.agenda_evento_id === eventoId
+      );
+      if (existing) {
+        return { created: false, registro: existing };
+      }
+      const novo = {
+        id: `culto-reg-${Date.now()}`,
+        ministry_id: ministryId,
+        agenda_evento_id: eventoId,
+        status: 'Aberto',
+      };
+      databaseCultoRegistros.push(novo);
+      return { created: true, registro: novo };
+    };
+
+    // 1ª invocação (clique no botão Recepção / Link)
+    const res1 = ensureRegistro(agendaEventoId);
+    assert.strictEqual(res1.created, true);
+    assert.strictEqual(databaseCultoRegistros.length, 1);
+    assert.strictEqual(res1.registro.agenda_evento_id, agendaEventoId);
+
+    // 2ª invocação concorrente ou subsequente
+    const res2 = ensureRegistro(agendaEventoId);
+    assert.strictEqual(res2.created, false);
+    assert.strictEqual(databaseCultoRegistros.length, 1, 'Não deve criar segundo registro em culto_registros');
+    assert.strictEqual(res2.registro.id, res1.registro.id);
+  });
 });

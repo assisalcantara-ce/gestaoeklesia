@@ -99,6 +99,13 @@ export default function AgendaPage() {
     handleSave,
     handleDelete,
     confirmDeleteAction,
+    agendaVisualizada,
+    setAgendaVisualizada,
+    isSecretarioGeral,
+    isSecretarioLocal,
+    userCongregacaoId,
+    congregacoesAutorizadas,
+    canEditEvento,
     handleCriarTipo,
     handleDeletarTipo,
     handlePublishPlanning,
@@ -304,6 +311,10 @@ export default function AgendaPage() {
           currentMonth={currentMonth}
           currentYear={currentYear}
           MESES_PT={MESES_PT}
+          agendaVisualizada={agendaVisualizada}
+          onAgendaVisualizadaChange={setAgendaVisualizada}
+          congregacoesAutorizadas={congregacoesAutorizadas}
+          isSecretarioGeral={isSecretarioGeral}
           quickFilter={quickFilter}
           showAdvancedFilters={showAdvancedFilters}
           filtroTipoId={filtroTipoId}
@@ -659,6 +670,9 @@ export default function AgendaPage() {
         <EventoFormModal
           showModal={showModal}
           editEvento={editEvento}
+          canEdit={editEvento ? canEditEvento(editEvento) : true}
+          isSecretarioLocal={isSecretarioLocal}
+          userCongregacaoId={userCongregacaoId}
           form={form}
           saving={saving}
           showAdvancedFormFields={showAdvancedFormFields}

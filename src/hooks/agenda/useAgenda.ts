@@ -204,6 +204,7 @@ export function useAgenda() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [agendaVisualizada, setAgendaVisualizada] = useState<string>('geral');
   const [filtroTipoId, setFiltroTipoId] = useState<string>('');
   const [filtroCongregacao, setFiltroCongregacao] = useState<string>('');
   const [filtroVisibilidade, setFiltroVisibilidade] = useState<string>('');
@@ -286,6 +287,44 @@ export function useAgenda() {
   const isAdmin = useMemo(() => {
     return userIsMaster || userRole === 'admin' || userRole === 'administrador' || isPresidenciaOrAdmin;
   }, [userIsMaster, userRole, isPresidenciaOrAdmin]);
+
+  const userCongregacaoId = (ctx as any)?.congregacaoId || null;
+
+  const isSecretarioGeral = useMemo(() => {
+    if (userIsMaster) return true;
+    if (!userRole) return false;
+    const r = String(userRole).toLowerCase();
+    return (
+      r === 'administrador' ||
+      r === 'secretario_geral' ||
+      r === 'presidencia' ||
+      r.includes('admin') ||
+      r.includes('secretario_geral') ||
+      isPresidenciaOrAdmin
+    );
+  }, [userIsMaster, userRole, isPresidenciaOrAdmin]);
+
+  const isSecretarioLocal = useMemo(() => {
+    if (isSecretarioGeral) return false;
+    if (!userRole) return false;
+    const r = String(userRole).toLowerCase();
+    return r === 'secretaria_local' || r === 'admin_local' || r === 'operador';
+  }, [isSecretarioGeral, userRole]);
+
+  const congregacoesAutorizadas = useMemo(() => {
+    if (isSecretarioGeral) return congregacoes;
+    if (isSecretarioLocal && userCongregacaoId) {
+      const match = congregacoes.filter(c => c.id === userCongregacaoId);
+      return match.length > 0 ? match : congregacoes;
+    }
+    return congregacoes;
+  }, [isSecretarioGeral, isSecretarioLocal, userCongregacaoId, congregacoes]);
+
+  useEffect(() => {
+    if (isSecretarioLocal && userCongregacaoId) {
+      setAgendaVisualizada(userCongregacaoId);
+    }
+  }, [isSecretarioLocal, userCongregacaoId]);
 
   const currentYear = useMemo(() => {
     const [y] = filtroMes.split('-');
@@ -449,11 +488,19 @@ export function useAgenda() {
       if (filtroTipoId) {
         query = query.eq('tipo_id', filtroTipoId);
       }
-      if (filtroCongregacao) {
-        query = query.eq('church_id', filtroCongregacao);
-      }
       if (filtroVisibilidade) {
         query = query.eq('visibilidade', filtroVisibilidade);
+      }
+
+      // Seletor Superior: Visualizar Agenda
+      if (agendaVisualizada === 'geral') {
+        query = query.or('church_id.is.null,escopo.eq.organizacao,gera_bloqueio.eq.true');
+      } else if (agendaVisualizada && agendaVisualizada !== 'todas') {
+        // Congregação específica ou Sede:
+        // Exibe os eventos da própria unidade + eventos gerais/bloqueios do ministério
+        query = query.or(`church_id.eq.${agendaVisualizada},church_id.is.null`);
+      } else if (filtroCongregacao) {
+        query = query.eq('church_id', filtroCongregacao);
       }
 
       const { data, error } = await query;
@@ -465,7 +512,7 @@ export function useAgenda() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, filtroMes, filtroTipoId, filtroCongregacao, filtroVisibilidade]);
+  }, [supabase, filtroMes, filtroTipoId, filtroVisibilidade, agendaVisualizada, filtroCongregacao]);
 
   const triggerSyncPublicMagazine = useCallback(async () => {
     try {
@@ -528,6 +575,15 @@ export function useAgenda() {
     }
   }, [ministryId, currentYear, loadCongregacoes, loadTipos, loadEventos, loadPlanningInfo, loadSolicitacoes]);
 
+  const canEditEvento = useCallback((evento: AgendaEvento | null): boolean => {
+    if (!evento) return isEscritaPermitida;
+    if (isSecretarioGeral) return true;
+    if (isSecretarioLocal) {
+      return Boolean(evento.church_id && evento.church_id === userCongregacaoId);
+    }
+    return isEscritaPermitida;
+  }, [isSecretarioGeral, isSecretarioLocal, userCongregacaoId, isEscritaPermitida]);
+
   const openForm = (evento: AgendaEvento | null = null, defaultDateStr?: string | null) => {
     if (evento) {
       setEditEvento(evento);
@@ -582,7 +638,27 @@ export function useAgenda() {
         ? `${targetDate}T09:00` 
         : `${new Date().toISOString().slice(0, 10)}T09:00`;
 
-      const defaultChurch = filtroCongregacao ? congregacoes.find(c => c.id === filtroCongregacao) : null;
+      // Destino do evento separado da agenda visualizada:
+      let initialChurchId = '';
+      let initialLocal = 'Sede Geral';
+
+      if (isSecretarioLocal && userCongregacaoId) {
+        const userChurch = congregacoes.find(c => c.id === userCongregacaoId);
+        initialChurchId = userCongregacaoId;
+        initialLocal = userChurch ? userChurch.nome : 'Minha Congregação';
+      } else if (agendaVisualizada && agendaVisualizada !== 'geral' && agendaVisualizada !== 'todas') {
+        const viewedChurch = congregacoes.find(c => c.id === agendaVisualizada);
+        if (viewedChurch) {
+          initialChurchId = viewedChurch.id;
+          initialLocal = viewedChurch.nome;
+        }
+      } else if (filtroCongregacao) {
+        const defaultChurch = congregacoes.find(c => c.id === filtroCongregacao);
+        if (defaultChurch) {
+          initialChurchId = defaultChurch.id;
+          initialLocal = defaultChurch.nome;
+        }
+      }
 
       setForm({
         titulo: '',
@@ -592,11 +668,11 @@ export function useAgenda() {
         data_fim: '',
         hora_inicio: '19:30',
         duracao_minutos: 120,
-        local: defaultChurch ? defaultChurch.nome : 'Sede Geral',
+        local: initialLocal,
         visibilidade: 'ministerio',
-        church_id: defaultChurch ? defaultChurch.id : '',
+        church_id: initialChurchId,
         status: 'agendado',
-        escopo: 'divisao1',
+        escopo: initialChurchId ? 'divisao1' : 'organizacao',
         calendario_oficial: false,
         gera_bloqueio: false,
         regra_posicionamento: '',
@@ -697,42 +773,48 @@ export function useAgenda() {
         dataFimEfetiva = form.data_fim ? new Date(form.data_fim).toISOString() : null;
       }
 
-      if (form.gera_bloqueio || form.calendario_oficial) {
-        const conflict = await PlanningConflictService.verificarConflito(
-          supabase,
-          {
-            titulo: form.titulo.trim(),
-            data_inicio: dataInicioEfetiva,
-            data_fim: dataFimEfetiva,
-            planejamento_id: activePlanning?.id || '',
-            tipo_id: form.tipo_id,
-            escopo: form.escopo,
-            prioridade: 1,
-            calendario_oficial: form.calendario_oficial,
-            gera_bloqueio: form.gera_bloqueio,
-          },
-          editEvento?.id || ''
-        );
+      const finalChurchId = isSecretarioLocal && userCongregacaoId ? userCongregacaoId : (form.church_id || null);
+      const finalGeraBloqueio = isSecretarioLocal ? false : form.gera_bloqueio;
+      const finalCalendarioOficial = isSecretarioLocal ? false : form.calendario_oficial;
+      const finalEscopo = isSecretarioLocal ? 'divisao1' : (finalChurchId ? form.escopo : 'organizacao');
 
-        if (conflict && conflict.status === 'BLOQUEIO') {
-          const proceed = await dialog.confirm({
-            title: 'Alerta de Conflito de Agenda',
-            type: 'warning',
-            message: `Detectado choque de data com o evento "${conflict.conflito?.titulo || 'Oficial/Bloqueante'}". Deseja submeter uma Solicitação de Exceção à Presidência?`,
-            confirmText: 'Enviar Solicitação',
-            cancelText: 'Cancelar'
-          });
+      // Pré-validação de Conflitos e Bloqueios Oficiais no cliente
+      const conflict = await PlanningConflictService.verificarConflito(
+        supabase,
+        {
+          titulo: form.titulo.trim(),
+          data_inicio: dataInicioEfetiva,
+          data_fim: dataFimEfetiva,
+          planejamento_id: activePlanning?.id || '',
+          ministry_id: ministryId,
+          church_id: finalChurchId,
+          tipo_id: form.tipo_id,
+          escopo: finalEscopo,
+          prioridade: finalEscopo === 'organizacao' ? 1 : 4,
+          calendario_oficial: finalCalendarioOficial,
+          gera_bloqueio: finalGeraBloqueio,
+        },
+        editEvento?.id || null
+      );
 
-          if (proceed) {
-            flash('ok', 'Solicitação de Exceção enviada com sucesso à Presidência para análise!');
-            setShowModal(false);
-            setSaving(false);
-            loadSolicitacoes(ministryId);
-            return;
-          } else {
-            setSaving(false);
-            return;
-          }
+      if (conflict && conflict.status === 'BLOQUEIO') {
+        const proceed = await dialog.confirm({
+          title: 'Alerta de Conflito de Agenda',
+          type: 'warning',
+          message: `${conflict.motivo || 'Choque com bloqueio oficial existente.'} Deseja submeter uma Solicitação de Exceção à Presidência?`,
+          confirmText: 'Enviar Solicitação',
+          cancelText: 'Cancelar'
+        });
+
+        if (proceed) {
+          flash('ok', 'Solicitação de Exceção enviada com sucesso à Presidência para análise!');
+          setShowModal(false);
+          setSaving(false);
+          loadSolicitacoes(ministryId);
+          return;
+        } else {
+          setSaving(false);
+          return;
         }
       }
 
@@ -751,76 +833,63 @@ export function useAgenda() {
         data_fim: dataFimEfetiva,
         local: form.local.trim() || null,
         visibilidade: form.visibilidade,
-        church_id: form.church_id || null,
+        church_id: finalChurchId,
         status: form.status,
-        escopo: form.escopo,
-        calendario_oficial: form.calendario_oficial,
-        gera_bloqueio: form.gera_bloqueio,
+        escopo: finalEscopo,
+        calendario_oficial: finalCalendarioOficial,
+        gera_bloqueio: finalGeraBloqueio,
         regra_posicionamento: form.regra_posicionamento || null,
         recorrente: form.recorrencia_tipo !== 'nenhuma',
         recorrencia_tipo: form.recorrencia_tipo,
         recorrencia_config: form.recorrencia_tipo !== 'nenhuma' ? recorrenciaConfig : null,
-        updated_at: new Date().toISOString(),
       };
 
-      if (editEvento) {
-        const { error } = await supabase
-          .from('agenda_eventos')
-          .update(payload)
-          .eq('id', editEvento.id);
-        if (error) throw error;
-        await registrarAcao({ acao: 'editar', modulo: 'agenda', tabela_afetada: 'agenda_eventos', registro_id: editEvento.id });
-        flash('ok', 'Compromisso atualizado com sucesso!');
-      } else {
-        const { data: newEvt, error } = await supabase
-          .from('agenda_eventos')
-          .insert([{ ...payload, created_by: user?.id || null }])
-          .select()
-          .single();
-        if (error) throw error;
-        await registrarAcao({ acao: 'criar', modulo: 'agenda', tabela_afetada: 'agenda_eventos', registro_id: newEvt.id });
-
-        // Se for recorrente, gerar instâncias reais filhas no calendário vinculadas ao pai
-        if (form.recorrencia_tipo !== 'nenhuma' && newEvt?.id && ocorrenciasGeradas.length > 1) {
-          // Pula a 1ª ocorrência pois ela já é o evento pai gerado acima
-          const filhas = ocorrenciasGeradas.slice(1).map(oc => ({
-            ministry_id: ministryId,
-            planejamento_id: activePlanning?.id || null,
-            titulo: form.titulo.trim(),
-            descricao: form.descricao.trim() || null,
-            tipo: tipoCalculado,
-            origem: 'manual',
-            tipo_id: form.tipo_id || null,
-            data_inicio: oc.dataInicio,
-            data_fim: oc.dataFim,
-            local: form.local.trim() || null,
-            visibilidade: form.visibilidade,
-            church_id: form.church_id || null,
-            status: form.status,
-            escopo: form.escopo,
-            calendario_oficial: form.calendario_oficial,
-            gera_bloqueio: form.gera_bloqueio,
-            recorrente: true,
-            recorrencia_tipo: form.recorrencia_tipo,
-            recorrencia_pai_id: newEvt.id,
-            created_by: user?.id || null,
-          }));
-
-          await supabase.from('agenda_eventos').insert(filhas);
-        }
-
-        flash('ok', 'Compromisso agendado com sucesso!');
+      let filhasPayload: any[] = [];
+      if (form.recorrencia_tipo !== 'nenhuma' && !editEvento && ocorrenciasGeradas.length > 1) {
+        filhasPayload = ocorrenciasGeradas.slice(1).map(oc => ({
+          dataInicio: oc.dataInicio,
+          dataFim: oc.dataFim,
+        }));
       }
 
+      // Envia requisição com autorização e validação server-side via API
+      const endpoint = '/api/v1/agenda';
+      const method = editEvento ? 'PUT' : 'POST';
+      const bodyPayload = editEvento
+        ? { id: editEvento.id, ...payload }
+        : { ...payload, filhas: filhasPayload };
+
+      const res = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyPayload),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Erro ao salvar compromisso (${res.status})`);
+      }
+
+      const resJson = await res.json();
+      const savedId = resJson?.data?.id || editEvento?.id || 'compromisso';
+
+      await registrarAcao({
+        acao: editEvento ? 'editar' : 'criar',
+        modulo: 'agenda',
+        tabela_afetada: 'agenda_eventos',
+        registro_id: savedId,
+      });
+
+      flash('ok', editEvento ? 'Compromisso atualizado com sucesso!' : 'Compromisso agendado com sucesso!');
       setShowModal(false);
       loadEventos(ministryId);
       if (activePlanning) loadPlanningInfo(ministryId, currentYear);
 
       // Sincronizar cache público caso seja evento público ou altere a agenda pública
       triggerSyncPublicMagazine();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      flash('erro', 'Falha ao salvar o compromisso.');
+      flash('erro', err.message || 'Falha ao salvar o compromisso.');
     } finally {
       setSaving(false);
     }
@@ -835,12 +904,20 @@ export function useAgenda() {
     const evento = deleteConfirmTarget;
     setDeleteConfirmTarget(null);
 
+    if (isSecretarioLocal && (!evento.church_id || evento.church_id !== userCongregacaoId)) {
+      flash('erro', 'Secretário local só pode excluir compromissos de sua própria congregação.');
+      return;
+    }
+
     try {
-      const { error } = await supabase
-        .from('agenda_eventos')
-        .delete()
-        .eq('id', evento.id);
-      if (error) throw error;
+      const res = await fetch(`/api/v1/agenda?id=${evento.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Erro ao excluir compromisso (${res.status})`);
+      }
 
       await registrarAcao({ acao: 'deletar', modulo: 'agenda', tabela_afetada: 'agenda_eventos', registro_id: evento.id });
       flash('ok', 'Compromisso excluído com sucesso.');
@@ -849,9 +926,9 @@ export function useAgenda() {
 
       // Sincronizar cache público caso o evento excluído fosse público
       triggerSyncPublicMagazine();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      flash('erro', 'Erro ao excluir o compromisso.');
+      flash('erro', err.message || 'Erro ao excluir o compromisso.');
     }
   };
 
@@ -1206,6 +1283,13 @@ export function useAgenda() {
     CATEGORIAS_LABEL,
     STATUS_PLAN_INFO,
     TIPO_SOLICITACAO_LABEL,
+    agendaVisualizada,
+    setAgendaVisualizada,
+    isSecretarioGeral,
+    isSecretarioLocal,
+    userCongregacaoId,
+    canEditEvento,
+    congregacoesAutorizadas,
     congregacoes,
     loadingCongregacoes,
     erroCongregacoes,
