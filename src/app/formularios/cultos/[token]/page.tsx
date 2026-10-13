@@ -43,6 +43,7 @@ export default async function RedirecionarFormularioCultoPage(props: PageProps) 
         data_culto,
         horario_culto,
         status,
+        agenda_evento_id,
         congregacoes ( nome )
       )
     `)
@@ -106,6 +107,59 @@ export default async function RedirecionarFormularioCultoPage(props: PageProps) 
         </div>
       </div>
     );
+  }
+
+  if (culto.status === 'Cancelado') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#062E6F] via-[#0A4499] to-[#1565C0] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+          <AlertCircle className="h-14 w-14 text-rose-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Culto Cancelado</h2>
+          <p className="text-slate-600 text-sm">
+            Este culto foi cancelado e não está mais disponível para acolhimento de visitantes.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (culto.status !== 'Encerrado' && culto.status !== 'Consolidado') {
+    if (!culto.agenda_evento_id) {
+      await admin.from('culto_tokens').update({ is_active: false }).eq('id', tokenRecord.id);
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-[#062E6F] via-[#0A4499] to-[#1565C0] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+            <Lock className="h-14 w-14 text-amber-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Evento Removido da Agenda</h2>
+            <p className="text-slate-600 text-sm">
+              O evento deste culto não está mais disponível na Agenda Oficial.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    const { data: agendaEv } = await admin
+      .from('agenda_eventos')
+      .select('id, status')
+      .eq('id', culto.agenda_evento_id)
+      .eq('ministry_id', tokenRecord.ministry_id)
+      .maybeSingle();
+
+    if (!agendaEv || agendaEv.status === 'cancelado') {
+      await admin.from('culto_tokens').update({ is_active: false }).eq('id', tokenRecord.id);
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-[#062E6F] via-[#0A4499] to-[#1565C0] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+            <Lock className="h-14 w-14 text-amber-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Evento Cancelado na Agenda</h2>
+            <p className="text-slate-600 text-sm">
+              O evento deste culto foi cancelado ou removido da Agenda Oficial.
+            </p>
+          </div>
+        </div>
+      );
+    }
   }
 
   // 4. Validação estrita de janela do culto (Fuso Horário Oficial de Brasília GMT-3)

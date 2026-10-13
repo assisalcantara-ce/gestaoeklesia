@@ -26,7 +26,7 @@ interface CultoRegistro {
   dirigente: string;
   pregador: string | null;
   observacoes: string | null;
-  status: 'Aberto' | 'Encerrado' | 'Consolidado' | 'Programado';
+  status: 'Aberto' | 'Encerrado' | 'Consolidado' | 'Programado' | 'Cancelado';
   // Campos de encerramento
   membros_presentes: number;
   visitantes_presentes: number;
@@ -297,6 +297,10 @@ export default function CultosPage() {
   // Gera ou regenera o token público para um culto (expira em 24h)
   const gerarTokenCulto = async (culto: CultoRegistro, regenerar = false) => {
     if (!ctx?.ministryId) return;
+    if (culto.status === 'Cancelado') {
+      showNotification('warning', 'Culto Cancelado', 'Não é possível gerar link para um culto cancelado.');
+      return;
+    }
     setLoadingToken(true);
     setLinkUrl('');
     try {
@@ -481,6 +485,8 @@ export default function CultosPage() {
             computedStatus = 'Consolidado';
           } else if (existingReg.status === 'Encerrado') {
             computedStatus = 'Encerrado';
+          } else if (existingReg.status === 'Cancelado') {
+            computedStatus = 'Cancelado';
           } else if (evDateStr > todayStr) {
             computedStatus = 'Programado';
           } else {
@@ -532,11 +538,31 @@ export default function CultosPage() {
         }
       }
 
-      // Adicionar registros históricos que não vieram da agenda (agenda_evento_id nulo)
+      const idsAgenda = new Set((rawAgenda as Array<{ id: string }>).map(ev => ev.id));
+
+      // Adicionar registros históricos preservados que não vieram de eventos ativos da Agenda
       for (const r of rawRegistros) {
-        if (!r.agenda_evento_id) {
-          mergedList.push(r);
-        }
+        // Se já foi processado através de rawAgenda, ignora
+        const jaProcessado = r.agenda_evento_id && idsAgenda.has(r.agenda_evento_id);
+        if (jaProcessado) continue;
+
+        // Se o culto foi cancelado, nunca adiciona à listagem
+        if (r.status === 'Cancelado') continue;
+
+        // Preserva registros com histórico operacional real (visitantes, membros ou encerramento)
+        const temHistorico =
+          r.status === 'Encerrado' ||
+          r.status === 'Consolidado' ||
+          (r.visitantes_presentes || 0) > 0 ||
+          (r.membros_presentes || 0) > 0 ||
+          (r.almas_alcancadas || 0) > 0 ||
+          Boolean(r.relatorio_espiritual_id) ||
+          Boolean(r.encerrado_em);
+
+        // Se não possui evento oficial na Agenda e não tem histórico operacional, ignora registro órfão
+        if (!temHistorico) continue;
+
+        mergedList.push(r);
       }
 
       // Ordenar decrescente por data e horário
@@ -578,6 +604,7 @@ export default function CultosPage() {
 
   // Garantir a existência do registro em culto_registros de forma idempotente
   const ensureCultoRegistro = async (culto: CultoRegistro): Promise<CultoRegistro | null> => {
+    if (culto.status === 'Cancelado') return null;
     if (culto.id && !culto.id.startsWith('agenda-')) {
       return culto;
     }
@@ -1098,7 +1125,7 @@ export default function CultosPage() {
                         const todayStr = getLocalDateStr(new Date());
                         const isHoje = reg.data_culto === todayStr;
                         const isFuturo = reg.data_culto > todayStr;
-                        const isElegivelAcolhimento = isHoje && reg.status !== 'Encerrado' && reg.status !== 'Consolidado' && !reg.relatorio_espiritual_id;
+                        const isElegivelAcolhimento = isHoje && reg.status === 'Aberto' && !reg.relatorio_espiritual_id && (Boolean(reg.agenda_evento_id) || reg.id.startsWith('agenda-'));
 
                         return (
                           <tr key={reg.id} className="hover:bg-slate-50/50 transition">
@@ -1136,6 +1163,11 @@ export default function CultosPage() {
                               </div>
                             </td>
                             <td className="p-3.5">
+                              {reg.status === 'Cancelado' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                                  ❌ Cancelado
+                                </span>
+                              )}
                               {reg.status === 'Programado' && (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
                                   📅 Programado

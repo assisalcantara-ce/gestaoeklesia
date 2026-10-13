@@ -41,6 +41,7 @@ export async function GET(
           data_culto,
           horario_culto,
           status,
+          agenda_evento_id,
           congregacao_id,
           congregacoes (
             nome
@@ -127,6 +128,59 @@ export async function GET(
         { error: 'Culto vinculado a este link não foi encontrado.', code: 'CULTO_NAO_ENCONTRADO' },
         { status: 404 }
       );
+    }
+
+    // 5.1 Verificar se o culto foi cancelado
+    if (culto.status === 'Cancelado') {
+      return NextResponse.json(
+        {
+          error: 'Este culto foi cancelado e não está mais disponível para acolhimento.',
+          code: 'CULTO_CANCELADO',
+          app_url: appUrl,
+          igreja_nome: igrejaNome,
+          logo_url: logoUrl,
+        },
+        { status: 410 }
+      );
+    }
+
+    // 5.2 Validação da Agenda Oficial: se o culto estiver aberto mas o evento da agenda foi excluído ou cancelado
+    if (culto.status !== 'Encerrado' && culto.status !== 'Consolidado') {
+      if (!culto.agenda_evento_id) {
+        // Evento da Agenda foi excluído (foreign key ficou nula)
+        await admin.from('culto_tokens').update({ is_active: false }).eq('id', tokenRecord.id);
+        return NextResponse.json(
+          {
+            error: 'O evento deste culto não está mais disponível na Agenda Oficial.',
+            code: 'EVENTO_AGENDA_CANCELADO',
+            app_url: appUrl,
+            igreja_nome: igrejaNome,
+            logo_url: logoUrl,
+          },
+          { status: 410 }
+        );
+      }
+
+      const { data: agendaEv } = await admin
+        .from('agenda_eventos')
+        .select('id, status')
+        .eq('id', culto.agenda_evento_id)
+        .eq('ministry_id', tokenRecord.ministry_id)
+        .maybeSingle();
+
+      if (!agendaEv || agendaEv.status === 'cancelado') {
+        await admin.from('culto_tokens').update({ is_active: false }).eq('id', tokenRecord.id);
+        return NextResponse.json(
+          {
+            error: 'O evento deste culto foi removido ou cancelado na Agenda Oficial.',
+            code: 'EVENTO_AGENDA_CANCELADO',
+            app_url: appUrl,
+            igreja_nome: igrejaNome,
+            logo_url: logoUrl,
+          },
+          { status: 410 }
+        );
+      }
     }
 
     // 6. Validação estrita de janela do culto (Data local de hoje e Status)

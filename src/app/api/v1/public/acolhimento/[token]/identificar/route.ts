@@ -65,7 +65,8 @@ export async function POST(
         culto_registros (
           id,
           data_culto,
-          status
+          status,
+          agenda_evento_id
         )
       `)
       .eq('token', rawToken.trim())
@@ -91,6 +92,38 @@ export async function POST(
         { error: 'Culto vinculado não localizado.', code: 'CULTO_NAO_ENCONTRADO' },
         { status: 404 }
       );
+    }
+
+    if (culto.status === 'Cancelado') {
+      return NextResponse.json(
+        { error: 'Culto cancelado.', code: 'CULTO_CANCELADO' },
+        { status: 410 }
+      );
+    }
+
+    if (culto.status !== 'Encerrado' && culto.status !== 'Consolidado') {
+      if (!culto.agenda_evento_id) {
+        await admin.from('culto_tokens').update({ is_active: false }).eq('id', tokenRecord.id);
+        return NextResponse.json(
+          { error: 'Evento da Agenda não disponível.', code: 'EVENTO_AGENDA_CANCELADO' },
+          { status: 410 }
+        );
+      }
+
+      const { data: agendaEv } = await admin
+        .from('agenda_eventos')
+        .select('id, status')
+        .eq('id', culto.agenda_evento_id)
+        .eq('ministry_id', tokenRecord.ministry_id)
+        .maybeSingle();
+
+      if (!agendaEv || agendaEv.status === 'cancelado') {
+        await admin.from('culto_tokens').update({ is_active: false }).eq('id', tokenRecord.id);
+        return NextResponse.json(
+          { error: 'Evento da Agenda foi cancelado ou removido.', code: 'EVENTO_AGENDA_CANCELADO' },
+          { status: 410 }
+        );
+      }
     }
 
     const validacaoJanela = isCultoAbertoHoje(culto.data_culto, culto.status);

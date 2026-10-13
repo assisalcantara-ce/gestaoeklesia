@@ -396,6 +396,34 @@ export async function PUT(request: NextRequest) {
     delete payloadAtualizacao.created_at;
     delete payloadAtualizacao.created_by;
 
+    if (payloadAtualizacao.status === 'cancelado') {
+      const { data: cultosVinculados } = await ctx.admin
+        .from('culto_registros')
+        .select('id, status')
+        .eq('agenda_evento_id', id)
+        .eq('ministry_id', ctx.ministryId);
+
+      if (cultosVinculados && cultosVinculados.length > 0) {
+        const cultoIds = cultosVinculados.map((c: any) => c.id);
+
+        await ctx.admin
+          .from('culto_tokens')
+          .update({ is_active: false })
+          .in('culto_id', cultoIds)
+          .eq('ministry_id', ctx.ministryId);
+
+        await ctx.admin
+          .from('culto_registros')
+          .update({
+            status: 'Cancelado',
+            observacoes: 'Evento cancelado na Agenda Oficial.'
+          })
+          .in('id', cultoIds)
+          .eq('ministry_id', ctx.ministryId)
+          .in('status', ['Aberto', 'Programado']);
+      }
+    }
+
     const { data: updatedEvento, error: updateError } = await ctx.admin
       .from('agenda_eventos')
       .update(payloadAtualizacao)
@@ -474,6 +502,38 @@ export async function DELETE(request: NextRequest) {
           { status: 403 }
         );
       }
+    }
+
+    // Sincronização estrita com Acolhimento e Operação de Cultos:
+    // Antes de excluir de agenda_eventos, desativa tokens de acolhimento e cancela cultos operacionais em aberto
+    // mantendo integridade multi-tenant e preservando 100% de dados históricos e visitantes.
+    const { data: cultosVinculados } = await ctx.admin
+      .from('culto_registros')
+      .select('id, status, visitantes_presentes')
+      .eq('agenda_evento_id', id)
+      .eq('ministry_id', ctx.ministryId);
+
+    if (cultosVinculados && cultosVinculados.length > 0) {
+      const cultoIds = cultosVinculados.map((c: any) => c.id);
+
+      // Invalida todos os tokens de acolhimento (QR Code / link de recepção) deste culto
+      await ctx.admin
+        .from('culto_tokens')
+        .update({ is_active: false })
+        .in('culto_id', cultoIds)
+        .eq('ministry_id', ctx.ministryId);
+
+      // Atualiza cultos em aberto ou programados para 'Cancelado', preservando registros históricos (Encerrado / Consolidado)
+      // sem efetuar DELETE destrutivo em culto_registros ou culto_visitantes.
+      await ctx.admin
+        .from('culto_registros')
+        .update({
+          status: 'Cancelado',
+          observacoes: 'Evento cancelado e removido da Agenda Oficial.'
+        })
+        .in('id', cultoIds)
+        .eq('ministry_id', ctx.ministryId)
+        .in('status', ['Aberto', 'Programado']);
     }
 
     const { error: deleteError } = await ctx.admin

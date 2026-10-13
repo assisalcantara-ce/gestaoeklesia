@@ -62,6 +62,7 @@ export async function POST(
           data_culto,
           horario_culto,
           status,
+          agenda_evento_id,
           congregacao_id
         )
       `)
@@ -95,6 +96,38 @@ export async function POST(
         { error: 'O culto vinculado a este link não foi encontrado.', code: 'CULTO_NAO_ENCONTRADO' },
         { status: 404 }
       );
+    }
+
+    if (culto.status === 'Cancelado') {
+      return NextResponse.json(
+        { error: 'Este culto foi cancelado e não aceita mais cadastros de acolhimento.', code: 'CULTO_CANCELADO' },
+        { status: 410 }
+      );
+    }
+
+    if (culto.status !== 'Encerrado' && culto.status !== 'Consolidado') {
+      if (!culto.agenda_evento_id) {
+        await admin.from('culto_tokens').update({ is_active: false }).eq('id', tokenRecord.id);
+        return NextResponse.json(
+          { error: 'O evento deste culto não está mais disponível na Agenda.', code: 'EVENTO_AGENDA_CANCELADO' },
+          { status: 410 }
+        );
+      }
+
+      const { data: agendaEv } = await admin
+        .from('agenda_eventos')
+        .select('id, status')
+        .eq('id', culto.agenda_evento_id)
+        .eq('ministry_id', tokenRecord.ministry_id)
+        .maybeSingle();
+
+      if (!agendaEv || agendaEv.status === 'cancelado') {
+        await admin.from('culto_tokens').update({ is_active: false }).eq('id', tokenRecord.id);
+        return NextResponse.json(
+          { error: 'O evento deste culto foi cancelado ou removido da Agenda Oficial.', code: 'EVENTO_AGENDA_CANCELADO' },
+          { status: 410 }
+        );
+      }
     }
 
     // Validação estrita de expiração e janela do culto no servidor
