@@ -26,7 +26,6 @@ import {
   CreditCard,
   CheckCircle2,
   MapPin,
-  Users,
   LifeBuoy,
   Settings,
   ChevronDown,
@@ -156,6 +155,7 @@ export default function Sidebar() {
     'meu-contrato': 'configuracoes',
     'config-cartoes': 'configuracoes',
     'ativar-fluxo': 'configuracoes',
+    'usuarios': 'configuracoes',
     ...Object.fromEntries(ALL_EBD_IDS.map(id => [id, 'ebd'])),
     'ebd-historico': 'ebd',
     'ebd-trimestres': 'ebd',
@@ -267,7 +267,6 @@ export default function Sidebar() {
     { id: 'financeiro', label: 'Financeiro', icon: CreditCard, path: '/financeiro', modulo: 'financeiro' },
     { id: 'auditoria', label: 'Auditoria', icon: CheckCircle2, path: '/auditoria', modulo: 'auditoria' },
     { id: 'geolocalizacao', label: 'Geolocalização', icon: MapPin, path: '/geolocalizacao', modulo: 'geolocalizacao' },
-    { id: 'usuarios', label: 'Usuários', icon: Users, path: '/usuarios', modulo: 'usuarios' },
     { id: 'suporte', label: 'Suporte', icon: LifeBuoy, path: '/suporte', modulo: 'suporte' },
     {
       id: 'configuracoes',
@@ -281,6 +280,7 @@ export default function Sidebar() {
         { id: 'config-cartoes', label: 'Cartões', path: '/configuracoes/cartoes' },
         { id: 'certificados', label: 'Certificados', path: '/configuracoes/certificados', modulo: 'configuracoes' },
         { id: 'ativar-fluxo', label: 'Ativar Fluxo', path: '/secretaria/ativar-fluxo' },
+        { id: 'usuarios', label: 'Usuários', path: '/usuarios', modulo: 'usuarios' },
       ],
     },
   ];

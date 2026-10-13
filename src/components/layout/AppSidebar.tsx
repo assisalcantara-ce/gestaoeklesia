@@ -114,6 +114,7 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
     'config-geral': 'configuracoes',
     'config-cartoes': 'configuracoes',
     'ativar-fluxo': 'configuracoes',
+    'usuarios': 'configuracoes',
     ...Object.fromEntries(ALL_EBD_IDS.map(id => [id, 'ebd'])),
     'ebd-historico': 'ebd',
     'ebd-trimestres': 'ebd',

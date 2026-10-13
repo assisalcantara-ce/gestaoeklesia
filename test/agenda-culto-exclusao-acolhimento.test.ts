@@ -734,7 +734,7 @@ describe('Sincronização entre Agenda e Acolhimento — Exclusão, Histórico e
     const isFuturo = cultoFuturo.data_culto > hoje;
     assert.equal(isFuturo, true, 'Deve ser identificado como data futura');
 
-    const isElegivelAcolhimento = isHoje && cultoFuturo.status === 'Aberto';
+    const isElegivelAcolhimento = isHoje && (cultoFuturo.status as string) === 'Aberto';
     assert.equal(isElegivelAcolhimento, false, 'Cultos futuros não devem permitir acolhimento antecipado');
   });
 });

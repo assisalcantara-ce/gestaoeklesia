@@ -40,6 +40,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
           { id: 'config-cartoes', label: 'Cartões', icon: '🎫', path: '/configuracoes/cartoes' },
           { id: 'certificados', label: 'Certificados', icon: '🎓', path: '/configuracoes/certificados', modulo: 'configuracoes' },
           { id: 'ativar-fluxo', label: 'Ativar Fluxo', icon: '🔄', path: '/secretaria/ativar-fluxo' },
+          { id: 'usuarios', label: 'Usuários', icon: '👤', path: '/usuarios', modulo: 'usuarios' },
         ]
       },
     ]
@@ -137,7 +138,6 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
   {
     groupName: "ADMINISTRAÇÃO",
     items: [
-      { id: 'usuarios', label: 'Usuários', icon: '👤', path: '/usuarios', modulo: 'usuarios' },
       { id: 'suporte', label: 'Suporte', icon: '🎫', path: '/suporte', modulo: 'suporte' },
       { id: 'reunioes', label: 'Reuniões', icon: '🤝', path: '/reunioes', modulo: 'reunioes', featureFlag: 'meetings_module', planFeature: 'has_modulo_reunioes' },
       { id: 'missoes', label: 'Missões', icon: '✈️', path: '/missoes', modulo: 'missoes', featureFlag: 'missions_module', planFeature: 'has_modulo_missoes' },
