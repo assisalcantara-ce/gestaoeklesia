@@ -429,12 +429,14 @@ export default function CultosPage() {
         regQuery = regQuery.eq('congregacao_id', ctx.congregacaoId);
       }
 
-      // 2. Buscar eventos da Agenda Oficial tipo = 'culto' e status != 'cancelado'
+      // 2. Buscar eventos da Agenda Oficial (tipo 'culto', categoria 'culto' ou títulos de culto) e status != 'cancelado'
       let agendaQuery = supabase
         .from('agenda_eventos')
-        .select('id, titulo, data_inicio, data_fim, local, church_id, congregacao_id:church_id, status')
+        .select(`
+          id, titulo, data_inicio, data_fim, local, church_id, congregacao_id:church_id, status, tipo, tipo_id,
+          agenda_tipos ( id, nome, categoria )
+        `)
         .eq('ministry_id', ctx.ministryId)
-        .eq('tipo', 'culto')
         .neq('status', 'cancelado');
 
       if (isLocalUser && ctx?.congregacaoId) {
@@ -454,7 +456,21 @@ export default function CultosPage() {
       }
 
       const rawRegistros = (resRegistros.data || []) as CultoRegistro[];
-      const rawAgenda = resAgenda.data || [];
+
+      // Filtra e normaliza os eventos válidos da Agenda para considerar todos os cultos
+      const rawAgenda = (resAgenda.data || []).filter((ev: any) => {
+        const tipoNorm = (ev.tipo || '').toLowerCase().trim();
+        const catNorm = (ev.agenda_tipos?.categoria || '').toLowerCase().trim();
+        const titNorm = (ev.titulo || '').toLowerCase().trim();
+
+        // É culto se: tipo canônico culto, categoria culto ou título semântico de culto
+        if (tipoNorm === 'culto') return true;
+        if (catNorm === 'culto') return true;
+        if (titNorm.includes('culto') || titNorm.includes('ceia') || titNorm.includes('vigilia') || titNorm.includes('vigília') || titNorm.includes('oracao') || titNorm.includes('oração')) {
+          return true;
+        }
+        return false;
+      });
 
       // Mapeamento por agenda_evento_id
       const registrosPorAgendaId = new Map<string, CultoRegistro>();
@@ -479,14 +495,12 @@ export default function CultosPage() {
         const existingReg = registrosPorAgendaId.get(ev.id);
 
         if (existingReg) {
-          // Status computado
+          // Status computado: se o evento na Agenda está ativo, não permanece cancelado
           let computedStatus: CultoRegistro['status'] = existingReg.status;
           if (existingReg.status === 'Consolidado') {
             computedStatus = 'Consolidado';
           } else if (existingReg.status === 'Encerrado') {
             computedStatus = 'Encerrado';
-          } else if (existingReg.status === 'Cancelado') {
-            computedStatus = 'Cancelado';
           } else if (evDateStr > todayStr) {
             computedStatus = 'Programado';
           } else {
@@ -533,7 +547,7 @@ export default function CultosPage() {
             agenda_evento_id: ev.id,
             created_at: ev.data_inicio,
             updated_at: ev.data_inicio,
-            congregacoes: localCongregacao ? { nome: localCongregacao.nome } : null
+            congregacoes: localCongregacao ? { nome: localCongregacao.nome } : (ev.church_id ? null : { nome: 'Todo o Campo (Geral)' })
           });
         }
       }
@@ -622,6 +636,13 @@ export default function CultosPage() {
           .maybeSingle();
 
         if (existing) {
+          if (existing.status === 'Cancelado') {
+            await supabase
+              .from('culto_registros')
+              .update({ status: 'Aberto', observacoes: null })
+              .eq('id', existing.id);
+            existing.status = 'Aberto';
+          }
           await loadRegistros();
           return existing as CultoRegistro;
         }
@@ -663,7 +684,8 @@ export default function CultosPage() {
   // Filtragem local de registros (ordenados decrescentes por data e horário)
   const registrosFiltrados = useMemo(() => {
     return registros.filter(r => {
-      if (filtroCongregacao && r.congregacao_id !== filtroCongregacao) return false;
+      // Eventos de Todo o Campo (sem congregacao_id específica) aparecem em todas as congregações
+      if (filtroCongregacao && r.congregacao_id && r.congregacao_id !== filtroCongregacao) return false;
       if (filtroTipo && r.tipo_culto !== filtroTipo) return false;
       if (filtroStatus && r.status !== filtroStatus) return false;
       if (filtroDataInicio && r.data_culto < filtroDataInicio) return false;

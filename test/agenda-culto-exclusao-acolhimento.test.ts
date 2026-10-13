@@ -585,4 +585,156 @@ describe('Sincronização entre Agenda e Acolhimento — Exclusão, Histórico e
     assert.equal(acessoB.permitido, true);
     assert.equal(acessoB.status, 200);
   });
+
+  it('5. Cenário Exato da Solicitação: Culto de hoje presente na Agenda sem registro operacional prévio aparece como Aberto e permite acolhimento', () => {
+    // Agenda possui o evento de hoje, mas culto_registros ainda não tem registro operacional (item virtual)
+    const db = {
+      agenda_eventos: [
+        {
+          id: 'ev-culto-hoje-novo',
+          ministry_id: TENANT_A,
+          titulo: 'CULTO TESTE',
+          tipo: 'culto',
+          data_inicio: '2026-10-12T19:30:00-03:00',
+          church_id: 'cong-1',
+          status: 'confirmado' as const,
+        },
+      ],
+      culto_registros: [], // Sem registro operacional prévio
+      culto_tokens: [],
+      culto_visitantes: [],
+    };
+
+    // Ao carregar a lista de cultos, o item virtual da agenda deve ser incluído
+    const lista = simularLoadRegistrosCultos(TENANT_A, db, hojeRef);
+    assert.equal(lista.length, 1);
+
+    const cultoVirtual = lista[0];
+    assert.equal(cultoVirtual.id, 'agenda-ev-culto-hoje-novo');
+    assert.equal(cultoVirtual.tipo_culto, 'CULTO TESTE');
+    assert.equal(cultoVirtual.data_culto, '2026-10-12');
+    assert.equal(cultoVirtual.status, 'Aberto'); // Status de hoje é 'Aberto'
+
+    // Avaliação de elegibilidade:
+    // const isElegivelAcolhimento = isHoje && reg.status === 'Aberto' && !reg.relatorio_espiritual_id && (Boolean(reg.agenda_evento_id) || reg.id.startsWith('agenda-'));
+    const isHoje = cultoVirtual.data_culto === hoje;
+    const isElegivelAcolhimento = isHoje &&
+      cultoVirtual.status === 'Aberto' &&
+      !cultoVirtual.relatorio_espiritual_id &&
+      (Boolean(cultoVirtual.agenda_evento_id) || cultoVirtual.id.startsWith('agenda-'));
+
+    assert.equal(isElegivelAcolhimento, true, 'Culto de hoje na Agenda deve ser elegível para Recepção, Link, QR Code e Encerrar');
+  });
+
+  it('6. Reconhecimento semântico de culto: Título "CULTO TESTE" com tipo "outro" na Agenda é reconhecido como culto', () => {
+    const rawAgendaMock = [
+      {
+        id: 'ev-semantico-1',
+        titulo: 'CULTO TESTE',
+        tipo: 'outro', // Criado sem categoria específica de tipo
+        data_inicio: '2026-10-12T19:30:00-03:00',
+        church_id: null,
+        status: 'confirmado',
+      },
+      {
+        id: 'ev-administrativo-1',
+        titulo: 'Reunião de Prestação de Contas',
+        tipo: 'reuniao',
+        data_inicio: '2026-10-12T20:00:00-03:00',
+        church_id: null,
+        status: 'confirmado',
+      },
+    ];
+
+    // Filtro semântico adotado na página de cultos
+    const cultosFiltrados = rawAgendaMock.filter((ev: any) => {
+      const tipoNorm = (ev.tipo || '').toLowerCase().trim();
+      const titNorm = (ev.titulo || '').toLowerCase().trim();
+
+      if (tipoNorm === 'culto') return true;
+      if (titNorm.includes('culto') || titNorm.includes('ceia') || titNorm.includes('vigilia')) {
+        return true;
+      }
+      return false;
+    });
+
+    assert.equal(cultosFiltrados.length, 1);
+    assert.equal(cultosFiltrados[0].id, 'ev-semantico-1');
+    assert.equal(cultosFiltrados[0].titulo, 'CULTO TESTE');
+  });
+
+  it('7. Culto de "Todo o Campo" (sem congregação específica) permanece visível mesmo com filtro de congregação selecionado', () => {
+    const cultos = [
+      {
+        id: 'c-geral',
+        congregacao_id: '', // Geral / Todo o Campo
+        tipo_culto: 'CULTO TESTE',
+        data_culto: '2026-10-12',
+        status: 'Aberto' as const,
+      },
+      {
+        id: 'c-local-a',
+        congregacao_id: 'cong-a',
+        tipo_culto: 'Culto de Oração',
+        data_culto: '2026-10-12',
+        status: 'Aberto' as const,
+      },
+      {
+        id: 'c-local-b',
+        congregacao_id: 'cong-b',
+        tipo_culto: 'Culto da Família',
+        data_culto: '2026-10-12',
+        status: 'Aberto' as const,
+      },
+    ];
+
+    const filtroCongregacao = 'cong-a';
+
+    // Regra atualizada de filtro de congregação
+    const filtrados = cultos.filter(r => {
+      // Se tiver congregação específica diferente, descarta; se for evento de Todo o Campo (sem congregação específica), mantém
+      if (filtroCongregacao && r.congregacao_id && r.congregacao_id !== filtroCongregacao) return false;
+      return true;
+    });
+
+    assert.equal(filtrados.length, 2);
+    assert.ok(filtrados.some(c => c.id === 'c-geral'), 'Evento de Todo o Campo deve estar presente');
+    assert.ok(filtrados.some(c => c.id === 'c-local-a'), 'Evento da congregação A deve estar presente');
+    assert.ok(!filtrados.some(c => c.id === 'c-local-b'), 'Evento da congregação B deve ser filtrado');
+  });
+
+  it('8. Cultos de datas futuras (ex: CULTO DA FAMÍLIA em 14/10/2026) aparecem como Programado e sem ações antecipadas', () => {
+    const db = {
+      agenda_eventos: [
+        {
+          id: 'ev-familia-quarta',
+          ministry_id: TENANT_A,
+          titulo: 'CULTO DA FAMÍLIA',
+          tipo: 'culto',
+          data_inicio: '2026-10-14T19:30:00-03:00', // Futuro em relação a 12/10
+          church_id: 'cong-1',
+          status: 'confirmado' as const,
+        },
+      ],
+      culto_registros: [],
+      culto_tokens: [],
+      culto_visitantes: [],
+    };
+
+    const lista = simularLoadRegistrosCultos(TENANT_A, db, hojeRef);
+    assert.equal(lista.length, 1);
+
+    const cultoFuturo = lista[0];
+    assert.equal(cultoFuturo.tipo_culto, 'CULTO DA FAMÍLIA');
+    assert.equal(cultoFuturo.status, 'Programado'); // Deve ser 'Programado'
+
+    const isHoje = cultoFuturo.data_culto === hoje;
+    assert.equal(isHoje, false);
+
+    const isFuturo = cultoFuturo.data_culto > hoje;
+    assert.equal(isFuturo, true, 'Deve ser identificado como data futura');
+
+    const isElegivelAcolhimento = isHoje && cultoFuturo.status === 'Aberto';
+    assert.equal(isElegivelAcolhimento, false, 'Cultos futuros não devem permitir acolhimento antecipado');
+  });
 });

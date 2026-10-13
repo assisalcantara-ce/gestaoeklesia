@@ -67,6 +67,11 @@ export function normalizarTipoAgendaEvento(
     return 'aula';
   }
 
+  // Título ou semântica explícita de Culto
+  if (n.includes('culto') || n.includes('ceia') || n.includes('vigilia') || n.includes('vigília')) {
+    return 'culto';
+  }
+
   return 'outro';
 }
 
