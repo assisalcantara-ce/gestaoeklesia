@@ -5,16 +5,16 @@
  *
  * Estrutura:
  * EBD (raiz)
- * ├─ Dashboard             (/ebd/dashboard)
- * ├─ Chamada Dominical     (/ebd/chamada)
- * ├─ Turmas                (/ebd/turmas)
- * ├─ Alunos & Matrículas   (/ebd/alunos)
- * ├─ Professores           (/ebd/cadastro/professores)
- * ├─ Trimestres            (/ebd/trimestres)
- * ├─ Revistas / Pedidos    (/ebd/revistas)
- * ├─ Classes               (/ebd/cadastro/classes)
- * ├─ Relatórios            (/ebd/relatorios)
- * └─ Ofertas EBD           (/ebd/ofertas)
+ * ├─ Dashboard                (/ebd/dashboard)
+ * ├─ Trimestres               (/ebd/trimestres)
+ * ├─ Classes                  (/ebd/cadastro/classes)
+ * ├─ Turmas                   (/ebd/turmas)
+ * ├─ Alunos                   (/ebd/alunos)
+ * ├─ Professores              (/ebd/cadastro/professores)
+ * ├─ Chamada Dominical        (/ebd/chamada)
+ * ├─ Oferta EBD               (/ebd/ofertas)
+ * ├─ Revistas / Pedidos       (/ebd/revistas)
+ * └─ Relatórios Consolidados  (/ebd/relatorios)
  */
 
 import { useState, useEffect } from 'react';
@@ -45,10 +45,16 @@ export const EBD_TREE: EbdNode[] = [
     matchIds: ['ebd-dashboard', 'ebd-dashboard-geral', 'ebd-dashboard-local'],
   },
   {
-    id: 'ebd-aulas-frequencia',
-    label: 'Chamada Dominical',
-    path: '/ebd/chamada',
-    matchIds: ['ebd-chamada', 'ebd-aulas-frequencia'],
+    id: 'ebd-trimestres',
+    label: 'Trimestres',
+    path: '/ebd/trimestres',
+    matchIds: ['ebd-trimestres', 'ebd-aulas-trimestres'],
+  },
+  {
+    id: 'ebd-cadastro-classes',
+    label: 'Classes',
+    path: '/ebd/cadastro/classes',
+    matchIds: ['ebd-classes', 'ebd-cadastro-classes'],
   },
   {
     id: 'ebd-cadastro-turmas',
@@ -58,7 +64,7 @@ export const EBD_TREE: EbdNode[] = [
   },
   {
     id: 'ebd-cadastro-alunos',
-    label: 'Alunos & Matrículas',
+    label: 'Alunos',
     path: '/ebd/alunos',
     matchIds: ['ebd-alunos', 'ebd-cadastro-alunos', 'ebd-cadastro-alunos-carteirinha'],
   },
@@ -69,22 +75,22 @@ export const EBD_TREE: EbdNode[] = [
     matchIds: ['ebd-professores', 'ebd-cadastro-professores', 'ebd-cadastro-superintendente'],
   },
   {
-    id: 'ebd-trimestres',
-    label: 'Trimestres',
-    path: '/ebd/trimestres',
-    matchIds: ['ebd-trimestres', 'ebd-aulas-trimestres'],
+    id: 'ebd-aulas-frequencia',
+    label: 'Chamada Dominical',
+    path: '/ebd/chamada',
+    matchIds: ['ebd-chamada', 'ebd-aulas-frequencia'],
+  },
+  {
+    id: 'ebd-caixa',
+    label: 'Oferta EBD',
+    path: '/ebd/ofertas',
+    matchIds: ['ebd-caixa', 'ebd-ofertas'],
   },
   {
     id: 'ebd-pedidos-revistas',
     label: 'Revistas / Pedidos',
     path: '/ebd/revistas',
     matchIds: ['ebd-revistas', 'ebd-pedidos-revistas', 'ebd-pedidos'],
-  },
-  {
-    id: 'ebd-cadastro-classes',
-    label: 'Classes',
-    path: '/ebd/cadastro/classes',
-    matchIds: ['ebd-classes', 'ebd-cadastro-classes'],
   },
   {
     id: 'ebd-relatorios',
@@ -99,12 +105,6 @@ export const EBD_TREE: EbdNode[] = [
       'ebd-relatorios-alunos',
       'ebd-historico',
     ],
-  },
-  {
-    id: 'ebd-caixa',
-    label: 'Ofertas EBD',
-    path: '/ebd/ofertas',
-    matchIds: ['ebd-caixa', 'ebd-ofertas'],
   },
 ];
 

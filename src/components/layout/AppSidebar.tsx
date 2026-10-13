@@ -95,8 +95,10 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
   })();
 
   const parentMap: Record<string, string> = {
+    'comissao': 'comissao',
     'consagracao': 'comissao',
     'comissoes': 'comissao',
+    'secretaria': 'secretaria',
     'estrutura-hierarquica': 'secretaria',
     'membros': 'secretaria',
     'departamentos': 'secretaria',
@@ -107,26 +109,28 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
     'cartas-pedidos': 'secretaria',
     'certificados': 'configuracoes',
     'relatorios-secretaria': 'secretaria',
+    'acolhimento': 'acolhimento',
     'relatorio-espiritual': 'acolhimento',
     'cultos': 'acolhimento',
     'visitantes': 'acolhimento',
     'sorteios': 'secretaria',
+    'configuracoes': 'configuracoes',
     'config-geral': 'configuracoes',
     'config-cartoes': 'configuracoes',
     'ativar-fluxo': 'configuracoes',
     'usuarios': 'configuracoes',
+    'ebd': 'ebd',
     ...Object.fromEntries(ALL_EBD_IDS.map(id => [id, 'ebd'])),
     'ebd-historico': 'ebd',
     'ebd-trimestres': 'ebd',
     'ebd-chamada': 'ebd',
+    'presidencia':              'presidencia',
     'conselho-fiscal':          'presidencia',
     'prestacao-contas-oficial': 'presidencia',
   };
 
   useEffect(() => {
-    if (parentMap[activeMenu]) {
-      setExpandedMenu(parentMap[activeMenu]);
-    }
+    setExpandedMenu(parentMap[activeMenu] ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMenu]);
 
@@ -273,6 +277,7 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
                             if (item.submenu || item.ebdMenu) {
                               setExpandedMenu(expandedMenu === item.id ? null : item.id);
                             } else {
+                              setExpandedMenu(null);
                               handleNavigate(item.id, item.path);
                             }
                           }}

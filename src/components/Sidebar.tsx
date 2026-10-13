@@ -29,12 +29,16 @@ import {
   LifeBuoy,
   Settings,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   LogOut,
   Sparkles,
   Menu,
   X,
   LucideIcon,
 } from 'lucide-react';
+
+const SIDEBAR_COLLAPSED_STORAGE_KEY = '@gestaoeklesia/sidebar_collapsed';
 
 // Mapa estático path → id de menu (mais específico primeiro)
 const PATH_TO_MENU_ID: { path: string; id: string }[] = [
@@ -68,6 +72,7 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
   { path: '/secretaria',                       id: 'secretaria'           },
   { path: '/presidencia',                      id: 'presidencia-geral'    },
   { path: '/dashboard',                        id: 'dashboard'            },
+  { path: '/agenda',                           id: 'agenda'               },
   { path: '/tesouraria',                       id: 'tesouraria'           },
   { path: '/ebd',                              id: 'ebd'                  },
   { path: '/comissao',                         id: 'comissao'             },
@@ -107,8 +112,33 @@ export default function Sidebar() {
   const supabase = createClient();
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const planFeatures = usePlanFeatures();
   const userCtx = useUserContext();
+
+  // Carrega preferência de expansão do usuário salva no localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
+      if (saved !== null) {
+        setIsCollapsed(saved === 'true');
+      }
+    } catch {
+      // Ignora erro de acesso a storage em ambientes restritos
+    }
+  }, []);
+
+  const toggleCollapse = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(next));
+      } catch {
+        // Ignora
+      }
+      return next;
+    });
+  };
 
   // Deriva o menu ativo a partir da URL atual
   const activeMenu = useMemo(() => {
@@ -135,8 +165,10 @@ export default function Sidebar() {
 
   // Auto-expande o menu pai quando um filho está ativo
   const parentMap: Record<string, string> = {
+    'comissao': 'comissao',
     'consagracao': 'comissao',
     'comissoes': 'comissao',
+    'secretaria': 'secretaria',
     'estrutura-hierarquica': 'secretaria',
     'membros': 'secretaria',
     'departamentos': 'secretaria',
@@ -145,21 +177,26 @@ export default function Sidebar() {
     'casamento': 'secretaria',
     'cartas': 'secretaria',
     'cartas-pedidos': 'secretaria',
-    'certificados': 'configuracoes',
+    'relatorios-secretaria': 'secretaria',
+    'sorteios': 'secretaria',
+    'acolhimento': 'acolhimento',
     'relatorio-espiritual': 'acolhimento',
     'relatorios-acolhimento': 'acolhimento',
     'cultos': 'acolhimento',
     'visitantes': 'acolhimento',
-    'sorteios': 'secretaria',
+    'configuracoes': 'configuracoes',
+    'certificados': 'configuracoes',
     'config-geral': 'configuracoes',
     'meu-contrato': 'configuracoes',
     'config-cartoes': 'configuracoes',
     'ativar-fluxo': 'configuracoes',
     'usuarios': 'configuracoes',
+    'ebd': 'ebd',
     ...Object.fromEntries(ALL_EBD_IDS.map(id => [id, 'ebd'])),
     'ebd-historico': 'ebd',
     'ebd-trimestres': 'ebd',
     'ebd-chamada': 'ebd',
+    'presidencia': 'presidencia',
     'presidencia-geral': 'presidencia',
     'consolidado-financeiro': 'presidencia',
     'prestacao-contas': 'presidencia',
@@ -169,9 +206,7 @@ export default function Sidebar() {
   };
 
   useEffect(() => {
-    if (parentMap[activeMenu]) {
-      setExpandedMenu(parentMap[activeMenu]);
-    }
+    setExpandedMenu(parentMap[activeMenu] ?? null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMenu]);
 
@@ -317,45 +352,99 @@ export default function Sidebar() {
   };
 
   const sidebarContent = (
-    <div className="w-64 bg-gradient-to-b from-[#0c233c] via-[#091b2e] to-[#051220] text-slate-100 flex flex-col h-full border-r border-[#163657]/70 shadow-2xl select-none">
+    <div
+      className={`${
+        isCollapsed ? 'w-20' : 'w-64'
+      } transition-[width] duration-300 bg-gradient-to-b from-[#0c233c] via-[#091b2e] to-[#051220] text-slate-100 flex flex-col h-full border-r border-[#163657]/70 shadow-2xl select-none`}
+    >
       {/* ─── 1. ÁREA DE BRANDING (TOPO) ─── */}
-      <div className="px-6 py-6 flex items-center justify-center border-b border-white/[0.08] relative bg-gradient-to-b from-[#112d4a]/50 to-transparent">
-        <div className="relative w-[180px] h-[52px] flex items-center justify-center">
-          <Image
-            src="/img/logoh.png"
-            alt="Gestão Eklésia"
-            width={180}
-            height={52}
-            priority
-            sizes="180px"
-            className="max-h-[52px] w-auto object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
-          />
-        </div>
+      <div
+        className={`border-b border-white/[0.08] relative bg-gradient-to-b from-[#112d4a]/50 to-transparent transition-all duration-300 ${
+          isCollapsed
+            ? 'py-3.5 px-2 flex flex-col items-center gap-2.5'
+            : 'px-4 py-5 flex items-center justify-between'
+        }`}
+      >
+        {isCollapsed ? (
+          <>
+            <div className="relative w-10 h-10 flex items-center justify-center">
+              <Image
+                src="/icons/icon-mask.png"
+                alt="Gestão Eklésia"
+                width={40}
+                height={40}
+                priority
+                sizes="40px"
+                className="w-9 h-9 object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+              />
+            </div>
+            <button
+              onClick={toggleCollapse}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] active:bg-white/[0.12] transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
+              title="Expandir menu lateral"
+              aria-label="Expandir menu lateral"
+            >
+              <ChevronRight className="w-4 h-4 stroke-[2.2]" />
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="relative flex-1 flex items-center justify-center pl-2">
+              <Image
+                src="/img/logoh.png"
+                alt="Gestão Eklésia"
+                width={160}
+                height={46}
+                priority
+                sizes="160px"
+                className="max-h-[46px] w-auto object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+              />
+            </div>
+            <button
+              onClick={toggleCollapse}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] active:bg-white/[0.12] transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
+              title="Recolher menu lateral"
+              aria-label="Recolher menu lateral"
+            >
+              <ChevronLeft className="w-5 h-5 stroke-[2.2]" />
+            </button>
+          </>
+        )}
       </div>
 
       {/* ─── TRIAL BANNER ─── */}
       {trialDaysLeft !== null && trialDaysLeft >= 0 && (
-        <div className="mx-3 mt-3 mb-1 p-3 rounded-xl bg-amber-500/10 border border-amber-400/30 shadow-inner">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <p className="text-amber-300 text-xs font-bold uppercase tracking-wider">Período de Teste</p>
-          </div>
-          <p className="text-slate-300 text-xs mt-1">
-            {trialDaysLeft === 0
-              ? 'Último dia de acesso gratuito!'
-              : `Restam ${trialDaysLeft} ${trialDaysLeft === 1 ? 'dia' : 'dias'}`}
-          </p>
-          <button
+        isCollapsed ? (
+          <div
+            className="mx-2 mt-2 mb-1 p-2 rounded-xl bg-amber-500/10 border border-amber-400/30 flex items-center justify-center cursor-pointer transition-colors hover:bg-amber-500/20"
+            title={trialDaysLeft === 0 ? 'Último dia de acesso gratuito!' : `Restam ${trialDaysLeft} ${trialDaysLeft === 1 ? 'dia' : 'dias'} de teste`}
             onClick={() => router.push('/trial-expirado')}
-            className="mt-2 w-full py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:from-amber-600 text-slate-950 text-xs font-black rounded-lg transition shadow-sm"
           >
-            Assinar agora →
-          </button>
-        </div>
+            <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+          </div>
+        ) : (
+          <div className="mx-3 mt-3 mb-1 p-3 rounded-xl bg-amber-500/10 border border-amber-400/30 shadow-inner">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <p className="text-amber-300 text-xs font-bold uppercase tracking-wider">Período de Teste</p>
+            </div>
+            <p className="text-slate-300 text-xs mt-1">
+              {trialDaysLeft === 0
+                ? 'Último dia de acesso gratuito!'
+                : `Restam ${trialDaysLeft} ${trialDaysLeft === 1 ? 'dia' : 'dias'}`}
+            </p>
+            <button
+              onClick={() => router.push('/trial-expirado')}
+              className="mt-2 w-full py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:from-amber-600 text-slate-950 text-xs font-black rounded-lg transition shadow-sm"
+            >
+              Assinar agora →
+            </button>
+          </div>
+        )
       )}
 
       {/* ─── 2. NAVEGAÇÃO / MENU (SCROLL INDEPENDENTE) ─── */}
-      <nav className="flex-1 px-3 py-3 overflow-y-auto sidebar-scrollbar space-y-1">
+      <nav className={`flex-1 ${isCollapsed ? 'px-2' : 'px-3'} py-3 overflow-y-auto sidebar-scrollbar space-y-1`}>
         {menuItems.map((item) => {
           const IconComponent = item.icon;
           const hasSub = !!item.submenu || !!item.ebdMenu;
@@ -368,13 +457,31 @@ export default function Sidebar() {
             <div key={item.id} className="relative">
               <button
                 onClick={() => {
-                  if (hasSub) {
-                    setExpandedMenu(isItemExpanded ? null : item.id);
+                  if (isCollapsed) {
+                    if (hasSub) {
+                      setIsCollapsed(false);
+                      setExpandedMenu(item.id);
+                      try {
+                        localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, 'false');
+                      } catch {}
+                    } else {
+                      setExpandedMenu(null);
+                      handleNavigate(item.id, item.path);
+                    }
                   } else {
-                    handleNavigate(item.id, item.path);
+                    if (hasSub) {
+                      setExpandedMenu(isItemExpanded ? null : item.id);
+                    } else {
+                      setExpandedMenu(null);
+                      handleNavigate(item.id, item.path);
+                    }
                   }
                 }}
-                className={`group w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl transition-all duration-200 text-left relative text-sm font-medium ${
+                title={item.label}
+                aria-label={item.label}
+                className={`group w-full flex items-center ${
+                  isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3.5 px-3 py-2.5'
+                } rounded-xl transition-all duration-200 text-left relative text-sm font-medium ${
                   isHighlighted
                     ? 'bg-gradient-to-r from-[#173e65] to-[#123151] text-white font-semibold shadow-[0_2px_10px_rgba(0,0,0,0.25)] border border-cyan-500/20'
                     : 'text-slate-300/85 hover:bg-white/[0.06] hover:text-white'
@@ -396,27 +503,29 @@ export default function Sidebar() {
                   <IconComponent className="w-5 h-5 stroke-[1.9]" />
                 </span>
 
-                {/* Texto do Módulo */}
-                <span className="flex-1 truncate tracking-tight text-[13.5px]">
-                  {item.label}
-                </span>
-
-                {/* Indicador Chevron */}
-                {hasSub && (
-                  <ChevronDown
-                    className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ${
-                      isItemExpanded
-                        ? 'rotate-180 text-cyan-400'
-                        : isHighlighted
-                        ? 'text-cyan-300/80'
-                        : 'text-slate-400 group-hover:text-slate-200'
-                    }`}
-                  />
+                {/* Texto do Módulo (apenas quando expandido) */}
+                {!isCollapsed && (
+                  <>
+                    <span className="flex-1 truncate tracking-tight text-[13.5px]">
+                      {item.label}
+                    </span>
+                    {hasSub && (
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ${
+                          isItemExpanded
+                            ? 'rotate-180 text-cyan-400'
+                            : isHighlighted
+                            ? 'text-cyan-300/80'
+                            : 'text-slate-400 group-hover:text-slate-200'
+                        }`}
+                      />
+                    )}
+                  </>
                 )}
               </button>
 
-              {/* ─── SUBMENU FLAT ─── */}
-              {item.submenu && isItemExpanded && (
+              {/* ─── SUBMENU FLAT (apenas quando expandido) ─── */}
+              {!isCollapsed && item.submenu && isItemExpanded && (
                 <div className="mt-1 mb-2 ml-4 pl-3.5 border-l border-white/[0.12] space-y-0.5 animate-fadeIn">
                   {item.submenu
                     .filter((sub) => !sub.modulo || userCtx.podeAcessar(sub.modulo))
@@ -449,8 +558,8 @@ export default function Sidebar() {
                 </div>
               )}
 
-              {/* ─── SUBMENU EBD (3 NÍVEIS) ─── */}
-              {item.ebdMenu && isItemExpanded && (
+              {/* ─── SUBMENU EBD (3 NÍVEIS - apenas quando expandido) ─── */}
+              {!isCollapsed && item.ebdMenu && isItemExpanded && (
                 <div className="mt-1 mb-2 ml-2 rounded-xl overflow-hidden animate-fadeIn">
                   <EbdSidebarMenu
                     activeMenu={activeMenu}
@@ -464,24 +573,34 @@ export default function Sidebar() {
       </nav>
 
       {/* ─── 3. RODAPÉ ESTÁVEL (LOGOUT + VERSÃO) ─── */}
-      <div className="p-4 border-t border-white/[0.08] bg-gradient-to-b from-transparent to-[#040e1a]/80 space-y-3.5">
+      <div
+        className={`border-t border-white/[0.08] bg-gradient-to-b from-transparent to-[#040e1a]/80 ${
+          isCollapsed ? 'p-2 space-y-2 flex flex-col items-center' : 'p-4 space-y-3.5'
+        }`}
+      >
         <button
           onClick={() => {
             supabase.auth.signOut().finally(() => router.push('/'));
           }}
-          className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 bg-gradient-to-r from-red-600 via-red-600 to-red-700 hover:from-red-500 hover:to-red-600 active:from-red-700 text-white rounded-xl font-bold text-sm shadow-[0_2px_10px_rgba(220,38,38,0.35)] hover:shadow-[0_4px_14px_rgba(220,38,38,0.5)] transition-all duration-150 active:scale-[0.98] border border-red-500/30"
+          title="Sair"
+          aria-label="Sair"
+          className={`w-full flex items-center justify-center ${
+            isCollapsed ? 'p-2.5 rounded-xl' : 'gap-2.5 px-4 py-2.5 rounded-xl text-sm'
+          } bg-gradient-to-r from-red-600 via-red-600 to-red-700 hover:from-red-500 hover:to-red-600 active:from-red-700 text-white font-bold shadow-[0_2px_10px_rgba(220,38,38,0.35)] hover:shadow-[0_4px_14px_rgba(220,38,38,0.5)] transition-all duration-150 active:scale-[0.98] border border-red-500/30`}
         >
           <LogOut className="w-4 h-4 stroke-[2.2]" />
-          <span>Sair</span>
+          {!isCollapsed && <span>Sair</span>}
         </button>
 
-        <div className="flex items-center justify-center gap-2 pt-0.5">
-          <div className="h-[1px] bg-white/[0.1] flex-1 max-w-[36px]" />
-          <p className="text-center text-[10px] uppercase font-bold tracking-widest text-slate-400/80">
-            GESTÃO EKLÉSIA v1.0
-          </p>
-          <div className="h-[1px] bg-white/[0.1] flex-1 max-w-[36px]" />
-        </div>
+        {!isCollapsed && (
+          <div className="flex items-center justify-center gap-2 pt-0.5">
+            <div className="h-[1px] bg-white/[0.1] flex-1 max-w-[36px]" />
+            <p className="text-center text-[10px] uppercase font-bold tracking-widest text-slate-400/80">
+              GESTÃO EKLÉSIA v1.0
+            </p>
+            <div className="h-[1px] bg-white/[0.1] flex-1 max-w-[36px]" />
+          </div>
+        )}
       </div>
     </div>
   );
