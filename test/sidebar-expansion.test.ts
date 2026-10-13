@@ -202,22 +202,22 @@ describe('Comportamento de Expansão e Retração do Menu Lateral (Sidebar)', ()
     assert.equal(sidebar.expandedMenu, 'configuracoes');
   });
 
-  it('8. No modo expandido, deve utilizar w-64 e logo /img/logoh.png', () => {
+  it('8. No modo expandido, deve utilizar w-64 e logo /icons/logob.png', () => {
     const isCollapsed = false;
     const sidebarWidthClass = isCollapsed ? 'w-20' : 'w-64';
-    const logoSrc = isCollapsed ? '/icons/icon-mask.png' : '/img/logoh.png';
+    const logoSrc = isCollapsed ? '/icons/logob2.png' : '/icons/logob.png';
 
     assert.equal(sidebarWidthClass, 'w-64');
-    assert.equal(logoSrc, '/img/logoh.png');
+    assert.equal(logoSrc, '/icons/logob.png');
   });
 
-  it('9. No modo recolhido, deve utilizar w-20 e substituir logo por /icons/icon-mask.png', () => {
+  it('9. No modo recolhido, deve utilizar w-20 e substituir logo por /icons/logob2.png', () => {
     const isCollapsed = true;
     const sidebarWidthClass = isCollapsed ? 'w-20' : 'w-64';
-    const logoSrc = isCollapsed ? '/icons/icon-mask.png' : '/img/logoh.png';
+    const logoSrc = isCollapsed ? '/icons/logob2.png' : '/icons/logob.png';
 
     assert.equal(sidebarWidthClass, 'w-20');
-    assert.equal(logoSrc, '/icons/icon-mask.png');
+    assert.equal(logoSrc, '/icons/logob2.png');
   });
 
   it('10. No modo recolhido, clicar em item com submenu deve expandir a Sidebar e abrir o submenu', () => {

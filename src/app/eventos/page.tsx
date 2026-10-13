@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import PageLayout from '@/components/PageLayout';
 import NotificationModal from '@/components/NotificationModal';
@@ -536,6 +537,13 @@ export default function EventosPage() {
   const [eventoSelecionado, setEventoSelecionado] = useState<Evento | null>(null);
   const [eventoVisualizando, setEventoVisualizando] = useState<Evento | null>(null);
   const [menuAbertoId, setMenuAbertoId] = useState<string | null>(null);
+  const [menuEventoAtivo, setMenuEventoAtivo] = useState<Evento | null>(null);
+  const [dropdownCoords, setDropdownCoords] = useState<{
+    top: number;
+    left: number;
+    openUpwards: boolean;
+    maxHeight: number;
+  } | null>(null);
 
   // ── Tab Eventos: Filtros Operacionais ──────────────────────────────────────
   const [eventos, setEventos] = useState<Evento[]>([]);
@@ -629,12 +637,89 @@ export default function EventosPage() {
   const [loadingLinkCheckin, setLoadingLinkCheckin] = useState(false);
   const [linkCheckinCopiado, setLinkCheckinCopiado] = useState(false);
 
-  // ── Fechar menu dropdown ao clicar fora ────────────────────────────────────
-  useEffect(() => {
-    const fecharMenu = () => setMenuAbertoId(null);
-    window.addEventListener('click', fecharMenu);
-    return () => window.removeEventListener('click', fecharMenu);
+  // ── Controle do menu dropdown de ações dos eventos (Portal) ───────────────
+  const fecharMenuAcoes = useCallback(() => {
+    setMenuAbertoId(null);
+    setMenuEventoAtivo(null);
+    setDropdownCoords(null);
   }, []);
+
+  const toggleMenuAcoes = useCallback((evento: Evento, btnElement: HTMLElement) => {
+    if (menuAbertoId === evento.id) {
+      fecharMenuAcoes();
+      return;
+    }
+
+    const btnRect = btnElement.getBoundingClientRect();
+    const menuWidth = 208; // w-52 = 208px
+
+    // Estima a altura do menu conforme as opções ativas para este evento:
+    let estimatedHeight = 136; // 3 itens base + padding
+    if (evento.is_publico && evento.slug) estimatedHeight += 40;
+    if (scope.canDelete) estimatedHeight += 46;
+
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const spaceBelow = viewportHeight - btnRect.bottom;
+    const spaceAbove = btnRect.top;
+
+    // Abre para cima se o espaço abaixo for insuficiente e houver mais espaço acima
+    const openUpwards = spaceBelow < (estimatedHeight + 12) && spaceAbove > spaceBelow;
+
+    let top: number;
+    let availableHeight: number;
+    if (openUpwards) {
+      availableHeight = Math.max(140, spaceAbove - 16);
+      top = Math.max(8, btnRect.top - Math.min(estimatedHeight, availableHeight) - 6);
+    } else {
+      availableHeight = Math.max(140, spaceBelow - 16);
+      top = Math.min(viewportHeight - 8, btnRect.bottom + 6);
+    }
+
+    const idealLeft = btnRect.right - menuWidth;
+    const left = Math.max(8, Math.min(viewportWidth - menuWidth - 8, idealLeft));
+
+    setDropdownCoords({
+      top,
+      left,
+      openUpwards,
+      maxHeight: Math.min(estimatedHeight + 10, availableHeight),
+    });
+    setMenuEventoAtivo(evento);
+    setMenuAbertoId(evento.id);
+  }, [menuAbertoId, scope.canDelete, fecharMenuAcoes]);
+
+  useEffect(() => {
+    if (!menuAbertoId) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        fecharMenuAcoes();
+      }
+    };
+
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest?.('[data-menu-portal]')) {
+        return;
+      }
+      fecharMenuAcoes();
+    };
+
+    const handleResize = () => {
+      fecharMenuAcoes();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [menuAbertoId, fecharMenuAcoes]);
 
   // ── Carga inicial ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -3182,7 +3267,8 @@ export default function EventosPage() {
                 </div>
               </div>
             ) : viewMode === 'lista' ? (
-              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+              <>
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs min-w-[780px]">
                     <thead className="bg-slate-50/70 border-b border-slate-200/90 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
@@ -3320,82 +3406,18 @@ export default function EventosPage() {
                                   <button
                                     onClick={ev => {
                                       ev.stopPropagation();
-                                      setMenuAbertoId(menuAberto ? null : e.id);
+                                      toggleMenuAcoes(e, ev.currentTarget);
                                     }}
-                                    className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 border border-slate-200/60 transition ${
-                                      menuAberto ? 'bg-slate-100 text-slate-800' : ''
+                                    className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 border border-slate-200/60 transition cursor-pointer ${
+                                      menuAberto ? 'bg-slate-100 text-slate-800 border-slate-300' : ''
                                     }`}
                                     title="Mais ações"
+                                    aria-label="Mais ações"
+                                    aria-haspopup="true"
+                                    aria-expanded={menuAberto}
                                   >
                                     <MoreVertical className="w-4 h-4" />
                                   </button>
-
-                                  {/* Dropdown Menu */}
-                                  {menuAberto && (
-                                    <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl border border-slate-200 shadow-xl py-1 z-30 text-left animate-in fade-in zoom-in-95 duration-100">
-                                      <button
-                                        onClick={() => {
-                                          setMenuAbertoId(null);
-                                          selecionarEvento(e, 'inscricoes');
-                                        }}
-                                        className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                                      >
-                                        <Users className="w-3.5 h-3.5 text-blue-600" />
-                                        <span>Gerenciar Inscrições</span>
-                                      </button>
-
-                                      <button
-                                        onClick={() => {
-                                          setMenuAbertoId(null);
-                                          selecionarEvento(e, 'checkin');
-                                        }}
-                                        className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                                      >
-                                        <QrCode className="w-3.5 h-3.5 text-emerald-600" />
-                                        <span>Realizar Check-in</span>
-                                      </button>
-
-                                      <button
-                                        onClick={() => {
-                                          setMenuAbertoId(null);
-                                          selecionarEvento(e, 'relatorios');
-                                        }}
-                                        className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                                      >
-                                        <FileBarChart2 className="w-3.5 h-3.5 text-amber-600" />
-                                        <span>Relatório do Evento</span>
-                                      </button>
-
-                                      {e.is_publico && e.slug && (
-                                        <button
-                                          onClick={() => {
-                                            setMenuAbertoId(null);
-                                            copiarLink(e);
-                                          }}
-                                          className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                                        >
-                                          <Copy className="w-3.5 h-3.5 text-teal-600" />
-                                          <span>Copiar Link Público</span>
-                                        </button>
-                                      )}
-
-                                      {scope.canDelete && (
-                                        <>
-                                          <div className="border-t border-slate-100 my-1" />
-                                          <button
-                                            onClick={() => {
-                                              setMenuAbertoId(null);
-                                              handleDeleteEvento(e.id);
-                                            }}
-                                            className="w-full px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                            <span>Excluir Evento</span>
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
                                 </div>
                               </div>
                             </td>
@@ -3488,6 +3510,101 @@ export default function EventosPage() {
                   </div>
                 </div>
               </div>
+
+              {/* ── Menu de Ações (Portal para evitar recorte por overflow da tabela) ── */}
+              {menuAbertoId && menuEventoAtivo && dropdownCoords && typeof document !== 'undefined' && createPortal(
+                <div data-menu-portal="true">
+                  {/* Overlay invisível para capturar clique fora */}
+                  <div
+                    className="fixed inset-0 z-[99998] bg-transparent"
+                    onClick={fecharMenuAcoes}
+                    aria-hidden="true"
+                  />
+
+                  {/* Menu flutuante sobreposto */}
+                  <div
+                    role="menu"
+                    aria-orientation="vertical"
+                    style={{
+                      position: 'fixed',
+                      top: `${dropdownCoords.top}px`,
+                      left: `${dropdownCoords.left}px`,
+                      zIndex: 99999,
+                      maxHeight: `${dropdownCoords.maxHeight}px`,
+                    }}
+                    className="w-52 bg-white rounded-xl border border-slate-200 shadow-2xl py-1 text-left overflow-y-auto animate-in fade-in zoom-in-95 duration-100 focus:outline-none"
+                  >
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        fecharMenuAcoes();
+                        selecionarEvento(menuEventoAtivo, 'inscricoes');
+                      }}
+                      className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition text-left"
+                    >
+                      <Users className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Gerenciar Inscrições</span>
+                    </button>
+
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        fecharMenuAcoes();
+                        selecionarEvento(menuEventoAtivo, 'checkin');
+                      }}
+                      className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition text-left"
+                    >
+                      <QrCode className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Realizar Check-in</span>
+                    </button>
+
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        fecharMenuAcoes();
+                        selecionarEvento(menuEventoAtivo, 'relatorios');
+                      }}
+                      className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition text-left"
+                    >
+                      <FileBarChart2 className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Relatório do Evento</span>
+                    </button>
+
+                    {menuEventoAtivo.is_publico && menuEventoAtivo.slug && (
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          fecharMenuAcoes();
+                          copiarLink(menuEventoAtivo);
+                        }}
+                        className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition text-left"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-teal-600" />
+                        <span>Copiar Link Público</span>
+                      </button>
+                    )}
+
+                    {scope.canDelete && (
+                      <>
+                        <div className="border-t border-slate-100 my-1" />
+                        <button
+                          role="menuitem"
+                          onClick={() => {
+                            fecharMenuAcoes();
+                            handleDeleteEvento(menuEventoAtivo.id);
+                          }}
+                          className="w-full px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer transition text-left"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Excluir Evento</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>,
+                document.body
+              )}
+              </>
             ) : (
               /* Modo Calendário Visual */
               <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">

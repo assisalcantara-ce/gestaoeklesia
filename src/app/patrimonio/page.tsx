@@ -1,9 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import PageLayout from '@/components/PageLayout';
-import Tabs from '@/components/Tabs';
-import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useAuditLog } from '@/hooks/useAuditLog';
@@ -11,7 +8,23 @@ import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
-import { Pencil, Trash2, Printer, Search } from 'lucide-react';
+import {
+  Package,
+  Building2,
+  Landmark,
+  CheckCircle2,
+  DollarSign,
+  Search,
+  Plus,
+  Pencil,
+  Trash2,
+  Printer,
+  Tag,
+  ClipboardList,
+  Sparkles,
+  TrendingUp,
+  X,
+} from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -63,18 +76,18 @@ const CATEGORIAS = [
 ];
 
 const ESTADOS = [
-  { value: 'otimo', label: 'Ótimo', color: 'bg-emerald-100 text-emerald-700' },
-  { value: 'bom', label: 'Bom', color: 'bg-blue-100 text-blue-700' },
-  { value: 'regular', label: 'Regular', color: 'bg-yellow-100 text-yellow-700' },
-  { value: 'ruim', label: 'Ruim', color: 'bg-orange-100 text-orange-700' },
-  { value: 'inservivel', label: 'Inservível', color: 'bg-red-100 text-red-700' },
+  { value: 'otimo', label: 'Ótimo', color: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+  { value: 'bom', label: 'Bom', color: 'bg-blue-50 text-blue-700 border border-blue-200' },
+  { value: 'regular', label: 'Regular', color: 'bg-amber-50 text-amber-700 border border-amber-200' },
+  { value: 'ruim', label: 'Ruim', color: 'bg-orange-50 text-orange-700 border border-orange-200' },
+  { value: 'inservivel', label: 'Inservível', color: 'bg-rose-50 text-rose-700 border border-rose-200' },
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'ativo', label: 'Ativo', color: 'bg-emerald-100 text-emerald-700' },
-  { value: 'emprestado', label: 'Emprestado', color: 'bg-blue-100 text-blue-700' },
-  { value: 'extraviado', label: 'Extraviado', color: 'bg-orange-100 text-orange-700' },
-  { value: 'baixado', label: 'Baixado', color: 'bg-gray-100 text-gray-500' },
+  { value: 'ativo', label: 'Ativo', color: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+  { value: 'emprestado', label: 'Emprestado', color: 'bg-blue-50 text-blue-700 border border-blue-200' },
+  { value: 'extraviado', label: 'Extraviado', color: 'bg-amber-50 text-amber-700 border border-amber-200' },
+  { value: 'baixado', label: 'Baixado', color: 'bg-slate-100 text-slate-600 border border-slate-200' },
 ];
 
 const ORIGENS = [
@@ -82,11 +95,6 @@ const ORIGENS = [
   { value: 'doacao', label: 'Doação' },
   { value: 'transferencia', label: 'Transferência' },
   { value: 'outros', label: 'Outros' },
-];
-
-const TABS = [
-  { id: 'cadastro', label: 'Cadastro', icon: '📝' },
-  { id: 'inventario', label: 'Inventário', icon: '📋' },
 ];
 
 const EMPTY_FORM = {
@@ -108,7 +116,8 @@ const EMPTY_FORM = {
   observacoes: '',
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// ─── Impressão de Etiquetas ───────────────────────────────────────────────────
+
 function imprimirEtiquetas(itens: PatrimonioItem[], locaisRef: LocalOption[]) {
   const getNome = (item: PatrimonioItem) => {
     if (item.congregacao_id) return locaisRef.find((l) => l.id === item.congregacao_id)?.nome || item.local_descricao || '';
@@ -169,7 +178,7 @@ const formatIso = (v?: string | null) => {
 const formatCurrency = (v?: number | null) =>
   v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-';
 
-// ─── Impressão ────────────────────────────────────────────────────────────────
+// ─── Impressão de Ficha ────────────────────────────────────────────────────────
 
 function imprimirFichaPatrimonio(opts: {
   itens: PatrimonioItem[];
@@ -290,19 +299,31 @@ function imprimirFichaPatrimonio(opts: {
   setTimeout(() => win.print(), 400);
 }
 
-// ─── Página ────────────────────────────────────────────────────────────────────
+// ─── Estilos de Input e Label Padrão Membros ───────────────────────────────────
+
+const inputCls =
+  'w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition';
+const labelCls =
+  'block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5';
+
+// ─── Página Principal ─────────────────────────────────────────────────────────
 
 export default function PatrimonioPage() {
   const { ctx, bloqueado } = useRequireModulo('patrimonio');
   const { registrarAcao } = useAuditLog();
   const supabase = useMemo(() => createClient(), []);
 
-  const [activeTab, setActiveTab] = useState('inventario');
+  const [activeTab, setActiveTab] = useState<'inventario' | 'cadastro'>('inventario');
   const [ministryId, setMinistryId] = useState<string | null>(null);
   const [itens, setItens] = useState<PatrimonioItem[]>([]);
   const [locais, setLocais] = useState<LocalOption[]>([]);
   const [configIgreja, setConfigIgreja] = useState<ConfiguracaoIgreja>({
-    nome: 'Igreja/Ministério', endereco: '', cnpj: '', telefone: '', email: '', logo: '',
+    nome: 'Igreja/Ministério',
+    endereco: '',
+    cnpj: '',
+    telefone: '',
+    email: '',
+    logo: '',
   });
   const [loadingData, setLoadingData] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -315,13 +336,26 @@ export default function PatrimonioPage() {
   const [filterStatus, setFilterStatus] = useState('ativo');
   const [filterSearch, setFilterSearch] = useState('');
 
-  const [notification, setNotification] = useState({
-    isOpen: false, title: '', message: '',
-    type: 'success' as 'success' | 'error' | 'warning' | 'info', autoClose: 3000 as number | undefined,
+  const [notification, setNotification] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    autoClose?: number;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'success',
+    autoClose: 3000,
   });
 
-  const showNotif = (type: typeof notification.type, title: string, message: string, autoClose: number | undefined = 3000) =>
-    setNotification({ isOpen: true, title, message, type, autoClose });
+  const showNotif = (
+    type: typeof notification.type,
+    title: string,
+    message: string,
+    autoClose: number | undefined = 3000
+  ) => setNotification({ isOpen: true, title, message, type, autoClose });
 
   const resetForm = () => {
     setFormData({
@@ -346,13 +380,13 @@ export default function PatrimonioPage() {
 
   const nomeDirigente = localSelecionado
     ? localSelecionado.tipo === 'congregacao'
-      ? (localSelecionado.dirigente || '')
-      : (localSelecionado.pastor_nome || '')
+      ? localSelecionado.dirigente || ''
+      : localSelecionado.pastor_nome || ''
     : '';
 
   const cargoDirigente = localSelecionado
     ? localSelecionado.tipo === 'congregacao'
-      ? (localSelecionado.dirigente_cargo || 'Dirigente')
+      ? localSelecionado.dirigente_cargo || 'Dirigente'
       : 'Pastor'
     : '';
 
@@ -393,7 +427,10 @@ export default function PatrimonioPage() {
       query = query.eq('congregacao_id', ctx.congregacaoId);
     }
     const { data, error } = await query.order('created_at', { ascending: false });
-    if (error) { showNotif('error', 'Erro ao carregar', error.message, undefined); return; }
+    if (error) {
+      showNotif('error', 'Erro ao carregar', error.message, undefined);
+      return;
+    }
     setItens((data || []) as PatrimonioItem[]);
   };
 
@@ -404,7 +441,7 @@ export default function PatrimonioPage() {
       .eq('ministry_id', mid)
       .not('numero_tombamento', 'is', null);
     let maxNum = 0;
-    for (const row of (data || [])) {
+    for (const row of data || []) {
       const m = (row.numero_tombamento as string)?.match(/(\d+)$/);
       if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
     }
@@ -431,7 +468,7 @@ export default function PatrimonioPage() {
       setLoadingData(false);
     };
     run();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.loading, bloqueado]);
 
   const handleSubmit = async () => {
@@ -449,7 +486,9 @@ export default function PatrimonioPage() {
       numero_serie: formData.numero_serie.trim() || null,
       cor: formData.cor.trim() || null,
       estado_conservacao: formData.estado_conservacao,
-      valor_aquisicao: formData.valor_aquisicao ? parseFloat(String(formData.valor_aquisicao).replace(/\./g, '').replace(',', '.')) : null,
+      valor_aquisicao: formData.valor_aquisicao
+        ? parseFloat(String(formData.valor_aquisicao).replace(/\./g, '').replace(',', '.'))
+        : null,
       data_aquisicao: formData.data_aquisicao || null,
       origem: formData.origem,
       responsavel_nome: nomeDirigente || null,
@@ -463,7 +502,12 @@ export default function PatrimonioPage() {
 
     if (editingId) {
       const itemAnterior = itens.find((i) => i.id === editingId);
-      const { data, error } = await supabase.from('patrimonio_itens').update(payload).eq('id', editingId).select('*').single();
+      const { data, error } = await supabase
+        .from('patrimonio_itens')
+        .update(payload)
+        .eq('id', editingId)
+        .select('*')
+        .single();
       if (error) {
         await registrarAcao({
           acao: 'editar',
@@ -485,13 +529,15 @@ export default function PatrimonioPage() {
         tabela_afetada: 'patrimonio_itens',
         registro_id: editingId,
         descricao: `Bem patrimonial atualizado: ${data.descricao} (Tombamento: ${data.numero_tombamento || '-'})`,
-        dados_anteriores: itemAnterior ? {
-          descricao: itemAnterior.descricao,
-          categoria: itemAnterior.categoria,
-          estado_conservacao: itemAnterior.estado_conservacao,
-          status: itemAnterior.status,
-          numero_tombamento: itemAnterior.numero_tombamento,
-        } : null,
+        dados_anteriores: itemAnterior
+          ? {
+              descricao: itemAnterior.descricao,
+              categoria: itemAnterior.categoria,
+              estado_conservacao: itemAnterior.estado_conservacao,
+              status: itemAnterior.status,
+              numero_tombamento: itemAnterior.numero_tombamento,
+            }
+          : null,
         dados_novos: {
           descricao: data.descricao,
           categoria: data.categoria,
@@ -505,7 +551,10 @@ export default function PatrimonioPage() {
       showNotif('success', 'Atualizado', 'Bem atualizado com sucesso.', 3000);
     } else {
       const { data, error } = await supabase
-        .from('patrimonio_itens').insert({ ...payload, created_at: new Date().toISOString() }).select('*').single();
+        .from('patrimonio_itens')
+        .insert({ ...payload, created_at: new Date().toISOString() })
+        .select('*')
+        .single();
       if (error) {
         await registrarAcao({
           acao: 'criar',
@@ -542,7 +591,9 @@ export default function PatrimonioPage() {
     const wasNew = !editingId;
     resetForm();
     if (wasNew && ministryId) {
-      generateNextTombamento(ministryId).then((t) => setFormData((p) => ({ ...p, numero_tombamento: t })));
+      generateNextTombamento(ministryId).then((t) =>
+        setFormData((p) => ({ ...p, numero_tombamento: t }))
+      );
     }
     setActiveTab('inventario');
   };
@@ -559,10 +610,20 @@ export default function PatrimonioPage() {
       numero_serie: item.numero_serie || '',
       cor: item.cor || '',
       estado_conservacao: item.estado_conservacao,
-      valor_aquisicao: item.valor_aquisicao != null ? (() => { const n = Math.round(item.valor_aquisicao! * 100); const d = String(n).replace(/\D/g,''); const num = parseInt(d,10)/100; return num.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); })() : '',
+      valor_aquisicao:
+        item.valor_aquisicao != null
+          ? (() => {
+              const n = Math.round(item.valor_aquisicao! * 100);
+              const d = String(n).replace(/\D/g, '');
+              const num = parseInt(d, 10) / 100;
+              return num.toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              });
+            })()
+          : '',
       data_aquisicao: formatIso(item.data_aquisicao),
       origem: item.origem || 'compra',
-
       status: item.status,
       data_baixa: formatIso(item.data_baixa),
       motivo_baixa: item.motivo_baixa || '',
@@ -596,11 +657,13 @@ export default function PatrimonioPage() {
       tabela_afetada: 'patrimonio_itens',
       registro_id: id,
       descricao: `Bem removido do patrimônio: ${itemRemovido?.descricao || id} (Tombamento: ${itemRemovido?.numero_tombamento || '-'})`,
-      dados_anteriores: itemRemovido ? {
-        descricao: itemRemovido.descricao,
-        categoria: itemRemovido.categoria,
-        numero_tombamento: itemRemovido.numero_tombamento,
-      } : null,
+      dados_anteriores: itemRemovido
+        ? {
+            descricao: itemRemovido.descricao,
+            categoria: itemRemovido.categoria,
+            numero_tombamento: itemRemovido.numero_tombamento,
+          }
+        : null,
       status: 'sucesso',
     });
     setItens((prev) => prev.filter((i) => i.id !== id));
@@ -608,8 +671,10 @@ export default function PatrimonioPage() {
   };
 
   const getNomeLocal = (item: PatrimonioItem) => {
-    if (item.congregacao_id) return locais.find((l) => l.id === item.congregacao_id)?.nome || item.local_descricao || '-';
-    if (item.campo_id) return locais.find((l) => l.id === item.campo_id)?.nome || item.local_descricao || '-';
+    if (item.congregacao_id)
+      return locais.find((l) => l.id === item.congregacao_id)?.nome || item.local_descricao || '-';
+    if (item.campo_id)
+      return locais.find((l) => l.id === item.campo_id)?.nome || item.local_descricao || '-';
     return item.local_descricao || '-';
   };
 
@@ -620,421 +685,815 @@ export default function PatrimonioPage() {
       localTipo === 'congregacao' ? i.congregacao_id === localId : i.campo_id === localId
     );
     if (itensFicha.length === 0) {
-      showNotif('warning', 'Aviso', 'Nenhum bem encontrado com os filtros atuais para este local.', 3000);
+      showNotif(
+        'warning',
+        'Aviso',
+        'Nenhum bem encontrado com os filtros atuais para este local.',
+        3000
+      );
       return;
     }
     imprimirFichaPatrimonio({ itens: itensFicha, local, configIgreja });
   };
 
-  const itensFiltrados = useMemo(() => itens.filter((item) => {
-    const matchStatus = !filterStatus || item.status === filterStatus;
-    const matchCat = !filterCategoria || item.categoria === filterCategoria;
-    const matchLocal = !filterLocal || item.congregacao_id === filterLocal || item.campo_id === filterLocal;
-    const termo = filterSearch.toLowerCase();
-    const matchSearch = !termo ||
-      item.descricao.toLowerCase().includes(termo) ||
-      (item.numero_tombamento || '').toLowerCase().includes(termo) ||
-      (item.marca_modelo || '').toLowerCase().includes(termo) ||
-      (item.responsavel_nome || '').toLowerCase().includes(termo) ||
-      getNomeLocal(item).toLowerCase().includes(termo);
-    return matchStatus && matchCat && matchLocal && matchSearch;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [itens, filterStatus, filterCategoria, filterLocal, filterSearch, locais]);
+  // Memos de estatísticas
+  const totalItens = itens.length;
+  const itensAtivos = itens.filter((i) => i.status === 'ativo').length;
+  const percentualAtivos = totalItens > 0 ? ((itensAtivos / totalItens) * 100).toFixed(0) : '0';
+  const totalValorGeral = itens.reduce((acc, i) => acc + (i.valor_aquisicao || 0), 0);
 
-  const totalValorFiltrado = itensFiltrados.reduce((acc, i) => acc + (i.valor_aquisicao || 0), 0);
+  const locaisComBensCount = useMemo(() => {
+    const set = new Set<string>();
+    itens.forEach((i) => {
+      if (i.congregacao_id) set.add(i.congregacao_id);
+      if (i.campo_id) set.add(i.campo_id);
+    });
+    return set.size;
+  }, [itens]);
 
-  if (ctx.loading || loadingData) return <div className="p-8">Carregando...</div>;
+  const itensFiltrados = useMemo(
+    () =>
+      itens.filter((item) => {
+        const matchStatus = !filterStatus || item.status === filterStatus;
+        const matchCat = !filterCategoria || item.categoria === filterCategoria;
+        const matchLocal =
+          !filterLocal || item.congregacao_id === filterLocal || item.campo_id === filterLocal;
+        const termo = filterSearch.toLowerCase();
+        const matchSearch =
+          !termo ||
+          item.descricao.toLowerCase().includes(termo) ||
+          (item.numero_tombamento || '').toLowerCase().includes(termo) ||
+          (item.marca_modelo || '').toLowerCase().includes(termo) ||
+          (item.responsavel_nome || '').toLowerCase().includes(termo) ||
+          getNomeLocal(item).toLowerCase().includes(termo);
+        return matchStatus && matchCat && matchLocal && matchSearch;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }),
+    [itens, filterStatus, filterCategoria, filterLocal, filterSearch, locais]
+  );
+
+  const totalValorFiltrado = itensFiltrados.reduce(
+    (acc, i) => acc + (i.valor_aquisicao || 0),
+    0
+  );
+
+  if (ctx.loading || loadingData) {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[#f4f7fa] min-h-screen flex items-center justify-center p-8">
+        <div className="flex items-center gap-3 text-slate-500 font-semibold text-sm bg-white px-6 py-4 rounded-2xl shadow-xs border border-slate-200">
+          <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+          <span>Carregando dados do Patrimônio...</span>
+        </div>
+      </div>
+    );
+  }
+
   if (bloqueado) return null;
 
   return (
-    <PageLayout title="Patrimônio" description="Gestão de bens das congregações e campos" activeMenu="patrimonio">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f4f7fa] min-h-screen">
       <NotificationModal
-        isOpen={notification.isOpen} title={notification.title} message={notification.message}
-        type={notification.type} onClose={() => setNotification((p) => ({ ...p, isOpen: false }))}
+        isOpen={notification.isOpen}
+        title={notification.title}
+        message={notification.message}
+        type={notification.type}
+        onClose={() => setNotification((p) => ({ ...p, isOpen: false }))}
         autoClose={notification.autoClose}
       />
 
-      {/* Cards de resumo */}
-      <div className="flex flex-wrap gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm border-l-4 border-blue-500 p-4 w-56">
-          <p className="text-xs text-gray-500">Itens cadastrados</p>
-          <p className="text-xl font-bold text-[#123b63] mt-1">{itens.length}</p>
+      <div className="p-4 sm:p-6 lg:p-8 max-w-[96rem] mx-auto w-full">
+        {/* ── Header da Página (Padrão Membros) ────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-teal-700 text-white flex items-center justify-center border border-teal-800 shadow-sm flex-shrink-0">
+              <Building2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                Patrimônio
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
+                Gestão de bens, tombamento, conservação e inventário patrimonial das congregações.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              onClick={() => {
+                resetForm();
+                if (ministryId) {
+                  generateNextTombamento(ministryId).then((t) =>
+                    setFormData((p) => ({ ...p, numero_tombamento: t }))
+                  );
+                }
+                setActiveTab('cadastro');
+              }}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer text-xs sm:text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Novo Bem</span>
+            </button>
+          </div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border-l-4 border-purple-500 p-4 w-56">
-          <p className="text-xs text-gray-500">Valor total estimado</p>
-          <p className="text-xl font-bold text-[#123b63] mt-1">{formatCurrency(itens.reduce((a, i) => a + (i.valor_aquisicao || 0), 0))}</p>
+
+        {/* ── Cards Principais — KPIs Coloridos (Padrão Membros) ──────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* Total de Bens (Azul) */}
+          <div className="bg-[#ebf5ff] border border-[#d0e6ff] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#2563eb] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dbeafe]">
+                <Package className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Total de Bens
+                </span>
+                <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                  {totalItens}
+                </p>
+                <p className="text-[11px] font-bold text-teal-700 mt-1 truncate">
+                  Itens registrados
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-[#dbeafe] text-[#2563eb] flex items-center justify-center flex-shrink-0 self-start">
+              <Tag className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* Bens Ativos (Verde) */}
+          <div className="bg-[#ecfdf3] border border-[#cff7de] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#16a34a] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dcfce7]">
+                <CheckCircle2 className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Bens em Atividade
+                </span>
+                <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                  {itensAtivos}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                  {percentualAtivos}% do inventário
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-[#dcfce7] text-[#16a34a] flex items-center justify-center flex-shrink-0 self-start">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* Valor Total Estimado (Âmbar / Laranja) */}
+          <div className="bg-[#fff6ea] border border-[#fde4c4] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#ea580c] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ffedd5]">
+                <DollarSign className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Valor Estimado
+                </span>
+                <p className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight mt-0.5 truncate">
+                  {formatCurrency(totalValorGeral)}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                  Patrimônio total
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-[#ffedd5] text-[#ea580c] flex items-center justify-center flex-shrink-0 self-start">
+              <Sparkles className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* Locais Atendidos (Roxo / Violeta) */}
+          <div className="bg-[#f3f0ff] border border-[#e3dbff] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#7c3aed] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ede9fe]">
+                <Landmark className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Locais com Bens
+                </span>
+                <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                  {locaisComBensCount}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                  {locais.length} locais mapeados
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center flex-shrink-0 self-start">
+              <Building2 className="w-4 h-4" />
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white/90 shadow-sm">
-        <div className="p-4 md:p-6">
-          <Tabs tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab}>
+        {/* ── Navegação de Abas (Pills no Padrão Membros) ─────────────── */}
+        <div className="flex items-center gap-2.5 mb-6 overflow-x-auto pb-1">
+          <button
+            onClick={() => setActiveTab('inventario')}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === 'inventario'
+                ? 'bg-teal-700 text-white shadow-sm border border-teal-800'
+                : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
+            }`}
+          >
+            <ClipboardList className="w-4 h-4" />
+            <span>Inventário</span>
+          </button>
 
-            {/* ═══════════════ ABA CADASTRO ═══════════════ */}
-            {activeTab === 'cadastro' && (
-              <Section icon="📝" title={editingId ? 'Editar Bem' : 'Registrar Bem'}>
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-5">
+          <button
+            onClick={() => setActiveTab('cadastro')}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === 'cadastro'
+                ? 'bg-teal-700 text-white shadow-sm border border-teal-800'
+                : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
+            }`}
+          >
+            <Pencil className="w-4 h-4" />
+            <span>{editingId ? 'Editar Bem' : 'Cadastro de Bem'}</span>
+          </button>
+        </div>
 
-                  {/* Local */}
-                  <fieldset className="border border-gray-200 rounded-xl p-4">
-                    <legend className="text-xs font-semibold text-gray-500 px-1">Local / Congregação</legend>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                      <div>
-                        <label className="text-xs font-semibold text-gray-600">Congregação/Igreja</label>
-                        <select
-                          disabled={ctx.nivel === 'operador'}
-                          value={formData.local_id}
-                          onChange={(e) => setFormData((p) => ({ ...p, local_id: e.target.value }))}
-                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          <option value="">Selecione...</option>
-                          {locais.filter((l) => l.tipo === 'congregacao').map((c) => (
-                            <option key={c.id} value={c.id}>{c.nome}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-gray-600">Pastor/Dirigente</label>
-                        <input
-                          readOnly
-                          value={nomeDirigente ? `${nomeDirigente}${cargoDirigente ? ' — ' + cargoDirigente : ''}` : ''}
-                          placeholder="Preenchido ao selecionar o local"
-                          className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 cursor-default"
-                        />
-                      </div>
+        {/* ═══════════════ ABA INVENTÁRIO ═══════════════ */}
+        {activeTab === 'inventario' && (
+          <div className="space-y-6">
+            {/* Card de Filtros (Padrão MembrosToolbar) */}
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-end">
+                {/* Busca */}
+                <div className="sm:col-span-2 lg:col-span-4">
+                  <label className={labelCls}>Buscar bens</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Search className="w-4 h-4" />
                     </div>
-                  </fieldset>
-
-                  {/* Dados do bem */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Nº de tombamento</label>
-                      <input
-                        value={formData.numero_tombamento}
-                        onChange={(e) => !editingId && setFormData((p) => ({ ...p, numero_tombamento: e.target.value }))}
-                        readOnly={!!editingId}
-                        placeholder="Ex: PAT-001"
-                        className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${editingId ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200' : 'border-gray-200'}`}
-                      />
-                      {editingId && <p className="text-xs text-gray-400 mt-1">O nº de tombamento não pode ser alterado após o cadastro.</p>}
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="text-xs font-semibold text-gray-600">Descrição do bem *</label>
-                      <input
-                        value={formData.descricao}
-                        onChange={(e) => setFormData((p) => ({ ...p, descricao: e.target.value }))}
-                        placeholder="Ex: Cadeira giratória preta, Mesa de madeira..."
-                        className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${fieldErrors.descricao ? 'border-red-400' : 'border-gray-200'}`}
-                      />
-                      {fieldErrors.descricao && <p className="text-xs text-red-600 mt-1">{fieldErrors.descricao}</p>}
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Categoria</label>
-                      <select
-                        value={formData.categoria}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setFormData((p) => ({
-                            ...p,
-                            categoria: val,
-                            ...(val === 'imovel' ? { marca_modelo: '', numero_serie: '', cor: '' } : {}),
-                          }));
-                        }}
-                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      >
-                        {CATEGORIAS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                      </select>
-                    </div>
-                    {formData.categoria !== 'imovel' && (
-                      <div>
-                        <label className="text-xs font-semibold text-gray-600">Marca / Modelo</label>
-                        <input
-                          value={formData.marca_modelo}
-                          onChange={(e) => setFormData((p) => ({ ...p, marca_modelo: e.target.value }))}
-                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                        />
-                      </div>
-                    )}
-                    {formData.categoria !== 'imovel' && (
-                      <div>
-                        <label className="text-xs font-semibold text-gray-600">
-                          {formData.categoria === 'veiculo' ? 'Placa' : 'Nº de série'}
-                        </label>
-                        <input
-                          value={formData.numero_serie}
-                          onChange={(e) => setFormData((p) => ({ ...p, numero_serie: e.target.value }))}
-                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                        />
-                      </div>
-                    )}
-                    {formData.categoria !== 'imovel' && (
-                      <div>
-                        <label className="text-xs font-semibold text-gray-600">Cor</label>
-                        <input
-                          value={formData.cor}
-                          onChange={(e) => setFormData((p) => ({ ...p, cor: e.target.value }))}
-                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Estado de conservação</label>
-                      <select
-                        value={formData.estado_conservacao}
-                        onChange={(e) => setFormData((p) => ({ ...p, estado_conservacao: e.target.value }))}
-                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      >
-                        {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Valor de aquisição (R$)</label>
-                      <input
-                        inputMode="numeric"
-                        value={formData.valor_aquisicao}
-                        onChange={(e) => {
-                          const digits = e.target.value.replace(/\D/g, '');
-                          if (!digits) { setFormData((p) => ({ ...p, valor_aquisicao: '' })); return; }
-                          const num = parseInt(digits, 10) / 100;
-                          setFormData((p) => ({ ...p, valor_aquisicao: num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }));
-                        }}
-                        placeholder="0,00"
-                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Data de aquisição</label>
-                      <input
-                        type="date"
-                        value={formData.data_aquisicao}
-                        onChange={(e) => setFormData((p) => ({ ...p, data_aquisicao: e.target.value }))}
-                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Origem</label>
-                      <select
-                        value={formData.origem}
-                        onChange={(e) => setFormData((p) => ({ ...p, origem: e.target.value }))}
-                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      >
-                        {ORIGENS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Status</label>
-                      <select
-                        value={formData.status}
-                        onChange={(e) => setFormData((p) => ({ ...p, status: e.target.value }))}
-                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      >
-                        {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Campos de baixa */}
-                  {formData.status === 'baixado' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-xs font-semibold text-gray-600">Data da baixa</label>
-                        <input
-                          type="date" value={formData.data_baixa}
-                          onChange={(e) => setFormData((p) => ({ ...p, data_baixa: e.target.value }))}
-                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-gray-600">Motivo da baixa</label>
-                        <input
-                          value={formData.motivo_baixa}
-                          onChange={(e) => setFormData((p) => ({ ...p, motivo_baixa: e.target.value }))}
-                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600">Observações</label>
-                    <textarea
-                      value={formData.observacoes}
-                      onChange={(e) => setFormData((p) => ({ ...p, observacoes: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm min-h-[72px]"
-                    />
-                  </div>
-
-                  <div className="flex flex-wrap gap-3 justify-end">
-                    {editingId && (
-                      <button onClick={resetForm} className="px-4 py-2 rounded-lg border border-gray-200 text-sm">
-                        Cancelar edição
-                      </button>
-                    )}
-                    <button onClick={handleSubmit} className="px-4 py-2 rounded-lg bg-[#123b63] text-white text-sm font-semibold">
-                      {editingId ? 'Atualizar bem' : 'Salvar bem'}
-                    </button>
-                  </div>
-                </div>
-              </Section>
-            )}
-
-            {/* ═══════════════ ABA INVENTÁRIO ═══════════════ */}
-            {activeTab === 'inventario' && (
-              <Section icon="📋" title="Inventário">
-                {/* Filtros */}
-                <div className="flex flex-wrap items-center gap-3 mb-4">
-                  <div className="relative flex-1 min-w-[200px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
                       value={filterSearch}
                       onChange={(e) => setFilterSearch(e.target.value)}
-                      placeholder="Buscar descrição, local, responsável..."
-                      className="pl-9 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                      placeholder="Descrição, tombamento, local..."
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
                     />
                   </div>
+                </div>
+
+                {/* Filtro Local */}
+                <div className="lg:col-span-3">
+                  <label className={labelCls}>Local / Congregação</label>
                   <select
                     value={filterLocal}
                     onChange={(e) => setFilterLocal(e.target.value)}
-                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm min-w-[160px]"
+                    className={inputCls}
                   >
                     <option value="">Todos os locais</option>
-                    {locais.map((l) => <option key={l.id} value={l.id}>{l.nome} ({l.tipo})</option>)}
+                    {locais.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.nome} ({l.tipo === 'campo' ? 'Campo' : 'Congregação'})
+                      </option>
+                    ))}
                   </select>
+                </div>
+
+                {/* Filtro Categoria */}
+                <div className="lg:col-span-3">
+                  <label className={labelCls}>Categoria</label>
                   <select
                     value={filterCategoria}
                     onChange={(e) => setFilterCategoria(e.target.value)}
-                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm min-w-[140px]"
+                    className={inputCls}
                   >
-                    <option value="">Todas categorias</option>
-                    {CATEGORIAS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    <option value="">Todas as categorias</option>
+                    {CATEGORIAS.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
                   </select>
+                </div>
+
+                {/* Filtro Status */}
+                <div className="lg:col-span-2">
+                  <label className={labelCls}>Status</label>
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm min-w-[120px]"
+                    className={inputCls}
                   >
                     <option value="">Todos os status</option>
-                    {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
                   </select>
-                  <button
-                    onClick={async () => {
-                      resetForm();
-                      if (ministryId) {
-                        const t = await generateNextTombamento(ministryId);
-                        setFormData((p) => ({ ...p, numero_tombamento: t }));
-                      }
-                      setActiveTab('cadastro');
-                    }}
-                    className="px-4 py-2 rounded-lg bg-[#123b63] text-white text-sm font-semibold whitespace-nowrap"
-                  >
-                    + Novo bem
-                  </button>
                 </div>
+              </div>
 
-                {/* Botões de impressão */}
-                <div className="mb-3 flex flex-wrap gap-2">
+              {/* Botões de Ação Secundários / Impressões */}
+              <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   {filterLocal && (() => {
                     const local = locais.find((l) => l.id === filterLocal);
                     if (!local) return null;
                     return (
                       <button
                         onClick={() => handleImprimir(filterLocal, local.tipo)}
-                        className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                        className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-teal-700 bg-teal-50 border border-teal-200 hover:bg-teal-100 transition cursor-pointer"
                       >
-                        <Printer className="h-4 w-4" />
-                        Ficha de Patrimônio — {local.nome}
+                        <Printer className="w-4 h-4" />
+                        <span>Ficha de Patrimônio — {local.nome}</span>
                       </button>
                     );
                   })()}
+
                   {itensFiltrados.length > 0 && (
                     <button
                       onClick={() => imprimirEtiquetas(itensFiltrados, locais)}
-                      className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                      className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition cursor-pointer"
                     >
-                      <Printer className="h-4 w-4" />
-                      Imprimir Etiquetas ({itensFiltrados.length})
+                      <Printer className="w-4 h-4 text-slate-500" />
+                      <span>Imprimir Etiquetas ({itensFiltrados.length})</span>
                     </button>
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                  {itensFiltrados.length === 0 ? (
-                    <p className="text-sm text-gray-500">Nenhum bem encontrado.</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-left text-xs uppercase text-gray-400 border-b">
-                            <th className="py-2 pr-3">Nº</th>
-                            <th className="py-2 pr-3">Bem</th>
-                            <th className="py-2 pr-3">Local</th>
-                            <th className="py-2 pr-3">Responsável</th>
-                            <th className="py-2 pr-3">Estado</th>
-                            <th className="py-2 pr-3">Valor</th>
-                            <th className="py-2 pr-3">Status</th>
-                            <th className="py-2">Ações</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {itensFiltrados.map((item) => {
-                            const estadoOpt = ESTADOS.find((e) => e.value === item.estado_conservacao);
-                            const statusOpt = STATUS_OPTIONS.find((s) => s.value === item.status);
-                            return (
-                              <tr key={item.id} className="border-b last:border-b-0 hover:bg-gray-50">
-                                <td className="py-3 pr-3 text-xs text-gray-500">{item.numero_tombamento || '-'}</td>
-                                <td className="py-3 pr-3">
-                                  <div className="font-semibold text-gray-800 max-w-[180px] truncate" title={item.descricao}>{item.descricao}</div>
-                                  <div className="text-xs text-gray-400">{CATEGORIAS.find((c) => c.value === item.categoria)?.label}</div>
-                                  {item.marca_modelo && <div className="text-xs text-gray-400">{item.marca_modelo}</div>}
-                                </td>
-                                <td className="py-3 pr-3 text-xs text-gray-600">{getNomeLocal(item)}</td>
-                                <td className="py-3 pr-3">
-                                  <div className="text-xs text-gray-700">{item.responsavel_nome || '-'}</div>
-                                  {item.responsavel_cargo && <div className="text-[11px] text-gray-400">{item.responsavel_cargo}</div>}
-                                </td>
-                                <td className="py-3 pr-3">
-                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${estadoOpt?.color || 'bg-gray-100 text-gray-600'}`}>
-                                    {estadoOpt?.label || item.estado_conservacao}
-                                  </span>
-                                </td>
-                                <td className="py-3 pr-3 text-xs text-gray-600">{formatCurrency(item.valor_aquisicao)}</td>
-                                <td className="py-3 pr-3">
-                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusOpt?.color || 'bg-gray-100 text-gray-600'}`}>
-                                    {statusOpt?.label || item.status}
-                                  </span>
-                                </td>
-                                <td className="py-3">
-                                  <div className="flex items-center gap-2">
-                                    <button title="Editar" onClick={() => handleEdit(item)} className="rounded-md border border-gray-200 p-2 text-gray-600 hover:bg-gray-50">
-                                      <Pencil className="h-4 w-4" />
-                                    </button>
-                                    <button title="Excluir" onClick={() => handleDelete(item.id)} className="rounded-md border border-gray-200 p-2 text-gray-600 hover:bg-gray-50">
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot>
-                          <tr className="border-t">
-                            <td colSpan={5} className="pt-3 text-xs font-semibold text-gray-500 text-right pr-3">
-                              Total estimado dos itens filtrados:
+                <div className="text-xs font-bold text-slate-500">
+                  <span>{itensFiltrados.length}</span>{' '}
+                  {itensFiltrados.length === 1 ? 'bem encontrado' : 'bens encontrados'}
+                </div>
+              </div>
+            </div>
+
+            {/* Tabela do Inventário (Padrão MembrosTable) */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+              {itensFiltrados.length === 0 ? (
+                <div className="p-12 text-center text-slate-400 font-semibold">
+                  <Package className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                  <p>Nenhum bem patrimonial encontrado com os filtros aplicados.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50/80 border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          Tombamento
+                        </th>
+                        <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          Descrição / Categoria
+                        </th>
+                        <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          Localização
+                        </th>
+                        <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          Responsável
+                        </th>
+                        <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          Estado
+                        </th>
+                        <th className="px-4 py-3.5 text-right text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          Valor
+                        </th>
+                        <th className="px-4 py-3.5 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-4 py-3.5 text-right text-xs font-bold text-slate-700 uppercase tracking-wider w-24">
+                          Ações
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {itensFiltrados.map((item) => {
+                        const estadoOpt = ESTADOS.find((e) => e.value === item.estado_conservacao);
+                        const statusOpt = STATUS_OPTIONS.find((s) => s.value === item.status);
+                        return (
+                          <tr key={item.id} className="hover:bg-slate-50/70 transition">
+                            <td className="px-4 py-3.5 font-bold text-slate-900 whitespace-nowrap">
+                              {item.numero_tombamento || '—'}
                             </td>
-                            <td className="pt-3 text-xs font-bold text-gray-800">{formatCurrency(totalValorFiltrado)}</td>
-                            <td colSpan={2}></td>
+                            <td className="px-4 py-3.5">
+                              <div
+                                className="font-bold text-slate-900 max-w-[220px] truncate"
+                                title={item.descricao}
+                              >
+                                {item.descricao}
+                              </div>
+                              <div className="text-xs text-slate-500 font-medium">
+                                {CATEGORIAS.find((c) => c.value === item.categoria)?.label}
+                                {item.marca_modelo && ` · ${item.marca_modelo}`}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5 text-slate-700 font-medium">
+                              {getNomeLocal(item)}
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="text-xs font-bold text-slate-800">
+                                {item.responsavel_nome || '—'}
+                              </div>
+                              {item.responsavel_cargo && (
+                                <div className="text-[11px] text-slate-500 font-medium">
+                                  {item.responsavel_cargo}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                  estadoOpt?.color || 'bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                {estadoOpt?.label || item.estado_conservacao}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5 text-right font-bold text-emerald-700 whitespace-nowrap">
+                              {formatCurrency(item.valor_aquisicao)}
+                            </td>
+                            <td className="px-4 py-3.5 text-center">
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                  statusOpt?.color || 'bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                {statusOpt?.label || item.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  title="Editar"
+                                  onClick={() => handleEdit(item)}
+                                  className="p-1.5 text-slate-400 hover:text-teal-700 hover:bg-slate-50 rounded-lg transition cursor-pointer"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button
+                                  title="Excluir"
+                                  onClick={() => handleDelete(item.id)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
                           </tr>
-                        </tfoot>
-                      </table>
-                    </div>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-slate-200 bg-slate-50/80">
+                        <td
+                          colSpan={5}
+                          className="px-4 py-3.5 text-xs font-bold text-slate-700 uppercase tracking-wider text-right"
+                        >
+                          Total Estimado dos Itens Filtrados:
+                        </td>
+                        <td className="px-4 py-3.5 text-right font-black text-base text-emerald-700 whitespace-nowrap">
+                          {formatCurrency(totalValorFiltrado)}
+                        </td>
+                        <td colSpan={2} />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════ ABA CADASTRO ═══════════════ */}
+        {activeTab === 'cadastro' && (
+          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-sm space-y-6">
+            {/* Header do Card */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 border border-teal-100/80 flex items-center justify-center font-bold flex-shrink-0">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800 tracking-tight">
+                    {editingId ? 'Editar Bem Patrimonial' : 'Novo Bem Patrimonial'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {editingId
+                      ? 'Atualize as informações do bem selecionado no sistema'
+                      : 'Preencha os dados abaixo para registrar um novo item no inventário'}
+                  </p>
+                </div>
+              </div>
+
+              {editingId && (
+                <button
+                  onClick={resetForm}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Cancelar Edição</span>
+                </button>
+              )}
+            </div>
+
+            {/* Seção 1: Local / Congregação */}
+            <div className="bg-slate-50/50 rounded-2xl p-4 sm:p-5 border border-slate-200/80">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
+                1. Localização e Responsabilidade
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Congregação / Igreja</label>
+                  <select
+                    disabled={ctx.nivel === 'operador'}
+                    value={formData.local_id}
+                    onChange={(e) => setFormData((p) => ({ ...p, local_id: e.target.value }))}
+                    className={`${inputCls} disabled:bg-slate-100 disabled:cursor-not-allowed`}
+                  >
+                    <option value="">Selecione...</option>
+                    {locais
+                      .filter((l) => l.tipo === 'congregacao')
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nome}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Pastor / Dirigente Responsável</label>
+                  <input
+                    readOnly
+                    value={
+                      nomeDirigente
+                        ? `${nomeDirigente}${cargoDirigente ? ' — ' + cargoDirigente : ''}`
+                        : ''
+                    }
+                    placeholder="Preenchido automaticamente ao selecionar o local"
+                    className={`${inputCls} bg-slate-100 text-slate-600 cursor-default`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Seção 2: Dados do Bem */}
+            <div>
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
+                2. Especificações do Bem
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className={labelCls}>Nº de tombamento</label>
+                  <input
+                    value={formData.numero_tombamento}
+                    onChange={(e) =>
+                      !editingId &&
+                      setFormData((p) => ({ ...p, numero_tombamento: e.target.value }))
+                    }
+                    readOnly={!!editingId}
+                    placeholder="Ex: PAT-001"
+                    className={`${inputCls} ${
+                      editingId ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''
+                    }`}
+                  />
+                  {editingId && (
+                    <p className="text-[11px] text-slate-400 font-medium mt-1">
+                      O tombamento não pode ser alterado após o cadastro.
+                    </p>
                   )}
                 </div>
-              </Section>
+
+                <div className="md:col-span-2">
+                  <label className={labelCls}>Descrição do bem *</label>
+                  <input
+                    value={formData.descricao}
+                    onChange={(e) => setFormData((p) => ({ ...p, descricao: e.target.value }))}
+                    placeholder="Ex: Mesa de som 16 canais, Projetor Full HD..."
+                    className={`${inputCls} ${
+                      fieldErrors.descricao ? 'border-rose-400 focus:border-rose-500' : ''
+                    }`}
+                  />
+                  {fieldErrors.descricao && (
+                    <p className="text-xs font-bold text-rose-600 mt-1">{fieldErrors.descricao}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className={labelCls}>Categoria</label>
+                  <select
+                    value={formData.categoria}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData((p) => ({
+                        ...p,
+                        categoria: val,
+                        ...(val === 'imovel'
+                          ? { marca_modelo: '', numero_serie: '', cor: '' }
+                          : {}),
+                      }));
+                    }}
+                    className={inputCls}
+                  >
+                    {CATEGORIAS.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {formData.categoria !== 'imovel' && (
+                  <div>
+                    <label className={labelCls}>Marca / Modelo</label>
+                    <input
+                      value={formData.marca_modelo}
+                      onChange={(e) =>
+                        setFormData((p) => ({ ...p, marca_modelo: e.target.value }))
+                      }
+                      placeholder="Ex: Yamaha MG16XU"
+                      className={inputCls}
+                    />
+                  </div>
+                )}
+
+                {formData.categoria !== 'imovel' && (
+                  <div>
+                    <label className={labelCls}>
+                      {formData.categoria === 'veiculo' ? 'Placa' : 'Nº de série'}
+                    </label>
+                    <input
+                      value={formData.numero_serie}
+                      onChange={(e) =>
+                        setFormData((p) => ({ ...p, numero_serie: e.target.value }))
+                      }
+                      placeholder="Nº de série ou chassi"
+                      className={inputCls}
+                    />
+                  </div>
+                )}
+
+                {formData.categoria !== 'imovel' && (
+                  <div>
+                    <label className={labelCls}>Cor</label>
+                    <input
+                      value={formData.cor}
+                      onChange={(e) => setFormData((p) => ({ ...p, cor: e.target.value }))}
+                      placeholder="Ex: Preto, Prata, Madeira..."
+                      className={inputCls}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className={labelCls}>Estado de conservação</label>
+                  <select
+                    value={formData.estado_conservacao}
+                    onChange={(e) =>
+                      setFormData((p) => ({ ...p, estado_conservacao: e.target.value }))
+                    }
+                    className={inputCls}
+                  >
+                    {ESTADOS.map((e) => (
+                      <option key={e.value} value={e.value}>
+                        {e.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={labelCls}>Valor de aquisição (R$)</label>
+                  <input
+                    inputMode="numeric"
+                    value={formData.valor_aquisicao}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '');
+                      if (!digits) {
+                        setFormData((p) => ({ ...p, valor_aquisicao: '' }));
+                        return;
+                      }
+                      const num = parseInt(digits, 10) / 100;
+                      setFormData((p) => ({
+                        ...p,
+                        valor_aquisicao: num.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        }),
+                      }));
+                    }}
+                    placeholder="0,00"
+                    className={inputCls}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Data de aquisição</label>
+                  <input
+                    type="date"
+                    value={formData.data_aquisicao}
+                    onChange={(e) =>
+                      setFormData((p) => ({ ...p, data_aquisicao: e.target.value }))
+                    }
+                    className={inputCls}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Origem</label>
+                  <select
+                    value={formData.origem}
+                    onChange={(e) => setFormData((p) => ({ ...p, origem: e.target.value }))}
+                    className={inputCls}
+                  >
+                    {ORIGENS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={labelCls}>Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData((p) => ({ ...p, status: e.target.value }))}
+                    className={inputCls}
+                  >
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Campos de baixa */}
+            {formData.status === 'baixado' && (
+              <div className="bg-rose-50/50 rounded-2xl p-4 sm:p-5 border border-rose-200">
+                <h4 className="text-xs font-bold text-rose-800 uppercase tracking-wider mb-3">
+                  Registro de Baixa do Bem
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>Data da baixa</label>
+                    <input
+                      type="date"
+                      value={formData.data_baixa}
+                      onChange={(e) => setFormData((p) => ({ ...p, data_baixa: e.target.value }))}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Motivo da baixa</label>
+                    <input
+                      value={formData.motivo_baixa}
+                      onChange={(e) =>
+                        setFormData((p) => ({ ...p, motivo_baixa: e.target.value }))
+                      }
+                      placeholder="Ex: Danificado sem reparo, doado, etc."
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+              </div>
             )}
-          </Tabs>
-        </div>
+
+            <div>
+              <label className={labelCls}>Observações adicionais</label>
+              <textarea
+                value={formData.observacoes}
+                onChange={(e) => setFormData((p) => ({ ...p, observacoes: e.target.value }))}
+                placeholder="Detalhes sobre garantia, procedência ou histórico..."
+                className={`${inputCls} min-h-[80px]`}
+              />
+            </div>
+
+            {/* Ações do Formulário */}
+            <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-slate-100">
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleSubmit}
+                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-bold shadow-xs transition cursor-pointer flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{editingId ? 'Atualizar bem' : 'Salvar bem'}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    </PageLayout>
+    </div>
   );
 }

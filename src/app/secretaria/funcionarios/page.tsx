@@ -2,13 +2,35 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import PageLayout from '@/components/PageLayout';
 import NotificationModal from '@/components/NotificationModal';
 import { createClient } from '@/lib/supabase-client';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { formatPhone } from '@/lib/mascaras';
+import {
+  Briefcase,
+  Users,
+  UserCheck,
+  UserX,
+  Layers,
+  Plus,
+  Search,
+  X,
+  CheckCircle2,
+  Trash2,
+  Building,
+  Mail,
+  Phone,
+  Calendar,
+  CreditCard,
+  MapPin,
+  Lock,
+  ArrowRight,
+  Filter,
+  FileText
+} from 'lucide-react';
 
 interface Membro {
   id: string;
@@ -114,6 +136,8 @@ export default function GerenciarFuncionarios() {
   const [funcoes, setFuncoes] = useState(FUNCOES_BASE);
   const [novoGrupo, setNovoGrupo] = useState('');
   const [novaFuncao, setNovaFuncao] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [deletandoId, setDeletandoId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     grupo: '',
@@ -195,7 +219,6 @@ export default function GerenciarFuncionarios() {
     }
   };
 
-  // Carregar membros do Supabase e funcionários da API
   useEffect(() => {
     carregarMembros();
     carregarFuncionarios();
@@ -407,9 +430,9 @@ export default function GerenciarFuncionarios() {
       return;
     }
 
+    setSalvando(true);
     try {
       const accessToken = await getAccessTokenOrThrow();
-      // Enviar dados para API
       const response = await fetch('/api/v1/employees', {
         method: 'POST',
         headers: {
@@ -452,10 +475,7 @@ export default function GerenciarFuncionarios() {
         type: 'success'
       });
 
-      // Recarregar lista de funcionários
       await carregarFuncionarios();
-
-      // Limpar formulário
       handleLimparMembro();
     } catch (error: any) {
       setModalSucesso({
@@ -464,11 +484,18 @@ export default function GerenciarFuncionarios() {
         message: error.message || 'Erro ao cadastrar funcionário',
         type: 'error'
       });
+    } finally {
+      setSalvando(false);
     }
   };
 
   // Deletar funcionário
   const handleDeletar = async (id: string) => {
+    if (!confirm('Deseja realmente remover este funcionário?')) {
+      return;
+    }
+
+    setDeletandoId(id);
     try {
       const accessToken = await getAccessTokenOrThrow();
       const response = await fetch(`/api/v1/employees/${id}`, {
@@ -498,29 +525,54 @@ export default function GerenciarFuncionarios() {
         message: error.message || 'Erro ao remover funcionário',
         type: 'error'
       });
+    } finally {
+      setDeletandoId(null);
     }
   };
 
   // Filtrar funcionários
-  const funcionariosFiltrados = funcionarios.filter(f => {
-    if (filtroGrupo && f.grupo !== filtroGrupo) return false;
-    if (f.status !== filtroStatus) return false;
-    return true;
-  });
+  const funcionariosFiltrados = useMemo(() => {
+    return funcionarios.filter(f => {
+      if (filtroGrupo && f.grupo !== filtroGrupo) return false;
+      if (filtroStatus && f.status !== filtroStatus) return false;
+      return true;
+    });
+  }, [funcionarios, filtroGrupo, filtroStatus]);
+
+  // Cálculos de KPIs no padrão de Membros
+  const totalFuncionarios = funcionarios.length;
+  const totalAtivos = funcionarios.filter(f => f.status === 'ATIVO').length;
+  const totalInativos = funcionarios.filter(f => f.status === 'INATIVO').length;
+  const totalDepartamentos = useMemo(() => {
+    const s = new Set<string>();
+    funcionarios.forEach(f => {
+      if (f.grupo) s.add(f.grupo);
+    });
+    return s.size;
+  }, [funcionarios]);
 
   const gruposCustom = gruposFuncao.filter(g => !GRUPOS_FUNCAO_BASE.some(base => base.valor === g.valor));
   const funcoesCustom = funcoes.filter(f => !FUNCOES_BASE.some(base => base.valor === f.valor));
 
   const isLocal = ctx.nivel && ['admin_local', 'financeiro_local', 'supervisor', 'viewer'].includes(ctx.nivel);
 
-  if (ctx.loading || planFeatures.loading) return <div className="p-8 text-gray-500">Carregando...</div>;
+  if (ctx.loading || planFeatures.loading) {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[#f4f7fa] min-h-screen flex items-center justify-center p-8">
+        <div className="flex items-center gap-3 text-slate-500 font-semibold text-sm bg-white px-6 py-4 rounded-2xl shadow-xs border border-slate-200">
+          <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+          <span>Carregando gestão de colaboradores...</span>
+        </div>
+      </div>
+    );
+  }
 
   if (!planFeatures.has_modulo_funcionarios || !planFeatures.hasFeature('employees_module')) {
     return (
       <PageLayout title="Funcionários" description="Gestão de Funcionários & RH" activeMenu="funcionarios">
         <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center max-w-2xl mx-auto space-y-5 my-10">
           <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto text-amber-600 shadow-sm border border-amber-200/60">
-            <span className="text-3xl">👔</span>
+            <Briefcase className="w-8 h-8 text-amber-600" />
           </div>
           <div>
             <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-full mb-3">
@@ -549,541 +601,758 @@ export default function GerenciarFuncionarios() {
 
   if (bloqueado || isLocal) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50 text-gray-500 font-semibold p-8 text-center">
-        Acesso restrito para a Sede do Ministério.
+      <div className="flex-1 overflow-y-auto bg-[#f4f7fa] min-h-screen flex items-center justify-center p-8">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center max-w-md mx-auto space-y-4">
+          <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto text-rose-600 border border-rose-200">
+            <Lock className="w-7 h-7" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-800">Acesso Restrito</h2>
+          <p className="text-slate-600 text-sm">
+            A gestão de funcionários é de acesso restrito para a Sede do Ministério.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-auto">
-        <div className="p-6 max-w-7xl mx-auto">
-          {/* Cabeçalho */}
-          <div className="mb-6">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-4xl">👔</span>
-              <h1 className="text-3xl font-bold text-gray-800">Gerenciar Funcionários</h1>
+    <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f4f7fa] min-h-screen">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-[96rem] mx-auto w-full">
+        {/* Header da Página (Padrão Membros) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-teal-700 text-white flex items-center justify-center border border-teal-800 shadow-sm flex-shrink-0">
+              <Briefcase className="w-6 h-6" />
             </div>
-            <p className="text-gray-600">Gerencie os funcionários da instituição</p>
-          </div>
-
-          {/* Abas */}
-          <div className="mb-6 border-b border-gray-300">
-            <div className="flex gap-4">
-              <button
-                onClick={() => setAbaAtiva('cadastro')}
-                className={`px-6 py-3 font-semibold border-b-2 transition ${
-                  abaAtiva === 'cadastro'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-800'
-                }`}
-              >
-                ➕ Cadastrar Novo
-              </button>
-              <button
-                onClick={() => setAbaAtiva('lista')}
-                className={`px-6 py-3 font-semibold border-b-2 transition ${
-                  abaAtiva === 'lista'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-800'
-                }`}
-              >
-                📋 Lista de Funcionários ({funcionarios.length})
-              </button>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Funcionários & RH</h1>
+              <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
+                Gerencie colaboradores da instituição, vínculos com membros, funções e dados bancários.
+              </p>
             </div>
           </div>
 
-          {/* ABA: CADASTRO */}
-          {abaAtiva === 'cadastro' && (
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <form onSubmit={handleCadastrar}>
-                {/* SEÇÃO: BUSCA E SELEÇÃO DE MEMBRO */}
-                <div className="mb-8">
-                  <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <span>👥</span> Dados Pessoais
-                  </h2>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              onClick={() => {
+                handleLimparMembro();
+                setAbaAtiva('cadastro');
+              }}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer text-xs sm:text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Novo Colaborador</span>
+            </button>
+          </div>
+        </div>
 
-                  {/* Busca de Membro */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Buscar Membro *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Digite nome ou CPF do membro..."
-                        value={searchMembro}
-                        onChange={(e) => handleSearchMembro(e.target.value)}
-                        className="w-full px-4 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+        {/* KPIs Coloridos Suaves (Padrão Membros) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* Total de Funcionários (Azul) */}
+          <div className="bg-[#ebf5ff] border border-[#d0e6ff] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#2563eb] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dbeafe]">
+                <Users className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Total de Funcionários
+                </span>
+                <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                  {totalFuncionarios}
+                </p>
+                <p className="text-[11px] font-bold text-teal-700 mt-1 truncate">
+                  Quadro cadastrado
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-[#dbeafe] text-[#2563eb] flex items-center justify-center flex-shrink-0 self-start">
+              <Briefcase className="w-4 h-4" />
+            </div>
+          </div>
 
-                      {/* Dropdown de resultados */}
-                      {searchResults.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                          {searchResults.map(membro => (
-                            <button
-                              key={membro.id}
-                              type="button"
-                              onClick={() => handleSelecionarMembro(membro)}
-                              className="w-full text-left px-4 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-0"
-                            >
-                              <div className="font-semibold">{membro.nome}</div>
-                              <div className="text-sm text-gray-500">CPF: {membro.cpf}</div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+          {/* Ativos (Verde) */}
+          <div className="bg-[#ecfdf3] border border-[#c7f3d6] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#059669] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#d1fae5]">
+                <UserCheck className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Colaboradores Ativos
+                </span>
+                <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                  {totalAtivos}
+                </p>
+                <p className="text-[11px] font-bold text-emerald-700 mt-1 truncate">
+                  Em atividade
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-[#d1fae5] text-[#059669] flex items-center justify-center flex-shrink-0 self-start">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+          </div>
 
-                  {/* Membro Selecionado */}
-                  {membroSelecionado && (
-                    <div className="mb-4 p-4 bg-green-50 border-2 border-green-500 rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-bold text-green-800">{membroSelecionado.nome}</h3>
-                          <p className="text-sm text-green-700">CPF: {membroSelecionado.cpf}</p>
-                        </div>
+          {/* Inativos (Âmbar) */}
+          <div className="bg-[#fff6ea] border border-[#fde4c4] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#ea580c] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ffedd5]">
+                <UserX className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Inativos / Desligados
+                </span>
+                <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                  {totalInativos}
+                </p>
+                <p className="text-[11px] font-bold text-amber-700 mt-1 truncate">
+                  Sem vínculo ativo
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-[#ffedd5] text-[#ea580c] flex items-center justify-center flex-shrink-0 self-start">
+              <X className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* Departamentos / Grupos (Roxo) */}
+          <div className="bg-[#f5f3ff] border border-[#ddd6fe] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#7c3aed] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ede9fe]">
+                <Layers className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Grupos & Departamentos
+                </span>
+                <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                  {totalDepartamentos}
+                </p>
+                <p className="text-[11px] font-bold text-purple-700 mt-1 truncate">
+                  Setores operacionais
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center flex-shrink-0 self-start">
+              <Building className="w-4 h-4" />
+            </div>
+          </div>
+        </div>
+
+        {/* Navegação de Abas por Pills (Padrão Membros) */}
+        <div className="flex items-center gap-2.5 mb-6 overflow-x-auto pb-1">
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('cadastro')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              abaAtiva === 'cadastro'
+                ? 'bg-teal-700 text-white shadow-sm border border-teal-800'
+                : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            <span>Cadastrar Novo</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('lista')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              abaAtiva === 'lista'
+                ? 'bg-teal-700 text-white shadow-sm border border-teal-800'
+                : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Lista de Funcionários ({funcionarios.length})</span>
+          </button>
+        </div>
+
+        {/* ABA: CADASTRO */}
+        {abaAtiva === 'cadastro' && (
+          <form onSubmit={handleCadastrar} className="space-y-6">
+            {/* Bloco 1: Seleção e Dados Pessoais */}
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-sm">
+              <div className="flex items-center gap-2.5 pb-4 mb-5 border-b border-slate-100">
+                <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-100">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Vínculo de Membro & Dados Pessoais</h2>
+                  <p className="text-xs text-slate-500">Selecione um membro cadastrado para vincular como colaborador institucional.</p>
+                </div>
+              </div>
+
+              {/* Busca de Membro */}
+              <div className="mb-5">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                  Buscar Membro Cadastrado *
+                </label>
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                  <input
+                    type="text"
+                    placeholder="Digite o nome ou CPF do membro..."
+                    value={searchMembro}
+                    onChange={(e) => handleSearchMembro(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  />
+
+                  {/* Dropdown de resultados */}
+                  {searchResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                      {searchResults.map(membro => (
                         <button
+                          key={membro.id}
                           type="button"
-                          onClick={handleLimparMembro}
-                          className="text-green-700 hover:text-green-900 font-semibold"
+                          onClick={() => handleSelecionarMembro(membro)}
+                          className="w-full text-left px-4 py-3 hover:bg-teal-50/60 transition flex items-center justify-between group"
                         >
-                          ✕ Limpar
+                          <div>
+                            <p className="text-sm font-bold text-slate-800 group-hover:text-teal-700">{membro.nome}</p>
+                            <p className="text-xs text-slate-500">CPF: {membro.cpf || 'Não informado'}</p>
+                          </div>
+                          <span className="text-xs font-bold text-teal-600 opacity-0 group-hover:opacity-100 transition flex items-center gap-1">
+                            Selecionar <ArrowRight className="w-3.5 h-3.5" />
+                          </span>
                         </button>
-                      </div>
+                      ))}
                     </div>
                   )}
+                </div>
+              </div>
 
-                  {/* Campos de Dados Pessoais (preenchidos dinamicamente) */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Email
-                      </label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        placeholder="email@example.com"
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+              {/* Membro Selecionado Banner */}
+              {membroSelecionado && (
+                <div className="mb-5 p-4 bg-emerald-50/70 border border-emerald-300 rounded-2xl flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+                      <UserCheck className="w-5 h-5" />
                     </div>
-
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        CPF *
-                      </label>
-                      <input
-                        type="text"
-                        value={membroSelecionado?.cpf || ''}
-                        disabled
-                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-600"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        RG
-                      </label>
-                      <input
-                        type="text"
-                        name="rg"
-                        value={formData.rg}
-                        onChange={handleInputChange}
-                        placeholder="00.000.000-0"
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Data de Nascimento
-                      </label>
-                      <input
-                        type="date"
-                        name="dataNascimento"
-                        value={formData.dataNascimento}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Telefone Celular
-                      </label>
-                      <input
-                        type="tel"
-                        name="telefone"
-                        value={formData.telefone}
-                        onChange={handleInputChange}
-                        placeholder="(11) 99999-9999"
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Whatsapp *
-                      </label>
-                      <input
-                        type="tel"
-                        name="whatsapp"
-                        value={formData.whatsapp}
-                        onChange={handleInputChange}
-                        placeholder="(11) 99999-9999"
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                      <p className="text-xs uppercase font-bold tracking-wider text-emerald-800">Membro Selecionado</p>
+                      <h3 className="text-sm font-bold text-slate-900">{membroSelecionado.nome}</h3>
+                      <p className="text-xs text-slate-600">CPF: {membroSelecionado.cpf}</p>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleLimparMembro}
+                    className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Trocar Membro</span>
+                  </button>
                 </div>
+              )}
 
-                {/* SEÇÃO: INFORMAÇÕES PROFISSIONAIS */}
-                <div className="mb-8 p-4 bg-gray-50 rounded-lg">
-                  <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <span>💼</span> Informações Profissionais
-                  </h2>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Grupo *
-                      </label>
-                      <select
-                        name="grupo"
-                        value={formData.grupo}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {gruposFuncao.map(g => (
-                          <option key={g.valor} value={g.valor}>{g.label}</option>
-                        ))}
-                      </select>
-                      <div className="mt-2 flex gap-2">
-                        <input
-                          type="text"
-                          value={novoGrupo}
-                          onChange={(e) => setNovoGrupo(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAdicionarGrupo();
-                            }
-                          }}
-                          placeholder="Adicionar novo grupo"
-                          className="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAdicionarGrupo}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-                        >
-                          + Adicionar
-                        </button>
-                      </div>
-                      {gruposCustom.length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-xs font-semibold text-gray-600 mb-2">Grupos criados</p>
-                          <div className="flex flex-wrap gap-2">
-                            {gruposCustom.map(grupo => (
-                              <div
-                                key={grupo.valor}
-                                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs"
-                              >
-                                <span>{grupo.label}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoverGrupoCustom(grupo.valor)}
-                                  className="text-red-600 hover:text-red-700 font-bold"
-                                  title="Remover grupo"
-                                >
-                                  x
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Função *
-                      </label>
-                      <select
-                        name="funcao"
-                        value={formData.funcao}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {funcoes.map(f => (
-                          <option key={f.valor} value={f.valor}>{f.label}</option>
-                        ))}
-                      </select>
-                      <div className="mt-2 flex gap-2">
-                        <input
-                          type="text"
-                          value={novaFuncao}
-                          onChange={(e) => setNovaFuncao(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAdicionarFuncao();
-                            }
-                          }}
-                          placeholder="Adicionar nova função"
-                          className="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAdicionarFuncao}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-                        >
-                          + Adicionar
-                        </button>
-                      </div>
-                      {funcoesCustom.length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-xs font-semibold text-gray-600 mb-2">Funções criadas</p>
-                          <div className="flex flex-wrap gap-2">
-                            {funcoesCustom.map(funcao => (
-                              <div
-                                key={funcao.valor}
-                                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs"
-                              >
-                                <span>{funcao.label}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoverFuncaoCustom(funcao.valor)}
-                                  className="text-red-600 hover:text-red-700 font-bold"
-                                  title="Remover função"
-                                >
-                                  x
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Data de Admissão
-                      </label>
-                      <input
-                        type="date"
-                        name="dataAdmissao"
-                        value={formData.dataAdmissao}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        STATUS
-                      </label>
-                      <select
-                        name="status"
-                        value={formData.status}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="ATIVO">ATIVO</option>
-                        <option value="INATIVO">INATIVO</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* SEÇÃO: ENDEREÇO */}
-                <div className="mb-8 p-4 bg-gray-50 rounded-lg">
-                  <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <span>📍</span> Endereço
-                  </h2>
-
-                  <div className="grid grid-cols-1 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        CEP
-                      </label>
-                      <input
-                        type="text"
-                        name="cep"
-                        value={formData.cep}
-                        onChange={handleInputChange}
-                        placeholder="00000-000"
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Endereço
-                      </label>
-                      <input
-                        type="text"
-                        name="endereco"
-                        value={formData.endereco}
-                        onChange={handleInputChange}
-                        placeholder="Rua, Avenida, etc..."
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          Bairro
-                        </label>
-                        <input
-                          type="text"
-                          name="bairro"
-                          value={formData.bairro}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          Cidade
-                        </label>
-                        <input
-                          type="text"
-                          name="cidade"
-                          value={formData.cidade}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          UF
-                        </label>
-                        <select
-                          name="uf"
-                          value={formData.uf}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Escolha um Estado</option>
-                          {UFDADOS.map(uf => (
-                            <option key={uf} value={uf}>{uf}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* SEÇÃO: DADOS FINANCEIROS */}
-                <div className="mb-8 p-4 bg-gray-50 rounded-lg">
-                  <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <span>💰</span> Dados Financeiros
-                  </h2>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Banco
-                      </label>
-                      <select
-                        name="banco"
-                        value={formData.banco}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {BANCOS.map(b => (
-                          <option key={b.valor} value={b.valor}>{b.label}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Agência
-                      </label>
-                      <input
-                        type="text"
-                        name="agencia"
-                        value={formData.agencia}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Conta Corrente
-                      </label>
-                      <input
-                        type="text"
-                        name="contaCorrente"
-                        value={formData.contaCorrente}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        PIX
-                      </label>
-                      <input
-                        type="text"
-                        name="pix"
-                        value={formData.pix}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* SEÇÃO: OBSERVAÇÕES */}
-                <div className="mb-8 p-4 bg-gray-50 rounded-lg">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    OBS.
+              {/* Campos de Dados Pessoais */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    E-mail
                   </label>
-                  <textarea
-                    name="obs"
-                    value={formData.obs}
-                    onChange={handleInputChange}
-                    placeholder="Observações adicionais..."
-                    className="w-full px-3 py-2 border-2 border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                    rows={3}
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      placeholder="email@instituicao.org"
+                      className="w-full pl-10 pr-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    CPF (Membro) *
+                  </label>
+                  <input
+                    type="text"
+                    value={membroSelecionado?.cpf || ''}
+                    disabled
+                    placeholder="Selecione um membro acima"
+                    className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-slate-600 text-sm font-medium cursor-not-allowed"
                   />
                 </div>
 
-                {/* BOTÃO CADASTRAR */}
-                <button
-                  type="submit"
-                  className="w-full px-6 py-3 bg-teal-500 text-white font-bold rounded-lg hover:bg-teal-600 transition shadow-md"
-                >
-                  CADASTRAR
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* ABA: LISTA */}
-          {abaAtiva === 'lista' && (
-            <div className="bg-white rounded-lg shadow-md p-6">
-              {/* FILTROS */}
-              <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Filtrar por Grupo
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    RG
                   </label>
+                  <input
+                    type="text"
+                    name="rg"
+                    value={formData.rg}
+                    onChange={handleInputChange}
+                    placeholder="00.000.000-0"
+                    className="w-full px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Data de Nascimento
+                  </label>
+                  <div className="relative">
+                    <Calendar className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <input
+                      type="date"
+                      name="dataNascimento"
+                      value={formData.dataNascimento}
+                      onChange={handleInputChange}
+                      className="w-full pl-10 pr-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Telefone Fixo / Recado
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <input
+                      type="tel"
+                      name="telefone"
+                      value={formData.telefone}
+                      onChange={handleInputChange}
+                      placeholder="(11) 99999-9999"
+                      className="w-full pl-10 pr-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    WhatsApp *
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <input
+                      type="tel"
+                      name="whatsapp"
+                      value={formData.whatsapp}
+                      onChange={handleInputChange}
+                      placeholder="(11) 99999-9999"
+                      className="w-full pl-10 pr-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bloco 2: Cargo & Função Institucional */}
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-sm">
+              <div className="flex items-center gap-2.5 pb-4 mb-5 border-b border-slate-100">
+                <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-100">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Cargo & Função Institucional</h2>
+                  <p className="text-xs text-slate-500">Defina o departamento, função, data de admissão e status operacional.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                {/* Grupo / Departamento */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Grupo / Departamento *
+                  </label>
+                  <select
+                    name="grupo"
+                    value={formData.grupo}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  >
+                    {gruposFuncao.map(g => (
+                      <option key={g.valor} value={g.valor}>{g.label}</option>
+                    ))}
+                  </select>
+
+                  <div className="flex gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={novoGrupo}
+                      onChange={(e) => setNovoGrupo(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAdicionarGrupo();
+                        }
+                      }}
+                      placeholder="Novo grupo/setor..."
+                      className="flex-1 px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAdicionarGrupo}
+                      className="px-3 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-2xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Adicionar
+                    </button>
+                  </div>
+
+                  {gruposCustom.length > 0 && (
+                    <div className="pt-2">
+                      <p className="text-[11px] font-bold text-slate-500 mb-1.5">Grupos personalizados:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {gruposCustom.map(grupo => (
+                          <span
+                            key={grupo.valor}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium"
+                          >
+                            <span>{grupo.label}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoverGrupoCustom(grupo.valor)}
+                              className="text-slate-400 hover:text-rose-600 font-bold transition"
+                              title="Remover grupo"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Função / Atribuição */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Função / Cargo *
+                  </label>
+                  <select
+                    name="funcao"
+                    value={formData.funcao}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  >
+                    {funcoes.map(f => (
+                      <option key={f.valor} value={f.valor}>{f.label}</option>
+                    ))}
+                  </select>
+
+                  <div className="flex gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={novaFuncao}
+                      onChange={(e) => setNovaFuncao(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAdicionarFuncao();
+                        }
+                      }}
+                      placeholder="Nova função..."
+                      className="flex-1 px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAdicionarFuncao}
+                      className="px-3 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-2xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Adicionar
+                    </button>
+                  </div>
+
+                  {funcoesCustom.length > 0 && (
+                    <div className="pt-2">
+                      <p className="text-[11px] font-bold text-slate-500 mb-1.5">Funções personalizadas:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {funcoesCustom.map(funcao => (
+                          <span
+                            key={funcao.valor}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium"
+                          >
+                            <span>{funcao.label}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoverFuncaoCustom(funcao.valor)}
+                              className="text-slate-400 hover:text-rose-600 font-bold transition"
+                              title="Remover função"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Data de Admissão & Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Data de Admissão *
+                  </label>
+                  <div className="relative">
+                    <Calendar className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <input
+                      type="date"
+                      name="dataAdmissao"
+                      value={formData.dataAdmissao}
+                      onChange={handleInputChange}
+                      className="w-full pl-10 pr-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Status Operacional *
+                  </label>
+                  <select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  >
+                    <option value="ATIVO">🟢 ATIVO</option>
+                    <option value="INATIVO">🔴 INATIVO</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Bloco 3: Endereço & Localização */}
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-sm">
+              <div className="flex items-center gap-2.5 pb-4 mb-5 border-b border-slate-100">
+                <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-100">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Endereço Residencial</h2>
+                  <p className="text-xs text-slate-500">Localização de domicílio do colaborador.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    CEP
+                  </label>
+                  <input
+                    type="text"
+                    name="cep"
+                    value={formData.cep}
+                    onChange={handleInputChange}
+                    placeholder="00000-000"
+                    className="w-full px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Endereço (Logradouro, Número, Complemento)
+                  </label>
+                  <input
+                    type="text"
+                    name="endereco"
+                    value={formData.endereco}
+                    onChange={handleInputChange}
+                    placeholder="Rua, Avenida, Número, Bloco, Apto..."
+                    className="w-full px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Bairro
+                  </label>
+                  <input
+                    type="text"
+                    name="bairro"
+                    value={formData.bairro}
+                    onChange={handleInputChange}
+                    placeholder="Bairro"
+                    className="w-full px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Cidade
+                  </label>
+                  <input
+                    type="text"
+                    name="cidade"
+                    value={formData.cidade}
+                    onChange={handleInputChange}
+                    placeholder="Cidade"
+                    className="w-full px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    UF
+                  </label>
+                  <select
+                    name="uf"
+                    value={formData.uf}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  >
+                    <option value="">Escolha um Estado</option>
+                    {UFDADOS.map(uf => (
+                      <option key={uf} value={uf}>{uf}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Bloco 4: Dados Financeiros & Bancários */}
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-sm">
+              <div className="flex items-center gap-2.5 pb-4 mb-5 border-b border-slate-100">
+                <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-100">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Dados Financeiros & Bancários</h2>
+                  <p className="text-xs text-slate-500">Informações para pagamento de ajuda de custo, folha ou benefícios.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Instituição Bancária
+                  </label>
+                  <select
+                    name="banco"
+                    value={formData.banco}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  >
+                    {BANCOS.map(b => (
+                      <option key={b.valor} value={b.valor}>{b.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Agência
+                  </label>
+                  <input
+                    type="text"
+                    name="agencia"
+                    value={formData.agencia}
+                    onChange={handleInputChange}
+                    placeholder="0000"
+                    className="w-full px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Conta Corrente
+                  </label>
+                  <input
+                    type="text"
+                    name="contaCorrente"
+                    value={formData.contaCorrente}
+                    onChange={handleInputChange}
+                    placeholder="00000-0"
+                    className="w-full px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Chave PIX
+                  </label>
+                  <input
+                    type="text"
+                    name="pix"
+                    value={formData.pix}
+                    onChange={handleInputChange}
+                    placeholder="CPF, e-mail, celular ou aleatória"
+                    className="w-full px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Bloco 5: Observações Adicionais */}
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-sm">
+              <div className="flex items-center gap-2.5 pb-4 mb-5 border-b border-slate-100">
+                <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-100">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Observações & Anotações</h2>
+                  <p className="text-xs text-slate-500">Histórico contratual, horários de expediente ou particularidades.</p>
+                </div>
+              </div>
+
+              <div>
+                <textarea
+                  name="obs"
+                  value={formData.obs}
+                  onChange={handleInputChange}
+                  placeholder="Anotações internas sobre o colaborador..."
+                  rows={3}
+                  className="w-full px-3 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Ações do Formulário */}
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleLimparMembro}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 font-bold hover:bg-slate-50 text-xs sm:text-sm transition cursor-pointer"
+              >
+                Limpar Campos
+              </button>
+              <button
+                type="submit"
+                disabled={salvando}
+                className="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm disabled:opacity-50"
+              >
+                {salvando ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Cadastrando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    <span>Salvar Colaborador</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ABA: LISTA */}
+        {abaAtiva === 'lista' && (
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+            {/* Toolbar de Filtros */}
+            <div className="p-4 sm:p-5 border-b border-slate-200/80 bg-slate-50/50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+                {/* Filtro por Grupo */}
+                <div className="relative flex-1 max-w-xs">
+                  <Filter className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                   <select
                     value={filtroGrupo}
                     onChange={(e) => setFiltroGrupo(e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-slate-800 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
                   >
                     <option value="">Todos os Grupos</option>
                     {gruposFuncao.filter(g => g.valor).map(g => (
@@ -1092,84 +1361,120 @@ export default function GerenciarFuncionarios() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Status
-                  </label>
+                {/* Filtro por Status */}
+                <div className="relative w-full sm:w-44">
                   <select
                     value={filtroStatus}
-                    onChange={(e) => setFiltroStatus(e.target.value as 'ATIVO' | 'INATIVO')}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => setFiltroStatus(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-800 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
                   >
-                    <option value="ATIVO">ATIVO</option>
-                    <option value="INATIVO">INATIVO</option>
+                    <option value="">Todos os Status</option>
+                    <option value="ATIVO">🟢 ATIVOS</option>
+                    <option value="INATIVO">🔴 INATIVOS</option>
                   </select>
                 </div>
               </div>
 
-              {/* TABELA */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-200 text-gray-800">
-                      <th className="px-4 py-3 text-left font-semibold">Nome</th>
-                      <th className="px-4 py-3 text-left font-semibold">CPF</th>
-                      <th className="px-4 py-3 text-left font-semibold">Grupo</th>
-                      <th className="px-4 py-3 text-left font-semibold">Função</th>
-                      <th className="px-4 py-3 text-left font-semibold">Email</th>
-                      <th className="px-4 py-3 text-left font-semibold">WhatsApp</th>
-                      <th className="px-4 py-3 text-left font-semibold">Adm.</th>
-                      <th className="px-4 py-3 text-left font-semibold">Status</th>
-                      <th className="px-4 py-3 text-center font-semibold">Ação</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {funcionariosFiltrados.length === 0 ? (
-                      <tr>
-                        <td colSpan={9} className="px-4 py-6 text-center text-gray-500">
-                          Nenhum funcionário encontrado.
-                        </td>
-                      </tr>
-                    ) : (
-                      funcionariosFiltrados.map(func => (
-                        <tr key={func.id} className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="px-4 py-3 font-semibold">{func.member_name || func.nome}</td>
-                          <td className="px-4 py-3">{func.member_cpf || func.cpf}</td>
-                          <td className="px-4 py-3">
-                            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
-                              {func.grupo}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">{func.funcao}</td>
-                          <td className="px-4 py-3">{func.email || '-'}</td>
-                          <td className="px-4 py-3">{func.whatsapp || '-'}</td>
-                          <td className="px-4 py-3 text-sm">{new Date(func.data_admissao).toLocaleDateString()}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                              func.status === 'ATIVO' 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {func.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => handleDeletar(func.id)}
-                              className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs font-semibold"
-                            >
-                              Deletar
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+              <div className="text-xs text-slate-500 font-semibold self-end sm:self-center">
+                Exibindo <span className="text-slate-900 font-bold">{funcionariosFiltrados.length}</span> colaboradores
               </div>
             </div>
-          )}
-        </div>
+
+            {/* Tabela de Listagem */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 text-[11px] sm:text-xs uppercase tracking-wider font-bold">
+                    <th className="py-3 px-4 sm:px-6">Colaborador</th>
+                    <th className="py-3 px-4">Grupo / Departamento</th>
+                    <th className="py-3 px-4">Função</th>
+                    <th className="py-3 px-4 hidden md:table-cell">Contatos</th>
+                    <th className="py-3 px-4 hidden lg:table-cell">Admissão</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {funcionariosFiltrados.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 px-4 text-center">
+                        <div className="max-w-xs mx-auto space-y-2">
+                          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                            <Users className="w-6 h-6" />
+                          </div>
+                          <p className="text-sm font-bold text-slate-700">Nenhum funcionário encontrado</p>
+                          <p className="text-xs text-slate-500">
+                            Não há colaboradores correspondentes aos filtros selecionados.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    funcionariosFiltrados.map(func => (
+                      <tr key={func.id} className="hover:bg-slate-50/70 transition">
+                        <td className="py-3.5 px-4 sm:px-6">
+                          <div className="font-bold text-slate-900">
+                            {func.member_name || func.nome || 'Nome não registrado'}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            CPF: {func.member_cpf || func.cpf || 'Não informado'}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 capitalize">
+                            {func.grupo}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-slate-700 capitalize">
+                          {func.funcao}
+                        </td>
+                        <td className="py-3.5 px-4 hidden md:table-cell">
+                          <div className="text-xs text-slate-700 font-medium">
+                            {func.whatsapp || func.telefone || '-'}
+                          </div>
+                          <div className="text-xs text-slate-400 truncate max-w-xs">
+                            {func.email || '-'}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 hidden lg:table-cell text-xs text-slate-600 font-medium">
+                          {func.data_admissao ? new Date(func.data_admissao).toLocaleDateString() : '-'}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                            func.status === 'ATIVO'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              func.status === 'ATIVO' ? 'bg-emerald-500' : 'bg-rose-500'
+                            }`} />
+                            {func.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeletar(func.id)}
+                            disabled={deletandoId === func.id}
+                            className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer disabled:opacity-50"
+                            title="Remover colaborador"
+                          >
+                            {deletandoId === func.id ? (
+                              <div className="w-4 h-4 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
 
       <NotificationModal
         isOpen={modalSucesso.isOpen}

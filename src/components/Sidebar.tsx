@@ -367,15 +367,15 @@ export default function Sidebar() {
       >
         {isCollapsed ? (
           <>
-            <div className="relative w-10 h-10 flex items-center justify-center">
+            <div className="relative w-12 h-10 flex items-center justify-center">
               <Image
-                src="/icons/icon-mask.png"
+                src="/icons/logob2.png"
                 alt="Gestão Eklésia"
-                width={40}
-                height={40}
+                width={48}
+                height={36}
                 priority
-                sizes="40px"
-                className="w-9 h-9 object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+                sizes="48px"
+                className="max-h-[38px] max-w-[48px] w-auto h-auto object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] transition-all duration-300"
               />
             </div>
             <button
@@ -391,13 +391,13 @@ export default function Sidebar() {
           <>
             <div className="relative flex-1 flex items-center justify-center pl-2">
               <Image
-                src="/img/logoh.png"
+                src="/icons/logob.png"
                 alt="Gestão Eklésia"
                 width={160}
-                height={46}
+                height={54}
                 priority
                 sizes="160px"
-                className="max-h-[46px] w-auto object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+                className="max-h-[48px] w-auto object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-300"
               />
             </div>
             <button

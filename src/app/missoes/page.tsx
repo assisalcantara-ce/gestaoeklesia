@@ -1,9 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import PageLayout from '@/components/PageLayout';
-import Tabs from '@/components/Tabs';
-import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
@@ -11,7 +8,24 @@ import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import type { ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
-import { Pencil, Trash2, Printer } from 'lucide-react';
+import {
+  Globe,
+  Plane,
+  Calendar,
+  DollarSign,
+  Printer,
+  Pencil,
+  Trash2,
+  Plus,
+  Target,
+  Clock,
+  Sparkles,
+  MapPin,
+  UserCheck,
+  FileText,
+  BarChart3,
+  TrendingUp,
+} from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -74,10 +88,10 @@ interface MemberOption { id: string; nome: string; }
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const STATUS_PROJETO = [
-  { value: 'planejado',    label: 'Planejado',    color: 'bg-gray-100 text-gray-600' },
-  { value: 'em_andamento', label: 'Em andamento', color: 'bg-blue-100 text-blue-700' },
-  { value: 'concluido',    label: 'Concluído',    color: 'bg-emerald-100 text-emerald-700' },
-  { value: 'suspenso',     label: 'Suspenso',     color: 'bg-orange-100 text-orange-700' },
+  { value: 'planejado',    label: 'Planejado',    color: 'bg-slate-100 text-slate-700 border border-slate-200' },
+  { value: 'em_andamento', label: 'Em andamento', color: 'bg-blue-50 text-blue-700 border border-blue-200' },
+  { value: 'concluido',    label: 'Concluído',    color: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+  { value: 'suspenso',     label: 'Suspenso',     color: 'bg-amber-50 text-amber-700 border border-amber-200' },
 ];
 
 const TIPO_MISSIONARIO = [
@@ -87,9 +101,9 @@ const TIPO_MISSIONARIO = [
 ];
 
 const STATUS_MISSIONARIO = [
-  { value: 'ativo',     label: 'Ativo',     color: 'bg-emerald-100 text-emerald-700' },
-  { value: 'afastado',  label: 'Afastado',  color: 'bg-yellow-100 text-yellow-700' },
-  { value: 'retornou',  label: 'Retornou',  color: 'bg-gray-100 text-gray-600' },
+  { value: 'ativo',     label: 'Ativo',     color: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+  { value: 'afastado',  label: 'Afastado',  color: 'bg-amber-50 text-amber-700 border border-amber-200' },
+  { value: 'retornou',  label: 'Retornou',  color: 'bg-slate-100 text-slate-700 border border-slate-200' },
 ];
 
 const TIPO_EVENTO = [
@@ -109,11 +123,11 @@ const FORMA_ARRECADACAO = [
 ];
 
 const TABS = [
-  { id: 'projetos',      label: 'Projetos Missionários', icon: '🌍' },
-  { id: 'missionarios',  label: 'Missionários',          icon: '✈️' },
-  { id: 'eventos',       label: 'Eventos',               icon: '📅' },
-  { id: 'arrecadacoes',  label: 'Arrecadações',          icon: '💰' },
-  { id: 'relatorio',     label: 'Relatório',             icon: '🖨️' },
+  { id: 'projetos',      label: 'Projetos Missionários', icon: Globe },
+  { id: 'missionarios',  label: 'Missionários',          icon: Plane },
+  { id: 'eventos',       label: 'Eventos',               icon: Calendar },
+  { id: 'arrecadacoes',  label: 'Arrecadações',          icon: DollarSign },
+  { id: 'relatorio',     label: 'Relatório',             icon: Printer },
 ];
 
 const EMPTY_PROJETO = { nome: '', descricao: '', pais_regiao: '', status: 'planejado', data_inicio: '', data_fim: '', meta_arrecadacao: '' };
@@ -132,7 +146,7 @@ const EMPTY_ARRECADACAO = { projeto_id: '', data: new Date().toISOString().slice
 // ─── Utilitários ──────────────────────────────────────────────────────────────
 
 const fmtCurrency = (v?: number | null) =>
-  v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-';
+  v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00';
 
 const fmtDate = (v?: string | null) => {
   if (!v) return '-';
@@ -161,11 +175,11 @@ const maskPhone = (raw: string): string => {
   return d.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
 };
 
-const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63] focus:border-transparent';
-const labelCls = 'block text-xs font-semibold text-gray-700 mb-1';
-const errCls = 'text-xs text-red-600 mt-1';
+const inputCls = 'w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition';
+const labelCls = 'block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5';
+const errCls = 'text-xs font-medium text-rose-600 mt-1';
 
-// ─── Componentes de formulário inline ─────────────────────────────────────────
+// ─── Componentes de formulário e UI ──────────────────────────────────────────
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
@@ -179,20 +193,61 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 
 function StatusBadge({ value, options }: { value: string; options: { value: string; label: string; color: string }[] }) {
   const opt = options.find((o) => o.value === value);
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${opt?.color ?? 'bg-gray-100 text-gray-500'}`}>{opt?.label ?? value}</span>;
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${opt?.color ?? 'bg-slate-100 text-slate-700'}`}>
+      {opt?.label ?? value}
+    </span>
+  );
 }
 
 function ProgressBar({ value, max }: { value: number; max: number }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
-    <div className="mt-2">
-      <div className="flex justify-between text-xs text-gray-500 mb-1">
-        <span>{fmtCurrency(value)} arrecadado</span>
-        <span>{pct}% de {fmtCurrency(max)}</span>
+    <div className="mt-3">
+      <div className="flex justify-between items-center text-xs font-bold text-slate-600 mb-1.5">
+        <span className="text-teal-700">{fmtCurrency(value)} arrecadado</span>
+        <span className="text-slate-500">{pct}% de {fmtCurrency(max)}</span>
       </div>
-      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-emerald-500' : 'bg-[#123b63]'}`} style={{ width: `${pct}%` }} />
+      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${
+            pct >= 100 ? 'bg-emerald-500' : 'bg-teal-600'
+          }`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
+    </div>
+  );
+}
+
+function SectionCard({
+  icon: Icon,
+  title,
+  subtitle,
+  children,
+  headerAction,
+}: {
+  icon: any;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  headerAction?: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-sm">
+      <div className="flex items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 border border-teal-100/80 flex items-center justify-center font-bold flex-shrink-0">
+            <Icon className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">{title}</h3>
+            {subtitle && <p className="text-xs text-slate-500 font-medium">{subtitle}</p>}
+          </div>
+        </div>
+        {headerAction && <div>{headerAction}</div>}
+      </div>
+      {children}
     </div>
   );
 }
@@ -202,162 +257,191 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
 export default function MissoesPage() {
   const { ctx, bloqueado } = useRequireModulo('missoes');
   const planFeatures = usePlanFeatures();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
-  const [activeTab, setActiveTab] = useState('projetos');
-  const [ministryId, setMinistryId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('projetos');
+  const [projetos, setProjetos] = useState<Projeto[]>([]);
+  const [missionarios, setMissionarios] = useState<Missionario[]>([]);
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [arrecadacoes, setArrecadacoes] = useState<Arrecadacao[]>([]);
+  const [congregacoes, setCongregacoes] = useState<CongregacaoOption[]>([]);
+  const [members, setMembers] = useState<MemberOption[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [ministryId, setMinistryId] = useState<string | null>(null);
+  const [configIgreja, setConfigIgreja] = useState<ConfiguracaoIgreja | null>(null);
 
-  // Dados
-  const [projetos,      setProjetos]      = useState<Projeto[]>([]);
-  const [missionarios,  setMissionarios]  = useState<Missionario[]>([]);
-  const [eventos,       setEventos]       = useState<Evento[]>([]);
-  const [arrecadacoes,  setArrecadacoes]  = useState<Arrecadacao[]>([]);
-  const [congregacoes,  setCongregacoes]  = useState<CongregacaoOption[]>([]);
-  const [members,       setMembers]       = useState<MemberOption[]>([]);
-  const [configIgreja,  setConfigIgreja]  = useState<ConfiguracaoIgreja | null>(null);
-
-  // Filtros do relatório
-  const [relDtInicio,  setRelDtInicio]  = useState('');
-  const [relDtFim,     setRelDtFim]     = useState('');
-  const [relProjetoId, setRelProjetoId] = useState('');
-  const [relCongId,    setRelCongId]    = useState('');
-
-  // Notificação
   const [notification, setNotification] = useState<{
-    isOpen: boolean; title: string; message: string;
-    type: 'success' | 'error' | 'warning' | 'info'; autoClose: number | undefined;
-  }>({ isOpen: false, title: '', message: '', type: 'success', autoClose: 3000 });
+    isOpen: boolean; title: string; message: string; type: 'success' | 'error' | 'warning' | 'info'; autoClose?: number;
+  }>({ isOpen: false, title: '', message: '', type: 'info' });
 
-  const showNotif = (type: typeof notification.type, title: string, message: string, autoClose: number | undefined = 3000) =>
-    setNotification({ isOpen: true, title, message, type, autoClose });
+  const showNotif = (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string, autoClose?: number) =>
+    setNotification({ isOpen: true, title, message, type, autoClose: autoClose ?? (type === 'success' ? 3000 : undefined) });
 
-  // Formulários
-  const [formProjeto,      setFormProjeto]      = useState<typeof EMPTY_PROJETO>({ ...EMPTY_PROJETO });
-  const [formMissionario,  setFormMissionario]  = useState<typeof EMPTY_MISSIONARIO>({ ...EMPTY_MISSIONARIO });
-  const [formEvento,       setFormEvento]       = useState<typeof EMPTY_EVENTO>({ ...EMPTY_EVENTO });
-  const [formArrecadacao,  setFormArrecadacao]  = useState<typeof EMPTY_ARRECADACAO>({ ...EMPTY_ARRECADACAO });
+  const currentYear = new Date().getFullYear();
+  const [anoFiltro, setAnoFiltro] = useState<number>(currentYear);
 
-  const [editProjetoId,     setEditProjetoId]     = useState<string | null>(null);
+  // Formulário: Projetos
+  const [formProjeto, setFormProjeto] = useState({ ...EMPTY_PROJETO });
+  const [editProjetoId, setEditProjetoId] = useState<string | null>(null);
+  const [errProjeto, setErrProjeto] = useState<Record<string, string>>({});
+
+  // Formulário: Missionários
+  const [formMissionario, setFormMissionario] = useState({ ...EMPTY_MISSIONARIO });
   const [editMissionarioId, setEditMissionarioId] = useState<string | null>(null);
-  const [editEventoId,      setEditEventoId]      = useState<string | null>(null);
-  const [editArrecadacaoId, setEditArrecadacaoId] = useState<string | null>(null);
+  const [errMissionario, setErrMissionario] = useState<Record<string, string>>({});
 
-  const [errProjeto,      setErrProjeto]      = useState<Record<string, string>>({});
-  const [errMissionario,  setErrMissionario]  = useState<Record<string, string>>({});
-  const [errEvento,       setErrEvento]       = useState<Record<string, string>>({});
-  const [errArrecadacao,  setErrArrecadacao]  = useState<Record<string, string>>({});
+  // Formulário: Eventos
+  const [formEvento, setFormEvento] = useState({ ...EMPTY_EVENTO });
+  const [editEventoId, setEditEventoId] = useState<string | null>(null);
+  const [errEvento, setErrEvento] = useState<Record<string, string>>({});
+
+  // Formulário: Arrecadações
+  const [formArrecadacao, setFormArrecadacao] = useState({ ...EMPTY_ARRECADACAO });
+  const [editArrecadacaoId, setEditArrecadacaoId] = useState<string | null>(null);
+  const [errArrecadacao, setErrArrecadacao] = useState<Record<string, string>>({});
+
+  // Filtros da aba Relatório
+  const [relDtInicio, setRelDtInicio] = useState('');
+  const [relDtFim, setRelDtFim] = useState('');
+  const [relProjetoId, setRelProjetoId] = useState('');
+  const [relCongId, setRelCongId] = useState('');
 
   // ── Carregamento inicial ──────────────────────────────────────────────────
 
   useEffect(() => {
-    if (ctx.loading || bloqueado) return;
-    const init = async () => {
-      const mid = await resolveMinistryId(supabase);
-      setMinistryId(mid);
-      if (!mid) { setLoadingData(false); return; }
-      const config = await fetchConfiguracaoIgrejaFromSupabase(supabase);
-      setConfigIgreja(config);
-      await Promise.all([
-        loadProjetos(mid),
-        loadMissionarios(mid),
-        loadEventos(mid),
-        loadArrecadacoes(mid),
-        loadCongregacoes(mid),
-        loadMembers(mid),
-      ]);
-      setLoadingData(false);
-    };
-    init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx.loading, bloqueado]);
+    let cancelled = false;
+    async function loadData() {
+      try {
+        const mid = await resolveMinistryId(supabase);
+        if (cancelled) return;
+        setMinistryId(mid);
+        if (mid) {
+          const cfg = await fetchConfiguracaoIgrejaFromSupabase(supabase, mid);
+          if (!cancelled) setConfigIgreja(cfg);
+          await loadAll(mid);
+        }
+      } catch (err: any) {
+        if (!cancelled) showNotif('error', 'Erro ao carregar dados', err?.message || 'Tente novamente.', undefined);
+      } finally {
+        if (!cancelled) setLoadingData(false);
+      }
+    }
+    loadData();
+    return () => { cancelled = true; };
+  }, [supabase]);
+
+  const loadAll = async (mid: string) => {
+    await Promise.all([
+      loadProjetos(mid),
+      loadMissionarios(mid),
+      loadEventos(mid),
+      loadArrecadacoes(mid),
+      loadCongregacoes(mid),
+      loadMembers(mid),
+    ]);
+  };
 
   const loadProjetos = async (mid: string) => {
-    const { data, error } = await supabase.from('missoes_projetos').select('*').eq('ministry_id', mid).order('created_at', { ascending: false });
-    if (!error) setProjetos((data || []) as Projeto[]);
+    const { data } = await supabase.from('missoes_projetos').select('*').eq('ministry_id', mid).order('created_at', { ascending: false });
+    setProjetos(data || []);
   };
+
   const loadMissionarios = async (mid: string) => {
-    const { data, error } = await supabase.from('missoes_missionarios').select('*').eq('ministry_id', mid).order('nome');
-    if (!error) setMissionarios((data || []) as Missionario[]);
+    const { data } = await supabase.from('missoes_missionarios').select('*').eq('ministry_id', mid).order('nome', { ascending: true });
+    setMissionarios(data || []);
   };
+
   const loadEventos = async (mid: string) => {
-    const { data, error } = await supabase.from('missoes_eventos').select('*').eq('ministry_id', mid).order('data_evento', { ascending: false });
-    if (!error) setEventos((data || []) as Evento[]);
+    const { data } = await supabase.from('missoes_eventos').select('*').eq('ministry_id', mid).order('data_evento', { ascending: false });
+    setEventos(data || []);
   };
+
   const loadArrecadacoes = async (mid: string) => {
-    const { data, error } = await supabase.from('missoes_arrecadacoes').select('*').eq('ministry_id', mid).order('data', { ascending: false });
-    if (!error) setArrecadacoes((data || []) as Arrecadacao[]);
+    const { data } = await supabase.from('missoes_arrecadacoes').select('*').eq('ministry_id', mid).order('data', { ascending: false });
+    setArrecadacoes(data || []);
   };
+
   const loadCongregacoes = async (mid: string) => {
-    const { data } = await supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome');
-    setCongregacoes((data || []) as CongregacaoOption[]);
+    const { data } = await supabase.from('congregacoes').select('id, nome').eq('ministry_id', mid).order('nome', { ascending: true });
+    setCongregacoes(data || []);
   };
+
   const loadMembers = async (mid: string) => {
-    const { data } = await supabase.from('members').select('id, nome').eq('ministry_id', mid).eq('status', 'ativo').order('nome');
-    setMembers((data || []) as MemberOption[]);
+    const { data } = await supabase.from('members').select('id, nome').eq('ministry_id', mid).eq('status', 'ativo').order('nome', { ascending: true });
+    setMembers(data || []);
   };
 
-  // ── Cards de resumo ───────────────────────────────────────────────────────
+  // ── Memos de estatísticas ─────────────────────────────────────────────────
 
-  const anoAtual = new Date().getFullYear();
-  const [anoFiltro, setAnoFiltro] = useState(anoAtual);
-
-  // Anos disponíveis com base nas arrecadações registradas + ano atual
   const anosDisponiveis = useMemo(() => {
-    const anos = new Set<number>([anoAtual]);
-    arrecadacoes.forEach((a) => { if (a.data) anos.add(new Date(a.data).getFullYear()); });
-    return Array.from(anos).sort((a, b) => b - a);
-  }, [arrecadacoes, anoAtual]);
+    const set = new Set<number>([currentYear]);
+    arrecadacoes.forEach((a) => {
+      const y = parseInt(a.data?.slice(0, 4), 10);
+      if (y) set.add(y);
+    });
+    return Array.from(set).sort((a, b) => b - a);
+  }, [arrecadacoes, currentYear]);
 
-  const arrecadacoesDoAno = useMemo(
-    () => arrecadacoes.filter((a) => a.data && new Date(a.data).getFullYear() === anoFiltro),
+  const arrecadacoesDoAno = useMemo(() =>
+    arrecadacoes.filter((a) => a.data?.startsWith(String(anoFiltro))),
     [arrecadacoes, anoFiltro]
   );
-
-  const projetosEmAndamento = useMemo(() => projetos.filter((p) => p.status === 'em_andamento').length, [projetos]);
-  const missionariosAtivos  = useMemo(() => missionarios.filter((m) => m.status === 'ativo').length, [missionarios]);
-  const totalArrecadado     = useMemo(() => arrecadacoesDoAno.reduce((acc, a) => acc + (a.valor || 0), 0), [arrecadacoesDoAno]);
-  const metaTotalAtivos     = useMemo(
-    () => projetos.filter((p) => p.status === 'em_andamento').reduce((acc, p) => acc + (p.meta_arrecadacao || 0), 0),
-    [projetos]
-  );
-
-  // ── Relatório filtrado ────────────────────────────────────────────────────
-
-  const relFiltrado = useMemo(() => arrecadacoes.filter((a) => {
-    if (relDtInicio && a.data < relDtInicio) return false;
-    if (relDtFim    && a.data > relDtFim)    return false;
-    if (relProjetoId && a.projeto_id !== relProjetoId) return false;
-    if (relCongId    && a.congregacao_id !== relCongId) return false;
-    return true;
-  }), [arrecadacoes, relDtInicio, relDtFim, relProjetoId, relCongId]);
-
-  const relTotal = useMemo(() => relFiltrado.reduce((s, a) => s + a.valor, 0), [relFiltrado]);
-
-  const relPorForma = useMemo(() => {
-    const m: Record<string, number> = {};
-    relFiltrado.forEach((a) => { m[a.forma] = (m[a.forma] || 0) + a.valor; });
-    return m;
-  }, [relFiltrado]);
-
-  const relPorProjeto = useMemo(() => {
-    const m: Record<string, number> = {};
-    relFiltrado.forEach((a) => {
-      const k = a.projeto_id || '__geral__';
-      m[k] = (m[k] || 0) + a.valor;
-    });
-    return m;
-  }, [relFiltrado]);
-
-  // ── Totais por projeto para aba Arrecadações ──────────────────────────────
 
   const totaisPorProjeto = useMemo(() => {
     const map: Record<string, number> = {};
     arrecadacoes.forEach((a) => {
-      if (a.projeto_id) map[a.projeto_id] = (map[a.projeto_id] || 0) + a.valor;
+      if (a.projeto_id) map[a.projeto_id] = (map[a.projeto_id] || 0) + Number(a.valor);
     });
     return map;
   }, [arrecadacoes]);
+
+  const totalArrecadado = useMemo(() =>
+    arrecadacoesDoAno.reduce((acc, a) => acc + Number(a.valor), 0),
+    [arrecadacoesDoAno]
+  );
+
+  const projetosEmAndamento = useMemo(() =>
+    projetos.filter((p) => p.status === 'em_andamento').length,
+    [projetos]
+  );
+
+  const missionariosAtivos = useMemo(() =>
+    missionarios.filter((m) => m.status === 'ativo').length,
+    [missionarios]
+  );
+
+  const metaTotalAtivos = useMemo(() =>
+    projetos.filter((p) => p.status === 'em_andamento').reduce((acc, p) => acc + (p.meta_arrecadacao || 0), 0),
+    [projetos]
+  );
+
+  // Relatório filtrado
+  const relFiltrado = useMemo(() => {
+    return arrecadacoes.filter((a) => {
+      if (relDtInicio && a.data < relDtInicio) return false;
+      if (relDtFim && a.data > relDtFim) return false;
+      if (relProjetoId && a.projeto_id !== relProjetoId) return false;
+      if (relCongId && a.congregacao_id !== relCongId) return false;
+      return true;
+    });
+  }, [arrecadacoes, relDtInicio, relDtFim, relProjetoId, relCongId]);
+
+  const relTotal = useMemo(() => relFiltrado.reduce((acc, a) => acc + Number(a.valor), 0), [relFiltrado]);
+
+  const relPorForma = useMemo(() => {
+    const map: Record<string, number> = {};
+    relFiltrado.forEach((a) => { map[a.forma] = (map[a.forma] || 0) + Number(a.valor); });
+    return map;
+  }, [relFiltrado]);
+
+  const relPorProjeto = useMemo(() => {
+    const map: Record<string, number> = {};
+    relFiltrado.forEach((a) => {
+      const k = a.projeto_id || '__geral__';
+      map[k] = (map[k] || 0) + Number(a.valor);
+    });
+    return map;
+  }, [relFiltrado]);
 
   // ── Handlers: Projetos ────────────────────────────────────────────────────
 
@@ -387,7 +471,7 @@ export default function MissoesPage() {
     } else {
       const { error } = await supabase.from('missoes_projetos').insert(payload);
       if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-      showNotif('success', 'Cadastrado', 'Projeto registrado com sucesso.');
+      showNotif('success', 'Cadastrado', 'Projeto cadastrado com sucesso.');
     }
     setFormProjeto({ ...EMPTY_PROJETO });
     setEditProjetoId(null);
@@ -396,8 +480,11 @@ export default function MissoesPage() {
 
   const editProjeto = (p: Projeto) => {
     setFormProjeto({
-      nome: p.nome, descricao: p.descricao || '', pais_regiao: p.pais_regiao || '',
-      status: p.status, data_inicio: p.data_inicio?.slice(0, 10) || '',
+      nome: p.nome,
+      descricao: p.descricao || '',
+      pais_regiao: p.pais_regiao || '',
+      status: p.status,
+      data_inicio: p.data_inicio?.slice(0, 10) || '',
       data_fim: p.data_fim?.slice(0, 10) || '',
       meta_arrecadacao: p.meta_arrecadacao != null ? maskCurrency(String(Math.round(p.meta_arrecadacao * 100))) : '',
     });
@@ -409,7 +496,7 @@ export default function MissoesPage() {
     if (!ministryId) return;
     const { error } = await supabase.from('missoes_projetos').delete().eq('id', id);
     if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-    showNotif('success', 'Excluído', 'Projeto removido.');
+    showNotif('success', 'Excluído', 'Projeto removido com sucesso.');
     await loadProjetos(ministryId);
   };
 
@@ -438,11 +525,11 @@ export default function MissoesPage() {
     if (editMissionarioId) {
       const { error } = await supabase.from('missoes_missionarios').update(payload).eq('id', editMissionarioId);
       if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-      showNotif('success', 'Atualizado', 'Missionário atualizado.');
+      showNotif('success', 'Atualizado', 'Missionário atualizado com sucesso.');
     } else {
       const { error } = await supabase.from('missoes_missionarios').insert(payload);
       if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-      showNotif('success', 'Cadastrado', 'Missionário registrado.');
+      showNotif('success', 'Cadastrado', 'Missionário cadastrado com sucesso.');
     }
     setFormMissionario({ ...EMPTY_MISSIONARIO });
     setEditMissionarioId(null);
@@ -562,7 +649,6 @@ export default function MissoesPage() {
     };
 
     if (editArrecadacaoId) {
-      // Busca o vínculo existente com a Tesouraria
       const { data: existing } = await supabase
         .from('missoes_arrecadacoes')
         .select('tesouraria_lancamento_id')
@@ -572,7 +658,6 @@ export default function MissoesPage() {
       const { error } = await supabase.from('missoes_arrecadacoes').update(payload).eq('id', editArrecadacaoId);
       if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
 
-      // Sincroniza lançamento na Tesouraria
       if (existing?.tesouraria_lancamento_id) {
         await supabase.from('tesouraria_lancamentos').update(tesPayload).eq('id', existing.tesouraria_lancamento_id);
       } else {
@@ -587,7 +672,6 @@ export default function MissoesPage() {
       }
       showNotif('success', 'Atualizado', 'Registro e lançamento da Tesouraria atualizados.');
     } else {
-      // Insere a arrecadação e recupera o id
       const { data: newArr, error } = await supabase
         .from('missoes_arrecadacoes')
         .insert(payload)
@@ -595,22 +679,20 @@ export default function MissoesPage() {
         .single();
       if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
 
-      // Gera lançamento automático na Tesouraria
       if (newArr?.id) {
         const { data: newLanc, error: errLanc } = await supabase
           .from('tesouraria_lancamentos')
           .insert({ ...tesPayload, created_at: now })
           .select('id')
           .single();
-        if (errLanc) {
-          showNotif('warning', 'Arrecadação salva', `Registrado em Missões, mas não foi possível criar o lançamento na Tesouraria: ${errLanc.message}`, undefined);
-        } else if (newLanc?.id) {
-          await supabase.from('missoes_arrecadacoes').update({ tesouraria_lancamento_id: newLanc.id }).eq('id', newArr.id);
-          showNotif('success', 'Registrado', 'Arrecadação registrada e lançamento gerado na Tesouraria.');
+        if (!errLanc && newLanc?.id) {
+          await supabase
+            .from('missoes_arrecadacoes')
+            .update({ tesouraria_lancamento_id: newLanc.id })
+            .eq('id', newArr.id);
         }
-      } else {
-        showNotif('success', 'Registrado', 'Arrecadação registrada.');  
       }
+      showNotif('success', 'Registrado', 'Arrecadação registrada e lançada na Tesouraria.');
     }
     setFormArrecadacao({ ...EMPTY_ARRECADACAO, data: new Date().toISOString().slice(0, 10) });
     setEditArrecadacaoId(null);
@@ -619,8 +701,12 @@ export default function MissoesPage() {
 
   const editArrecadacao = (a: Arrecadacao) => {
     setFormArrecadacao({
-      projeto_id: a.projeto_id || '', data: a.data?.slice(0, 10) || '',
-      valor: maskCurrency(String(Math.round(a.valor * 100))), forma: a.forma, forma_pagamento: 'dinheiro', descricao: a.descricao || '',
+      projeto_id: a.projeto_id || '',
+      data: a.data?.slice(0, 10) || '',
+      valor: maskCurrency(String(Math.round(a.valor * 100))),
+      forma: a.forma,
+      forma_pagamento: 'dinheiro',
+      descricao: a.descricao || '',
       congregacao_id: a.congregacao_id || '',
     });
     setEditArrecadacaoId(a.id);
@@ -629,15 +715,15 @@ export default function MissoesPage() {
 
   const deleteArrecadacao = async (id: string) => {
     if (!ministryId) return;
-    // Busca o vínculo com a Tesouraria antes de deletar
     const { data: rec } = await supabase
       .from('missoes_arrecadacoes')
       .select('tesouraria_lancamento_id')
       .eq('id', id)
       .single();
+
     const { error } = await supabase.from('missoes_arrecadacoes').delete().eq('id', id);
     if (error) { showNotif('error', 'Erro', error.message, undefined); return; }
-    // Remove o lançamento vinculado da Tesouraria
+
     if (rec?.tesouraria_lancamento_id) {
       await supabase.from('tesouraria_lancamentos').delete().eq('id', rec.tesouraria_lancamento_id);
     }
@@ -647,148 +733,366 @@ export default function MissoesPage() {
 
   // ─────────────────────────────────────────────────────────────────────────
 
-  if (ctx.loading || loadingData || planFeatures.loading) return <div className="p-8 text-gray-500">Carregando...</div>;
-  if (!planFeatures.has_modulo_missoes || !planFeatures.hasFeature('missions_module')) {
+  if (ctx.loading || loadingData || planFeatures.loading) {
     return (
-      <PageLayout title="Missões" description="Gestão de atividades missionárias" activeMenu="missoes">
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center max-w-2xl mx-auto space-y-5 my-10">
-          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto text-blue-600 shadow-sm border border-blue-200/60">
-            <span className="text-3xl">✈️</span>
-          </div>
-          <div>
-            <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full mb-3">
-              Recurso do Plano Starter
-            </span>
-            <h2 className="text-xl font-bold text-slate-800">Módulo Missões Indisponível no seu Plano</h2>
-          </div>
-          <p className="text-slate-600 text-base font-semibold leading-relaxed max-w-lg mx-auto">
-            A Gestão de Missões está disponível a partir do Plano Starter.
-          </p>
-          <p className="text-slate-500 text-xs leading-relaxed max-w-md mx-auto">
-            Faça o upgrade para gerenciar projetos missionários, sustento de missionários, campanhas e relatórios de arrecadação da sua igreja.
-          </p>
-          <div className="pt-3">
-            <a
-              href="/configuracoes"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-[#123b63] text-white text-sm font-semibold rounded-xl hover:bg-[#1a4f85] transition shadow-md hover:shadow-lg"
-            >
-              Fazer Upgrade / Conhecer Planos
-            </a>
-          </div>
+      <div className="flex-1 overflow-y-auto bg-[#f4f7fa] min-h-screen flex items-center justify-center p-8">
+        <div className="flex items-center gap-3 text-slate-500 font-semibold text-sm bg-white px-6 py-4 rounded-2xl shadow-xs border border-slate-200">
+          <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+          <span>Carregando módulo Missões...</span>
         </div>
-      </PageLayout>
+      </div>
     );
   }
+
+  if (!planFeatures.has_modulo_missoes || !planFeatures.hasFeature('missions_module')) {
+    return (
+      <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f4f7fa] min-h-screen">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-[96rem] mx-auto w-full">
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-8 sm:p-12 shadow-sm text-center max-w-2xl mx-auto space-y-6 my-10">
+            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto text-blue-600 shadow-xs border border-blue-200/60">
+              <Plane className="w-8 h-8" />
+            </div>
+            <div>
+              <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full mb-3">
+                Recurso do Plano Starter
+              </span>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Módulo Missões Indisponível no seu Plano</h2>
+            </div>
+            <p className="text-slate-600 text-sm sm:text-base font-semibold leading-relaxed max-w-lg mx-auto">
+              A Gestão de Missões está disponível a partir do Plano Starter.
+            </p>
+            <p className="text-slate-500 text-xs sm:text-sm leading-relaxed max-w-md mx-auto">
+              Faça o upgrade para gerenciar projetos missionários, sustento de missionários, campanhas e relatórios de arrecadação da sua igreja.
+            </p>
+            <div className="pt-3">
+              <a
+                href="/configuracoes"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-teal-700 hover:bg-teal-800 text-white text-sm font-bold rounded-xl transition shadow-sm hover:shadow-md cursor-pointer"
+              >
+                Fazer Upgrade / Conhecer Planos
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (bloqueado) return null;
 
   return (
-    <PageLayout title="Missões" description="Gestão de atividades missionárias" activeMenu="missoes">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f4f7fa] min-h-screen">
       <NotificationModal
         isOpen={notification.isOpen} title={notification.title} message={notification.message}
         type={notification.type} onClose={() => setNotification((p) => ({ ...p, isOpen: false }))}
         autoClose={notification.autoClose}
       />
 
-      {/* ── Cards de resumo ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs text-gray-500 font-medium">Exercício</span>
-        <select
-          value={anoFiltro}
-          onChange={(e) => setAnoFiltro(Number(e.target.value))}
-          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-semibold text-[#123b63] bg-white shadow-sm"
-        >
-          {anosDisponiveis.map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm border-l-4 border-blue-500 p-4">
-          <p className="text-xs text-gray-500">Projetos em andamento</p>
-          <p className="text-2xl font-bold text-[#123b63] mt-1">{projetosEmAndamento}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border-l-4 border-emerald-500 p-4">
-          <p className="text-xs text-gray-500">Missionários ativos</p>
-          <p className="text-2xl font-bold text-[#123b63] mt-1">{missionariosAtivos}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border-l-4 border-yellow-500 p-4">
-          <p className="text-xs text-gray-500">Total arrecadado <span className="text-gray-300">· {anoFiltro}</span></p>
-          <p className="text-xl font-bold text-[#123b63] mt-1">{fmtCurrency(totalArrecadado)}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border-l-4 border-purple-500 p-4">
-          <p className="text-xs text-gray-500">Meta projetos ativos</p>
-          <p className="text-xl font-bold text-[#123b63] mt-1">{metaTotalAtivos > 0 ? fmtCurrency(metaTotalAtivos) : '—'}</p>
-        </div>
-      </div>
+      <div className="p-4 sm:p-6 lg:p-8 max-w-[96rem] mx-auto w-full">
+        {/* ── Header da Página (Padrão Membros) ────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-teal-700 text-white flex items-center justify-center border border-teal-800 shadow-sm flex-shrink-0">
+              <Globe className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Missões</h1>
+              <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
+                Gerencie projetos, missionários, eventos, arrecadações e relatórios missionários.
+              </p>
+            </div>
+          </div>
 
-      {/* ── Abas ────────────────────────────────────────────────────────── */}
-      <Tabs tabs={TABS} activeTab={activeTab} onTabChange={(id) => setActiveTab(id)}>
+          {/* Seletor de Exercício */}
+          <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-slate-300 shadow-xs self-start sm:self-auto">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Exercício</span>
+            <select
+              value={anoFiltro}
+              onChange={(e) => setAnoFiltro(Number(e.target.value))}
+              className="text-sm font-black text-teal-800 bg-transparent focus:outline-none cursor-pointer"
+            >
+              {anosDisponiveis.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* ── Cards Principais — KPIs Coloridos (Padrão Membros) ──────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* Projetos em andamento (Azul) */}
+          <div className="bg-[#ebf5ff] border border-[#d0e6ff] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#2563eb] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dbeafe]">
+                <Globe className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Projetos Ativos
+                </span>
+                <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                  {projetosEmAndamento}
+                </p>
+                <p className="text-[11px] font-bold text-teal-700 mt-1 truncate">
+                  {projetos.length} cadastrado{projetos.length === 1 ? '' : 's'} no total
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-[#dbeafe] text-[#2563eb] flex items-center justify-center flex-shrink-0 self-start">
+              <BarChart3 className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* Missionários Ativos (Verde) */}
+          <div className="bg-[#ecfdf3] border border-[#cff7de] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#16a34a] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dcfce7]">
+                <Plane className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Missionários Ativos
+                </span>
+                <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                  {missionariosAtivos}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                  {missionarios.length} no cadastro geral
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-[#dcfce7] text-[#16a34a] flex items-center justify-center flex-shrink-0 self-start">
+              <UserCheck className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* Total Arrecadado (Âmbar / Laranja) */}
+          <div className="bg-[#fff6ea] border border-[#fde4c4] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#ea580c] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ffedd5]">
+                <DollarSign className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Arrecadado · {anoFiltro}
+                </span>
+                <p className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight mt-0.5 truncate">
+                  {fmtCurrency(totalArrecadado)}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                  {arrecadacoesDoAno.length} lançamento{arrecadacoesDoAno.length === 1 ? '' : 's'} no ano
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-[#ffedd5] text-[#ea580c] flex items-center justify-center flex-shrink-0 self-start">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* Meta Projetos Ativos (Roxo / Violeta) */}
+          <div className="bg-[#f3f0ff] border border-[#e3dbff] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#7c3aed] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ede9fe]">
+                <Target className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Meta Projetos Ativos
+                </span>
+                <p className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight mt-0.5 truncate">
+                  {metaTotalAtivos > 0 ? fmtCurrency(metaTotalAtivos) : '—'}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                  Projetos em andamento
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center flex-shrink-0 self-start">
+              <Sparkles className="w-4 h-4" />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Navegação de Abas (Pills no Padrão Membros) ─────────────── */}
+        <div className="flex items-center gap-2.5 mb-6 overflow-x-auto pb-1">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                  isActive
+                    ? 'bg-teal-700 text-white shadow-sm border border-teal-800'
+                    : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
         {/* ═══════════════════ ABA: PROJETOS ═══════════════════════════ */}
         {activeTab === 'projetos' && (
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Formulário */}
-            <Section icon="📝" title={editProjetoId ? 'Editar Projeto' : 'Novo Projeto'}>
-              <div className="space-y-3">
+            <SectionCard
+              icon={Globe}
+              title={editProjetoId ? 'Editar Projeto' : 'Novo Projeto'}
+              subtitle="Cadastre e gerencie metas e prazos"
+            >
+              <div className="space-y-4">
                 <Field label="Nome do projeto *" error={errProjeto.nome}>
-                  <input className={inputCls} value={formProjeto.nome} onChange={(e) => setFormProjeto((p) => ({ ...p, nome: e.target.value }))} placeholder="Ex: Missão Amazônia" />
+                  <input
+                    className={inputCls}
+                    value={formProjeto.nome}
+                    onChange={(e) => setFormProjeto((p) => ({ ...p, nome: e.target.value }))}
+                    placeholder="Ex: Missão Amazônia"
+                  />
                 </Field>
                 <Field label="País / Região">
-                  <input className={inputCls} value={formProjeto.pais_regiao} onChange={(e) => setFormProjeto((p) => ({ ...p, pais_regiao: e.target.value }))} placeholder="Ex: Brasil - AM" />
+                  <input
+                    className={inputCls}
+                    value={formProjeto.pais_regiao}
+                    onChange={(e) => setFormProjeto((p) => ({ ...p, pais_regiao: e.target.value }))}
+                    placeholder="Ex: Brasil - AM"
+                  />
                 </Field>
                 <Field label="Status">
-                  <select className={inputCls} value={formProjeto.status} onChange={(e) => setFormProjeto((p) => ({ ...p, status: e.target.value }))}>
-                    {STATUS_PROJETO.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  <select
+                    className={inputCls}
+                    value={formProjeto.status}
+                    onChange={(e) => setFormProjeto((p) => ({ ...p, status: e.target.value }))}
+                  >
+                    {STATUS_PROJETO.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
                   </select>
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Data início">
-                    <input className={inputCls} type="date" value={formProjeto.data_inicio} onChange={(e) => setFormProjeto((p) => ({ ...p, data_inicio: e.target.value }))} />
+                    <input
+                      className={inputCls}
+                      type="date"
+                      value={formProjeto.data_inicio}
+                      onChange={(e) => setFormProjeto((p) => ({ ...p, data_inicio: e.target.value }))}
+                    />
                   </Field>
                   <Field label="Data fim">
-                    <input className={inputCls} type="date" value={formProjeto.data_fim} onChange={(e) => setFormProjeto((p) => ({ ...p, data_fim: e.target.value }))} />
+                    <input
+                      className={inputCls}
+                      type="date"
+                      value={formProjeto.data_fim}
+                      onChange={(e) => setFormProjeto((p) => ({ ...p, data_fim: e.target.value }))}
+                    />
                   </Field>
                 </div>
                 <Field label="Meta de Investimento (R$)">
-                  <input className={inputCls} inputMode="numeric" value={formProjeto.meta_arrecadacao} onChange={(e) => setFormProjeto((p) => ({ ...p, meta_arrecadacao: maskCurrency(e.target.value) }))} placeholder="0,00" />
+                  <input
+                    className={inputCls}
+                    inputMode="numeric"
+                    value={formProjeto.meta_arrecadacao}
+                    onChange={(e) => setFormProjeto((p) => ({ ...p, meta_arrecadacao: maskCurrency(e.target.value) }))}
+                    placeholder="0,00"
+                  />
                 </Field>
                 <Field label="Descrição">
-                  <textarea className={inputCls} rows={3} value={formProjeto.descricao} onChange={(e) => setFormProjeto((p) => ({ ...p, descricao: e.target.value }))} placeholder="Descrição do projeto..." />
+                  <textarea
+                    className={inputCls}
+                    rows={3}
+                    value={formProjeto.descricao}
+                    onChange={(e) => setFormProjeto((p) => ({ ...p, descricao: e.target.value }))}
+                    placeholder="Descrição do projeto..."
+                  />
                 </Field>
-                <div className="flex gap-2 pt-1">
-                  <button onClick={saveProjeto} className="flex-1 bg-[#123b63] text-white py-2 rounded-md text-sm font-semibold hover:bg-[#0f2a45] transition">
-                    {editProjetoId ? 'Salvar alterações' : 'Cadastrar projeto'}
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={saveProjeto}
+                    className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer text-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{editProjetoId ? 'Salvar alterações' : 'Cadastrar projeto'}</span>
                   </button>
                   {editProjetoId && (
-                    <button onClick={() => { setFormProjeto({ ...EMPTY_PROJETO }); setEditProjetoId(null); setErrProjeto({}); }} className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition">
+                    <button
+                      onClick={() => {
+                        setFormProjeto({ ...EMPTY_PROJETO });
+                        setEditProjetoId(null);
+                        setErrProjeto({});
+                      }}
+                      className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold rounded-xl transition cursor-pointer text-sm"
+                    >
                       Cancelar
                     </button>
                   )}
                 </div>
               </div>
-            </Section>
+            </SectionCard>
 
-            {/* Lista */}
+            {/* Lista de Projetos */}
             <div className="lg:col-span-2 space-y-4">
               {projetos.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-400">Nenhum projeto cadastrado</div>
+                <div className="bg-white rounded-2xl border border-slate-200/90 p-12 text-center text-slate-400 font-semibold shadow-sm">
+                  <Globe className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                  <p>Nenhum projeto cadastrado no momento.</p>
+                </div>
               ) : (
                 projetos.map((p) => {
                   const arrecadado = totaisPorProjeto[p.id] || 0;
                   return (
-                    <div key={p.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                      <div className="flex items-start justify-between gap-3">
+                    <div
+                      key={p.id}
+                      className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold text-[#123b63] text-sm">{p.nome}</h3>
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <h3 className="font-bold text-slate-900 text-base">{p.nome}</h3>
                             <StatusBadge value={p.status} options={STATUS_PROJETO} />
                           </div>
-                          {p.pais_regiao && <p className="text-xs text-gray-500 mt-0.5">📍 {p.pais_regiao}</p>}
-                          {p.descricao && <p className="text-xs text-gray-600 mt-1 line-clamp-2">{p.descricao}</p>}
-                          {p.data_inicio && <p className="text-xs text-gray-400 mt-1">📅 {fmtDate(p.data_inicio)}{p.data_fim ? ` → ${fmtDate(p.data_fim)}` : ''}</p>}
-                          {(p.meta_arrecadacao ?? 0) > 0 && <ProgressBar value={arrecadado} max={p.meta_arrecadacao!} />}
+                          {p.pais_regiao && (
+                            <p className="text-xs font-semibold text-slate-600 mt-1 flex items-center gap-1">
+                              <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                              <span>{p.pais_regiao}</span>
+                            </p>
+                          )}
+                          {p.descricao && (
+                            <p className="text-xs text-slate-600 mt-2 line-clamp-2 leading-relaxed">
+                              {p.descricao}
+                            </p>
+                          )}
+                          {p.data_inicio && (
+                            <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>{fmtDate(p.data_inicio)}{p.data_fim ? ` → ${fmtDate(p.data_fim)}` : ''}</span>
+                            </p>
+                          )}
+                          {(p.meta_arrecadacao ?? 0) > 0 && (
+                            <ProgressBar value={arrecadado} max={p.meta_arrecadacao!} />
+                          )}
                         </div>
-                        <div className="flex gap-1 shrink-0">
-                          <button onClick={() => editProjeto(p)} className="p-1.5 text-gray-400 hover:text-[#123b63] transition"><Pencil size={14} /></button>
-                          <button onClick={() => deleteProjeto(p.id)} className="p-1.5 text-gray-400 hover:text-red-600 transition"><Trash2 size={14} /></button>
+                        <div className="flex gap-1.5 shrink-0">
+                          <button
+                            onClick={() => editProjeto(p)}
+                            title="Editar projeto"
+                            className="p-2 text-slate-400 hover:text-teal-700 hover:bg-slate-50 rounded-lg transition"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteProjeto(p.id)}
+                            title="Excluir projeto"
+                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -801,93 +1105,177 @@ export default function MissoesPage() {
 
         {/* ═══════════════════ ABA: MISSIONÁRIOS ═══════════════════════ */}
         {activeTab === 'missionarios' && (
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Formulário */}
-            <Section icon="✈️" title={editMissionarioId ? 'Editar Missionário' : 'Novo Missionário'}>
-              <div className="space-y-3">
+            <SectionCard
+              icon={Plane}
+              title={editMissionarioId ? 'Editar Missionário' : 'Novo Missionário'}
+              subtitle="Cadastro de missionários no campo"
+            >
+              <div className="space-y-4">
                 <Field label="Nome *" error={errMissionario.nome}>
-                  <input className={inputCls} value={formMissionario.nome} onChange={(e) => setFormMissionario((p) => ({ ...p, nome: e.target.value }))} placeholder="Nome completo" />
+                  <input
+                    className={inputCls}
+                    value={formMissionario.nome}
+                    onChange={(e) => setFormMissionario((p) => ({ ...p, nome: e.target.value }))}
+                    placeholder="Nome completo"
+                  />
                 </Field>
                 <Field label="Campo de atuação">
-                  <input className={inputCls} value={formMissionario.campo_atuacao} onChange={(e) => setFormMissionario((p) => ({ ...p, campo_atuacao: e.target.value }))} placeholder="País / Cidade" />
+                  <input
+                    className={inputCls}
+                    value={formMissionario.campo_atuacao}
+                    onChange={(e) => setFormMissionario((p) => ({ ...p, campo_atuacao: e.target.value }))}
+                    placeholder="País / Cidade"
+                  />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Tipo">
-                    <select className={inputCls} value={formMissionario.tipo} onChange={(e) => setFormMissionario((p) => ({ ...p, tipo: e.target.value }))}>
-                      {TIPO_MISSIONARIO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    <select
+                      className={inputCls}
+                      value={formMissionario.tipo}
+                      onChange={(e) => setFormMissionario((p) => ({ ...p, tipo: e.target.value }))}
+                    >
+                      {TIPO_MISSIONARIO.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
+                        </option>
+                      ))}
                     </select>
                   </Field>
                   <Field label="Status">
-                    <select className={inputCls} value={formMissionario.status} onChange={(e) => setFormMissionario((p) => ({ ...p, status: e.target.value }))}>
-                      {STATUS_MISSIONARIO.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    <select
+                      className={inputCls}
+                      value={formMissionario.status}
+                      onChange={(e) => setFormMissionario((p) => ({ ...p, status: e.target.value }))}
+                    >
+                      {STATUS_MISSIONARIO.map((s) => (
+                        <option key={s.value} value={s.value}>
+                          {s.label}
+                        </option>
+                      ))}
                     </select>
                   </Field>
                 </div>
                 <Field label="Data de envio">
-                  <input className={inputCls} type="date" value={formMissionario.data_envio} onChange={(e) => setFormMissionario((p) => ({ ...p, data_envio: e.target.value }))} />
+                  <input
+                    className={inputCls}
+                    type="date"
+                    value={formMissionario.data_envio}
+                    onChange={(e) => setFormMissionario((p) => ({ ...p, data_envio: e.target.value }))}
+                  />
                 </Field>
                 <Field label="Contato (tel / e-mail)">
-                  <input className={inputCls} value={formMissionario.contato} onChange={(e) => setFormMissionario((p) => ({ ...p, contato: maskPhone(e.target.value) }))} placeholder="(85) 99999-9999" />
+                  <input
+                    className={inputCls}
+                    value={formMissionario.contato}
+                    onChange={(e) => setFormMissionario((p) => ({ ...p, contato: maskPhone(e.target.value) }))}
+                    placeholder="(85) 99999-9999"
+                  />
                 </Field>
                 <Field label="Valor de sustento mensal (R$)">
-                  <input className={inputCls} inputMode="numeric" value={formMissionario.valor_sustento_mensal} onChange={(e) => setFormMissionario((p) => ({ ...p, valor_sustento_mensal: maskCurrency(e.target.value) }))} placeholder="0,00" />
+                  <input
+                    className={inputCls}
+                    inputMode="numeric"
+                    value={formMissionario.valor_sustento_mensal}
+                    onChange={(e) => setFormMissionario((p) => ({ ...p, valor_sustento_mensal: maskCurrency(e.target.value) }))}
+                    placeholder="0,00"
+                  />
                 </Field>
                 {members.length > 0 && (
                   <Field label="Vínculo com membro (opcional)">
-                    <select className={inputCls} value={formMissionario.member_id} onChange={(e) => setFormMissionario((p) => ({ ...p, member_id: e.target.value }))}>
+                    <select
+                      className={inputCls}
+                      value={formMissionario.member_id}
+                      onChange={(e) => setFormMissionario((p) => ({ ...p, member_id: e.target.value }))}
+                    >
                       <option value="">— Sem vínculo —</option>
-                      {members.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                      {members.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.nome}
+                        </option>
+                      ))}
                     </select>
                   </Field>
                 )}
-                <div className="flex gap-2 pt-1">
-                  <button onClick={saveMissionario} className="flex-1 bg-[#123b63] text-white py-2 rounded-md text-sm font-semibold hover:bg-[#0f2a45] transition">
-                    {editMissionarioId ? 'Salvar alterações' : 'Cadastrar missionário'}
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={saveMissionario}
+                    className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer text-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{editMissionarioId ? 'Salvar alterações' : 'Cadastrar missionário'}</span>
                   </button>
                   {editMissionarioId && (
-                    <button onClick={() => { setFormMissionario({ ...EMPTY_MISSIONARIO }); setEditMissionarioId(null); setErrMissionario({}); }} className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition">
+                    <button
+                      onClick={() => {
+                        setFormMissionario({ ...EMPTY_MISSIONARIO });
+                        setEditMissionarioId(null);
+                        setErrMissionario({});
+                      }}
+                      className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold rounded-xl transition cursor-pointer text-sm"
+                    >
                       Cancelar
                     </button>
                   )}
                 </div>
               </div>
-            </Section>
+            </SectionCard>
 
-            {/* Lista */}
+            {/* Tabela de Missionários */}
             <div className="lg:col-span-2">
               {missionarios.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-400">Nenhum missionário cadastrado</div>
+                <div className="bg-white rounded-2xl border border-slate-200/90 p-12 text-center text-slate-400 font-semibold shadow-sm">
+                  <Plane className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                  <p>Nenhum missionário cadastrado no momento.</p>
+                </div>
               ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-[#123b63] text-white">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Nome</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Campo</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Tipo</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Sustento/mês</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Status</th>
-                        <th className="px-4 py-3 w-16" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {missionarios.map((m, i) => (
-                        <tr key={m.id} className={`border-t border-gray-100 ${i % 2 === 0 ? '' : 'bg-gray-50'}`}>
-                          <td className="px-4 py-3 font-medium text-[#123b63]">{m.nome}</td>
-                          <td className="px-4 py-3 text-gray-600">{m.campo_atuacao || '—'}</td>
-                          <td className="px-4 py-3 text-gray-600">{TIPO_MISSIONARIO.find((t) => t.value === m.tipo)?.label}</td>
-                          <td className="px-4 py-3 text-gray-600">{fmtCurrency(m.valor_sustento_mensal)}</td>
-                          <td className="px-4 py-3"><StatusBadge value={m.status} options={STATUS_MISSIONARIO} /></td>
-                          <td className="px-4 py-3">
-                            <div className="flex gap-1">
-                              <button onClick={() => editMissionario(m)} className="p-1 text-gray-400 hover:text-[#123b63] transition"><Pencil size={13} /></button>
-                              <button onClick={() => deleteMissionario(m.id)} className="p-1 text-gray-400 hover:text-red-600 transition"><Trash2 size={13} /></button>
-                            </div>
-                          </td>
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50/80 border-b border-slate-200">
+                        <tr>
+                          <th className="px-5 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Nome</th>
+                          <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Campo</th>
+                          <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Tipo</th>
+                          <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Sustento/mês</th>
+                          <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Status</th>
+                          <th className="px-4 py-3.5 w-16" />
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {missionarios.map((m) => (
+                          <tr key={m.id} className="hover:bg-slate-50/70 transition">
+                            <td className="px-5 py-3.5 font-bold text-slate-900">{m.nome}</td>
+                            <td className="px-4 py-3.5 text-slate-600 font-medium">{m.campo_atuacao || '—'}</td>
+                            <td className="px-4 py-3.5 text-slate-600 font-medium">{TIPO_MISSIONARIO.find((t) => t.value === m.tipo)?.label}</td>
+                            <td className="px-4 py-3.5 font-bold text-emerald-700">{fmtCurrency(m.valor_sustento_mensal)}</td>
+                            <td className="px-4 py-3.5">
+                              <StatusBadge value={m.status} options={STATUS_MISSIONARIO} />
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex gap-1 justify-end">
+                                <button
+                                  onClick={() => editMissionario(m)}
+                                  title="Editar"
+                                  className="p-1.5 text-slate-400 hover:text-teal-700 hover:bg-slate-50 rounded-lg transition"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => deleteMissionario(m.id)}
+                                  title="Excluir"
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -896,75 +1284,167 @@ export default function MissoesPage() {
 
         {/* ═══════════════════ ABA: EVENTOS ════════════════════════════ */}
         {activeTab === 'eventos' && (
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Formulário */}
-            <Section icon="📅" title={editEventoId ? 'Editar Evento' : 'Novo Evento'}>
-              <div className="space-y-3">
+            <SectionCard
+              icon={Calendar}
+              title={editEventoId ? 'Editar Evento' : 'Novo Evento'}
+              subtitle="Cultos, conferências e campanhas"
+            >
+              <div className="space-y-4">
                 <Field label="Título *" error={errEvento.titulo}>
-                  <input className={inputCls} value={formEvento.titulo} onChange={(e) => setFormEvento((p) => ({ ...p, titulo: e.target.value }))} placeholder="Nome do evento" />
+                  <input
+                    className={inputCls}
+                    value={formEvento.titulo}
+                    onChange={(e) => setFormEvento((p) => ({ ...p, titulo: e.target.value }))}
+                    placeholder="Nome do evento"
+                  />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Tipo">
-                    <select className={inputCls} value={formEvento.tipo} onChange={(e) => setFormEvento((p) => ({ ...p, tipo: e.target.value }))}>
-                      {TIPO_EVENTO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    <select
+                      className={inputCls}
+                      value={formEvento.tipo}
+                      onChange={(e) => setFormEvento((p) => ({ ...p, tipo: e.target.value }))}
+                    >
+                      {TIPO_EVENTO.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
+                        </option>
+                      ))}
                     </select>
                   </Field>
                   <Field label="Data *" error={errEvento.data_evento}>
-                    <input className={inputCls} type="date" value={formEvento.data_evento} onChange={(e) => setFormEvento((p) => ({ ...p, data_evento: e.target.value }))} />
+                    <input
+                      className={inputCls}
+                      type="date"
+                      value={formEvento.data_evento}
+                      onChange={(e) => setFormEvento((p) => ({ ...p, data_evento: e.target.value }))}
+                    />
                   </Field>
                 </div>
                 <Field label="Local">
-                  <input className={inputCls} value={formEvento.local} onChange={(e) => setFormEvento((p) => ({ ...p, local: e.target.value }))} placeholder="Local do evento" />
+                  <input
+                    className={inputCls}
+                    value={formEvento.local}
+                    onChange={(e) => setFormEvento((p) => ({ ...p, local: e.target.value }))}
+                    placeholder="Local do evento"
+                  />
                 </Field>
                 <Field label="Projeto vinculado (opcional)">
-                  <select className={inputCls} value={formEvento.projeto_id} onChange={(e) => setFormEvento((p) => ({ ...p, projeto_id: e.target.value }))}>
+                  <select
+                    className={inputCls}
+                    value={formEvento.projeto_id}
+                    onChange={(e) => setFormEvento((p) => ({ ...p, projeto_id: e.target.value }))}
+                  >
                     <option value="">— Nenhum —</option>
-                    {projetos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                    {projetos.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nome}
+                      </option>
+                    ))}
                   </select>
                 </Field>
                 <Field label="Descrição">
-                  <textarea className={inputCls} rows={3} value={formEvento.descricao} onChange={(e) => setFormEvento((p) => ({ ...p, descricao: e.target.value }))} placeholder="Detalhes do evento..." />
+                  <textarea
+                    className={inputCls}
+                    rows={3}
+                    value={formEvento.descricao}
+                    onChange={(e) => setFormEvento((p) => ({ ...p, descricao: e.target.value }))}
+                    placeholder="Detalhes do evento..."
+                  />
                 </Field>
-                <div className="flex gap-2 pt-1">
-                  <button onClick={saveEvento} className="flex-1 bg-[#123b63] text-white py-2 rounded-md text-sm font-semibold hover:bg-[#0f2a45] transition">
-                    {editEventoId ? 'Salvar alterações' : 'Registrar evento'}
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={saveEvento}
+                    className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer text-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{editEventoId ? 'Salvar alterações' : 'Registrar evento'}</span>
                   </button>
                   {editEventoId && (
-                    <button onClick={() => { setFormEvento({ ...EMPTY_EVENTO }); setEditEventoId(null); setErrEvento({}); }} className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition">
+                    <button
+                      onClick={() => {
+                        setFormEvento({ ...EMPTY_EVENTO });
+                        setEditEventoId(null);
+                        setErrEvento({});
+                      }}
+                      className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold rounded-xl transition cursor-pointer text-sm"
+                    >
                       Cancelar
                     </button>
                   )}
                 </div>
               </div>
-            </Section>
+            </SectionCard>
 
-            {/* Lista cronológica */}
+            {/* Lista cronológica de eventos */}
             <div className="lg:col-span-2 space-y-3">
               {eventos.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-400">Nenhum evento registrado</div>
+                <div className="bg-white rounded-2xl border border-slate-200/90 p-12 text-center text-slate-400 font-semibold shadow-sm">
+                  <Calendar className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                  <p>Nenhum evento registrado no momento.</p>
+                </div>
               ) : (
                 eventos.map((ev) => {
                   const projeto = projetos.find((p) => p.id === ev.projeto_id);
                   const tipoLabel = TIPO_EVENTO.find((t) => t.value === ev.tipo)?.label ?? ev.tipo;
                   return (
-                    <div key={ev.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex gap-4">
-                      <div className="text-center min-w-[44px]">
-                        <div className="text-lg font-bold text-[#123b63]">{ev.data_evento?.slice(8, 10)}</div>
-                        <div className="text-xs text-gray-400 uppercase">{new Date(ev.data_evento + 'T00:00:00').toLocaleString('pt-BR', { month: 'short' })}</div>
-                        <div className="text-xs text-gray-400">{ev.data_evento?.slice(0, 4)}</div>
+                    <div
+                      key={ev.id}
+                      className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs hover:shadow-md transition-all flex items-start gap-4"
+                    >
+                      <div className="bg-teal-50 border border-teal-100/90 rounded-2xl p-3 text-center min-w-[56px] flex-shrink-0">
+                        <div className="text-xl font-black text-teal-800 leading-none">
+                          {ev.data_evento?.slice(8, 10)}
+                        </div>
+                        <div className="text-[10px] font-bold text-teal-600 uppercase mt-1">
+                          {new Date(ev.data_evento + 'T00:00:00').toLocaleString('pt-BR', { month: 'short' })}
+                        </div>
+                        <div className="text-[10px] font-semibold text-slate-400">
+                          {ev.data_evento?.slice(0, 4)}
+                        </div>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-[#123b63] text-sm">{ev.titulo}</span>
-                          <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{tipoLabel}</span>
+                          <span className="font-bold text-slate-900 text-base">{ev.titulo}</span>
+                          <span className="text-xs bg-teal-50 text-teal-700 border border-teal-200 font-bold px-2.5 py-0.5 rounded-full">
+                            {tipoLabel}
+                          </span>
                         </div>
-                        {ev.local && <p className="text-xs text-gray-500 mt-0.5">📍 {ev.local}</p>}
-                        {projeto && <p className="text-xs text-purple-600 mt-0.5">🌍 {projeto.nome}</p>}
-                        {ev.descricao && <p className="text-xs text-gray-600 mt-1 line-clamp-2">{ev.descricao}</p>}
+                        {ev.local && (
+                          <p className="text-xs font-semibold text-slate-600 mt-1 flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{ev.local}</span>
+                          </p>
+                        )}
+                        {projeto && (
+                          <p className="text-xs font-bold text-purple-700 mt-1 flex items-center gap-1">
+                            <Globe className="w-3.5 h-3.5 text-purple-500" />
+                            <span>Projeto: {projeto.nome}</span>
+                          </p>
+                        )}
+                        {ev.descricao && (
+                          <p className="text-xs text-slate-600 mt-2 line-clamp-2 leading-relaxed">
+                            {ev.descricao}
+                          </p>
+                        )}
                       </div>
                       <div className="flex gap-1 shrink-0">
-                        <button onClick={() => editEvento(ev)} className="p-1.5 text-gray-400 hover:text-[#123b63] transition"><Pencil size={13} /></button>
-                        <button onClick={() => deleteEvento(ev.id)} className="p-1.5 text-gray-400 hover:text-red-600 transition"><Trash2 size={13} /></button>
+                        <button
+                          onClick={() => editEvento(ev)}
+                          title="Editar"
+                          className="p-1.5 text-slate-400 hover:text-teal-700 hover:bg-slate-50 rounded-lg transition"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteEvento(ev.id)}
+                          title="Excluir"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   );
@@ -977,83 +1457,158 @@ export default function MissoesPage() {
         {/* ═══════════════════ ABA: ARRECADAÇÕES ══════════════════════ */}
         {activeTab === 'arrecadacoes' && (
           <div className="space-y-6">
-            <div className="grid lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Formulário */}
-              <Section icon="💰" title={editArrecadacaoId ? 'Editar Registro' : 'Novo Registro'}>
-                <div className="space-y-3">
+              <SectionCard
+                icon={DollarSign}
+                title={editArrecadacaoId ? 'Editar Registro' : 'Novo Registro'}
+                subtitle="Ofertas e doações vinculadas à Tesouraria"
+              >
+                <div className="space-y-4">
                   <Field label="Projeto vinculado (opcional)">
-                    <select className={inputCls} value={formArrecadacao.projeto_id} onChange={(e) => setFormArrecadacao((p) => ({ ...p, projeto_id: e.target.value }))}>
+                    <select
+                      className={inputCls}
+                      value={formArrecadacao.projeto_id}
+                      onChange={(e) => setFormArrecadacao((p) => ({ ...p, projeto_id: e.target.value }))}
+                    >
                       <option value="">— Geral / Sem projeto —</option>
-                      {projetos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                      {projetos.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.nome}
+                        </option>
+                      ))}
                     </select>
                   </Field>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Data *" error={errArrecadacao.data}>
-                      <input className={inputCls} type="date" value={formArrecadacao.data} onChange={(e) => setFormArrecadacao((p) => ({ ...p, data: e.target.value }))} />
+                      <input
+                        className={inputCls}
+                        type="date"
+                        value={formArrecadacao.data}
+                        onChange={(e) => setFormArrecadacao((p) => ({ ...p, data: e.target.value }))}
+                      />
                     </Field>
                     <Field label="Valor (R$) *" error={errArrecadacao.valor}>
-                      <input className={inputCls} inputMode="numeric" value={formArrecadacao.valor} onChange={(e) => setFormArrecadacao((p) => ({ ...p, valor: maskCurrency(e.target.value) }))} placeholder="0,00" />
+                      <input
+                        className={inputCls}
+                        inputMode="numeric"
+                        value={formArrecadacao.valor}
+                        onChange={(e) => setFormArrecadacao((p) => ({ ...p, valor: maskCurrency(e.target.value) }))}
+                        placeholder="0,00"
+                      />
                     </Field>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Tipo de Registro">
-                      <select className={inputCls} value={formArrecadacao.forma} onChange={(e) => setFormArrecadacao((p) => ({ ...p, forma: e.target.value }))}>
-                        {FORMA_ARRECADACAO.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                      <select
+                        className={inputCls}
+                        value={formArrecadacao.forma}
+                        onChange={(e) => setFormArrecadacao((p) => ({ ...p, forma: e.target.value }))}
+                      >
+                        {FORMA_ARRECADACAO.map((f) => (
+                          <option key={f.value} value={f.value}>
+                            {f.label}
+                          </option>
+                        ))}
                       </select>
                     </Field>
                     <Field label="Forma de Pagamento">
-                      <select className={inputCls} value={formArrecadacao.forma_pagamento} onChange={(e) => setFormArrecadacao((p) => ({ ...p, forma_pagamento: e.target.value }))}>
-                        {FORMA_PAGAMENTO.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                      <select
+                        className={inputCls}
+                        value={formArrecadacao.forma_pagamento}
+                        onChange={(e) => setFormArrecadacao((p) => ({ ...p, forma_pagamento: e.target.value }))}
+                      >
+                        {FORMA_PAGAMENTO.map((f) => (
+                          <option key={f.value} value={f.value}>
+                            {f.label}
+                          </option>
+                        ))}
                       </select>
                     </Field>
                   </div>
                   {congregacoes.length > 0 && (
                     <Field label="Congregação de origem">
-                      <select className={inputCls} value={formArrecadacao.congregacao_id} onChange={(e) => setFormArrecadacao((p) => ({ ...p, congregacao_id: e.target.value }))}>
+                      <select
+                        className={inputCls}
+                        value={formArrecadacao.congregacao_id}
+                        onChange={(e) => setFormArrecadacao((p) => ({ ...p, congregacao_id: e.target.value }))}
+                      >
                         <option value="">— Todas —</option>
-                        {congregacoes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                        {congregacoes.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.nome}
+                          </option>
+                        ))}
                       </select>
                     </Field>
                   )}
                   <Field label="Descrição">
-                    <input className={inputCls} value={formArrecadacao.descricao} onChange={(e) => setFormArrecadacao((p) => ({ ...p, descricao: e.target.value }))} placeholder="Observação..." />
+                    <input
+                      className={inputCls}
+                      value={formArrecadacao.descricao}
+                      onChange={(e) => setFormArrecadacao((p) => ({ ...p, descricao: e.target.value }))}
+                      placeholder="Observação..."
+                    />
                   </Field>
-                  <div className="flex gap-2 pt-1">
-                    <button onClick={saveArrecadacao} className="flex-1 bg-[#123b63] text-white py-2 rounded-md text-sm font-semibold hover:bg-[#0f2a45] transition">
-                      {editArrecadacaoId ? 'Salvar alterações' : 'Registrar entrada'}
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={saveArrecadacao}
+                      className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer text-sm"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{editArrecadacaoId ? 'Salvar alterações' : 'Registrar entrada'}</span>
                     </button>
                     {editArrecadacaoId && (
-                      <button onClick={() => { setFormArrecadacao({ ...EMPTY_ARRECADACAO, data: new Date().toISOString().slice(0, 10) }); setEditArrecadacaoId(null); setErrArrecadacao({}); }} className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition">
+                      <button
+                        onClick={() => {
+                          setFormArrecadacao({ ...EMPTY_ARRECADACAO, data: new Date().toISOString().slice(0, 10) });
+                          setEditArrecadacaoId(null);
+                          setErrArrecadacao({});
+                        }}
+                        className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold rounded-xl transition cursor-pointer text-sm"
+                      >
                         Cancelar
                       </button>
                     )}
                   </div>
                 </div>
-              </Section>
+              </SectionCard>
 
               {/* Comparativo meta × realizado por projeto */}
-              <div className="lg:col-span-2 space-y-3">
-                <h3 className="text-sm font-semibold text-gray-700 mb-1">Meta × Realizado por projeto</h3>
+              <div className="lg:col-span-2 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                    Meta × Realizado por projeto
+                  </h3>
+                </div>
                 {projetos.filter((p) => (p.meta_arrecadacao ?? 0) > 0 || (totaisPorProjeto[p.id] ?? 0) > 0).length === 0 ? (
-                  <div className="bg-white rounded-xl shadow-sm p-6 text-center text-gray-400 text-sm">Nenhum projeto com meta ou arrecadação</div>
+                  <div className="bg-white rounded-2xl border border-slate-200/90 p-8 text-center text-slate-400 font-semibold shadow-sm">
+                    Nenhum projeto com meta ou arrecadação registrada no momento.
+                  </div>
                 ) : (
                   projetos
                     .filter((p) => (p.meta_arrecadacao ?? 0) > 0 || (totaisPorProjeto[p.id] ?? 0) > 0)
                     .map((p) => {
                       const arrecadado = totaisPorProjeto[p.id] || 0;
                       return (
-                        <div key={p.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-[#123b63] text-sm">{p.nome}</span>
+                        <div
+                          key={p.id}
+                          className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs hover:shadow-md transition-all"
+                        >
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-2.5">
+                              <span className="font-bold text-slate-900 text-base">{p.nome}</span>
                               <StatusBadge value={p.status} options={STATUS_PROJETO} />
                             </div>
-                            <span className="text-sm font-bold text-emerald-600">{fmtCurrency(arrecadado)}</span>
+                            <span className="text-base font-black text-emerald-700">
+                              {fmtCurrency(arrecadado)}
+                            </span>
                           </div>
-                          {(p.meta_arrecadacao ?? 0) > 0
-                            ? <ProgressBar value={arrecadado} max={p.meta_arrecadacao!} />
-                            : <p className="text-xs text-gray-400 mt-1">Sem meta definida</p>
-                          }
+                          {(p.meta_arrecadacao ?? 0) > 0 ? (
+                            <ProgressBar value={arrecadado} max={p.meta_arrecadacao!} />
+                          ) : (
+                            <p className="text-xs font-semibold text-slate-400 mt-2">Sem meta financeira definida</p>
+                          )}
                         </div>
                       );
                     })
@@ -1062,40 +1617,66 @@ export default function MissoesPage() {
             </div>
 
             {/* Histórico de entradas */}
-            <Section icon="📋" title="Histórico de entradas">
+            <SectionCard
+              icon={FileText}
+              title="Histórico de Entradas"
+              subtitle="Lançamentos realizados no módulo de Missões"
+            >
               {arrecadacoes.length === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-4">Nenhuma arrecadação registrada</p>
+                <p className="text-slate-400 text-sm font-semibold text-center py-8">
+                  Nenhuma arrecadação registrada.
+                </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="py-2 px-3 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
-                        <th className="py-2 px-3 text-left text-xs font-semibold text-gray-500 uppercase">Projeto</th>
-                        <th className="py-2 px-3 text-left text-xs font-semibold text-gray-500 uppercase">Forma</th>
-                        <th className="py-2 px-3 text-left text-xs font-semibold text-gray-500 uppercase">Congregação</th>
-                        <th className="py-2 px-3 text-left text-xs font-semibold text-gray-500 uppercase">Descrição</th>
-                        <th className="py-2 px-3 text-right text-xs font-semibold text-gray-500 uppercase">Valor</th>
-                        <th className="py-2 px-3 w-16" />
+                    <thead className="bg-slate-50/80 border-b border-slate-200">
+                      <tr>
+                        <th className="py-3 px-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Data</th>
+                        <th className="py-3 px-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Projeto</th>
+                        <th className="py-3 px-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Forma</th>
+                        <th className="py-3 px-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Congregação</th>
+                        <th className="py-3 px-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Descrição</th>
+                        <th className="py-3 px-4 text-right text-xs font-bold text-slate-700 uppercase tracking-wider">Valor</th>
+                        <th className="py-3 px-4 w-16" />
                       </tr>
                     </thead>
-                    <tbody>
-                      {arrecadacoes.map((a, i) => {
+                    <tbody className="divide-y divide-slate-100">
+                      {arrecadacoes.map((a) => {
                         const projeto = projetos.find((p) => p.id === a.projeto_id);
                         const cong = congregacoes.find((c) => c.id === a.congregacao_id);
                         const formaLabel = FORMA_ARRECADACAO.find((f) => f.value === a.forma)?.label ?? a.forma;
                         return (
-                          <tr key={a.id} className={`border-t border-gray-100 ${i % 2 === 0 ? '' : 'bg-gray-50'}`}>
-                            <td className="py-2 px-3 text-gray-600 whitespace-nowrap">{fmtDate(a.data)}</td>
-                            <td className="py-2 px-3 text-gray-700">{projeto?.nome ?? <span className="text-gray-400 italic">Geral</span>}</td>
-                            <td className="py-2 px-3 text-gray-600">{formaLabel}</td>
-                            <td className="py-2 px-3 text-gray-600">{cong?.nome ?? '—'}</td>
-                            <td className="py-2 px-3 text-gray-600 max-w-[200px] truncate">{a.descricao || '—'}</td>
-                            <td className="py-2 px-3 text-right font-semibold text-emerald-700 whitespace-nowrap">{fmtCurrency(a.valor)}</td>
-                            <td className="py-2 px-3">
-                              <div className="flex gap-1">
-                                <button onClick={() => editArrecadacao(a)} className="p-1 text-gray-400 hover:text-[#123b63] transition"><Pencil size={13} /></button>
-                                <button onClick={() => deleteArrecadacao(a.id)} className="p-1 text-gray-400 hover:text-red-600 transition"><Trash2 size={13} /></button>
+                          <tr key={a.id} className="hover:bg-slate-50/70 transition">
+                            <td className="py-3.5 px-4 text-slate-600 font-semibold whitespace-nowrap">{fmtDate(a.data)}</td>
+                            <td className="py-3.5 px-4 font-bold text-slate-800">
+                              {projeto?.nome ?? <span className="text-slate-400 font-normal italic">Geral</span>}
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-600 font-medium">
+                              <span className="bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                                {formaLabel}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-600 font-medium">{cong?.nome ?? '—'}</td>
+                            <td className="py-3.5 px-4 text-slate-600 max-w-[220px] truncate">{a.descricao || '—'}</td>
+                            <td className="py-3.5 px-4 text-right font-black text-emerald-700 whitespace-nowrap">
+                              {fmtCurrency(a.valor)}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="flex gap-1 justify-end">
+                                <button
+                                  onClick={() => editArrecadacao(a)}
+                                  title="Editar"
+                                  className="p-1.5 text-slate-400 hover:text-teal-700 hover:bg-slate-50 rounded-lg transition"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => deleteArrecadacao(a.id)}
+                                  title="Excluir"
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -1103,16 +1684,20 @@ export default function MissoesPage() {
                       })}
                     </tbody>
                     <tfoot>
-                      <tr className="border-t-2 border-gray-300 bg-gray-50">
-                        <td colSpan={5} className="py-2 px-3 text-sm font-semibold text-gray-700 text-right">Total:</td>
-                        <td className="py-2 px-3 text-right font-bold text-emerald-700">{fmtCurrency(totalArrecadado)}</td>
+                      <tr className="border-t-2 border-slate-200 bg-slate-50">
+                        <td colSpan={5} className="py-3.5 px-4 text-sm font-bold text-slate-800 text-right uppercase tracking-wider">
+                          Total Geral:
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-black text-base text-emerald-700">
+                          {fmtCurrency(totalArrecadado)}
+                        </td>
                         <td />
                       </tr>
                     </tfoot>
                   </table>
                 </div>
               )}
-            </Section>
+            </SectionCard>
           </div>
         )}
 
@@ -1127,46 +1712,70 @@ export default function MissoesPage() {
                 .no-print { display: none !important; }
               }
             `}</style>
-            <div className="space-y-4">
+            <div className="space-y-6">
               {/* Filtros */}
-              <div className="no-print bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-wrap gap-4 items-end">
+              <div className="no-print bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-sm flex flex-wrap gap-4 items-end">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Data início</label>
-                  <input type="date" value={relDtInicio} onChange={(e) => setRelDtInicio(e.target.value)}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                  <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">Data início</label>
+                  <input
+                    type="date"
+                    value={relDtInicio}
+                    onChange={(e) => setRelDtInicio(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Data fim</label>
-                  <input type="date" value={relDtFim} onChange={(e) => setRelDtFim(e.target.value)}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                  <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">Data fim</label>
+                  <input
+                    type="date"
+                    value={relDtFim}
+                    onChange={(e) => setRelDtFim(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Projeto</label>
-                  <select value={relProjetoId} onChange={(e) => setRelProjetoId(e.target.value)}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                  <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">Projeto</label>
+                  <select
+                    value={relProjetoId}
+                    onChange={(e) => setRelProjetoId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  >
                     <option value="">Todos os projetos</option>
-                    {projetos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                    {projetos.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nome}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 {congregacoes.length > 0 && (
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Congregação</label>
-                    <select value={relCongId} onChange={(e) => setRelCongId(e.target.value)}
-                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">Congregação</label>
+                    <select
+                      value={relCongId}
+                      onChange={(e) => setRelCongId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                    >
                       <option value="">Todas</option>
-                      {congregacoes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                      {congregacoes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nome}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 )}
-                <button onClick={() => window.print()}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#123b63] text-white rounded-lg text-sm font-semibold hover:bg-[#0f2a45] transition">
-                  <Printer className="h-4 w-4" /> Imprimir
+                <button
+                  onClick={() => window.print()}
+                  className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-bold rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer text-sm"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Imprimir Relatório</span>
                 </button>
               </div>
 
               {/* Corpo do relatório */}
-              <div id="missoes-relatorio-print" className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
-
+              <div id="missoes-relatorio-print" className="bg-white rounded-2xl border border-slate-200/90 p-6 sm:p-8 shadow-sm space-y-6">
                 {/* Timbre (só na impressão) */}
                 <div className="hidden print:block border-b border-gray-300 pb-4 mb-2">
                   <div className="flex items-center gap-4">
@@ -1185,10 +1794,10 @@ export default function MissoesPage() {
                 </div>
 
                 {/* Cabeçalho */}
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start border-b border-slate-100 pb-4">
                   <div>
-                    <h2 className="text-lg font-bold text-[#123b63]">Relatório de Arrecadações — Missões</h2>
-                    <p className="text-sm text-gray-500 mt-0.5">
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight">Relatório de Arrecadações — Missões</h2>
+                    <p className="text-xs sm:text-sm text-slate-500 font-semibold mt-1">
                       {relDtInicio || relDtFim
                         ? `${relDtInicio ? fmtDate(relDtInicio) : '—'} até ${relDtFim ? fmtDate(relDtFim) : '—'}`
                         : 'Todos os períodos'}
@@ -1196,23 +1805,28 @@ export default function MissoesPage() {
                       {relCongId ? ` · ${congregacoes.find((c) => c.id === relCongId)?.nome}` : ''}
                     </p>
                   </div>
-                  <p className="text-xl font-bold text-[#123b63]">{fmtCurrency(relTotal)}</p>
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Total Filtrado</span>
+                    <p className="text-2xl font-black text-emerald-700">{fmtCurrency(relTotal)}</p>
+                  </div>
                 </div>
 
                 {/* Resumo por forma */}
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-600 mb-2">Resumo por tipo de registro</h3>
-                  <div className="divide-y divide-gray-100">
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Resumo por tipo de registro</h3>
+                  <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-xl overflow-hidden">
                     {FORMA_ARRECADACAO.map((f) => {
                       const val = relPorForma[f.value] ?? 0;
                       if (!val) return null;
                       const pct = relTotal > 0 ? ((val / relTotal) * 100).toFixed(1) : '0.0';
                       return (
-                        <div key={f.value} className="flex items-center justify-between py-2 text-sm">
-                          <span className="px-2 py-0.5 rounded bg-teal-50 text-teal-700 text-xs font-semibold">{f.label}</span>
+                        <div key={f.value} className="flex items-center justify-between px-4 py-2.5 text-sm hover:bg-slate-50/60 transition">
+                          <span className="px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 text-xs font-bold border border-teal-100">
+                            {f.label}
+                          </span>
                           <div className="flex gap-4 items-center">
-                            <span className="text-gray-400 text-xs">{pct}%</span>
-                            <span className="font-semibold text-gray-800 w-28 text-right">{fmtCurrency(val)}</span>
+                            <span className="text-slate-400 text-xs font-semibold">{pct}%</span>
+                            <span className="font-bold text-slate-800 w-28 text-right">{fmtCurrency(val)}</span>
                           </div>
                         </div>
                       );
@@ -1222,17 +1836,17 @@ export default function MissoesPage() {
 
                 {/* Resumo por projeto */}
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-600 mb-2">Resumo por projeto</h3>
-                  <div className="divide-y divide-gray-100">
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Resumo por projeto</h3>
+                  <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-xl overflow-hidden">
                     {Object.entries(relPorProjeto).map(([pid, val]) => {
                       const nome = pid === '__geral__' ? 'Geral (sem projeto)' : projetos.find((p) => p.id === pid)?.nome ?? pid;
                       const pct = relTotal > 0 ? ((val / relTotal) * 100).toFixed(1) : '0.0';
                       return (
-                        <div key={pid} className="flex items-center justify-between py-2 text-sm">
-                          <span className="text-gray-700">{nome}</span>
+                        <div key={pid} className="flex items-center justify-between px-4 py-2.5 text-sm hover:bg-slate-50/60 transition">
+                          <span className="font-bold text-slate-800">{nome}</span>
                           <div className="flex gap-4 items-center">
-                            <span className="text-gray-400 text-xs">{pct}%</span>
-                            <span className="font-semibold text-gray-800 w-28 text-right">{fmtCurrency(val)}</span>
+                            <span className="text-slate-400 text-xs font-semibold">{pct}%</span>
+                            <span className="font-bold text-slate-800 w-28 text-right">{fmtCurrency(val)}</span>
                           </div>
                         </div>
                       );
@@ -1242,42 +1856,42 @@ export default function MissoesPage() {
 
                 {/* Detalhado */}
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-600 mb-2">Lançamentos detalhados</h3>
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Lançamentos detalhados</h3>
                   {relFiltrado.length === 0 ? (
-                    <p className="text-sm text-gray-400">Nenhum registro no período.</p>
+                    <p className="text-sm font-semibold text-slate-400">Nenhum registro no período.</p>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm border border-gray-100 rounded-lg overflow-hidden">
-                        <thead className="bg-gray-50">
+                    <div className="overflow-x-auto border border-slate-200/80 rounded-xl">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50/80 border-b border-slate-200">
                           <tr>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Data</th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Projeto</th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Tipo</th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Congregação</th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Descrição</th>
-                            <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">Valor</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Data</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Projeto</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Tipo</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Congregação</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Descrição</th>
+                            <th className="px-4 py-3 text-right text-xs font-bold text-slate-700 uppercase tracking-wider">Valor</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50">
+                        <tbody className="divide-y divide-slate-100">
                           {relFiltrado.map((a) => (
-                            <tr key={a.id}>
-                              <td className="px-3 py-2 text-gray-600">{fmtDate(a.data)}</td>
-                              <td className="px-3 py-2 text-gray-700">{projetos.find((p) => p.id === a.projeto_id)?.nome ?? '—'}</td>
-                              <td className="px-3 py-2">
-                                <span className="px-2 py-0.5 rounded bg-teal-50 text-teal-700 text-xs font-semibold">
+                            <tr key={a.id} className="hover:bg-slate-50/60 transition">
+                              <td className="px-4 py-3 text-slate-600 font-semibold">{fmtDate(a.data)}</td>
+                              <td className="px-4 py-3 font-bold text-slate-800">{projetos.find((p) => p.id === a.projeto_id)?.nome ?? '—'}</td>
+                              <td className="px-4 py-3">
+                                <span className="px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 text-xs font-bold border border-teal-100">
                                   {FORMA_ARRECADACAO.find((f) => f.value === a.forma)?.label ?? a.forma}
                                 </span>
                               </td>
-                              <td className="px-3 py-2 text-gray-500 text-xs">{congregacoes.find((c) => c.id === a.congregacao_id)?.nome ?? '—'}</td>
-                              <td className="px-3 py-2 text-gray-500">{a.descricao || '—'}</td>
-                              <td className="px-3 py-2 text-right font-semibold text-[#123b63]">{fmtCurrency(a.valor)}</td>
+                              <td className="px-4 py-3 text-slate-500 text-xs font-medium">{congregacoes.find((c) => c.id === a.congregacao_id)?.nome ?? '—'}</td>
+                              <td className="px-4 py-3 text-slate-600">{a.descricao || '—'}</td>
+                              <td className="px-4 py-3 text-right font-black text-emerald-700">{fmtCurrency(a.valor)}</td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
-                          <tr className="bg-[#123b63]/5 border-t border-gray-200">
-                            <td colSpan={5} className="px-3 py-2 text-xs font-bold text-gray-600 text-right">TOTAL</td>
-                            <td className="px-3 py-2 text-right font-bold text-[#123b63]">{fmtCurrency(relTotal)}</td>
+                          <tr className="bg-slate-50 border-t border-slate-200">
+                            <td colSpan={5} className="px-4 py-3 text-xs font-bold text-slate-700 text-right uppercase tracking-wider">TOTAL</td>
+                            <td className="px-4 py-3 text-right font-black text-emerald-700">{fmtCurrency(relTotal)}</td>
                           </tr>
                         </tfoot>
                       </table>
@@ -1286,16 +1900,14 @@ export default function MissoesPage() {
                 </div>
 
                 {/* Rodapé de impressão */}
-                <div className="hidden print:block border-t border-gray-200 pt-3 text-center text-xs text-gray-400">
+                <div className="hidden print:block border-t border-slate-200 pt-3 text-center text-xs text-slate-400">
                   Emitido em {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })} — {configIgreja?.nome}
                 </div>
               </div>
             </div>
           </>
         )}
-
-      </Tabs>
-    </PageLayout>
+      </div>
+    </div>
   );
 }
-
