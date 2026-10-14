@@ -255,6 +255,54 @@ export class DirigentesService {
     };
   }
 
+  /**
+   * Paginação e filtro de congregações/lideranças vigentes:
+   * 1. Aplica busca sobre todo o acervo antes de paginar.
+   * 2. Pagina estritamente em 15 congregações por página (adequado para 150+ congregações).
+   * 3. Garante que a página solicitada não ultrapasse o total de páginas disponíveis.
+   */
+  public static filtrarEPaginarLiderancas(
+    liderancas: CongregacaoLiderancaView[],
+    termoBusca: string,
+    pagina: number,
+    itensPorPagina = 15
+  ): {
+    itensPaginados: CongregacaoLiderancaView[];
+    totalItens: number;
+    totalPaginas: number;
+    paginaAtual: number;
+    inicioRegistro: number;
+    fimRegistro: number;
+  } {
+    const t = termoBusca.toLowerCase().trim();
+    const filtradas = !t
+      ? liderancas
+      : liderancas.filter(
+          (l) =>
+            l.congregacao_nome.toLowerCase().includes(t) ||
+            (l.dirigente_atual_nome || '').toLowerCase().includes(t) ||
+            (l.dirigente_atual_cargo || '').toLowerCase().includes(t)
+        );
+
+    const totalItens = filtradas.length;
+    const totalPaginas = Math.max(1, Math.ceil(totalItens / itensPorPagina));
+    const paginaAtual = Math.min(Math.max(1, pagina), totalPaginas);
+
+    const inicio = (paginaAtual - 1) * itensPorPagina;
+    const itensPaginados = filtradas.slice(inicio, inicio + itensPorPagina);
+    const inicioRegistro = totalItens === 0 ? 0 : inicio + 1;
+    const fimRegistro = Math.min(paginaAtual * itensPorPagina, totalItens);
+
+    return {
+      itensPaginados,
+      totalItens,
+      totalPaginas,
+      paginaAtual,
+      inicioRegistro,
+      fimRegistro,
+    };
+  }
+
   // ─── Operações com Supabase Client ──────────────────────────────────────────
 
   /**

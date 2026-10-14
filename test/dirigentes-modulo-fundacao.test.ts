@@ -383,4 +383,56 @@ describe('Módulo Dirigentes — Fundação, Regras de Negócio, RBAC e Integra�
     assert.equal(exigencia.requerTermo, true);
     assert.equal(exigencia.statusConferencia, 'pendente');
   });
+
+  test('12. Paginação em Escala: suporta 150 congregações em páginas de 15, busca antes de paginar e previne páginas inválidas', () => {
+    // Simula 150 congregações cadastradas no ministério
+    const congregacoes150: import('../src/types/dirigentes.js').CongregacaoLiderancaView[] = Array.from(
+      { length: 150 },
+      (_, i) => ({
+        congregacao_id: `cong-${i + 1}`,
+        congregacao_nome: `Congregação ${String(i + 1).padStart(3, '0')}`,
+        campo_id: null,
+        supervisao_id: null,
+        dirigente_atual_nome: i % 10 === 0 ? null : `Pastor Número ${i + 1}`,
+        dirigente_atual_cargo: i % 10 === 0 ? null : 'Pastor',
+        dirigente_atual_telefone: '(11) 99999-0000',
+        data_posse_atual: '2025-01-01',
+        tempo_mandato_meses: 14,
+        designacao_atual_id: `desig-${i + 1}`,
+        is_acumulacao: i % 25 === 0,
+        total_bens_patrimonio: 10 + i,
+        valor_patrimonio_estimado: (10 + i) * 150,
+      })
+    );
+
+    // 1. Sem busca: deve dividir exatamente em 10 páginas (150 / 15 = 10)
+    const p1 = DirigentesService.filtrarEPaginarLiderancas(congregacoes150, '', 1, 15);
+    assert.equal(p1.totalItens, 150);
+    assert.equal(p1.totalPaginas, 10);
+    assert.equal(p1.paginaAtual, 1);
+    assert.equal(p1.itensPaginados.length, 15);
+    assert.equal(p1.inicioRegistro, 1);
+    assert.equal(p1.fimRegistro, 15);
+    assert.equal(p1.itensPaginados[0].congregacao_nome, 'Congregação 001');
+    assert.equal(p1.itensPaginados[14].congregacao_nome, 'Congregação 015');
+
+    // 2. Última página (Página 10): deve exibir de 136 a 150
+    const p10 = DirigentesService.filtrarEPaginarLiderancas(congregacoes150, '', 10, 15);
+    assert.equal(p10.paginaAtual, 10);
+    assert.equal(p10.itensPaginados.length, 15);
+    assert.equal(p10.inicioRegistro, 136);
+    assert.equal(p10.fimRegistro, 150);
+    assert.equal(p10.itensPaginados[14].congregacao_nome, 'Congregação 150');
+
+    // 3. Busca antes da paginação: buscar termo que existe em todo o acervo
+    const pBusca = DirigentesService.filtrarEPaginarLiderancas(congregacoes150, 'Número 14', 1, 15);
+    // Deve encontrar itens que contenham 'Número 14' (ex: 14, 140..149)
+    assert.equal(pBusca.totalItens > 0, true);
+    assert.equal(pBusca.itensPaginados.every((item) => (item.dirigente_atual_nome || '').includes('Número 14')), true);
+
+    // 4. Prevenção de página vazia/inválida: requisitar página 999 deve ajustar automaticamente para a última página
+    const pExcesso = DirigentesService.filtrarEPaginarLiderancas(congregacoes150, '', 999, 15);
+    assert.equal(pExcesso.paginaAtual, 10);
+    assert.equal(pExcesso.itensPaginados.length, 15);
+  });
 });

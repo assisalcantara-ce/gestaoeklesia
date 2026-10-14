@@ -16,6 +16,9 @@ import {
   Package,
   History,
   X,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { useUserContext } from '@/hooks/useUserContext';
@@ -32,6 +35,28 @@ import type {
 function formatCurrency(val: number | null | undefined): string {
   if (val === null || val === undefined) return 'R$ 0,00';
   return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatTempoMandato(meses: number): string {
+  if (meses <= 0) return 'Recém-empossado';
+  if (meses < 12) return `${meses} ${meses === 1 ? 'mês' : 'meses'}`;
+  const anos = Math.floor(meses / 12);
+  const restoMeses = meses % 12;
+  if (restoMeses === 0) return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+  return `${anos}a ${restoMeses}m`;
+}
+
+function getPaginationRange(current: number, total: number): (number | string)[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 3) {
+    return [1, 2, 3, 4, '...', total];
+  }
+  if (current >= total - 2) {
+    return [1, '...', total - 3, total - 2, total - 1, total];
+  }
+  return [1, '...', current - 1, current, current + 1, '...', total];
 }
 
 export default function DirigentesPage() {
@@ -58,6 +83,8 @@ export default function DirigentesPage() {
   const [busca, setBusca] = useState('');
   const [filtroTipoMov, setFiltroTipoMov] = useState('');
   const [filtroStatusMov, setFiltroStatusMov] = useState('');
+  const [paginaAtualLiderancas, setPaginaAtualLiderancas] = useState(1);
+  const [detalheCongregacao, setDetalheCongregacao] = useState<CongregacaoLiderancaView | null>(null);
 
   // Modais
   const [modalPropostaOpen, setModalPropostaOpen] = useState(false);
@@ -408,6 +435,29 @@ export default function DirigentesPage() {
     );
   }, [liderancas, busca]);
 
+  const ITEMS_PER_PAGE_LIDERANCAS = 15;
+  const totalItensLiderancas = liderancasFiltradas.length;
+  const totalPaginasLiderancas = Math.max(1, Math.ceil(totalItensLiderancas / ITEMS_PER_PAGE_LIDERANCAS));
+  const paginaValidaLiderancas = Math.min(Math.max(1, paginaAtualLiderancas), totalPaginasLiderancas);
+
+  useEffect(() => {
+    if (paginaAtualLiderancas > totalPaginasLiderancas) {
+      setPaginaAtualLiderancas(totalPaginasLiderancas);
+    }
+  }, [paginaAtualLiderancas, totalPaginasLiderancas]);
+
+  const liderancasPaginadas = useMemo(() => {
+    const inicio = (paginaValidaLiderancas - 1) * ITEMS_PER_PAGE_LIDERANCAS;
+    return liderancasFiltradas.slice(inicio, inicio + ITEMS_PER_PAGE_LIDERANCAS);
+  }, [liderancasFiltradas, paginaValidaLiderancas]);
+
+  const inicioRegistroLiderancas =
+    totalItensLiderancas === 0 ? 0 : (paginaValidaLiderancas - 1) * ITEMS_PER_PAGE_LIDERANCAS + 1;
+  const fimRegistroLiderancas = Math.min(
+    paginaValidaLiderancas * ITEMS_PER_PAGE_LIDERANCAS,
+    totalItensLiderancas
+  );
+
   const movimentacoesFiltradas = useMemo(() => {
     return movimentacoes.filter((m) => {
       const matchTipo = !filtroTipoMov || m.tipo_movimentacao === filtroTipoMov;
@@ -585,122 +635,351 @@ export default function DirigentesPage() {
           </button>
         </div>
 
-        {/* ═══════════════ ABA 1: LIDERANÇAS VIGENTES ═══════════════ */}
+        {/* ═══════════════ ABA 1: LIDERANÇAS VIGENTES (LISTA COMPACTA COM PAGINAÇÃO DE 15 ITENS) ═══════════════ */}
         {activeTab === 'liderancas' && (
           <div className="space-y-4">
-            {/* Toolbar de Busca */}
+            {/* Toolbar de Busca e Indicador de Paginação */}
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="relative w-full sm:max-w-md">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar por congregação ou dirigente..."
-                  className="w-full pl-10 pr-4 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  onChange={(e) => {
+                    setBusca(e.target.value);
+                    setPaginaAtualLiderancas(1);
+                  }}
+                  placeholder="Buscar por congregação, dirigente ou cargo..."
+                  className="w-full pl-10 pr-10 py-2 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
                 />
+                {busca && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBusca('');
+                      setPaginaAtualLiderancas(1);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                    title="Limpar busca"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
-              <div className="text-xs font-semibold text-slate-500">
-                <span>{liderancasFiltradas.length} congregações listadas</span>
+              <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end text-xs font-semibold text-slate-500">
+                <span>
+                  {totalItensLiderancas}{' '}
+                  {totalItensLiderancas === 1 ? 'congregação listada' : 'congregações listadas'}
+                </span>
+                {totalPaginasLiderancas > 1 && (
+                  <span className="text-slate-400 font-normal">
+                    · Página {paginaValidaLiderancas} de {totalPaginasLiderancas}
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Grid de Cards de Congregações e Lideranças */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {liderancasFiltradas.map((item) => (
-                <div
-                  key={item.congregacao_id}
-                  className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 flex flex-col justify-between hover:border-slate-300 transition"
-                >
-                  <div>
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div>
-                        <h3 className="text-base font-bold text-slate-900 leading-snug">
-                          {item.congregacao_nome}
-                        </h3>
-                        <span className="text-xs text-slate-400 font-medium">Congregação Local</span>
-                      </div>
-                      {item.is_acumulacao && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
-                          Acumulação
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-100 space-y-1.5 mb-4">
-                      <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
-                        Dirigente Vigente
-                      </div>
-                      {item.dirigente_atual_nome ? (
-                        <>
-                          <div className="text-sm font-bold text-slate-900">
-                            {item.dirigente_atual_nome}
-                          </div>
-                          {item.dirigente_atual_cargo && (
-                            <div className="text-xs font-medium text-teal-700">
-                              {item.dirigente_atual_cargo}
-                            </div>
-                          )}
-                          {item.data_posse_atual && (
-                            <div className="text-[11px] text-slate-500 font-medium">
-                              Posse: {new Date(item.data_posse_atual).toLocaleDateString('pt-BR')} (
-                              {item.tempo_mandato_meses} meses de mandato)
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="text-xs font-semibold text-rose-600">
-                          Nenhum dirigente formalmente designado
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Vínculo Patrimonial */}
-                    <div className="flex items-center justify-between text-xs py-2 border-t border-slate-100 text-slate-600">
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <Package className="w-3.5 h-3.5 text-slate-400" />
-                        Patrimônio Vinculado:
-                      </span>
-                      <span className="font-bold text-slate-900">
-                        {item.total_bens_patrimonio} {item.total_bens_patrimonio === 1 ? 'bem' : 'bens'} (
-                        {formatCurrency(item.valor_patrimonio_estimado)})
-                      </span>
-                    </div>
-
-                    {item.movimentacao_em_andamento && (
-                      <div className="mt-2.5 p-2 rounded-lg bg-indigo-50 border border-indigo-100 text-xs text-indigo-700 font-medium">
-                        <strong>Proposta em curso:</strong> {item.movimentacao_em_andamento.dirigente_novo_nome} (
-                        {item.movimentacao_em_andamento.status.toUpperCase()})
-                      </div>
-                    )}
+            {/* Container da Lista Compacta */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+              {liderancasFiltradas.length === 0 ? (
+                <div className="p-12 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                    <Building2 className="w-6 h-6" />
                   </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <h4 className="text-base font-bold text-slate-800">
+                    {busca ? 'Nenhuma congregação ou dirigente encontrado' : 'Nenhuma congregação cadastrada'}
+                  </h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    {busca
+                      ? `Não encontramos registros para o termo "${busca}". Tente pesquisar com outro nome ou cargo.`
+                      : 'Cadastre as congregações no módulo de Igrejas/Congregações para iniciar a gestão de lideranças.'}
+                  </p>
+                  {busca && (
                     <button
                       type="button"
                       onClick={() => {
-                        setPropostaForm((prev) => ({
-                          ...prev,
-                          congregacao_destino_id: item.congregacao_id,
-                          dirigente_anterior_nome: item.dirigente_atual_nome || '',
-                        }));
-                        setModalPropostaOpen(true);
+                        setBusca('');
+                        setPaginaAtualLiderancas(1);
                       }}
-                      className="text-xs font-bold text-teal-700 hover:text-teal-900 transition flex items-center gap-1 cursor-pointer"
+                      className="px-4 py-2 text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-xl border border-teal-200 transition cursor-pointer"
                     >
-                      <ArrowRightLeft className="w-3.5 h-3.5" />
-                      <span>Propor Mudança</span>
+                      Limpar filtro de busca
                     </button>
-
-                    {item.total_bens_patrimonio > 0 && (
-                      <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                        Inventário Ativo
-                      </span>
-                    )}
-                  </div>
+                  )}
                 </div>
-              ))}
+              ) : (
+                <>
+                  {/* Visualização Desktop (Tabela compacta horizontal) */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                          <th className="py-3 px-4">Congregação</th>
+                          <th className="py-3 px-4">Dirigente Vigente</th>
+                          <th className="py-3 px-4">Cargo</th>
+                          <th className="py-3 px-4">Tempo de Mandato</th>
+                          <th className="py-3 px-4">Patrimônio</th>
+                          <th className="py-3 px-4 text-right">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs">
+                        {liderancasPaginadas.map((item) => (
+                          <tr key={item.congregacao_id} className="hover:bg-slate-50/70 transition group">
+                            {/* Congregação */}
+                            <td className="py-3 px-4">
+                              <div className="font-bold text-slate-900 leading-snug">{item.congregacao_nome}</div>
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                {item.is_acumulacao && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+                                    Acumulação
+                                  </span>
+                                )}
+                                {item.movimentacao_em_andamento && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    Mudança em análise
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Dirigente Vigente */}
+                            <td className="py-3 px-4">
+                              {item.dirigente_atual_nome ? (
+                                <div className="font-semibold text-slate-800">{item.dirigente_atual_nome}</div>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                                  Não designado
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Cargo */}
+                            <td className="py-3 px-4">
+                              <span className="font-medium text-teal-700">{item.dirigente_atual_cargo || '—'}</span>
+                            </td>
+
+                            {/* Tempo de Mandato */}
+                            <td className="py-3 px-4">
+                              {item.data_posse_atual ? (
+                                <div>
+                                  <span className="font-semibold text-slate-800">
+                                    {formatTempoMandato(item.tempo_mandato_meses)}
+                                  </span>
+                                  <span className="text-[11px] text-slate-400 block font-normal">
+                                    Posse: {new Date(item.data_posse_atual).toLocaleDateString('pt-BR')}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </td>
+
+                            {/* Patrimônio */}
+                            <td className="py-3 px-4">
+                              <div className="font-semibold text-slate-800">
+                                {item.total_bens_patrimonio} {item.total_bens_patrimonio === 1 ? 'bem' : 'bens'}
+                              </div>
+                              <div className="text-[11px] text-slate-500 font-medium">
+                                {formatCurrency(item.valor_patrimonio_estimado)}
+                              </div>
+                            </td>
+
+                            {/* Ações */}
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setDetalheCongregacao(item)}
+                                  className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer border border-transparent hover:border-slate-200"
+                                  title="Ver detalhes da congregação"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPropostaForm((prev) => ({
+                                      ...prev,
+                                      congregacao_destino_id: item.congregacao_id,
+                                      dirigente_anterior_nome: item.dirigente_atual_nome || '',
+                                      dirigente_anterior_cargo: item.dirigente_atual_cargo || '',
+                                    }));
+                                    setModalPropostaOpen(true);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100/70 border border-teal-200/80 transition cursor-pointer"
+                                >
+                                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                                  <span>Propor Mudança</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Visualização Mobile (Lista vertical compacta) */}
+                  <div className="md:hidden divide-y divide-slate-100">
+                    {liderancasPaginadas.map((item) => (
+                      <div key={item.congregacao_id} className="p-4 hover:bg-slate-50/60 transition space-y-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-sm leading-snug">{item.congregacao_nome}</h4>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              {item.is_acumulacao && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+                                  Acumulação
+                                </span>
+                              )}
+                              {item.movimentacao_em_andamento && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                  Mudança em análise
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setDetalheCongregacao(item)}
+                            className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg border border-slate-200 hover:bg-slate-100 cursor-pointer"
+                            title="Ver detalhes"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Dirigente</span>
+                            {item.dirigente_atual_nome ? (
+                              <div>
+                                <p className="font-semibold text-slate-800 truncate">{item.dirigente_atual_nome}</p>
+                                <p className="text-[11px] text-teal-700 font-medium truncate">{item.dirigente_atual_cargo || '—'}</p>
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200/70 text-slate-600 mt-0.5">
+                                Não designado
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Mandato</span>
+                            {item.data_posse_atual ? (
+                              <div>
+                                <p className="font-semibold text-slate-800">{formatTempoMandato(item.tempo_mandato_meses)}</p>
+                                <p className="text-[11px] text-slate-400">{new Date(item.data_posse_atual).toLocaleDateString('pt-BR')}</p>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </div>
+
+                          <div className="col-span-2 pt-1.5 border-t border-slate-200/60 flex items-center justify-between">
+                            <span className="text-slate-500 font-medium flex items-center gap-1">
+                              <Package className="w-3.5 h-3.5 text-slate-400" />
+                              {item.total_bens_patrimonio} {item.total_bens_patrimonio === 1 ? 'bem' : 'bens'}
+                            </span>
+                            <span className="font-bold text-slate-800">{formatCurrency(item.valor_patrimonio_estimado)}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPropostaForm((prev) => ({
+                                ...prev,
+                                congregacao_destino_id: item.congregacao_id,
+                                dirigente_anterior_nome: item.dirigente_atual_nome || '',
+                                dirigente_anterior_cargo: item.dirigente_atual_cargo || '',
+                              }));
+                              setModalPropostaOpen(true);
+                            }}
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition cursor-pointer"
+                          >
+                            <ArrowRightLeft className="w-3.5 h-3.5" />
+                            <span>Propor Mudança</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Rodapé com Navegação Paginada (15 por página) */}
+                  <div className="px-4 py-3 bg-white border-t border-slate-200/90 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                    <div className="text-slate-600 font-medium text-center sm:text-left">
+                      Mostrando <span className="font-bold text-slate-900">{inicioRegistroLiderancas}</span> a{' '}
+                      <span className="font-bold text-slate-900">{fimRegistroLiderancas}</span> de{' '}
+                      <span className="font-bold text-slate-900">{totalItensLiderancas}</span> congregações
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      {/* Botão Anterior */}
+                      <button
+                        type="button"
+                        onClick={() => setPaginaAtualLiderancas((p) => Math.max(1, p - 1))}
+                        disabled={paginaValidaLiderancas <= 1}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-bold border transition ${
+                          paginaValidaLiderancas <= 1
+                            ? 'bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 cursor-pointer shadow-2xs'
+                        }`}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        <span className="hidden sm:inline">Anterior</span>
+                      </button>
+
+                      {/* Números das Páginas */}
+                      <div className="flex items-center gap-1 px-1">
+                        {getPaginationRange(paginaValidaLiderancas, totalPaginasLiderancas).map((p, idx) => {
+                          if (p === '...') {
+                            return (
+                              <span key={`dots-${idx}`} className="px-2 py-1 text-slate-400 select-none">
+                                ...
+                              </span>
+                            );
+                          }
+                          const pageNum = Number(p);
+                          const isAtiva = pageNum === paginaValidaLiderancas;
+                          return (
+                            <button
+                              key={`page-${pageNum}`}
+                              type="button"
+                              onClick={() => setPaginaAtualLiderancas(pageNum)}
+                              className={`min-w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                isAtiva
+                                  ? 'bg-teal-700 text-white shadow-xs'
+                                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Botão Próxima */}
+                      <button
+                        type="button"
+                        onClick={() => setPaginaAtualLiderancas((p) => Math.min(totalPaginasLiderancas, p + 1))}
+                        disabled={paginaValidaLiderancas >= totalPaginasLiderancas}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-bold border transition ${
+                          paginaValidaLiderancas >= totalPaginasLiderancas
+                            ? 'bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 cursor-pointer shadow-2xs'
+                        }`}
+                      >
+                        <span className="hidden sm:inline">Próxima</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -1165,6 +1444,146 @@ export default function DirigentesPage() {
                 className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-teal-700 hover:bg-teal-800 transition shadow-sm cursor-pointer"
               >
                 Submeter Proposta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Detalhes da Congregação e Liderança ─────────────────── */}
+      {detalheCongregacao && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200/90 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold bg-teal-50 text-teal-800 border border-teal-200 mb-1">
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>Congregação</span>
+                </div>
+                <h3 className="text-lg font-black text-slate-900">{detalheCongregacao.congregacao_nome}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetalheCongregacao(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              {/* Card Dirigente */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Liderança Atual
+                </span>
+                {detalheCongregacao.dirigente_atual_nome ? (
+                  <div className="space-y-1">
+                    <div className="text-sm font-bold text-slate-900">
+                      {detalheCongregacao.dirigente_atual_nome}
+                    </div>
+                    {detalheCongregacao.dirigente_atual_cargo && (
+                      <div className="text-teal-700 font-semibold">{detalheCongregacao.dirigente_atual_cargo}</div>
+                    )}
+                    {detalheCongregacao.dirigente_atual_telefone && (
+                      <div className="text-slate-500">Contato: {detalheCongregacao.dirigente_atual_telefone}</div>
+                    )}
+                    {detalheCongregacao.data_posse_atual && (
+                      <div className="text-slate-600 pt-1 border-t border-slate-200/60 flex items-center justify-between">
+                        <span>Data de Posse:</span>
+                        <span className="font-semibold">
+                          {new Date(detalheCongregacao.data_posse_atual).toLocaleDateString('pt-BR')} (
+                          {formatTempoMandato(detalheCongregacao.tempo_mandato_meses)})
+                        </span>
+                      </div>
+                    )}
+                    {detalheCongregacao.is_acumulacao && (
+                      <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        Acumula congregação adicional
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-rose-600 font-semibold py-1">
+                    Nenhum dirigente formalmente designado nesta congregação.
+                  </div>
+                )}
+              </div>
+
+              {/* Card Patrimônio */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Patrimônio Vinculado à Congregação
+                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600 font-medium flex items-center gap-1.5">
+                    <Package className="w-4 h-4 text-slate-400" />
+                    Total de Itens:
+                  </span>
+                  <span className="font-bold text-slate-900 text-sm">
+                    {detalheCongregacao.total_bens_patrimonio}{' '}
+                    {detalheCongregacao.total_bens_patrimonio === 1 ? 'bem' : 'bens'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                  <span className="text-slate-600 font-medium">Valor Total Estimado:</span>
+                  <span className="font-bold text-teal-800 text-sm">
+                    {formatCurrency(detalheCongregacao.valor_patrimonio_estimado)}
+                  </span>
+                </div>
+                {detalheCongregacao.total_bens_patrimonio > 0 ? (
+                  <p className="text-[11px] text-slate-500">
+                    * Qualquer movimentação exigirá conferência e homologação do Termo Patrimonial.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-emerald-700 font-medium">
+                    Sem bens registrados (mudança de liderança dispensada de termo patrimonial).
+                  </p>
+                )}
+              </div>
+
+              {/* Card Movimentação em Andamento */}
+              {detalheCongregacao.movimentacao_em_andamento && (
+                <div className="p-3.5 rounded-xl bg-indigo-50 border border-indigo-200/80 space-y-1.5 text-indigo-900">
+                  <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">
+                    Movimentação em Curso
+                  </span>
+                  <div className="font-bold text-sm">
+                    Novo proposto: {detalheCongregacao.movimentacao_em_andamento.dirigente_novo_nome}
+                  </div>
+                  <div className="text-xs text-indigo-700">
+                    Status: {detalheCongregacao.movimentacao_em_andamento.status.toUpperCase()} · Previsto:{' '}
+                    {new Date(detalheCongregacao.movimentacao_em_andamento.data_prevista).toLocaleDateString('pt-BR')}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDetalheCongregacao(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition cursor-pointer"
+              >
+                Fechar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const targetCong = detalheCongregacao;
+                  setDetalheCongregacao(null);
+                  setPropostaForm((prev) => ({
+                    ...prev,
+                    congregacao_destino_id: targetCong.congregacao_id,
+                    dirigente_anterior_nome: targetCong.dirigente_atual_nome || '',
+                    dirigente_anterior_cargo: targetCong.dirigente_atual_cargo || '',
+                  }));
+                  setModalPropostaOpen(true);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-teal-700 hover:bg-teal-800 transition shadow-sm cursor-pointer flex items-center gap-1.5"
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5" />
+                <span>Propor Mudança</span>
               </button>
             </div>
           </div>
