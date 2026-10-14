@@ -301,6 +301,9 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'ebd',
   ],
   presidencia: [
+    'presidencia',
+    'consolidado_financeiro',
+    'conselho_fiscal',
     'agenda',
   ],
   conselho_fiscal: [
@@ -438,7 +441,7 @@ export function mapRoleAndPermissions(nivel: NivelAcesso): RoleConfig {
     case 'coordenador':
       return { role: 'operator', permissions: ['COORDENADOR_EBD', 'COORDENADOR'] };
     case 'presidencia':
-      return { role: 'operator', permissions: ['PRESIDENCIA'] };
+      return { role: 'manager', permissions: ['PRESIDENCIA'] };
     case 'conselho_fiscal':
       return { role: 'operator', permissions: ['CONSELHO_FISCAL'] };
   }

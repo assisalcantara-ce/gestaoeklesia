@@ -652,6 +652,21 @@ export class DirigentesService {
       throw new Error('Congregação não encontrada ou pertencente a outro ministério.');
     }
 
+    // 1.1 Impede criação de proposta concorrente se já houver mudança em análise ou aprovada
+    const { data: movEmAndamento } = await supabase
+      .from('dirigentes_movimentacoes')
+      .select('id, status, dirigente_novo_nome')
+      .eq('ministry_id', user.ministryId)
+      .eq('congregacao_destino_id', input.congregacao_destino_id)
+      .in('status', ['proposta', 'aprovada'])
+      .maybeSingle();
+
+    if (movEmAndamento) {
+      throw new Error(
+        `A congregação "${congDest.nome}" já possui uma mudança de liderança em análise (novo proposto: ${movEmAndamento.dirigente_novo_nome}). Aguarde a deliberação da Presidência antes de submeter nova proposta.`
+      );
+    }
+
     // 2. Valida elegibilidade do novo dirigente selecionado no perfil de ministro ativo
     const ministroElegivel = await this.validarElegibilidadeMinistro(
       supabase,

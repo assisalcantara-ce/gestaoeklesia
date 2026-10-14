@@ -190,6 +190,16 @@ export default function DirigentesPage() {
 
   // Ações de Proposta e Aprovação
   const abrirPropostaParaCongregacao = (item: CongregacaoLiderancaView) => {
+    if (item.movimentacao_em_andamento) {
+      setNotification({
+        isOpen: true,
+        title: 'Mudança em Análise',
+        message: `Já existe uma movimentação em análise para a congregação "${item.congregacao_nome}" (Novo proposto: ${item.movimentacao_em_andamento.dirigente_novo_nome}). Aguarde a deliberação da Presidência antes de propor nova mudança.`,
+        type: 'warning',
+      });
+      return;
+    }
+
     setCongregacaoProposta(item);
     setPropostaForm({
       tipo_movimentacao: 'rodizio_anual',
@@ -917,14 +927,26 @@ export default function DirigentesPage() {
                                   <Eye className="w-4 h-4" />
                                 </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => abrirPropostaParaCongregacao(item)}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100/70 border border-teal-200/80 transition cursor-pointer"
-                                >
-                                  <ArrowRightLeft className="w-3.5 h-3.5" />
-                                  <span>Propor Mudança</span>
-                                </button>
+                                {item.movimentacao_em_andamento ? (
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 bg-slate-100 border border-slate-200/90 cursor-not-allowed select-none opacity-80"
+                                    title={`Já existe uma mudança em análise para esta congregação (Novo proposto: ${item.movimentacao_em_andamento.dirigente_novo_nome}).`}
+                                  >
+                                    <ArrowRightLeft className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>Propor Mudança</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirPropostaParaCongregacao(item)}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100/70 border border-teal-200/80 transition cursor-pointer"
+                                  >
+                                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                                    <span>Propor Mudança</span>
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1000,14 +1022,26 @@ export default function DirigentesPage() {
                         </div>
 
                         <div className="flex items-center justify-end pt-1">
-                          <button
-                            type="button"
-                            onClick={() => abrirPropostaParaCongregacao(item)}
-                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition cursor-pointer"
-                          >
-                            <ArrowRightLeft className="w-3.5 h-3.5" />
-                            <span>Propor Mudança</span>
-                          </button>
+                          {item.movimentacao_em_andamento ? (
+                            <button
+                              type="button"
+                              disabled
+                              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed select-none opacity-80"
+                              title={`Já existe uma mudança em análise para esta congregação (Novo proposto: ${item.movimentacao_em_andamento.dirigente_novo_nome}).`}
+                            >
+                              <ArrowRightLeft className="w-3.5 h-3.5 text-slate-400" />
+                              <span>Propor Mudança</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => abrirPropostaParaCongregacao(item)}
+                              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition cursor-pointer"
+                            >
+                              <ArrowRightLeft className="w-3.5 h-3.5" />
+                              <span>Propor Mudança</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1790,20 +1824,32 @@ export default function DirigentesPage() {
               >
                 Fechar
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const targetCong = detalheCongregacao;
-                  setDetalheCongregacao(null);
-                  if (targetCong) {
-                    abrirPropostaParaCongregacao(targetCong);
-                  }
-                }}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-teal-700 hover:bg-teal-800 transition shadow-sm cursor-pointer flex items-center gap-1.5"
-              >
-                <ArrowRightLeft className="w-3.5 h-3.5" />
-                <span>Propor Mudança</span>
-              </button>
+              {detalheCongregacao.movimentacao_em_andamento ? (
+                <button
+                  type="button"
+                  disabled
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed select-none opacity-80 flex items-center gap-1.5"
+                  title={`Já existe uma mudança em análise para esta congregação (Novo proposto: ${detalheCongregacao.movimentacao_em_andamento.dirigente_novo_nome}).`}
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Propor Mudança</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetCong = detalheCongregacao;
+                    setDetalheCongregacao(null);
+                    if (targetCong) {
+                      abrirPropostaParaCongregacao(targetCong);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-teal-700 hover:bg-teal-800 transition shadow-sm cursor-pointer flex items-center gap-1.5"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                  <span>Propor Mudança</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -1169,6 +1169,67 @@ describe('Módulo Dirigentes — Fundação, Regras de Negócio, RBAC e Integra�
     assert.equal(id2, 'desig_1');
     assert.equal(designacoesDb[0].nome_dirigente, 'Pr. Josué Pereira');
   });
+
+  test('21. Bloqueio de Proposta Concorrente: impede nova proposta para congregação que já possui mudança em análise', async () => {
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === 'congregacoes') {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  maybeSingle: async () => ({
+                    data: { id: 'cong-monte-oliveiras', nome: 'Monte das Oliveiras', ministry_id: ministryAlpha },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'dirigentes_movimentacoes') {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  in: () => ({
+                    maybeSingle: async () => ({
+                      data: {
+                        id: 'mov-existente-1',
+                        status: 'proposta',
+                        dirigente_novo_nome: 'Pr. Proposto Anterior',
+                      },
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+        return {};
+      },
+    };
+
+    await assert.rejects(
+      async () => {
+        await DirigentesService.criarProposta(
+          mockSupabase as any,
+          userSecretaria,
+          {
+            tipo_movimentacao: 'rodizio_anual',
+            congregacao_destino_id: 'cong-monte-oliveiras',
+            dirigente_novo_member_id: 'mem-pr-ativo',
+            dirigente_novo_nome: 'Pr. Josué Pereira',
+            motivo: 'Tentativa de proposta concorrente',
+            data_prevista: '2026-11-01',
+          }
+        );
+      },
+      /já possui uma mudança de liderança em análise/
+    );
+  });
 });
+
 
 

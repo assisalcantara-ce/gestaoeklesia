@@ -291,7 +291,7 @@ export default function Sidebar() {
       featureFlag: 'presidency_module',
       planFeature: 'has_modulo_presidencial',
       submenu: [
-        { id: 'presidencia-geral', label: 'Visão Geral', path: '/presidencia', modulo: 'presidencia', featureFlag: 'presidency_module', planFeature: 'has_modulo_presidencial' },
+        { id: 'presidencia-geral', label: 'Central de Decisões', path: '/presidencia', modulo: 'presidencia', featureFlag: 'presidency_module', planFeature: 'has_modulo_presidencial' },
         { id: 'consolidado-financeiro', label: 'Consolidado Financeiro', path: '/presidencia/consolidado', modulo: 'consolidado_financeiro', featureFlag: 'presidency_module', planFeature: 'has_modulo_presidencial' },
         { id: 'prestacao-contas', label: 'Prestação de Contas', path: '/presidencia/prestacao-contas', modulo: 'consolidado_financeiro', featureFlag: 'accounting_module', planFeature: 'has_modulo_contabilidade' },
         { id: 'prestacao-contas-oficial', label: 'Prestação de Contas Oficial', path: '/presidencia/prestacao-contas-oficial', modulo: 'consolidado_financeiro', featureFlag: 'accounting_module', planFeature: 'has_modulo_contabilidade' },
@@ -324,30 +324,43 @@ export default function Sidebar() {
   ];
 
   // Filtra menus: 1) por plano  2) por nível de acesso do usuário
-  const menuItems = allMenuItems.filter(i => {
-    if (planFeatures.loading || userCtx.loading) {
-      return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda', 'ebd', 'missoes', 'funcionarios', 'comissao', 'comissoes', 'consagracao', 'apresentacao-criancas', 'presidencia', 'presidencia-geral', 'consolidado-financeiro', 'prestacao-contas', 'prestacao-contas-oficial', 'auditoria-financeira', 'conselho-fiscal'].includes(i.id);
-    }
-    if (i.featureFlag && !planFeatures.hasFeature(i.featureFlag)) return false;
-    if (i.id === 'tesouraria' && !planFeatures.has_modulo_financeiro) return false;
-    if (i.id === 'financeiro' && !planFeatures.has_modulo_financeiro_avancado) return false;
-    if (i.id === 'eventos' && !planFeatures.has_modulo_eventos) return false;
-    if (i.id === 'reunioes' && !planFeatures.has_modulo_reunioes) return false;
-    if (i.id === 'agenda' && !planFeatures.has_modulo_agenda) return false;
-    if (i.id === 'funcionarios') {
-      if (!planFeatures.has_modulo_funcionarios || !planFeatures.hasFeature('employees_module')) return false;
-      const isLocal = userCtx.nivel && ['admin_local', 'financeiro_local', 'supervisor', 'viewer'].includes(userCtx.nivel);
-      if (isLocal) return false;
-    }
-    if (userCtx.nivel === 'auxiliar_secretaria') {
-      if (['cartas', 'certificados', 'funcionarios', 'comissao', 'ativar-fluxo', 'casamento', 'estrutura-hierarquica'].includes(i.id)) {
-        return false;
+  const menuItems = useMemo(() => {
+    let items = allMenuItems.filter(i => {
+      if (planFeatures.loading || userCtx.loading) {
+        return !['tesouraria', 'financeiro', 'eventos', 'reunioes', 'auditoria', 'usuarios', 'agenda', 'ebd', 'missoes', 'funcionarios', 'comissao', 'comissoes', 'consagracao', 'apresentacao-criancas', 'presidencia', 'presidencia-geral', 'consolidado-financeiro', 'prestacao-contas', 'prestacao-contas-oficial', 'auditoria-financeira', 'conselho-fiscal'].includes(i.id);
+      }
+      if (i.featureFlag && !planFeatures.hasFeature(i.featureFlag)) return false;
+      if (i.id === 'tesouraria' && !planFeatures.has_modulo_financeiro) return false;
+      if (i.id === 'financeiro' && !planFeatures.has_modulo_financeiro_avancado) return false;
+      if (i.id === 'eventos' && !planFeatures.has_modulo_eventos) return false;
+      if (i.id === 'reunioes' && !planFeatures.has_modulo_reunioes) return false;
+      if (i.id === 'agenda' && !planFeatures.has_modulo_agenda) return false;
+      if (i.id === 'funcionarios') {
+        if (!planFeatures.has_modulo_funcionarios || !planFeatures.hasFeature('employees_module')) return false;
+        const isLocal = userCtx.nivel && ['admin_local', 'financeiro_local', 'supervisor', 'viewer'].includes(userCtx.nivel);
+        if (isLocal) return false;
+      }
+      if (userCtx.nivel === 'auxiliar_secretaria') {
+        if (['cartas', 'certificados', 'funcionarios', 'comissao', 'ativar-fluxo', 'casamento', 'estrutura-hierarquica'].includes(i.id)) {
+          return false;
+        }
+      }
+      const modulo = i.modulo;
+      if (modulo && !userCtx.podeAcessar(modulo)) return false;
+      return true;
+    });
+
+    // Se o perfil for estritamente Presidência, prioriza a Central de Decisões no topo do menu institucional
+    if (userCtx.nivel === 'presidencia') {
+      const presidenciaItem = items.find((i) => i.id === 'presidencia');
+      if (presidenciaItem) {
+        const outros = items.filter((i) => i.id !== 'presidencia');
+        items = [presidenciaItem, ...outros];
       }
     }
-    const modulo = i.modulo;
-    if (modulo && !userCtx.podeAcessar(modulo)) return false;
-    return true;
-  });
+
+    return items;
+  }, [allMenuItems, planFeatures, userCtx]);
 
   const handleNavigate = (_id: string, path: string) => {
     router.push(path);
