@@ -1229,6 +1229,177 @@ describe('Módulo Dirigentes — Fundação, Regras de Negócio, RBAC e Integra�
       /já possui uma mudança de liderança em análise/
     );
   });
+
+  test('22. Lista Completa de Dirigentes para Impressão: inclui todas as congregações ativas, identifica não designados e mapeia matrícula ministerial real', async () => {
+    const mockSupabase = {
+      from: (tabela: string) => {
+        if (tabela === 'congregacoes') {
+          return {
+            select: () => ({
+              eq: (col: string, val: string) => {
+                assert.equal(col, 'ministry_id');
+                assert.equal(val, ministryAlpha);
+                return {
+                  or: () => ({
+                    order: () =>
+                      Promise.resolve({
+                        data: [
+                          {
+                            id: 'cong-betel',
+                            nome: 'Congregação Betel',
+                            dirigente: 'Pr. Marcos Silva',
+                            dirigente_cargo: 'Pastor',
+                            dirigente_cpf: '111.222.333-44',
+                            dirigente_matricula: 'MIN-010',
+                          },
+                          {
+                            id: 'cong-canaa',
+                            nome: 'Congregação Canaã',
+                            dirigente: null,
+                            dirigente_cargo: null,
+                            dirigente_cpf: null,
+                            dirigente_matricula: null,
+                          },
+                          {
+                            id: 'cong-alfa',
+                            nome: 'Congregação Alfa',
+                            dirigente: 'Ev. Silas Santos',
+                            dirigente_cargo: 'Evangelista',
+                            dirigente_cpf: null,
+                            dirigente_matricula: null,
+                          },
+                        ],
+                        error: null,
+                      }),
+                  }),
+                };
+              },
+            }),
+          };
+        }
+
+        if (tabela === 'dirigentes_designacoes') {
+          return {
+            select: () => ({
+              eq: (_c1: string, _v1: string) => ({
+                eq: (_c2: string, _v2: string) =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        id: 'desig-1',
+                        congregacao_id: 'cong-betel',
+                        nome_dirigente: 'Pr. Marcos Silva',
+                        cargo_ministerial: 'Pastor',
+                        matricula_dirigente: 'MIN-010',
+                        data_posse: '2024-01-15',
+                        status: 'ativo',
+                      },
+                      {
+                        id: 'desig-2',
+                        congregacao_id: 'cong-alfa',
+                        member_id: 'mem-silas',
+                        nome_dirigente: 'Ev. Silas Santos',
+                        cargo_ministerial: 'Evangelista',
+                        matricula_dirigente: null, // sem matrícula na designação, mas terá na tabela members
+                        data_posse: '2025-06-01',
+                        status: 'ativo',
+                      },
+                    ],
+                    error: null,
+                  }),
+              }),
+            }),
+          };
+        }
+
+        if (tabela === 'members') {
+          return {
+            select: () => ({
+              in: () => ({
+                eq: () =>
+                  Promise.resolve({
+                    data: [
+                      { id: 'mem-silas', matricula: 'MIN-099' },
+                    ],
+                    error: null,
+                  }),
+              }),
+            }),
+          };
+        }
+
+        if (tabela === 'patrimonio_itens') {
+          return {
+            select: () => ({
+              eq: () => ({
+                neq: () =>
+                  Promise.resolve({
+                    data: [],
+                    error: null,
+                  }),
+              }),
+            }),
+          };
+        }
+
+        if (tabela === 'dirigentes_movimentacoes') {
+          return {
+            select: () => ({
+              eq: () => ({
+                in: () =>
+                  Promise.resolve({
+                    data: [],
+                    error: null,
+                  }),
+              }),
+            }),
+          };
+        }
+
+        throw new Error(`Tabela não mockada: ${tabela}`);
+      },
+    };
+
+    const views = await DirigentesService.carregarVisaoGeral(mockSupabase as any, ministryAlpha);
+
+    // 1. Deve carregar todas as congregações ativas (inclusive sem dirigente)
+    assert.equal(views.length, 3);
+
+    // 2. Congregação Betel: possui dirigente e matrícula 'MIN-010'
+    const betel = views.find((v) => v.congregacao_id === 'cong-betel');
+    assert.ok(betel);
+    assert.equal(betel.dirigente_atual_nome, 'Pr. Marcos Silva');
+    assert.equal(betel.dirigente_atual_matricula, 'MIN-010');
+    assert.equal(betel.dirigente_atual_cargo, 'Pastor');
+    assert.equal(betel.data_posse_atual, '2024-01-15');
+
+    // 3. Congregação Alfa: recuperou matrícula ministerial 'MIN-099' via cadastro do membro
+    const alfa = views.find((v) => v.congregacao_id === 'cong-alfa');
+    assert.ok(alfa);
+    assert.equal(alfa.dirigente_atual_nome, 'Ev. Silas Santos');
+    assert.equal(alfa.dirigente_atual_matricula, 'MIN-099');
+
+    // 4. Congregação Canaã: não possui dirigente designado
+    const canaa = views.find((v) => v.congregacao_id === 'cong-canaa');
+    assert.ok(canaa);
+    assert.equal(canaa.dirigente_atual_nome, null);
+    assert.equal(canaa.dirigente_atual_matricula, null);
+
+    // 5. Ordenação alfabética para impressão
+    const ordenadas = [...views].sort((a, b) =>
+      a.congregacao_nome.localeCompare(b.congregacao_nome, 'pt-BR')
+    );
+    assert.deepEqual(
+      ordenadas.map((o) => o.congregacao_nome),
+      ['Congregação Alfa', 'Congregação Betel', 'Congregação Canaã']
+    );
+
+    // 6. Totalizadores
+    const totalDesignados = ordenadas.filter((o) => Boolean(o.dirigente_atual_nome)).length;
+    const totalVagas = ordenadas.length - totalDesignados;
+    assert.equal(totalDesignados, 2);
+    assert.equal(totalVagas, 1);
+  });
 });
 
 

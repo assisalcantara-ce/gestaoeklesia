@@ -372,6 +372,24 @@ export class DirigentesService {
       contagemPorDirigente.set(k, (contagemPorDirigente.get(k) || 0) + 1);
     });
 
+    // Mapeamento de matrícula ministerial por membro
+    const memberIds = (desigs || []).map((d: any) => d.member_id).filter(Boolean);
+    const mapMembersMatricula = new Map<string, string>();
+    if (memberIds.length > 0) {
+      try {
+        const { data: mData } = await supabase
+          .from('members')
+          .select('id, matricula')
+          .in('id', memberIds)
+          .eq('ministry_id', ministryId);
+        (mData || []).forEach((m: any) => {
+          if (m.matricula) mapMembersMatricula.set(m.id, m.matricula);
+        });
+      } catch {
+        // Fallback resiliente
+      }
+    }
+
     return congs.map((c: any) => {
       const desig = mapDesigs.get(c.id);
       const bensInfo = mapBensContagem.get(c.id) || { total: 0, valor: 0 };
@@ -379,6 +397,11 @@ export class DirigentesService {
 
       const nomeDir = desig?.nome_dirigente || c.dirigente || null;
       const cargoDir = desig?.cargo_ministerial || c.dirigente_cargo || null;
+      const matriculaDir =
+        desig?.matricula_dirigente ||
+        (desig?.member_id ? mapMembersMatricula.get(desig.member_id) : null) ||
+        c.dirigente_matricula ||
+        null;
       const telDir = desig?.telefone || null;
       const dataPosse = desig?.data_posse || null;
 
@@ -405,6 +428,7 @@ export class DirigentesService {
         dirigente_atual_member_id: desig?.member_id || null,
         dirigente_atual_nome: nomeDir,
         dirigente_atual_cargo: cargoDir,
+        dirigente_atual_matricula: matriculaDir,
         dirigente_atual_telefone: telDir,
         data_posse_atual: dataPosse,
         tempo_mandato_meses: tempoMeses,

@@ -1,12 +1,7 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  PresidenciaService,
-  type ProcessoDecisao,
-  type PresidenciaResumo,
-} from '../src/services/presidencia-service.js';
+import { PresidenciaService } from '../src/services/presidencia-service.js';
 import type { UserContextAuth } from '../src/services/dirigentes-service.js';
-import type { DirigenteMovimentacao } from '../src/types/dirigentes.js';
 
 describe('Presidência — Central de Decisões Institucionais, Governança e Fila Unificada', () => {
   const ministryAlpha = '11111111-1111-1111-1111-111111111111';
@@ -95,7 +90,7 @@ describe('Presidência — Central de Decisões Institucionais, Governança e Fi
                 assert.equal(col, 'ministry_id');
                 assert.equal(val, ministryAlpha);
                 return {
-                  in: (statusCol: string, statuses: string[]) => {
+                  in: (_statusCol: string, statuses: string[]) => {
                     assert.deepEqual(statuses, ['proposta', 'aprovada']);
                     return {
                       order: () =>
@@ -254,8 +249,8 @@ describe('Presidência — Central de Decisões Institucionais, Governança e Fi
         if (tabela === 'dirigentes_movimentacoes') {
           return {
             select: () => ({
-              eq: (col: string, val: string) => ({
-                eq: (c2: string, v2: string) => ({
+              eq: (_col: string, _val: string) => ({
+                eq: (_c2: string, _v2: string) => ({
                   single: () =>
                     Promise.resolve({
                       data: {

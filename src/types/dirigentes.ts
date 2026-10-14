@@ -125,6 +125,7 @@ export interface CongregacaoLiderancaView {
   dirigente_atual_member_id?: string | null;
   dirigente_atual_nome: string | null;
   dirigente_atual_cargo: string | null;
+  dirigente_atual_matricula?: string | null;
   dirigente_atual_telefone: string | null;
   data_posse_atual: string | null;
   tempo_mandato_meses: number;

@@ -49,6 +49,21 @@ function formatTempoMandato(meses: number): string {
   return `${anos}a ${restoMeses}m`;
 }
 
+function formatDataPtBr(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  } catch {
+    return iso;
+  }
+}
+
 function getPaginationRange(current: number, total: number): (number | string)[] {
   if (total <= 7) {
     return Array.from({ length: total }, (_, i) => i + 1);
@@ -539,6 +554,287 @@ export default function DirigentesPage() {
     }
   };
 
+  // Impressão da Lista Atual de Dirigentes por Congregação
+  const handleImprimirListaDirigentes = () => {
+    if (liderancas.length === 0) {
+      showNotif('info', 'Sem Dados', 'Não há congregações cadastradas para emitir a lista de dirigentes.');
+      return;
+    }
+
+    // 1. Ordena alfabeticamente todas as congregações ativas do ministério
+    const listaOrdenada = [...liderancas].sort((a, b) =>
+      (a.congregacao_nome || '').localeCompare(b.congregacao_nome || '', 'pt-BR', {
+        sensitivity: 'base',
+      })
+    );
+
+    // 2. Estatísticas consolidadas
+    const totalCongregacoes = listaOrdenada.length;
+    const totalDesignados = listaOrdenada.filter((l) => Boolean(l.dirigente_atual_nome?.trim())).length;
+    const totalSemDirigente = totalCongregacoes - totalDesignados;
+
+    const dataHoraEmissao =
+      new Date().toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }) +
+      ' às ' +
+      new Date().toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+    const linhasHtml = listaOrdenada
+      .map((item, idx) => {
+        const temDirigente = Boolean(item.dirigente_atual_nome?.trim());
+        const nomeDirigente = temDirigente
+          ? `<span style="font-weight:700;color:#0f172a;">${item.dirigente_atual_nome}</span>`
+          : `<span style="color:#b91c1c;font-weight:600;font-style:italic;">Não designado</span>`;
+
+        const matricula = item.dirigente_atual_matricula?.trim() || '—';
+        const cargo = temDirigente ? (item.dirigente_atual_cargo?.trim() || '—') : '—';
+        const dataPosse = temDirigente && item.data_posse_atual ? formatDataPtBr(item.data_posse_atual) : '—';
+        const bgCor = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+
+        return `
+          <tr style="border-bottom:1px solid #e2e8f0;background-color:${bgCor};page-break-inside:avoid;">
+            <td style="padding:6px 8px;text-align:center;font-weight:bold;color:#475569;width:38px;">${idx + 1}</td>
+            <td style="padding:6px 8px;font-weight:700;color:#1e293b;">
+              ${item.congregacao_nome}
+              ${item.is_acumulacao ? '<span style="font-size:8.5px;color:#d97706;font-weight:bold;margin-left:4px;">(Acumulação)</span>' : ''}
+            </td>
+            <td style="padding:6px 8px;">${nomeDirigente}</td>
+            <td style="padding:6px 8px;text-align:center;font-weight:600;color:#334155;">${matricula}</td>
+            <td style="padding:6px 8px;color:#334155;">${cargo}</td>
+            <td style="padding:6px 8px;text-align:center;color:#334155;white-space:nowrap;">${dataPosse}</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Lista Atual de Dirigentes por Congregação</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    @page {
+      size: A4 portrait;
+      margin: 12mm 10mm 14mm 10mm;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      font-size: 10.5px;
+      line-height: 1.35;
+      padding: 0;
+    }
+    .header-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid #0f766e;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+      gap: 16px;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-logo {
+      height: 50px;
+      max-width: 110px;
+      object-fit: contain;
+    }
+    .header-titles h1 {
+      font-size: 15px;
+      font-weight: 800;
+      color: #0f766e;
+      letter-spacing: -0.2px;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .header-titles h2 {
+      font-size: 12px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 1px;
+    }
+    .header-titles p {
+      font-size: 9.5px;
+      color: #64748b;
+    }
+    .header-badge {
+      text-align: right;
+      background: #f0fdfa;
+      border: 1px solid #ccfbf1;
+      border-radius: 8px;
+      padding: 6px 12px;
+      flex-shrink: 0;
+    }
+    .header-badge strong {
+      display: block;
+      font-size: 10px;
+      color: #0f766e;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+    }
+    .header-badge span {
+      font-size: 9px;
+      color: #475569;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 14px;
+      margin-bottom: 12px;
+      page-break-inside: avoid;
+    }
+    .summary-item strong {
+      display: block;
+      font-size: 8.5px;
+      text-transform: uppercase;
+      color: #64748b;
+      letter-spacing: 0.4px;
+      font-weight: 700;
+    }
+    .summary-item span {
+      font-size: 13px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+    }
+    thead {
+      display: table-header-group;
+    }
+    thead th {
+      background-color: #0f766e;
+      color: #ffffff;
+      padding: 6px 8px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      text-align: left;
+      border: 1px solid #0f766e;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    tbody td {
+      border: 1px solid #e2e8f0;
+      font-size: 9.5px;
+    }
+    tr {
+      page-break-inside: avoid;
+    }
+    .footer-note {
+      margin-top: 14px;
+      border-top: 1px solid #cbd5e1;
+      padding-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8.5px;
+      color: #64748b;
+      page-break-inside: avoid;
+    }
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header-container">
+    <div class="header-left">
+      ${configIgreja.logo ? `<img class="header-logo" src="${configIgreja.logo}" alt="Logo" />` : ''}
+      <div class="header-titles">
+        <h1>${configIgreja.nome || 'Ministério Eklésia'}</h1>
+        <h2>Lista Atual de Dirigentes por Congregação</h2>
+        <p>Secretaria Geral · Governança e Liderança Eclesiástica</p>
+      </div>
+    </div>
+    <div class="header-badge">
+      <strong>Relatório Oficial</strong>
+      <span>Emissão: ${dataHoraEmissao}</span>
+    </div>
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-item">
+      <strong>Total de Congregações</strong>
+      <span>${totalCongregacoes}</span>
+    </div>
+    <div class="summary-item">
+      <strong>Dirigentes Designados</strong>
+      <span style="color:#0f766e;">${totalDesignados}</span>
+    </div>
+    <div class="summary-item">
+      <strong>Congregações Não Designadas</strong>
+      <span style="color:${totalSemDirigente > 0 ? '#b91c1c' : '#475569'};">${totalSemDirigente}</span>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:center;width:38px;">Nº</th>
+        <th>Congregação</th>
+        <th>Nome Completo do Dirigente Vigente</th>
+        <th style="text-align:center;width:110px;">Matrícula</th>
+        <th style="width:130px;">Cargo</th>
+        <th style="text-align:center;width:95px;">Data da Posse</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${linhasHtml}
+    </tbody>
+  </table>
+
+  <div class="footer-note">
+    <span>Gestão Eklésia · Sistema de Gestão Eclesiástica Integrada</span>
+    <span>Documento gerado para controle e governança da Secretaria Geral</span>
+  </div>
+
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+      }, 300);
+    };
+  <\/script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+    } else {
+      showNotif(
+        'warning',
+        'Pop-up Bloqueado',
+        'O navegador bloqueou a abertura da janela de impressão. Por favor, permita pop-ups para este site para gerar o relatório impresso.'
+      );
+    }
+  };
+
   // Memos e Métricas
   const totalCongregacoes = liderancas.length;
   const comDirigenteCount = liderancas.filter((l) => Boolean(l.dirigente_atual_nome)).length;
@@ -630,7 +926,17 @@ export default function DirigentesPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleImprimirListaDirigentes}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 shadow-xs border border-slate-300 hover:border-slate-400 transition cursor-pointer"
+              title="Imprimir lista oficial de dirigentes de todas as congregações"
+            >
+              <Printer className="w-4 h-4 text-slate-600" />
+              <span>Imprimir Lista de Dirigentes</span>
+            </button>
+
             {podePropor && (
               <button
                 type="button"
