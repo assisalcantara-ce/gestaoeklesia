@@ -19,6 +19,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Lock,
+  Loader2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { useUserContext } from '@/hooks/useUserContext';
@@ -30,6 +32,7 @@ import type {
   DirigenteMovimentacao,
   TipoMovimentacao,
   DirigenteDesignacao,
+  MinistroElegivelBusca,
 } from '@/types/dirigentes';
 
 function formatCurrency(val: number | null | undefined): string {
@@ -86,14 +89,26 @@ export default function DirigentesPage() {
   const [paginaAtualLiderancas, setPaginaAtualLiderancas] = useState(1);
   const [detalheCongregacao, setDetalheCongregacao] = useState<CongregacaoLiderancaView | null>(null);
 
-  // Modais
+  // Modais e Proposta Contextualizada
   const [modalPropostaOpen, setModalPropostaOpen] = useState(false);
+  const [congregacaoProposta, setCongregacaoProposta] = useState<CongregacaoLiderancaView | null>(null);
+  const [termoBuscaMinistro, setTermoBuscaMinistro] = useState('');
+  const [buscandoMinistros, setBuscandoMinistros] = useState(false);
+  const [ministrosSugestoes, setMinistrosSugestoes] = useState<MinistroElegivelBusca[]>([]);
+  const [erroBuscaMinistros, setErroBuscaMinistros] = useState<string | null>(null);
+  const [ministroSelecionado, setMinistroSelecionado] = useState<MinistroElegivelBusca | null>(null);
+
   const [propostaForm, setPropostaForm] = useState<CriarPropostaInput>({
     tipo_movimentacao: 'rodizio_anual',
     congregacao_destino_id: '',
+    dirigente_novo_member_id: '',
     dirigente_novo_nome: '',
     dirigente_novo_cargo: '',
     dirigente_novo_cpf: '',
+    dirigente_novo_matricula: '',
+    dirigente_anterior_member_id: null,
+    dirigente_anterior_nome: null,
+    dirigente_anterior_cargo: null,
     motivo: '',
     data_prevista: new Date().toISOString().slice(0, 10),
     ano_referencia: new Date().getFullYear(),
@@ -174,39 +189,135 @@ export default function DirigentesPage() {
   const podePropor = DirigentesService.podeProporMovimentacao(authUser);
 
   // Ações de Proposta e Aprovação
+  const abrirPropostaParaCongregacao = (item: CongregacaoLiderancaView) => {
+    setCongregacaoProposta(item);
+    setPropostaForm({
+      tipo_movimentacao: 'rodizio_anual',
+      congregacao_destino_id: item.congregacao_id,
+      dirigente_novo_member_id: '',
+      dirigente_novo_nome: '',
+      dirigente_novo_cargo: '',
+      dirigente_novo_cpf: '',
+      dirigente_novo_matricula: '',
+      dirigente_anterior_member_id: item.dirigente_atual_member_id || null,
+      dirigente_anterior_nome: item.dirigente_atual_nome || null,
+      dirigente_anterior_cargo: item.dirigente_atual_cargo || null,
+      motivo: '',
+      data_prevista: new Date().toISOString().slice(0, 10),
+      ano_referencia: new Date().getFullYear(),
+    });
+    setMinistroSelecionado(null);
+    setTermoBuscaMinistro('');
+    setMinistrosSugestoes([]);
+    setErroBuscaMinistros(null);
+    setModalPropostaOpen(true);
+  };
+
+  const handleSelecionarMinistro = (m: MinistroElegivelBusca) => {
+    setMinistroSelecionado(m);
+    setPropostaForm((prev) => ({
+      ...prev,
+      dirigente_novo_member_id: m.id,
+      dirigente_novo_nome: m.nome,
+      dirigente_novo_cargo: m.cargo_ministerial || 'Pastor',
+      dirigente_novo_cpf: m.cpf || '',
+      dirigente_novo_matricula: m.matricula || '',
+    }));
+    setTermoBuscaMinistro('');
+    setMinistrosSugestoes([]);
+    setErroBuscaMinistros(null);
+  };
+
+  const handleTrocarMinistro = () => {
+    setMinistroSelecionado(null);
+    setPropostaForm((prev) => ({
+      ...prev,
+      dirigente_novo_member_id: '',
+      dirigente_novo_nome: '',
+      dirigente_novo_cargo: '',
+      dirigente_novo_cpf: '',
+      dirigente_novo_matricula: '',
+    }));
+    setTermoBuscaMinistro('');
+  };
+
+  // Efeito de busca de ministros elegíveis com debounce (300ms) após 3 caracteres
+  useEffect(() => {
+    if (!modalPropostaOpen || ministroSelecionado || !mid) {
+      setMinistrosSugestoes([]);
+      return;
+    }
+
+    const t = termoBuscaMinistro.trim();
+    if (t.length < 3) {
+      setMinistrosSugestoes([]);
+      setErroBuscaMinistros(null);
+      setBuscandoMinistros(false);
+      return;
+    }
+
+    let isCancelled = false;
+    setBuscandoMinistros(true);
+    setErroBuscaMinistros(null);
+
+    const timer = setTimeout(async () => {
+      try {
+        const resultados = await DirigentesService.buscarMinistrosElegiveis(supabase, mid, t);
+        if (!isCancelled) {
+          setMinistrosSugestoes(resultados);
+        }
+      } catch (err: any) {
+        if (!isCancelled) {
+          console.error('Erro ao buscar ministros elegíveis:', err);
+          setErroBuscaMinistros(err.message || 'Falha ao consultar ministros elegíveis.');
+        }
+      } finally {
+        if (!isCancelled) {
+          setBuscandoMinistros(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [termoBuscaMinistro, modalPropostaOpen, ministroSelecionado, supabase, mid]);
+
   const handleSalvarProposta = async () => {
     if (!mid) return;
     if (!propostaForm.congregacao_destino_id) {
-      showNotif('warning', 'Atenção', 'Selecione a congregação de destino.');
+      showNotif('warning', 'Atenção', 'Congregação não identificada para a proposta.');
       return;
     }
-    if (!propostaForm.dirigente_novo_nome.trim()) {
-      showNotif('warning', 'Atenção', 'Informe o nome do novo dirigente proposto.');
+    if (!propostaForm.dirigente_novo_member_id) {
+      showNotif('warning', 'Atenção', 'Selecione o novo dirigente elegível através da pesquisa de ministros.');
       return;
     }
     if (!propostaForm.motivo.trim()) {
-      showNotif('warning', 'Atenção', 'Informe a justificativa ou motivo da movimentação.');
+      showNotif('warning', 'Atenção', 'Informe a justificativa ou motivo da proposta de substituição.');
       return;
     }
 
     try {
-      // Localiza congregação para preencher dirigente anterior
-      const congDest = liderancas.find((l) => l.congregacao_id === propostaForm.congregacao_destino_id);
-      const payload: CriarPropostaInput = {
-        ...propostaForm,
-        dirigente_anterior_nome: congDest?.dirigente_atual_nome || null,
-        dirigente_anterior_cargo: congDest?.dirigente_atual_cargo || null,
-      };
-
-      await DirigentesService.criarProposta(supabase, authUser, payload);
-      showNotif('success', 'Proposta Registrada', 'A proposta foi enviada para apreciação da Presidência.');
+      await DirigentesService.criarProposta(supabase, authUser, propostaForm);
+      showNotif('success', 'Proposta Registrada', 'A proposta de substituição foi enviada para apreciação da Presidência.');
       setModalPropostaOpen(false);
+      setCongregacaoProposta(null);
+      setMinistroSelecionado(null);
+      setTermoBuscaMinistro('');
+      setMinistrosSugestoes([]);
       setPropostaForm({
         tipo_movimentacao: 'rodizio_anual',
         congregacao_destino_id: '',
+        dirigente_novo_member_id: '',
         dirigente_novo_nome: '',
         dirigente_novo_cargo: '',
         dirigente_novo_cpf: '',
+        dirigente_novo_matricula: '',
+        dirigente_anterior_member_id: null,
+        dirigente_anterior_nome: null,
+        dirigente_anterior_cargo: null,
         motivo: '',
         data_prevista: new Date().toISOString().slice(0, 10),
         ano_referencia: new Date().getFullYear(),
@@ -513,7 +624,16 @@ export default function DirigentesPage() {
             {podePropor && (
               <button
                 type="button"
-                onClick={() => setModalPropostaOpen(true)}
+                onClick={() => {
+                  setActiveTab('liderancas');
+                  setNotification({
+                    isOpen: true,
+                    title: 'Selecione a Congregação',
+                    message:
+                      'Para propor uma substituição de liderança, localize a congregação desejada na lista abaixo e clique em "Propor Mudança" na respectiva linha.',
+                    type: 'info',
+                  });
+                }}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-teal-700 hover:bg-teal-800 shadow-sm border border-teal-800 transition cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
@@ -799,15 +919,7 @@ export default function DirigentesPage() {
 
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setPropostaForm((prev) => ({
-                                      ...prev,
-                                      congregacao_destino_id: item.congregacao_id,
-                                      dirigente_anterior_nome: item.dirigente_atual_nome || '',
-                                      dirigente_anterior_cargo: item.dirigente_atual_cargo || '',
-                                    }));
-                                    setModalPropostaOpen(true);
-                                  }}
+                                  onClick={() => abrirPropostaParaCongregacao(item)}
                                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100/70 border border-teal-200/80 transition cursor-pointer"
                                 >
                                   <ArrowRightLeft className="w-3.5 h-3.5" />
@@ -890,15 +1002,7 @@ export default function DirigentesPage() {
                         <div className="flex items-center justify-end pt-1">
                           <button
                             type="button"
-                            onClick={() => {
-                              setPropostaForm((prev) => ({
-                                ...prev,
-                                congregacao_destino_id: item.congregacao_id,
-                                dirigente_anterior_nome: item.dirigente_atual_nome || '',
-                                dirigente_anterior_cargo: item.dirigente_atual_cargo || '',
-                              }));
-                              setModalPropostaOpen(true);
-                            }}
+                            onClick={() => abrirPropostaParaCongregacao(item)}
                             className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition cursor-pointer"
                           >
                             <ArrowRightLeft className="w-3.5 h-3.5" />
@@ -1301,7 +1405,7 @@ export default function DirigentesPage() {
         )}
       </div>
 
-      {/* ── Modal de Nova Proposta de Movimentação ────────────────────── */}
+      {/* ── Modal de Proposta de Substituição de Liderança (Contextualizada) ── */}
       {modalPropostaOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4">
@@ -1312,16 +1416,21 @@ export default function DirigentesPage() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900">
-                    Nova Proposta de Mudança de Dirigente
+                    Proposta de Substituição de Liderança
                   </h3>
                   <p className="text-xs text-slate-500 font-medium">
-                    Secretaria Geral · Submissão para deliberação da Presidência
+                    Secretaria Geral · Submissão de substituição para deliberação da Presidência
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setModalPropostaOpen(false)}
+                onClick={() => {
+                  setModalPropostaOpen(false);
+                  setCongregacaoProposta(null);
+                  setMinistroSelecionado(null);
+                  setTermoBuscaMinistro('');
+                }}
                 className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -1329,6 +1438,66 @@ export default function DirigentesPage() {
             </div>
 
             <div className="space-y-3.5 text-xs">
+              {/* Congregação Contextualizada (Bloqueada) */}
+              <div className="p-3.5 bg-slate-100/90 border border-slate-200 rounded-2xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-slate-600" />
+                    Congregação da Substituição
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">
+                    <Lock className="w-3 h-3 text-slate-500" />
+                    Bloqueado para edição
+                  </span>
+                </div>
+                <div className="font-bold text-sm text-slate-900">
+                  {congregacaoProposta?.congregacao_nome || 'Congregação Selecionada'}
+                </div>
+              </div>
+
+              {/* Identificação Clara da Liderança Atual */}
+              <div
+                className={`p-3.5 rounded-2xl border text-xs space-y-1.5 transition ${
+                  congregacaoProposta?.dirigente_atual_nome
+                    ? 'bg-amber-50/70 border-amber-200 text-amber-950'
+                    : 'bg-slate-50 border-slate-200 text-slate-600'
+                }`}
+              >
+                <span
+                  className={`text-[10px] font-bold uppercase tracking-wider block ${
+                    congregacaoProposta?.dirigente_atual_nome ? 'text-amber-800' : 'text-slate-400'
+                  }`}
+                >
+                  Liderança Atual da Congregação
+                </span>
+                {congregacaoProposta?.dirigente_atual_nome ? (
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-bold text-slate-900 text-sm block">
+                        {congregacaoProposta.dirigente_atual_nome}
+                      </span>
+                      <span className="text-slate-600 text-[11px] block mt-0.5">
+                        Cargo: <strong>{congregacaoProposta.dirigente_atual_cargo || '—'}</strong>
+                        {congregacaoProposta.tempo_mandato_meses > 0 && (
+                          <span> · Mandato: {formatTempoMandato(congregacaoProposta.tempo_mandato_meses)}</span>
+                        )}
+                        {congregacaoProposta.data_posse_atual && (
+                          <span> (desde {new Date(congregacaoProposta.data_posse_atual).toLocaleDateString('pt-BR')})</span>
+                        )}
+                      </span>
+                    </div>
+                    <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+                      A ser substituído
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-slate-600 italic">
+                    Sem dirigente formalmente designado no momento (congregação vaga). Esta proposta registrará o titular da congregação.
+                  </div>
+                )}
+              </div>
+
+              {/* Tipo de Movimentação e Data Prevista */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
@@ -1363,59 +1532,108 @@ export default function DirigentesPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Congregação de Destino *
+              {/* Busca e Autocomplete de Novo Dirigente (Exclusivo para Ministros) */}
+              <div className="space-y-1.5">
+                <label className="block font-bold text-slate-700">
+                  Novo Dirigente Proposto *
+                  <span className="font-normal text-slate-400 text-[11px] ml-1.5">
+                    (Apenas ministros ordenados/credenciados ativos)
+                  </span>
                 </label>
-                <select
-                  value={propostaForm.congregacao_destino_id}
-                  onChange={(e) =>
-                    setPropostaForm({
-                      ...propostaForm,
-                      congregacao_destino_id: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-800"
-                >
-                  <option value="">Selecione a congregação...</option>
-                  {liderancas.map((l) => (
-                    <option key={l.congregacao_id} value={l.congregacao_id}>
-                      {l.congregacao_nome} (Dirigente atual: {l.dirigente_atual_nome || 'Nenhum'})
-                    </option>
-                  ))}
-                </select>
+
+                {ministroSelecionado ? (
+                  <div className="p-3 bg-emerald-50/80 border border-emerald-300 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                        <UserCheck className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 text-sm truncate">{ministroSelecionado.nome}</div>
+                        <div className="text-[11px] text-slate-600 flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-teal-800 bg-teal-100/70 px-1.5 py-0.5 rounded">
+                            {ministroSelecionado.cargo_ministerial || 'Ministro'}
+                          </span>
+                          {ministroSelecionado.matricula && (
+                            <span className="font-mono">Mat: {ministroSelecionado.matricula}</span>
+                          )}
+                          <span className="truncate">· Origem: {ministroSelecionado.congregacao_nome || 'Sem congregação'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleTrocarMinistro}
+                      className="px-2.5 py-1 text-xs font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition cursor-pointer shrink-0"
+                    >
+                      Trocar
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={termoBuscaMinistro}
+                        onChange={(e) => setTermoBuscaMinistro(e.target.value)}
+                        placeholder="Digite ao menos 3 letras para pesquisar ministro (nome, matrícula ou CPF)..."
+                        className="w-full pl-9 pr-10 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                      />
+                      {buscandoMinistros && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Loader2 className="w-4 h-4 text-teal-600 animate-spin" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Dropdown de Resultados */}
+                    {termoBuscaMinistro.trim().length >= 3 && !buscandoMinistros && (
+                      <div className="mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-52 overflow-y-auto divide-y divide-slate-100 z-30 relative">
+                        {ministrosSugestoes.length === 0 ? (
+                          <div className="p-3 text-center text-slate-500 text-xs">
+                            Nenhum ministro elegível encontrado para &ldquo;{termoBuscaMinistro}&rdquo;. Apenas membros cadastrados no perfil de ministro ativo são elegíveis.
+                          </div>
+                        ) : (
+                          ministrosSugestoes.map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => handleSelecionarMinistro(m)}
+                              className="w-full p-2.5 text-left hover:bg-teal-50/60 transition flex items-center justify-between cursor-pointer group"
+                            >
+                              <div className="min-w-0 pr-2">
+                                <div className="font-bold text-slate-900 group-hover:text-teal-900 truncate">{m.nome}</div>
+                                <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
+                                  <span className="font-medium text-teal-700">{m.cargo_ministerial || 'Ministro'}</span>
+                                  {m.matricula && <span className="font-mono">Mat: {m.matricula}</span>}
+                                  <span className="truncate">· {m.congregacao_nome || 'Sem congregação'}</span>
+                                </div>
+                              </div>
+                              <span className="text-[11px] font-bold text-teal-700 opacity-0 group-hover:opacity-100 transition shrink-0">
+                                Selecionar →
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {erroBuscaMinistros && (
+                      <div className="mt-1 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-[11px]">
+                        {erroBuscaMinistros}
+                      </div>
+                    )}
+
+                    {termoBuscaMinistro.trim().length > 0 && termoBuscaMinistro.trim().length < 3 && (
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Digite pelo menos 3 caracteres para iniciar a consulta de ministros no banco de dados.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    Novo Dirigente Proposto *
-                  </label>
-                  <input
-                    type="text"
-                    value={propostaForm.dirigente_novo_nome}
-                    onChange={(e) =>
-                      setPropostaForm({ ...propostaForm, dirigente_novo_nome: e.target.value })
-                    }
-                    placeholder="Nome completo do dirigente"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Cargo Ministerial</label>
-                  <input
-                    type="text"
-                    value={propostaForm.dirigente_novo_cargo || ''}
-                    onChange={(e) =>
-                      setPropostaForm({ ...propostaForm, dirigente_novo_cargo: e.target.value })
-                    }
-                    placeholder="Pastor, Evangelista, Presbítero..."
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-800"
-                  />
-                </div>
-              </div>
-
+              {/* Justificativa / Motivo da Proposta */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   Justificativa / Motivo da Proposta *
@@ -1424,7 +1642,7 @@ export default function DirigentesPage() {
                   rows={3}
                   value={propostaForm.motivo}
                   onChange={(e) => setPropostaForm({ ...propostaForm, motivo: e.target.value })}
-                  placeholder="Descreva o motivo da movimentação para apreciação da Presidência..."
+                  placeholder="Descreva a motivação da substituição para apreciação da Presidência..."
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-800"
                 />
               </div>
@@ -1433,7 +1651,12 @@ export default function DirigentesPage() {
             <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
               <button
                 type="button"
-                onClick={() => setModalPropostaOpen(false)}
+                onClick={() => {
+                  setModalPropostaOpen(false);
+                  setCongregacaoProposta(null);
+                  setMinistroSelecionado(null);
+                  setTermoBuscaMinistro('');
+                }}
                 className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition cursor-pointer"
               >
                 Cancelar
@@ -1572,13 +1795,9 @@ export default function DirigentesPage() {
                 onClick={() => {
                   const targetCong = detalheCongregacao;
                   setDetalheCongregacao(null);
-                  setPropostaForm((prev) => ({
-                    ...prev,
-                    congregacao_destino_id: targetCong.congregacao_id,
-                    dirigente_anterior_nome: targetCong.dirigente_atual_nome || '',
-                    dirigente_anterior_cargo: targetCong.dirigente_atual_cargo || '',
-                  }));
-                  setModalPropostaOpen(true);
+                  if (targetCong) {
+                    abrirPropostaParaCongregacao(targetCong);
+                  }
                 }}
                 className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-teal-700 hover:bg-teal-800 transition shadow-sm cursor-pointer flex items-center gap-1.5"
               >

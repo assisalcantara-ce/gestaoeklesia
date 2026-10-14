@@ -81,11 +81,15 @@ export type TipoEventoHistorico =
   | 'cancelamento'
   | 'exclusao_processo'
   | 'marco_ministerial'
-  | 'mudanca_cargo';
+  | 'mudanca_cargo'
+  | 'posse_dirigente'
+  | 'saida_dirigente';
 
 export interface HistoricoProcessoItem {
   id?: string;
   processo_id?: string;
+  movimentacao_id?: string;
+  tipo_movimentacao?: string;
   numero_processo?: string;
   ministry_id?: string;
   member_id?: string;
@@ -98,9 +102,14 @@ export interface HistoricoProcessoItem {
   cargo?: string | null;
   local?: string | null;
   local_origem?: string | null;
+  congregacao_nome?: string | null;
   status_processo?: string | null;
   decisao?: string | null;
   parecer?: string | null;
+  justificativa?: string | null;
+  responsavel?: string | null;
+  usuario_id?: string | null;
+  data_hora_efetivacao?: string | null;
   comissao_nome?: string | null;
   pastor_solicitante?: string | null;
   descricao?: string;

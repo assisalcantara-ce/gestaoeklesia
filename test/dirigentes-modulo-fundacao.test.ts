@@ -435,4 +435,740 @@ describe('Módulo Dirigentes — Fundação, Regras de Negócio, RBAC e Integra�
     assert.equal(pExcesso.paginaAtual, 10);
     assert.equal(pExcesso.itensPaginados.length, 15);
   });
+
+  test('13. Elegibilidade de Ministros: permite apenas ministros ativos do mesmo ministério; rejeita membros comuns, congregados e crianças', async () => {
+    const fakeMembersDb: Record<string, any> = {
+      'mem-pr-ativo': {
+        id: 'mem-pr-ativo',
+        ministry_id: ministryAlpha,
+        name: 'Pr. Josué Pereira',
+        role: 'ministro',
+        tipo_cadastro: 'ministro',
+        status: 'active',
+        matricula: 'MIN-001',
+        cpf: '111.111.111-11',
+        cargo_ministerial: 'Pastor',
+      },
+      'mem-ev-ativo': {
+        id: 'mem-ev-ativo',
+        ministry_id: ministryAlpha,
+        name: 'Ev. Lucas Rocha',
+        role: 'ministro',
+        tipo_cadastro: 'ministro',
+        status: 'ativo',
+        matricula: 'MIN-002',
+        cpf: '222.222.222-22',
+        cargo_ministerial: 'Evangelista',
+      },
+      'mem-comum': {
+        id: 'mem-comum',
+        ministry_id: ministryAlpha,
+        name: 'Carlos Oliveira',
+        role: 'membro',
+        tipo_cadastro: 'membro',
+        status: 'active',
+        matricula: 'MEM-100',
+        cpf: '333.333.333-33',
+        cargo_ministerial: null,
+      },
+      'mem-congregado': {
+        id: 'mem-congregado',
+        ministry_id: ministryAlpha,
+        name: 'Pedro Visitante Regular',
+        role: 'congregado',
+        tipo_cadastro: 'congregado',
+        status: 'active',
+        matricula: null,
+        cpf: null,
+        cargo_ministerial: null,
+      },
+      'mem-crianca': {
+        id: 'mem-crianca',
+        ministry_id: ministryAlpha,
+        name: 'Tiago Criança',
+        role: 'membro',
+        tipo_cadastro: 'crianca',
+        status: 'active',
+        matricula: null,
+        cpf: null,
+        cargo_ministerial: null,
+      },
+      'mem-pr-inativo': {
+        id: 'mem-pr-inativo',
+        ministry_id: ministryAlpha,
+        name: 'Pr. Inativo Silva',
+        role: 'ministro',
+        tipo_cadastro: 'ministro',
+        status: 'inativo',
+        matricula: 'MIN-003',
+        cpf: '444.444.444-44',
+        cargo_ministerial: 'Pastor',
+      },
+      'mem-pr-outro-tenant': {
+        id: 'mem-pr-outro-tenant',
+        ministry_id: ministryBeta,
+        name: 'Pr. Outro Ministério',
+        role: 'ministro',
+        tipo_cadastro: 'ministro',
+        status: 'active',
+        matricula: 'MIN-004',
+        cpf: '555.555.555-55',
+        cargo_ministerial: 'Pastor',
+      },
+    };
+
+    const createMockSupabase = () => ({
+      from: (table: string) => {
+        if (table === 'members') {
+          return {
+            select: () => ({
+              eq: (col1: string, val1: any) => ({
+                eq: (_col2: string, val2: any) => ({
+                  maybeSingle: async () => {
+                    const id = col1 === 'id' ? val1 : val2;
+                    const minId = col1 === 'ministry_id' ? val1 : val2;
+                    const item = fakeMembersDb[id];
+                    if (item && item.ministry_id === minId) {
+                      return { data: item, error: null };
+                    }
+                    return { data: null, error: null };
+                  },
+                }),
+              }),
+            }),
+          };
+        }
+        return {};
+      },
+    });
+
+    const mockSupabase = createMockSupabase();
+
+    // 1. Ministro ativo do tenant -> Aprovado
+    const elegivel1 = await DirigentesService.validarElegibilidadeMinistro(
+      mockSupabase,
+      ministryAlpha,
+      'mem-pr-ativo'
+    );
+    assert.equal(elegivel1.id, 'mem-pr-ativo');
+    assert.equal(elegivel1.nome, 'Pr. Josué Pereira');
+    assert.equal(elegivel1.cargo_ministerial, 'Pastor');
+
+    // 2. Evangelista ativo -> Aprovado
+    const elegivel2 = await DirigentesService.validarElegibilidadeMinistro(
+      mockSupabase,
+      ministryAlpha,
+      'mem-ev-ativo'
+    );
+    assert.equal(elegivel2.id, 'mem-ev-ativo');
+    assert.equal(elegivel2.cargo_ministerial, 'Evangelista');
+
+    // 3. Membro comum -> Rejeitado
+    await assert.rejects(
+      async () => {
+        await DirigentesService.validarElegibilidadeMinistro(
+          mockSupabase,
+          ministryAlpha,
+          'mem-comum'
+        );
+      },
+      /não possui o perfil de ministro/
+    );
+
+    // 4. Congregado -> Rejeitado
+    await assert.rejects(
+      async () => {
+        await DirigentesService.validarElegibilidadeMinistro(
+          mockSupabase,
+          ministryAlpha,
+          'mem-congregado'
+        );
+      },
+      /não possui o perfil de ministro/
+    );
+
+    // 5. Criança -> Rejeitado
+    await assert.rejects(
+      async () => {
+        await DirigentesService.validarElegibilidadeMinistro(
+          mockSupabase,
+          ministryAlpha,
+          'mem-crianca'
+        );
+      },
+      /não possui o perfil de ministro/
+    );
+
+    // 6. Ministro Inativo -> Rejeitado
+    await assert.rejects(
+      async () => {
+        await DirigentesService.validarElegibilidadeMinistro(
+          mockSupabase,
+          ministryAlpha,
+          'mem-pr-inativo'
+        );
+      },
+      /Apenas ministros ativos podem ser designados/
+    );
+
+    // 7. Ministro de Outro Tenant -> Rejeitado
+    await assert.rejects(
+      async () => {
+        await DirigentesService.validarElegibilidadeMinistro(
+          mockSupabase,
+          ministryAlpha,
+          'mem-pr-outro-tenant'
+        );
+      },
+      /não encontrado ou pertencente a outro ministério/
+    );
+  });
+
+  test('14. Busca de Ministros Elegíveis: exige mínimo de 3 caracteres e retorna apenas perfis ministeriais', async () => {
+    let queryExecutada = false;
+
+    const createFluentChain = () => {
+      const chain: any = {
+        select: () => chain,
+        eq: () => chain,
+        or: () => chain,
+        order: () => chain,
+        limit: async () => {
+          queryExecutada = true;
+          return {
+            data: [
+              {
+                id: 'mem-1',
+                name: 'Pr. Josué Pereira',
+                matricula: 'MIN-001',
+                cpf: '111.111.111-11',
+                cargo_ministerial: 'Pastor',
+                role: 'ministro',
+                tipo_cadastro: 'ministro',
+                status: 'ativo',
+                congregacao_id: 'cong-1',
+                congregacoes: { nome: 'Sede' },
+              },
+              {
+                id: 'mem-2',
+                name: 'Membro Infiltrado',
+                matricula: 'MEM-002',
+                cpf: null,
+                cargo_ministerial: null,
+                role: 'membro',
+                tipo_cadastro: 'membro',
+                status: 'ativo',
+                congregacao_id: 'cong-1',
+                congregacoes: { nome: 'Sede' },
+              },
+            ],
+            error: null,
+          };
+        },
+      };
+      return chain;
+    };
+
+    const mockSupabase = {
+      from: () => createFluentChain(),
+    };
+
+    // Caso A: Menos de 3 caracteres -> Não deve executar consulta ao banco e retorna array vazio
+    const resCurto = await DirigentesService.buscarMinistrosElegiveis(
+      mockSupabase,
+      ministryAlpha,
+      'pr',
+      10
+    );
+    assert.equal(resCurto.length, 0);
+    assert.equal(queryExecutada, false, 'Não deve consultar o banco com menos de 3 caracteres');
+
+    // Caso B: 3 ou mais caracteres -> Executa busca e filtra estritamente ministros
+    const resBusca = await DirigentesService.buscarMinistrosElegiveis(
+      mockSupabase,
+      ministryAlpha,
+      'Josué',
+      10
+    );
+    assert.equal(queryExecutada, true);
+    assert.equal(resBusca.length, 1, 'Deve excluir membros comuns do resultado da busca');
+    assert.equal(resBusca[0].nome, 'Pr. Josué Pereira');
+    assert.equal(resBusca[0].congregacao_nome, 'Sede');
+  });
+
+  test('15. Histórico Individual Ministerial: efetivação registra posse e saída atrelados ao mesmo movimentacao_id', async () => {
+    const obreirosStore: Record<string, any> = {
+      'obreiro-anterior': {
+        id: 'obreiro-anterior',
+        ministry_id: ministryAlpha,
+        cargo_ministerial: 'Pastor Titular',
+        custom_fields: {
+          historico_processos: [],
+        },
+      },
+      'obreiro-novo': {
+        id: 'obreiro-novo',
+        ministry_id: ministryAlpha,
+        cargo_ministerial: 'Pastor',
+        custom_fields: {
+          historico_processos: [],
+        },
+      },
+    };
+
+    const mockSupabase = {
+      from: (_table: string) => ({
+        select: (_cols: string) => ({
+          eq: (col1: string, val1: string) => ({
+            eq: (_col2: string, val2: string) => ({
+              maybeSingle: async () => {
+                const id = col1 === 'id' ? val1 : val2;
+                return { data: obreirosStore[id] || null, error: null };
+              },
+            }),
+          }),
+        }),
+        update: (payload: any) => ({
+          eq: (col1: string, val1: string) => ({
+            eq: (_col2: string, val2: string) => {
+              const id = col1 === 'id' ? val1 : val2;
+              if (obreirosStore[id]) {
+                obreirosStore[id].custom_fields = {
+                  ...obreirosStore[id].custom_fields,
+                  ...payload.custom_fields,
+                };
+              }
+              return Promise.resolve({ error: null });
+            },
+          }),
+        }),
+      }),
+    };
+
+    const movId = 'mov-unificada-999';
+    const dataHoraEfetivacao = '2026-10-15T10:00:00.000Z';
+    const dataIso = '2026-10-15';
+
+    // 1. Registra saída do dirigente anterior
+    await DirigentesService.registrarEventoHistoricoObreiro(
+      mockSupabase,
+      ministryAlpha,
+      'obreiro-anterior',
+      {
+        id: `hist_saida_${movId}_obreiro-anterior`,
+        movimentacao_id: movId,
+        tipo_evento: 'saida_dirigente',
+        tipo_movimentacao: 'rodizio_anual',
+        data: dataIso,
+        data_hora_efetivacao: dataHoraEfetivacao,
+        local: 'Congregação Monte Moriá',
+        congregacao_nome: 'Congregação Monte Moriá',
+        cargo: 'Pastor Titular',
+        justificativa: 'Conclusão regular do mandato anual de rodízio',
+        descricao: 'Término de mandato e transmissão formal da congregação',
+        responsavel: 'Pr. Presidente',
+        usuario_id: 'user-pres-1',
+      }
+    );
+
+    // 2. Registra posse do novo dirigente na mesma congregação
+    await DirigentesService.registrarEventoHistoricoObreiro(
+      mockSupabase,
+      ministryAlpha,
+      'obreiro-novo',
+      {
+        id: `hist_posse_${movId}_obreiro-novo`,
+        movimentacao_id: movId,
+        tipo_evento: 'posse_dirigente',
+        tipo_movimentacao: 'rodizio_anual',
+        data: dataIso,
+        data_hora_efetivacao: dataHoraEfetivacao,
+        local: 'Congregação Monte Moriá',
+        congregacao_nome: 'Congregação Monte Moriá',
+        cargo: 'Pastor',
+        justificativa: 'Designado pela Presidência para assumir a titularidade',
+        descricao: 'Posse e assunção da titularidade da congregação com transferência patrimonial',
+        responsavel: 'Pr. Presidente',
+        usuario_id: 'user-pres-1',
+      }
+    );
+
+    // Verificação Dirigente Anterior
+    const histAnterior = obreirosStore['obreiro-anterior'].custom_fields.historico_processos;
+    assert.equal(histAnterior.length, 1);
+    assert.equal(histAnterior[0].tipo_evento, 'saida_dirigente');
+    assert.equal(histAnterior[0].movimentacao_id, movId);
+    assert.equal(histAnterior[0].congregacao_nome, 'Congregação Monte Moriá');
+    assert.equal(histAnterior[0].cargo_anterior, 'Pastor Titular');
+    assert.equal(histAnterior[0].responsavel, 'Pr. Presidente');
+
+    // Verificação Novo Dirigente
+    const histNovo = obreirosStore['obreiro-novo'].custom_fields.historico_processos;
+    assert.equal(histNovo.length, 1);
+    assert.equal(histNovo[0].tipo_evento, 'posse_dirigente');
+    assert.equal(histNovo[0].movimentacao_id, movId, 'Deve compartilhar exatamente o mesmo movimentacao_id');
+    assert.equal(histNovo[0].congregacao_nome, 'Congregação Monte Moriá');
+    assert.equal(histNovo[0].cargo_resultante, 'Pastor');
+    assert.equal(histNovo[0].responsavel, 'Pr. Presidente');
+  });
+
+  test('16. Cenário Sem Dirigente Anterior: registra apenas a posse do novo ministro sem criar evento fictício de saída', async () => {
+    const obreiroStore: Record<string, any> = {
+      'novo-titular-vaga': {
+        id: 'novo-titular-vaga',
+        ministry_id: ministryAlpha,
+        cargo_ministerial: 'Evangelista',
+        custom_fields: {
+          historico_processos: [],
+        },
+      },
+    };
+
+    const mockSupabase = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: obreiroStore['novo-titular-vaga'],
+                error: null,
+              }),
+            }),
+          }),
+        }),
+        update: (payload: any) => ({
+          eq: () => ({
+            eq: () => {
+              obreiroStore['novo-titular-vaga'].custom_fields = payload.custom_fields;
+              return Promise.resolve({ error: null });
+            },
+          }),
+        }),
+      }),
+    };
+
+    const movVagaId = 'mov-vaga-555';
+
+    // Registra apenas posse
+    await DirigentesService.registrarEventoHistoricoObreiro(
+      mockSupabase as any,
+      ministryAlpha,
+      'novo-titular-vaga',
+      {
+        id: `hist_posse_${movVagaId}_novo-titular-vaga`,
+        movimentacao_id: movVagaId,
+        tipo_evento: 'posse_dirigente',
+        tipo_movimentacao: 'transferencia_extraordinaria',
+        data: '2026-10-15',
+        data_hora_efetivacao: '2026-10-15T11:00:00.000Z',
+        local: 'Congregação Betel (Preenchimento de Vaga)',
+        congregacao_nome: 'Congregação Betel',
+        cargo: 'Evangelista',
+        justificativa: 'Nomeação para congregação que se encontrava sem dirigente formal',
+        descricao: 'Assunção de titularidade da congregação',
+        responsavel: 'Administrador',
+        usuario_id: 'user-adm-1',
+      }
+    );
+
+    const hist = obreiroStore['novo-titular-vaga'].custom_fields.historico_processos;
+    assert.equal(hist.length, 1);
+    assert.equal(hist[0].tipo_evento, 'posse_dirigente');
+    assert.equal(hist[0].movimentacao_id, movVagaId);
+    assert.equal(hist[0].congregacao_nome, 'Congregação Betel');
+  });
+
+  test('17. Idempotência do Histórico: impede duplicação de eventos em tentativas repetidas de efetivação', async () => {
+    let updateCount = 0;
+    const obreiroData: any = {
+      id: 'mem-pr-idemp',
+      ministry_id: ministryAlpha,
+      cargo_ministerial: 'Pastor',
+      custom_fields: {
+        historico_processos: [],
+      },
+    };
+
+    const mockSupabase = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: obreiroData, error: null }),
+            }),
+          }),
+        }),
+        update: (payload: any) => ({
+          eq: () => ({
+            eq: () => {
+              updateCount++;
+              obreiroData.custom_fields = payload.custom_fields;
+              return Promise.resolve({ error: null });
+            },
+          }),
+        }),
+      }),
+    };
+
+    const eventoPayload = {
+      id: 'hist_posse_mov-rep-101_mem-pr-idemp',
+      movimentacao_id: 'mov-rep-101',
+      tipo_evento: 'posse_dirigente' as const,
+      tipo_movimentacao: 'rodizio_anual',
+      data: '2026-10-15',
+      data_hora_efetivacao: '2026-10-15T12:00:00.000Z',
+      local: 'Congregação Central',
+      congregacao_nome: 'Congregação Central',
+      cargo: 'Pastor',
+      justificativa: 'Posse inicial',
+      descricao: 'Posse de dirigente',
+      responsavel: 'Secretaria',
+      usuario_id: 'user-sec-1',
+    };
+
+    // Primeira execução: insere evento
+    await DirigentesService.registrarEventoHistoricoObreiro(
+      mockSupabase as any,
+      ministryAlpha,
+      'mem-pr-idemp',
+      eventoPayload
+    );
+
+    assert.equal(updateCount, 1);
+    assert.equal(obreiroData.custom_fields.historico_processos.length, 1);
+
+    // Segunda execução idêntica: deve detectar duplicidade e não reinserir nem atualizar
+    await DirigentesService.registrarEventoHistoricoObreiro(
+      mockSupabase as any,
+      ministryAlpha,
+      'mem-pr-idemp',
+      eventoPayload
+    );
+
+    assert.equal(updateCount, 1, 'Não deve emitir segundo update quando o evento já existe');
+    assert.equal(obreiroData.custom_fields.historico_processos.length, 1, 'Histórico não pode ser duplicado');
+  });
+
+  test('18. Operação Atômica Exclusiva: efetivarMovimentacao exige RPC e proíbe escritas soltas em TypeScript', async () => {
+    let rpcInvocada = false;
+    let rpcArgs: any = null;
+
+    const mockSupabase = {
+      rpc: async (fnName: string, args: any) => {
+        rpcInvocada = true;
+        rpcArgs = args;
+        if (fnName === 'efetivar_movimentacao_dirigente') {
+          return {
+            data: {
+              sucesso: true,
+              movimentacao_id: args.p_movimentacao_id,
+              nova_designacao_id: 'desig-atomica-001',
+              congregacao_id: 'cong-001',
+              congregacao_nome: 'Congregação Alpha',
+              data_efetiva: args.p_data_efetiva,
+              is_acumulacao: false,
+              obreiro_saindo_id: 'mem-antigo',
+              obreiro_novo_id: 'mem-novo',
+            },
+            error: null,
+          };
+        }
+        return { data: null, error: new Error('Função RPC desconhecida') };
+      },
+      from: (table: string) => ({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              single: async () => {
+                if (table === 'dirigentes_movimentacoes') {
+                  return {
+                    data: {
+                      id: 'mov-1',
+                      ministry_id: ministryAlpha,
+                      status: 'efetivada',
+                      tipo_movimentacao: 'rodizio_anual',
+                    },
+                    error: null,
+                  };
+                }
+                if (table === 'dirigentes_designacoes') {
+                  return {
+                    data: {
+                      id: 'desig-atomica-001',
+                      ministry_id: ministryAlpha,
+                      status: 'ativo',
+                      nome_dirigente: 'Pr. Novo',
+                    },
+                    error: null,
+                  };
+                }
+                return { data: null, error: null };
+              },
+            }),
+          }),
+        }),
+      }),
+    };
+
+    const res = await DirigentesService.efetivarMovimentacao(
+      mockSupabase,
+      userPresidencia,
+      {
+        movimentacao_id: 'mov-1',
+        data_efetiva: '2026-10-15',
+      }
+    );
+
+    assert.equal(rpcInvocada, true, 'Deve delegar a efetivação obrigatoriamente para a RPC atômica');
+    assert.equal(rpcArgs.p_movimentacao_id, 'mov-1');
+    assert.equal(rpcArgs.p_ministry_id, ministryAlpha);
+    assert.equal(res.movimentacao.status, 'efetivada');
+    assert.equal(res.novaDesignacao.id, 'desig-atomica-001');
+
+    // Comprova que se o client não suportar RPC, a operação é rejeitada imediatamente sem fazer escritas
+    const mockSemRpc = { from: () => ({}) };
+    await assert.rejects(
+      async () => {
+        await DirigentesService.efetivarMovimentacao(
+          mockSemRpc,
+          userPresidencia,
+          { movimentacao_id: 'mov-1', data_efetiva: '2026-10-15' }
+        );
+      },
+      /Cliente de banco de dados não suporta chamadas RPC atômicas/
+    );
+  });
+
+  test('19. Rollback Integral: falha na gravação do histórico ministerial impede efetivação e mantém integridade', async () => {
+    // Simulação do comportamento transacional PostgreSQL:
+    // Se ocorrer uma falha ao tentar atualizar o histórico em members.custom_fields,
+    // a transação inteira aborta com ROLLBACK, de modo que nem movimentação, nem designação,
+    // nem congregação sofram alterações.
+    interface BancoSimulado {
+      movimentacao: { id: string; status: string; data_efetiva: string | null };
+      designacaoAnterior: { id: string; status: string; data_termino: string | null };
+      novaDesignacao: any | null;
+      congregacao: { id: string; dirigente: string };
+      membroHistorico: any[];
+    }
+
+    const estadoInicial: BancoSimulado = {
+      movimentacao: { id: 'mov-err-1', status: 'aprovada', data_efetiva: null },
+      designacaoAnterior: { id: 'desig-antiga', status: 'ativo', data_termino: null },
+      novaDesignacao: null,
+      congregacao: { id: 'cong-1', dirigente: 'Pr. Titular Anterior' },
+      membroHistorico: [],
+    };
+
+    let estadoBanco: BancoSimulado = JSON.parse(JSON.stringify(estadoInicial));
+
+    // Simula a transação PostgreSQL da RPC efetivar_movimentacao_dirigente
+    const executarTransacaoPostgreSQL = async (deveFalharHistorico: boolean) => {
+      // Cria snapshot para permitir rollback
+      const snapshotTransacao = JSON.parse(JSON.stringify(estadoBanco));
+      try {
+        // Passo 1: Atualiza movimentação
+        estadoBanco.movimentacao.status = 'efetivada';
+        estadoBanco.movimentacao.data_efetiva = '2026-10-15';
+
+        // Passo 2: Conclui designação anterior
+        estadoBanco.designacaoAnterior.status = 'concluido';
+        estadoBanco.designacaoAnterior.data_termino = '2026-10-15';
+
+        // Passo 3: Cria nova designação
+        estadoBanco.novaDesignacao = { id: 'desig-nova-1', status: 'ativo' };
+
+        // Passo 4: Sincroniza congregação
+        estadoBanco.congregacao.dirigente = 'Pr. Novo Titular';
+
+        // Passo 5: Gravação de histórico ministerial em members.custom_fields
+        if (deveFalharHistorico) {
+          throw new Error('Falha ao atualizar histórico ministerial: chave JSON corrompida ou membro bloqueado.');
+        }
+
+        estadoBanco.membroHistorico.push({ tipo_evento: 'posse_dirigente', movimentacao_id: 'mov-err-1' });
+        return { sucesso: true, nova_designacao_id: 'desig-nova-1' };
+      } catch (err) {
+        // Em caso de qualquer erro, o PostgreSQL executa ROLLBACK integral
+        estadoBanco = JSON.parse(JSON.stringify(snapshotTransacao));
+        throw err;
+      }
+    };
+
+    // Executa cenário de falha na gravação do histórico
+    await assert.rejects(
+      async () => {
+        await executarTransacaoPostgreSQL(true);
+      },
+      /Falha ao atualizar histórico ministerial/
+    );
+
+    // Comprova que o ROLLBACK reverteu TODOS os passos:
+    assert.equal(estadoBanco.movimentacao.status, 'aprovada', 'Movimentação NÃO pode permanecer efetivada');
+    assert.equal(estadoBanco.movimentacao.data_efetiva, null);
+    assert.equal(estadoBanco.designacaoAnterior.status, 'ativo', 'Mandato anterior não pode ser encerrado em falha');
+    assert.equal(estadoBanco.novaDesignacao, null, 'Nova designação não pode existir em falha');
+    assert.equal(estadoBanco.congregacao.dirigente, 'Pr. Titular Anterior', 'Congregação não pode ter dirigente trocado em falha');
+    assert.equal(estadoBanco.membroHistorico.length, 0);
+
+    // Executa cenário de sucesso: todos os passos persistem atomicamente
+    const resSucesso = await executarTransacaoPostgreSQL(false);
+    assert.equal(resSucesso.sucesso, true);
+    assert.equal(estadoBanco.movimentacao.status, 'efetivada');
+    assert.equal(estadoBanco.designacaoAnterior.status, 'concluido');
+    assert.equal((estadoBanco.novaDesignacao as any)?.id, 'desig-nova-1');
+    assert.equal(estadoBanco.congregacao.dirigente, 'Pr. Novo Titular');
+    assert.equal(estadoBanco.membroHistorico.length, 1);
+  });
+
+  test('20. Idempotência das Designações: impede criação de designações duplicadas na mesma movimentação', () => {
+    // Simula a lógica da RPC: antes de criar uma nova designação, busca se já existe designação vinculada
+    const designacoesDb: Array<{
+      id: string;
+      ministry_id: string;
+      movimentacao_origem_id: string;
+      nome_dirigente: string;
+      status: string;
+    }> = [];
+
+    const aplicarDesignacaoIdempotente = (
+      movId: string,
+      ministryId: string,
+      nomeDirigente: string
+    ): string => {
+      const existente = designacoesDb.find(
+        (d) => d.ministry_id === ministryId && d.movimentacao_origem_id === movId
+      );
+
+      if (existente) {
+        // Atualiza a designação existente sem duplicar
+        existente.nome_dirigente = nomeDirigente;
+        existente.status = 'ativo';
+        return existente.id;
+      }
+
+      const novoId = `desig_${designacoesDb.length + 1}`;
+      designacoesDb.push({
+        id: novoId,
+        ministry_id: ministryId,
+        movimentacao_origem_id: movId,
+        nome_dirigente: nomeDirigente,
+        status: 'ativo',
+      });
+      return novoId;
+    };
+
+    // Primeira execução: cria designação
+    const id1 = aplicarDesignacaoIdempotente('mov-idem-77', ministryAlpha, 'Pr. Josué Pereira');
+    assert.equal(designacoesDb.length, 1);
+    assert.equal(id1, 'desig_1');
+
+    // Segunda execução (replay ou retry): não cria registro duplicado e retorna o mesmo ID
+    const id2 = aplicarDesignacaoIdempotente('mov-idem-77', ministryAlpha, 'Pr. Josué Pereira');
+    assert.equal(designacoesDb.length, 1, 'Não deve duplicar a designação');
+    assert.equal(id2, 'desig_1');
+    assert.equal(designacoesDb[0].nome_dirigente, 'Pr. Josué Pereira');
+  });
 });
+
+

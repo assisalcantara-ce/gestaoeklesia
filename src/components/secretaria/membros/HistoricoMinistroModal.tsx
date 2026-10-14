@@ -161,6 +161,20 @@ export default function HistoricoMinistroModal({
           dot: 'bg-slate-500',
           icon: '🗑️',
         };
+      case 'posse_dirigente':
+        return {
+          label: 'Posse de Dirigente',
+          bg: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+          dot: 'bg-emerald-600',
+          icon: '🏛️',
+        };
+      case 'saida_dirigente':
+        return {
+          label: 'Término de Mandato',
+          bg: 'bg-amber-100 text-amber-800 border-amber-300',
+          dot: 'bg-amber-600',
+          icon: '📤',
+        };
       case 'marco_ministerial':
       case 'mudanca_cargo':
         return {
@@ -229,12 +243,14 @@ export default function HistoricoMinistroModal({
                   ${ev.descricao || '-'}
                 </div>
 
-                ${ev.comissao_nome || ev.pastor_solicitante || ev.local ? `
+                ${ev.comissao_nome || ev.pastor_solicitante || ev.local || ev.tipo_movimentacao || ev.responsavel ? `
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 10.5px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; margin-top: 6px;">
                     ${ev.comissao_nome ? `<div><strong>Comissão:</strong> ${ev.comissao_nome}</div>` : ''}
                     ${ev.pastor_solicitante ? `<div><strong>Indicação / Solicitante:</strong> ${ev.pastor_solicitante}</div>` : ''}
                     ${ev.local ? `<div><strong>Local / Congregação:</strong> ${ev.local}</div>` : ''}
                     ${ev.local_origem ? `<div><strong>Origem:</strong> ${ev.local_origem}</div>` : ''}
+                    ${ev.tipo_movimentacao ? `<div><strong>Tipo Movimentação:</strong> ${ev.tipo_movimentacao.replace(/_/g, ' ')}</div>` : ''}
+                    ${ev.responsavel ? `<div><strong>Homologado por:</strong> ${ev.responsavel}</div>` : ''}
                   </div>
                 ` : ''}
 
@@ -566,8 +582,8 @@ export default function HistoricoMinistroModal({
                         </p>
                       )}
 
-                      {/* Metadados adicionais: Comissão, Solicitante, Local */}
-                      {(ev.comissao_nome || ev.pastor_solicitante || ev.local || ev.local_origem) && (
+                      {/* Metadados adicionais: Comissão, Solicitante, Local, Responsável, Movimentação */}
+                      {(ev.comissao_nome || ev.pastor_solicitante || ev.local || ev.local_origem || ev.responsavel || ev.tipo_movimentacao) && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-600">
                           {ev.comissao_nome && (
                             <div>
@@ -587,6 +603,17 @@ export default function HistoricoMinistroModal({
                           {ev.local_origem && (
                             <div>
                               <span className="font-semibold text-slate-700">Origem:</span> {ev.local_origem}
+                            </div>
+                          )}
+                          {ev.tipo_movimentacao && (
+                            <div>
+                              <span className="font-semibold text-slate-700">Tipo de Movimentação:</span>{' '}
+                              <span className="capitalize">{ev.tipo_movimentacao.replace(/_/g, ' ')}</span>
+                            </div>
+                          )}
+                          {ev.responsavel && (
+                            <div>
+                              <span className="font-semibold text-slate-700">Homologado por:</span> {ev.responsavel}
                             </div>
                           )}
                         </div>

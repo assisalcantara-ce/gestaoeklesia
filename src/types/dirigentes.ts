@@ -122,6 +122,7 @@ export interface CongregacaoLiderancaView {
   congregacao_nome: string;
   campo_id: string | null;
   supervisao_id: string | null;
+  dirigente_atual_member_id?: string | null;
   dirigente_atual_nome: string | null;
   dirigente_atual_cargo: string | null;
   dirigente_atual_telefone: string | null;
@@ -132,4 +133,15 @@ export interface CongregacaoLiderancaView {
   total_bens_patrimonio: number;
   valor_patrimonio_estimado: number;
   movimentacao_em_andamento?: DirigenteMovimentacao | null;
+}
+
+export interface MinistroElegivelBusca {
+  id: string; // member_id
+  nome: string;
+  matricula: string | null;
+  cpf: string | null;
+  cargo_ministerial: string | null;
+  congregacao_id: string | null;
+  congregacao_nome: string | null;
+  foto_url?: string | null;
 }

@@ -4,6 +4,7 @@ import type {
   DirigenteMovimentacao,
   DirigenteTermoPatrimonial,
   CongregacaoLiderancaView,
+  MinistroElegivelBusca,
 } from '@/types/dirigentes';
 import type { NivelAcesso } from '@/lib/access-control';
 
@@ -21,7 +22,7 @@ export interface CriarPropostaInput {
   titulo?: string | null;
   congregacao_destino_id: string;
   congregacao_origem_id?: string | null;
-  dirigente_novo_member_id?: string | null;
+  dirigente_novo_member_id: string;
   dirigente_novo_nome: string;
   dirigente_novo_cargo?: string | null;
   dirigente_novo_cpf?: string | null;
@@ -401,6 +402,7 @@ export class DirigentesService {
         congregacao_nome: c.nome,
         campo_id: c.campo_id || null,
         supervisao_id: c.supervisao_id || null,
+        dirigente_atual_member_id: desig?.member_id || null,
         dirigente_atual_nome: nomeDir,
         dirigente_atual_cargo: cargoDir,
         dirigente_atual_telefone: telDir,
@@ -416,6 +418,213 @@ export class DirigentesService {
   }
 
   /**
+   * Consulta pessoas elegíveis cadastradas no perfil ministerial de ministro.
+   * Regras:
+   * 1. Exige no mínimo 3 caracteres de busca.
+   * 2. Consulta restrita ao ministry_id autenticado (isolamento multi-tenant).
+   * 3. Filtra apenas ministros ativos (role = 'ministro' ou tipo_cadastro = 'ministro').
+   * 4. Exclui estritamente membros comuns, congregados, crianças e visitantes.
+   * 5. Retorna nome, matrícula, CPF, cargo ministerial e congregação atual.
+   */
+  public static async buscarMinistrosElegiveis(
+    supabase: any,
+    ministryId: string,
+    termoBusca: string,
+    limite = 15
+  ): Promise<MinistroElegivelBusca[]> {
+    const termo = (termoBusca || '').trim();
+    if (termo.length < 3) return [];
+    if (!ministryId) throw new Error('Identificação do ministério ausente para a consulta.');
+
+    const sanitized = termo.replace(/[,()]/g, '');
+    if (!sanitized) return [];
+
+    const { data, error } = await supabase
+      .from('members')
+      .select('id, name, matricula, cpf, cargo_ministerial, congregacao_id, role, tipo_cadastro, status, foto_url, congregacoes(nome)')
+      .eq('ministry_id', ministryId)
+      .or('status.eq.active,status.eq.ativo')
+      .or('role.eq.ministro,tipo_cadastro.eq.ministro')
+      .or(`name.ilike.%${sanitized}%,matricula.ilike.%${sanitized}%,cpf.ilike.%${sanitized}%`)
+      .order('name', { ascending: true })
+      .limit(limite);
+
+    if (error) {
+      console.error('Erro na consulta de ministros elegíveis:', error);
+      throw new Error(`Falha na consulta de ministros elegíveis: ${error.message}`);
+    }
+
+    return (data || [])
+      .filter((m: any) => {
+        const r = (m.role || '').toLowerCase();
+        const tc = (m.tipo_cadastro || '').toLowerCase();
+        if (['membro', 'congregado', 'crianca', 'visitante'].includes(r)) return false;
+        if (['membro', 'congregado', 'crianca', 'visitante'].includes(tc)) return false;
+        return r === 'ministro' || tc === 'ministro';
+      })
+      .map((m: any) => ({
+        id: m.id,
+        nome: m.name,
+        matricula: m.matricula || null,
+        cpf: m.cpf || null,
+        cargo_ministerial: m.cargo_ministerial || 'Ministro',
+        congregacao_id: m.congregacao_id || null,
+        congregacao_nome: m.congregacoes?.nome || null,
+        foto_url: m.foto_url || null,
+      }));
+  }
+
+  /**
+   * Valida se um obreiro é elegível para assumir liderança (ministro ativo do tenant).
+   */
+  public static async validarElegibilidadeMinistro(
+    supabase: any,
+    ministryId: string,
+    memberId: string
+  ): Promise<{
+    id: string;
+    nome: string;
+    matricula: string | null;
+    cpf: string | null;
+    cargo_ministerial: string | null;
+  }> {
+    if (!memberId) {
+      throw new Error('É obrigatório selecionar um ministro elegível cadastrado no sistema.');
+    }
+
+    const { data: member, error } = await supabase
+      .from('members')
+      .select('id, name, matricula, cpf, cargo_ministerial, role, tipo_cadastro, status, ministry_id')
+      .eq('id', memberId)
+      .eq('ministry_id', ministryId)
+      .maybeSingle();
+
+    if (error || !member) {
+      throw new Error('Ministro selecionado não encontrado ou pertencente a outro ministério.');
+    }
+
+    const st = (member.status || '').toLowerCase();
+    if (st !== 'active' && st !== 'ativo') {
+      throw new Error(`O ministro selecionado (${member.name}) encontra-se com status "${member.status}". Apenas ministros ativos podem ser designados.`);
+    }
+
+    const r = (member.role || '').toLowerCase();
+    const tc = (member.tipo_cadastro || '').toLowerCase();
+    const isNaoElegivel = ['membro', 'congregado', 'crianca', 'visitante'].includes(r) || ['membro', 'congregado', 'crianca', 'visitante'].includes(tc);
+    const isMinistro = r === 'ministro' || tc === 'ministro';
+
+    if (!isMinistro || isNaoElegivel) {
+      throw new Error(`O cadastro de ${member.name} não possui o perfil de ministro. Membros comuns, congregados e crianças não são elegíveis para liderar congregações.`);
+    }
+
+    return {
+      id: member.id,
+      nome: member.name,
+      matricula: member.matricula || null,
+      cpf: member.cpf || null,
+      cargo_ministerial: member.cargo_ministerial || 'Pastor',
+    };
+  }
+
+  /**
+   * Registra um evento no histórico individual do obreiro (members.custom_fields).
+   * Idempotente: se já existir evento com a mesma chave ou id_movimentacao + tipo_evento, não duplica.
+   */
+  public static async registrarEventoHistoricoObreiro(
+    supabase: any,
+    ministryId: string,
+    memberId: string,
+    evento: {
+      id: string;
+      movimentacao_id: string;
+      tipo_evento: 'posse_dirigente' | 'saida_dirigente';
+      tipo_movimentacao: string;
+      data: string;
+      data_hora_efetivacao: string;
+      local: string;
+      congregacao_nome: string;
+      cargo: string;
+      justificativa: string;
+      descricao: string;
+      responsavel: string;
+      usuario_id: string;
+    }
+  ): Promise<void> {
+    if (!memberId || !ministryId) return;
+
+    const { data: member, error: fetchErr } = await supabase
+      .from('members')
+      .select('id, custom_fields, cargo_ministerial')
+      .eq('id', memberId)
+      .eq('ministry_id', ministryId)
+      .maybeSingle();
+
+    if (fetchErr || !member) return;
+
+    const cf = (member.custom_fields && typeof member.custom_fields === 'object')
+      ? { ...(member.custom_fields as Record<string, any>) }
+      : {};
+
+    const historicoAtual: any[] = Array.isArray(cf.historico_processos)
+      ? [...cf.historico_processos]
+      : Array.isArray(cf.historicoProcessos)
+      ? [...cf.historicoProcessos]
+      : [];
+
+    // Prevenção de duplicidade estrita (idempotência)
+    const exists = historicoAtual.some(
+      (h) =>
+        h.id === evento.id ||
+        (h.movimentacao_id === evento.movimentacao_id && h.tipo_evento === evento.tipo_evento)
+    );
+
+    if (exists) return;
+
+    const novoItem = {
+      id: evento.id,
+      processo_id: evento.movimentacao_id,
+      movimentacao_id: evento.movimentacao_id,
+      ministry_id: ministryId,
+      member_id: memberId,
+      tipo_evento: evento.tipo_evento,
+      tipo_movimentacao: evento.tipo_movimentacao,
+      data: evento.data,
+      data_hora_efetivacao: evento.data_hora_efetivacao,
+      local: evento.local,
+      congregacao_nome: evento.congregacao_nome,
+      cargo: evento.cargo,
+      cargo_resultante: evento.tipo_evento === 'posse_dirigente' ? evento.cargo : null,
+      cargo_anterior: evento.tipo_evento === 'saida_dirigente' ? evento.cargo : null,
+      justificativa: evento.justificativa,
+      parecer: evento.justificativa,
+      descricao: evento.descricao,
+      responsavel: evento.responsavel,
+      usuario_id: evento.usuario_id,
+      criado_em: evento.data_hora_efetivacao,
+    };
+
+    const nextHistorico = [...historicoAtual, novoItem];
+
+    const { error: upErr } = await supabase
+      .from('members')
+      .update({
+        custom_fields: {
+          ...cf,
+          historico_processos: nextHistorico,
+          historicoProcessos: nextHistorico,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', memberId)
+      .eq('ministry_id', ministryId);
+
+    if (upErr) {
+      console.error(`Erro ao gravar histórico individual do obreiro ${memberId}:`, upErr);
+      throw new Error(`Falha ao registrar histórico individual do ministro: ${upErr.message}`);
+    }
+  }
+
+  /**
    * Prepara e registra uma proposta de movimentação na secretaria.
    */
   public static async criarProposta(
@@ -427,7 +636,44 @@ export class DirigentesService {
       throw new Error('Acesso negado: Apenas a Secretaria ou Administrador podem registrar propostas de movimentação.');
     }
 
-    // 1. Verifica se a congregação destino possui bens cadastrados no patrimônio
+    if (!input.congregacao_destino_id) {
+      throw new Error('A congregação de destino é obrigatória para a proposta.');
+    }
+
+    // 1. Valida que a congregação pertence ao mesmo ministério
+    const { data: congDest, error: congErr } = await supabase
+      .from('congregacoes')
+      .select('id, nome, ministry_id')
+      .eq('id', input.congregacao_destino_id)
+      .eq('ministry_id', user.ministryId)
+      .maybeSingle();
+
+    if (congErr || !congDest) {
+      throw new Error('Congregação não encontrada ou pertencente a outro ministério.');
+    }
+
+    // 2. Valida elegibilidade do novo dirigente selecionado no perfil de ministro ativo
+    const ministroElegivel = await this.validarElegibilidadeMinistro(
+      supabase,
+      user.ministryId,
+      input.dirigente_novo_member_id
+    );
+
+    // 3. Valida dirigente anterior (se houver member_id informado, deve pertencer ao mesmo ministério)
+    if (input.dirigente_anterior_member_id) {
+      const { data: antMem } = await supabase
+        .from('members')
+        .select('id')
+        .eq('id', input.dirigente_anterior_member_id)
+        .eq('ministry_id', user.ministryId)
+        .maybeSingle();
+
+      if (!antMem) {
+        console.warn('Dirigente anterior não encontrado no ministério; prosseguindo com dados textuais.');
+      }
+    }
+
+    // 4. Verifica se a congregação destino possui bens cadastrados no patrimônio
     const { count: bensCount, error: countErr } = await supabase
       .from('patrimonio_itens')
       .select('id', { count: 'exact', head: true })
@@ -446,14 +692,14 @@ export class DirigentesService {
       tipo_movimentacao: input.tipo_movimentacao,
       status: 'proposta', // Já submete como proposta pronta para apreciação da presidência
       ano_referencia: input.ano_referencia || new Date().getFullYear(),
-      titulo: input.titulo || `Movimentação — ${input.dirigente_novo_nome}`,
+      titulo: input.titulo || `Substituição de Liderança — ${congDest.nome}`,
       congregacao_destino_id: input.congregacao_destino_id,
       congregacao_origem_id: input.congregacao_origem_id || null,
-      dirigente_novo_member_id: input.dirigente_novo_member_id || null,
-      dirigente_novo_nome: input.dirigente_novo_nome.trim(),
-      dirigente_novo_cargo: input.dirigente_novo_cargo || null,
-      dirigente_novo_cpf: input.dirigente_novo_cpf || null,
-      dirigente_novo_matricula: input.dirigente_novo_matricula || null,
+      dirigente_novo_member_id: ministroElegivel.id,
+      dirigente_novo_nome: ministroElegivel.nome,
+      dirigente_novo_cargo: input.dirigente_novo_cargo || ministroElegivel.cargo_ministerial || 'Pastor',
+      dirigente_novo_cpf: ministroElegivel.cpf || input.dirigente_novo_cpf || null,
+      dirigente_novo_matricula: ministroElegivel.matricula || input.dirigente_novo_matricula || null,
       dirigente_anterior_member_id: input.dirigente_anterior_member_id || null,
       dirigente_anterior_nome: input.dirigente_anterior_nome || null,
       dirigente_anterior_cargo: input.dirigente_anterior_cargo || null,
@@ -574,120 +820,61 @@ export class DirigentesService {
       throw new Error('Acesso negado: Somente a Presidência ou Administrador podem efetivar movimentações.');
     }
 
-    // 1. Busca a movimentação
-    const { data: mov, error: findErr } = await supabase
+    if (!input.movimentacao_id) {
+      throw new Error('ID da movimentação é obrigatório para efetivação.');
+    }
+
+    const dataEfetiva = input.data_efetiva || new Date().toISOString().slice(0, 10);
+
+    // Operação Atômica Transacional Exclusiva via PostgreSQL (RPC)
+    // Elimina o risco de gravações parciais ou inconsistências em caso de falha.
+    if (!supabase || typeof supabase.rpc !== 'function') {
+      throw new Error('Cliente de banco de dados não suporta chamadas RPC atômicas.');
+    }
+
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('efetivar_movimentacao_dirigente', {
+      p_ministry_id: user.ministryId,
+      p_movimentacao_id: input.movimentacao_id,
+      p_user_id: user.userId,
+      p_user_name: user.userName,
+      p_data_efetiva: dataEfetiva,
+      p_divergencias: input.divergencias_patrimoniais || null,
+    });
+
+    if (rpcErr) {
+      throw new Error(`Falha na efetivação atômica da movimentação: ${rpcErr.message}`);
+    }
+
+    if (!rpcRes || !rpcRes.sucesso) {
+      throw new Error(rpcRes?.erro || 'A transação atômica de efetivação não retornou confirmação de sucesso.');
+    }
+
+    // Carrega os dados atualizados gerados pela transação atômica
+    const { data: movAtual, error: movErr } = await supabase
       .from('dirigentes_movimentacoes')
       .select('*')
       .eq('id', input.movimentacao_id)
       .eq('ministry_id', user.ministryId)
       .single();
 
-    if (findErr || !mov) {
-      throw new Error('Movimentação não encontrada no ministério.');
+    if (movErr || !movAtual) {
+      throw new Error(`Movimentação efetivada, mas houve erro ao carregar os dados atualizados: ${movErr?.message || 'não encontrada'}`);
     }
 
-    // 2. Valida prontidão
-    const temTermo = Boolean(mov.termo_patrimonial_id);
-    const check = this.validarProntidaoEfetivacao(mov, temTermo);
-    if (!check.valida) {
-      throw new Error(check.erro);
-    }
-
-    const dataEfetiva = input.data_efetiva || new Date().toISOString().slice(0, 10);
-
-    // 3. Encerra mandato anterior na congregação destino (se houver ativo)
-    const { data: mandatosAtivos } = await supabase
+    const { data: desigAtual, error: desigErr } = await supabase
       .from('dirigentes_designacoes')
       .select('*')
+      .eq('id', rpcRes.nova_designacao_id)
       .eq('ministry_id', user.ministryId)
-      .eq('congregacao_id', mov.congregacao_destino_id)
-      .eq('status', 'ativo');
-
-    if (mandatosAtivos && mandatosAtivos.length > 0) {
-      for (const m of mandatosAtivos) {
-        await supabase
-          .from('dirigentes_designacoes')
-          .update({
-            status: 'concluido',
-            data_termino: dataEfetiva,
-            motivo_saida: `Substituído por movimentação: ${mov.motivo}`,
-            movimentacao_saida_id: mov.id,
-          })
-          .eq('id', m.id);
-      }
-    }
-
-    // 4. Verifica se o novo dirigente já tem outras congregações ativas para marcar acumulação
-    const { data: todasAtivas } = await supabase
-      .from('dirigentes_designacoes')
-      .select('*')
-      .eq('ministry_id', user.ministryId)
-      .eq('status', 'ativo');
-
-    const isAcumulacao = this.verificarAcumulacao(
-      mov.dirigente_novo_nome,
-      mov.congregacao_destino_id,
-      todasAtivas || []
-    );
-
-    // 5. Cria a nova designação
-    const novaDesignacaoPayload = {
-      ministry_id: user.ministryId,
-      congregacao_id: mov.congregacao_destino_id,
-      member_id: mov.dirigente_novo_member_id || null,
-      nome_dirigente: mov.dirigente_novo_nome,
-      cpf_dirigente: mov.dirigente_novo_cpf || null,
-      cargo_ministerial: mov.dirigente_novo_cargo || null,
-      matricula_dirigente: mov.dirigente_novo_matricula || null,
-      tipo_designacao: mov.tipo_movimentacao === 'substituicao_temporaria' ? 'interino' : 'titular',
-      is_acumulacao: isAcumulacao,
-      status: 'ativo',
-      data_posse: dataEfetiva,
-      movimentacao_origem_id: mov.id,
-      observacoes: input.observacoes || mov.observacoes || null,
-    };
-
-    const { data: novaDesig, error: desigErr } = await supabase
-      .from('dirigentes_designacoes')
-      .insert(novaDesignacaoPayload)
-      .select()
       .single();
 
-    if (desigErr) {
-      throw new Error(`Falha ao registrar posse do novo dirigente: ${desigErr.message}`);
-    }
-
-    // 6. Atualiza a tabela legada 'congregacoes' para refletir o novo dirigente
-    await supabase
-      .from('congregacoes')
-      .update({
-        dirigente: mov.dirigente_novo_nome,
-        dirigente_cargo: mov.dirigente_novo_cargo || null,
-        dirigente_cpf: mov.dirigente_novo_cpf || null,
-        dirigente_matricula: mov.dirigente_novo_matricula || null,
-      })
-      .eq('id', mov.congregacao_destino_id)
-      .eq('ministry_id', user.ministryId);
-
-    // 7. Marca a movimentação como efetivada
-    const { data: movAtualizada, error: movUpErr } = await supabase
-      .from('dirigentes_movimentacoes')
-      .update({
-        status: 'efetivada',
-        data_efetiva: dataEfetiva,
-        divergencias_patrimoniais: input.divergencias_patrimoniais || mov.divergencias_patrimoniais || null,
-      })
-      .eq('id', mov.id)
-      .select()
-      .single();
-
-    if (movUpErr) {
-      throw new Error(`Falha ao concluir efetivação: ${movUpErr.message}`);
+    if (desigErr || !desigAtual) {
+      throw new Error(`Movimentação efetivada, mas houve erro ao carregar a designação gerada: ${desigErr?.message || 'não encontrada'}`);
     }
 
     return {
-      movimentacao: movAtualizada as DirigenteMovimentacao,
-      novaDesignacao: novaDesig as DirigenteDesignacao,
+      movimentacao: movAtual as DirigenteMovimentacao,
+      novaDesignacao: desigAtual as DirigenteDesignacao,
     };
   }
 }
