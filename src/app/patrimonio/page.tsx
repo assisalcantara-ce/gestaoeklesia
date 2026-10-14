@@ -24,6 +24,15 @@ import {
   Sparkles,
   TrendingUp,
   X,
+  Layers,
+  MapPin,
+  Car,
+  Music,
+  Tv,
+  HelpCircle,
+  ChevronDown,
+  ChevronRight,
+  ChevronLeft,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -59,6 +68,7 @@ interface PatrimonioItem {
   data_baixa?: string | null;
   motivo_baixa?: string | null;
   observacoes?: string | null;
+  dados_especificos?: Record<string, any> | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -66,13 +76,14 @@ interface PatrimonioItem {
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const CATEGORIAS = [
-  { value: 'equipamento', label: 'Equipamento' },
-  { value: 'movel', label: 'Móvel / Utensílio' },
-  { value: 'imovel', label: 'Imóvel / Prédio' },
-  { value: 'veiculo', label: 'Veículo' },
-  { value: 'instrumento', label: 'Instrumento Musical' },
-  { value: 'eletronico', label: 'Eletrônico / Sonorização' },
-  { value: 'outros', label: 'Outros' },
+  { value: 'imovel', label: 'Imóveis', desc: 'Prédio, templo, salão, casa pastoral e edificações' },
+  { value: 'terreno', label: 'Terrenos', desc: 'Terrenos sem edificação, medidas e localização' },
+  { value: 'movel', label: 'Móveis e utensílios', desc: 'Mesas, cadeiras, armários, bancos e mobiliário' },
+  { value: 'equipamento', label: 'Equipamentos', desc: 'Computadores, impressoras, projetores e uso geral' },
+  { value: 'instrumento', label: 'Instrumentos musicais', desc: 'Teclados, baterias, violões, guitarras, microfones' },
+  { value: 'som_imagem', label: 'Equipamentos de som e imagem', desc: 'Mesas de som, caixas acústicas, amplificadores, câmeras' },
+  { value: 'veiculo', label: 'Veículos', desc: 'Carros, motos, vans, ônibus e outros veículos' },
+  { value: 'outros', label: 'Outros', desc: 'Bens não enquadrados nas categorias anteriores' },
 ];
 
 const ESTADOS = [
@@ -101,8 +112,8 @@ const EMPTY_FORM = {
   local_id: '',
   local_descricao: '',
   numero_tombamento: '',
+  categoria: 'imovel',
   descricao: '',
-  categoria: 'equipamento',
   marca_modelo: '',
   numero_serie: '',
   cor: '',
@@ -114,6 +125,48 @@ const EMPTY_FORM = {
   data_baixa: '',
   motivo_baixa: '',
   observacoes: '',
+
+  // Campos dinâmicos específicos
+  // Imóveis
+  tipo_imovel: '',
+  endereco_imovel: '',
+  area_construida: '',
+  matricula_imovel: '',
+  observacoes_imovel: '',
+
+  // Terrenos
+  endereco_terreno: '',
+  area_terreno: '',
+  medidas_frente: '',
+  medidas_fundos: '',
+  medidas_laterais: '',
+  matricula_terreno: '',
+  observacoes_terreno: '',
+
+  // Móveis e utensílios
+  quantidade_movel: '1',
+  material_movel: '',
+  localizacao_interna_movel: '',
+
+  // Equipamentos
+  quantidade_equipamento: '1',
+
+  // Instrumentos musicais
+  tipo_instrumento: '',
+  quantidade_instrumento: '1',
+
+  // Som e imagem
+  tipo_som_imagem: '',
+  quantidade_som_imagem: '1',
+
+  // Veículos
+  ano_veiculo: '',
+  placa_veiculo: '',
+  renavam_veiculo: '',
+  km_veiculo: '',
+
+  // Outros
+  quantidade_outros: '1',
 };
 
 // ─── Impressão de Etiquetas ───────────────────────────────────────────────────
@@ -180,7 +233,9 @@ const formatCurrency = (v?: number | null) =>
 
 // ─── Impressão de Ficha ────────────────────────────────────────────────────────
 
-function imprimirFichaPatrimonio(opts: {
+// ─── Impressão de Relatório Patrimonial Oficial por Congregação ───────────────
+
+function imprimirRelatorioPatrimonial(opts: {
   itens: PatrimonioItem[];
   local: LocalOption;
   configIgreja: ConfiguracaoIgreja;
@@ -188,107 +243,215 @@ function imprimirFichaPatrimonio(opts: {
   const { itens, local, configIgreja } = opts;
   const hoje = new Date().toLocaleDateString('pt-BR');
 
-  const dirigente = local.tipo === 'congregacao'
-    ? (local.dirigente || '-')
-    : (local.pastor_nome || '-');
-  const cargoDirigente = local.tipo === 'congregacao'
-    ? (local.dirigente_cargo || 'Dirigente')
-    : 'Pastor';
+  const dirigenteNome = local.tipo === 'congregacao'
+    ? (local.dirigente?.trim() || '')
+    : (local.pastor_nome?.trim() || '');
+  const dirigenteCargo = local.tipo === 'congregacao'
+    ? (local.dirigente_cargo?.trim() || 'Dirigente Responsável')
+    : 'Pastor Responsável';
 
-  const linhasHtml = itens.map((item, i) => `
-    <tr style="border-bottom:1px solid #e5e7eb;${i % 2 === 0 ? 'background:#f9fafb' : ''}">
-      <td style="padding:6px 8px;font-size:11px;text-align:center;">${item.numero_tombamento || (i + 1)}</td>
-      <td style="padding:6px 8px;font-size:11px;">${item.descricao}</td>
-      <td style="padding:6px 8px;font-size:11px;text-align:center;">${CATEGORIAS.find(c => c.value === item.categoria)?.label || item.categoria}</td>
-      <td style="padding:6px 8px;font-size:11px;">${item.marca_modelo || '-'}</td>
-      <td style="padding:6px 8px;font-size:11px;text-align:center;">${item.numero_serie || '-'}</td>
-      <td style="padding:6px 8px;font-size:11px;text-align:center;">${ESTADOS.find(e => e.value === item.estado_conservacao)?.label || item.estado_conservacao}</td>
-      <td style="padding:6px 8px;font-size:11px;text-align:right;">${formatCurrency(item.valor_aquisicao)}</td>
-      <td style="padding:6px 8px;font-size:11px;">${item.observacoes || ''}</td>
-    </tr>
-  `).join('');
+  const linhasHtml = itens.map((item, i) => {
+    const catLabel = CATEGORIAS.find(c => c.value === item.categoria)?.label || 
+      (item.categoria === 'eletronico' ? 'Equipamentos de som e imagem' : item.categoria);
+    const estadoLabel = ESTADOS.find(e => e.value === item.estado_conservacao)?.label || item.estado_conservacao;
+    const statusLabel = STATUS_OPTIONS.find(s => s.value === item.status)?.label || item.status;
+
+    return `
+      <tr style="border-bottom:1px solid #e2e8f0;${i % 2 === 0 ? 'background:#f8fafc' : ''}">
+        <td style="padding:6px 8px;font-size:10px;text-align:center;font-weight:bold;">${item.numero_tombamento || (i + 1)}</td>
+        <td style="padding:6px 8px;font-size:10px;font-weight:600;">
+          ${item.descricao}
+          ${item.marca_modelo ? `<div style="font-size:9px;color:#64748b;font-weight:normal;">${item.marca_modelo}</div>` : ''}
+        </td>
+        <td style="padding:6px 8px;font-size:10px;text-align:center;">${catLabel}</td>
+        <td style="padding:6px 8px;font-size:10px;text-align:center;">${item.local_descricao || local.nome}</td>
+        <td style="padding:6px 8px;font-size:10px;text-align:center;">${estadoLabel}</td>
+        <td style="padding:6px 8px;font-size:10px;text-align:right;font-weight:600;">${formatCurrency(item.valor_aquisicao)}</td>
+        <td style="padding:6px 8px;font-size:10px;text-align:center;">
+          <span style="display:inline-block;padding:1px 6px;border-radius:9999px;font-size:9px;font-weight:bold;text-transform:uppercase;background:#e2e8f0;color:#334155;">
+            ${statusLabel}
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join('');
 
   const totalValor = itens.reduce((acc, i) => acc + (i.valor_aquisicao || 0), 0);
 
   const html = `<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8"><title>Ficha de Patrimônio</title>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Patrimonial — ${local.nome}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  @page{size:A4;margin:16mm 14mm}
-  body{font-family:Arial,sans-serif;color:#111;font-size:12px}
-  .header{display:flex;align-items:center;gap:16px;border-bottom:2px solid #123b63;padding-bottom:12px;margin-bottom:14px}
-  .header img{height:64px;object-fit:contain}
-  .header-text h1{font-size:16px;font-weight:700;color:#123b63}
-  .header-text p{font-size:11px;color:#555;margin-top:2px}
-  .titulo{text-align:center;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:10px 0;color:#123b63}
-  .meta{display:flex;gap:32px;flex-wrap:wrap;margin-bottom:12px;font-size:11px}
-  .meta-item{display:flex;flex-direction:column}
-  .meta-item strong{font-size:10px;text-transform:uppercase;color:#555}
+  @page{
+    size:A4 portrait;
+    margin:14mm 12mm 16mm 12mm;
+  }
+  body{
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color:#0f172a;
+    font-size:11px;
+    line-height:1.4;
+  }
+  .header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    border-bottom:2px solid #0f766e;
+    padding-bottom:12px;
+    margin-bottom:14px;
+  }
+  .header-left{display:flex;align-items:center;gap:14px}
+  .header img{height:58px;max-width:120px;object-fit:contain}
+  .header-text h1{font-size:16px;font-weight:800;color:#0f766e;letter-spacing:-0.3px}
+  .header-text p{font-size:10px;color:#475569;margin-top:2px}
+  .doc-badge{
+    text-align:right;
+    background:#f0fdfa;
+    border:1px solid #ccfbf1;
+    border-radius:8px;
+    padding:6px 12px;
+  }
+  .doc-badge strong{display:block;font-size:11px;color:#0f766e;text-transform:uppercase}
+  .doc-badge span{font-size:9px;color:#64748b}
+  .meta-grid{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:8px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+    padding:8px 12px;
+    margin-bottom:14px;
+  }
+  .meta-item strong{display:block;font-size:9px;text-transform:uppercase;color:#64748b;letter-spacing:0.5px}
+  .meta-item span{font-size:11px;font-weight:700;color:#1e293b}
   table{width:100%;border-collapse:collapse;margin-bottom:16px}
-  thead tr{background:#123b63;color:#fff}
-  thead th{padding:7px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;text-align:left}
-  .total-row{font-weight:700;background:#f3f4f6}
-  .section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#123b63;border-top:1px solid #123b63;padding-top:14px;margin-top:8px;margin-bottom:10px}
-  .assinaturas{display:flex;gap:32px;margin-top:8px}
-  .assinatura-box{flex:1}
-  .assinatura-linha{border-top:1px solid #111;margin-top:40px}
-  .assinatura-nome{font-size:11px;font-weight:700;margin-top:4px}
-  .assinatura-cargo{font-size:10px;color:#555}
-  .rodape{margin-top:20px;text-align:center;font-size:9px;color:#999;border-top:1px solid #e5e7eb;padding-top:8px}
-  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  thead{display:table-header-group}
+  tr{page-break-inside:avoid}
+  thead tr{background:#0f766e;color:#fff}
+  thead th{
+    padding:7px 8px;
+    font-size:9px;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    text-align:left;
+  }
+  .total-row{
+    font-weight:800;
+    background:#f1f5f9;
+    border-top:2px solid #cbd5e1;
+  }
+  .termos-box{
+    background:#fafafa;
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+    padding:10px 14px;
+    margin-top:14px;
+    page-break-inside:avoid;
+  }
+  .termos-title{font-size:10px;font-weight:800;text-transform:uppercase;color:#0f766e;margin-bottom:4px}
+  .termos-texto{font-size:9.5px;color:#475569;line-height:1.45}
+  .assinaturas{
+    display:flex;
+    gap:36px;
+    margin-top:24px;
+    page-break-inside:avoid;
+  }
+  .assinatura-box{flex:1;text-align:center}
+  .assinatura-linha{border-top:1.5px solid #334155;margin-top:38px}
+  .assinatura-nome{font-size:11px;font-weight:800;color:#0f172a;margin-top:4px}
+  .assinatura-cargo{font-size:9.5px;color:#64748b;font-weight:600}
+  .rodape{
+    margin-top:20px;
+    text-align:center;
+    font-size:9px;
+    color:#94a3b8;
+    border-top:1px solid #e2e8f0;
+    padding-top:8px;
+  }
+  @media print{
+    body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
 </style></head><body>
   <div class="header">
-    ${configIgreja.logo ? `<img src="${configIgreja.logo}" alt="Logo" />` : ''}
-    <div class="header-text">
-      <h1>${configIgreja.nome}</h1>
-      <p>${configIgreja.endereco || ''}</p>
-      ${configIgreja.cnpj ? `<p>CNPJ: ${configIgreja.cnpj}</p>` : ''}
-      ${configIgreja.telefone ? `<p>${configIgreja.telefone}</p>` : ''}
+    <div class="header-left">
+      ${configIgreja.logo ? `<img src="${configIgreja.logo}" alt="Logo" />` : ''}
+      <div class="header-text">
+        <h1>${configIgreja.nome || 'Igreja / Ministério'}</h1>
+        <p>${configIgreja.endereco || ''}</p>
+        ${configIgreja.cnpj ? `<p>CNPJ: ${configIgreja.cnpj}</p>` : ''}
+        ${configIgreja.telefone ? `<p>Contato: ${configIgreja.telefone}</p>` : ''}
+      </div>
+    </div>
+    <div class="doc-badge">
+      <strong>Relatório Patrimonial</strong>
+      <span>Inventário Oficial</span>
     </div>
   </div>
-  <div class="titulo">Ficha de Patrimônio</div>
-  <div class="meta">
-    <div class="meta-item"><strong>Local</strong>${local.nome}</div>
-    <div class="meta-item"><strong>Dirigente atual</strong>${dirigente}</div>
-    <div class="meta-item"><strong>Cargo</strong>${cargoDirigente}</div>
-    <div class="meta-item"><strong>Data de emissão</strong>${hoje}</div>
-    <div class="meta-item"><strong>Total de itens</strong>${itens.length}</div>
+
+  <div class="meta-grid">
+    <div class="meta-item">
+      <strong>Congregação / Local</strong>
+      <span>${local.nome}</span>
+    </div>
+    <div class="meta-item">
+      <strong>Dirigente Responsável</strong>
+      <span>${dirigenteNome || 'Não informado'}</span>
+    </div>
+    <div class="meta-item">
+      <strong>Data de Emissão</strong>
+      <span>${hoje}</span>
+    </div>
+    <div class="meta-item">
+      <strong>Total de Itens Cadastrados</strong>
+      <span>${itens.length} ${itens.length === 1 ? 'bem' : 'bens'}</span>
+    </div>
   </div>
+
   <table>
     <thead><tr>
-      <th style="width:48px">Nº</th><th>Descrição</th><th style="width:90px">Categoria</th>
-      <th style="width:110px">Marca/Modelo</th><th style="width:90px">Nº Série</th>
-      <th style="width:70px">Estado</th><th style="width:80px">Valor</th><th>Obs.</th>
+      <th style="width:70px;text-align:center">Tombamento</th>
+      <th>Descrição do Bem</th>
+      <th style="width:110px;text-align:center">Categoria</th>
+      <th style="width:110px;text-align:center">Localização</th>
+      <th style="width:75px;text-align:center">Estado</th>
+      <th style="width:85px;text-align:right">Valor Estimado</th>
+      <th style="width:70px;text-align:center">Status</th>
     </tr></thead>
     <tbody>
-      ${linhasHtml}
+      ${linhasHtml || '<tr><td colspan="7" style="padding:16px;text-align:center;color:#64748b;">Nenhum bem patrimonial cadastrado para este local.</td></tr>'}
       <tr class="total-row">
-        <td colspan="6" style="padding:6px 8px;font-size:11px;text-align:right;">Total estimado:</td>
-        <td style="padding:6px 8px;font-size:11px;text-align:right;">${formatCurrency(totalValor)}</td>
+        <td colspan="5" style="padding:8px;font-size:10px;text-align:right;text-transform:uppercase;">Valor Total Estimado do Patrimônio:</td>
+        <td style="padding:8px;font-size:11px;text-align:right;color:#0f766e;">${formatCurrency(totalValor)}</td>
         <td></td>
       </tr>
     </tbody>
   </table>
-  <div class="section-title">Termos e Assinaturas</div>
-  <p style="font-size:11px;margin-bottom:16px;">Eu, abaixo assinado(a), declaro ter recebido/entregado os bens acima relacionados, comprometendo-me a zelar pela sua conservação e uso adequado conforme as normas do ministério.</p>
+
+  <div class="termos-box">
+    <div class="termos-title">Declaração e Termo de Responsabilidade</div>
+    <p class="termos-texto">
+      Declaramos para os devidos fins que a relação acima reflete com exatidão os bens móveis e imóveis tombados e sob guarda e responsabilidade da referida congregação, cabendo aos responsáveis zelar pela sua conservação, proteção e uso adequado de acordo com as normas estatutárias do ministério.
+    </p>
+  </div>
+
   <div class="assinaturas">
     <div class="assinatura-box">
       <div class="assinatura-linha"></div>
-      <div class="assinatura-nome">${dirigente}</div>
-      <div class="assinatura-cargo">${cargoDirigente} — Saída / Entrega</div>
+      <div class="assinatura-nome">${dirigenteNome || 'Dirigente Responsável'}</div>
+      <div class="assinatura-cargo">${dirigenteCargo}</div>
     </div>
     <div class="assinatura-box">
       <div class="assinatura-linha"></div>
-      <div class="assinatura-nome">Novo Dirigente</div>
-      <div class="assinatura-cargo">Dirigente — Entrada / Recebimento</div>
-    </div>
-    <div class="assinatura-box">
-      <div class="assinatura-linha"></div>
-      <div class="assinatura-nome">Pastor do Ministério</div>
-      <div class="assinatura-cargo">Testemunha / Responsável</div>
+      <div class="assinatura-nome">Secretaria Geral</div>
+      <div class="assinatura-cargo">Secretário(a) Geral / Administração do Patrimônio</div>
     </div>
   </div>
-  <div class="rodape">Documento gerado em ${hoje} · ${configIgreja.nome} · Gestão Eklesia</div>
+
+  <div class="rodape">
+    Documento emitido eletronicamente em ${hoje} · ${configIgreja.nome || 'Gestão Eklésia'} · Sistema Integrado de Gestão Eclesiástica
+  </div>
 </body></html>`;
 
   const win = window.open('', '_blank');
@@ -349,6 +512,25 @@ export default function PatrimonioPage() {
     type: 'success',
     autoClose: 3000,
   });
+
+  // Estado para expansão sanfonada e paginação individual por congregação
+  const [expandedLocais, setExpandedLocais] = useState<Record<string, boolean>>({});
+  const [pagesLocais, setPagesLocais] = useState<Record<string, number>>({});
+
+  const toggleExpandLocal = (localKey: string) => {
+    setExpandedLocais((prev) => {
+      const willOpen = !prev[localKey];
+      if (willOpen) {
+        // Ao expandir pela primeira vez ou reabrir, inicia na página 1
+        setPagesLocais((p) => ({ ...p, [localKey]: 1 }));
+      }
+      return { ...prev, [localKey]: willOpen };
+    });
+  };
+
+  const changePageLocal = (localKey: string, newPage: number) => {
+    setPagesLocais((prev) => ({ ...prev, [localKey]: newPage }));
+  };
 
   const showNotif = (
     type: typeof notification.type,
@@ -471,8 +653,159 @@ export default function PatrimonioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.loading, bloqueado]);
 
+  // ─── Helpers de Limpeza e Migração de Campos Específicos ────────────────────
+  const clearSpecificFieldsForCategory = (cat: string) => {
+    return {
+      // Imóveis
+      ...(cat !== 'imovel' ? {
+        tipo_imovel: '',
+        endereco_imovel: '',
+        area_construida: '',
+        matricula_imovel: '',
+        observacoes_imovel: '',
+      } : {}),
+
+      // Terrenos
+      ...(cat !== 'terreno' ? {
+        endereco_terreno: '',
+        area_terreno: '',
+        medidas_frente: '',
+        medidas_fundos: '',
+        medidas_laterais: '',
+        matricula_terreno: '',
+        observacoes_terreno: '',
+      } : {}),
+
+      // Móveis e utensílios
+      ...(cat !== 'movel' ? {
+        quantidade_movel: '1',
+        material_movel: '',
+        localizacao_interna_movel: '',
+      } : {}),
+
+      // Equipamentos
+      ...(cat !== 'equipamento' ? {
+        quantidade_equipamento: '1',
+      } : {}),
+
+      // Instrumentos musicais
+      ...(cat !== 'instrumento' ? {
+        tipo_instrumento: '',
+        quantidade_instrumento: '1',
+      } : {}),
+
+      // Som e imagem
+      ...(cat !== 'som_imagem' ? {
+        tipo_som_imagem: '',
+        quantidade_som_imagem: '1',
+      } : {}),
+
+      // Veículos
+      ...(cat !== 'veiculo' ? {
+        ano_veiculo: '',
+        placa_veiculo: '',
+        renavam_veiculo: '',
+        km_veiculo: '',
+      } : {}),
+
+      // Outros
+      ...(cat !== 'outros' ? {
+        quantidade_outros: '1',
+      } : {}),
+
+      // Campos genéricos padrão
+      ...(cat === 'imovel' || cat === 'terreno' ? {
+        marca_modelo: '',
+        numero_serie: '',
+        cor: '',
+      } : {}),
+    };
+  };
+
   const handleSubmit = async () => {
     if (!ministryId || !validate()) return;
+
+    // Constrói os dados específicos ativos para a categoria selecionada
+    let dadosEspecificosAtivos: Record<string, any> = {};
+    if (formData.categoria === 'imovel') {
+      dadosEspecificosAtivos = {
+        tipo_imovel: formData.tipo_imovel.trim() || null,
+        endereco: formData.endereco_imovel.trim() || null,
+        area_construida_m2: formData.area_construida ? Number(formData.area_construida) || formData.area_construida : null,
+        numero_registro_matricula: formData.matricula_imovel.trim() || null,
+        observacoes_imovel: formData.observacoes_imovel.trim() || null,
+      };
+    } else if (formData.categoria === 'terreno') {
+      dadosEspecificosAtivos = {
+        endereco_localizacao: formData.endereco_terreno.trim() || null,
+        area_total_m2: formData.area_terreno ? Number(formData.area_terreno) || formData.area_terreno : null,
+        medidas_frente: formData.medidas_frente.trim() || null,
+        medidas_fundos: formData.medidas_fundos.trim() || null,
+        medidas_laterais: formData.medidas_laterais.trim() || null,
+        matricula: formData.matricula_terreno.trim() || null,
+        observacoes_terreno: formData.observacoes_terreno.trim() || null,
+      };
+    } else if (formData.categoria === 'movel') {
+      dadosEspecificosAtivos = {
+        quantidade: formData.quantidade_movel ? parseInt(formData.quantidade_movel, 10) || 1 : 1,
+        material: formData.material_movel.trim() || null,
+        localizacao_interna: formData.localizacao_interna_movel.trim() || null,
+        estado_conservacao: formData.estado_conservacao,
+      };
+    } else if (formData.categoria === 'equipamento') {
+      dadosEspecificosAtivos = {
+        quantidade: formData.quantidade_equipamento ? parseInt(formData.quantidade_equipamento, 10) || 1 : 1,
+        marca: formData.marca_modelo.trim() || null,
+        modelo: formData.marca_modelo.trim() || null,
+        numero_serie: formData.numero_serie.trim() || null,
+        estado_conservacao: formData.estado_conservacao,
+      };
+    } else if (formData.categoria === 'instrumento') {
+      dadosEspecificosAtivos = {
+        instrumento: formData.tipo_instrumento.trim() || null,
+        quantidade: formData.quantidade_instrumento ? parseInt(formData.quantidade_instrumento, 10) || 1 : 1,
+        marca: formData.marca_modelo.trim() || null,
+        modelo: formData.marca_modelo.trim() || null,
+        numero_serie: formData.numero_serie.trim() || null,
+        estado_conservacao: formData.estado_conservacao,
+      };
+    } else if (formData.categoria === 'som_imagem') {
+      dadosEspecificosAtivos = {
+        tipo_equipamento: formData.tipo_som_imagem.trim() || null,
+        quantidade: formData.quantidade_som_imagem ? parseInt(formData.quantidade_som_imagem, 10) || 1 : 1,
+        marca: formData.marca_modelo.trim() || null,
+        modelo: formData.marca_modelo.trim() || null,
+        numero_serie: formData.numero_serie.trim() || null,
+        estado_conservacao: formData.estado_conservacao,
+      };
+    } else if (formData.categoria === 'veiculo') {
+      dadosEspecificosAtivos = {
+        marca_modelo: formData.marca_modelo.trim() || null,
+        ano: formData.ano_veiculo ? parseInt(formData.ano_veiculo, 10) || null : null,
+        placa: formData.placa_veiculo.trim() || formData.numero_serie.trim() || null,
+        renavam: formData.renavam_veiculo.trim() || null,
+        quilometragem: formData.km_veiculo ? Number(formData.km_veiculo) || null : null,
+      };
+    } else if (formData.categoria === 'outros') {
+      dadosEspecificosAtivos = {
+        quantidade: formData.quantidade_outros ? parseInt(formData.quantidade_outros, 10) || 1 : 1,
+        estado_conservacao: formData.estado_conservacao,
+      };
+    }
+
+    // Marca/modelo e número de série ajustados por categoria
+    let finalMarcaModelo = formData.marca_modelo.trim() || null;
+    let finalNumeroSerie = formData.numero_serie.trim() || null;
+
+    if (formData.categoria === 'veiculo') {
+      finalNumeroSerie = formData.placa_veiculo.trim() || formData.numero_serie.trim() || null;
+    } else if (formData.categoria === 'imovel') {
+      finalMarcaModelo = formData.tipo_imovel.trim() || null;
+      finalNumeroSerie = formData.matricula_imovel.trim() || null;
+    } else if (formData.categoria === 'terreno') {
+      finalMarcaModelo = null;
+      finalNumeroSerie = formData.matricula_terreno.trim() || null;
+    }
 
     const payload: any = {
       ministry_id: ministryId,
@@ -482,9 +815,9 @@ export default function PatrimonioPage() {
       numero_tombamento: formData.numero_tombamento.trim() || null,
       descricao: formData.descricao.trim(),
       categoria: formData.categoria,
-      marca_modelo: formData.marca_modelo.trim() || null,
-      numero_serie: formData.numero_serie.trim() || null,
-      cor: formData.cor.trim() || null,
+      marca_modelo: finalMarcaModelo,
+      numero_serie: finalNumeroSerie,
+      cor: ['imovel', 'terreno'].includes(formData.categoria) ? null : formData.cor.trim() || null,
       estado_conservacao: formData.estado_conservacao,
       valor_aquisicao: formData.valor_aquisicao
         ? parseFloat(String(formData.valor_aquisicao).replace(/\./g, '').replace(',', '.'))
@@ -497,6 +830,7 @@ export default function PatrimonioPage() {
       data_baixa: formData.status === 'baixado' ? formData.data_baixa || null : null,
       motivo_baixa: formData.status === 'baixado' ? formData.motivo_baixa.trim() || null : null,
       observacoes: formData.observacoes.trim() || null,
+      dados_especificos: dadosEspecificosAtivos,
       updated_at: new Date().toISOString(),
     };
 
@@ -600,16 +934,21 @@ export default function PatrimonioPage() {
 
   const handleEdit = (item: PatrimonioItem) => {
     setEditingId(item.id);
+    const esp = item.dados_especificos || {};
+
+    // Normaliza categoria caso venha de 'eletronico' legado
+    const catNormalizada = item.categoria === 'eletronico' ? 'som_imagem' : item.categoria;
+
     setFormData({
       local_id: item.congregacao_id || item.campo_id || '',
       local_descricao: item.local_descricao || '',
       numero_tombamento: item.numero_tombamento || '',
+      categoria: catNormalizada || 'imovel',
       descricao: item.descricao,
-      categoria: item.categoria,
-      marca_modelo: item.marca_modelo || '',
-      numero_serie: item.numero_serie || '',
+      marca_modelo: item.marca_modelo || esp.marca || esp.marca_modelo || '',
+      numero_serie: item.numero_serie || esp.numero_serie || '',
       cor: item.cor || '',
-      estado_conservacao: item.estado_conservacao,
+      estado_conservacao: item.estado_conservacao || 'bom',
       valor_aquisicao:
         item.valor_aquisicao != null
           ? (() => {
@@ -628,6 +967,47 @@ export default function PatrimonioPage() {
       data_baixa: formatIso(item.data_baixa),
       motivo_baixa: item.motivo_baixa || '',
       observacoes: item.observacoes || '',
+
+      // Imóveis
+      tipo_imovel: esp.tipo_imovel || '',
+      endereco_imovel: esp.endereco || '',
+      area_construida: esp.area_construida_m2 ? String(esp.area_construida_m2) : '',
+      matricula_imovel: esp.numero_registro_matricula || item.numero_serie || '',
+      observacoes_imovel: esp.observacoes_imovel || '',
+
+      // Terrenos
+      endereco_terreno: esp.endereco_localizacao || '',
+      area_terreno: esp.area_total_m2 ? String(esp.area_total_m2) : '',
+      medidas_frente: esp.medidas_frente || '',
+      medidas_fundos: esp.medidas_fundos || '',
+      medidas_laterais: esp.medidas_laterais || '',
+      matricula_terreno: esp.matricula || item.numero_serie || '',
+      observacoes_terreno: esp.observacoes_terreno || '',
+
+      // Móveis e utensílios
+      quantidade_movel: esp.quantidade ? String(esp.quantidade) : '1',
+      material_movel: esp.material || '',
+      localizacao_interna_movel: esp.localizacao_interna || '',
+
+      // Equipamentos
+      quantidade_equipamento: esp.quantidade ? String(esp.quantidade) : '1',
+
+      // Instrumentos musicais
+      tipo_instrumento: esp.instrumento || '',
+      quantidade_instrumento: esp.quantidade ? String(esp.quantidade) : '1',
+
+      // Som e imagem
+      tipo_som_imagem: esp.tipo_equipamento || '',
+      quantidade_som_imagem: esp.quantidade ? String(esp.quantidade) : '1',
+
+      // Veículos
+      ano_veiculo: esp.ano ? String(esp.ano) : '',
+      placa_veiculo: esp.placa || item.numero_serie || '',
+      renavam_veiculo: esp.renavam || '',
+      km_veiculo: esp.quilometragem ? String(esp.quilometragem) : '',
+
+      // Outros
+      quantidade_outros: esp.quantidade ? String(esp.quantidade) : '1',
     });
     setActiveTab('cadastro');
   };
@@ -693,7 +1073,7 @@ export default function PatrimonioPage() {
       );
       return;
     }
-    imprimirFichaPatrimonio({ itens: itensFicha, local, configIgreja });
+    imprimirRelatorioPatrimonial({ itens: itensFicha, local, configIgreja });
   };
 
   // Memos de estatísticas
@@ -715,7 +1095,10 @@ export default function PatrimonioPage() {
     () =>
       itens.filter((item) => {
         const matchStatus = !filterStatus || item.status === filterStatus;
-        const matchCat = !filterCategoria || item.categoria === filterCategoria;
+        const matchCat =
+          !filterCategoria ||
+          item.categoria === filterCategoria ||
+          (filterCategoria === 'som_imagem' && item.categoria === 'eletronico');
         const matchLocal =
           !filterLocal || item.congregacao_id === filterLocal || item.campo_id === filterLocal;
         const termo = filterSearch.toLowerCase();
@@ -736,6 +1119,118 @@ export default function PatrimonioPage() {
     (acc, i) => acc + (i.valor_aquisicao || 0),
     0
   );
+
+  // ─── Agrupamento por Congregação / Local para a Lista Sanfonada ───────────────
+  const gruposCongregacoes = useMemo(() => {
+    // 1. Cria um mapa para cada local cadastrado
+    const map = new Map<string, {
+      id: string;
+      localKey: string;
+      nome: string;
+      tipo: 'congregacao' | 'campo';
+      dirigenteNome: string;
+      dirigenteCargo: string;
+      localObj: LocalOption;
+      itensFiltrados: PatrimonioItem[];
+      totalFiltrado: number;
+      valorTotalFiltrado: number;
+      totalInventarioGeral: number;
+      valorInventarioGeral: number;
+    }>();
+
+    // Registra locais conhecidos
+    locais.forEach((loc) => {
+      const key = `${loc.tipo}_${loc.id}`;
+      const dirigente = loc.tipo === 'congregacao' ? (loc.dirigente || '') : (loc.pastor_nome || '');
+      const cargo = loc.tipo === 'congregacao' ? (loc.dirigente_cargo || 'Dirigente') : 'Pastor';
+
+      // Totais gerais do inventário desse local (sem filtros de busca/categoria/status)
+      const itensGerais = itens.filter((i) =>
+        loc.tipo === 'congregacao' ? i.congregacao_id === loc.id : i.campo_id === loc.id
+      );
+      const valorGeral = itensGerais.reduce((acc, i) => acc + (i.valor_aquisicao || 0), 0);
+
+      map.set(key, {
+        id: loc.id,
+        localKey: key,
+        nome: loc.nome,
+        tipo: loc.tipo,
+        dirigenteNome: dirigente,
+        dirigenteCargo: cargo,
+        localObj: loc,
+        itensFiltrados: [],
+        totalFiltrado: 0,
+        valorTotalFiltrado: 0,
+        totalInventarioGeral: itensGerais.length,
+        valorInventarioGeral: valorGeral,
+      });
+    });
+
+    // 2. Agrupa os itens filtrados dentro do respectivo local
+    const semLocalFiltrados: PatrimonioItem[] = [];
+
+    itensFiltrados.forEach((item) => {
+      let key: string | null = null;
+      if (item.congregacao_id) {
+        key = `congregacao_${item.congregacao_id}`;
+      } else if (item.campo_id) {
+        key = `campo_${item.campo_id}`;
+      }
+
+      if (key && map.has(key)) {
+        const grp = map.get(key)!;
+        grp.itensFiltrados.push(item);
+        grp.totalFiltrado += 1;
+        grp.valorTotalFiltrado += (item.valor_aquisicao || 0);
+      } else {
+        semLocalFiltrados.push(item);
+      }
+    });
+
+    // Cria o grupo especial "Outros / Sem Local Definido" se houver itens ou se estiver cadastrado
+    const itensSemLocalGerais = itens.filter((i) => !i.congregacao_id && !i.campo_id);
+    if (itensSemLocalGerais.length > 0) {
+      const valorGeralSemLocal = itensSemLocalGerais.reduce((acc, i) => acc + (i.valor_aquisicao || 0), 0);
+      const valorFiltradoSemLocal = semLocalFiltrados.reduce((acc, i) => acc + (i.valor_aquisicao || 0), 0);
+      map.set('sem_local', {
+        id: 'sem_local',
+        localKey: 'sem_local',
+        nome: 'Sede / Sem Local Definido',
+        tipo: 'congregacao',
+        dirigenteNome: '',
+        dirigenteCargo: 'Administração',
+        localObj: {
+          id: 'sem_local',
+          nome: 'Sede / Sem Local Definido',
+          tipo: 'congregacao',
+          dirigente: null,
+          dirigente_cargo: null,
+          pastor_nome: null,
+        },
+        itensFiltrados: semLocalFiltrados,
+        totalFiltrado: semLocalFiltrados.length,
+        valorTotalFiltrado: valorFiltradoSemLocal,
+        totalInventarioGeral: itensSemLocalGerais.length,
+        valorInventarioGeral: valorGeralSemLocal,
+      });
+    }
+
+    // 3. Converte para array
+    const lista = Array.from(map.values());
+
+    // Se houver filtros ativos (busca, categoria, status, local), exibe apenas congregações que possuem bens filtrados
+    const temFiltroAtivo = Boolean(filterSearch || filterCategoria || (filterStatus && filterStatus !== 'ativo') || filterLocal);
+    if (temFiltroAtivo) {
+      return lista.filter((g) => g.totalFiltrado > 0);
+    }
+
+    // Sem filtros, ordena primeiro as que têm bens cadastrados, depois por ordem alfabética
+    return lista.sort((a, b) => {
+      if (a.totalInventarioGeral > 0 && b.totalInventarioGeral === 0) return -1;
+      if (a.totalInventarioGeral === 0 && b.totalInventarioGeral > 0) return 1;
+      return a.nome.localeCompare(b.nome);
+    });
+  }, [locais, itens, itensFiltrados, filterSearch, filterCategoria, filterStatus, filterLocal]);
 
   if (ctx.loading || loadingData) {
     return (
@@ -1005,7 +1500,7 @@ export default function PatrimonioPage() {
                         className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-teal-700 bg-teal-50 border border-teal-200 hover:bg-teal-100 transition cursor-pointer"
                       >
                         <Printer className="w-4 h-4" />
-                        <span>Ficha de Patrimônio — {local.nome}</span>
+                        <span>Relatório Patrimonial — {local.nome}</span>
                       </button>
                     );
                   })()}
@@ -1028,139 +1523,328 @@ export default function PatrimonioPage() {
               </div>
             </div>
 
-            {/* Tabela do Inventário (Padrão MembrosTable) */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
-              {itensFiltrados.length === 0 ? (
-                <div className="p-12 text-center text-slate-400 font-semibold">
-                  <Package className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                  <p>Nenhum bem patrimonial encontrado com os filtros aplicados.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-slate-50/80 border-b border-slate-200">
-                      <tr>
-                        <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                          Tombamento
-                        </th>
-                        <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                          Descrição / Categoria
-                        </th>
-                        <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                          Localização
-                        </th>
-                        <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                          Responsável
-                        </th>
-                        <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                          Estado
-                        </th>
-                        <th className="px-4 py-3.5 text-right text-xs font-bold text-slate-700 uppercase tracking-wider">
-                          Valor
-                        </th>
-                        <th className="px-4 py-3.5 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-4 py-3.5 text-right text-xs font-bold text-slate-700 uppercase tracking-wider w-24">
-                          Ações
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {itensFiltrados.map((item) => {
-                        const estadoOpt = ESTADOS.find((e) => e.value === item.estado_conservacao);
-                        const statusOpt = STATUS_OPTIONS.find((s) => s.value === item.status);
-                        return (
-                          <tr key={item.id} className="hover:bg-slate-50/70 transition">
-                            <td className="px-4 py-3.5 font-bold text-slate-900 whitespace-nowrap">
-                              {item.numero_tombamento || '—'}
-                            </td>
-                            <td className="px-4 py-3.5">
-                              <div
-                                className="font-bold text-slate-900 max-w-[220px] truncate"
-                                title={item.descricao}
-                              >
-                                {item.descricao}
+            {/* Listagem Agrupada por Congregação (Acordeão Sanfonado com Paginação Individual de 10 por Página) */}
+            {gruposCongregacoes.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-12 text-center text-slate-400 font-semibold">
+                <Package className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                <p className="text-slate-600 font-bold mb-1">Nenhum bem patrimonial encontrado com os filtros aplicados.</p>
+                <p className="text-xs text-slate-400">Tente ajustar a busca, congregação, categoria ou status selecionados.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {gruposCongregacoes.map((grupo) => {
+                  const isExpanded = !!expandedLocais[grupo.localKey];
+                  const totalItensGrupo = grupo.itensFiltrados.length;
+                  const ITENS_POR_PAGINA = 10;
+                  const totalPaginas = Math.max(1, Math.ceil(totalItensGrupo / ITENS_POR_PAGINA));
+                  const paginaAtual = Math.min(Math.max(1, pagesLocais[grupo.localKey] || 1), totalPaginas);
+                  const startIndex = (paginaAtual - 1) * ITENS_POR_PAGINA;
+                  const endIndex = Math.min(startIndex + ITENS_POR_PAGINA, totalItensGrupo);
+                  const itensPaginados = grupo.itensFiltrados.slice(startIndex, endIndex);
+
+                  return (
+                    <div
+                      key={grupo.localKey}
+                      className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden transition-all duration-200 hover:border-slate-300"
+                    >
+                      {/* Cabeçalho do Painel Sanfonado */}
+                      <div
+                        onClick={() => toggleExpandLocal(grupo.localKey)}
+                        className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer select-none bg-slate-50/50 hover:bg-slate-50/90 transition border-b border-transparent data-[expanded=true]:border-slate-200"
+                        data-expanded={isExpanded}
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <button
+                            type="button"
+                            className="w-9 h-9 rounded-xl bg-white border border-slate-200/90 text-slate-600 flex items-center justify-center flex-shrink-0 shadow-xs hover:text-teal-700 hover:border-teal-300 transition"
+                            aria-label={isExpanded ? 'Recolher' : 'Expandir'}
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="w-5 h-5 text-teal-700" />
+                            ) : (
+                              <ChevronRight className="w-5 h-5 text-slate-400" />
+                            )}
+                          </button>
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-base font-bold text-slate-900 truncate">
+                                {grupo.nome}
+                              </h4>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200/60">
+                                {grupo.tipo === 'campo' ? 'Campo' : grupo.localKey === 'sem_local' ? 'Geral' : 'Congregação'}
+                              </span>
+                            </div>
+                            {grupo.dirigenteNome ? (
+                              <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                                <span className="font-semibold text-slate-700">{grupo.dirigenteCargo || 'Responsável'}:</span>{' '}
+                                {grupo.dirigenteNome}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
+                                Inventário oficial do local
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Indicadores do cabeçalho e Botão de Ação */}
+                        <div className="flex items-center gap-3 sm:gap-4 flex-wrap justify-between sm:justify-end">
+                          <div className="flex items-center gap-3">
+                            {/* Badge de Quantidade */}
+                            <div className="text-right">
+                              <span className="text-[11px] font-semibold text-slate-500 block uppercase tracking-wider">
+                                Bens
+                              </span>
+                              <span className="text-sm font-bold text-slate-900">
+                                {grupo.totalFiltrado}{' '}
+                                <span className="text-xs text-slate-500 font-normal">
+                                  {grupo.totalFiltrado === 1 ? 'item' : 'itens'}
+                                </span>
+                              </span>
+                            </div>
+
+                            <div className="h-7 w-px bg-slate-200" />
+
+                            {/* Badge de Valor Estimado */}
+                            <div className="text-right">
+                              <span className="text-[11px] font-semibold text-slate-500 block uppercase tracking-wider">
+                                Valor Estimado
+                              </span>
+                              <span className="text-sm font-black text-emerald-700 whitespace-nowrap">
+                                {formatCurrency(grupo.valorTotalFiltrado)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Ação: Imprimir Relatório Patrimonial Oficial */}
+                          <button
+                            type="button"
+                            title="Imprimir Relatório Patrimonial Oficial desta Congregação"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Relação completa de todos os bens da congregação (não cortada pela paginação de 10)
+                              const bensCongregacao = grupo.id === 'sem_local'
+                                ? itens.filter((i) => !i.congregacao_id && !i.campo_id)
+                                : itens.filter((i) =>
+                                    grupo.tipo === 'congregacao'
+                                      ? i.congregacao_id === grupo.id
+                                      : i.campo_id === grupo.id
+                                  );
+
+                              if (bensCongregacao.length === 0) {
+                                showNotif(
+                                  'warning',
+                                  'Aviso',
+                                  `Não há bens cadastrados para ${grupo.nome}.`,
+                                  3000
+                                );
+                                return;
+                              }
+                              imprimirRelatorioPatrimonial({
+                                itens: bensCongregacao,
+                                local: grupo.localObj,
+                                configIgreja,
+                              });
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-teal-800 bg-teal-50 border border-teal-200 hover:bg-teal-100 hover:border-teal-300 transition shadow-2xs cursor-pointer"
+                          >
+                            <Printer className="w-3.5 h-3.5 text-teal-600" />
+                            <span className="hidden sm:inline">Relatório Oficial</span>
+                            <span className="sm:hidden">Relatório</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Tabela de Bens e Paginação Individual quando Expandido */}
+                      {isExpanded && (
+                        <div className="border-t border-slate-200">
+                          {totalItensGrupo === 0 ? (
+                            <div className="p-8 text-center text-slate-400 font-semibold bg-white">
+                              <Package className="w-9 h-9 mx-auto mb-2 text-slate-300" />
+                              <p className="text-sm">Nenhum bem patrimonial encontrado para esta congregação com os filtros aplicados.</p>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                  <thead className="bg-slate-50/80 border-b border-slate-200">
+                                    <tr>
+                                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-28">
+                                        Tombamento
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider min-w-[220px]">
+                                        Descrição / Categoria
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                        Localização
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                        Responsável
+                                      </th>
+                                      <th className="px-4 py-3 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                        Estado
+                                      </th>
+                                      <th className="px-4 py-3 text-right text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                        Valor
+                                      </th>
+                                      <th className="px-4 py-3 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                        Status
+                                      </th>
+                                      <th className="px-4 py-3 text-right text-xs font-bold text-slate-700 uppercase tracking-wider w-24">
+                                        Ações
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100 bg-white">
+                                    {itensPaginados.map((item) => {
+                                      const estadoOpt = ESTADOS.find((e) => e.value === item.estado_conservacao);
+                                      const statusOpt = STATUS_OPTIONS.find((s) => s.value === item.status);
+                                      return (
+                                        <tr key={item.id} className="hover:bg-slate-50/70 transition">
+                                          <td className="px-4 py-3.5 font-bold text-slate-900 whitespace-nowrap">
+                                            {item.numero_tombamento || '—'}
+                                          </td>
+                                          <td className="px-4 py-3.5">
+                                            <div
+                                              className="font-bold text-slate-900 max-w-[260px] truncate"
+                                              title={item.descricao}
+                                            >
+                                              {item.descricao}
+                                            </div>
+                                            <div className="text-xs text-slate-500 font-medium">
+                                              {CATEGORIAS.find((c) => c.value === item.categoria)?.label || (item.categoria === 'eletronico' ? 'Equipamentos de som e imagem' : item.categoria)}
+                                              {item.marca_modelo && ` · ${item.marca_modelo}`}
+                                              {item.categoria === 'veiculo' && item.numero_serie && ` · Placa: ${item.numero_serie}`}
+                                              {item.categoria === 'imovel' && (item.dados_especificos as any)?.area_construida_m2 && ` · ${(item.dados_especificos as any).area_construida_m2}m²`}
+                                              {item.categoria === 'terreno' && (item.dados_especificos as any)?.area_total_m2 && ` · ${(item.dados_especificos as any).area_total_m2}m²`}
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-3.5 text-slate-700 font-medium">
+                                            {getNomeLocal(item)}
+                                          </td>
+                                          <td className="px-4 py-3.5">
+                                            <div className="text-xs font-bold text-slate-800">
+                                              {item.responsavel_nome || '—'}
+                                            </div>
+                                            {item.responsavel_cargo && (
+                                              <div className="text-[11px] text-slate-500 font-medium">
+                                                {item.responsavel_cargo}
+                                              </div>
+                                            )}
+                                          </td>
+                                          <td className="px-4 py-3.5 text-center">
+                                            <span
+                                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                                estadoOpt?.color || 'bg-slate-100 text-slate-700'
+                                              }`}
+                                            >
+                                              {estadoOpt?.label || item.estado_conservacao}
+                                            </span>
+                                          </td>
+                                          <td className="px-4 py-3.5 text-right font-bold text-emerald-700 whitespace-nowrap">
+                                            {formatCurrency(item.valor_aquisicao)}
+                                          </td>
+                                          <td className="px-4 py-3.5 text-center">
+                                            <span
+                                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                                statusOpt?.color || 'bg-slate-100 text-slate-700'
+                                              }`}
+                                            >
+                                              {statusOpt?.label || item.status}
+                                            </span>
+                                          </td>
+                                          <td className="px-4 py-3.5 text-right">
+                                            <div className="flex items-center justify-end gap-1.5">
+                                              <button
+                                                type="button"
+                                                title="Editar"
+                                                onClick={() => handleEdit(item)}
+                                                className="p-1.5 text-slate-400 hover:text-teal-700 hover:bg-slate-50 rounded-lg transition cursor-pointer"
+                                              >
+                                                <Pencil className="w-4 h-4" />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                title="Excluir"
+                                                onClick={() => handleDelete(item.id)}
+                                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                              >
+                                                <Trash2 className="w-4 h-4" />
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
                               </div>
-                              <div className="text-xs text-slate-500 font-medium">
-                                {CATEGORIAS.find((c) => c.value === item.categoria)?.label}
-                                {item.marca_modelo && ` · ${item.marca_modelo}`}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3.5 text-slate-700 font-medium">
-                              {getNomeLocal(item)}
-                            </td>
-                            <td className="px-4 py-3.5">
-                              <div className="text-xs font-bold text-slate-800">
-                                {item.responsavel_nome || '—'}
-                              </div>
-                              {item.responsavel_cargo && (
-                                <div className="text-[11px] text-slate-500 font-medium">
-                                  {item.responsavel_cargo}
+
+                              {/* Barra de Paginação Individual por Congregação (máx 10 por página) */}
+                              <div className="p-3.5 sm:px-5 sm:py-3.5 bg-slate-50/80 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                                <div className="font-semibold text-slate-600">
+                                  Mostrando <span className="font-bold text-slate-900">{startIndex + 1}–{endIndex}</span> de{' '}
+                                  <span className="font-bold text-slate-900">{totalItensGrupo}</span> {totalItensGrupo === 1 ? 'bem' : 'bens'}
                                 </div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3.5">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                                  estadoOpt?.color || 'bg-slate-100 text-slate-700'
-                                }`}
-                              >
-                                {estadoOpt?.label || item.estado_conservacao}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3.5 text-right font-bold text-emerald-700 whitespace-nowrap">
-                              {formatCurrency(item.valor_aquisicao)}
-                            </td>
-                            <td className="px-4 py-3.5 text-center">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                                  statusOpt?.color || 'bg-slate-100 text-slate-700'
-                                }`}
-                              >
-                                {statusOpt?.label || item.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3.5 text-right">
-                              <div className="flex items-center justify-end gap-1.5">
-                                <button
-                                  title="Editar"
-                                  onClick={() => handleEdit(item)}
-                                  className="p-1.5 text-slate-400 hover:text-teal-700 hover:bg-slate-50 rounded-lg transition cursor-pointer"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </button>
-                                <button
-                                  title="Excluir"
-                                  onClick={() => handleDelete(item.id)}
-                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-slate-500 mr-1">
+                                    Página <strong className="text-slate-800">{paginaAtual}</strong> de{' '}
+                                    <strong className="text-slate-800">{totalPaginas}</strong>
+                                  </span>
+
+                                  <button
+                                    type="button"
+                                    disabled={paginaAtual <= 1}
+                                    onClick={() => changePageLocal(grupo.localKey, paginaAtual - 1)}
+                                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <ChevronLeft className="w-3.5 h-3.5" />
+                                    <span>Anterior</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    disabled={paginaAtual >= totalPaginas}
+                                    onClick={() => changePageLocal(grupo.localKey, paginaAtual + 1)}
+                                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <span>Próxima</span>
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t-2 border-slate-200 bg-slate-50/80">
-                        <td
-                          colSpan={5}
-                          className="px-4 py-3.5 text-xs font-bold text-slate-700 uppercase tracking-wider text-right"
-                        >
-                          Total Estimado dos Itens Filtrados:
-                        </td>
-                        <td className="px-4 py-3.5 text-right font-black text-base text-emerald-700 whitespace-nowrap">
-                          {formatCurrency(totalValorFiltrado)}
-                        </td>
-                        <td colSpan={2} />
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              )}
-            </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Card Consolidado de Rodapé com Totais Filtrados */}
+                {itensFiltrados.length > 0 && (
+                  <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="text-xs font-semibold text-slate-500">
+                      Total do inventário filtrado:{' '}
+                      <strong className="text-slate-900 font-bold">
+                        {itensFiltrados.length} {itensFiltrados.length === 1 ? 'bem' : 'bens'}
+                      </strong>{' '}
+                      em <strong className="text-slate-900 font-bold">{gruposCongregacoes.length}</strong> {gruposCongregacoes.length === 1 ? 'congregação / local' : 'congregações / locais'}
+                    </div>
+                    <div className="text-right flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        Valor Total Estimado:
+                      </span>
+                      <span className="text-lg font-black text-emerald-700">
+                        {formatCurrency(totalValorFiltrado)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1236,12 +1920,14 @@ export default function PatrimonioPage() {
               </div>
             </div>
 
-            {/* Seção 2: Dados do Bem */}
+            {/* Seção 2: Especificações do Bem com Campos Dinâmicos por Categoria */}
             <div>
               <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
                 2. Especificações do Bem
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+              {/* Grid Principal: Tombamento e Categoria */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <label className={labelCls}>Nº de tombamento</label>
                   <input
@@ -1264,88 +1950,546 @@ export default function PatrimonioPage() {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className={labelCls}>Descrição do bem *</label>
-                  <input
-                    value={formData.descricao}
-                    onChange={(e) => setFormData((p) => ({ ...p, descricao: e.target.value }))}
-                    placeholder="Ex: Mesa de som 16 canais, Projetor Full HD..."
-                    className={`${inputCls} ${
-                      fieldErrors.descricao ? 'border-rose-400 focus:border-rose-500' : ''
-                    }`}
-                  />
-                  {fieldErrors.descricao && (
-                    <p className="text-xs font-bold text-rose-600 mt-1">{fieldErrors.descricao}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className={labelCls}>Categoria</label>
+                  <label className={labelCls}>Categoria do Bem *</label>
                   <select
                     value={formData.categoria}
                     onChange={(e) => {
-                      const val = e.target.value;
+                      const novaCat = e.target.value;
                       setFormData((p) => ({
                         ...p,
-                        categoria: val,
-                        ...(val === 'imovel'
-                          ? { marca_modelo: '', numero_serie: '', cor: '' }
-                          : {}),
+                        categoria: novaCat,
+                        ...clearSpecificFieldsForCategory(novaCat),
                       }));
                     }}
                     className={inputCls}
                   >
                     {CATEGORIAS.map((c) => (
                       <option key={c.value} value={c.value}>
-                        {c.label}
+                        {c.label} {c.desc ? `— ${c.desc}` : ''}
                       </option>
                     ))}
                   </select>
+                  {(() => {
+                    const catInfo = CATEGORIAS.find((c) => c.value === formData.categoria);
+                    return catInfo ? (
+                      <p className="text-[11px] text-teal-700 font-semibold mt-1">
+                        {catInfo.desc}
+                      </p>
+                    ) : null;
+                  })()}
                 </div>
+              </div>
 
-                {formData.categoria !== 'imovel' && (
+              {/* Descrição do Bem (posicionada logo após a Categoria) */}
+              <div className="mb-4">
+                <label className={labelCls}>Descrição do bem *</label>
+                <input
+                  value={formData.descricao}
+                  onChange={(e) => setFormData((p) => ({ ...p, descricao: e.target.value }))}
+                  placeholder={
+                    formData.categoria === 'imovel'
+                      ? 'Ex: Templo Sede Central, Salão Anexo, Casa Pastoral...'
+                      : formData.categoria === 'terreno'
+                      ? 'Ex: Loteamento Boa Vista - Terreno anexo para estacionamento...'
+                      : formData.categoria === 'movel'
+                      ? 'Ex: Mesa de reunião em madeira maciça, Conjunto de 20 bancos...'
+                      : formData.categoria === 'instrumento'
+                      ? 'Ex: Teclado Yamaha Motif XF8, Bateria acústica Nagano...'
+                      : formData.categoria === 'som_imagem'
+                      ? 'Ex: Mesa de Som Digital 32 Canais, Projetor Laser 5000 lumens...'
+                      : formData.categoria === 'veiculo'
+                      ? 'Ex: Van Renault Master 16 Lugares, Fiat Ducato...'
+                      : 'Ex: Computador All-in-One, Impressora Laser...'
+                  }
+                  className={`${inputCls} ${
+                    fieldErrors.descricao ? 'border-rose-400 focus:border-rose-500' : ''
+                  }`}
+                />
+                {fieldErrors.descricao && (
+                  <p className="text-xs font-bold text-rose-600 mt-1">{fieldErrors.descricao}</p>
+                )}
+              </div>
+
+              {/* ─────────────────────────────────────────────────────────── */}
+              {/* BLOCOS DINÂMICOS CONFORME A CATEGORIA SELECIONADA          */}
+              {/* ─────────────────────────────────────────────────────────── */}
+
+              {/* 1. IMÓVEIS: tipo, endereço, área construída m², matrícula, observações */}
+              {formData.categoria === 'imovel' && (
+                <div className="p-4 sm:p-5 bg-teal-50/50 border border-teal-200/80 rounded-2xl mb-4 space-y-4">
+                  <div className="flex items-center gap-2 text-teal-900 font-bold text-xs uppercase tracking-wider">
+                    <Building2 className="w-4 h-4 text-teal-700" />
+                    <span>Campos Específicos para Imóvel</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className={labelCls}>Tipo de Imóvel</label>
+                      <input
+                        value={formData.tipo_imovel}
+                        onChange={(e) => setFormData((p) => ({ ...p, tipo_imovel: e.target.value }))}
+                        placeholder="Ex: Templo, Salão, Casa Pastoral, Prédio Comercial"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Área Construída (m²)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={formData.area_construida}
+                        onChange={(e) => setFormData((p) => ({ ...p, area_construida: e.target.value }))}
+                        placeholder="Ex: 350"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Nº Registro / Matrícula</label>
+                      <input
+                        value={formData.matricula_imovel}
+                        onChange={(e) => setFormData((p) => ({ ...p, matricula_imovel: e.target.value }))}
+                        placeholder="Ex: Matrícula nº 12.345 do 1º Ofício"
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className={labelCls}>Marca / Modelo</label>
+                    <label className={labelCls}>Endereço do Imóvel</label>
                     <input
-                      value={formData.marca_modelo}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, marca_modelo: e.target.value }))
-                      }
-                      placeholder="Ex: Yamaha MG16XU"
+                      value={formData.endereco_imovel}
+                      onChange={(e) => setFormData((p) => ({ ...p, endereco_imovel: e.target.value }))}
+                      placeholder="Rua, número, bairro, cidade e ponto de referência"
                       className={inputCls}
                     />
                   </div>
-                )}
 
-                {formData.categoria !== 'imovel' && (
                   <div>
-                    <label className={labelCls}>
-                      {formData.categoria === 'veiculo' ? 'Placa' : 'Nº de série'}
-                    </label>
-                    <input
-                      value={formData.numero_serie}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, numero_serie: e.target.value }))
-                      }
-                      placeholder="Nº de série ou chassi"
-                      className={inputCls}
+                    <label className={labelCls}>Observações do Imóvel</label>
+                    <textarea
+                      value={formData.observacoes_imovel}
+                      onChange={(e) => setFormData((p) => ({ ...p, observacoes_imovel: e.target.value }))}
+                      placeholder="Detalhes sobre habite-se, IPTU, escritura pública ou benfeitorias..."
+                      className={`${inputCls} min-h-[60px]`}
                     />
                   </div>
-                )}
+                </div>
+              )}
 
-                {formData.categoria !== 'imovel' && (
+              {/* 2. TERRENOS: endereço/localização, área total m², medidas (frente, fundos, laterais), matrícula, observações */}
+              {formData.categoria === 'terreno' && (
+                <div className="p-4 sm:p-5 bg-amber-50/50 border border-amber-200/80 rounded-2xl mb-4 space-y-4">
+                  <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                    <MapPin className="w-4 h-4 text-amber-700" />
+                    <span>Campos Específicos para Terreno</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelCls}>Endereço / Localização do Terreno</label>
+                      <input
+                        value={formData.endereco_terreno}
+                        onChange={(e) => setFormData((p) => ({ ...p, endereco_terreno: e.target.value }))}
+                        placeholder="Rua, loteamento, quadra, lote..."
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>Área Total (m²)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={formData.area_terreno}
+                          onChange={(e) => setFormData((p) => ({ ...p, area_terreno: e.target.value }))}
+                          placeholder="Ex: 600"
+                          className={inputCls}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelCls}>Nº Matrícula / Registro</label>
+                        <input
+                          value={formData.matricula_terreno}
+                          onChange={(e) => setFormData((p) => ({ ...p, matricula_terreno: e.target.value }))}
+                          placeholder="Ex: 45.678"
+                          className={inputCls}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className={labelCls}>Medida de Frente</label>
+                      <input
+                        value={formData.medidas_frente}
+                        onChange={(e) => setFormData((p) => ({ ...p, medidas_frente: e.target.value }))}
+                        placeholder="Ex: 15m de frente"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Medida de Fundos</label>
+                      <input
+                        value={formData.medidas_fundos}
+                        onChange={(e) => setFormData((p) => ({ ...p, medidas_fundos: e.target.value }))}
+                        placeholder="Ex: 15m de fundos"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Medidas Laterais</label>
+                      <input
+                        value={formData.medidas_laterais}
+                        onChange={(e) => setFormData((p) => ({ ...p, medidas_laterais: e.target.value }))}
+                        placeholder="Ex: 40m lado direito, 40m lado esquerdo"
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className={labelCls}>Cor</label>
+                    <label className={labelCls}>Observações do Terreno</label>
+                    <textarea
+                      value={formData.observacoes_terreno}
+                      onChange={(e) => setFormData((p) => ({ ...p, observacoes_terreno: e.target.value }))}
+                      placeholder="Confrontações, topografia, existência de cerca ou muramento..."
+                      className={`${inputCls} min-h-[60px]`}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 3. MÓVEIS E UTENSÍLIOS: quantidade, material, estado de conservação e localização interna */}
+              {formData.categoria === 'movel' && (
+                <div className="p-4 sm:p-5 bg-blue-50/50 border border-blue-200/80 rounded-2xl mb-4 space-y-4">
+                  <div className="flex items-center gap-2 text-blue-900 font-bold text-xs uppercase tracking-wider">
+                    <Layers className="w-4 h-4 text-blue-700" />
+                    <span>Campos Específicos para Móveis e Utensílios</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className={labelCls}>Quantidade</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.quantidade_movel}
+                        onChange={(e) => setFormData((p) => ({ ...p, quantidade_movel: e.target.value }))}
+                        placeholder="1"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Material / Acabamento</label>
+                      <input
+                        value={formData.material_movel}
+                        onChange={(e) => setFormData((p) => ({ ...p, material_movel: e.target.value }))}
+                        placeholder="Ex: Madeira maciça, Aço, MDF, Estofado"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Localização Interna</label>
+                      <input
+                        value={formData.localizacao_interna_movel}
+                        onChange={(e) => setFormData((p) => ({ ...p, localizacao_interna_movel: e.target.value }))}
+                        placeholder="Ex: Nave do templo, Sala pastoral, Gabinete, Cozinha"
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. EQUIPAMENTOS: marca, modelo, número de série, quantidade e estado de conservação */}
+              {formData.categoria === 'equipamento' && (
+                <div className="p-4 sm:p-5 bg-slate-50 border border-slate-200/80 rounded-2xl mb-4 space-y-4">
+                  <div className="flex items-center gap-2 text-slate-800 font-bold text-xs uppercase tracking-wider">
+                    <Package className="w-4 h-4 text-slate-600" />
+                    <span>Campos Específicos para Equipamentos</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className={labelCls}>Marca / Modelo</label>
+                      <input
+                        value={formData.marca_modelo}
+                        onChange={(e) => setFormData((p) => ({ ...p, marca_modelo: e.target.value }))}
+                        placeholder="Ex: Dell Inspiron 15, Epson EcoTank..."
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Número de Série</label>
+                      <input
+                        value={formData.numero_serie}
+                        onChange={(e) => setFormData((p) => ({ ...p, numero_serie: e.target.value }))}
+                        placeholder="Nº de série de fábrica"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Quantidade</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.quantidade_equipamento}
+                        onChange={(e) => setFormData((p) => ({ ...p, quantidade_equipamento: e.target.value }))}
+                        placeholder="1"
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 5. INSTRUMENTOS MUSICAIS: instrumento, marca, modelo, número de série, quantidade e estado */}
+              {formData.categoria === 'instrumento' && (
+                <div className="p-4 sm:p-5 bg-indigo-50/50 border border-indigo-200/80 rounded-2xl mb-4 space-y-4">
+                  <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs uppercase tracking-wider">
+                    <Music className="w-4 h-4 text-indigo-700" />
+                    <span>Campos Específicos para Instrumentos Musicais</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className={labelCls}>Instrumento</label>
+                      <input
+                        value={formData.tipo_instrumento}
+                        onChange={(e) => setFormData((p) => ({ ...p, tipo_instrumento: e.target.value }))}
+                        placeholder="Ex: Teclado, Bateria, Violão, Contrabaixo..."
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Marca / Modelo</label>
+                      <input
+                        value={formData.marca_modelo}
+                        onChange={(e) => setFormData((p) => ({ ...p, marca_modelo: e.target.value }))}
+                        placeholder="Ex: Yamaha Motif XF8, Roland XPS-30"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Número de Série</label>
+                      <input
+                        value={formData.numero_serie}
+                        onChange={(e) => setFormData((p) => ({ ...p, numero_serie: e.target.value }))}
+                        placeholder="Nº de série"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Quantidade</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.quantidade_instrumento}
+                        onChange={(e) => setFormData((p) => ({ ...p, quantidade_instrumento: e.target.value }))}
+                        placeholder="1"
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 6. SOM E IMAGEM: tipo de equipamento, marca, modelo, número de série, quantidade e estado */}
+              {formData.categoria === 'som_imagem' && (
+                <div className="p-4 sm:p-5 bg-violet-50/50 border border-violet-200/80 rounded-2xl mb-4 space-y-4">
+                  <div className="flex items-center gap-2 text-violet-900 font-bold text-xs uppercase tracking-wider">
+                    <Tv className="w-4 h-4 text-violet-700" />
+                    <span>Campos Específicos para Som e Imagem</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className={labelCls}>Tipo de Equipamento</label>
+                      <input
+                        value={formData.tipo_som_imagem}
+                        onChange={(e) => setFormData((p) => ({ ...p, tipo_som_imagem: e.target.value }))}
+                        placeholder="Ex: Mesa de som, Caixa acústica, Projetor, Câmera PTZ..."
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Marca / Modelo</label>
+                      <input
+                        value={formData.marca_modelo}
+                        onChange={(e) => setFormData((p) => ({ ...p, marca_modelo: e.target.value }))}
+                        placeholder="Ex: Behringer X32, JBL EON 615"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Número de Série</label>
+                      <input
+                        value={formData.numero_serie}
+                        onChange={(e) => setFormData((p) => ({ ...p, numero_serie: e.target.value }))}
+                        placeholder="Nº de série"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Quantidade</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.quantidade_som_imagem}
+                        onChange={(e) => setFormData((p) => ({ ...p, quantidade_som_imagem: e.target.value }))}
+                        placeholder="1"
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 7. VEÍCULOS: marca, modelo, ano, placa, Renavam e quilometragem */}
+              {formData.categoria === 'veiculo' && (
+                <div className="p-4 sm:p-5 bg-sky-50/50 border border-sky-200/80 rounded-2xl mb-4 space-y-4">
+                  <div className="flex items-center gap-2 text-sky-900 font-bold text-xs uppercase tracking-wider">
+                    <Car className="w-4 h-4 text-sky-700" />
+                    <span>Campos Específicos para Veículo</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className={labelCls}>Marca / Modelo</label>
+                      <input
+                        value={formData.marca_modelo}
+                        onChange={(e) => setFormData((p) => ({ ...p, marca_modelo: e.target.value }))}
+                        placeholder="Ex: Renault Master 16L, Fiat Ducato..."
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Ano / Fabricação</label>
+                      <input
+                        type="number"
+                        value={formData.ano_veiculo}
+                        onChange={(e) => setFormData((p) => ({ ...p, ano_veiculo: e.target.value }))}
+                        placeholder="Ex: 2022"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Placa</label>
+                      <input
+                        value={formData.placa_veiculo}
+                        onChange={(e) => setFormData((p) => ({ ...p, placa_veiculo: e.target.value.toUpperCase() }))}
+                        placeholder="Ex: ABC-1D23"
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelCls}>Renavam</label>
+                      <input
+                        value={formData.renavam_veiculo}
+                        onChange={(e) => setFormData((p) => ({ ...p, renavam_veiculo: e.target.value }))}
+                        placeholder="Ex: 00123456789"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Quilometragem (km)</label>
+                      <input
+                        type="number"
+                        value={formData.km_veiculo}
+                        onChange={(e) => setFormData((p) => ({ ...p, km_veiculo: e.target.value }))}
+                        placeholder="Ex: 45000"
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 8. OUTROS: descrição detalhada (já no topo), quantidade e estado de conservação */}
+              {formData.categoria === 'outros' && (
+                <div className="p-4 sm:p-5 bg-slate-50 border border-slate-200/80 rounded-2xl mb-4 space-y-4">
+                  <div className="flex items-center gap-2 text-slate-800 font-bold text-xs uppercase tracking-wider">
+                    <HelpCircle className="w-4 h-4 text-slate-600" />
+                    <span>Campos Específicos para Outros Bens</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className={labelCls}>Quantidade</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.quantidade_outros}
+                        onChange={(e) => setFormData((p) => ({ ...p, quantidade_outros: e.target.value }))}
+                        placeholder="1"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Marca / Referência (Opcional)</label>
+                      <input
+                        value={formData.marca_modelo}
+                        onChange={(e) => setFormData((p) => ({ ...p, marca_modelo: e.target.value }))}
+                        placeholder="Se aplicável"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Nº de Série / Identificador (Opcional)</label>
+                      <input
+                        value={formData.numero_serie}
+                        onChange={(e) => setFormData((p) => ({ ...p, numero_serie: e.target.value }))}
+                        placeholder="Se aplicável"
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ─────────────────────────────────────────────────────────── */}
+              {/* CAMPOS COMUNS A TODAS AS CATEGORIAS                         */}
+              {/* ─────────────────────────────────────────────────────────── */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {!['imovel', 'terreno'].includes(formData.categoria) && (
+                  <div>
+                    <label className={labelCls}>Cor Predominante</label>
                     <input
                       value={formData.cor}
                       onChange={(e) => setFormData((p) => ({ ...p, cor: e.target.value }))}
-                      placeholder="Ex: Preto, Prata, Madeira..."
+                      placeholder="Ex: Preto, Branco, Prata, Madeira..."
                       className={inputCls}
                     />
                   </div>
                 )}
 
                 <div>
-                  <label className={labelCls}>Estado de conservação</label>
+                  <label className={labelCls}>Estado de conservação *</label>
                   <select
                     value={formData.estado_conservacao}
                     onChange={(e) =>
@@ -1414,7 +2558,7 @@ export default function PatrimonioPage() {
                 </div>
 
                 <div>
-                  <label className={labelCls}>Status</label>
+                  <label className={labelCls}>Status Operacional *</label>
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData((p) => ({ ...p, status: e.target.value }))}

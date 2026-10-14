@@ -62,6 +62,7 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
   { path: '/secretaria/relatorios',            id: 'relatorios-secretaria'},
   { path: '/secretaria/cartas',                id: 'cartas'               },
   { path: '/secretaria/membros',               id: 'membros'              },
+  { path: '/secretaria/dirigentes',            id: 'dirigentes'           },
   { path: '/presidencia/prestacao-contas-oficial', id: 'prestacao-contas-oficial' },
   { path: '/presidencia/prestacao-contas',         id: 'prestacao-contas'         },
   { path: '/presidencia/consolidado',              id: 'consolidado-financeiro'   },
@@ -171,6 +172,7 @@ export default function Sidebar() {
     'secretaria': 'secretaria',
     'estrutura-hierarquica': 'secretaria',
     'membros': 'secretaria',
+    'dirigentes': 'secretaria',
     'departamentos': 'secretaria',
     'apresentacao-criancas': 'secretaria',
     'batismo-aguas': 'secretaria',
@@ -222,6 +224,7 @@ export default function Sidebar() {
       submenu: [
         { id: 'estrutura-hierarquica', label: 'Estrutura Hierárquica', path: '/secretaria/estrutura-hierarquica', modulo: 'gestao' },
         { id: 'membros', label: 'Membros', path: '/secretaria/membros' },
+        { id: 'dirigentes', label: 'Dirigentes', path: '/secretaria/dirigentes', modulo: 'gestao' },
         { id: 'departamentos', label: 'Departamentos', path: '/secretaria/departamentos', modulo: 'secretaria_local' },
         { id: 'apresentacao-criancas', label: 'Apresentação de Crianças', path: '/secretaria/apresentacao-criancas', modulo: 'secretaria_local', featureFlag: 'kids_module', planFeature: 'has_modulo_kids' },
         { id: 'batismo-aguas', label: 'Batismo nas Águas', path: '/secretaria/batismo-aguas', modulo: 'secretaria_local' },
