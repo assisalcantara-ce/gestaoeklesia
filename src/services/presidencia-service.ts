@@ -1,4 +1,5 @@
 import { DirigentesService, type UserContextAuth } from './dirigentes-service';
+import { CartasService } from './cartas-service';
 import type { DirigenteMovimentacao } from '@/types/dirigentes';
 
 export type ProcessoOrigem = 'dirigente_movimentacao' | 'carta_pedido';
@@ -481,6 +482,54 @@ export class PresidenciaService {
       throw new Error('Identificador do pedido de carta é obrigatório.');
     }
 
+    // 1. Tenta executar de forma 100% atômica no PostgreSQL via RPC transacional
+    if (typeof supabase?.rpc === 'function') {
+      try {
+        const { data: rpcResult, error: rpcError } = await supabase.rpc('deliberar_carta_presidencia_rpc', {
+        p_pedido_id: input.pedido_id,
+        p_ministry_id: user.ministryId,
+        p_decisao: input.decisao,
+        p_motivo_rejeicao: input.motivo_rejeicao || null,
+        p_autorizador_id: user.userId,
+        p_autorizador_nome: user.userName,
+      });
+
+      if (rpcError) {
+        const msg = String(rpcError.message || '').toLowerCase();
+        const code = String(rpcError.code || '');
+        const isNotInstalled =
+          code === 'PGRST202' ||
+          msg.includes('could not find the function') ||
+          msg.includes('não encontrada') ||
+          msg.includes('não instalada');
+
+        if (!isNotInstalled) {
+          throw new Error(rpcError.message);
+        }
+      } else if (rpcResult && rpcResult.sucesso) {
+        const { data: pedidoAtualizado } = await supabase
+          .from('carta_pedidos')
+          .select('*')
+          .eq('id', input.pedido_id)
+          .eq('ministry_id', user.ministryId)
+          .maybeSingle();
+
+        return pedidoAtualizado || rpcResult;
+      }
+    } catch (err: any) {
+      const msg = String(err?.message || '').toLowerCase();
+      const isNotInstalled =
+        msg.includes('could not find the function') ||
+        msg.includes('não encontrada') ||
+        msg.includes('não instalada');
+
+      if (!isNotInstalled) {
+        throw err;
+      }
+    }
+  }
+
+    // 2. Fallback lógico resiliente (compensação de consistência)
     // Valida tenant
     const { data: pedido, error: findErr } = await supabase
       .from('carta_pedidos')
@@ -514,6 +563,40 @@ export class PresidenciaService {
         .single();
 
       if (error) throw new Error(`Falha ao autorizar pedido de carta: ${error.message}`);
+
+      // Efeito Institucional da Presidência:
+      // Se for carta de mudança ou desligamento, o membro é inativado e o histórico registrado com idempotência.
+      // Se a atualização do membro falhar, aplica compensação (rollback) revertendo o pedido para pendente.
+      if (pedido.member_id && CartasService.exigeAutorizacaoPresidencial(pedido.tipo_carta)) {
+        try {
+          await CartasService.aplicarEfeitoDeliberacaoPresidencial(supabase, {
+            memberId: pedido.member_id,
+            ministryId: user.ministryId,
+            pedido: data,
+            usuario: {
+              userId: user.userId,
+              userName: user.userName,
+            },
+          });
+        } catch (memberErr: any) {
+          // Compensação / Rollback de consistência
+          await supabase
+            .from('carta_pedidos')
+            .update({
+              status: 'pendente',
+              autorizador_id: null,
+              autorizador_nome: null,
+              data_autorizacao: null,
+            })
+            .eq('id', input.pedido_id)
+            .eq('ministry_id', user.ministryId);
+
+          throw new Error(
+            `Falha ao aplicar efeitos cadastrais no membro ao autorizar carta (${memberErr?.message || 'erro desconhecido'}). A deliberação foi revertida.`
+          );
+        }
+      }
+
       return data;
     } else {
       const motivo = (input.motivo_rejeicao || '').trim();

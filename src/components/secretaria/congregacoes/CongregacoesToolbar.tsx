@@ -27,9 +27,9 @@ export default function CongregacoesToolbar({
   nomeD1,
   nomeD2,
   nomeD3,
-  showFormD1,
-  showFormD2,
-  showFormD3,
+  showFormD1: _showFormD1,
+  showFormD2: _showFormD2,
+  showFormD3: _showFormD3,
   planLimits,
   divisoes2Length,
   divisoes3Length,
@@ -37,7 +37,7 @@ export default function CongregacoesToolbar({
   onOpenNewD2,
   onOpenNewD3,
 }: CongregacoesToolbarProps) {
-  if (activeTab === 'divisao1' && !showFormD3) {
+  if (activeTab === 'divisao1') {
     const isBlocked = planLimits.max_divisao3 === 0 || (planLimits.max_divisao3 > 0 && divisoes3Length >= planLimits.max_divisao3);
     return (
       <div className="mb-6 flex justify-end">
@@ -68,7 +68,7 @@ export default function CongregacoesToolbar({
     );
   }
 
-  if (activeTab === 'divisao2' && !showFormD2) {
+  if (activeTab === 'divisao2') {
     const isBlocked = planLimits.max_divisao2 === 0 || (planLimits.max_divisao2 > 0 && divisoes2Length >= planLimits.max_divisao2);
     return (
       <div className="mb-6 flex justify-end">
@@ -99,7 +99,7 @@ export default function CongregacoesToolbar({
     );
   }
 
-  if (activeTab === 'divisao3' && !showFormD1) {
+  if (activeTab === 'divisao3') {
     return (
       <div className="mb-6 flex justify-end">
         <button

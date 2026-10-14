@@ -188,9 +188,6 @@ const normalizeEscolaridade = (value: any): string => {
 const dbStatusToUi = (status: any): Membro['status'] =>
   status === 'active' ? 'ativo' : 'inativo';
 
-const uiStatusToDb = (status: Membro['status']): string =>
-  status === 'ativo' ? 'active' : 'inactive';
-
 const gerarUniqueId = (): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
@@ -888,10 +885,14 @@ export function useMembros() {
         fotoUrl: fotoMembro || undefined,
       };
 
+      const existingCf = ((membroEditando as any)?.custom_fields || {}) as Record<string, any>;
       const custom_fields = {
+        ...existingCf,
         ...buildCustomFieldsFromForm(baseForCustom),
         cargoMinisterial: cargoSelecionado || null,
         cargo_ministerial: cargoSelecionado || null,
+        ...(existingCf.historico_processos ? { historico_processos: existingCf.historico_processos } : {}),
+        ...(existingCf.historicoProcessos ? { historicoProcessos: existingCf.historicoProcessos } : {}),
       };
 
       const latitudeNumber = enderecoData.latitude
@@ -962,7 +963,7 @@ export function useMembros() {
         data_consagracao: dadosMinisteriais.dataConsagracao || null,
         data_emissao: dadosMinisteriais.dataEmissao || null,
         data_validade_credencial: dadosMinisteriais.dataValidadeCredencial || null,
-        status: uiStatusToDb('ativo'),
+        status: membroEditando ? membroEditando.status : 'ativo',
         role: dadosPessoais.tipoCadastro,
         observacoes: u(dadosPessoais.observacoes),
         custom_fields,

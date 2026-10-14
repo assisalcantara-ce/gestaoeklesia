@@ -9,10 +9,13 @@ import { useRouter } from 'next/navigation';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useUserContext } from '@/hooks/useUserContext';
+import { useAuth } from '@/providers/AuthProvider';
 import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { createClient } from '@/lib/supabase-client';
 import { CheckCircle, Clock, FileText, Printer, Send, XCircle } from 'lucide-react';
+import { CartasService } from '@/services/cartas-service';
+import { PresidenciaService } from '@/services/presidencia-service';
 
 type TipoCarta = 'mudanca' | 'transito' | 'desligamento' | 'recomendacao';
 type StatusPedido = 'pendente' | 'autorizado' | 'rejeitado';
@@ -56,6 +59,15 @@ const fmtDate = (iso: string | null) => {
 };
 
 function CartaParaImprimir({ pedido, ministerioNome }: { pedido: CartaPedido; ministerioNome: string }) {
+  if (pedido.status !== 'autorizado') {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: '#b91c1c', fontFamily: 'sans-serif' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700 }}>Emissão Bloqueada</h2>
+        <p style={{ fontSize: 14 }}>Esta carta ministerial não possui deliberação de autorização e não pode ser impressa como documento oficial.</p>
+      </div>
+    );
+  }
+
   const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   const textos: Record<TipoCarta, string> = {
     mudanca:     `Certificamos que o(a) irmão(ã) ${pedido.membro_nome}${pedido.membro_cargo ? ', ' + pedido.membro_cargo : ''}, é membro desta Igreja, encontrando-se em plena comunhão com nossa assembleia. Por motivo de mudança para ${pedido.destino || 'outra localidade'}, solicitou esta carta para que possa ser recebido(a) por uma assembleia congênere.`,
@@ -64,10 +76,10 @@ function CartaParaImprimir({ pedido, ministerioNome }: { pedido: CartaPedido; mi
     recomendacao:`Recomendamos o(a) irmão(ã) ${pedido.membro_nome}${pedido.membro_cargo ? ', ' + pedido.membro_cargo : ''}, membro desta Igreja em plena comunhão com nossa assembleia. É pessoa de conduta íntegra e dedicação à obra de Deus, sendo por nós reconhecido(a) e recomendado(a) às igrejas congêneres.`,
   };
   return (
-    <div style={{ fontFamily: 'Georgia, serif', color: '#1a1a1a', maxWidth: 720, margin: '0 auto', padding: '48px 64px', lineHeight: 1.8 }}>
+    <div style={{ fontFamily: 'Georgia, serif', color: '#1a1a1a', maxWidth: 720, margin: '0 auto', padding: '48px 64px', lineHeight: 1.8, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 }}>{ministerioNome}</h1>
-        <div style={{ width: 60, height: 2, background: '#333', margin: '0 auto 12px' }} />
+        <div style={{ width: 60, height: 2, background: '#333', borderTop: '2px solid #333', margin: '0 auto 12px', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
         <h2 style={{ fontSize: 17, fontWeight: 600, letterSpacing: 1 }}>{TIPO_LABELS[pedido.tipo_carta].toUpperCase()}</h2>
       </div>
       <p style={{ textIndent: 40, marginBottom: 20, fontSize: 15 }}>{textos[pedido.tipo_carta]}</p>
@@ -76,8 +88,10 @@ function CartaParaImprimir({ pedido, ministerioNome }: { pedido: CartaPedido; mi
       <p style={{ textAlign: 'right', marginBottom: 60, fontSize: 14 }}>{hoje}</p>
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: 200, borderTop: '1px solid #555', margin: '0 auto 4px' }} />
-        <p style={{ fontSize: 14, margin: 0 }}>{pedido.autorizador_nome || 'Secretaria Geral'}</p>
-        <p style={{ fontSize: 12, margin: 0, color: '#666' }}>Secretaria Geral — {ministerioNome}</p>
+        <p style={{ fontSize: 14, margin: 0 }}>{pedido.autorizador_nome || 'Presidência'}</p>
+        <p style={{ fontSize: 12, margin: 0, color: '#666' }}>
+          {pedido.data_autorizacao ? `Autorizado em ${fmtDate(pedido.data_autorizacao)} — ` : ''}Secretaria Geral — {ministerioNome}
+        </p>
       </div>
     </div>
   );
@@ -90,20 +104,19 @@ export default function CartaPedidosPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const userCtx = useUserContext();
+  const { user } = useAuth();
   const { ministry: currentMinistry } = useCurrentMinistry();
   const isGestor = userCtx.nivel === 'administrador' || userCtx.nivel === 'supervisor';
   const isAuxiliar = userCtx.nivel === 'auxiliar_secretaria';
 
-  // Administrador tem o editor completo em /secretaria/cartas; Auxiliar não acessa emissão de cartas
+  // Auxiliar não acessa pedidos de cartas
   useEffect(() => {
     if (!userCtx.loading) {
-      if (userCtx.nivel === 'administrador') {
-        router.replace('/secretaria/cartas');
-      } else if (isAuxiliar) {
+      if (isAuxiliar) {
         router.replace('/acesso-negado');
       }
     }
-  }, [userCtx.loading, userCtx.nivel, isAuxiliar, router]);
+  }, [userCtx.loading, isAuxiliar, router]);
 
   const [pedidos, setPedidos] = useState<CartaPedido[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -238,16 +251,30 @@ export default function CartaPedidosPage() {
     }
   }
 
+  const isPresidencia = userCtx.nivel === 'administrador' || userCtx.nivel === 'presidencia';
+
   async function handleAutorizar() {
-    if (!pedidoParaAutorizar || !userCtx.userId) return;
+    if (!pedidoParaAutorizar || !userCtx.userId || !userCtx.ministryId) return;
+
+    if (CartasService.exigeAutorizacaoPresidencial(pedidoParaAutorizar.tipo_carta) && !isPresidencia) {
+      showNotif('error', 'Acesso Negado', 'Cartas de Mudança e Desligamento só podem ser deliberadas pela Presidência na Central de Decisões.');
+      return;
+    }
+
     setAutorizando(true);
     try {
-      const { error } = await supabase.from('carta_pedidos').update({
-        status: 'autorizado',
-        autorizador_id: userCtx.userId,
-        data_autorizacao: new Date().toISOString(),
-      }).eq('id', pedidoParaAutorizar.id);
-      if (error) throw error;
+      const userAuth = {
+        userId: userCtx.userId || user?.id || '',
+        userName: user?.user_metadata?.full_name || user?.email || 'Presidência',
+        ministryId: userCtx.ministryId,
+        nivel: userCtx.nivel || 'operador',
+        isAdmin: isPresidencia,
+      };
+
+      await PresidenciaService.deliberarCartaPedido(supabase, userAuth, {
+        pedido_id: pedidoParaAutorizar.id,
+        decisao: 'autorizar',
+      });
 
       await registrarAcao({
         acao: 'atualizar_status',
@@ -255,12 +282,12 @@ export default function CartaPedidosPage() {
         area: 'cartas',
         tabela_afetada: 'carta_pedidos',
         registro_id: pedidoParaAutorizar.id,
-        descricao: `Pedido de ${TIPO_LABELS[pedidoParaAutorizar.tipo_carta]} autorizado para ${pedidoParaAutorizar.membro_nome}`,
+        descricao: `Pedido de ${TIPO_LABELS[pedidoParaAutorizar.tipo_carta]} autorizado para ${pedidoParaAutorizar.membro_nome} pela Presidência`,
         dados_novos: { status: 'autorizado', autorizador_id: userCtx.userId },
         status: 'sucesso',
       });
 
-      showNotif('success', 'Autorizado', 'A carta está disponível para impressão.');
+      showNotif('success', 'Autorizado', 'A carta foi autorizada e está liberada para emissão e impressão.');
       setPedidoParaAutorizar(null);
       loadData();
     } catch (err: any) {
@@ -274,24 +301,36 @@ export default function CartaPedidosPage() {
         status: 'erro',
         mensagem_erro: err?.message,
       });
-      showNotif('error', 'Erro', 'Não foi possível autorizar o pedido.');
+      showNotif('error', 'Erro', err?.message || 'Não foi possível autorizar o pedido.');
     } finally {
       setAutorizando(false);
     }
   }
 
   async function handleRejeitar() {
-    if (!pedidoParaAutorizar || !userCtx.userId) return;
+    if (!pedidoParaAutorizar || !userCtx.userId || !userCtx.ministryId) return;
     if (!motivoRejeicao.trim()) { showNotif('error', 'Campo obrigatório', 'Informe o motivo da rejeição.'); return; }
+
+    if (CartasService.exigeAutorizacaoPresidencial(pedidoParaAutorizar.tipo_carta) && !isPresidencia) {
+      showNotif('error', 'Acesso Negado', 'Cartas de Mudança e Desligamento só podem ser deliberadas pela Presidência na Central de Decisões.');
+      return;
+    }
+
     setAutorizando(true);
     try {
-      const { error } = await supabase.from('carta_pedidos').update({
-        status: 'rejeitado',
-        autorizador_id: userCtx.userId,
+      const userAuth = {
+        userId: userCtx.userId || user?.id || '',
+        userName: user?.user_metadata?.full_name || user?.email || 'Presidência',
+        ministryId: userCtx.ministryId,
+        nivel: userCtx.nivel || 'operador',
+        isAdmin: isPresidencia,
+      };
+
+      await PresidenciaService.deliberarCartaPedido(supabase, userAuth, {
+        pedido_id: pedidoParaAutorizar.id,
+        decisao: 'rejeitar',
         motivo_rejeicao: motivoRejeicao.trim(),
-        data_autorizacao: new Date().toISOString(),
-      }).eq('id', pedidoParaAutorizar.id);
-      if (error) throw error;
+      });
 
       await registrarAcao({
         acao: 'atualizar_status',
@@ -304,7 +343,7 @@ export default function CartaPedidosPage() {
         status: 'sucesso',
       });
 
-      showNotif('warning', 'Rejeitado', 'O pedido foi rejeitado.');
+      showNotif('warning', 'Rejeitado', 'O pedido foi rejeitado e a emissão oficial permanece bloqueada.');
       setPedidoParaAutorizar(null);
       setMotivoRejeicao('');
       loadData();
@@ -319,7 +358,7 @@ export default function CartaPedidosPage() {
         status: 'erro',
         mensagem_erro: err?.message,
       });
-      showNotif('error', 'Erro', 'Não foi possível rejeitar o pedido.');
+      showNotif('error', 'Erro', err?.message || 'Não foi possível rejeitar o pedido.');
     } finally {
       setAutorizando(false);
     }
@@ -369,32 +408,55 @@ export default function CartaPedidosPage() {
         {pedido.observacoes && (
           <p className="text-xs text-gray-400 italic border-l-2 border-gray-200 pl-3">"{pedido.observacoes}"</p>
         )}
-        {pedido.status === 'rejeitado' && pedido.motivo_rejeicao && (
-          <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            <strong>Motivo:</strong> {pedido.motivo_rejeicao}
-          </p>
+        {pedido.status === 'rejeitado' && (
+          <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-1">
+            <p className="font-semibold flex items-center gap-1">
+              <XCircle size={12} /> Pedido indeferido pela Presidência (Emissão oficial bloqueada)
+            </p>
+            {pedido.motivo_rejeicao && (
+              <p>
+                <strong>Justificativa:</strong> {pedido.motivo_rejeicao}
+              </p>
+            )}
+          </div>
         )}
         {pedido.status === 'autorizado' && (
           <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-            Autorizado em {fmtDate(pedido.data_autorizacao)}
+            Autorizado por <strong>{pedido.autorizador_nome || 'Presidência'}</strong> em {fmtDate(pedido.data_autorizacao)}
           </p>
         )}
-        <div className="flex gap-2 pt-1">
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           {pedido.status === 'autorizado' && (
             <button
               onClick={() => { setPedidoParaImprimir(pedido); setTimeout(() => window.print(), 150); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition shadow-sm"
             >
-              <Printer size={12} /> Imprimir Carta
+              <Printer size={12} /> Imprimir Carta Oficial
             </button>
           )}
-          {isGestor && pedido.status === 'pendente' && (
-            <button
-              onClick={() => { setPedidoParaAutorizar(pedido); setMotivoRejeicao(''); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition"
-            >
-              <CheckCircle size={12} /> Avaliar
-            </button>
+          {pedido.status === 'pendente' && (
+            CartasService.exigeAutorizacaoPresidencial(pedido.tipo_carta) ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 flex items-center gap-1 font-medium">
+                  <Clock size={12} /> Aguardando deliberação da Presidência
+                </span>
+                {isPresidencia && (
+                  <button
+                    onClick={() => { setPedidoParaAutorizar(pedido); setMotivoRejeicao(''); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition"
+                  >
+                    <CheckCircle size={12} /> Avaliar (Presidência)
+                  </button>
+                )}
+              </div>
+            ) : isGestor ? (
+              <button
+                onClick={() => { setPedidoParaAutorizar(pedido); setMotivoRejeicao(''); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition"
+              >
+                <CheckCircle size={12} /> Avaliar
+              </button>
+            ) : null
           )}
         </div>
       </div>

@@ -621,8 +621,12 @@ export default function InteractiveCanvas({
                             width: '100%',
                             height: '100%',
                             backgroundColor: elemento.cor || '#111',
+                            borderTop: `${Math.max(1, elemento.altura || 2)}px solid ${elemento.cor || '#111'}`,
+                            boxSizing: 'border-box',
                             borderRadius: `${elemento.borderRadius || 0}px`,
-                            opacity: elemento.transparencia || 1
+                            opacity: elemento.transparencia || 1,
+                            WebkitPrintColorAdjust: 'exact',
+                            printColorAdjust: 'exact',
                         }}
                     />
                 );

@@ -65,9 +65,15 @@ function buildMemberPayload(normalizedBody: Record<string, any>) {
     data_validade_credencial: normalizedBody.data_validade_credencial ?? null,
     ...('foto_url' in normalizedBody ? { foto_url: normalizedBody.foto_url ?? null } : {}),
     member_since: normalizedBody.member_since ?? undefined,
-    role: normalizedBody.role ?? null,
-    status: normalizedBody.status ?? undefined,
-    custom_fields: normalizedBody.custom_fields ?? {},
+    status: normalizedBody.status
+      ? ((s: string) => {
+          const lower = s.toLowerCase();
+          if (lower === 'ativo' || lower === 'active') return 'active';
+          if (lower === 'inativo' || lower === 'inactive') return 'inactive';
+          return lower;
+        })(String(normalizedBody.status))
+      : undefined,
+    custom_fields: normalizedBody.custom_fields ?? undefined,
     observacoes: normalizedBody.observacoes ?? null,
     is_dizimista: normalizedBody.is_dizimista ?? undefined,
     updated_at: new Date().toISOString(),
@@ -161,7 +167,7 @@ export async function PUT(
 
     let existingQuery = supabase
       .from('members')
-      .select('id, name, matricula, cargo_ministerial, tipo_cadastro, status, congregacao_id')
+      .select('id, name, matricula, cargo_ministerial, tipo_cadastro, status, congregacao_id, custom_fields')
       .eq('id', id)
       .eq('ministry_id', ministryId)
 
@@ -172,9 +178,80 @@ export async function PUT(
       return NextResponse.json({ error: 'Membro nao encontrado' }, { status: 404 })
     }
 
+    const existingCustomFields =
+      existing.custom_fields && typeof existing.custom_fields === 'object'
+        ? { ...existing.custom_fields }
+        : {}
+
+    const incomingCustomFields =
+      normalizedBody.custom_fields && typeof normalizedBody.custom_fields === 'object'
+        ? { ...normalizedBody.custom_fields }
+        : {}
+
+    const mergedCustomFields: Record<string, any> = {
+      ...existingCustomFields,
+      ...incomingCustomFields,
+    }
+
+    // Reativação futura: se o membro era inativo e agora está sendo alterado para ativo
+    const rawStatus = normalizedBody.status ? String(normalizedBody.status).toLowerCase() : null
+    const dbNovoStatus = rawStatus
+      ? (rawStatus === 'ativo' || rawStatus === 'active' ? 'active' : 'inactive')
+      : null
+
+    const isExistingInactive = existing.status === 'inactive' || existing.status === 'inativo'
+    const isReativacao = isExistingInactive && dbNovoStatus === 'active'
+
+    if (isReativacao) {
+      const historicoAtual = Array.isArray(existingCustomFields.historico_processos)
+        ? [...existingCustomFields.historico_processos]
+        : Array.isArray(existingCustomFields.historicoProcessos)
+        ? [...existingCustomFields.historicoProcessos]
+        : []
+
+      const nowIso = new Date().toISOString()
+      const reativacaoEventId = `reativ_${Date.now()}_${Math.random().toString(16).slice(2)}`
+      const eventoReativacao = {
+        id: reativacaoEventId,
+        processo_id: reativacaoEventId,
+        ministry_id: ministryId,
+        member_id: id,
+        tipo_evento: 'reativacao',
+        tipo_documento: 'Reativação Cadastral',
+        data: nowIso.slice(0, 10),
+        data_hora: nowIso,
+        status_anterior: existing.status,
+        status_resultante: 'active',
+        motivo: body.motivo_reativacao || body.motivo || 'Reativação cadastral no rol de membros',
+        observacoes: body.observacoes || null,
+        responsavel: 'Administração',
+        usuario_id: context.userId || null,
+        descricao: 'Membro reativado no rol de membros ativos. Histórico anterior preservado integralmente.',
+        criado_em: nowIso,
+      }
+
+      const nextHistorico = [...historicoAtual, eventoReativacao]
+      mergedCustomFields.historico_processos = nextHistorico
+      mergedCustomFields.historicoProcessos = nextHistorico
+    } else {
+      // Se não for reativação, garante preservação do histórico existente caso o payload não o tenha enviado
+      if (!incomingCustomFields.historico_processos && existingCustomFields.historico_processos) {
+        mergedCustomFields.historico_processos = existingCustomFields.historico_processos
+      }
+      if (!incomingCustomFields.historicoProcessos && existingCustomFields.historicoProcessos) {
+        mergedCustomFields.historicoProcessos = existingCustomFields.historicoProcessos
+      }
+    }
+
+    const updatePayload = buildMemberPayload(normalizedBody)
+    updatePayload.custom_fields = mergedCustomFields
+    if (dbNovoStatus) {
+      updatePayload.status = dbNovoStatus
+    }
+
     let updateQuery = supabase
       .from('members')
-      .update(buildMemberPayload(normalizedBody))
+      .update(updatePayload)
       .eq('id', id)
       .eq('ministry_id', ministryId)
 

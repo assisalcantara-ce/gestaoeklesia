@@ -1406,13 +1406,13 @@ export default function MembroFormModal({
                 </div>
               </div>
 
-              {/* Histórico / Trajetória de Consagrações e Processos */}
+              {/* Histórico / Trajetória de Processos, Cartas e Consagrações */}
               {membroEditando && (
                 <div className="p-4.5 border border-slate-200 rounded-2xl bg-slate-50/80 space-y-3">
                   <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                       <ScrollText className="w-4 h-4 text-teal-700" />
-                      <span>Histórico de Processos e Consagração</span>
+                      <span>Histórico de Processos e Trajetória Ministerial</span>
                     </h3>
                     <span className="text-xs text-slate-500 font-medium">
                       {((membroEditando?.historico_processos || membroEditando?.historicoProcessos || membroEditando?.custom_fields?.historico_processos || []) as Array<any>).length} registro(s)
@@ -1421,10 +1421,10 @@ export default function MembroFormModal({
 
                   {((membroEditando?.historico_processos || membroEditando?.historicoProcessos || membroEditando?.custom_fields?.historico_processos || []) as Array<any>).length === 0 ? (
                     <p className="text-xs text-slate-500 italic py-3 text-center">
-                      Nenhum processo de consagração registrado no histórico deste ministro.
+                      Nenhum evento ou processo registrado no histórico deste membro.
                     </p>
                   ) : (
-                    <div className="space-y-2.5 max-h-56 overflow-y-auto modal-scrollbar pr-1">
+                    <div className="space-y-2.5 max-h-64 overflow-y-auto modal-scrollbar pr-1">
                       {((membroEditando?.historico_processos || membroEditando?.historicoProcessos || membroEditando?.custom_fields?.historico_processos || []) as Array<any>)
                         .slice()
                         .reverse()
@@ -1433,29 +1433,52 @@ export default function MembroFormModal({
                           const isDeferido = item.decisao === 'deferir' || item.status_processo === 'deferir';
                           const isIndeferido = item.decisao === 'indeferir' || item.status_processo === 'indeferir';
                           const isReaberto = item.tipo_evento === 'reabertura';
+                          const isMudanca = item.tipo_evento === 'carta_mudanca';
+                          const isDesligamento = item.tipo_evento === 'carta_desligamento';
+                          const isTransito = item.tipo_evento === 'carta_transito';
+                          const isDocumento = item.tipo_evento === 'documento_emitido';
+                          const isReativacao = item.tipo_evento === 'reativacao';
+                          const isDirigente = item.tipo_evento === 'posse_dirigente' || item.tipo_evento === 'dirigente_posse';
 
-                          const badgeColor = isHomologado
-                            ? 'bg-purple-50 text-purple-800 border-purple-200'
-                            : isDeferido
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                            : isIndeferido
-                            ? 'bg-red-50 text-red-800 border-red-200'
-                            : isReaberto
-                            ? 'bg-amber-50 text-amber-800 border-amber-200'
-                            : 'bg-sky-50 text-sky-800 border-sky-200';
+                          let badgeColor = 'bg-sky-50 text-sky-800 border-sky-200';
+                          let badgeLabel = 'Início do Processo';
 
-                          const badgeLabel = isHomologado
-                            ? 'Homologado'
-                            : isDeferido
-                            ? 'Comissão: Deferido'
-                            : isIndeferido
-                            ? 'Comissão: Indeferido'
-                            : isReaberto
-                            ? 'Reaberto'
-                            : 'Início do Processo';
+                          if (isMudanca) {
+                            badgeColor = 'bg-amber-50 text-amber-800 border-amber-200';
+                            badgeLabel = 'Carta de Mudança';
+                          } else if (isDesligamento) {
+                            badgeColor = 'bg-rose-50 text-rose-800 border-rose-200';
+                            badgeLabel = 'Carta de Desligamento';
+                          } else if (isTransito) {
+                            badgeColor = 'bg-indigo-50 text-indigo-800 border-indigo-200';
+                            badgeLabel = 'Carta de Trânsito';
+                          } else if (isDocumento) {
+                            badgeColor = 'bg-teal-50 text-teal-800 border-teal-200';
+                            badgeLabel = item.tipo_documento || 'Documento Emitido';
+                          } else if (isReativacao) {
+                            badgeColor = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                            badgeLabel = 'Reativação Cadastral';
+                          } else if (isDirigente) {
+                            badgeColor = 'bg-blue-50 text-blue-800 border-blue-200';
+                            badgeLabel = 'Posse de Dirigente';
+                          } else if (isHomologado) {
+                            badgeColor = 'bg-purple-50 text-purple-800 border-purple-200';
+                            badgeLabel = 'Homologado';
+                          } else if (isDeferido) {
+                            badgeColor = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                            badgeLabel = 'Comissão: Deferido';
+                          } else if (isIndeferido) {
+                            badgeColor = 'bg-red-50 text-red-800 border-red-200';
+                            badgeLabel = 'Comissão: Indeferido';
+                          } else if (isReaberto) {
+                            badgeColor = 'bg-amber-50 text-amber-800 border-amber-200';
+                            badgeLabel = 'Reaberto';
+                          }
 
                           const dataFormatada = item.data
                             ? item.data.split('-').reverse().join('/')
+                            : item.data_hora
+                            ? new Date(item.data_hora).toLocaleDateString('pt-BR')
                             : item.criado_em
                             ? new Date(item.criado_em).toLocaleDateString('pt-BR')
                             : '-';
@@ -1466,17 +1489,22 @@ export default function MembroFormModal({
                               className="bg-white p-3 rounded-xl border border-slate-200 text-xs space-y-1.5 shadow-2xs"
                             >
                               <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeColor}`}>
                                     {badgeLabel}
                                   </span>
+                                  {item.numero_documento && (
+                                    <span className="font-mono text-[11px] font-bold text-slate-700">
+                                      Doc. nº {item.numero_documento}
+                                    </span>
+                                  )}
                                   {item.numero_processo && (
                                     <span className="font-mono text-[11px] font-bold text-slate-700">
                                       Proc. nº {item.numero_processo}
                                     </span>
                                   )}
                                 </div>
-                                <span className="text-[10px] text-slate-400 font-medium">
+                                <span className="text-[10px] text-slate-400 font-medium shrink-0">
                                   {dataFormatada}
                                 </span>
                               </div>
@@ -1492,6 +1520,28 @@ export default function MembroFormModal({
                                   {item.cargo_pretendido ? `Para: ${item.cargo_pretendido}` : ''}
                                 </div>
                               ) : null}
+
+                              {item.destino && (
+                                <div className="text-slate-700 font-medium text-[11px]">
+                                  <span className="text-slate-500">Destino:</span> {item.destino}
+                                </div>
+                              )}
+
+                              {item.motivo && item.motivo !== item.destino && (
+                                <div className="text-slate-700 font-medium text-[11px]">
+                                  <span className="text-slate-500">Motivo:</span> {item.motivo}
+                                </div>
+                              )}
+
+                              {item.status_resultante && (
+                                <div className="text-slate-600 text-[10px]">
+                                  <span className="text-slate-400">Situação:</span>{' '}
+                                  <span className={item.status_resultante === 'inativo' ? 'text-amber-700 font-semibold' : 'text-emerald-700 font-semibold'}>
+                                    {item.status_resultante === 'inativo' ? 'Inativado no Rol' : 'Ativo no Rol'}
+                                  </span>
+                                  {item.responsavel ? ` • Resp.: ${item.responsavel}` : ''}
+                                </div>
+                              )}
 
                               {item.descricao && (
                                 <p className="text-slate-500 text-[10px] italic">

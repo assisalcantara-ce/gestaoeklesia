@@ -52,8 +52,13 @@ import {
   Unlock,
   Upload,
   Send,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  XCircle,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { CartasService, type VerificacaoAutorizacaoCarta } from '@/services/cartas-service';
 
 const CANVAS_A4 = { width: 794, height: 1123 };
 
@@ -444,6 +449,83 @@ export default function CartasPage() {
     [members, selectedMemberId]
   );
 
+  const [autorizacaoStatus, setAutorizacaoStatus] = useState<VerificacaoAutorizacaoCarta>({
+    status: 'isento',
+    exigeAutorizacao: false,
+    autorizado: true,
+    mensagem: '',
+  });
+  const [verificandoAutorizacao, setVerificandoAutorizacao] = useState(false);
+
+  useEffect(() => {
+    let cancel = false;
+    async function checkAuth() {
+      if (!selectedTemplate) {
+        setAutorizacaoStatus({
+          status: 'isento',
+          exigeAutorizacao: false,
+          autorizado: true,
+          mensagem: '',
+        });
+        return;
+      }
+
+      const tipo = selectedTemplate.tipo || selectedTemplate.template_key;
+      if (!CartasService.exigeAutorizacaoPresidencial(tipo)) {
+        setAutorizacaoStatus({
+          status: 'isento',
+          exigeAutorizacao: false,
+          autorizado: true,
+          mensagem: 'Este documento não exige deliberação prévia da Presidência.',
+        });
+        return;
+      }
+
+      const currentMinId = ministryId || userCtx.ministryId;
+      if (!currentMinId || !selectedMemberId) {
+        setAutorizacaoStatus({
+          status: 'nao_solicitado',
+          exigeAutorizacao: true,
+          autorizado: false,
+          mensagem: 'Selecione um membro para verificar a deliberação da Presidência.',
+        });
+        return;
+      }
+
+      setVerificandoAutorizacao(true);
+      try {
+        const res = await CartasService.verificarAutorizacaoCarta(
+          supabase,
+          currentMinId,
+          selectedMemberId,
+          tipo,
+          selectedMember?.name
+        );
+        if (!cancel) {
+          setAutorizacaoStatus(res);
+        }
+      } catch (err: any) {
+        if (!cancel) {
+          setAutorizacaoStatus({
+            status: 'pendente',
+            exigeAutorizacao: true,
+            autorizado: false,
+            mensagem: err?.message || 'Erro ao verificar deliberação da Presidência.',
+          });
+        }
+      } finally {
+        if (!cancel) {
+          setVerificandoAutorizacao(false);
+        }
+      }
+    }
+
+    checkAuth();
+    return () => {
+      cancel = true;
+    };
+  }, [selectedTemplate, selectedMemberId, selectedMember, ministryId, userCtx.ministryId, supabase]);
+
   const [congregacoes, setCongregacoes] = useState<Array<{ id: string; nome: string }>>([]);
 
   const buildPlaceholderMap = (member?: Member | null) => {
@@ -610,16 +692,25 @@ export default function CartasPage() {
             `opacity:${el.transparencia ?? 1};`,
             `font-size:${el.fontSize || 12}px;`,
             'font-weight:700;',
+            '-webkit-print-color-adjust:exact;',
+            'print-color-adjust:exact;',
           ].join('');
           return `<div style="${style}">${el.texto || ''}</div>`;
         }
 
         if (el.tipo === 'linha') {
+          const thickness = Math.max(1, el.altura || 2);
+          const lineColor = el.cor || '#111';
           const style = [
             baseStyle,
-            `background-color:${el.cor || '#111'};`,
+            `height:${thickness}px;`,
+            `background-color:${lineColor};`,
+            `border-top:${thickness}px solid ${lineColor};`,
+            'box-sizing:border-box;',
             `border-radius:${el.borderRadius || 0}px;`,
             `opacity:${el.transparencia ?? 1};`,
+            '-webkit-print-color-adjust:exact;',
+            'print-color-adjust:exact;',
           ].join('');
           return `<div style="${style}"></div>`;
         }
@@ -632,6 +723,8 @@ export default function CartasPage() {
             `border-radius:${el.borderRadius || 0}px;`,
             `opacity:${el.transparencia ?? 1};`,
             'box-sizing:border-box;',
+            '-webkit-print-color-adjust:exact;',
+            'print-color-adjust:exact;',
           ].join('');
           return `<div style="${style}"></div>`;
         }
@@ -641,7 +734,7 @@ export default function CartasPage() {
       .join('');
 
     return `
-      <div style="position:relative; width:${safeCanvas.width}px; height:${safeCanvas.height}px; ${bgStyle} margin:0 auto;">
+      <div style="position:relative; width:${safeCanvas.width}px; height:${safeCanvas.height}px; ${bgStyle} margin:0 auto; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
         ${elementsHtml}
       </div>
     `;
@@ -1647,7 +1740,8 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
 
   const handleIssueLetter = async () => {
     if (!selectedTemplate) return;
-    if (!ministryId) {
+    const effMinistryId = ministryId || userCtx.ministryId;
+    if (!effMinistryId) {
       setNotification({
         isOpen: true,
         title: 'Aviso',
@@ -1665,6 +1759,30 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         message: 'Selecione um membro para emitir a carta.',
         type: 'warning',
         autoClose: 3000,
+      });
+      return;
+    }
+
+    const docCategoria: TemplateCategoria = selectedTemplate.categoria || 'carta';
+    const tipoCartaOuDoc = selectedTemplate.tipo || selectedTemplate.template_key;
+
+    // Bloqueio obrigatório de governança: validação formal de deliberação presidencial
+    let authResult: VerificacaoAutorizacaoCarta | null = null;
+    try {
+      authResult = await CartasService.validarEmissaoOuImpressaoCarta(
+        supabase,
+        effMinistryId,
+        selectedMember.id,
+        tipoCartaOuDoc,
+        selectedMember.name
+      );
+    } catch (authErr: any) {
+      setNotification({
+        isOpen: true,
+        title: 'Emissão Bloqueada pela Presidência',
+        message: authErr?.message || 'Documento ministerial sem autorização válida da Presidência.',
+        type: 'error',
+        autoClose: undefined,
       });
       return;
     }
@@ -1709,18 +1827,22 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         data: { user },
       } = await supabase.auth.getUser();
 
-      const docCategoria: TemplateCategoria = selectedTemplate.categoria || 'carta';
-
       const payload = {
         id: cartaRegistroId,
-        ministry_id: ministryId,
+        ministry_id: effMinistryId,
         member_id: selectedMember.id,
         template_id: selectedTemplate.id,
         template_key: selectedTemplate.template_key,
         template_title: selectedTemplate.title,
         categoria: docCategoria,
         status: 'emitida',
-        payload_snapshot: map,
+        payload_snapshot: {
+          ...map,
+          pedido_id: authResult?.pedidoId || null,
+          autorizador_id: authResult?.autorizadorId || null,
+          autorizador_nome: authResult?.autorizadorNome || null,
+          data_autorizacao: authResult?.dataAutorizacao || null,
+        },
         template_snapshot: serializeCanvasContent(canvasContent),
         rendered_html: renderedHtml,
         issued_by: user?.id || null,
@@ -1729,6 +1851,25 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
 
       const { error } = await supabase.from('cartas_registros').insert(payload);
       if (error) throw error;
+
+      // Requisito: Registrar no histórico do membro a emissão do documento (sem inativar)
+      try {
+        await CartasService.registrarEmissaoDocumentoNoHistoricoMembro(supabase, {
+          memberId: selectedMember.id,
+          ministryId: effMinistryId,
+          documentoId: cartaRegistroId,
+          tipoDocumento: selectedTemplate.title || selectedTemplate.template_key,
+          categoria: docCategoria,
+          tipoCarta: tipoCartaOuDoc,
+          motivo: issueFields.motivo || issueFields.destino || null,
+          destino: issueFields.destino || null,
+          observacoes: issueFields.observacoes || null,
+          usuarioNome: (user as any)?.user_metadata?.name || user?.email || 'Secretaria',
+          usuarioId: user?.id || null,
+        });
+      } catch (histErr) {
+        console.warn('Aviso: Falha ao registrar evento no histórico do membro:', histErr);
+      }
 
       setNotification({
         isOpen: true,
@@ -1753,17 +1894,87 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
     }
   };
 
-  const handlePrintHtml = (html: string) => {
+  const handlePrintHtml = (html: string, options?: { forceAllowed?: boolean }) => {
+    if (!options?.forceAllowed && autorizacaoStatus.exigeAutorizacao && !autorizacaoStatus.autorizado) {
+      setNotification({
+        isOpen: true,
+        title: 'Impressão Bloqueada',
+        message: autorizacaoStatus.mensagem || 'Este documento exige deliberação prévia da Presidência e não pode ser impresso.',
+        type: 'error',
+        autoClose: undefined,
+      });
+      return;
+    }
+
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Carta</title>`);
-    win.document.write('<style>body{font-family:Arial, sans-serif; padding:32px; color:#111;} img{max-width:100%;} .carta{max-width:800px; margin:0 auto;}</style>');
-    win.document.write('</head><body>');
-    win.document.write(`<div class="carta">${html}</div>`);
-    win.document.write('</body></html>');
+    win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Documento Oficial - Gestão Eklésia</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      font-family: Arial, sans-serif;
+      color: #111;
+      width: 100%;
+      height: 100%;
+    }
+    .print-container {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      padding: 0;
+      margin: 0;
+    }
+    .carta-documento {
+      width: 794px;
+      min-height: 1123px;
+      position: relative;
+      margin: 0 auto;
+      background: #ffffff;
+      overflow: hidden;
+    }
+    img {
+      max-width: 100%;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    @media print {
+      body {
+        margin: 0;
+        padding: 0;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    <div class="carta-documento">${html}</div>
+  </div>
+</body>
+</html>`);
     win.document.close();
     win.focus();
-    setTimeout(() => win.print(), 300);
+    setTimeout(() => win.print(), 350);
   };
 
   if (loading) return <div className="p-8">Carregando...</div>;
@@ -3027,17 +3238,100 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                   </div>
 
                   {/* Passo 5: Ação de Emissão */}
-                  <div className="pt-2 border-t border-gray-100">
+                  <div className="pt-2 border-t border-gray-100 space-y-3">
+                    {/* Alertas e Status da Deliberação Presidencial */}
+                    {autorizacaoStatus.exigeAutorizacao && selectedMemberId && (
+                      <div>
+                        {autorizacaoStatus.status === 'pendente' && (
+                          <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-1.5">
+                            <div className="flex items-center gap-1.5 text-amber-800 text-xs font-bold">
+                              <Clock className="h-4 w-4 shrink-0 text-amber-600" />
+                              <span>Aguardando Deliberação da Presidência</span>
+                            </div>
+                            <p className="text-[11px] text-amber-700 leading-relaxed">
+                              {autorizacaoStatus.mensagem}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => router.push('/secretaria/cartas/pedidos')}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-900 underline hover:text-amber-950 mt-0.5"
+                            >
+                              Ver pedidos de cartas ministeriais &rarr;
+                            </button>
+                          </div>
+                        )}
+
+                        {autorizacaoStatus.status === 'rejeitado' && (
+                          <div className="rounded-xl border border-red-300 bg-red-50 p-3 space-y-1.5">
+                            <div className="flex items-center gap-1.5 text-red-800 text-xs font-bold">
+                              <XCircle className="h-4 w-4 shrink-0 text-red-600" />
+                              <span>Pedido Indeferido pela Presidência</span>
+                            </div>
+                            <p className="text-[11px] text-red-700 leading-relaxed">
+                              {autorizacaoStatus.mensagem}
+                            </p>
+                            {autorizacaoStatus.motivoRejeicao && (
+                              <p className="text-[11px] text-red-800 font-medium bg-red-100/70 rounded px-2 py-1">
+                                <strong>Justificativa registrada:</strong> {autorizacaoStatus.motivoRejeicao}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {autorizacaoStatus.status === 'nao_solicitado' && (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 space-y-1.5">
+                            <div className="flex items-center gap-1.5 text-amber-800 text-xs font-bold">
+                              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                              <span>Autorização Presidencial Obrigatória</span>
+                            </div>
+                            <p className="text-[11px] text-amber-700 leading-relaxed">
+                              {autorizacaoStatus.mensagem}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => router.push('/secretaria/cartas/pedidos')}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition shadow-sm mt-1"
+                            >
+                              <Send className="h-3 w-3" />
+                              <span>Registrar Pedido de Carta</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {autorizacaoStatus.status === 'autorizado' && (
+                          <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 space-y-1">
+                            <div className="flex items-center gap-1.5 text-emerald-800 text-xs font-bold">
+                              <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
+                              <span>Autorizado pela Presidência</span>
+                            </div>
+                            <p className="text-[11px] text-emerald-700 leading-relaxed">
+                              {autorizacaoStatus.mensagem}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       onClick={handleIssueLetter}
-                      className="w-full rounded-xl bg-teal-600 px-4 py-3 text-xs font-bold text-white hover:bg-teal-700 shadow-md transition flex items-center justify-center gap-2"
-                      disabled={isIssuing || !selectedTemplate || !selectedMemberId}
+                      className="w-full rounded-xl bg-teal-600 px-4 py-3 text-xs font-bold text-white hover:bg-teal-700 shadow-md transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={
+                        isIssuing ||
+                        verificandoAutorizacao ||
+                        !selectedTemplate ||
+                        !selectedMemberId ||
+                        (autorizacaoStatus.exigeAutorizacao && !autorizacaoStatus.autorizado)
+                      }
                     >
                       <FileCheck className="h-4 w-4" />
                       <span>
                         {isIssuing
                           ? 'Emitindo Documento...'
+                          : verificandoAutorizacao
+                          ? 'Verificando autorização presidencial...'
+                          : autorizacaoStatus.exigeAutorizacao && !autorizacaoStatus.autorizado
+                          ? 'Emissão Bloqueada (Aguardando Presidência)'
                           : selectedTemplate?.categoria === 'declaracao'
                           ? 'Emitir Declaração Oficial'
                           : 'Emitir Carta Ministerial'}
@@ -3065,17 +3359,33 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                     <button
                       type="button"
                       onClick={() => handlePrintHtml(previewHtml)}
-                      className="rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-teal-50 hover:text-teal-800 transition flex items-center gap-1.5 shadow-sm"
+                      disabled={autorizacaoStatus.exigeAutorizacao && !autorizacaoStatus.autorizado}
+                      title={
+                        autorizacaoStatus.exigeAutorizacao && !autorizacaoStatus.autorizado
+                          ? 'Impressão bloqueada até deliberação da Presidência'
+                          : 'Imprimir ou salvar em PDF'
+                      }
+                      className="rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-teal-50 hover:text-teal-800 transition flex items-center gap-1.5 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Printer className="h-3.5 w-3.5 text-gray-600" />
                       <span>Imprimir / PDF</span>
                     </button>
                   </div>
+
+                  {autorizacaoStatus.exigeAutorizacao && !autorizacaoStatus.autorizado && (
+                    <div className="bg-amber-100 border border-amber-300 text-amber-900 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-amber-700 shrink-0" />
+                      <span>
+                        Documento Não Autorizado — Impressão oficial bloqueada até deliberação prévia da Presidência na Central de Decisões.
+                      </span>
+                    </div>
+                  )}
+
                   <div
-                    className="min-h-[500px] max-h-[820px] rounded-xl border border-gray-200 bg-gray-100 p-4 shadow-inner overflow-auto flex justify-center"
+                    className="relative min-h-[500px] max-h-[820px] rounded-xl border border-gray-200 bg-gray-100 p-4 shadow-inner overflow-auto flex justify-center"
                   >
                     <div
-                      className="bg-white shadow-md"
+                      className="bg-white shadow-md relative"
                       dangerouslySetInnerHTML={{ __html: previewHtml }}
                     />
                   </div>
@@ -3199,7 +3509,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                             </div>
                           </div>
                           <button
-                            onClick={() => handlePrintHtml(rec.rendered_html || previewHtml)}
+                            onClick={() => handlePrintHtml(rec.rendered_html || previewHtml, { forceAllowed: true })}
                             className="rounded-lg bg-gray-100 px-3.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-teal-50 hover:text-teal-700 border border-gray-200 transition flex items-center gap-1.5"
                           >
                             <span>🖨️</span>

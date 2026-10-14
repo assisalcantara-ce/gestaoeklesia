@@ -834,14 +834,35 @@ export default function PatrimonioPage() {
       updated_at: new Date().toISOString(),
     };
 
+    let data: any = null;
+    let error: any = null;
+    let fallbackUsed = false;
+
     if (editingId) {
       const itemAnterior = itens.find((i) => i.id === editingId);
-      const { data, error } = await supabase
+      const res = await supabase
         .from('patrimonio_itens')
         .update(payload)
         .eq('id', editingId)
         .select('*')
         .single();
+      data = res.data;
+      error = res.error;
+
+      // Fallback gracioso caso a migration de dados_especificos ainda não tenha sido aplicada no banco
+      if (error && error.message && error.message.includes('dados_especificos')) {
+        const { dados_especificos: _, ...fallbackPayload } = payload;
+        const retryRes = await supabase
+          .from('patrimonio_itens')
+          .update(fallbackPayload)
+          .eq('id', editingId)
+          .select('*')
+          .single();
+        data = retryRes.data;
+        error = retryRes.error;
+        if (!error) fallbackUsed = true;
+      }
+
       if (error) {
         await registrarAcao({
           acao: 'editar',
@@ -882,13 +903,38 @@ export default function PatrimonioPage() {
         status: 'sucesso',
       });
       setItens((prev) => prev.map((i) => (i.id === editingId ? (data as PatrimonioItem) : i)));
-      showNotif('success', 'Atualizado', 'Bem atualizado com sucesso.', 3000);
+      if (fallbackUsed) {
+        showNotif(
+          'warning',
+          'Atualizado com ressalva',
+          'Bem atualizado com sucesso. Para salvar os campos específicos da categoria, execute a migração pendente no Supabase.',
+          7000
+        );
+      } else {
+        showNotif('success', 'Atualizado', 'Bem atualizado com sucesso.', 3000);
+      }
     } else {
-      const { data, error } = await supabase
+      const res = await supabase
         .from('patrimonio_itens')
         .insert({ ...payload, created_at: new Date().toISOString() })
         .select('*')
         .single();
+      data = res.data;
+      error = res.error;
+
+      // Fallback gracioso caso a migration de dados_especificos ainda não tenha sido aplicada no banco
+      if (error && error.message && error.message.includes('dados_especificos')) {
+        const { dados_especificos: _, ...fallbackPayload } = payload;
+        const retryRes = await supabase
+          .from('patrimonio_itens')
+          .insert({ ...fallbackPayload, created_at: new Date().toISOString() })
+          .select('*')
+          .single();
+        data = retryRes.data;
+        error = retryRes.error;
+        if (!error) fallbackUsed = true;
+      }
+
       if (error) {
         await registrarAcao({
           acao: 'criar',
@@ -919,7 +965,16 @@ export default function PatrimonioPage() {
         status: 'sucesso',
       });
       setItens((prev) => [data as PatrimonioItem, ...prev]);
-      showNotif('success', 'Cadastrado', 'Bem registrado com sucesso.', 3000);
+      if (fallbackUsed) {
+        showNotif(
+          'warning',
+          'Cadastrado com ressalva',
+          'Bem registrado com sucesso. Para salvar os campos específicos da categoria, execute a migração pendente no Supabase.',
+          7000
+        );
+      } else {
+        showNotif('success', 'Cadastrado', 'Bem registrado com sucesso.', 3000);
+      }
     }
 
     const wasNew = !editingId;
